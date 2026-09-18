@@ -15,9 +15,9 @@ import type {
 import { getAutomationRunRepoId } from '../../../shared/automation-run-identity'
 import { getAutomationAction } from '../../../shared/automation-action'
 import {
-  didAutomationPrecheckPass,
-  formatAutomationPrecheckFailure
-} from '../../../shared/automation-precheck'
+  didAutomationShellRunSucceed,
+  formatAutomationShellFailure
+} from '../../../shared/automation-shell-result'
 import {
   createAutomationRunOutputSnapshotBuffer,
   selectAutomationRunOutputSnapshot
@@ -252,14 +252,14 @@ export function useAutomationDispatchEvents(): void {
               automationId: automation.id,
               runId: run.id
             })
-            if (precheckResult && !didAutomationPrecheckPass(precheckResult)) {
+            if (precheckResult && !didAutomationShellRunSucceed(precheckResult)) {
               await markDispatchResult({
                 runId: run.id,
                 status: 'skipped_precheck',
                 workspaceId: dispatchWorkspaceId,
                 workspaceDisplayName: dispatchWorkspaceDisplayName,
                 precheckResult,
-                error: formatAutomationPrecheckFailure(precheckResult)
+                error: formatAutomationShellFailure(precheckResult, 'Precheck')
               })
               return
             }

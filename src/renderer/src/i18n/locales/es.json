@@ -10088,6 +10088,8 @@
         "PluginAutomationConsentPreview": {
           "heading": "Automatizaciones programadas",
           "schedule": "Programacion",
+          "precheck": "Comprobacion previa",
+          "precheckLabel": "{{value0}} · comprobacion previa",
           "command": "Comando",
           "commandLabel": "{{value0}} · comando",
           "runs": "Corre",
@@ -10111,6 +10113,7 @@
           "capabilities": "Este plugin puede",
           "instructionalWarning": "Este plugin no tiene ningún proceso en segundo plano. Aun así, su contenido instructivo puede provocar acciones cuando tú o un agente lo usen. Revisa las instrucciones y los comandos siguientes antes de habilitarlo.",
           "automationWarning": "Este plugin no tiene ningún proceso en segundo plano, pero se ejecuta con su propia programación: el comando de abajo es lo que Orca Lab ejecutará, en los horarios indicados, estés presente o no. Revísalo antes de habilitar este plugin.",
+          "automationAgentWarning": "Este plugin no tiene ningún proceso en segundo plano, pero se ejecuta con su propia programación: lanza un agente de código con el prompt que trae el plugin, en los horarios indicados, estés presente o no. Revisa la programación de abajo antes de habilitar este plugin.",
           "panelWarning": "Estos permisos limitan cómo usa el plugin la API de Orca Lab. Este plugin no tiene ningún proceso en segundo plano.",
           "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API.",
           "keepDisabled": "Mantener desactivado",

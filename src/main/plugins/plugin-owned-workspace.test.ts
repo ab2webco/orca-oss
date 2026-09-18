@@ -159,6 +159,23 @@ describe('plugin-owned automation workspace', () => {
     expect(store.getRepos()).toHaveLength(1)
   })
 
+  it('registers one workspace and one row when two reconciles overlap', async () => {
+    // Habilitar por IPC y por el RPC de serve llegan aca a la vez: sin
+    // serializar, las dos leen el store vacio y las dos crean lo suyo.
+    const pluginService = pluginServiceWith(
+      manifestWith([{ ...sync, workspace: 'plugin-owned' }]),
+      rootDir
+    )
+
+    await Promise.all([
+      reconcilePluginAutomations({ store, pluginService }),
+      reconcilePluginAutomations({ store, pluginService })
+    ])
+
+    expect(store.getRepos()).toHaveLength(1)
+    expect(store.listAutomations()).toHaveLength(1)
+  })
+
   it('keeps a project the user picked instead of dragging the row back to the plugin folder', async () => {
     const pluginService = pluginServiceWith(
       manifestWith([{ ...sync, workspace: 'plugin-owned' }]),

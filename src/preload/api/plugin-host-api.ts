@@ -87,7 +87,13 @@ export type PluginHostListEntry = {
   needsSetup?: boolean
   /** Manifest-declared scheduled work; `command` present means the run IS that
    *  shell string. Optional so an older host reads as "none". */
-  automations?: { id: string; title: string; trigger: string; command?: string }[]
+  automations?: {
+    id: string
+    title: string
+    trigger: string
+    precheck?: string
+    command?: string
+  }[]
   vmRecipes?: {
     id: string
     name: string

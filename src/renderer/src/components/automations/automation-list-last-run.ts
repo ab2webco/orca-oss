@@ -53,7 +53,8 @@ export function getAutomationRunLastRunAt(run: AutomationRun): number {
 }
 
 export function getToneForAutomationRunStatus(status: AutomationRunStatus): AutomationLastRunTone {
-  if (status === 'dispatch_failed') {
+  // `command_failed` es rojo como `dispatch_failed`: corrio y fallo, no es un salto.
+  if (status === 'dispatch_failed' || status === 'command_failed') {
     return 'failed'
   }
   if (status === 'completed') {

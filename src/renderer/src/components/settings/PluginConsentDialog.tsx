@@ -52,6 +52,14 @@ function trustTier(plugin: PluginHostListEntry): string {
   )
 }
 
+/** True cuando el dialogo muestra al menos una cadena de shell abajo: el
+ *  comando de una command-only o el precheck que corre en cada corrida. */
+function showsAutomationShellCommand(plugin: PluginHostListEntry): boolean {
+  return (plugin.automations ?? []).some(
+    (automation) => Boolean(automation.command) || Boolean(automation.precheck)
+  )
+}
+
 function hasInstructionalContent(plugin: PluginHostListEntry): boolean {
   return (
     (plugin.vmRecipes?.length ?? 0) > 0 ||
@@ -225,10 +233,17 @@ export function PluginConsentDialog({
                   : // An automation fires on its cron with nobody present, so it cannot
                     // borrow the use-time wording of skills or VM recipes.
                     (plugin.automations?.length ?? 0) > 0
-                    ? translate(
-                        'auto.components.settings.PluginConsentDialog.automationWarning',
-                        'This plugin has no worker process, but it runs on its own schedule — the command below is what Orca Lab will run, at the times shown, whether or not you are here. Review it before enabling this plugin.'
-                      )
+                    ? // Sin comando ni precheck abajo no hay shell que leer: la
+                      // corrida la hace un agente con el prompt del plugin.
+                      showsAutomationShellCommand(plugin)
+                      ? translate(
+                          'auto.components.settings.PluginConsentDialog.automationWarning',
+                          'This plugin has no worker process, but it runs on its own schedule — the command below is what Orca Lab will run, at the times shown, whether or not you are here. Review it before enabling this plugin.'
+                        )
+                      : translate(
+                          'auto.components.settings.PluginConsentDialog.automationAgentWarning',
+                          'This plugin has no worker process, but it runs on its own schedule — it launches a coding agent with the prompt shipped inside the plugin, at the times shown, whether or not you are here. Review the schedule below before enabling this plugin.'
+                        )
                     : hasInstructionalContent(plugin)
                       ? translate(
                           'auto.components.settings.PluginConsentDialog.instructionalWarning',

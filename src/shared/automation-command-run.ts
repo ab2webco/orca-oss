@@ -3,7 +3,7 @@ import {
   normalizeAutomationPrecheck,
   normalizeAutomationPrecheckTimeoutSeconds
 } from './automation-precheck'
-import type { AutomationShellCommand, AutomationShellResult } from './automations-types'
+import type { AutomationShellCommand } from './automations-types'
 
 /**
  * El comando de una automatizacion command-only: mismos limites que un
@@ -30,20 +30,4 @@ export function normalizeAutomationCommand(
     command: command.command,
     timeoutSeconds: normalizeAutomationCommandTimeoutSeconds(command.timeoutSeconds)
   })
-}
-
-export function didAutomationCommandSucceed(
-  result: AutomationShellResult | null | undefined
-): boolean {
-  return Boolean(result && !result.timedOut && !result.error && result.exitCode === 0)
-}
-
-export function formatAutomationCommandFailure(result: AutomationShellResult): string {
-  if (result.timedOut) {
-    return `Command timed out after ${Math.max(1, Math.round(result.durationMs / 1000))}s.`
-  }
-  if (result.error) {
-    return `Command failed: ${result.error}`
-  }
-  return `Command exited with code ${result.exitCode ?? 'unknown'}.`
 }

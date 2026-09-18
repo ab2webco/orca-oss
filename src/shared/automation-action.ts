@@ -26,7 +26,3 @@ export function getAutomationAction(automation: AutomationActionFields): Automat
   // se dice en voz alta en vez de correr algo que nadie pidio.
   throw new Error('Automation has neither a command to run nor an agent to launch.')
 }
-
-export function isCommandOnlyAutomation(automation: AutomationActionFields): boolean {
-  return Boolean(automation.command)
-}

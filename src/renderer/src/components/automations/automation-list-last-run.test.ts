@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type {
   Automation,
   AutomationRun,
+  AutomationRunStatus,
   ExternalAutomationJob
 } from '../../../../shared/automations-types'
 import {
@@ -9,7 +10,8 @@ import {
   getExternalAutomationLastRunSnapshot,
   getLocalAutomationLastRunSnapshot,
   getToneForAutomationRunStatus,
-  indexLatestAutomationRuns
+  indexLatestAutomationRuns,
+  type AutomationLastRunTone
 } from './automation-list-last-run'
 
 function makeAutomation(overrides: Partial<Automation> = {}): Automation {
@@ -99,11 +101,26 @@ describe('automation-list-last-run', () => {
     expect(latest.get('automation-2')?.id).toBe('other')
   })
 
-  it('classifies local run statuses', () => {
-    expect(getToneForAutomationRunStatus('dispatch_failed')).toBe('failed')
-    expect(getToneForAutomationRunStatus('completed')).toBe('succeeded')
-    expect(getToneForAutomationRunStatus('dispatched')).toBe('running')
-    expect(getToneForAutomationRunStatus('skipped_precheck')).toBe('skipped')
+  it('classifies every local run status, so a new one cannot land grey by omission', () => {
+    // El Record es la guarda: un estado nuevo no compila hasta tener tono.
+    const tones: Record<AutomationRunStatus, AutomationLastRunTone> = {
+      pending: 'running',
+      dispatching: 'running',
+      dispatched: 'running',
+      completed: 'succeeded',
+      command_failed: 'failed',
+      skipped_precheck: 'skipped',
+      skipped_missed: 'skipped',
+      skipped_unavailable: 'skipped',
+      skipped_needs_interactive_auth: 'skipped',
+      dispatch_failed: 'failed'
+    }
+    for (const [status, tone] of Object.entries(tones) as [
+      AutomationRunStatus,
+      AutomationLastRunTone
+    ][]) {
+      expect(getToneForAutomationRunStatus(status), status).toBe(tone)
+    }
   })
 
   it('prefers the latest run over lastRunAt-only metadata', () => {

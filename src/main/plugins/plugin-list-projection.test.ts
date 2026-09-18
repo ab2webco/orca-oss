@@ -582,6 +582,7 @@ describe('buildPluginList contributed automations', () => {
               title: 'Mirror the vault',
               trigger: '*/5 * * * *',
               timezone: 'UTC',
+              precheck: 'test -d "$HOME/vault"',
               command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
             },
             {
@@ -603,11 +604,14 @@ describe('buildPluginList contributed automations', () => {
 
     const [entry] = await buildPluginList(serviceWith(plugin), emptyPluginLockfile())
 
+    // El precheck tambien corre en cada corrida programada, asi que viaja al
+    // dialogo por el mismo camino que el comando.
     expect(entry?.automations).toEqual([
       {
         id: 'mirror',
         title: 'Mirror the vault',
         trigger: '*/5 * * * *',
+        precheck: 'test -d "$HOME/vault"',
         command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
       },
       { id: 'review', title: 'Nightly review', trigger: '0 3 * * *' }

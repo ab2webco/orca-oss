@@ -46,10 +46,30 @@ import type { PluginService } from './plugin-service'
  *   Lo que elige el usuario nunca se toca: proyecto, workspace, modo,
  *   habilitada, timeout del precheck, gracia de corridas perdidas.
  */
-export async function reconcilePluginAutomations(input: {
+export function reconcilePluginAutomations(input: {
   store: Store
   pluginService: PluginService
 }): Promise<void> {
+  const run = pendingReconcile.then(
+    () => reconcileNow(input),
+    () => reconcileNow(input)
+  )
+  pendingReconcile = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+/**
+ * Serializa las reconciliaciones: consentir, habilitar, deshabilitar y
+ * desinstalar llegan por IPC y por el RPC de serve a la vez, y dos pasadas
+ * solapadas leen el mismo store vacio — cada una crea entonces sus propias
+ * filas y su propia carpeta de plugin, con rutas identicas e ids distintos.
+ */
+let pendingReconcile: Promise<void> = Promise.resolve()
+
+async function reconcileNow(input: { store: Store; pluginService: PluginService }): Promise<void> {
   const { store, pluginService } = input
   const userDataPath = pluginService.options.userDataPath
   const declared = collectApprovedPluginAutomations(pluginService)

@@ -41,10 +41,14 @@ function registerWorkDir(): string {
  *  the assertions below look at everything else. */
 const SLOW_COMMAND = 'node -e "setTimeout(()=>{},3000)"'
 
-function createCommandAutomation(command: string, enabled = false): Automation {
+function createCommandAutomation(
+  command: string,
+  enabled = false,
+  timeoutSeconds = 30
+): Automation {
   return store.createAutomation({
     name: 'Sync',
-    command: { command, timeoutSeconds: 30 },
+    command: { command, timeoutSeconds },
     projectId: registerWorkDir(),
     workspaceMode: 'new_per_run',
     timezone: 'UTC',
@@ -184,6 +188,71 @@ describe('command-only automations', () => {
     expect(first.status).toBe('dispatching')
     expect(second.status).toBe('skipped_unavailable')
     expect(second.error).toContain('still running')
+  })
+
+  it('does not let a run deleted mid-flight escape as an unhandled rejection', async () => {
+    // El comando sobrevive al borrado, asi que el final de la corrida escribe
+    // sobre una fila que ya no existe — el store tira y nadie espera esa promesa.
+    const automation = createCommandAutomation('node -e "setTimeout(()=>{},400)"')
+    const service = new AutomationService(store)
+    const escaped: unknown[] = []
+    const onUnhandledRejection = (reason: unknown): void => {
+      escaped.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandledRejection)
+    try {
+      await service.runNow(automation.id)
+      store.deleteAutomation(automation.id)
+      await new Promise<void>((resolve) => setTimeout(resolve, 1500))
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection)
+    }
+
+    expect(escaped.map((reason) => String(reason))).toEqual([])
+  })
+
+  it('skips a scheduled run whose precheck fails, without running the command', async () => {
+    // Solo `Date` es falso: el hijo termina por I/O, no por un timer.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const automation = store.createAutomation({
+      name: 'Sync',
+      command: { command: 'echo ran-anyway', timeoutSeconds: 30 },
+      precheck: { command: 'exit 7', timeoutSeconds: 30 },
+      projectId: registerWorkDir(),
+      workspaceMode: 'new_per_run',
+      timezone: 'UTC',
+      rrule: '*/5 * * * *',
+      dtstart: Date.now(),
+      enabled: true
+    })
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+    const service = new AutomationService(store)
+
+    // `runNow` marca la corrida como manual y el precheck solo corre en las
+    // programadas, asi que la unica forma de tocar esta rama es el scheduler.
+    service.setRendererReady()
+
+    const stored = await waitForRun(automation.id, (entry) => entry?.status === 'skipped_precheck')
+    expect(stored.precheckResult?.exitCode).toBe(7)
+    expect(stored.commandResult ?? null).toBeNull()
+    expect(stored.outputSnapshot ?? null).toBeNull()
+    expect(stored.error).toContain('7')
+  })
+
+  it('records a command that blew its timeout as failed, not completed', async () => {
+    const automation = createCommandAutomation(SLOW_COMMAND, false, 1)
+    const service = new AutomationService(store)
+
+    await service.runNow(automation.id)
+
+    const stored = await waitForRun(
+      automation.id,
+      (entry) => Boolean(entry && entry.status !== 'pending' && entry.status !== 'dispatching'),
+      6000
+    )
+    expect(stored.status).toBe('command_failed')
+    expect(stored.commandResult?.timedOut).toBe(true)
+    expect(stored.error).toMatch(/^Command timed out after \d+s\.$/)
   })
 
   it('refuses a row that would neither run a command nor launch an agent', () => {

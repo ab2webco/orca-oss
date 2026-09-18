@@ -108,11 +108,14 @@ function isSupportedTimezone(value: string): boolean {
 }
 
 /** Wire preview of a contributed automation. `command` present = command-only:
- *  that shell string IS the run, so consent has to show it verbatim. */
+ *  that shell string IS the run, so consent has to show it verbatim. El
+ *  `precheck` viaja igual: lo corre el mismo runner en cada corrida programada,
+ *  asi que es tan aprobable como el comando. */
 export type PluginAutomationPreview = {
   id: string
   title: string
   trigger: string
+  precheck?: string
   command?: string
 }
 
@@ -123,6 +126,7 @@ export function previewPluginAutomations(
     id: contribution.id,
     title: contribution.title,
     trigger: contribution.trigger,
+    ...(contribution.precheck ? { precheck: contribution.precheck } : {}),
     ...(isPluginCommandAutomation(contribution) ? { command: contribution.command } : {})
   }))
 }

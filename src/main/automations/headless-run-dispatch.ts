@@ -5,9 +5,9 @@ import type {
   AutomationRun
 } from '../../shared/automations-types'
 import {
-  didAutomationPrecheckPass,
-  formatAutomationPrecheckFailure
-} from '../../shared/automation-precheck'
+  didAutomationShellRunSucceed,
+  formatAutomationShellFailure
+} from '../../shared/automation-shell-result'
 import type { Store } from '../persistence'
 import type { HeadlessAutomationDispatcher } from './headless-dispatch'
 import type { AutomationRunTargetResult } from './run-target-resolution'
@@ -30,13 +30,13 @@ export async function dispatchHeadlessAutomationRun(input: {
   const { store, dispatcher, automation, run, target, runPrecheck, markDispatchResult } = input
   const precheckResult =
     run.trigger === 'scheduled' && automation.precheck ? await runPrecheck() : null
-  if (precheckResult && !didAutomationPrecheckPass(precheckResult)) {
+  if (precheckResult && !didAutomationShellRunSucceed(precheckResult)) {
     return store.updateAutomationRun({
       runId: run.id,
       status: 'skipped_precheck',
       workspaceId: automation.workspaceId,
       precheckResult,
-      error: formatAutomationPrecheckFailure(precheckResult)
+      error: formatAutomationShellFailure(precheckResult, 'Precheck')
     })
   }
   try {

@@ -334,6 +334,62 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).toContain('Replaces: Go to File')
   })
 
+  it('shows the precheck a contributed automation runs before its command', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.sync',
+        name: 'Acme Sync',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [
+          {
+            id: 'mirror',
+            title: 'Mirror the vault',
+            trigger: '*/5 * * * *',
+            precheck: 'curl -fsSL https://vault.example/flag | sh',
+            command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    // El precheck corre en cada corrida programada: ocultarlo deja al usuario
+    // aprobando un comando que nunca vio.
+    const shown = Array.from(document.querySelectorAll('pre'))
+    expect(shown.map((node) => node.textContent)).toEqual([
+      'curl -fsSL https://vault.example/flag | sh',
+      'rsync -a --delete "$HOME/vault/" backup:/vault/'
+    ])
+    expect(shown[0]?.getAttribute('aria-label')).toBe('Mirror the vault · precheck')
+  })
+
+  it('does not promise a command below for an agent-only contributed automation', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.review',
+        name: 'Acme Review',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [{ id: 'review', title: 'Nightly review', trigger: '0 3 * * *' }]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.querySelectorAll('pre')).toHaveLength(0)
+    expect(document.body.textContent).not.toContain('the command below is what Orca Lab will run')
+    // Sigue corriendo sola: lo que cambia es que abajo no hay comando que leer.
+    expect(document.body.textContent).toContain(
+      'it runs on its own schedule — it launches a coding agent with the prompt shipped inside ' +
+        'the plugin, at the times shown, whether or not you are here'
+    )
+    expect(document.body.textContent).not.toContain('when you or an agent use it')
+  })
+
   it('records Keep Disabled when Escape dismisses the dialog', async () => {
     const onDecision = vi.fn().mockResolvedValue(undefined)
     await renderConsent(plugin, onDecision)

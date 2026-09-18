@@ -10089,6 +10089,8 @@
         "PluginAutomationConsentPreview": {
           "heading": "计划的自动化",
           "schedule": "计划",
+          "precheck": "预检命令",
+          "precheckLabel": "{{value0}} · 预检命令",
           "command": "命令",
           "commandLabel": "{{value0}} · 命令",
           "runs": "运行",
@@ -10112,6 +10114,7 @@
           "capabilities": "此插件可以",
           "instructionalWarning": "此插件没有工作进程。但当你或智能体使用其指令内容时，仍可能触发操作。启用前请检查以下指令和命令。",
           "automationWarning": "此插件没有工作进程，但会按自己的计划运行：下方命令就是 Orca Lab 将在所示时间执行的内容，无论你是否在场。启用此插件前请检查该命令。",
+          "automationAgentWarning": "此插件没有工作进程，但会按自己的计划运行：它会在所示时间使用插件内置的提示词启动编码代理，无论你是否在场。启用此插件前请检查下方的计划。",
           "panelWarning": "这些权限限制插件使用 Orca Lab API 的方式。此插件没有后台工作进程。",
           "declarativeWarning": "此插件仅贡献经过验证的内容。它不运行后台工作进程，也不接收对 Orca Lab API 的访问。",
           "keepDisabled": "保持禁用",

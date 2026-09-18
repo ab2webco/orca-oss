@@ -15,6 +15,10 @@ const AUTOMATION_TITLE = 'Nightly report sync'
 const AUTOMATION_COMMAND =
   'rsync -a --delete "$HOME/Documents/reports/" "$HOME/Backups/reports/" && ' +
   'printf "synced %s\\n" "$(date -u +%FT%TZ)" >> "$HOME/.orca/report-sync.log"'
+/** Corre en cada corrida programada, asi que el consentimiento tiene que
+ *  mostrarlo igual que al comando. */
+const AUTOMATION_PRECHECK =
+  'test -d "$HOME/Documents/reports" && [ -n "$(find "$HOME/Documents/reports" -newermt -1day)" ]'
 const DECLARATIVE_COPY = 'contributes validated content only'
 const USE_TIME_COPY = 'when you or an agent use it'
 const SCHEDULE_COPY =
@@ -36,6 +40,7 @@ const MANIFEST = {
         title: AUTOMATION_TITLE,
         trigger: '0 3 * * *',
         timezone: 'UTC',
+        precheck: AUTOMATION_PRECHECK,
         command: AUTOMATION_COMMAND
       }
     ]
@@ -120,27 +125,40 @@ test('shows the shell command of a command-only plugin automation before consent
     await expect(consent).toBeVisible()
     await expect(consent).toContainText(AUTOMATION_TITLE)
     await expect(consent).toContainText(AUTOMATION_COMMAND)
+    await expect(consent).toContainText(AUTOMATION_PRECHECK)
     await expect(consent).toContainText('0 3 * * *')
     await expect(consent).toContainText('Instructional')
     await expect(consent).toContainText(SCHEDULE_COPY)
     await expect(consent).not.toContainText(DECLARATIVE_COPY)
     await expect(consent).not.toContainText(USE_TIME_COPY)
 
-    const command = consent.locator('pre').filter({ hasText: AUTOMATION_COMMAND })
+    const shells = [
+      {
+        name: 'precheck',
+        locator: consent.locator('pre').filter({ hasText: AUTOMATION_PRECHECK })
+      },
+      { name: 'command', locator: consent.locator('pre').filter({ hasText: AUTOMATION_COMMAND }) }
+    ]
     for (const width of SCREENSHOT_WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
       for (const theme of ['light', 'dark'] as const) {
         await setTheme(orcaPage, theme)
-        await expect(command).toBeVisible()
-        // Wrapping is the only thing keeping the command readable this narrow.
-        const clipped = await command.evaluate((node) => ({
-          overflowX: node.scrollWidth - node.clientWidth,
-          hiddenY: node.scrollHeight - node.clientHeight
-        }))
-        expect(clipped.overflowX, `command clipped horizontally at ${width}px`).toBeLessThanOrEqual(
-          1
-        )
-        expect(clipped.hiddenY, `command clipped vertically at ${width}px`).toBeLessThanOrEqual(1)
+        for (const shell of shells) {
+          await expect(shell.locator).toBeVisible()
+          // Wrapping is the only thing keeping the command readable this narrow.
+          const clipped = await shell.locator.evaluate((node) => ({
+            overflowX: node.scrollWidth - node.clientWidth,
+            hiddenY: node.scrollHeight - node.clientHeight
+          }))
+          expect(
+            clipped.overflowX,
+            `${shell.name} clipped horizontally at ${width}px`
+          ).toBeLessThanOrEqual(1)
+          expect(
+            clipped.hiddenY,
+            `${shell.name} clipped vertically at ${width}px`
+          ).toBeLessThanOrEqual(1)
+        }
         // Without this the shot can catch the dialog mid fade-in and read as translucent.
         await orcaPage.screenshot({
           path: testInfo.outputPath(`consent-${width}-${theme}.png`),
@@ -148,6 +166,15 @@ test('shows the shell command of a command-only plugin automation before consent
         })
       }
     }
+    // La caja entera scrollea, asi que a 320px el pie queda bajo el pliegue: lo
+    // que hay que probar es que se llegue a el, no que entre en la primera vista.
+    await setWindowWidth(electronApp, orcaPage, 320)
+    await consent.evaluate((node) => node.scrollTo(0, node.scrollHeight))
+    await expect(consent.getByRole('button', { name: 'Keep Disabled' })).toBeInViewport()
+    await orcaPage.screenshot({
+      path: testInfo.outputPath('consent-320-footer.png'),
+      animations: 'disabled'
+    })
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }

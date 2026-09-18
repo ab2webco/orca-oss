@@ -3,6 +3,33 @@ import { translate } from '@/i18n/i18n'
 
 type AutomationPreview = NonNullable<PluginHostListEntry['automations']>[number]
 
+/** Un comando que el usuario aprueba: verbatim, seleccionable y envuelto, para
+ *  que aprobar no dependa de adivinar la parte que quedo fuera de la caja. */
+function ShellStringField({
+  label,
+  ariaLabel,
+  value
+}: {
+  label: string
+  ariaLabel: string
+  value: string
+}): React.JSX.Element {
+  return (
+    <div>
+      <dt className="mb-1 text-xs text-muted-foreground">{label}</dt>
+      <dd>
+        <pre
+          tabIndex={0}
+          aria-label={ariaLabel}
+          className="max-h-40 overflow-auto scrollbar-sleek whitespace-pre-wrap break-all rounded-md bg-muted px-2.5 py-2 font-mono text-xs leading-5 text-foreground"
+        >
+          {value}
+        </pre>
+      </dd>
+    </div>
+  )
+}
+
 export function PluginAutomationConsentPreview({
   automations
 }: {
@@ -35,28 +62,33 @@ export function PluginAutomationConsentPreview({
               </dt>
               <dd className="font-mono text-xs leading-5">{automation.trigger}</dd>
             </div>
+            {automation.precheck ? (
+              <ShellStringField
+                label={translate(
+                  'auto.components.settings.PluginAutomationConsentPreview.precheck',
+                  'Precheck'
+                )}
+                ariaLabel={translate(
+                  'auto.components.settings.PluginAutomationConsentPreview.precheckLabel',
+                  '{{value0}} · precheck',
+                  { value0: automation.title }
+                )}
+                value={automation.precheck}
+              />
+            ) : null}
             {automation.command ? (
-              <div>
-                <dt className="mb-1 text-xs text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.PluginAutomationConsentPreview.command',
-                    'Command'
-                  )}
-                </dt>
-                <dd>
-                  <pre
-                    tabIndex={0}
-                    aria-label={translate(
-                      'auto.components.settings.PluginAutomationConsentPreview.commandLabel',
-                      '{{value0}} · command',
-                      { value0: automation.title }
-                    )}
-                    className="max-h-40 overflow-auto scrollbar-sleek whitespace-pre-wrap break-all rounded-md bg-muted px-2.5 py-2 font-mono text-xs leading-5 text-foreground"
-                  >
-                    {automation.command}
-                  </pre>
-                </dd>
-              </div>
+              <ShellStringField
+                label={translate(
+                  'auto.components.settings.PluginAutomationConsentPreview.command',
+                  'Command'
+                )}
+                ariaLabel={translate(
+                  'auto.components.settings.PluginAutomationConsentPreview.commandLabel',
+                  '{{value0}} · command',
+                  { value0: automation.title }
+                )}
+                value={automation.command}
+              />
             ) : (
               <div>
                 <dt className="mb-1 text-xs text-muted-foreground">

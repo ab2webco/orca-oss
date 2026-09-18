@@ -10088,6 +10088,8 @@
         "PluginAutomationConsentPreview": {
           "heading": "예약된 자동화",
           "schedule": "일정",
+          "precheck": "사전 점검",
+          "precheckLabel": "{{value0}} · 사전 점검",
           "command": "명령",
           "commandLabel": "{{value0}} · 명령",
           "runs": "실행",
@@ -10111,6 +10113,7 @@
           "capabilities": "이 플러그인이 할 수 있는 작업",
           "instructionalWarning": "이 플러그인에는 워커 프로세스가 없습니다. 하지만 사용자나 에이전트가 사용할 때 지침 콘텐츠로 인해 작업이 실행될 수 있습니다. 활성화하기 전에 아래 지침과 명령을 검토하세요.",
           "automationWarning": "이 플러그인에는 워커 프로세스가 없지만 자체 일정에 따라 실행됩니다. 아래 명령은 표시된 시각에, 사용자가 자리에 없어도 Orca Lab이 실행할 내용입니다. 이 플러그인을 활성화하기 전에 검토하세요.",
+          "automationAgentWarning": "이 플러그인에는 워커 프로세스가 없지만 자체 일정에 따라 실행됩니다. 표시된 시각에, 사용자가 자리에 없어도 플러그인에 포함된 프롬프트로 코딩 에이전트를 실행합니다. 이 플러그인을 활성화하기 전에 아래 일정을 검토하세요.",
           "panelWarning": "이 권한은 플러그인이 Orca Lab API를 사용하는 방식을 제한합니다. 이 플러그인에는 백그라운드 워커가 없습니다.",
           "declarativeWarning": "이 플러그인은 검증된 내용만 기여합니다. 백그라운드 워커를 실행하지 않으며 Orca Lab API에 대한 액세스를 받지 않습니다.",
           "keepDisabled": "비활성화 유지",
