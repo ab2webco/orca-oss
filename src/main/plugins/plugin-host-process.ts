@@ -95,7 +95,7 @@ export async function startPluginWorker(
       ORCA_PLUGIN_NET_FETCH_HOSTS: JSON.stringify(options.networkHosts ?? [])
     },
     // Why: never inherit Orca's flags; only this fixed sandbox may run here.
-    execArgv: buildPluginWorkerSandboxArgs(rootDir, entryPath),
+    execArgv: buildPluginWorkerSandboxArgs(rootDir, entryPath, options.grantedCapabilities),
     // Why: the protocol permits structured-clone values. Node's default JSON
     // fork serialization rejects BigInt, cycles, maps, and typed arrays.
     serialization: 'advanced',

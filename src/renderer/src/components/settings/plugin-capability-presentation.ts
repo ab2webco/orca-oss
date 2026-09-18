@@ -42,6 +42,11 @@ export function pluginCapabilityDescription(kind: string, fallback: string): str
         'auto.components.settings.PluginConsentDialog.capability.skillsContribute',
         'Teach every agent, in every project, how to use this plugin: its skill instructions are served to any agent that asks for them'
       )
+    case 'process:spawn':
+      return translate(
+        'auto.components.settings.PluginConsentDialog.capability.processSpawn',
+        "Start programs as you. Programs it starts are not constrained by this plugin worker's file or network permissions."
+      )
     case 'net:fetch':
       return fallback
     default:

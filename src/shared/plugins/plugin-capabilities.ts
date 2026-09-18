@@ -20,6 +20,7 @@ export const PLUGIN_CAPABILITY_KINDS = [
   'events:subscribe',
   'settings:own',
   'net:fetch',
+  'process:spawn',
   'skills:contribute'
 ] as const
 
@@ -96,6 +97,8 @@ export const PLUGIN_CAPABILITY_DESCRIPTIONS: Record<PluginCapabilityKind, string
     'Get notified when worktrees are created or removed and when agent status changes',
   'settings:own': "Read and change the plugin's own settings",
   'net:fetch': 'Connect to the declared network hosts',
+  'process:spawn':
+    "Start programs as you. Programs it starts are not constrained by this plugin worker's file or network permissions.",
   // Why this line is blunt: every other capability bounds what the PLUGIN does.
   // This one bounds what any coding agent may be told to do on the plugin's
   // behalf, in any project, long after the dialog is closed.

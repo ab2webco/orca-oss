@@ -17,7 +17,11 @@ class FakeChild extends EventEmitter {
 
 function start(
   child: FakeChild,
-  options: { eventTimeoutMs?: number; networkHosts?: readonly string[] } = {}
+  options: {
+    eventTimeoutMs?: number
+    networkHosts?: readonly string[]
+    grantedCapabilities?: readonly ['process:spawn']
+  } = {}
 ) {
   processMocks.fork.mockReturnValue(child)
   return startPluginWorker({
@@ -62,6 +66,23 @@ describe('startPluginWorker', () => {
         ]
       })
     )
+  })
+
+  it('adds child-process permission only for the exact approved grant', async () => {
+    const deniedChild = new FakeChild()
+    const deniedPending = start(deniedChild)
+    deniedChild.emit('message', { type: 'ready', commands: [] })
+    await deniedPending
+
+    const allowedChild = new FakeChild()
+    const allowedPending = start(allowedChild, { grantedCapabilities: ['process:spawn'] })
+    allowedChild.emit('message', { type: 'ready', commands: [] })
+    await allowedPending
+
+    const deniedArgv = processMocks.fork.mock.calls[0]?.[2]?.execArgv
+    const allowedArgv = processMocks.fork.mock.calls[1]?.[2]?.execArgv
+    expect(deniedArgv).not.toContain('--allow-child-process')
+    expect(allowedArgv).toContain('--allow-child-process')
   })
 
   it('passes only the consented network host scope to the preload', async () => {

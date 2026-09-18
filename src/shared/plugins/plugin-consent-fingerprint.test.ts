@@ -127,6 +127,22 @@ describe('fingerprintPluginConsent', () => {
     ).toBe('approved')
   })
 
+  it('requires re-consent when a plugin adds child-process access', () => {
+    const withoutSpawn = fingerprintPluginConsent({ main: 'worker.js', capabilities: [storage] })
+    const withSpawn = fingerprintPluginConsent({
+      main: 'worker.js',
+      capabilities: [storage, { kind: 'process:spawn' }]
+    })
+    const lists = {
+      pluginConsents: { 'orca-samples.demo': withoutSpawn },
+      disabledPlugins: []
+    }
+
+    expect(withSpawn).not.toBe(withoutSpawn)
+    expect(getPluginActivationState('orca-samples.demo', withSpawn, lists)).toBe('pending')
+    expect(needsReconsent('orca-samples.demo', withSpawn, lists)).toBe(true)
+  })
+
   it('requires re-consent when instructional content bytes change', () => {
     const subject = {
       main: undefined,

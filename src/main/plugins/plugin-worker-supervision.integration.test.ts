@@ -85,7 +85,10 @@ afterAll(async () => {
 
 async function createPluginSpec(
   source = `export default function activate(orca) { orca.commands.register('run', async () => ({ ok: true })); }`,
-  networkHosts: readonly string[] = []
+  networkHosts: readonly string[] = [],
+  grantedCapabilities: PluginWorkerSpawnSpec['grantedCapabilities'] = networkHosts.length > 0
+    ? ['net:fetch']
+    : []
 ): Promise<PluginWorkerSpawnSpec> {
   const rootDir = await mkdtemp(join(tmpdir(), 'orca-plugin-supervision-'))
   pluginRoots.push(rootDir)
@@ -94,7 +97,7 @@ async function createPluginSpec(
     pluginKey: 'orca-samples.supervision',
     rootDir,
     mainEntry: 'main.mjs',
-    grantedCapabilities: networkHosts.length > 0 ? ['net:fetch'] : [],
+    grantedCapabilities,
     networkHosts
   }
 }
@@ -224,6 +227,46 @@ describe('real plugin worker supervision', () => {
         server.close((error) => (error ? reject(error) : resolve()))
       )
     }
+  })
+
+  it('starts a real child process only with the approved process:spawn grant', async () => {
+    const source = `
+      export default function activate(orca) {
+        orca.commands.register('run', async () => {
+          try {
+            const { execFileSync } = await import('node:child_process')
+            return { ok: true, output: execFileSync(process.execPath, ['--version'], { encoding: 'utf8' }).trim() }
+          } catch (error) {
+            return { ok: false, error: String(error) }
+          }
+        })
+      }
+    `
+    const createManager = (): PluginWorkerManager => {
+      const manager = new PluginWorkerManager({
+        entryPath: hostEntryPath,
+        executeHostCall: async () => ({ ok: true, value: null }),
+        log: vi.fn(),
+        onWorkerStateChange: vi.fn(),
+        onWorkerGone: vi.fn()
+      })
+      managers.push(manager)
+      return manager
+    }
+
+    const denied = await createManager().ensureActive(await createPluginSpec(source))
+    await expect(denied.invokeCommand('run')).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('restricted')
+    })
+
+    const allowed = await createManager().ensureActive(
+      await createPluginSpec(source, [], ['process:spawn'])
+    )
+    await expect(allowed.invokeCommand('run')).resolves.toMatchObject({
+      ok: true,
+      output: expect.stringMatching(/^v\d+/)
+    })
   })
 
   it('terminates and supervises a live worker that disconnects IPC', async () => {
