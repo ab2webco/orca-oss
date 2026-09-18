@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it } from 'vitest'
+import { PANEL_CONTENT_HEIGHT_TYPE } from './plugin-panel-bridge'
 import {
   buildPluginPanelShellHtml,
   PANEL_DESIGN_TOKEN_ALLOWLIST,
@@ -8,6 +9,18 @@ import {
   PLUGIN_PANEL_CSP
 } from './plugin-panel-shell'
 import { PANEL_SANS_FONT_DATA_URI } from './plugin-panel-sans-font'
+
+/** Runs the shell's inline prelude against a caller-supplied `window` so each
+ *  test gets its own listeners and its own postMessage sink. */
+function runShellPrelude(panelWindow: object): void {
+  const script = buildPluginPanelShellHtml('<main>Plugin</main>').match(
+    /<script>\n([\s\S]*?)<\/script>/
+  )?.[1]
+  if (!script) {
+    throw new Error('shell prelude not found')
+  }
+  new Function('window', script)(panelWindow)
+}
 
 describe('buildPluginPanelShellHtml', () => {
   it('keeps destructive surface and foreground tokens paired', () => {
@@ -120,5 +133,49 @@ describe('buildPluginPanelShellHtml', () => {
     expect(clickAccepted).toBe(false)
     expect(submitAccepted).toBe(false)
     expect(window.open('https://example.com/')).toBeNull()
+  })
+
+  it('reports its content height to the host, once per change', async () => {
+    // Its own window object, not the test's: the shell prelude is evaluated
+    // twice in this file, and two live reporters would double every count.
+    const reported: unknown[] = []
+    const windowListeners = new Map<string, (event: unknown) => void>()
+    const panelWindow = {
+      parent: { postMessage: (message: unknown) => reported.push(message) },
+      addEventListener: (type: string, listener: (event: unknown) => void) =>
+        void windowListeners.set(type, listener)
+    }
+    Object.defineProperty(document.body, 'scrollHeight', { value: 420, configurable: true })
+    runShellPrelude(panelWindow)
+
+    const settle = async (): Promise<void> => {
+      windowListeners.get('load')?.(new Event('load'))
+      await new Promise((resolve) => setTimeout(resolve, 120))
+    }
+
+    // The host is sandboxed out of this document, so the only proof the height
+    // ever reaches it is the frame the shell posts to window.parent.
+    await settle()
+    expect(reported).toEqual([{ type: PANEL_CONTENT_HEIGHT_TYPE, height: 420 }])
+
+    // Content that arrives after load — the case a one-shot measurement misses.
+    Object.defineProperty(document.body, 'scrollHeight', { value: 900, configurable: true })
+    await settle()
+    expect(reported.at(-1)).toEqual({ type: PANEL_CONTENT_HEIGHT_TYPE, height: 900 })
+
+    // A repaint that resizes nothing must not spend the panel's bridge budget.
+    await settle()
+    expect(reported).toHaveLength(2)
+  })
+
+  it('measures from inside because the host can never read the frame', () => {
+    const html = buildPluginPanelShellHtml('<main id="plugin-content">Plugin</main>')
+    const pluginOffset = html.indexOf('plugin-content')
+
+    expect(html).toContain('new ResizeObserver(queue)')
+    expect(html).toContain('observer.observe(document.documentElement)')
+    expect(html).toContain('observer.observe(document.body)')
+    // The reporter must be installed before plugin content can resize anything.
+    expect(html.indexOf(PANEL_CONTENT_HEIGHT_TYPE)).toBeLessThan(pluginOffset)
   })
 })

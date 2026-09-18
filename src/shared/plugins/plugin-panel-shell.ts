@@ -1,4 +1,4 @@
-import { PANEL_PING_TYPE, PANEL_PONG_TYPE } from './plugin-panel-bridge'
+import { PANEL_CONTENT_HEIGHT_TYPE, PANEL_PING_TYPE, PANEL_PONG_TYPE } from './plugin-panel-bridge'
 import {
   PANEL_SANS_FONT_DATA_URI,
   PANEL_SANS_FONT_FAMILY,
@@ -88,6 +88,14 @@ const PANEL_BASE_STYLE =
 export function buildPluginPanelShellHtml(pluginHtml: string): string {
   // The inline ping responder proves the frame's event loop is alive; the
   // renderer watchdog demotes the panel when pongs stop arriving.
+  //
+  // The height reporter is here for the same structural reason: the frame is
+  // sandboxed without allow-same-origin, so the host can neither read
+  // contentDocument nor observe the document from outside — the measurement
+  // can only happen inside. Putting it in the host-owned shell rather than
+  // asking each plugin for it means every already-installed panel reports its
+  // height with no plugin change. A host that never asks for the height (the
+  // right sidebar, the nav page) simply ignores the message.
   const prelude =
     '<!doctype html>\n' +
     `<html class="${PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER}">\n` +
@@ -126,6 +134,67 @@ export function buildPluginPanelShellHtml(pluginHtml: string): string {
     `    window.parent.postMessage({ type: '${PANEL_PONG_TYPE}', pingId: data.pingId }, '*')\n` +
     '  }\n' +
     '})\n' +
+    // IIFE: the plugin's own script shares this global object, so the reporter
+    // must not plant names a panel could shadow or clobber.
+    ';(function () {\n' +
+    '  var reported = 0\n' +
+    '  var timer = null\n' +
+    '  // body, not documentElement: for the root scroller scrollHeight never\n' +
+    '  // reports less than the viewport, and the viewport here IS the height the\n' +
+    '  // host last applied — measuring it would ratchet and never shrink again.\n' +
+    "  // body's scrollHeight is its own content box, so it tracks both ways. It\n" +
+    '  // covers padding and overflowing descendants but not body margins, which\n' +
+    '  // are added back; without them a panel with the UA default 8px margin\n' +
+    '  // loses its last 16px to the frame edge.\n' +
+    '  function measure() {\n' +
+    '    var body = document.body\n' +
+    '    if (!body) return 0\n' +
+    '    var margins = 0\n' +
+    '    var view = document.defaultView\n' +
+    "    if (view && typeof view.getComputedStyle === 'function') {\n" +
+    '      var style = view.getComputedStyle(body)\n' +
+    '      margins = (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)\n' +
+    '    }\n' +
+    "    var box = typeof body.getBoundingClientRect === 'function'\n" +
+    '      ? body.getBoundingClientRect().height\n' +
+    '      : 0\n' +
+    '    return Math.ceil(Math.max(body.scrollHeight || 0, box) + margins)\n' +
+    '  }\n' +
+    '  function report() {\n' +
+    '    timer = null\n' +
+    '    var height = measure()\n' +
+    '    // Change-only: a panel that merely repaints must not spend its bridge\n' +
+    '    // budget on frames that would resize nothing.\n' +
+    '    if (height <= 0 || height === reported) return\n' +
+    '    reported = height\n' +
+    `    window.parent.postMessage({ type: '${PANEL_CONTENT_HEIGHT_TYPE}', height: height }, '*')\n` +
+    '  }\n' +
+    '  // Trailing debounce, not requestAnimationFrame: rAF does not run in a\n' +
+    '  // frame the host has not painted yet, and a report that waits for a paint\n' +
+    '  // is a panel stuck at its placeholder height. A timer also coalesces the\n' +
+    '  // burst of mutations a list refresh produces into one message.\n' +
+    '  function queue() {\n' +
+    '    if (timer !== null) return\n' +
+    '    timer = setTimeout(report, 50)\n' +
+    '  }\n' +
+    "  if (typeof ResizeObserver === 'function') {\n" +
+    '    var observer = new ResizeObserver(queue)\n' +
+    '    observer.observe(document.documentElement)\n' +
+    '    // body is what actually grows when content arrives after load, and it\n' +
+    '    // does not exist yet while this prelude parses in <head>.\n' +
+    "    document.addEventListener('DOMContentLoaded', function () {\n" +
+    '      if (document.body) observer.observe(document.body)\n' +
+    '    })\n' +
+    '  }\n' +
+    '  // Three load-time reports for the three things that settle after parse:\n' +
+    '  // the DOM, subresources such as images, and the web font — text measured\n' +
+    '  // in the fallback face is the short height that clips a panel.\n' +
+    "  document.addEventListener('DOMContentLoaded', queue)\n" +
+    "  window.addEventListener('load', queue)\n" +
+    '  if (document.fonts && document.fonts.ready && document.fonts.ready.then) {\n' +
+    '    document.fonts.ready.then(queue)\n' +
+    '  }\n' +
+    '})()\n' +
     '</script>\n' +
     '</head>\n'
   return prelude + pluginHtml

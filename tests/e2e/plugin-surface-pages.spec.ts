@@ -78,9 +78,29 @@ test('renders settings-surface and nav-surface panels as their own pages', async
       .locator(`[data-settings-section="plugin:${installed.pluginKey}/registry"]`)
       .locator('iframe[title="Registry"]')
     await expect(registryPanel).toBeVisible()
-    // A page, not a card in a two-column grid: the panel takes the page's height.
+    // A page, not a card in a two-column grid: the frame spans the page's
+    // content column and takes the height its own document reports, so the
+    // settings page scrolls as one instead of nesting a scroller in a scroller.
+    const registryBody = orcaPage.frameLocator('iframe[title="Registry"]').locator('h1')
+    await expect(registryBody).toBeVisible({ timeout: 15_000 })
+    // Within a pixel of its own document: the frame is sized to the height the
+    // panel reports, not to the page box it used to fill.
+    await expect
+      .poll(
+        async () => {
+          const frameHeight = await registryPanel.evaluate((node) =>
+            Math.round(node.getBoundingClientRect().height)
+          )
+          const documentHeight = await registryBody.evaluate(
+            (node) => node.ownerDocument.body.scrollHeight
+          )
+          return Math.abs(frameHeight - documentHeight) <= 1
+        },
+        { timeout: 15_000 }
+      )
+      .toBe(true)
     expect(
-      await registryPanel.evaluate((node) => node.getBoundingClientRect().height)
+      await registryPanel.evaluate((node) => node.getBoundingClientRect().width)
     ).toBeGreaterThan(400)
 
     await orcaPage.evaluate(() => {

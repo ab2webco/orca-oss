@@ -1228,13 +1228,6 @@ function Settings(): React.JSX.Element {
   const isSectionMounted = (sectionId: string): boolean => neededSectionIds.has(sectionId)
   const isFocusedShortcutsPane =
     activeSectionId === 'shortcuts' && settingsSearchQuery.trim() === ''
-  // Why: a plugin panel owns its height like Shortcuts does, so the page must
-  // stop scrolling behind it instead of nesting a scroller in a scroller.
-  const activePluginPanelTabKey =
-    settingsSearchQuery.trim() === '' &&
-    pluginSettingsPanels.some((panel) => panel.tabKey === activeSectionId)
-      ? activeSectionId
-      : null
   const isFocusedSetupGuidePane =
     activeSectionId === 'setup-guide' && settingsSearchQuery.trim() === ''
 
@@ -1263,15 +1256,13 @@ function Settings(): React.JSX.Element {
           ref={setContentScrollNode}
           className={cn(
             'min-h-0 flex-1',
-            isFocusedShortcutsPane || activePluginPanelTabKey
-              ? 'overflow-hidden'
-              : 'overflow-y-auto scrollbar-sleek'
+            isFocusedShortcutsPane ? 'overflow-hidden' : 'overflow-y-auto scrollbar-sleek'
           )}
         >
           <div
             className={cn(
               'mx-auto flex w-full flex-col gap-10 px-8 pt-10',
-              isFocusedShortcutsPane || activePluginPanelTabKey ? 'h-full pb-6' : 'pb-24',
+              isFocusedShortcutsPane ? 'h-full pb-6' : 'pb-24',
               isFocusedSetupGuidePane ? 'max-w-6xl' : 'max-w-4xl'
             )}
           >
@@ -1934,7 +1925,6 @@ function Settings(): React.JSX.Element {
                   if (!panelSection) {
                     return null
                   }
-                  const focused = activePluginPanelTabKey === panel.tabKey
                   return (
                     <SettingsSection
                       key={panel.tabKey}
@@ -1942,15 +1932,17 @@ function Settings(): React.JSX.Element {
                       title={panelSection.title}
                       description={panelSection.description}
                       searchEntries={panelSection.searchEntries}
-                      className={
-                        focused ? 'flex min-h-0 flex-1 flex-col gap-6 space-y-0' : undefined
-                      }
-                      bodyClassName={
-                        focused ? 'flex min-h-0 flex-1 overflow-hidden p-0' : undefined
-                      }
+                      // Why: the panel brings its own padding; clipping keeps the
+                      // frame's square corners inside the card's rounded ones.
+                      bodyClassName="overflow-hidden p-0"
                     >
+                      {/* Why: the frame takes the height the panel reports from
+                          inside itself, so this page grows with its content and
+                          scrolls as one, like every other settings page. It used
+                          to own its height like Shortcuts does, which made the
+                          only plugin page in Settings scroll from the inside. */}
                       {isSectionMounted(panel.tabKey) ? (
-                        <PluginPanel tabKey={panel.tabKey} />
+                        <PluginPanel tabKey={panel.tabKey} flowWithContentHeight />
                       ) : null}
                     </SettingsSection>
                   )

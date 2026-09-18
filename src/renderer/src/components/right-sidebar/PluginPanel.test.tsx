@@ -3,6 +3,10 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  PANEL_CONTENT_HEIGHT_MAX_PX,
+  PANEL_CONTENT_HEIGHT_TYPE
+} from '../../../../shared/plugins/plugin-panel-bridge'
 import type { ActivePluginPanel } from '@/store/plugin-panels'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -105,6 +109,30 @@ afterEach(async () => {
 async function renderPanel(tabKey: string): Promise<void> {
   await act(async () => {
     root.render(<PluginPanel tabKey={tabKey} />)
+  })
+}
+
+async function renderFlowingPanel(tabKey: string): Promise<HTMLIFrameElement> {
+  await act(async () => {
+    root.render(<PluginPanel tabKey={tabKey} flowWithContentHeight />)
+  })
+  const iframe = container.querySelector('iframe')
+  if (!iframe) {
+    throw new Error('panel iframe did not render')
+  }
+  return iframe
+}
+
+/** Posts a height frame the way the sandboxed panel does: the frame's origin is
+ *  opaque, so `source` is the only identity the host can check. */
+async function postHeight(source: Window | null, height: unknown): Promise<void> {
+  await act(async () => {
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: PANEL_CONTENT_HEIGHT_TYPE, height },
+        source
+      })
+    )
   })
 }
 
@@ -353,5 +381,82 @@ describe('PluginPanel', () => {
 
     expect(readPanelEntryMock).not.toHaveBeenCalled()
     expect(container.textContent).toContain('This plugin panel is no longer available.')
+  })
+
+  it('sizes the frame to the height the panel reports when the host asks it to', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    const iframe = await renderFlowingPanel('plugin:orca-samples.my-plugin/dashboard')
+
+    await postHeight(iframe.contentWindow, 742)
+    expect(iframe.style.height).toBe('742px')
+    // No h-full: the page around it, not the frame, owns the scrolling now.
+    expect(iframe.className).not.toContain('h-full')
+
+    // The conversation list repopulates and a row expands long after load.
+    await postHeight(iframe.contentWindow, 1180)
+    expect(iframe.style.height).toBe('1180px')
+    // ...and a section that collapses again must give the space back.
+    await postHeight(iframe.contentWindow, 640)
+    expect(iframe.style.height).toBe('640px')
+  })
+
+  it('ignores a height from any window that is not this panel frame', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    const iframe = await renderFlowingPanel('plugin:orca-samples.my-plugin/dashboard')
+    await postHeight(iframe.contentWindow, 742)
+
+    const foreignFrame = document.createElement('iframe')
+    document.body.append(foreignFrame)
+    await postHeight(foreignFrame.contentWindow, 2000)
+    foreignFrame.remove()
+
+    expect(iframe.style.height).toBe('742px')
+  })
+
+  it('refuses a height that is not a finite positive number', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    const iframe = await renderFlowingPanel('plugin:orca-samples.my-plugin/dashboard')
+    await postHeight(iframe.contentWindow, 742)
+
+    for (const height of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0, '900']) {
+      await postHeight(iframe.contentWindow, height)
+      expect(iframe.style.height).toBe('742px')
+    }
+  })
+
+  it('clamps a frame no panel can need instead of allocating it', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    const iframe = await renderFlowingPanel('plugin:orca-samples.my-plugin/dashboard')
+
+    await postHeight(iframe.contentWindow, 2_000_000)
+
+    expect(iframe.style.height).toBe(`${PANEL_CONTENT_HEIGHT_MAX_PX}px`)
+  })
+
+  it('keeps filling its box, and ignores reported heights, without the prop', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    await renderPanel('plugin:orca-samples.my-plugin/dashboard')
+    const iframe = container.querySelector('iframe')
+
+    await postHeight(iframe?.contentWindow ?? null, 742)
+
+    // The right sidebar and the nav page hand the frame a box and expect it filled.
+    expect(iframe?.className).toContain('h-full')
+    expect(iframe?.getAttribute('style')).toBeNull()
   })
 })

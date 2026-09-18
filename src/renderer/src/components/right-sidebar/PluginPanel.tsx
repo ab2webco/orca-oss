@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { isPluginPanelTabKey } from '../../../../shared/plugins/plugin-manifest'
 import {
+  PANEL_CONTENT_HEIGHT_INITIAL_PX,
   PANEL_PING_TYPE,
-  PLUGIN_PANEL_FRAME_NAME_PREFIX
+  PLUGIN_PANEL_FRAME_NAME_PREFIX,
+  readPanelContentHeight
 } from '../../../../shared/plugins/plugin-panel-bridge'
 import {
   PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER,
@@ -17,9 +19,14 @@ import { buildPanelDesignTokenCss, currentPanelColorScheme } from './plugin-pane
 import { usePluginPanelThemeRevision } from './use-plugin-panel-theme-revision'
 import { usePluginPanels, usePluginPanelsStore } from '@/store/plugin-panels'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 type PluginPanelProps = {
   tabKey: string
+  /** Opt-in: size the frame to the height the panel reports from inside itself
+   *  instead of filling the box. For a host that scrolls as one page; omitted,
+   *  the frame keeps filling whatever height it is handed. */
+  flowWithContentHeight?: boolean
 }
 
 type PluginPanelEntryState =
@@ -45,7 +52,7 @@ function fillPanelShell(html: string): string {
     .replace(PANEL_SHELL_TOKENS_PLACEHOLDER, buildPanelDesignTokenCss())
 }
 
-function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
+function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React.JSX.Element {
   const panels = usePluginPanels()
   const setPanelHealth = usePluginPanelsStore((state) => state.setPanelHealth)
   const panel = isPluginPanelTabKey(tabKey)
@@ -54,6 +61,10 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
   const [entryState, setEntryState] = useState<PluginPanelEntryState>({ status: 'loading' })
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [loadedFrameKey, setLoadedFrameKey] = useState<string | null>(null)
+  const [reportedHeight, setReportedHeight] = useState<{
+    frameKey: string
+    height: number
+  } | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const themeRevision = usePluginPanelThemeRevision()
 
@@ -67,6 +78,8 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
     entryState.status === 'ready'
       ? `${tabKey}:${entryState.documentRevision}:${themeRevision}`
       : null
+  const contentHeight =
+    reportedHeight && reportedHeight.frameKey === panelFrameKey ? reportedHeight.height : null
   const watchdog = useMemo(
     () =>
       createPanelWatchdog({
@@ -98,6 +111,31 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
       window.removeEventListener('message', handler)
     }
   }, [panelDocument, sessionToken, watchdog])
+
+  useEffect(() => {
+    if (!flowWithContentHeight || !panelFrameKey) {
+      return
+    }
+    const handler = (event: MessageEvent): void => {
+      // Same trust model as the action bridge: the frame's origin is opaque, so
+      // the sending window's identity is the only check worth making. The value
+      // itself is untrusted — the reader drops NaN, Infinity and non-positive
+      // numbers and clamps the rest, so no panel can demand an arbitrary frame.
+      const panelWindow = iframeRef.current?.contentWindow
+      if (!panelWindow || event.source !== panelWindow) {
+        return
+      }
+      const height = readPanelContentHeight(event.data)
+      if (height === null) {
+        return
+      }
+      // Stamped with the frame it measured: a reload or theme rebuild replaces
+      // the document, and the old document's height must not size the new one.
+      setReportedHeight({ frameKey: panelFrameKey, height })
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [flowWithContentHeight, panelFrameKey])
 
   useEffect(() => {
     if (!panelFrameKey || loadedFrameKey !== panelFrameKey) {
@@ -228,7 +266,15 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
       srcDoc={panelDocument ?? ''}
       onLoad={() => setLoadedFrameKey(panelFrameKey)}
       title={panel.title}
-      className="h-full w-full flex-1 border-0 bg-background"
+      className={cn(
+        'w-full border-0 bg-background',
+        flowWithContentHeight ? 'shrink-0' : 'h-full flex-1'
+      )}
+      style={
+        flowWithContentHeight
+          ? { height: contentHeight ?? PANEL_CONTENT_HEIGHT_INITIAL_PX }
+          : undefined
+      }
     />
   )
 }
