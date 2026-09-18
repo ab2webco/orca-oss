@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import type { AutomationPluginOrigin } from '../shared/automation-plugin-origin'
 import type { PersistedState } from '../shared/persisted-state-types'
 import { toRuntimeExecutionHostId, toSshExecutionHostId } from '../shared/execution-host'
 import {
@@ -717,6 +718,43 @@ describe('plugin-declared automations', () => {
     expect(edited.pluginOrigin).toEqual({
       pluginKey: 'orca-samples.wa',
       automationId: 'triage'
+    })
+  })
+
+  it('persists the plugin fingerprints the reconciliation writes with a refresh', async () => {
+    const store = await createStore()
+    const automation = store.createAutomation({
+      name: 'WhatsApp: triage',
+      prompt: 'Run ./bin/wa-scope pending',
+      agentId: 'claude',
+      projectId: '',
+      workspaceMode: 'new_per_run',
+      timezone: 'America/Bogota',
+      rrule: '*/5 8-18 * * 1-5',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime(),
+      enabled: false,
+      pluginOrigin: { pluginKey: 'orca-samples.wa', automationId: 'triage' }
+    })
+
+    const refreshed = store.updateAutomation(automation.id, {
+      prompt: 'Resolve tool paths at run time.',
+      pluginOrigin: {
+        pluginKey: 'orca-samples.wa',
+        automationId: 'triage',
+        managedFingerprints: { prompt: 'sha256-new-prompt' },
+        userEditedFields: ['name']
+      }
+    })
+
+    expect(refreshed.pluginOrigin?.managedFingerprints).toEqual({ prompt: 'sha256-new-prompt' })
+    expect(refreshed.pluginOrigin?.userEditedFields).toEqual(['name'])
+    store.flush()
+    const persisted = readDataFile() as {
+      automations: { prompt: string; pluginOrigin?: AutomationPluginOrigin }[]
+    }
+    expect(persisted.automations[0].prompt).toBe('Resolve tool paths at run time.')
+    expect(persisted.automations[0].pluginOrigin?.managedFingerprints).toEqual({
+      prompt: 'sha256-new-prompt'
     })
   })
 })

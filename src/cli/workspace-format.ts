@@ -222,8 +222,27 @@ export function formatAutomationShow(result: { automation: Automation }): string
     `reuseSession: ${automation.reuseSession}`,
     `targetPane: ${automation.targetPaneKey ?? 'null'}`,
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
+    ...formatAutomationPluginOrigin(automation),
     `prompt: ${automation.prompt}`
   ].join('\n')
+}
+
+/** Por que: una fila de plugin con un campo editado aca deja de seguir al
+ *  plugin, y sin decirlo el usuario no entiende por que su prompt no se
+ *  actualiza cuando el plugin cambia. La reconciliacion lo mide y lo anota, asi
+ *  que el dato es del ultimo habilitar/deshabilitar/consentir, no de ahora. */
+function formatAutomationPluginOrigin(automation: Automation): string[] {
+  const origin = automation.pluginOrigin
+  if (!origin) {
+    return []
+  }
+  const edited = origin.userEditedFields ?? []
+  const editedLabel =
+    edited.length > 0 ? `${edited.join(', ')}; the plugin no longer refreshes them` : 'none'
+  return [
+    `plugin: ${origin.pluginKey}/${origin.automationId}`,
+    `pluginEditedHere: ${editedLabel} (as of the last plugin reconcile)`
+  ]
 }
 
 export function formatAutomationRemoved(result: { removed: boolean; id: string }): string {
