@@ -37,6 +37,11 @@ export function pluginCapabilityDescription(kind: string, fallback: string): str
         'auto.components.settings.PluginConsentDialog.capability.settingsOwn',
         "Read and change the plugin's own settings"
       )
+    case 'skills:contribute':
+      return translate(
+        'auto.components.settings.PluginConsentDialog.capability.skillsContribute',
+        'Teach every agent, in every project, how to use this plugin: its skill instructions are served to any agent that asks for them'
+      )
     case 'net:fetch':
       return fallback
     default:

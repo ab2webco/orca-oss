@@ -15,6 +15,10 @@ const PLUGIN_ICON_MAX_BYTES = 2 * 1024 * 1024
 export const PLUGIN_LANGUAGE_PACK_MAX_BYTES = 5 * 1024 * 1024
 export const PLUGIN_VM_RECIPE_MAX_BYTES = 256 * 1024
 const PLUGIN_AGENT_PROFILE_MAX_BYTES = 1024 * 1024
+// Matches skill discovery's own markdown read cap, so a skill that installs is
+// a skill discovery can actually read.
+export const PLUGIN_SKILL_MARKDOWN_MAX_BYTES = 256 * 1024
+export const PLUGIN_SKILL_FILE_NAME = 'SKILL.md'
 
 type DeclaredArtifact =
   | { label: string; path: string; kind: 'file'; maxBytes: number }
@@ -83,7 +87,18 @@ function declaredArtifactPaths(manifest: PluginManifest): DeclaredArtifact[] {
       path: automation.prompt,
       kind: 'file' as const,
       maxBytes: PLUGIN_AUTOMATION_PROMPT_MAX_BYTES
-    }))
+    })),
+    // Both entries matter: the directory proves containment of what discovery
+    // will walk, the file proves the skill an agent would be served exists.
+    ...manifest.contributes.skills.flatMap((skill) => [
+      { label: 'skill directory', path: skill.path, kind: 'directory' as const },
+      {
+        label: 'skill',
+        path: `${skill.path}/${PLUGIN_SKILL_FILE_NAME}`,
+        kind: 'file' as const,
+        maxBytes: PLUGIN_SKILL_MARKDOWN_MAX_BYTES
+      }
+    ])
   ]
 }
 
@@ -94,6 +109,16 @@ export async function resolveContainedPluginArtifact(
 ): Promise<string> {
   const rootReal = await realpath(resolve(rootDir))
   return resolvePathFromRealRoot(rootDir, rootReal, relativePath, 'file', maxBytes)
+}
+
+/** Directory twin of `resolveContainedPluginArtifact`; returns the real path so
+ *  a caller that keeps scanning it cannot be redirected by the declared link. */
+export async function resolveContainedPluginDirectory(
+  rootDir: string,
+  relativePath: string
+): Promise<string> {
+  const rootReal = await realpath(resolve(rootDir))
+  return resolvePathFromRealRoot(rootDir, rootReal, relativePath, 'directory')
 }
 
 export async function readContainedPluginArtifactText(

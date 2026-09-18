@@ -70,6 +70,33 @@ async function renderConsent(
 }
 
 describe('PluginConsentDialog', () => {
+  it('spells out that a skills:contribute plugin reaches every agent', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        hasWorker: false,
+        skills: ['skills/hello'],
+        capabilities: [
+          {
+            kind: 'skills:contribute',
+            description: 'Teach every agent, in every project, how to use this plugin'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.body.textContent).toContain(
+      'Teach every agent, in every project, how to use this plugin: its skill instructions ' +
+        'are served to any agent that asks for them'
+    )
+    expect(document.body.textContent).toContain('(skills:contribute)')
+    // A skill is read and acted on by an agent, so the tier must not read
+    // "Panel" the way a panel-only plugin does.
+    expect(document.body.textContent).toContain('Instructional')
+    expect(document.body.textContent).toContain('Review access and content')
+  })
+
   it('keeps the displayed fingerprint immutable during a same-key update', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -186,6 +213,7 @@ describe('PluginConsentDialog', () => {
       {
         ...plugin,
         hasWorker: false,
+        skills: ['skills/hello'],
         capabilities: [],
         vmRecipes: [
           {
@@ -224,6 +252,7 @@ describe('PluginConsentDialog', () => {
       {
         ...plugin,
         hasWorker: false,
+        skills: ['skills/hello'],
         capabilities: [],
         commands: [
           {

@@ -237,9 +237,12 @@ describe('orca skills CLI', () => {
 
     expect(process.exitCode).toBe(1)
     expect(errorSpy).toHaveBeenCalledWith(
-      'Unknown skill topic "missing". Available topics: alpha, gamma, zeta'
+      'Unknown skill topic "missing". Available topics: alpha, gamma, zeta. ' +
+        'Plugin-contributed skills need a running Orca Lab with that plugin enabled.'
     )
-    expect(runtimeClientConstructorMock).not.toHaveBeenCalled()
+    // A miss is the one case that asks the runtime: only it knows which plugins
+    // the user approved for skills:contribute.
+    expect(runtimeClientConstructorMock).toHaveBeenCalledTimes(1)
   })
 
   it('lists installable skills when no --skill/--all is given', async () => {

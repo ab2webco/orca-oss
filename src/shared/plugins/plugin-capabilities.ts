@@ -19,7 +19,8 @@ export const PLUGIN_CAPABILITY_KINDS = [
   'secrets',
   'events:subscribe',
   'settings:own',
-  'net:fetch'
+  'net:fetch',
+  'skills:contribute'
 ] as const
 
 export type PluginCapabilityKind = (typeof PLUGIN_CAPABILITY_KINDS)[number]
@@ -94,7 +95,12 @@ export const PLUGIN_CAPABILITY_DESCRIPTIONS: Record<PluginCapabilityKind, string
   'events:subscribe':
     'Get notified when worktrees are created or removed and when agent status changes',
   'settings:own': "Read and change the plugin's own settings",
-  'net:fetch': 'Connect to the declared network hosts'
+  'net:fetch': 'Connect to the declared network hosts',
+  // Why this line is blunt: every other capability bounds what the PLUGIN does.
+  // This one bounds what any coding agent may be told to do on the plugin's
+  // behalf, in any project, long after the dialog is closed.
+  'skills:contribute':
+    'Teach every agent, in every project, how to use this plugin: its skill instructions are served to any agent that asks for them'
 }
 
 export function describePluginCapability(capability: PluginCapability): string {

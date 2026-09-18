@@ -65,6 +65,9 @@ export type PluginHostListEntry = {
     keybindings: { key: string; when: 'global' | 'worktree' }[]
   }[]
   hasWorker: boolean
+  /** Manifest-declared skill directories. Optional so an older host that does
+   *  not send them reads as "none" instead of breaking the consent dialog. */
+  skills?: string[]
   /** Manifest-declared settings the user can fill from Settings -> Plugins.
    *  A `secret` entry never carries `value`; only whether one is stored. */
   settings?: {

@@ -17,6 +17,7 @@ import {
   type SkillScanRoot
 } from './skill-discovery-sources'
 import { discoverClaudePluginSkillSources } from './claude-plugin-skill-sources'
+import { discoverOrcaPluginSkillSources } from './orca-plugin-skill-sources'
 import { findSkillFiles } from './skill-root-file-walk'
 import { runSkillCandidateTasks } from './skill-candidate-concurrency'
 import {
@@ -94,7 +95,7 @@ async function readSkillSummary(skillFilePath: string): Promise<{
 type ScannedSkill = DiscoveredSkill & { canonicalSkillFilePath: string }
 
 async function scanRoot(root: SkillScanRoot, signal: AbortSignal): Promise<ScannedSkill[]> {
-  const maxDepth = root.sourceKind === 'plugin' ? 9 : 4
+  const maxDepth = root.maxDepth ?? (root.sourceKind === 'plugin' ? 9 : 4)
   const skillFiles = await findSkillFiles(root.path, maxDepth, signal)
   // Why: a root can hold many packages and each one costs a summary read plus a
   // package walk. Unbounded fan-out here is what turned one scan into a burst of
@@ -138,7 +139,7 @@ async function scanRoot(root: SkillScanRoot, signal: AbortSignal): Promise<Scann
 // and a repo root when the home dir is the workspace), and their scan differs
 // only by depth, which `sourceKind` decides.
 function rootScanKey(root: SkillScanRoot): string {
-  return `${root.sourceKind}\0${root.path}`
+  return `${root.sourceKind}\0${root.maxDepth ?? ''}\0${root.path}`
 }
 
 async function scanRootShared(
@@ -218,10 +219,14 @@ export async function discoverSkills(args: {
     // Untargeted scans (Settings) keep their pre-picker inventory and cost.
     ...(args.cwd && args.includeCwd !== false
       ? await discoverClaudePluginSkillSources({ homeDir, cwd: args.cwd })
-      : [])
+      : []),
+    // Unconditional, unlike the Claude roots: these come from an in-memory
+    // consent decision, cost one readdir each, and the user approved them for
+    // every workspace — Settings has to show what it let in.
+    ...(await discoverOrcaPluginSkillSources())
   ]
   const scans = await Promise.all(roots.map((root) => scanRootShared(root, refresh)))
-  const sources: SkillDiscoverySource[] = roots.map((root, index) => ({
+  const sources: SkillDiscoverySource[] = roots.map(({ maxDepth: _maxDepth, ...root }, index) => ({
     ...root,
     providers: [...root.providers],
     exists: scans[index].value.exists,

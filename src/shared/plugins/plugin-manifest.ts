@@ -4,10 +4,12 @@ import {
   PLUGIN_AGENT_PROFILE_LIMIT,
   PLUGIN_KEYBINDING_LIMIT,
   PLUGIN_LANGUAGE_PACK_LIMIT,
+  PLUGIN_SKILL_LIMIT,
   PLUGIN_VM_RECIPE_LIMIT,
   pluginAgentProfileContributionSchema,
   pluginKeybindingContributionSchema,
   pluginLanguagePackContributionSchema,
+  pluginSkillContributionSchema,
   pluginVmRecipeContributionSchema
 } from './plugin-content-pack-contributions'
 import {
@@ -35,6 +37,14 @@ import {
  *
  * Lives in `shared` so the desktop app, the headless `orca serve` runtime,
  * the relay, and the CLI validate manifests identically (SSH/remote parity).
+ *
+ * `contributes.skills` is the one contribution aimed at *other* software: each
+ * entry names a directory inside the plugin holding a `SKILL.md`, and an
+ * approved plugin's skills are served to any agent in any workspace. Declaring
+ * them requires the `skills:contribute` capability, the same way
+ * `contributes.events` requires `events:subscribe`, and the host re-checks that
+ * grant against recorded consent before serving a byte: a manifest declaration
+ * on its own contributes nothing.
  *
  * Everything here is EXPERIMENTAL: no compatibility promises until pluginApi
  * v1 freezes (see the plugin roadmap).
@@ -137,6 +147,7 @@ export const pluginManifestSchema = z
           .array(pluginAutomationContributionSchema)
           .max(PLUGIN_AUTOMATION_LIMIT)
           .default([]),
+        skills: z.array(pluginSkillContributionSchema).max(PLUGIN_SKILL_LIMIT).default([]),
         settings: pluginSettingsContributionSchema
       })
       .strict()
@@ -149,6 +160,7 @@ export const pluginManifestSchema = z
         vmRecipes: [],
         agents: [],
         automations: [],
+        skills: [],
         settings: []
       })),
     capabilities: z.array(pluginCapabilitySchema).max(32).default([])

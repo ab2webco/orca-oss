@@ -56,6 +56,24 @@ describe('fingerprintPluginConsent', () => {
     expect(needsReconsent('orca-samples.demo', withWorker, lists)).toBe(true)
   })
 
+  it('binds a contributed skill to the immutable tree it was reviewed from', () => {
+    const skills = { contributes: { skills: [{ path: 'skills/send' }] } }
+    const reviewed = fingerprintPluginConsent(
+      { main: undefined, capabilities: [{ kind: 'skills:contribute' }], ...skills },
+      'tree-hash-a'
+    )
+    const rewritten = fingerprintPluginConsent(
+      { main: undefined, capabilities: [{ kind: 'skills:contribute' }], ...skills },
+      'tree-hash-b'
+    )
+
+    // Editing a SKILL.md changes what agents are told to run, so it re-prompts.
+    expect(rewritten).not.toBe(reviewed)
+    const lists = { pluginConsents: { 'orca-samples.demo': reviewed }, disabledPlugins: [] }
+    expect(getPluginActivationState('orca-samples.demo', rewritten, lists)).toBe('pending')
+    expect(needsReconsent('orca-samples.demo', rewritten, lists)).toBe(true)
+  })
+
   it('preserves capability-only fingerprints for existing panel plugins', () => {
     const capabilities = [workspaceRead, storage]
     const legacy = `sha256-${createHash('sha256')
