@@ -15611,5 +15611,6 @@
   "auto.components.settings.HostAccountLoginDialog.deviceCode": "在该页面输入此代码：",
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "该页面上的代码",
   "auto.components.settings.HostAccountLoginDialog.cancel": "取消",
-  "auto.components.settings.HostAccountLoginDialog.finish": "完成登录"
+  "auto.components.settings.HostAccountLoginDialog.finish": "完成登录",
+  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "让任何项目中的任何智能体都学会使用此插件：它的技能说明会提供给任何提出请求的智能体"
 }

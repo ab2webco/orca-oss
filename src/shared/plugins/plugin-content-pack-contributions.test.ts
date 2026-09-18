@@ -51,15 +51,44 @@ describe('content-pack manifest contributions', () => {
       keybindings: [],
       vmRecipes: [],
       agents: [],
+      skills: [],
       settings: []
     })
   })
 
-  it('rejects the removed plugin skills contribution', () => {
+  it('accepts skill directories declared with the skills:contribute capability', () => {
+    const parsed = pluginManifestSchema.parse({
+      ...manifest({ skills: [{ path: 'skills/whatsapp/' }] }),
+      capabilities: [{ kind: 'skills:contribute' }]
+    })
+
+    // Trailing slash canonicalized: one identity for hashing and containment.
+    expect(parsed.contributes.skills).toEqual([{ path: 'skills/whatsapp' }])
+  })
+
+  it('rejects skill directories without the skills:contribute capability', () => {
     expect(parsePluginManifest(manifest({ skills: [{ path: 'skills' }] }))).toMatchObject({
       ok: false,
-      error: expect.stringContaining('Unrecognized key')
+      error: expect.stringContaining('skills:contribute capability required')
     })
+  })
+
+  it('rejects a skill directory that escapes the plugin root', () => {
+    expect(
+      parsePluginManifest({
+        ...manifest({ skills: [{ path: '../elsewhere/skill' }] }),
+        capabilities: [{ kind: 'skills:contribute' }]
+      })
+    ).toMatchObject({ ok: false, error: expect.stringContaining('inside the plugin directory') })
+  })
+
+  it('rejects two skill contributions naming the same directory', () => {
+    expect(
+      parsePluginManifest({
+        ...manifest({ skills: [{ path: 'skills/a' }, { path: 'skills/a' }] }),
+        capabilities: [{ kind: 'skills:contribute' }]
+      })
+    ).toMatchObject({ ok: false, error: expect.stringContaining('duplicate skills path') })
   })
 
   it('still requires a worker entry for non-alias commands', () => {

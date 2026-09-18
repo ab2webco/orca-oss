@@ -336,6 +336,11 @@ import { resolvePluginHostEntryPath } from './plugins/plugin-host-process'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
 import { setPluginServiceForRpc } from './runtime/rpc/methods/plugins'
 import {
+  collectOrcaPluginSkillContributions,
+  setOrcaPluginSkillContributionProvider
+} from './skills/orca-plugin-skill-sources'
+import { clearSkillDiscoveryCaches } from './skills/skill-discovery-target'
+import {
   normalizePluginConsents,
   normalizePluginIdList
 } from '../shared/plugins/plugin-consent-state'
@@ -2983,6 +2988,12 @@ void app.whenReady().then(async () => {
     applyEnablement: (pluginKey, enabled) =>
       applyPluginEnablement({ store: store!, pluginService: pluginService!, pluginKey, enabled })
   })
+  // Same module-setter shape, for the same reason: skill discovery runs per
+  // workspace and must not learn about the plugin composition root to ask
+  // which plugins the user approved for `skills:contribute`.
+  setOrcaPluginSkillContributionProvider(() =>
+    pluginService ? collectOrcaPluginSkillContributions(pluginService) : []
+  )
   // Lazy kernel: initialize() only discovers manifests — no worker forks, no
   // panel reads. Zero plugin code runs before an explicit trigger.
   void pluginService
@@ -3002,6 +3013,10 @@ void app.whenReady().then(async () => {
     })
   }
   pluginService.onChanged((event) => {
+    // Enable, disable, uninstall, or a content update all change which skills
+    // agents are served; the shared root scans would otherwise serve the old
+    // answer for their whole TTL.
+    clearSkillDiscoveryCaches()
     if (
       event.contentPacksChanged &&
       setMainPluginLanguagePacks(pluginService?.contentPacks.languagePacks.list() ?? [])
@@ -3461,6 +3476,7 @@ app.on('will-quit', (e) => {
   // the teardown barrier below — quitting before it resolves would let
   // Electron exit first and orphan the hosts.
   setPluginServiceForRpc(null)
+  setOrcaPluginSkillContributionProvider(null)
   pluginKillListService = null
   pluginMarketplaceService = null
   pluginMarketplaceInstaller = null

@@ -16,6 +16,7 @@ type ContributionValidationManifest = {
     vmRecipes: PathContribution[]
     agents: PathContribution[]
     automations: IdentifiedContribution[]
+    skills: PathContribution[]
   }
   capabilities: { kind: string }[]
 }
@@ -61,7 +62,7 @@ export function validatePluginManifestContributions(
     'language pack locale',
     ctx
   )
-  for (const path of ['vmRecipes', 'agents'] as const) {
+  for (const path of ['vmRecipes', 'agents', 'skills'] as const) {
     rejectDuplicateValues(
       manifest.contributes[path],
       (entry) => (entry as PathContribution).path,
@@ -140,6 +141,19 @@ export function validatePluginManifestContributions(
       code: 'custom',
       path: ['capabilities'],
       message: 'events:subscribe capability required when contributes.events is non-empty'
+    })
+  }
+  // A skill teaches any agent, in any project, how to run this plugin. Authors
+  // get the error here; the host still re-checks the granted capability before
+  // serving one, because only consent grants it.
+  if (
+    manifest.contributes.skills.length > 0 &&
+    !manifest.capabilities.some((capability) => capability.kind === 'skills:contribute')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['capabilities'],
+      message: 'skills:contribute capability required when contributes.skills is non-empty'
     })
   }
 }

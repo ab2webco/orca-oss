@@ -25,11 +25,17 @@ export const OFFICIAL_PLUGIN_ORG = 'ab2webco'
 export const OFFICIAL_MARKETPLACE_OWNER = 'ab2webco'
 export const OFFICIAL_MARKETPLACE_REPOSITORY = 'orcalab-plugins'
 
-// Why: theme/icon/skill contributions were deferred, so `contributes` now
-// rejects them and any plugin declaring one fails to install wholesale. The
-// shared marketplace index (which this build does not control) still advertises
-// such packs; hide listings that carry these categories so users never hit a
-// dead "install" path until the marketplace catches up.
+// Why: theme/icon contributions were deferred, so `contributes` rejects them and
+// any plugin declaring one fails to install wholesale. The shared marketplace
+// index (which this build does not control) still advertises such packs; hide
+// listings that carry these categories so users never hit a dead "install" path
+// until the marketplace catches up.
+//
+// `skills` stays on this list even though `contributes.skills` now exists: the
+// listings under that category predate the field, so none of their manifests
+// declares it or the `skills:contribute` capability, and unhiding them today
+// would re-open the exact dead install path this list exists to prevent. It
+// comes off once the shared index ships listings that declare both.
 export const UNSUPPORTED_MARKETPLACE_CATEGORIES: readonly string[] = [
   'themes',
   'icons',

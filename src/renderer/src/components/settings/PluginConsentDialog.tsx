@@ -54,6 +54,9 @@ function trustTier(plugin: PluginHostListEntry): string {
 function hasInstructionalContent(plugin: PluginHostListEntry): boolean {
   return (
     (plugin.vmRecipes?.length ?? 0) > 0 ||
+    // A contributed skill is read by an agent and acted on with the user's
+    // authority: the same trust tier as a VM recipe, not panel content.
+    (plugin.skills?.length ?? 0) > 0 ||
     plugin.commands.some((command) => command.keybindings.length > 0)
   )
 }

@@ -22,8 +22,13 @@ export const SKILL_COMMAND_SPECS: CommandSpec[] = [
     positionalArgs: ['topic'],
     notes: [
       'Reads bundled guide content locally without contacting the Orca Lab runtime.',
+      'A topic that is not a bundled guide is looked up as a skill contributed by an ' +
+        'installed plugin, which the runtime serves only when that plugin is enabled and ' +
+        'the user approved its skills:contribute capability. The guide prints unchanged on ' +
+        'stdout and the contributing plugin is named on stderr.',
       'Use --full to include bundled reference documents when the guide provides them.',
-      'Use --json for a deterministic object containing canonical topic metadata and content.'
+      'Use --json for a deterministic object containing canonical topic metadata and content; ' +
+        'a plugin-contributed skill adds its sourceLabel and plugin identity.'
     ],
     examples: ['orca skills get orca-cli', 'orca skills get orchestration --full']
   },

@@ -74,6 +74,60 @@ describe('installed plugin discovery identity', () => {
   })
 })
 
+describe('contributed skill discovery', () => {
+  const skillManifest = {
+    manifestVersion: 1,
+    id: 'whatsapp',
+    publisher: 'acme',
+    name: 'WhatsApp',
+    version: '1.0.0',
+    engines: { orca: '>=1.0.0' },
+    pluginApi: 1,
+    contributes: { skills: [{ path: 'skills/send' }] },
+    capabilities: [{ kind: 'skills:contribute' }]
+  }
+
+  it('rejects a declared skill directory with no SKILL.md', async () => {
+    const devDir = await tempPluginsDir()
+    await mkdir(join(devDir, 'skills', 'send'), { recursive: true })
+    await writeFile(join(devDir, 'orca-plugin.json'), JSON.stringify(skillManifest))
+
+    const [plugin] = await discoverPlugins({
+      pluginsDir: await tempPluginsDir(),
+      devPluginPaths: [devDir],
+      hostVersion: '1.4.0'
+    })
+
+    expect(plugin && isInvalidDiscoveredPlugin(plugin)).toBe(true)
+    expect(plugin && 'error' in plugin ? plugin.error : '').toContain('skill skills/send/SKILL.md')
+  })
+
+  it('binds consent to the tree identity once a skill is declared', async () => {
+    const devDir = await tempPluginsDir()
+    await mkdir(join(devDir, 'skills', 'send'), { recursive: true })
+    await writeFile(join(devDir, 'skills', 'send', 'SKILL.md'), '---\nname: send\n---\n')
+    await writeFile(join(devDir, 'orca-plugin.json'), JSON.stringify(skillManifest))
+
+    const [before] = await discoverPlugins({
+      pluginsDir: await tempPluginsDir(),
+      devPluginPaths: [devDir],
+      hostVersion: '1.4.0'
+    })
+    await writeFile(join(devDir, 'skills', 'send', 'SKILL.md'), '---\nname: send\n---\nrm -rf\n')
+    const [after] = await discoverPlugins({
+      pluginsDir: await tempPluginsDir(),
+      devPluginPaths: [devDir],
+      hostVersion: '1.4.0'
+    })
+
+    expect(before && isInvalidDiscoveredPlugin(before)).toBe(false)
+    expect(before && 'consentContentHash' in before ? before.consentContentHash : null).toBeTruthy()
+    expect(before && 'consentFingerprint' in before ? before.consentFingerprint : '').not.toBe(
+      after && 'consentFingerprint' in after ? after.consentFingerprint : ''
+    )
+  })
+})
+
 describe('instructional plugin discovery identity', () => {
   it('changes dev consent when a VM recipe command changes', async () => {
     const pluginsDir = await tempPluginsDir()

@@ -11,7 +11,12 @@ import type { AgentType } from '../../shared/agent-status-types'
 import type { Repo } from '../../shared/repo-types'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 
-export type SkillScanRoot = Omit<SkillDiscoverySource, 'exists' | 'skippedReason'>
+export type SkillScanRoot = Omit<SkillDiscoverySource, 'exists' | 'skippedReason'> & {
+  /** Directory levels below the root the walk may descend; the classification
+   *  by `sourceKind` decides when a root does not say. Plugin-declared skill
+   *  directories pin it to 0: the root itself is the skill. */
+  maxDepth?: number
+}
 type SkillDiscoveryPathApi = Pick<typeof posix, 'basename' | 'join'>
 
 export function stablePathId(pathValue: string): string {

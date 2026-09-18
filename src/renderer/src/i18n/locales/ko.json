@@ -15613,5 +15613,6 @@
   "auto.components.settings.HostAccountLoginDialog.deviceCode": "해당 페이지에 이 코드를 입력하세요:",
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "해당 페이지의 코드",
   "auto.components.settings.HostAccountLoginDialog.cancel": "취소",
-  "auto.components.settings.HostAccountLoginDialog.finish": "로그인 완료"
+  "auto.components.settings.HostAccountLoginDialog.finish": "로그인 완료",
+  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "모든 프로젝트의 모든 에이전트에게 이 플러그인 사용법을 알려줍니다. 스킬 지침은 요청하는 모든 에이전트에게 제공됩니다"
 }

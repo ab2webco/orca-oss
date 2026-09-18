@@ -4,7 +4,10 @@ import type { PluginManifest } from './plugin-manifest'
 
 type PluginConsentSubject = Pick<PluginManifest, 'capabilities' | 'main'> & {
   contributes?: Partial<
-    Pick<PluginManifest['contributes'], 'keybindings' | 'vmRecipes' | 'agents' | 'automations'>
+    Pick<
+      PluginManifest['contributes'],
+      'keybindings' | 'vmRecipes' | 'agents' | 'automations' | 'skills'
+    >
   >
 }
 
@@ -17,7 +20,11 @@ export function hasInstructionalPluginContributions(manifest: PluginConsentSubje
       (contributions.agents?.length ?? 0) > 0 ||
       // Un prompt de automatizacion lo ejecuta despues un agente de codigo con
       // la autoridad del usuario: son bytes instruccionales como los demas.
-      (contributions.automations?.length ?? 0) > 0)
+      (contributions.automations?.length ?? 0) > 0 ||
+      // Una skill se la sirve el host a cualquier agente: cambiar su contenido
+      // cambia lo que se le dice que ejecute, asi que el consentimiento queda
+      // atado al hash del arbol igual que el resto.
+      (contributions.skills?.length ?? 0) > 0)
   )
 }
 

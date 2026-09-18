@@ -87,6 +87,9 @@ export type PluginListEntry = {
     keybindings: { key: string; when: 'global' | 'worktree' }[]
   }[]
   hasWorker: boolean
+  /** Directories the manifest declares as skills; instructional bytes an agent
+   *  is served, so the consent dialog must not read as panel-only content. */
+  skills: string[]
   vmRecipes: {
     id: string
     name: string
@@ -179,6 +182,7 @@ export async function buildPluginList(
           panels: [],
           commands: [],
           hasWorker: false,
+          skills: [],
           vmRecipes: [],
           restarts: 0
         }
@@ -283,6 +287,7 @@ export async function buildPluginList(
           keybindings: command.keybindings
         })),
         hasWorker: Boolean(plugin.manifest.main),
+        skills: plugin.manifest.contributes.skills.map((skill) => skill.path),
         vmRecipes: service.contentPacks.vmRecipes.preview(plugin.pluginKey).map(({ recipe }) => ({
           id: recipe.id,
           name: recipe.name,

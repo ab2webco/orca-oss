@@ -1,6 +1,15 @@
 import { spawn } from 'node:child_process'
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
+import {
+  canonicalGuides,
+  guideNames,
+  guidesByTopic,
+  readContributedSkill,
+  requireTopicName,
+  unknownTopicError,
+  type BundledSkillGuide
+} from './skill-topic-lookup'
 import { delimiter, dirname } from 'node:path'
 import { getRepeatedStringFlag } from '../flags'
 import { resolveCliCommand } from '../../shared/node-cli-command-resolution'
@@ -20,47 +29,6 @@ import {
   buildAgentFeatureSkillInstallArgsByRepository,
   buildAgentFeatureSkillUpdateArgs
 } from '../../shared/agent-feature-install-commands'
-
-type BundledSkillGuide = {
-  name: string
-  description: string
-  markdown: string
-  fullMarkdown: string
-  aliases: readonly string[]
-}
-
-function canonicalGuides(guides: readonly BundledSkillGuide[]): BundledSkillGuide[] {
-  return [...guides].sort((left, right) =>
-    left.name < right.name ? -1 : left.name > right.name ? 1 : 0
-  )
-}
-
-function requireTopic(
-  flags: Map<string, string | boolean>,
-  guides: BundledSkillGuide[]
-): BundledSkillGuide {
-  const availableTopics = guides.map((guide) => guide.name).join(', ')
-  const topic = flags.get('topic')
-  if (typeof topic !== 'string' || topic.length === 0) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `Missing skill topic. Available topics: ${availableTopics}`
-    )
-  }
-  // Why: installed stubs may retain an old topic forever, so aliases and canonical
-  // names share one lookup table instead of being treated as transient CLI aliases.
-  const guideByTopic = new Map<string, BundledSkillGuide>(
-    guides.flatMap((guide) => [guide.name, ...guide.aliases].map((name) => [name, guide]))
-  )
-  const guide = guideByTopic.get(topic)
-  if (!guide) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `Unknown skill topic "${topic}". Available topics: ${availableTopics}`
-    )
-  }
-  return guide
-}
 
 function writeStdout(value: string): void {
   process.stdout.write(value.endsWith('\n') ? value : `${value}\n`)
@@ -84,10 +52,8 @@ function resolveSelectedSkillNames(
   if (selectAll) {
     return guides.map((guide) => guide.name)
   }
-  const availableTopics = guides.map((guide) => guide.name).join(', ')
-  const guideByTopic = new Map<string, BundledSkillGuide>(
-    guides.flatMap((guide) => [guide.name, ...guide.aliases].map((name) => [name, guide]))
-  )
+  const availableTopics = guideNames(guides)
+  const guideByTopic = guidesByTopic(guides)
   const canonicalNames = new Set<string>()
   for (const requested of requestedSkills) {
     const guide = guideByTopic.get(requested)
@@ -351,14 +317,44 @@ export const SKILL_HANDLERS: Record<string, CommandHandler> = {
         : topics.map((topic) => `${topic.name}: ${topic.description}`).join('\n')
     )
   },
-  'skills get': async ({ flags, json }) => {
+  'skills get': async (context) => {
+    const { flags, json } = context
     // Why: keep the large generated table off the eager handler registry path.
     const { BUNDLED_SKILL_GUIDES } = await import('../bundled-skill-guides.js')
     const guides = canonicalGuides(BUNDLED_SKILL_GUIDES)
-    const guide = requireTopic(flags, guides)
+    const topic = requireTopicName(flags, guides)
     const full = flags.has('full')
-    const markdown = full ? guide.fullMarkdown : guide.markdown
-    writeStdout(json ? JSON.stringify({ name: guide.name, full, markdown }, null, 2) : markdown)
+    const guide = guidesByTopic(guides).get(topic)
+    if (guide) {
+      const markdown = full ? guide.fullMarkdown : guide.markdown
+      writeStdout(json ? JSON.stringify({ name: guide.name, full, markdown }, null, 2) : markdown)
+      return
+    }
+    const contributed = await readContributedSkill(context, topic)
+    if (!contributed) {
+      throw unknownTopicError(topic, guides)
+    }
+    if (json) {
+      writeStdout(
+        JSON.stringify(
+          {
+            name: contributed.name,
+            full,
+            markdown: contributed.markdown,
+            sourceLabel: contributed.sourceLabel,
+            plugin: { key: contributed.pluginKey, name: contributed.pluginName }
+          },
+          null,
+          2
+        )
+      )
+      return
+    }
+    // Attribution on stderr, never stdout: a skill that looks built-in but was
+    // shipped by a third party is the confusion to avoid, and piping the guide
+    // must still yield the plugin's bytes unchanged.
+    process.stderr.write(`Contributed by ${contributed.sourceLabel} (${contributed.pluginKey})\n`)
+    writeStdout(contributed.markdown)
   },
   'skills install': createSkillMutationHandler('install'),
   'skills update': createSkillMutationHandler('update')
