@@ -902,6 +902,7 @@
         "linearDescription": "Cómo funciona Linear en Orca Lab, lista de configuración, habilidad del agente y ejemplos de prompts.",
         "pluginsTitle": "Plugins",
         "pluginsDescription": "Instala y administra plugins experimentales de Orca Lab.",
+        "pluginPanelDescription": "Proporcionado por el plugin {{value0}}.",
         "tasksDescription": "Conecta proveedores, instala la habilidad de Linear y elige qué aparece en Tareas.",
         "planeTitle": "Plane",
         "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
@@ -7117,6 +7118,7 @@
           "3bf149e873": "Configuración del proyecto > {{value0}}",
           "075341c763": "Nuevas funciones que aún están tomando forma. Pruébalas.",
           "8b017f2506": "Experimental",
+          "pluginsGroup": "Plugins",
           "499c1cd7f9": "Ajustes de compatibilidad de bajo nivel para solucionar problemas.",
           "1c87f8d024": "Avanzado",
           "c1b43dc4e2": "Datos de uso anónimos y controles de telemetría.",

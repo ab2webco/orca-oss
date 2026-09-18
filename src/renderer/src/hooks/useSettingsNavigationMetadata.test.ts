@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { FileText } from 'lucide-react'
 import { describe, expect, it } from 'vitest'
 import { buildSettingsNavigationMetadata } from './useSettingsNavigationMetadata'
 import type { Repo } from '../../../shared/repo-types'
@@ -393,6 +394,78 @@ describe('settings navigation metadata', () => {
     expect(importLines).not.toMatch(/components\/settings\/Settings(?:'|")/)
     expect(importLines).not.toMatch(/components\/settings\/[A-Z][A-Za-z]+Pane(?:'|")/)
     expect(importLines).not.toMatch(/components\/stats\/StatsPane(?:'|")/)
+  })
+
+  it('gives each settings-surface plugin panel its own page in its own group', () => {
+    const sections = buildSettingsNavigationMetadata({
+      isMac: false,
+      isWindows: false,
+      isWebClient: false,
+      isDev: false,
+      pluginSettingsPanels: [
+        {
+          id: 'registry',
+          title: 'Webhook Registry',
+          icon: 'file-text',
+          tabKey: 'plugin:orca-samples.webhook/registry',
+          surface: 'settings',
+          pluginKey: 'orca-samples.webhook',
+          pluginName: 'Webhook'
+        }
+      ],
+      repos: [repo]
+    })
+    const sectionIds = sections.map((section) => section.id)
+    const panelSection = sections.find(
+      (section) => section.id === 'plugin:orca-samples.webhook/registry'
+    )
+
+    expect(sectionIds.indexOf('plugin:orca-samples.webhook/registry')).toBe(
+      sectionIds.indexOf('plugins') + 1
+    )
+    expect(panelSection?.title).toBe('Webhook Registry')
+    // Own group, not Experimental: five plugins there would bury the Plugins row.
+    expect(panelSection?.group).toBe('plugins')
+    expect(sections.find((section) => section.id === 'plugins')?.group).toBe('experimental')
+    expect(panelSection?.icon).toBe(FileText)
+    // Without a search entry the row vanishes the moment the user types.
+    expect(panelSection?.searchEntries).toEqual([
+      { title: 'Webhook Registry', keywords: ['Webhook'] }
+    ])
+  })
+
+  it('emits no plugins-group section when no plugin contributes a settings page', () => {
+    expect(
+      buildSettingsNavigationMetadata({
+        isMac: false,
+        isWindows: false,
+        isWebClient: false,
+        isDev: false,
+        repos: [repo]
+      }).some((section) => section.group === 'plugins')
+    ).toBe(false)
+  })
+
+  it('keeps plugin panel pages off the web client, which has no Plugins row', () => {
+    expect(
+      buildSettingsNavigationMetadata({
+        isMac: false,
+        isWindows: false,
+        isWebClient: true,
+        isDev: false,
+        pluginSettingsPanels: [
+          {
+            id: 'registry',
+            title: 'Webhook Registry',
+            tabKey: 'plugin:orca-samples.webhook/registry',
+            surface: 'settings',
+            pluginKey: 'orca-samples.webhook',
+            pluginName: 'Webhook'
+          }
+        ],
+        repos: [repo]
+      }).map((section) => section.id)
+    ).not.toContain('plugin:orca-samples.webhook/registry')
   })
 
   it('does not import Settings page or pane UI modules from the quick action registry', () => {

@@ -674,3 +674,71 @@ describe('createUISlice space navigation', () => {
     expect(store.getState().activeView).toBe('artifacts')
   })
 })
+
+describe('createUISlice plugin nav navigation', () => {
+  it('opens a plugin nav page and restores the originating view on close', () => {
+    const store = createUIStore()
+
+    store.getState().openTaskPage()
+    store.getState().openPluginNavPage('plugin:orca-samples.demo/inbox')
+
+    expect(store.getState().activeView).toBe('plugin')
+    expect(store.getState().activePluginNavTabKey).toBe('plugin:orca-samples.demo/inbox')
+    expect(store.getState().previousViewBeforePlugin).toBe('tasks')
+
+    store.getState().closePluginNavPage()
+
+    expect(store.getState().activeView).toBe('tasks')
+    expect(store.getState().activePluginNavTabKey).toBeNull()
+  })
+
+  it('keeps the original return target when another nav panel is opened from the page', () => {
+    const store = createUIStore()
+
+    store.getState().openTaskPage()
+    store.getState().openPluginNavPage('plugin:orca-samples.demo/inbox')
+    store.getState().openPluginNavPage('plugin:orca-samples.demo/outbox')
+
+    expect(store.getState().activePluginNavTabKey).toBe('plugin:orca-samples.demo/outbox')
+    expect(store.getState().previousViewBeforePlugin).toBe('tasks')
+  })
+
+  it('never restores a plugin page from persistence, whose panel is not persisted', () => {
+    const store = createUIStore()
+
+    store.getState().hydratePersistedUI(makePersistedUI({ activeView: 'plugin' }), 'startup')
+
+    expect(store.getState().activeView).toBe('terminal')
+  })
+
+  it('clears a dead plugin route from the active view and from every back target', () => {
+    const store = createUIStore()
+    store.setState({
+      activeView: 'plugin',
+      activePluginNavTabKey: 'plugin:orca-samples.demo/inbox',
+      previousViewBeforeSettings: 'plugin',
+      previousViewBeforeAutomations: 'plugin'
+    })
+
+    store.getState().clearPluginNavRoute()
+
+    expect(store.getState().activeView).toBe('terminal')
+    expect(store.getState().activePluginNavTabKey).toBeNull()
+    expect(store.getState().previousViewBeforeSettings).toBe('terminal')
+    expect(store.getState().previousViewBeforeAutomations).toBe('terminal')
+  })
+
+  it('leaves an unrelated view alone while dropping only the plugin back target', () => {
+    const store = createUIStore()
+    store.setState({
+      activeView: 'automations',
+      activePluginNavTabKey: 'plugin:orca-samples.demo/inbox',
+      previousViewBeforeAutomations: 'plugin'
+    })
+
+    store.getState().clearPluginNavRoute()
+
+    expect(store.getState().activeView).toBe('automations')
+    expect(store.getState().previousViewBeforeAutomations).toBe('terminal')
+  })
+})

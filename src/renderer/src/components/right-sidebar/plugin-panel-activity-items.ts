@@ -25,16 +25,15 @@ import {
   Star,
   Terminal,
   Wrench,
-  Zap
+  Zap,
+  type LucideIcon
 } from 'lucide-react'
-import type { ActivePluginPanel } from '@/store/plugin-panels'
+import { isWorktreeSurfacePanel, type ActivePluginPanel } from '@/store/plugin-panels'
 import type { ActivityBarItem } from './activity-bar-buttons'
-
-type PluginPanelIcon = ActivityBarItem['icon']
 
 // Why: importing lucide's full `icons` map would bundle every icon and defeat
 // tree-shaking, so plugin manifests pick from this curated set (fallback: Plug).
-const PLUGIN_PANEL_ICONS: Record<string, PluginPanelIcon> = {
+const PLUGIN_PANEL_ICONS: Record<string, LucideIcon> = {
   activity: Activity,
   barchart3: BarChart3,
   bell: Bell,
@@ -64,7 +63,7 @@ const PLUGIN_PANEL_ICONS: Record<string, PluginPanelIcon> = {
   zap: Zap
 }
 
-export function resolvePluginPanelIcon(iconName: string | undefined): PluginPanelIcon {
+export function resolvePluginPanelIcon(iconName: string | undefined): LucideIcon {
   if (!iconName) {
     return Plug
   }
@@ -77,12 +76,14 @@ export function resolvePluginPanelIcon(iconName: string | undefined): PluginPane
     : Plug
 }
 
-/** Maps active plugin panel contributions onto right-sidebar activity items. */
+/** Maps active plugin panel contributions onto right-sidebar activity items.
+ *  Filtering happens here and not in `collectActivePluginPanels` because the
+ *  Settings surface resolves its panel through that same collection. */
 export function getPluginPanelActivityItems(
   panels: ActivePluginPanel[],
   panelErrors: Readonly<Record<string, true>> = {}
 ): ActivityBarItem[] {
-  return panels.map((panel) => ({
+  return panels.filter(isWorktreeSurfacePanel).map((panel) => ({
     id: panel.tabKey,
     icon: resolvePluginPanelIcon(panel.icon),
     // Why: panel titles come from plugin manifests, not the app catalog, so

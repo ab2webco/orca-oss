@@ -46,6 +46,9 @@ import { getRepoKindLabel } from '../../../shared/repo-kind'
 import { useAppStore } from '@/store'
 import { isMacUserAgent, isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 import type { SettingsNavSection } from '@/lib/settings-navigation-types'
+import type { ActivePluginPanel } from '@/store/plugin-panels'
+import { useEnabledPluginSettingsPanels } from '@/components/plugins/plugin-surface-pages'
+import { resolvePluginPanelIcon } from '@/components/right-sidebar/plugin-panel-activity-items'
 import { getGeneralPaneSearchEntries } from '@/components/settings/general-search'
 import { getAgentsPaneSearchEntries } from '@/components/settings/agents-search'
 import { getAccountsPaneSearchEntries } from '@/components/settings/accounts-search'
@@ -136,6 +139,7 @@ export function buildSettingsNavigationMetadata({
   isDev = import.meta.env.DEV,
   isLinearConnected = false,
   isPlaneConnected = false,
+  pluginSettingsPanels = [],
   repos
 }: {
   isMac: boolean
@@ -148,6 +152,8 @@ export function buildSettingsNavigationMetadata({
   isDev?: boolean
   isLinearConnected?: boolean
   isPlaneConnected?: boolean
+  /** `surface: 'settings'` panels of enabled plugins, one Settings page each. */
+  pluginSettingsPanels?: readonly ActivePluginPanel[]
   repos: readonly Repo[]
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
@@ -684,7 +690,21 @@ export function buildSettingsNavigationMetadata({
             icon: Blocks,
             searchEntries: getPluginsPaneSearchEntries(),
             group: 'experimental'
-          }
+          },
+          // Why: a settings-surface panel is global config, so it gets the page
+          // width every other Settings pane has instead of a card in the grid.
+          ...pluginSettingsPanels.map((panel) => ({
+            id: panel.tabKey,
+            title: panel.title,
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.pluginPanelDescription',
+              'Provided by the {{value0}} plugin.',
+              { value0: panel.pluginName }
+            ),
+            icon: resolvePluginPanelIcon(panel.icon),
+            searchEntries: [{ title: panel.title, keywords: [panel.pluginName] }],
+            group: 'plugins'
+          }))
         ]
       : []),
     // Why: one nav row per project, not per repo row — a project set up on
@@ -737,6 +757,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const isWebClient = isWebClientLocation()
   const isLinearConnected = useLinearProviderConnected()
   const isPlaneConnected = usePlaneProviderConnected()
+  const pluginSettingsPanels = useEnabledPluginSettingsPanels()
   const windowsTerminalCapabilityOwnerKey = useWindowsTerminalCapabilityOwnerKey(
     settings?.activeRuntimeEnvironmentId
   )
@@ -780,6 +801,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isDev: import.meta.env.DEV,
         isLinearConnected,
         isPlaneConnected,
+        pluginSettingsPanels,
         repos
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
@@ -793,6 +815,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
       mobileEmulatorCreationEnabled,
       isLinearConnected,
       isPlaneConnected,
+      pluginSettingsPanels,
       repos,
       activeLocale
     ]

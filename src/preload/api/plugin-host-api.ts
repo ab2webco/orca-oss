@@ -15,6 +15,9 @@ export type PluginHostPanel = {
   /** Lucide icon name declared in the plugin manifest. */
   icon?: string
   tabKey: `plugin:${string}`
+  /** Absent over the wire when the host predates panel surfaces, or when the
+   *  panel uses the default one; both mean `worktree`. */
+  surface?: 'worktree' | 'settings' | 'nav'
 }
 
 /** `pending` = awaiting (re-)consent; `idle` = enabled, worker not running

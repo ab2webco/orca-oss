@@ -8,6 +8,28 @@ export type ActivePluginPanel = PluginHostPanel & {
   pluginName: string
 }
 
+/** Statuses whose panels are mounted. `idle` and `restarting` still show panels
+ *  — the panel itself never needs a worker — but `errored` does not, so any
+ *  surface offering a panel must agree with this or it opens an empty state. */
+export function pluginPanelsAreMounted(plugin: Pick<PluginHostListEntry, 'status'>): boolean {
+  return plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
+}
+
+/** No `surface` (host predates them) means worktree; allow-list so an unknown
+ *  surface never leaks into the per-worktree activity bar. */
+export function isWorktreeSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface === undefined || panel.surface === 'worktree'
+}
+
+export function isSettingsSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface === 'settings'
+}
+
+/** Panels promoted to a first-level destination in the left sidebar. */
+export function isNavSurfacePanel(panel: PluginHostPanel): boolean {
+  return panel.surface === 'nav'
+}
+
 export type ActivePluginCommand = PluginHostListEntry['commands'][number] & {
   pluginKey: string
   pluginName: string
@@ -139,18 +161,13 @@ export function ensurePluginPanelsLoaded(): void {
 /** Panels of plugins the user enabled (consented + not disabled). `idle` and
  *  `restarting` still show panels — the panel itself never needs a worker. */
 export function collectActivePluginPanels(plugins: PluginHostListEntry[]): ActivePluginPanel[] {
-  return plugins
-    .filter(
-      (plugin) =>
-        plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
-    )
-    .flatMap((plugin) =>
-      plugin.panels.map((panel) => ({
-        ...panel,
-        pluginKey: plugin.pluginKey,
-        pluginName: plugin.name
-      }))
-    )
+  return plugins.filter(pluginPanelsAreMounted).flatMap((plugin) =>
+    plugin.panels.map((panel) => ({
+      ...panel,
+      pluginKey: plugin.pluginKey,
+      pluginName: plugin.name
+    }))
+  )
 }
 
 /** Tab keys of every installed plugin panel (any status) — used by the
@@ -202,6 +219,19 @@ export function usePluginPanels(): ActivePluginPanel[] {
   // Why: derive in useMemo (not the selector) so the store snapshot stays
   // referentially stable and doesn't retrigger useSyncExternalStore loops.
   return useMemo(() => collectActivePluginPanels(plugins), [plugins])
+}
+
+/** Nav-surface panels of enabled plugins — one left-sidebar destination each;
+ *  disabling or uninstalling a plugin drops its destination for free. */
+export function usePluginNavPanels(): ActivePluginPanel[] {
+  const panels = usePluginPanels()
+  return useMemo(() => panels.filter(isNavSurfacePanel), [panels])
+}
+
+/** Settings-surface panels of enabled plugins, one Settings page each. */
+export function usePluginSettingsPanels(): ActivePluginPanel[] {
+  const panels = usePluginPanels()
+  return useMemo(() => panels.filter(isSettingsSurfacePanel), [panels])
 }
 
 /** Commands of enabled plugins, sharing the authoritative plugin-list refresh. */

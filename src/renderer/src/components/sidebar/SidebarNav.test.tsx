@@ -8,6 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
+import type { ActivePluginPanel } from '@/store/plugin-panels'
 import { i18n } from '../../i18n/i18n'
 import { PSEUDO_LOCALIZATION_LOCALE } from '../../i18n/pseudo-localization'
 
@@ -26,11 +27,20 @@ const mocks = vi.hoisted(() => ({
   agentBucketCounts: { attention: 0, working: 0, done: 0, idle: 0 },
   getAgentBucketCounts: vi.fn(),
   dismissMobileOnboardingBadge: vi.fn(),
-  setSetupGuideSidebarDismissed: vi.fn()
+  setSetupGuideSidebarDismissed: vi.fn(),
+  openPluginNavPage: vi.fn(),
+  navPanels: [] as ActivePluginPanel[]
 }))
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) => selector(mocks.state)
+}))
+
+// Only the nav-panel hook is faked; the surface predicates stay real so this
+// suite cannot pass against a broken one.
+vi.mock('@/store/plugin-panels', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  usePluginNavPanels: () => mocks.navPanels
 }))
 
 vi.mock('@/store/selectors', () => ({
@@ -148,7 +158,9 @@ function setSidebarState({
     persistedUIReady: true,
     activeModal: null,
     setupGuideSidebarDismissed: true,
-    setSetupGuideSidebarDismissed: mocks.setSetupGuideSidebarDismissed
+    setSetupGuideSidebarDismissed: mocks.setSetupGuideSidebarDismissed,
+    openPluginNavPage: mocks.openPluginNavPage,
+    activePluginNavTabKey: null
   }
 }
 
@@ -217,6 +229,7 @@ describe('SidebarNav', () => {
     await i18n.changeLanguage('en')
     mocks.hasPairedMobileDevice = false
     mocks.agentBucketCounts = { attention: 0, working: 0, done: 0, idle: 0 }
+    mocks.navPanels = []
     setSidebarState()
   })
 
@@ -528,6 +541,62 @@ describe('SidebarNav', () => {
     expect(shouldShowSetupGuideEntry({ ready: true, setupComplete: false, dismissed: true })).toBe(
       false
     )
+  })
+
+  it('gives every nav-surface panel of an enabled plugin its own first-level entry', async () => {
+    mocks.navPanels = [
+      {
+        id: 'inbox',
+        title: 'Messages',
+        icon: 'bell',
+        tabKey: 'plugin:orca-samples.demo/inbox',
+        surface: 'nav',
+        pluginKey: 'orca-samples.demo',
+        pluginName: 'Demo'
+      }
+    ]
+    setSidebarState({ settings: { ...getDefaultSettings('/tmp'), pluginSystemEnabled: true } })
+    const container = await renderSidebarNav()
+
+    await clickButton(getButtonByText(container, 'Messages'))
+
+    expect(mocks.openPluginNavPage).toHaveBeenCalledWith('plugin:orca-samples.demo/inbox')
+  })
+
+  it('omits plugin nav entries while the plugin system is off', async () => {
+    mocks.navPanels = [
+      {
+        id: 'inbox',
+        title: 'Messages',
+        tabKey: 'plugin:orca-samples.demo/inbox',
+        surface: 'nav',
+        pluginKey: 'orca-samples.demo',
+        pluginName: 'Demo'
+      }
+    ]
+    setSidebarState({ settings: { ...getDefaultSettings('/tmp'), pluginSystemEnabled: false } })
+    const container = await renderSidebarNav()
+
+    expect(queryButtonByText(container, 'Messages')).toBeNull()
+  })
+
+  it('marks the open plugin destination as the current page', async () => {
+    mocks.navPanels = [
+      {
+        id: 'inbox',
+        title: 'Messages',
+        tabKey: 'plugin:orca-samples.demo/inbox',
+        surface: 'nav',
+        pluginKey: 'orca-samples.demo',
+        pluginName: 'Demo'
+      }
+    ]
+    setSidebarState({ settings: { ...getDefaultSettings('/tmp'), pluginSystemEnabled: true } })
+    mocks.state.activeView = 'plugin'
+    mocks.state.activePluginNavTabKey = 'plugin:orca-samples.demo/inbox'
+    const container = await renderSidebarNav()
+
+    expect(getButtonByText(container, 'Messages').getAttribute('aria-current')).toBe('page')
   })
 
   it('requires both persisted UI and setup progress readiness before showing setup guide entry', () => {

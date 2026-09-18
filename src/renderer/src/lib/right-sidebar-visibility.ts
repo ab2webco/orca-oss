@@ -10,7 +10,10 @@ const RIGHT_SIDEBAR_SUPPRESSED_VIEWS = new Set<ActiveView>([
   'automations',
   'space',
   'artifacts',
-  'mobile'
+  'mobile',
+  // A nav-surface plugin page is global; the per-worktree rail beside it would
+  // crush the page and imply the panel belongs to the open workspace.
+  'plugin'
 ])
 
 export function canShowRightSidebarForView(activeView: ActiveView): boolean {

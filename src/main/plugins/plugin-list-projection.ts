@@ -31,6 +31,7 @@ export type PluginListPanelEntry = {
   title: string
   icon?: string
   tabKey: `plugin:${string}`
+  surface?: 'worktree' | 'settings' | 'nav'
 }
 
 export type PluginListStatus =
@@ -195,7 +196,10 @@ export async function buildPluginList(
           id: panel.id,
           title: panel.title,
           ...(panel.icon ? { icon: panel.icon } : {}),
-          tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id)
+          tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id),
+          // Solo el valor no-default viaja: un cliente viejo ignora la clave y
+          // un host viejo que no la manda sigue significando 'worktree'.
+          ...(panel.surface === 'worktree' ? {} : { surface: panel.surface })
         })),
         commands: service.contentPacks.commands.preview(plugin.pluginKey).map((command) => ({
           id: command.id,

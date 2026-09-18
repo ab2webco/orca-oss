@@ -902,6 +902,7 @@
         "linearDescription": "Linear 在 Orca Lab 中的工作方式、设置清单、智能体技能和提示词示例。",
         "pluginsTitle": "插件",
         "pluginsDescription": "安装和管理实验性 Orca Lab 插件。",
+        "pluginPanelDescription": "由 {{value0}} 插件提供。",
         "tasksDescription": "连接提供商、安装 Linear 技能并选择要在任务中显示的内容。",
         "planeTitle": "Plane",
         "planeDescription": "Give agents the skill to read and update your Plane work items."
@@ -7103,6 +7104,7 @@
           "3bf149e873": "项目设置 > {{value0}}",
           "075341c763": "仍在形成的新功能。尝试一下。",
           "8b017f2506": "实验性",
+          "pluginsGroup": "插件",
           "499c1cd7f9": "用于故障排除的低级兼容性设置。",
           "1c87f8d024": "高级",
           "c1b43dc4e2": "匿名使用数据和遥测控制。",

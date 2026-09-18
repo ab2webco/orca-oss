@@ -54,6 +54,8 @@ import { NotificationsPane } from './NotificationsPane'
 import { VoicePane } from './VoicePane'
 import { SshPane } from './SshPane'
 import { ExperimentalPane } from './ExperimentalPane'
+import PluginPanel from '../right-sidebar/PluginPanel'
+import { useEnabledPluginSettingsPanels } from '../plugins/plugin-surface-pages'
 import { PluginsSettingsSection } from './PluginsSettingsSection'
 import { AgentsPane } from './AgentsPane'
 import { OrchestrationPane } from './OrchestrationPane'
@@ -177,6 +179,14 @@ const SETTINGS_NAV_GROUPS = [
     id: 'experimental',
     titleKey: 'auto.components.settings.Settings.8b017f2506',
     titleDefault: 'Experimental'
+  },
+  // Last, and its own group: plugin pages stacked inside Experimental would
+  // bury the Plugins row, and third-party config does not belong in Orca's
+  // own product taxonomy.
+  {
+    id: 'plugins',
+    titleKey: 'auto.components.settings.Settings.pluginsGroup',
+    titleDefault: 'Plugins'
   }
 ] as const
 
@@ -386,6 +396,7 @@ function Settings(): React.JSX.Element {
     [fontSuggestions]
   )
   const [activeSectionId, setActiveSectionId] = useState('general')
+  const pluginSettingsPanels = useEnabledPluginSettingsPanels()
   const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(
     getInitialMountedSectionIds
   )
@@ -1217,6 +1228,13 @@ function Settings(): React.JSX.Element {
   const isSectionMounted = (sectionId: string): boolean => neededSectionIds.has(sectionId)
   const isFocusedShortcutsPane =
     activeSectionId === 'shortcuts' && settingsSearchQuery.trim() === ''
+  // Why: a plugin panel owns its height like Shortcuts does, so the page must
+  // stop scrolling behind it instead of nesting a scroller in a scroller.
+  const activePluginPanelTabKey =
+    settingsSearchQuery.trim() === '' &&
+    pluginSettingsPanels.some((panel) => panel.tabKey === activeSectionId)
+      ? activeSectionId
+      : null
   const isFocusedSetupGuidePane =
     activeSectionId === 'setup-guide' && settingsSearchQuery.trim() === ''
 
@@ -1245,13 +1263,15 @@ function Settings(): React.JSX.Element {
           ref={setContentScrollNode}
           className={cn(
             'min-h-0 flex-1',
-            isFocusedShortcutsPane ? 'overflow-hidden' : 'overflow-y-auto scrollbar-sleek'
+            isFocusedShortcutsPane || activePluginPanelTabKey
+              ? 'overflow-hidden'
+              : 'overflow-y-auto scrollbar-sleek'
           )}
         >
           <div
             className={cn(
               'mx-auto flex w-full flex-col gap-10 px-8 pt-10',
-              isFocusedShortcutsPane ? 'h-full pb-6' : 'pb-24',
+              isFocusedShortcutsPane || activePluginPanelTabKey ? 'h-full pb-6' : 'pb-24',
               isFocusedSetupGuidePane ? 'max-w-6xl' : 'max-w-4xl'
             )}
           >
@@ -1906,6 +1926,35 @@ function Settings(): React.JSX.Element {
                     updateSettings={updateSettingsOrThrow}
                   />
                 ) : null}
+
+                {/* Why: title/description/search come from the same nav metadata
+                    that built the sidebar row, so the two cannot drift. */}
+                {pluginSettingsPanels.map((panel) => {
+                  const panelSection = navSectionById.get(panel.tabKey)
+                  if (!panelSection) {
+                    return null
+                  }
+                  const focused = activePluginPanelTabKey === panel.tabKey
+                  return (
+                    <SettingsSection
+                      key={panel.tabKey}
+                      id={panel.tabKey}
+                      title={panelSection.title}
+                      description={panelSection.description}
+                      searchEntries={panelSection.searchEntries}
+                      className={
+                        focused ? 'flex min-h-0 flex-1 flex-col gap-6 space-y-0' : undefined
+                      }
+                      bodyClassName={
+                        focused ? 'flex min-h-0 flex-1 overflow-hidden p-0' : undefined
+                      }
+                    >
+                      {isSectionMounted(panel.tabKey) ? (
+                        <PluginPanel tabKey={panel.tabKey} />
+                      ) : null}
+                    </SettingsSection>
+                  )
+                })}
 
                 {settingsProjectList.map((settingsProject) => {
                   const repoSectionId = `repo-${settingsProject.representativeRepoId}`

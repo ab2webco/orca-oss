@@ -902,6 +902,7 @@
         "linearDescription": "Orca Lab での Linear の仕組み、セットアップチェックリスト、Agent スキル、プロンプト例。",
         "pluginsTitle": "プラグイン",
         "pluginsDescription": "実験的機能の Orca Lab プラグインをインストール・管理します。",
+        "pluginPanelDescription": "{{value0}} プラグインが提供します。",
         "tasksDescription": "プロバイダーを接続し、Linear スキルをインストールして、タスクに表示する項目を選択します。",
         "planeTitle": "Plane",
         "planeDescription": "Give agents the skill to read and update your Plane work items."
@@ -7128,6 +7129,7 @@
           "3bf149e873": "プロジェクト設定 > {{value0}}",
           "075341c763": "まだ形になりつつある新機能。試してみてください。",
           "8b017f2506": "実験的機能",
+          "pluginsGroup": "プラグイン",
           "499c1cd7f9": "トラブルシューティングのための低レベルの互換性設定。",
           "1c87f8d024": "詳細設定",
           "c1b43dc4e2": "匿名の使用状況データとテレメトリ制御。",
