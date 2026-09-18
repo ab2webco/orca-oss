@@ -16,6 +16,7 @@ export const PANEL_ACTION_REQUEST_TYPE = 'orca-panel-action'
 export const PANEL_ACTION_RESULT_TYPE = 'orca-panel-action-result'
 export const PANEL_PING_TYPE = 'orca-panel-ping'
 export const PANEL_PONG_TYPE = 'orca-panel-pong'
+export const PANEL_CONTENT_HEIGHT_TYPE = 'orca-panel-content-height'
 export const PLUGIN_PANEL_FRAME_NAME_PREFIX = 'orca-plugin-panel:'
 
 /** Per-plugin bridge budgets, enforced host-side. */
@@ -34,6 +35,25 @@ export const PANEL_CONTROL_MESSAGE_MAX_BYTES = 1024
  *  process gate confirms the sandbox stays outside the host renderer. */
 export const PANEL_WATCHDOG_PING_INTERVAL_MS = 10_000
 export const PANEL_WATCHDOG_PONG_TIMEOUT_MS = 5_000
+
+/** Bounds for a panel-reported content height, in CSS pixels.
+ *
+ *  The frame is sandboxed without `allow-same-origin`, so the host can never
+ *  read `contentDocument` nor observe the document from outside: the height
+ *  only ever arrives as a number the panel chose, which makes it untrusted
+ *  input like every other frame on this bridge. The floor keeps an empty or
+ *  still-booting document from collapsing to a hairline. The ceiling is the
+ *  whole reason a cap exists: the host allocates a real compositor layer for
+ *  whatever height it is given, so a buggy loop asking for 2,000,000px would
+ *  take the window down. 8,000px is about eight full-height settings screens
+ *  — past that the panel is broken or hostile, and clamping there degrades to
+ *  today's behaviour (the panel scrolls inside its own frame) instead of
+ *  hanging the app. `INITIAL` is what the frame is given before its first
+ *  report lands.
+ */
+export const PANEL_CONTENT_HEIGHT_MIN_PX = 48
+export const PANEL_CONTENT_HEIGHT_MAX_PX = 8_000
+export const PANEL_CONTENT_HEIGHT_INITIAL_PX = 320
 
 export const panelActionRequestSchema = z.object({
   type: z.literal(PANEL_ACTION_REQUEST_TYPE),
@@ -149,4 +169,27 @@ export function readPanelPongId(data: unknown): number | null {
   // isSafeInteger, not isInteger: zod's .int() rejects 2**53 and above, and a
   // wider reader would admit ids the watchdog can never have issued.
   return Number.isSafeInteger(frame.pingId) && frame.pingId >= 0 ? frame.pingId : null
+}
+
+/** Reads a content-height frame and returns the height the host may apply,
+ *  clamped to [MIN, MAX], or null when the frame is not one. Hand-rolled for
+ *  the same reason as `readPanelPongId`: it runs on every inbound frame.
+ *  NaN, Infinity and non-positive values are rejected outright rather than
+ *  clamped — none of them is a height a working panel can have measured, and
+ *  clamping them would let junk resize the frame. */
+export function readPanelContentHeight(data: unknown): number | null {
+  if (typeof data !== 'object' || data === null) {
+    return null
+  }
+  const frame = data as { type?: unknown; height?: unknown }
+  if (frame.type !== PANEL_CONTENT_HEIGHT_TYPE || typeof frame.height !== 'number') {
+    return null
+  }
+  if (!Number.isFinite(frame.height) || frame.height <= 0) {
+    return null
+  }
+  return Math.min(
+    Math.max(Math.ceil(frame.height), PANEL_CONTENT_HEIGHT_MIN_PX),
+    PANEL_CONTENT_HEIGHT_MAX_PX
+  )
 }
