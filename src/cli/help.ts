@@ -274,7 +274,7 @@ Common Commands:
 
 Selectors:
   --repo <selector>         Registered repo selector such as id:<id>, name:<name>, or path:<path>
-  --worktree <selector>     Worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, path:<path>, or active/current
+  --worktree <selector>     Worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, path:<path>, active/current, or floating (Orca's floating workspace)
   --terminal <handle>       Runtime-issued terminal handle returned by \`orca terminal list --json\`
   --parent-worktree <selector> Parent worktree selector such as id:<repo-id>::<path>, branch:<branch>, issue:<number>, path:<path>, or active/current
   --no-parent               Force no parent lineage for unrelated worktree creation/update
@@ -631,7 +631,7 @@ export function formatFlagHelp(flag: string): string {
     'to-x': '--to-x <x>             Destination window-local x coordinate',
     'to-y': '--to-y <y>             Destination window-local y coordinate',
     worktree:
-      '--worktree <selector>  Worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, path:<path>, or active/current',
+      '--worktree <selector>  Worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, path:<path>, active/current, or floating',
     workspace: '--workspace <selector> Existing worktree selector for automation runs',
     'workspace-status':
       '--workspace-status <id> Board status id (defaults: todo, in-progress, in-review, completed)',

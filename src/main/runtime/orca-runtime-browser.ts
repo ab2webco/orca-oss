@@ -57,6 +57,10 @@ import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
 import { browserCertificateTrustController, browserManager } from '../browser/browser-manager'
 import { BrowserError } from '../browser/cdp-bridge'
+import {
+  FLOATING_TERMINAL_WORKTREE_ID,
+  isFloatingWorkspaceSelector
+} from '../../shared/floating-workspace-selector'
 import { startBrowserScreencast } from '../browser/browser-screencast-stream'
 import type { BrowserScreencastSession } from '../browser/browser-screencast-stream-types'
 import { browserSessionRegistry } from '../browser/browser-session-registry'
@@ -201,6 +205,15 @@ export class RuntimeBrowserCommands {
     return Boolean(guest && !guest.isDestroyed())
   }
 
+  // Why: the floating workspace is app-owned and has no repository worktree, so the fleet resolver
+  // can only answer selector_not_found for it; name its synthetic id directly instead.
+  private async resolveWorktreeIdForBrowserScope(selector: string): Promise<string> {
+    if (isFloatingWorkspaceSelector(selector)) {
+      return FLOATING_TERMINAL_WORKTREE_ID
+    }
+    return (await this.host.resolveWorktreeSelector(selector)).id
+  }
+
   // Why: the CLI sends selectors (e.g. "path:/...") but the bridge keys tabs by "repoId::path"; resolve to that store-compatible id.
   private async resolveBrowserWorktreeId(selector?: string): Promise<string | undefined> {
     if (!selector) {
@@ -216,7 +229,7 @@ export class RuntimeBrowserCommands {
       return undefined
     }
 
-    const worktreeId = (await this.host.resolveWorktreeSelector(selector)).id
+    const worktreeId = await this.resolveWorktreeIdForBrowserScope(selector)
     // Why: explicit selectors are user intent, so resolution errors surface (not silently widen scope); only activation stays best-effort.
     const bridge = this.host.getAgentBrowserBridge()
     if (bridge && !this.hasLiveRegisteredBrowserTab(bridge, worktreeId)) {
@@ -241,7 +254,7 @@ export class RuntimeBrowserCommands {
     }
 
     const worktreeId = params.worktree
-      ? (await this.host.resolveWorktreeSelector(params.worktree)).id
+      ? await this.resolveWorktreeIdForBrowserScope(params.worktree)
       : undefined
     const bridge = this.host.getAgentBrowserBridge()
     if (bridge && !this.hasLiveRegisteredBrowserPage(bridge, worktreeId, browserPageId)) {
@@ -1307,7 +1320,7 @@ export class RuntimeBrowserCommands {
   }): Promise<{ browserPageId: string }> {
     const url = params.url ?? 'about:blank'
     const worktreeId = params.worktree
-      ? (await this.host.resolveWorktreeSelector(params.worktree)).id
+      ? await this.resolveWorktreeIdForBrowserScope(params.worktree)
       : undefined
     const sessionPartition = browserSessionRegistry.resolveKnownPartition(params.profileId)
     if (!sessionPartition) {
@@ -1608,7 +1621,7 @@ export class RuntimeBrowserCommands {
     const explicitPage = typeof params.page === 'string' && params.page.length > 0
     const worktreeId = explicitPage
       ? params.worktree
-        ? (await this.host.resolveWorktreeSelector(params.worktree)).id
+        ? await this.resolveWorktreeIdForBrowserScope(params.worktree)
         : undefined
       : await this.resolveBrowserWorktreeId(params.worktree)
 
