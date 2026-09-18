@@ -5,6 +5,10 @@ import type {
   RuntimeWorktreeRecord
 } from '../shared/runtime-types'
 import { isPathInsideOrEqual } from '../shared/cross-platform-path'
+import {
+  FLOATING_WORKSPACE_WORKTREE_SELECTOR,
+  isFloatingWorkspaceSelector
+} from '../shared/floating-workspace-selector'
 import type { RuntimeClient } from './runtime-client'
 import { RuntimeClientError } from './runtime/types'
 import { getOptionalStringFlag, getRequiredStringFlag } from './flags'
@@ -28,6 +32,11 @@ export function normalizeWorktreeSelector(selector: string, cwd: string): string
   if (selector === 'active' || selector === 'current') {
     return buildCurrentWorktreeSelector(cwd)
   }
+  // Why: the floating workspace has a fixed synthetic id and no path, so the alias expands here
+  // rather than being resolved — that keeps it valid on remote runtimes too.
+  if (isFloatingWorkspaceSelector(selector)) {
+    return FLOATING_WORKSPACE_WORKTREE_SELECTOR
+  }
   return selector
 }
 
@@ -39,7 +48,7 @@ function assertLocalCwdWorktreeSelector(selector: string, client: RuntimeClient)
   // server, so cwd-derived worktree selectors are only valid locally.
   throw new RuntimeClientError(
     'invalid_argument',
-    `${selector} is a local cwd shortcut and cannot be resolved against a remote runtime. Pass an explicit server-side worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, or path:<absolute-server-path>.`
+    `${selector} is a local cwd shortcut and cannot be resolved against a remote runtime. Pass an explicit server-side worktree selector such as id:<repo-id>::<path>, name:<displayName>, branch:<branch>, issue:<number>, path:<absolute-server-path>, or floating.`
   )
 }
 
@@ -232,7 +241,7 @@ export async function getEmulatorWorktreeSelector(
       assertLocalCwdWorktreeSelector(explicit, client)
       return resolveCurrentWorktreeSelector(cwd, client)
     }
-    return explicit
+    return normalizeWorktreeSelector(explicit, cwd)
   }
   if (client.isRemote) {
     return undefined

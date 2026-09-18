@@ -119,7 +119,8 @@ export const STAR_NAG_INITIAL_THRESHOLD = 35
 export const ORPHAN_WORKTREE_ID = '__orphan__'
 
 // Why: synthetic local workspace; persistence pruning must classify it without the repo catalog.
-export const FLOATING_TERMINAL_WORKTREE_ID = 'global-floating-terminal'
+// Declared in its own module so the CLI can address it without pulling this settings graph.
+export { FLOATING_TERMINAL_WORKTREE_ID } from './floating-workspace-selector'
 
 export const REPO_COLORS = [
   '#737373', // neutral
