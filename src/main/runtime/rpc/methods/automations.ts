@@ -4,6 +4,10 @@ import {
   MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS,
   normalizeAutomationPrecheckTimeoutSeconds
 } from '../../../../shared/automation-precheck'
+import {
+  MAX_AUTOMATION_COMMAND_TIMEOUT_SECONDS,
+  normalizeAutomationCommandTimeoutSeconds
+} from '../../../../shared/automation-command-run'
 import { normalizeExecutionHostId } from '../../../../shared/execution-host'
 import type { TaskProviderIdentity as SharedTaskProviderIdentity } from '../../../../shared/task-source-context'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
@@ -43,6 +47,18 @@ const AutomationPrecheck = z
       normalizeAutomationPrecheckTimeoutSeconds(value)
     ).refine((value) => value <= MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS, {
       message: 'Precheck timeout is too large'
+    })
+  })
+  .nullable()
+  .optional()
+
+const AutomationCommand = z
+  .object({
+    command: requiredString('Missing automation command'),
+    timeoutSeconds: OptionalPositiveInt.transform((value) =>
+      normalizeAutomationCommandTimeoutSeconds(value)
+    ).refine((value) => value <= MAX_AUTOMATION_COMMAND_TIMEOUT_SECONDS, {
+      message: 'Command timeout is too large'
     })
   })
   .nullable()
@@ -99,32 +115,43 @@ const AutomationRuns = z.object({
   automationId: OptionalString
 })
 
-const AutomationCreate = z.object({
-  name: requiredString('Missing automation name'),
-  prompt: requiredString('Missing automation prompt'),
-  precheck: AutomationPrecheck,
-  agentId: TuiAgent,
-  runContext: WorkspaceRunContext,
-  sourceContext: TaskSourceContext,
-  repo: OptionalString,
-  workspace: OptionalString,
-  workspaceMode: AutomationWorkspaceMode,
-  baseBranch: OptionalPlainString,
-  setupDecision: SetupDecision,
-  reuseSession: OptionalBoolean,
-  targetPaneKey: OptionalNullablePlainString,
-  timezone: OptionalString,
-  rrule: AutomationSchedule,
-  dtstart: requiredNumber('Missing trigger start time'),
-  enabled: OptionalBoolean,
-  missedRunGraceMinutes: OptionalPositiveInt
-})
+const AutomationCreate = z
+  .object({
+    name: requiredString('Missing automation name'),
+    prompt: OptionalString,
+    precheck: AutomationPrecheck,
+    command: AutomationCommand,
+    agentId: TuiAgent.optional(),
+    runContext: WorkspaceRunContext,
+    sourceContext: TaskSourceContext,
+    repo: OptionalString,
+    workspace: OptionalString,
+    workspaceMode: AutomationWorkspaceMode,
+    baseBranch: OptionalPlainString,
+    setupDecision: SetupDecision,
+    reuseSession: OptionalBoolean,
+    targetPaneKey: OptionalNullablePlainString,
+    timezone: OptionalString,
+    rrule: AutomationSchedule,
+    dtstart: requiredNumber('Missing trigger start time'),
+    enabled: OptionalBoolean,
+    missedRunGraceMinutes: OptionalPositiveInt
+  })
+  // Una automatizacion es una de dos cosas y nunca ninguna: el tipo lo exige en
+  // proceso, esto lo exige en el cable.
+  .refine((params) => Boolean(params.command) !== Boolean(params.agentId), {
+    message: 'Pass either a command to run or an agent to launch, not both and not neither'
+  })
+  .refine((params) => Boolean(params.command) || Boolean(params.prompt?.trim()), {
+    message: 'Missing automation prompt'
+  })
 
 const AutomationUpdateFields = z.object({
   name: OptionalString,
   prompt: OptionalString,
   precheck: AutomationPrecheck,
   agentId: TuiAgent.optional(),
+  command: AutomationCommand,
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
   repo: OptionalString,
@@ -162,9 +189,18 @@ export const AUTOMATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'automation.create',
     params: AutomationCreate,
-    handler: async (params, { runtime }) => ({
-      automation: await runtime.createAutomation(params)
-    })
+    handler: async (params, { runtime }) => {
+      const { command, agentId, prompt, ...rest } = params
+      // El refine del esquema ya garantizo que hay exactamente una forma; esto
+      // solo se la muestra al tipo.
+      return {
+        automation: await runtime.createAutomation(
+          command
+            ? { ...rest, command }
+            : { ...rest, agentId: agentId as NonNullable<typeof agentId>, prompt: prompt ?? '' }
+        )
+      }
+    }
   }),
   defineMethod({
     name: 'automation.update',

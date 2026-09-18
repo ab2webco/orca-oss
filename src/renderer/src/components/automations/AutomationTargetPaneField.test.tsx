@@ -33,7 +33,10 @@ function renderField(props: React.ComponentProps<typeof AutomationTargetPaneFiel
 function makeDraft(overrides: Partial<AutomationDraft> = {}): AutomationDraft {
   return {
     name: 'Digest',
+    actionKind: 'agent',
     prompt: 'Summarize',
+    command: '',
+    commandTimeoutSeconds: '300',
     agentId: 'claude',
     projectId: 'repo-1',
     workspaceMode: 'existing',

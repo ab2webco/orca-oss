@@ -781,7 +781,8 @@
         "59718b120b": "대상 워크스페이스를 더 이상 사용할 수 없습니다.",
         "16a21d6413": "SSH 재연결에는 대화형 자격 증명이 필요합니다.",
         "386db94f3e": "대상 프로젝트를 더 이상 사용할 수 없습니다.",
-        "3ad7d77f57": "대상 워크스페이스가 이 자동화 실행 대상과 다른 호스트에 있습니다."
+        "3ad7d77f57": "대상 워크스페이스가 이 자동화 실행 대상과 다른 호스트에 있습니다.",
+        "commandOnlyNotDispatchable": "이 자동화는 명령을 실행하므로 창에서 시작할 수 없습니다."
       },
       "useComposerState": {
         "7eb3f44ff7": "선택한 agent가 비활성화되었습니다. 생성하기 전에 활성화된 agent를 선택하세요.",
@@ -10084,6 +10085,16 @@
           "descriptionSystem": "Links open in Orca Lab, so {{chord}}+click sends one to your system browser instead.",
           "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca Lab's built-in browser instead."
         },
+        "PluginAutomationConsentPreview": {
+          "heading": "예약된 자동화",
+          "schedule": "일정",
+          "precheck": "사전 점검",
+          "precheckLabel": "{{value0}} · 사전 점검",
+          "command": "명령",
+          "commandLabel": "{{value0}} · 명령",
+          "runs": "실행",
+          "agentRun": "플러그인에 포함된 프롬프트로 코딩 에이전트를 실행합니다."
+        },
         "PluginConsentDialog": {
           "workerTrust": "백그라운드 워커 — 별도 프로세스에서 실행",
           "instructionalTrust": "지침 콘텐츠 — 나중에 사용자 또는 에이전트 권한으로 실행",
@@ -10101,6 +10112,8 @@
           "reconsent": "이 플러그인을 마지막으로 검토한 후 권한, 워커 신뢰 수준 또는 지침 콘텐츠가 변경되었습니다. 실행하기 전에 다시 검토하세요.",
           "capabilities": "이 플러그인이 할 수 있는 작업",
           "instructionalWarning": "이 플러그인에는 워커 프로세스가 없습니다. 하지만 사용자나 에이전트가 사용할 때 지침 콘텐츠로 인해 작업이 실행될 수 있습니다. 활성화하기 전에 아래 지침과 명령을 검토하세요.",
+          "automationWarning": "이 플러그인에는 워커 프로세스가 없지만 자체 일정에 따라 실행됩니다. 아래 명령은 표시된 시각에, 사용자가 자리에 없어도 Orca Lab이 실행할 내용입니다. 이 플러그인을 활성화하기 전에 검토하세요.",
+          "automationAgentWarning": "이 플러그인에는 워커 프로세스가 없지만 자체 일정에 따라 실행됩니다. 표시된 시각에, 사용자가 자리에 없어도 플러그인에 포함된 프롬프트로 코딩 에이전트를 실행합니다. 이 플러그인을 활성화하기 전에 아래 일정을 검토하세요.",
           "panelWarning": "이 권한은 플러그인이 Orca Lab API를 사용하는 방식을 제한합니다. 이 플러그인에는 백그라운드 워커가 없습니다.",
           "declarativeWarning": "이 플러그인은 검증된 내용만 기여합니다. 백그라운드 워커를 실행하지 않으며 Orca Lab API에 대한 액세스를 받지 않습니다.",
           "keepDisabled": "비활성화 유지",
@@ -14164,7 +14177,9 @@
           "51a470b966": "SSH",
           "b09b2384fd": "일시중지됨",
           "eaa02014f8": "활성화됨",
-          "29baf8f4c2": "소스"
+          "29baf8f4c2": "소스",
+          "commandAction": "명령",
+          "runsLabel": "실행 내용"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "취소",
@@ -14355,7 +14370,9 @@
           "tableStatus": "상태",
           "tableActions": "작업",
           "newAutomation": "새 자동화",
-          "rowActions": "자동화 작업"
+          "rowActions": "자동화 작업",
+          "enterCommand": "저장하기 전에 명령을 입력하세요.",
+          "runsInProjectDirectory": "프로젝트 디렉터리에서"
         },
         "CreateFromPicker": {
           "f061f49e3f": "repo 브랜치 검색...",
@@ -14480,7 +14497,20 @@
           "clear": "검색 지우기"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "자동화 작업"
+          "c92c9463c6": "자동화 작업",
+          "noProjectChosen": "아직 프로젝트 없음",
+          "commandAction": "명령"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "에이전트 실행",
+          "runCommand": "명령 실행",
+          "commandLabel": "명령",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "에이전트, 터미널, 모델 없이 대상 프로젝트 디렉터리에서 실행됩니다. 종료 코드 0은 성공이고, 그 외에는 실패한 실행으로 기록됩니다.",
+          "commandTimeout": "제한 시간(초)"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "실행되지 않음"
         }
       },
       "agent": {

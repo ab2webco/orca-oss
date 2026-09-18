@@ -1,9 +1,12 @@
 import type { Automation } from '../../shared/automations-types'
 import { DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS } from '../../shared/automation-precheck'
 import {
+  isPluginCommandAutomation,
   PLUGIN_AUTOMATION_PROMPT_MAX_BYTES,
+  usesPluginOwnedWorkspace,
   type PluginAutomationContribution
 } from '../../shared/plugins/plugin-automation-contribution'
+import { DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS } from '../../shared/automation-command-run'
 import type { Store } from '../persistence'
 import { readContainedPluginArtifactText } from './plugin-artifact-validation'
 import { isInvalidDiscoveredPlugin } from './plugin-discovery'
@@ -13,6 +16,10 @@ import {
   pluginDeclaredAutomationFields,
   type PluginManagedAutomationFields
 } from './plugin-automation-managed-fields'
+import {
+  ensurePluginOwnedWorkspaceRepo,
+  pluginOwnedWorkspaceDisplayName
+} from './plugin-owned-workspace'
 import type { PluginService } from './plugin-service'
 
 /**
@@ -24,8 +31,9 @@ import type { PluginService } from './plugin-service'
  *
  * Reglas:
  * - Nacen SIEMPRE deshabilitadas. Un plugin no enciende trabajo automatico.
- * - Nacen SIN proyecto. El plugin no sabe en que workspace corre; el usuario lo
- *   elige antes de encenderlas.
+ * - Nacen SIN proyecto, salvo que la declaracion pida `workspace:
+ *   'plugin-owned'`. El plugin nunca adivina un repo del usuario: o no elige
+ *   nada, o pide la carpeta que Orca crea para el, que no es de nadie mas.
  * - Nunca `reuseSession`: `workspaceMode: 'new_per_run'` lo fuerza a false en
  *   `createAutomation`, asi que jamas puede apropiarse del terminal de otro.
  * - Crea las que faltan y borra las que el plugin ya no declara.
@@ -38,11 +46,32 @@ import type { PluginService } from './plugin-service'
  *   Lo que elige el usuario nunca se toca: proyecto, workspace, modo,
  *   habilitada, timeout del precheck, gracia de corridas perdidas.
  */
-export async function reconcilePluginAutomations(input: {
+export function reconcilePluginAutomations(input: {
   store: Store
   pluginService: PluginService
 }): Promise<void> {
+  const run = pendingReconcile.then(
+    () => reconcileNow(input),
+    () => reconcileNow(input)
+  )
+  pendingReconcile = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+/**
+ * Serializa las reconciliaciones: consentir, habilitar, deshabilitar y
+ * desinstalar llegan por IPC y por el RPC de serve a la vez, y dos pasadas
+ * solapadas leen el mismo store vacio — cada una crea entonces sus propias
+ * filas y su propia carpeta de plugin, con rutas identicas e ids distintos.
+ */
+let pendingReconcile: Promise<void> = Promise.resolve()
+
+async function reconcileNow(input: { store: Store; pluginService: PluginService }): Promise<void> {
   const { store, pluginService } = input
+  const userDataPath = pluginService.options.userDataPath
   const declared = collectApprovedPluginAutomations(pluginService)
   for (const automation of store.listAutomations()) {
     if (shouldDropPluginAutomation(automation, declared)) {
@@ -58,10 +87,20 @@ export async function reconcilePluginAutomations(input: {
   }
   for (const [pluginKey, entry] of declared) {
     for (const contribution of entry.automations) {
-      const fields = await readDeclaredFields(entry.rootDir, contribution)
-      if (!fields) {
+      // El destino se resuelve DESPUES del prompt: una declaracion que se salta
+      // por prompt ilegible no debe dejar una carpeta creada a medias.
+      const declaredFields = await readDeclaredFields(entry.rootDir, contribution)
+      if (!declaredFields) {
         continue
       }
+      const fields = await withPluginOwnedRunTarget({
+        store,
+        userDataPath,
+        pluginKey,
+        pluginDisplayName: entry.displayName,
+        contribution,
+        fields: declaredFields
+      })
       const existing = stored.get(originKey(pluginKey, contribution.id))
       if (existing) {
         refreshPluginAutomation(store, existing, fields)
@@ -72,9 +111,41 @@ export async function reconcilePluginAutomations(input: {
   }
 }
 
+/** Materializa la carpeta del plugin y la pone como destino declarado. Sin
+ *  opt-in devuelve los campos tal cual: cero cambios para quien no lo pide. */
+async function withPluginOwnedRunTarget(input: {
+  store: Store
+  userDataPath: string
+  pluginKey: string
+  pluginDisplayName: string
+  contribution: PluginAutomationContribution
+  fields: PluginManagedAutomationFields
+}): Promise<PluginManagedAutomationFields> {
+  if (!usesPluginOwnedWorkspace(input.contribution)) {
+    return input.fields
+  }
+  try {
+    const repo = await ensurePluginOwnedWorkspaceRepo({
+      store: input.store,
+      userDataPath: input.userDataPath,
+      pluginKey: input.pluginKey,
+      displayName: pluginOwnedWorkspaceDisplayName(input.pluginDisplayName)
+    })
+    return { ...input.fields, runTarget: repo.id }
+  } catch (error) {
+    // Un disco que no deja crear la carpeta no puede tumbar el habilitar del
+    // plugin: la fila nace sin destino, como sin opt-in, y se dice por que.
+    console.error(
+      `[plugins] ${input.pluginKey}: could not create the plugin workspace; the automation is left without a run target:`,
+      error
+    )
+    return input.fields
+  }
+}
+
 type DeclaredAutomations = Map<
   string,
-  { rootDir: string; automations: readonly PluginAutomationContribution[] }
+  { rootDir: string; displayName: string; automations: readonly PluginAutomationContribution[] }
 >
 
 function collectApprovedPluginAutomations(pluginService: PluginService): DeclaredAutomations {
@@ -86,6 +157,7 @@ function collectApprovedPluginAutomations(pluginService: PluginService): Declare
     if (plugin.manifest.contributes.automations.length > 0) {
       declared.set(plugin.pluginKey, {
         rootDir: plugin.rootDir,
+        displayName: plugin.manifest.name,
         automations: plugin.manifest.contributes.automations
       })
     }
@@ -113,6 +185,11 @@ async function readDeclaredFields(
   rootDir: string,
   contribution: PluginAutomationContribution
 ): Promise<PluginManagedAutomationFields | null> {
+  // Una declaracion command-only no tiene prompt que leer: el comando ES la
+  // corrida y viaja en el manifiesto, que el hash de contenido ya cubre.
+  if (isPluginCommandAutomation(contribution)) {
+    return pluginDeclaredAutomationFields(contribution, '')
+  }
   let prompt: string
   try {
     prompt = await readContainedPluginArtifactText(
@@ -135,9 +212,8 @@ function createPluginAutomation(
   contribution: PluginAutomationContribution,
   fields: PluginManagedAutomationFields
 ): void {
-  store.createAutomation({
+  const base = {
     name: fields.name,
-    prompt: fields.prompt,
     ...(fields.precheck
       ? {
           precheck: {
@@ -146,11 +222,12 @@ function createPluginAutomation(
           }
         }
       : {}),
-    agentId: fields.agentId,
     // Sin proyecto hasta que el usuario elija: el plugin no conoce el workspace
-    // y adivinarlo correria trabajo ajeno en el repo equivocado.
-    projectId: '',
-    workspaceMode: 'new_per_run',
+    // y adivinarlo correria trabajo ajeno en el repo equivocado. Con
+    // `workspace: 'plugin-owned'` el destino es la carpeta del propio plugin,
+    // que no es un repo del usuario: nadie adivino nada.
+    projectId: fields.runTarget ?? '',
+    workspaceMode: 'new_per_run' as const,
     timezone: fields.timezone,
     rrule: fields.rrule,
     dtstart: Date.now(),
@@ -160,7 +237,23 @@ function createPluginAutomation(
       automationId: contribution.id,
       managedFingerprints: fingerprintPluginAutomationFields(fields)
     }
-  })
+  }
+  // Una u otra forma, nunca las dos ni ninguna: el esquema del manifiesto ya lo
+  // garantiza y la union de `AutomationCreateInput` lo vuelve a exigir aca.
+  if (fields.command) {
+    store.createAutomation({
+      ...base,
+      command: {
+        command: fields.command,
+        timeoutSeconds: DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS
+      }
+    })
+    return
+  }
+  if (!fields.agentId) {
+    return
+  }
+  store.createAutomation({ ...base, agentId: fields.agentId, prompt: fields.prompt })
 }
 
 function refreshPluginAutomation(

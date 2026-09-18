@@ -85,6 +85,15 @@ export type PluginHostListEntry = {
   }[]
   /** A required setting has no value, so the plugin runs unconfigured. */
   needsSetup?: boolean
+  /** Manifest-declared scheduled work; `command` present means the run IS that
+   *  shell string. Optional so an older host reads as "none". */
+  automations?: {
+    id: string
+    title: string
+    trigger: string
+    precheck?: string
+    command?: string
+  }[]
   vmRecipes?: {
     id: string
     name: string

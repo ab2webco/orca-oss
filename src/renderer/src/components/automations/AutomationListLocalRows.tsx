@@ -1,5 +1,5 @@
 import React from 'react'
-import { MoreHorizontal, Pause, Pencil, Play, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pause, Pencil, Play, SquareTerminal, Trash2 } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentIcon } from '@/lib/agent-catalog'
+import { getAutomationAction } from '../../../../shared/automation-action'
 import { cn } from '@/lib/utils'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
@@ -37,6 +38,7 @@ import { getLocalAutomationLastRunSnapshot } from './automation-list-last-run'
 import { AutomationListLastRunCell } from './AutomationListLastRunCell'
 import { formatAutomationDateTimeWithRelative } from './automation-page-parts'
 import { getAutomationTargetAvailability } from './automation-target-availability'
+import { isAutomationTargetMisconfigured } from './automation-availability-result'
 import { getAgentLabel } from './automation-draft-model'
 import { formatAutomationCost } from './automation-usage-model'
 import {
@@ -109,13 +111,31 @@ export function AutomationListLocalRows({
         })
         const projectLabel =
           automationRepo?.displayName ??
-          translate('auto.components.automations.AutomationsPage.13118faadf', 'Unknown project')
+          (automation.pluginOrigin
+            ? // Una fila de plugin sin proyecto no es un proyecto desconocido:
+              // es una que todavia no lo eligio. Decirlo asi evita que se lea
+              // como un repo que se perdio.
+              translate(
+                'auto.components.automations.AutomationListLocalRows.noProjectChosen',
+                'No project chosen yet'
+              )
+            : translate(
+                'auto.components.automations.AutomationsPage.13118faadf',
+                'Unknown project'
+              ))
         const scheduleLabel = formatAutomationSchedule(automation.rrule)
         const nextRunLabel = automation.enabled
           ? formatAutomationDateTimeWithRelative(automation.nextRunAt, relativeNow)
           : translate('auto.components.automations.AutomationsPage.paused', 'Paused')
         const isSelected = isSelectedLocal && selectedId === automation.id
-        const agentLabel = getAgentLabel(automation.agentId)
+        const action = getAutomationAction(automation)
+        const agentLabel =
+          action.kind === 'command'
+            ? translate(
+                'auto.components.automations.AutomationListLocalRows.commandAction',
+                'Command'
+              )
+            : getAgentLabel(action.agentId)
         const hostId =
           automation.runContext?.hostId ??
           (automationRepo ? getRepoExecutionHostId(automationRepo) : null)
@@ -206,14 +226,25 @@ export function AutomationListLocalRows({
                   {nextRunLabel}
                 </span>
                 <AutomationListLastRunCell snapshot={lastRunSnapshot} now={relativeNow} />
-                <AutomationListStatusCell enabled={automation.enabled} />
+                <AutomationListStatusCell
+                  enabled={automation.enabled}
+                  blockedMessage={
+                    isAutomationTargetMisconfigured(automationRunAvailability)
+                      ? automationRunAvailability.message
+                      : null
+                  }
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
                       className="flex items-center justify-center text-muted-foreground"
                       aria-label={agentTooltipLabel}
                     >
-                      <AgentIcon agent={automation.agentId} size={16} />
+                      {action.kind === 'command' ? (
+                        <SquareTerminal className="size-4" />
+                      ) : (
+                        <AgentIcon agent={action.agentId} size={16} />
+                      )}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={4}>

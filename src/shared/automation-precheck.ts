@@ -1,4 +1,4 @@
-import type { AutomationPrecheck, AutomationPrecheckResult } from './automations-types'
+import type { AutomationPrecheck } from './automations-types'
 
 export const DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS = 60
 export const MAX_AUTOMATION_PRECHECK_TIMEOUT_SECONDS = 600
@@ -26,22 +26,4 @@ export function normalizeAutomationPrecheck(
 
 export function formatAutomationPrecheckTimeout(seconds: number): string {
   return `${seconds}s`
-}
-
-export function didAutomationPrecheckPass(
-  result: AutomationPrecheckResult | null | undefined
-): boolean {
-  return Boolean(result && !result.timedOut && !result.error && result.exitCode === 0)
-}
-
-export function formatAutomationPrecheckFailure(result: AutomationPrecheckResult): string {
-  if (result.timedOut) {
-    return `Precheck timed out after ${formatAutomationPrecheckTimeout(
-      Math.max(1, Math.round(result.durationMs / 1000))
-    )}.`
-  }
-  if (result.error) {
-    return `Precheck failed: ${result.error}`
-  }
-  return `Precheck exited with code ${result.exitCode ?? 'unknown'}.`
 }

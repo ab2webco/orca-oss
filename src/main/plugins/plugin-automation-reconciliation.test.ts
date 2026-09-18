@@ -86,6 +86,7 @@ function createPluginService(
 ): PluginService {
   const activationByKey = new Map(plugins.map((entry) => [entry.rootDir, entry.activation]))
   return {
+    options: { userDataPath: rootDir },
     getDiscovered: (): ValidDiscoveredPlugin[] =>
       plugins.map((entry) => ({
         pluginKey,

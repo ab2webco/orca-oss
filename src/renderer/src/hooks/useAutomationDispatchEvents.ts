@@ -13,10 +13,11 @@ import type {
   AutomationPrecheckResult
 } from '../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../shared/automation-run-identity'
+import { getAutomationAction } from '../../../shared/automation-action'
 import {
-  didAutomationPrecheckPass,
-  formatAutomationPrecheckFailure
-} from '../../../shared/automation-precheck'
+  didAutomationShellRunSucceed,
+  formatAutomationShellFailure
+} from '../../../shared/automation-shell-result'
 import {
   createAutomationRunOutputSnapshotBuffer,
   selectAutomationRunOutputSnapshot
@@ -93,6 +94,21 @@ export function useAutomationDispatchEvents(): void {
         const markDispatchResult = async (result: AutomationDispatchResult): Promise<void> => {
           await window.api.automations.markDispatchResult(result)
           window.dispatchEvent(new Event(AUTOMATIONS_CHANGED_EVENT))
+        }
+        // Una fila command-only se corre entera en el main, sin ventana ni
+        // terminal: si llegara aca seria un bug, no un lanzamiento.
+        const action = getAutomationAction(automation)
+        if (action.kind !== 'agent') {
+          await markDispatchResult({
+            runId: run.id,
+            status: 'dispatch_failed',
+            workspaceId: run.workspaceId,
+            error: translate(
+              'auto.hooks.useAutomationDispatchEvents.commandOnlyNotDispatchable',
+              'This automation runs a command and cannot be launched in a window.'
+            )
+          })
+          return
         }
         const state = useAppStore.getState()
         const focusBeforeDispatch = {
@@ -236,14 +252,14 @@ export function useAutomationDispatchEvents(): void {
               automationId: automation.id,
               runId: run.id
             })
-            if (precheckResult && !didAutomationPrecheckPass(precheckResult)) {
+            if (precheckResult && !didAutomationShellRunSucceed(precheckResult)) {
               await markDispatchResult({
                 runId: run.id,
                 status: 'skipped_precheck',
                 workspaceId: dispatchWorkspaceId,
                 workspaceDisplayName: dispatchWorkspaceDisplayName,
                 precheckResult,
-                error: formatAutomationPrecheckFailure(precheckResult)
+                error: formatAutomationShellFailure(precheckResult, 'Precheck')
               })
               return
             }
@@ -499,7 +515,7 @@ export function useAutomationDispatchEvents(): void {
           if (automation.reuseSession) {
             const reusableSession = findReusableAutomationSession({
               automationId: automation.id,
-              agentId: automation.agentId,
+              agentId: action.agentId,
               worktreeId: worktree.id,
               currentRunId: run.id,
               runs: await window.api.automations.listRuns({ automationId: automation.id }),
@@ -583,7 +599,7 @@ export function useAutomationDispatchEvents(): void {
             }
           }
           const result = await launchAgentBackgroundSession({
-            agent: automation.agentId,
+            agent: action.agentId,
             worktreeId: worktree.id,
             prompt: automation.prompt,
             launchSource: 'unknown',

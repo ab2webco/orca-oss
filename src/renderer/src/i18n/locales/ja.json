@@ -781,7 +781,8 @@
         "59718b120b": "ターゲットワークスペースは使用できなくなりました。",
         "16a21d6413": "SSH の再接続には対話型の認証情報が必要です。",
         "386db94f3e": "対象のプロジェクトは利用できなくなりました。",
-        "3ad7d77f57": "対象ワークスペースは、この自動化実行ターゲットとは別のホスト上にあります。"
+        "3ad7d77f57": "対象ワークスペースは、この自動化実行ターゲットとは別のホスト上にあります。",
+        "commandOnlyNotDispatchable": "この自動化はコマンドを実行するため、ウィンドウでは起動できません。"
       },
       "useComposerState": {
         "7eb3f44ff7": "選択した Agent は無効です。作成する前に、有効な Agent を選択してください。",
@@ -10073,6 +10074,16 @@
           "descriptionSystem": "リンクは Orca Lab で開きます。{{chord}}+クリックすると、システムのブラウザで開きます。",
           "descriptionOrca": "リンクはシステムのブラウザで開きます。有効にすると、{{chord}}+クリックで Orca Lab 内蔵のブラウザで開きます。"
         },
+        "PluginAutomationConsentPreview": {
+          "heading": "スケジュールされた自動化",
+          "schedule": "スケジュール",
+          "precheck": "事前チェック",
+          "precheckLabel": "{{value0}} · 事前チェック",
+          "command": "コマンド",
+          "commandLabel": "{{value0}} · コマンド",
+          "runs": "実行内容",
+          "agentRun": "プラグインに含まれるプロンプトでコーディング Agent を起動します。"
+        },
         "PluginConsentDialog": {
           "workerTrust": "バックグラウンドワーカー — 独自のプロセスで実行",
           "instructionalTrust": "インストラクショナルコンテンツ — ユーザーまたは Agent の権限で後から実行",
@@ -10090,6 +10101,8 @@
           "reconsent": "前回このプラグインを確認してから、権限、ワーカーの信頼レベル、または指示コンテンツが変更されました。実行する前にもう一度確認してください。",
           "capabilities": "このプラグインに許可する操作",
           "instructionalWarning": "このプラグインにはワーカープロセスがありません。それでも、ユーザーや Agent が使用したときに、記載された手順が操作を引き起こす可能性があります。有効にする前に、以下の手順とコマンドを確認してください。",
+          "automationWarning": "このプラグインにはワーカープロセスがありませんが、独自のスケジュールで実行されます。以下のコマンドは、表示された時刻に、あなたがいなくても Orca Lab が実行する内容です。このプラグインを有効にする前に確認してください。",
+          "automationAgentWarning": "このプラグインにはワーカープロセスがありませんが、独自のスケジュールで実行されます。表示された時刻に、あなたがいなくても、プラグインに含まれるプロンプトでコーディング Agent を起動します。このプラグインを有効にする前に以下のスケジュールを確認してください。",
           "panelWarning": "これらの権限は、プラグインが Orca Lab APIを使用する方法を制限します。このプラグインにはバックグラウンドワーカーがありません。",
           "declarativeWarning": "このプラグインは検証されたコンテンツのみを提供します。バックグラウンドワーカーを実行せず、Orca Lab APIへのアクセスを受け取りません。",
           "keepDisabled": "無効のままにする",
@@ -14142,7 +14155,9 @@
           "51a470b966": "ssh",
           "b09b2384fd": "一時停止中",
           "eaa02014f8": "有効",
-          "29baf8f4c2": "ソース"
+          "29baf8f4c2": "ソース",
+          "commandAction": "コマンド",
+          "runsLabel": "実行内容"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "キャンセル",
@@ -14333,7 +14348,9 @@
           "tableStatus": "ステータス",
           "tableActions": "操作",
           "newAutomation": "新しい自動化",
-          "rowActions": "自動化の操作"
+          "rowActions": "自動化の操作",
+          "enterCommand": "保存する前にコマンドを入力してください。",
+          "runsInProjectDirectory": "プロジェクトのディレクトリ内"
         },
         "CreateFromPicker": {
           "f061f49e3f": "リポジトリブランチを検索…",
@@ -14458,7 +14475,20 @@
           "clear": "検索をクリア"
         },
         "AutomationListLocalRows": {
-          "c92c9463c6": "自動化の操作"
+          "c92c9463c6": "自動化の操作",
+          "noProjectChosen": "プロジェクト未選択",
+          "commandAction": "コマンド"
+        },
+        "AutomationEditorPromptSection": {
+          "launchAgent": "Agent を起動",
+          "runCommand": "コマンドを実行",
+          "commandLabel": "コマンド",
+          "commandPlaceholder": "wa-inbox sync --quiet",
+          "commandHelp": "Agent・ターミナル・モデルなしで、対象プロジェクトのディレクトリで実行します。終了コード 0 は成功、それ以外は失敗した実行として記録されます。",
+          "commandTimeout": "タイムアウト（秒）"
+        },
+        "AutomationListStatusCell": {
+          "willNotRun": "実行されません"
         }
       },
       "agent": {

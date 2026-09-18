@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pencil, Pause, Play, Trash2 } from 'lucide-react'
+import { Pencil, Pause, Play, SquareTerminal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -7,6 +7,7 @@ import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { formatAutomationSchedule } from '../../../../shared/automation-schedules'
 import { formatAutomationPrecheckTimeout } from '../../../../shared/automation-precheck'
+import { getAutomationAction } from '../../../../shared/automation-action'
 import { formatAutomationDateTimeWithRelative } from './automation-page-parts'
 import {
   formatAutomationCost,
@@ -125,8 +126,11 @@ export function AutomationDetail({
       : usageSummary.unavailableRuns > 0
         ? 'Unavailable'
         : 'No runs'
+  const action = getAutomationAction(automation)
   const agentLabel =
-    getAgentCatalog().find((agent) => agent.id === automation.agentId)?.label ?? automation.agentId
+    action.kind === 'command'
+      ? translate('auto.components.automations.AutomationDetail.commandAction', 'Command')
+      : (getAgentCatalog().find((agent) => agent.id === action.agentId)?.label ?? action.agentId)
   const runLocationLabel =
     automation.workspaceMode === 'new_per_run'
       ? (automation.baseBranch ?? projectDefaultBaseRef ?? 'Project default')
@@ -237,18 +241,33 @@ export function AutomationDetail({
               : 'Paused'
           }
         />
-        <DetailMetric
-          label={
-            automation.workspaceMode === 'new_per_run'
-              ? translate('auto.components.automations.AutomationDetail.2f8baf5360', 'Create from')
-              : translate('auto.components.automations.AutomationDetail.5405a09b1f', 'Run location')
-          }
-          value={runLocationLabel}
-        />
-        <DetailMetric
-          label={translate('auto.components.automations.AutomationDetail.15ea446b93', 'Session')}
-          value={automation.reuseSession ? 'Reuse live session' : 'Fresh each run'}
-        />
+        {/* Un comando no abre workspace ni sesion: anunciar "Fresh each run"
+            para algo que nunca abre un terminal seria inventarle una sesion. */}
+        {action.kind === 'command' ? null : (
+          <>
+            <DetailMetric
+              label={
+                automation.workspaceMode === 'new_per_run'
+                  ? translate(
+                      'auto.components.automations.AutomationDetail.2f8baf5360',
+                      'Create from'
+                    )
+                  : translate(
+                      'auto.components.automations.AutomationDetail.5405a09b1f',
+                      'Run location'
+                    )
+              }
+              value={runLocationLabel}
+            />
+            <DetailMetric
+              label={translate(
+                'auto.components.automations.AutomationDetail.15ea446b93',
+                'Session'
+              )}
+              value={automation.reuseSession ? 'Reuse live session' : 'Fresh each run'}
+            />
+          </>
+        )}
         {sourceDisplay ? (
           <DetailMetric
             label={translate('auto.components.automations.AutomationDetail.29baf8f4c2', 'Source')}
@@ -270,11 +289,22 @@ export function AutomationDetail({
         />
         <div className="min-w-0">
           <div className="text-[11px] font-medium uppercase text-muted-foreground">
-            {translate('auto.components.automations.AutomationDetail.2df8970cd5', 'Agent')}
+            {action.kind === 'command'
+              ? translate('auto.components.automations.AutomationDetail.runsLabel', 'Runs')
+              : translate('auto.components.automations.AutomationDetail.2df8970cd5', 'Agent')}
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-2 text-sm font-medium">
-            <AgentIcon agent={automation.agentId} size={16} />
-            <span className="truncate">{agentLabel}</span>
+            {action.kind === 'command' ? (
+              <SquareTerminal className="size-4 shrink-0" />
+            ) : (
+              <AgentIcon agent={action.agentId} size={16} />
+            )}
+            <span
+              className="truncate"
+              title={action.kind === 'command' ? action.command.command : undefined}
+            >
+              {action.kind === 'command' ? action.command.command : agentLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -301,17 +331,29 @@ export function AutomationDetail({
         />
       </div>
 
+      {/* Una fila command-only no tiene prompt: mostrar el bloque vacio seria
+          exactamente la celda en blanco que esto viene a evitar. */}
       <div className="rounded-md border border-border/50 bg-muted/20 shadow-sm">
         <div className="border-b border-border/50 px-3 py-2 text-sm font-medium">
-          {translate('auto.components.automations.AutomationDetail.007c8ad874', 'Prompt')}
+          {action.kind === 'command'
+            ? translate('auto.components.automations.AutomationDetail.commandAction', 'Command')
+            : translate('auto.components.automations.AutomationDetail.007c8ad874', 'Prompt')}
         </div>
         <div className="px-3 py-3">
           <div className="min-w-0">
             <div className="text-[11px] font-medium uppercase text-muted-foreground">
-              {translate('auto.components.automations.AutomationDetail.007c8ad874', 'Prompt')}
+              {action.kind === 'command'
+                ? translate('auto.components.automations.AutomationDetail.commandAction', 'Command')
+                : translate('auto.components.automations.AutomationDetail.007c8ad874', 'Prompt')}
             </div>
-            <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-sm text-foreground">
-              {automation.prompt}
+            <p
+              className={
+                action.kind === 'command'
+                  ? 'mt-1 whitespace-pre-wrap break-all font-mono text-sm text-foreground'
+                  : 'mt-1 line-clamp-4 whitespace-pre-wrap text-sm text-foreground'
+              }
+            >
+              {action.kind === 'command' ? action.command.command : automation.prompt}
             </p>
           </div>
         </div>

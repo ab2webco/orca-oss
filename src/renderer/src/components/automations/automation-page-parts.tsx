@@ -62,7 +62,7 @@ export function getAutomationRunStatusVariant(
   if (status.startsWith('skipped')) {
     return 'outline'
   }
-  if (status === 'dispatch_failed') {
+  if (status === 'dispatch_failed' || status === 'command_failed') {
     return 'destructive'
   }
   return 'dot'
@@ -86,9 +86,14 @@ export function getAutomationRunStatusLabel(status: AutomationRun['status']): st
       return 'Unavailable'
     case 'skipped_needs_interactive_auth':
       return 'Needs credentials'
+    case 'command_failed':
+      return 'Command failed'
     case 'dispatch_failed':
       return 'Failed'
   }
+  // Inalcanzable por tipos, pero un host remoto mas nuevo puede publicar un
+  // estado que este cliente no conoce: mejor decirlo que dejar la celda vacia.
+  return 'Unknown'
 }
 
 export function Field({

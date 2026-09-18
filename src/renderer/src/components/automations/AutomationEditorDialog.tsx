@@ -32,7 +32,12 @@ const MODE_TOGGLE_ITEM_CLASS =
 
 export type AutomationDraft = {
   name: string
+  /** Que hace la corrida. `'command'` no necesita agente, terminal ni modelo. */
+  actionKind: 'agent' | 'command'
   prompt: string
+  /** Solo se usa con `actionKind: 'command'`. */
+  command: string
+  commandTimeoutSeconds: string
   agentId: TuiAgent
   projectId: string
   workspaceMode: AutomationWorkspaceMode
@@ -164,6 +169,7 @@ export function AutomationEditorDialog({
         <AutomationEditorPromptSection
           draft={draft}
           isHermesCreate={isHermesCreate}
+          modeToggleItemClassName={MODE_TOGGLE_ITEM_CLASS}
           pickerTriggerClassName={PICKER_TRIGGER_CLASS}
           onDraftChange={onDraftChange}
         />

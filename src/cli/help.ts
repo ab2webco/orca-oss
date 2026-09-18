@@ -562,7 +562,8 @@ export function formatFlagHelp(flag: string): string {
       '--claude-account <email|id>  Managed Claude account to launch against (see `orca account list`)',
     'codex-account':
       '--codex-account <email|id>   Managed Codex account to launch against (see `orca account list`)',
-    command: '--command <text>       Command to run in the terminal on startup',
+    command:
+      '--command <text>       Command to run: on terminal startup, or as the automation run itself',
     comment: '--comment <text>       Comment stored in Orca Lab metadata',
     cursor: '--cursor <n>           Line cursor from a previous read (returns only new output)',
     action: '--action <name>       Secondary accessibility action name',
@@ -636,6 +637,7 @@ export function formatFlagHelp(flag: string): string {
       '--workspace-status <id> Board status id (defaults: todo, in-progress, in-review, completed)',
     staged: '--staged               Open staged source-control changes',
     provider: '--provider <agent>     Agent id such as codex, claude, or gemini',
+    'command-timeout': '--command-timeout <s>  Seconds before an automation command is killed',
     'source-context':
       '--source-context <json|null> Explicit TaskSourceContext for automation task/provider data',
     trigger: '--trigger <schedule>   Automation schedule preset, cron, or RRULE',

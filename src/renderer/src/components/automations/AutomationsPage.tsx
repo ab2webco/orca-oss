@@ -21,6 +21,10 @@ import type {
 } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import {
+  DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS,
+  normalizeAutomationCommandTimeoutSeconds
+} from '../../../../shared/automation-command-run'
+import {
   getLocalExecutionHostLabel,
   getRepoExecutionHostId,
   parseExecutionHostId
@@ -256,7 +260,10 @@ export default function AutomationsPage(): React.JSX.Element {
   >({})
   const [draft, setDraft] = useState<AutomationDraft>({
     name: '',
+    actionKind: 'agent',
     prompt: '',
+    command: '',
+    commandTimeoutSeconds: String(DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS),
     agentId: defaultAgent,
     projectId: '',
     workspaceMode: 'existing',
@@ -1069,7 +1076,10 @@ export default function AutomationsPage(): React.JSX.Element {
     setCreateTarget('orca')
     const baseDraft: AutomationDraft = {
       name: '',
+      actionKind: 'agent',
       prompt: '',
+      command: '',
+      commandTimeoutSeconds: String(DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS),
       agentId: defaultAgent,
       projectId: target.projectId,
       workspaceMode: 'existing',
@@ -1125,8 +1135,13 @@ export default function AutomationsPage(): React.JSX.Element {
     setEditingAutomationId(latest.id)
     const nextDraft: AutomationDraft = {
       name: latest.name,
+      actionKind: latest.command ? 'command' : 'agent',
       prompt: latest.prompt,
-      agentId: latest.agentId,
+      command: latest.command?.command ?? '',
+      commandTimeoutSeconds: String(
+        latest.command?.timeoutSeconds ?? DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS
+      ),
+      agentId: latest.agentId ?? defaultAgent,
       projectId: getAutomationRunRepoId(latest),
       workspaceMode: latest.workspaceMode,
       workspaceId: latest.workspaceId ?? '',
@@ -1177,7 +1192,10 @@ export default function AutomationsPage(): React.JSX.Element {
     const workspaceId = targetWorktree?.id ?? fallbackTarget.workspaceId
     const nextDraft: AutomationDraft = {
       name: job.name,
+      actionKind: 'agent',
       prompt: job.prompt ?? job.promptPreview,
+      command: '',
+      commandTimeoutSeconds: String(DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS),
       agentId: 'hermes',
       projectId,
       workspaceMode: 'existing',
@@ -1272,9 +1290,20 @@ export default function AutomationsPage(): React.JSX.Element {
       )
       return
     }
+    const isCommandSave = !isHermesSave && draft.actionKind === 'command'
+    if (isCommandSave && !draft.command.trim()) {
+      toast.error(
+        translate(
+          'auto.components.automations.AutomationsPage.enterCommand',
+          'Enter a command before saving.'
+        )
+      )
+      return
+    }
     if (
       editingAutomationId === null &&
       !isHermesSave &&
+      !isCommandSave &&
       !isTuiAgentEnabled(draft.agentId, settings?.disabledTuiAgents)
     ) {
       toast.error(
@@ -1435,11 +1464,23 @@ export default function AutomationsPage(): React.JSX.Element {
           // Keep the in-memory automation as a fallback if the refresh fails.
         }
       }
+      // Una u otra forma, nunca las dos: guardar como comando limpia el agente
+      // y al reves, para que la fila guardada signifique una sola cosa.
+      const action = isCommandSave
+        ? {
+            command: {
+              command: draft.command.trim(),
+              timeoutSeconds: normalizeAutomationCommandTimeoutSeconds(
+                Number(draft.commandTimeoutSeconds)
+              )
+            }
+          }
+        : { agentId: draft.agentId, prompt: draft.prompt, command: null }
       const updates: AutomationUpdateInput = {
         name: draft.name,
-        prompt: draft.prompt,
+        prompt: isCommandSave ? '' : draft.prompt,
         precheck,
-        agentId: draft.agentId,
+        ...action,
         runContext,
         projectId: draft.projectId,
         workspaceMode: draft.workspaceMode,
@@ -1468,9 +1509,10 @@ export default function AutomationsPage(): React.JSX.Element {
             })
         : await createAutomationForTarget({
             name: draft.name,
-            prompt: draft.prompt,
             precheck,
-            agentId: draft.agentId,
+            ...(isCommandSave
+              ? { command: action.command as NonNullable<typeof action.command> }
+              : { agentId: draft.agentId, prompt: draft.prompt }),
             runContext,
             projectId: draft.projectId,
             workspaceMode: draft.workspaceMode,
@@ -2008,16 +2050,23 @@ export default function AutomationsPage(): React.JSX.Element {
           }
           selectedRepoDefaultBaseRef={selectedRepo?.worktreeBaseRef ?? null}
           selectedWorkspaceName={
-            selected?.workspaceMode === 'new_per_run'
+            // Un comando corre en el directorio del proyecto: no abre workspace,
+            // asi que prometer uno nuevo por corrida seria falso.
+            selected?.command
               ? translate(
-                  'auto.components.automations.AutomationsPage.cd8397cc32',
-                  'New workspace each run'
+                  'auto.components.automations.AutomationsPage.runsInProjectDirectory',
+                  'In the project directory'
                 )
-              : (selectedWorktree?.displayName ??
-                translate(
-                  'auto.components.automations.AutomationsPage.missingWorkspace',
-                  'Missing workspace'
-                ))
+              : selected?.workspaceMode === 'new_per_run'
+                ? translate(
+                    'auto.components.automations.AutomationsPage.cd8397cc32',
+                    'New workspace each run'
+                  )
+                : (selectedWorktree?.displayName ??
+                  translate(
+                    'auto.components.automations.AutomationsPage.missingWorkspace',
+                    'Missing workspace'
+                  ))
           }
           hostLabelById={hostLabelById}
           selectedRunNowAvailability={selectedRunNowAvailability}

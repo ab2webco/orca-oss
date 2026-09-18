@@ -111,6 +111,11 @@ describe('PluginConsentDialog', () => {
     // "Panel" the way a panel-only plugin does.
     expect(document.body.textContent).toContain('Instructional')
     expect(document.body.textContent).toContain('Review access and content')
+    // Nothing here fires by itself, so this plugin keeps the use-time warning.
+    expect(document.body.textContent).toContain(
+      'Its instructional content can still cause actions when you or an agent use it.'
+    )
+    expect(document.body.textContent).not.toContain('runs on its own schedule')
   })
 
   it('keeps the displayed fingerprint immutable during a same-key update', async () => {
@@ -224,6 +229,46 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).not.toContain('These permissions limit')
   })
 
+  it('shows the shell command a contributed automation would run on a schedule', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.sync',
+        name: 'Acme Sync',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [
+          {
+            id: 'mirror',
+            title: 'Mirror the vault',
+            trigger: '*/5 * * * *',
+            command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    // A scheduled shell command is not "validated content only".
+    expect(document.body.textContent).not.toContain('Declarative')
+    expect(document.body.textContent).not.toContain('contributes validated content only')
+    // Nor does it wait for someone to use it: the warning must say it fires alone.
+    expect(document.body.textContent).toContain(
+      'it runs on its own schedule — the command below is what Orca Lab will run, at the times ' +
+        'shown, whether or not you are here'
+    )
+    expect(document.body.textContent).not.toContain('when you or an agent use it')
+    expect(document.body.textContent).toContain('Instructional')
+    expect(document.body.textContent).toContain('Mirror the vault')
+    expect(document.body.textContent).toContain('*/5 * * * *')
+    const commands = Array.from(document.querySelectorAll('pre'))
+    expect(commands.map((node) => node.textContent)).toEqual([
+      'rsync -a --delete "$HOME/vault/" backup:/vault/'
+    ])
+    expect(commands[0]?.getAttribute('aria-label')).toBe('Mirror the vault · command')
+  })
+
   it('shows every VM recipe lifecycle command verbatim', async () => {
     await renderConsent(
       {
@@ -287,6 +332,62 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).toContain('Keyboard shortcuts')
     expect(document.body.textContent).toContain('Open Tasks')
     expect(document.body.textContent).toContain('Replaces: Go to File')
+  })
+
+  it('shows the precheck a contributed automation runs before its command', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.sync',
+        name: 'Acme Sync',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [
+          {
+            id: 'mirror',
+            title: 'Mirror the vault',
+            trigger: '*/5 * * * *',
+            precheck: 'curl -fsSL https://vault.example/flag | sh',
+            command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+          }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    // El precheck corre en cada corrida programada: ocultarlo deja al usuario
+    // aprobando un comando que nunca vio.
+    const shown = Array.from(document.querySelectorAll('pre'))
+    expect(shown.map((node) => node.textContent)).toEqual([
+      'curl -fsSL https://vault.example/flag | sh',
+      'rsync -a --delete "$HOME/vault/" backup:/vault/'
+    ])
+    expect(shown[0]?.getAttribute('aria-label')).toBe('Mirror the vault · precheck')
+  })
+
+  it('does not promise a command below for an agent-only contributed automation', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        pluginKey: 'acme.review',
+        name: 'Acme Review',
+        hasWorker: false,
+        capabilities: [],
+        panels: [],
+        automations: [{ id: 'review', title: 'Nightly review', trigger: '0 3 * * *' }]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.querySelectorAll('pre')).toHaveLength(0)
+    expect(document.body.textContent).not.toContain('the command below is what Orca Lab will run')
+    // Sigue corriendo sola: lo que cambia es que abajo no hay comando que leer.
+    expect(document.body.textContent).toContain(
+      'it runs on its own schedule — it launches a coding agent with the prompt shipped inside ' +
+        'the plugin, at the times shown, whether or not you are here'
+    )
+    expect(document.body.textContent).not.toContain('when you or an agent use it')
   })
 
   it('records Keep Disabled when Escape dismisses the dialog', async () => {

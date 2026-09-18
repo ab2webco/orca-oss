@@ -327,6 +327,7 @@ import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
+import { getAutomationAction } from '../shared/automation-action'
 import { getPluginsDataDir } from './plugins/plugin-discovery'
 import { PluginMarketplaceService } from './plugins/plugin-marketplace-service'
 import { PluginMarketplaceInstaller } from './plugins/plugin-marketplace-installer'
@@ -2791,6 +2792,12 @@ void app.whenReady().then(async () => {
     allowRemoteHostScheduling: isServeMode,
     headlessDispatcher: isServeMode
       ? async ({ automation, run, target }) => {
+          // Una fila command-only nunca llega aca: el servicio la corre en el
+          // main sin workspace ni terminal. El guard lo deja dicho y tipado.
+          const action = getAutomationAction(automation)
+          if (action.kind !== 'agent') {
+            throw new Error('A command-only automation does not need a headless workspace.')
+          }
           const terminalSnapshotLimit = 2_000
           let terminalHandle: string
           let terminalSessionId: string | null = null
@@ -2826,8 +2833,8 @@ void app.whenReady().then(async () => {
             const terminal = await runtimeService.launchAgentTerminal(
               `id:${automation.workspaceId}`,
               {
-                agent: automation.agentId,
-                prompt: automation.prompt,
+                agent: action.agentId,
+                prompt: action.prompt,
                 title: run.title
               }
             )

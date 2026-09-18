@@ -8,6 +8,8 @@ import type { PluginLockfile } from '../../shared/plugins/plugin-install-lockfil
 import { getPluginsDataDir, isInvalidDiscoveredPlugin } from './plugin-discovery'
 import type { PluginService } from './plugin-service'
 import { listPluginVmRecipeCommands } from '../../shared/plugins/plugin-vm-recipe-artifact'
+import { previewPluginAutomations } from '../../shared/plugins/plugin-automation-contribution'
+import type { PluginAutomationPreview } from '../../shared/plugins/plugin-automation-contribution'
 import type { PluginCommandAliasActionId } from '../../shared/plugins/plugin-command-actions'
 import {
   isOfficialMarketplaceGitSource,
@@ -90,6 +92,9 @@ export type PluginListEntry = {
   /** Directories the manifest declares as skills; instructional bytes an agent
    *  is served, so the consent dialog must not read as panel-only content. */
   skills: string[]
+  /** Scheduled work the manifest declares; consent must show what it runs.
+   *  Optional like the wire type: an older host simply sends none. */
+  automations?: PluginAutomationPreview[]
   vmRecipes: {
     id: string
     name: string
@@ -288,6 +293,7 @@ export async function buildPluginList(
         })),
         hasWorker: Boolean(plugin.manifest.main),
         skills: plugin.manifest.contributes.skills.map((skill) => skill.path),
+        automations: previewPluginAutomations(plugin.manifest.contributes.automations),
         vmRecipes: service.contentPacks.vmRecipes.preview(plugin.pluginKey).map(({ recipe }) => ({
           id: recipe.id,
           name: recipe.name,

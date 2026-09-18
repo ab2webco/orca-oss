@@ -5,6 +5,7 @@ import { translate } from '@/i18n/i18n'
 import { pluginConsentErrorMessage } from './plugin-error-presentation'
 import { Button } from '../ui/button'
 import { PluginVmRecipeConsentPreview } from './PluginVmRecipeConsentPreview'
+import { PluginAutomationConsentPreview } from './PluginAutomationConsentPreview'
 import { PluginKeybindingConsentPreview } from './PluginKeybindingConsentPreview'
 import { PluginConsentProvenance } from './PluginConsentProvenance'
 import { pluginCapabilityDescription } from './plugin-capability-presentation'
@@ -51,12 +52,23 @@ function trustTier(plugin: PluginHostListEntry): string {
   )
 }
 
+/** True cuando el dialogo muestra al menos una cadena de shell abajo: el
+ *  comando de una command-only o el precheck que corre en cada corrida. */
+function showsAutomationShellCommand(plugin: PluginHostListEntry): boolean {
+  return (plugin.automations ?? []).some(
+    (automation) => Boolean(automation.command) || Boolean(automation.precheck)
+  )
+}
+
 function hasInstructionalContent(plugin: PluginHostListEntry): boolean {
   return (
     (plugin.vmRecipes?.length ?? 0) > 0 ||
     // A contributed skill is read by an agent and acted on with the user's
     // authority: the same trust tier as a VM recipe, not panel content.
     (plugin.skills?.length ?? 0) > 0 ||
+    // A contributed automation runs on a schedule under the user's authority —
+    // a bare shell command in the command-only form. Never "declarative".
+    (plugin.automations?.length ?? 0) > 0 ||
     plugin.commands.some((command) => command.keybindings.length > 0)
   )
 }
@@ -218,23 +230,38 @@ export function PluginConsentDialog({
                             'Network access is blocked because this plugin does not request net:fetch.'
                           )
                     }`
-                  : hasInstructionalContent(plugin)
-                    ? translate(
-                        'auto.components.settings.PluginConsentDialog.instructionalWarning',
-                        'This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.'
-                      )
-                    : plugin.capabilities.length > 0 || plugin.panels.length > 0
+                  : // An automation fires on its cron with nobody present, so it cannot
+                    // borrow the use-time wording of skills or VM recipes.
+                    (plugin.automations?.length ?? 0) > 0
+                    ? // Sin comando ni precheck abajo no hay shell que leer: la
+                      // corrida la hace un agente con el prompt del plugin.
+                      showsAutomationShellCommand(plugin)
                       ? translate(
-                          'auto.components.settings.PluginConsentDialog.panelWarning',
-                          "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
+                          'auto.components.settings.PluginConsentDialog.automationWarning',
+                          'This plugin has no worker process, but it runs on its own schedule — the command below is what Orca Lab will run, at the times shown, whether or not you are here. Review it before enabling this plugin.'
                         )
                       : translate(
-                          'auto.components.settings.PluginConsentDialog.declarativeWarning',
-                          "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
-                        )}
+                          'auto.components.settings.PluginConsentDialog.automationAgentWarning',
+                          'This plugin has no worker process, but it runs on its own schedule — it launches a coding agent with the prompt shipped inside the plugin, at the times shown, whether or not you are here. Review the schedule below before enabling this plugin.'
+                        )
+                    : hasInstructionalContent(plugin)
+                      ? translate(
+                          'auto.components.settings.PluginConsentDialog.instructionalWarning',
+                          'This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.'
+                        )
+                      : plugin.capabilities.length > 0 || plugin.panels.length > 0
+                        ? translate(
+                            'auto.components.settings.PluginConsentDialog.panelWarning',
+                            "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
+                          )
+                        : translate(
+                            'auto.components.settings.PluginConsentDialog.declarativeWarning',
+                            "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
+                          )}
               </span>
             </div>
             <PluginKeybindingConsentPreview commands={plugin.commands} />
+            <PluginAutomationConsentPreview automations={plugin.automations ?? []} />
             <PluginVmRecipeConsentPreview recipes={plugin.vmRecipes ?? []} />
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
             <DialogFooter>

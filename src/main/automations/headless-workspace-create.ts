@@ -38,8 +38,10 @@ export function buildHeadlessAutomationWorktreeCreateArgs({
     baseBranch: automation.baseBranch ?? undefined,
     setupDecision: automation.setupDecision ?? 'skip',
     activate: false,
-    createdWithAgent: automation.agentId,
-    startupAgent: automation.agentId,
+    // Este camino solo se alcanza con filas que lanzan agente: una
+    // command-only se resuelve en el main antes de pedir workspace.
+    createdWithAgent: automation.agentId ?? undefined,
+    startupAgent: automation.agentId ?? undefined,
     startupPrompt: automation.prompt,
     telemetrySource: 'unknown',
     automationProvenance: buildAutomationWorkspaceProvenance(automation, run, repo, createdAt)

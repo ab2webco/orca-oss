@@ -182,7 +182,8 @@ export function formatAutomationList(result: { automations: Automation[] }): str
   return result.automations
     .map((automation) => {
       const status = automation.enabled ? 'enabled' : 'disabled'
-      return `${automation.id}  ${automation.name}  ${automation.agentId}  ${status}\n${formatAutomationSchedule(automation.rrule)}  next: ${new Date(automation.nextRunAt).toISOString()}`
+      const action = automation.command ? 'command' : (automation.agentId ?? 'none')
+      return `${automation.id}  ${automation.name}  ${action}  ${status}\n${formatAutomationSchedule(automation.rrule)}  next: ${new Date(automation.nextRunAt).toISOString()}`
     })
     .join('\n\n')
 }
@@ -203,7 +204,7 @@ export function formatAutomationShow(result: { automation: Automation }): string
   return [
     `id: ${automation.id}`,
     `name: ${automation.name}`,
-    `provider: ${automation.agentId}`,
+    `provider: ${automation.agentId ?? 'none'}`,
     `enabled: ${automation.enabled}`,
     `schedule: ${formatAutomationSchedule(automation.rrule)}`,
     `rrule: ${automation.rrule}`,
@@ -223,7 +224,14 @@ export function formatAutomationShow(result: { automation: Automation }): string
     `targetPane: ${automation.targetPaneKey ?? 'null'}`,
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
     ...formatAutomationPluginOrigin(automation),
-    `prompt: ${automation.prompt}`
+    // Una fila command-only no tiene prompt: imprimir el comando y su techo de
+    // tiempo es lo unico que describe lo que va a correr.
+    ...(automation.command
+      ? [
+          `command: ${automation.command.command}`,
+          `commandTimeout: ${formatAutomationPrecheckTimeout(automation.command.timeoutSeconds)}`
+        ]
+      : [`prompt: ${automation.prompt}`])
   ].join('\n')
 }
 

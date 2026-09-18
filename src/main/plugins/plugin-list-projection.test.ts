@@ -561,3 +561,60 @@ describe('buildPluginList panel icons', () => {
     ).not.toHaveProperty('iconSvg')
   })
 })
+
+describe('buildPluginList contributed automations', () => {
+  it('projects the declared schedule and the verbatim command the consent dialog must show', async () => {
+    const plugin: ValidDiscoveredPlugin = {
+      pluginKey: 'orca-samples.demo',
+      rootDir: join(tmpdir(), 'plugins', 'demo'),
+      manifest: pluginManifestSchema.parse({
+        manifestVersion: 1,
+        id: 'demo',
+        publisher: 'orca-samples',
+        name: 'Demo',
+        version: '1.0.0',
+        engines: { orca: '>=1.0.0' },
+        pluginApi: 1,
+        contributes: {
+          automations: [
+            {
+              id: 'mirror',
+              title: 'Mirror the vault',
+              trigger: '*/5 * * * *',
+              timezone: 'UTC',
+              precheck: 'test -d "$HOME/vault"',
+              command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+            },
+            {
+              id: 'review',
+              title: 'Nightly review',
+              trigger: '0 3 * * *',
+              timezone: 'UTC',
+              prompt: 'prompts/review.md',
+              provider: 'claude'
+            }
+          ]
+        },
+        capabilities: []
+      }),
+      consentFingerprint: 'sha256-current',
+      contentHash: null,
+      isDev: true
+    }
+
+    const [entry] = await buildPluginList(serviceWith(plugin), emptyPluginLockfile())
+
+    // El precheck tambien corre en cada corrida programada, asi que viaja al
+    // dialogo por el mismo camino que el comando.
+    expect(entry?.automations).toEqual([
+      {
+        id: 'mirror',
+        title: 'Mirror the vault',
+        trigger: '*/5 * * * *',
+        precheck: 'test -d "$HOME/vault"',
+        command: 'rsync -a --delete "$HOME/vault/" backup:/vault/'
+      },
+      { id: 'review', title: 'Nightly review', trigger: '0 3 * * *' }
+    ])
+  })
+})

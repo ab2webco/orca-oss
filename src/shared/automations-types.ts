@@ -12,6 +12,10 @@ export type AutomationRunStatus =
   | 'dispatching'
   | 'dispatched'
   | 'completed'
+  /** El comando de una automatizacion command-only corrio y salio distinto de
+   *  cero. No es `skipped_precheck` (eso es "no valia la pena correr") ni
+   *  `dispatch_failed` (eso es "no se pudo lanzar"): corrio y fallo. */
+  | 'command_failed'
   | 'skipped_precheck'
   | 'skipped_missed'
   | 'skipped_unavailable'
@@ -23,6 +27,7 @@ export type AutomationRunTrigger = 'scheduled' | 'manual'
 export function isFinalAutomationRunStatus(status: AutomationRunStatus): boolean {
   return (
     status === 'completed' ||
+    status === 'command_failed' ||
     status === 'dispatch_failed' ||
     status === 'skipped_precheck' ||
     status === 'skipped_missed' ||
@@ -70,12 +75,17 @@ export type AutomationRunOutputSnapshot = {
   truncated: boolean
 }
 
-export type AutomationPrecheck = {
+/** Un comando de shell con su techo de tiempo. El precheck y el comando de una
+ *  automatizacion command-only son la misma forma y los corre el mismo runner
+ *  (`runAutomationPrecheck`), por eso comparten tipo en vez de duplicarlo. */
+export type AutomationShellCommand = {
   command: string
   timeoutSeconds: number
 }
 
-export type AutomationPrecheckResult = {
+export type AutomationPrecheck = AutomationShellCommand
+
+export type AutomationShellResult = {
   command: string
   exitCode: number | null
   timedOut: boolean
@@ -89,12 +99,20 @@ export type AutomationPrecheckResult = {
   completedAt: number
 }
 
+export type AutomationPrecheckResult = AutomationShellResult
+
 export type Automation = {
   id: string
   name: string
   prompt: string
   precheck: AutomationPrecheck | null
-  agentId: TuiAgent
+  /** Agente TUI que lanza la corrida, o `null` cuando la fila es command-only.
+   *  Nunca leer directo: `getAutomationAction` decide cual de las dos formas es
+   *  y no admite una fila que no sea ninguna. */
+  agentId: TuiAgent | null
+  /** Comando que ES la corrida, o `null` cuando la fila lanza un agente.
+   *  Exactamente uno de `agentId` y `command` esta presente. */
+  command?: AutomationShellCommand | null
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
    *  field for pre-host-context automations.
@@ -154,6 +172,10 @@ export type AutomationRun = {
   terminalPtyId: string | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
+  /** Lo que hizo el comando de una corrida command-only: codigo de salida y
+   *  salida acotada, en su propio campo para que el historial nunca etiquete el
+   *  comando de la corrida como si fuera un precheck. */
+  commandResult?: AutomationShellResult | null
   usage: AutomationRunUsage | null
   error: string | null
   startedAt: number | null
@@ -164,11 +186,9 @@ export type AutomationRun = {
   runNumber?: number
 }
 
-export type AutomationCreateInput = {
+type AutomationCreateBase = {
   name: string
-  prompt: string
   precheck?: AutomationPrecheck | null
-  agentId: TuiAgent
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
   /** @deprecated Legacy repo-id compatibility field required for older stored
@@ -188,6 +208,16 @@ export type AutomationCreateInput = {
   pluginOrigin?: AutomationPluginOrigin
 }
 
+/**
+ * Una automatizacion es una de dos cosas y nunca ninguna: lanza un agente con
+ * un prompt, o corre un comando. La union lo hace imposible de construir mal en
+ * cada sitio que crea una fila — store, runtime, CLI y renderer — en vez de
+ * dejar dos opcionales sueltos que admiten una fila que no significa nada.
+ */
+export type AutomationCreateInput =
+  | (AutomationCreateBase & { agentId: TuiAgent; prompt: string; command?: null })
+  | (AutomationCreateBase & { agentId?: null; prompt?: string; command: AutomationShellCommand })
+
 export type AutomationUpdateInput = Partial<
   Pick<
     Automation,
@@ -195,6 +225,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'command'
     | 'runContext'
     | 'sourceContext'
     | 'projectId'
@@ -233,109 +264,23 @@ export type AutomationDispatchResult = {
   terminalPtyId?: string | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
+  commandResult?: AutomationShellResult | null
   usage?: AutomationRunUsage | null
   error?: string | null
 }
 
-export type ExternalAutomationProvider = 'hermes' | 'openclaw'
-export type ExternalAutomationManagerStatus = 'available' | 'unavailable'
-export type ExternalAutomationAction = 'pause' | 'resume' | 'run' | 'delete'
-export type ExternalAutomationRunStatus = 'completed' | 'failed' | 'unknown'
-
-export type ExternalAutomationTarget =
-  | {
-      type: 'local'
-    }
-  | {
-      type: 'ssh'
-      connectionId: string
-    }
-
-export type ExternalAutomationJob = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  name: string
-  schedule: string
-  rawSchedule: string | null
-  enabled: boolean
-  state: string
-  prompt: string | null
-  promptPreview: string
-  nextRunAt: string | null
-  lastRunAt: string | null
-  lastStatus: string | null
-  lastError: string | null
-  workdir: string | null
-  runCount: number
-  runCountSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRun = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  jobId: string
-  runAt: string | null
-  status: ExternalAutomationRunStatus
-  outputPreview: string | null
-  outputContent: string | null
-  error: string | null
-  outputPath: string | null
-}
-
-export type ExternalAutomationRunsPage = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-  total: number
-  totalSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRunsInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-}
-
-export type ExternalAutomationCreateInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  name: string
-  prompt: string
-  schedule: string
-  workdir: string | null
-}
-
-export type ExternalAutomationUpdateInput = ExternalAutomationCreateInput & {
-  jobId: string
-}
-
-export type ExternalAutomationManager = {
-  id: string
-  provider: ExternalAutomationProvider
-  label: string
-  targetLabel: string
-  target: ExternalAutomationTarget
-  status: ExternalAutomationManagerStatus
-  error: string | null
-  canManage: boolean
-  jobs: ExternalAutomationJob[]
-}
-
-export type ExternalAutomationActionInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  action: ExternalAutomationAction
-}
+export type {
+  ExternalAutomationProvider,
+  ExternalAutomationManagerStatus,
+  ExternalAutomationAction,
+  ExternalAutomationRunStatus,
+  ExternalAutomationTarget,
+  ExternalAutomationJob,
+  ExternalAutomationRun,
+  ExternalAutomationRunsPage,
+  ExternalAutomationRunsInput,
+  ExternalAutomationCreateInput,
+  ExternalAutomationUpdateInput,
+  ExternalAutomationManager,
+  ExternalAutomationActionInput
+} from './external-automation-types'
