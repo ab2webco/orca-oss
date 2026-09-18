@@ -1,6 +1,4 @@
 import { fork, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import {
   PLUGIN_WORKER_INVOKE_TIMEOUT_MS,
   PLUGIN_WORKER_READY_TIMEOUT_MS,
@@ -13,6 +11,11 @@ import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel
 import { buildPluginWorkerEnv } from './plugin-worker-env'
 import { pipePluginWorkerOutput } from './plugin-worker-output-buffer'
 import { buildPluginWorkerSandboxArgs } from './plugin-worker-sandbox-args'
+import {
+  reapPluginWorkerGroup,
+  terminatePluginWorkerTree,
+  usesDetachedProcessGroup
+} from './plugin-worker-process-tree'
 
 // Grace between the shutdown message and SIGKILL: long enough for plugin
 // cleanup, short enough that disable/quit never feels stuck.
@@ -58,20 +61,6 @@ export type StartPluginWorkerOptions = {
   signal?: AbortSignal
 }
 
-/**
- * Resolves the compiled child entry from the app path. Mirrors
- * getDaemonEntryPath(): packaged apps must fork the asar-unpacked copy
- * because fork() cannot execute scripts from inside app.asar.
- */
-export function resolvePluginHostEntryPath(appPath: string, isPackaged: boolean): string {
-  const basePath = isPackaged ? appPath.replace('app.asar', 'app.asar.unpacked') : appPath
-  const directEntryPath = join(basePath, 'plugin-host-entry.js')
-  if (existsSync(directEntryPath)) {
-    return directEntryPath
-  }
-  return join(basePath, 'out', 'main', 'plugin-host-entry.js')
-}
-
 type PendingCall = {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
@@ -95,14 +84,19 @@ export async function startPluginWorker(
       ORCA_PLUGIN_NET_FETCH_HOSTS: JSON.stringify(options.networkHosts ?? [])
     },
     // Why: never inherit Orca's flags; only this fixed sandbox may run here.
-    execArgv: buildPluginWorkerSandboxArgs(rootDir, entryPath),
+    execArgv: buildPluginWorkerSandboxArgs(rootDir, entryPath, options.grantedCapabilities),
     // Why: the protocol permits structured-clone values. Node's default JSON
     // fork serialization rejects BigInt, cycles, maps, and typed arrays.
     serialization: 'advanced',
+    detached: usesDetachedProcessGroup(options.grantedCapabilities),
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   })
   pipePluginWorkerOutput(child.stdout, 'info', log)
   pipePluginWorkerOutput(child.stderr, 'error', log)
+
+  const killWorkerTree = () => terminatePluginWorkerTree(child, options.grantedCapabilities)
+  // Why: child.pid is cleared on exit, and the post-exit sweep still needs it.
+  const workerPid = child.pid
 
   const pendingCommands = new Map<number, PendingCall>()
   const pendingEvents = new Map<number, ReturnType<typeof setTimeout>>()
@@ -135,6 +129,9 @@ export async function startPluginWorker(
   child.on('exit', (code) => {
     exited = true
     exitCode = code
+    // Why: a clean self-exit never goes through killWorkerTree, so without this
+    // the children the worker spawned would outlive it.
+    reapPluginWorkerGroup(workerPid, options.grantedCapabilities)
     rejectAllPending(`${tag} worker exited before responding`)
     for (const callback of exitCallbacks) {
       callback(code)
@@ -145,7 +142,7 @@ export async function startPluginWorker(
     // it so the ensuing exit enters the normal supervision/backoff path.
     rejectAllPending(`${tag} worker disconnected before responding`)
     if (!exited) {
-      child.kill('SIGKILL')
+      killWorkerTree()
     }
   })
 
@@ -153,7 +150,7 @@ export async function startPluginWorker(
     let settled = false
     const timer = setTimeout(() => {
       fail(new Error(`${tag} worker did not become ready within ${readyTimeoutMs}ms`))
-      child.kill('SIGKILL')
+      killWorkerTree()
     }, readyTimeoutMs)
     function fail(error: Error): void {
       if (!settled) {
@@ -165,13 +162,13 @@ export async function startPluginWorker(
     }
     const onAbort = (): void => {
       fail(new Error(`${tag} worker startup was cancelled`))
-      child.kill('SIGKILL')
+      killWorkerTree()
     }
     options.signal?.addEventListener('abort', onAbort, { once: true })
     child.on('error', (error) => {
       const failure = new Error(`${tag} worker process error: ${error.message}`)
       fail(failure)
-      child.kill('SIGKILL')
+      killWorkerTree()
       // Why: fail() no-ops once ready; a post-ready channel fault must still
       // reject in-flight calls instead of letting each hit its own timeout.
       rejectAllPending(failure.message)
@@ -245,7 +242,7 @@ export async function startPluginWorker(
         case 'fatal': {
           fail(new Error(`${tag} worker crashed: ${message.error}`))
           rejectAllPending(`${tag} worker crashed: ${message.error}`)
-          child.kill('SIGKILL')
+          killWorkerTree()
         }
       }
     })
@@ -283,7 +280,7 @@ export async function startPluginWorker(
       }
       if (pendingEvents.size >= PLUGIN_WORKER_MAX_PENDING_EVENTS) {
         log('error', `${tag} exceeded the pending event limit`)
-        child.kill('SIGKILL')
+        killWorkerTree()
         return
       }
       lastActivityAt = Date.now()
@@ -291,7 +288,7 @@ export async function startPluginWorker(
       const timer = setTimeout(() => {
         pendingEvents.delete(eventId)
         log('error', `${tag} ${event} did not finish within ${eventTimeoutMs}ms`)
-        child.kill('SIGKILL')
+        killWorkerTree()
       }, eventTimeoutMs)
       pendingEvents.set(eventId, timer)
       sendToChild({ type: 'deliverEvent', eventId, event, payload })
@@ -309,7 +306,7 @@ export async function startPluginWorker(
       sendToChild({ type: 'shutdown' })
       await new Promise<void>((resolve) => {
         const killTimer = setTimeout(() => {
-          child.kill('SIGKILL')
+          killWorkerTree()
         }, PLUGIN_WORKER_SHUTDOWN_GRACE_MS)
         child.once('exit', () => {
           clearTimeout(killTimer)
@@ -322,7 +319,7 @@ export async function startPluginWorker(
       })
     },
     kill() {
-      child.kill('SIGKILL')
+      killWorkerTree()
     },
     onExit(callback) {
       if (exited) {

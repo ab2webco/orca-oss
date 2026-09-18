@@ -134,6 +134,16 @@ export function validatePluginManifestContributions(
     })
   }
   if (
+    !manifest.main &&
+    manifest.capabilities.some((capability) => capability.kind === 'process:spawn')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['main'],
+      message: 'required when process:spawn capability is declared'
+    })
+  }
+  if (
     manifest.contributes.events.length > 0 &&
     !manifest.capabilities.some((capability) => capability.kind === 'events:subscribe')
   ) {

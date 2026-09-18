@@ -70,6 +70,22 @@ async function renderConsent(
 }
 
 describe('PluginConsentDialog', () => {
+  it('discloses the authority of programs started by the worker', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        capabilities: [{ kind: 'process:spawn', description: 'unsafe fallback' }]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.body.textContent).toContain(
+      "Start programs as you. Programs it starts are not constrained by this plugin worker's file or network permissions."
+    )
+    expect(document.body.textContent).toContain('(process:spawn)')
+    expect(document.body.textContent).not.toContain('unsafe fallback')
+  })
+
   it('spells out that a skills:contribute plugin reaches every agent', async () => {
     await renderConsent(
       {

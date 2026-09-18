@@ -22,6 +22,17 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
 }
 
 describe('pluginManifestSchema boundaries', () => {
+  it('requires a worker entry point when child-process access is requested', () => {
+    expect(parsePluginManifest(manifest({ capabilities: [{ kind: 'process:spawn' }] })).ok).toBe(
+      false
+    )
+    expect(
+      parsePluginManifest(
+        manifest({ main: 'worker.js', capabilities: [{ kind: 'process:spawn' }] })
+      ).ok
+    ).toBe(true)
+  })
+
   it('accepts scoped network access and rejects invalid host scopes', () => {
     expect(
       parsePluginManifest(

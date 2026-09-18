@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const processMocks = vi.hoisted(() => ({ fork: vi.fn() }))
-vi.mock('node:child_process', () => ({ fork: processMocks.fork }))
+const processMocks = vi.hoisted(() => ({ fork: vi.fn(), execFile: vi.fn() }))
+vi.mock('node:child_process', () => processMocks)
 
 import { startPluginWorker } from './plugin-host-process'
 
@@ -13,11 +13,16 @@ class FakeChild extends EventEmitter {
   stderr = new PassThrough()
   send = vi.fn()
   kill = vi.fn()
+  pid = 4321
 }
 
 function start(
   child: FakeChild,
-  options: { eventTimeoutMs?: number; networkHosts?: readonly string[] } = {}
+  options: {
+    eventTimeoutMs?: number
+    networkHosts?: readonly string[]
+    grantedCapabilities?: readonly ['process:spawn']
+  } = {}
 ) {
   processMocks.fork.mockReturnValue(child)
   return startPluginWorker({
@@ -36,8 +41,16 @@ beforeEach(() => {
   processMocks.fork.mockReset()
 })
 
+// Why: vi.restoreAllMocks() cannot undo a defineProperty, so a win32 override
+// would leak into every later test in this file.
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+
 afterEach(() => {
+  if (originalPlatform) {
+    Object.defineProperty(process, 'platform', originalPlatform)
+  }
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('startPluginWorker', () => {
@@ -62,6 +75,23 @@ describe('startPluginWorker', () => {
         ]
       })
     )
+  })
+
+  it('adds child-process permission only for the exact approved grant', async () => {
+    const deniedChild = new FakeChild()
+    const deniedPending = start(deniedChild)
+    deniedChild.emit('message', { type: 'ready', commands: [] })
+    await deniedPending
+
+    const allowedChild = new FakeChild()
+    const allowedPending = start(allowedChild, { grantedCapabilities: ['process:spawn'] })
+    allowedChild.emit('message', { type: 'ready', commands: [] })
+    await allowedPending
+
+    const deniedArgv = processMocks.fork.mock.calls[0]?.[2]?.execArgv
+    const allowedArgv = processMocks.fork.mock.calls[1]?.[2]?.execArgv
+    expect(deniedArgv).not.toContain('--allow-child-process')
+    expect(allowedArgv).toContain('--allow-child-process')
   })
 
   it('passes only the consented network host scope to the preload', async () => {
@@ -94,6 +124,74 @@ describe('startPluginWorker', () => {
     expect(onExit).toHaveBeenCalledOnce()
     expect(onExit).toHaveBeenCalledWith(23)
   })
+
+  it.runIf(process.platform !== 'win32')(
+    'terminates the process group when process spawning was consented',
+    async () => {
+      const child = new FakeChild()
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+      const pending = start(child, { grantedCapabilities: ['process:spawn'] })
+      child.emit('message', { type: 'ready', commands: [] })
+      const handle = await pending
+
+      handle.kill()
+
+      expect(killProcess).toHaveBeenCalledWith(-child.pid, 'SIGKILL')
+      Object.defineProperty(process, 'platform', { value: 'win32' })
+      processMocks.execFile.mockImplementation((...args) =>
+        args.at(-1)(new Error('taskkill failed'))
+      )
+      handle.kill()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+    }
+  )
+
+  it('forks detached only when process spawning was consented', async () => {
+    const deniedChild = new FakeChild()
+    const deniedPending = start(deniedChild)
+    deniedChild.emit('message', { type: 'ready', commands: [] })
+    await deniedPending
+
+    const allowedChild = new FakeChild()
+    const allowedPending = start(allowedChild, { grantedCapabilities: ['process:spawn'] })
+    allowedChild.emit('message', { type: 'ready', commands: [] })
+    await allowedPending
+
+    // Only a detached fork owns its pid as a pgid; kill(-pid) depends on it.
+    expect(processMocks.fork.mock.calls[0]?.[2]?.detached).toBe(false)
+    expect(processMocks.fork.mock.calls[1]?.[2]?.detached).toBe(process.platform !== 'win32')
+  })
+
+  it.runIf(process.platform !== 'win32')(
+    'sweeps the process group after the worker exits on its own',
+    async () => {
+      const child = new FakeChild()
+      const pending = start(child, { grantedCapabilities: ['process:spawn'] })
+      child.emit('message', { type: 'ready', commands: [] })
+      await pending
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+
+      child.emit('exit', 0)
+
+      expect(killProcess).toHaveBeenCalledWith(-4321, 'SIGKILL')
+    }
+  )
+
+  it.runIf(process.platform !== 'win32')(
+    'leaves the process group alone for a worker without process spawning',
+    async () => {
+      const child = new FakeChild()
+      const pending = start(child)
+      child.emit('message', { type: 'ready', commands: [] })
+      await pending
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+
+      child.emit('exit', 0)
+
+      expect(killProcess).not.toHaveBeenCalled()
+    }
+  )
 
   it('kills a live worker that disconnects its IPC channel', async () => {
     const child = new FakeChild()

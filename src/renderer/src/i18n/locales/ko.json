@@ -15614,5 +15614,6 @@
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "해당 페이지의 코드",
   "auto.components.settings.HostAccountLoginDialog.cancel": "취소",
   "auto.components.settings.HostAccountLoginDialog.finish": "로그인 완료",
+  "auto.components.settings.PluginConsentDialog.capability.processSpawn": "사용자 권한으로 프로그램을 시작합니다. 시작된 프로그램은 이 플러그인 워커의 파일 또는 네트워크 권한에 의해 제한되지 않습니다.",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "모든 프로젝트의 모든 에이전트에게 이 플러그인 사용법을 알려줍니다. 스킬 지침은 요청하는 모든 에이전트에게 제공됩니다"
 }

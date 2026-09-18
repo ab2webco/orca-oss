@@ -15612,5 +15612,6 @@
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "该页面上的代码",
   "auto.components.settings.HostAccountLoginDialog.cancel": "取消",
   "auto.components.settings.HostAccountLoginDialog.finish": "完成登录",
+  "auto.components.settings.PluginConsentDialog.capability.processSpawn": "以你的用户身份启动程序。所启动的程序不受此插件工作进程的文件或网络权限限制。",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "让任何项目中的任何智能体都学会使用此插件：它的技能说明会提供给任何提出请求的智能体"
 }

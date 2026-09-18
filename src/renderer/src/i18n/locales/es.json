@@ -15603,5 +15603,6 @@
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "Código de esa página",
   "auto.components.settings.HostAccountLoginDialog.cancel": "Cancelar",
   "auto.components.settings.HostAccountLoginDialog.finish": "Finalizar inicio de sesión",
+  "auto.components.settings.PluginConsentDialog.capability.processSpawn": "Iniciar programas como tú. Los programas que inicia no están restringidos por los permisos de archivos o red del worker del plugin.",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida"
 }
