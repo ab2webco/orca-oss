@@ -6,6 +6,7 @@ import type { Store } from '../persistence'
 import type { PluginService } from './plugin-service'
 import type { PluginConsentRequest } from '../../shared/plugins/plugin-consent-request'
 import { verifyInstructionalPluginContent } from './plugin-instructional-content-integrity'
+import { reconcilePluginAutomations } from './plugin-automation-reconciliation'
 
 /**
  * Single write path for consent + enablement. Consent is recorded as
@@ -54,6 +55,7 @@ export async function applyPluginConsent(input: {
     { notifyListeners: true, originWebContentsId: input.originWebContentsId }
   )
   await pluginService.reconcileActivationState()
+  await reconcilePluginAutomations({ store, pluginService })
 }
 
 /** Enables/disables an already-consented plugin. Enabling never bypasses
@@ -82,4 +84,5 @@ export async function applyPluginEnablement(input: {
     { notifyListeners: true, originWebContentsId: input.originWebContentsId }
   )
   await pluginService.reconcileActivationState()
+  await reconcilePluginAutomations({ store, pluginService })
 }

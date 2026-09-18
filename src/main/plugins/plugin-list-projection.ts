@@ -16,6 +16,18 @@ import {
 } from '../../shared/plugins/plugin-marketplace'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import { projectPluginSettings, type PluginSettingProjection } from './plugin-settings-values'
+import {
+  parsePluginNavBadgeCount,
+  PLUGIN_NAV_BADGE_STORAGE_KEY
+} from '../../shared/plugins/plugin-nav-badge'
+import { PluginKvStore } from './plugin-storage-store'
+import { isPluginPanelIconPath } from '../../shared/plugins/plugin-manifest-fields'
+import {
+  PLUGIN_PANEL_ICON_SVG_MAX_BYTES,
+  sanitizePluginPanelIconSvg,
+  type PluginPanelIconSvgNode
+} from '../../shared/plugins/plugin-panel-icon-svg'
+import { readContainedPluginArtifactText } from './plugin-artifact-validation'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -32,6 +44,14 @@ export type PluginListPanelEntry = {
   icon?: string
   tabKey: `plugin:${string}`
   surface?: 'worktree' | 'settings' | 'nav'
+  /** Positive counter from the plugin's reserved `navBadge` storage key;
+   *  absent means no badge. Es POR PLUGIN, no por panel: dos paneles `nav`
+   *  del mismo plugin espejan el mismo numero a proposito. */
+  badgeCount?: number
+  /** Sanitized tree of the plugin's own `.svg` icon. Absent when `icon` names a
+   *  curated lucide icon, or when the file failed to sanitize — ambos casos
+   *  caen al icono por defecto en el renderer. */
+  iconSvg?: PluginPanelIconSvgNode
 }
 
 export type PluginListStatus =
@@ -85,6 +105,45 @@ export type PluginListEntry = {
     resolvedCommit: string | null
     contentHash: string
     marketplace?: { reference: string; resolvedCommit: string }
+  }
+}
+
+/** Fail-soft read of the plugin's reserved badge key. A corrupt store, an
+ *  unreadable file or a nonsense value all mean "no badge" — la barra nunca
+ *  se rompe por lo que un plugin haya escrito. */
+function readPluginNavBadgeCount(
+  pluginsDataDir: string,
+  pluginKey: string,
+  hasNavPanel: boolean
+): number | null {
+  if (!hasNavPanel) {
+    return null
+  }
+  try {
+    return parsePluginNavBadgeCount(
+      new PluginKvStore(pluginsDataDir, pluginKey, 'storage.json').get(PLUGIN_NAV_BADGE_STORAGE_KEY)
+    )
+  } catch {
+    return null
+  }
+}
+
+/** Reads and sanitizes a panel's own `.svg` icon. Fail-soft on every axis: a
+ *  missing file, a symlink escape, an oversized file or markup the sanitizer
+ *  refuses all mean "no custom icon", never a broken sidebar. */
+async function readPluginPanelIconSvg(
+  rootDir: string,
+  icon: string | undefined
+): Promise<PluginPanelIconSvgNode | null> {
+  if (!icon || !isPluginPanelIconPath(icon)) {
+    return null
+  }
+  try {
+    return sanitizePluginPanelIconSvg(
+      await readContainedPluginArtifactText(rootDir, icon, PLUGIN_PANEL_ICON_SVG_MAX_BYTES)
+    )
+  } catch {
+    return null
   }
 }
 
@@ -166,6 +225,29 @@ export async function buildPluginList(
         settingsState.unconfigured.length > 0 &&
         activation !== 'disabled' &&
         activation !== 'pending'
+      const navBadgeCount = readPluginNavBadgeCount(
+        getPluginsDataDir(service.options.userDataPath),
+        plugin.pluginKey,
+        plugin.manifest.contributes.panels.some((panel) => panel.surface === 'nav')
+      )
+      const panelEntries: PluginListPanelEntry[] = await Promise.all(
+        plugin.manifest.contributes.panels.map(async (panel) => {
+          const iconSvg = await readPluginPanelIconSvg(plugin.rootDir, panel.icon)
+          return {
+            id: panel.id,
+            title: panel.title,
+            ...(panel.icon ? { icon: panel.icon } : {}),
+            tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id),
+            // Solo el valor no-default viaja: un cliente viejo ignora la clave y
+            // un host viejo que no la manda sigue significando 'worktree'.
+            ...(panel.surface === 'worktree' ? {} : { surface: panel.surface }),
+            ...(panel.surface === 'nav' && navBadgeCount !== null
+              ? { badgeCount: navBadgeCount }
+              : {}),
+            ...(iconSvg ? { iconSvg } : {})
+          }
+        })
+      )
       const bundled = lockEntry?.source.kind === 'bundled'
       const official =
         bundled ||
@@ -192,15 +274,7 @@ export async function buildPluginList(
           kind: capability.kind,
           description: describePluginCapability(capability)
         })),
-        panels: plugin.manifest.contributes.panels.map((panel) => ({
-          id: panel.id,
-          title: panel.title,
-          ...(panel.icon ? { icon: panel.icon } : {}),
-          tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id),
-          // Solo el valor no-default viaja: un cliente viejo ignora la clave y
-          // un host viejo que no la manda sigue significando 'worktree'.
-          ...(panel.surface === 'worktree' ? {} : { surface: panel.surface })
-        })),
+        panels: panelEntries,
         commands: service.contentPacks.commands.preview(plugin.pluginKey).map((command) => ({
           id: command.id,
           title: command.title,

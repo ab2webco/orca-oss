@@ -1,12 +1,7 @@
 import React from 'react'
+import type { LucideProps } from 'lucide-react'
 
-export function AgentSessionHistoryIcon({
-  size = 16,
-  className
-}: {
-  size?: number
-  className?: string
-}): React.JSX.Element {
+export function AgentSessionHistoryIcon({ size = 16, className }: LucideProps): React.JSX.Element {
   return (
     <svg
       width={size}

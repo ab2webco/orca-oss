@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -14,7 +14,7 @@ import { emptyPluginLockfile } from '../../shared/plugins/plugin-install-lockfil
 import { pluginManifestSchema } from '../../shared/plugins/plugin-manifest'
 import type { InvalidDiscoveredPlugin, ValidDiscoveredPlugin } from './plugin-discovery'
 import { getPluginsDataDir } from './plugin-discovery'
-import { buildPluginList } from './plugin-list-projection'
+import { buildPluginList, type PluginListPanelEntry } from './plugin-list-projection'
 import { writePluginSetting } from './plugin-settings-write'
 import type { PluginService } from './plugin-service'
 
@@ -90,8 +90,18 @@ describe('buildPluginList consent identity', () => {
         contributes: {
           panels: [
             { id: 'dashboard', title: 'Dashboard', entry: 'dashboard.html' },
-            { id: 'registry', title: 'Registry', entry: 'registry.html', surface: 'settings' },
-            { id: 'inbox', title: 'Inbox', entry: 'inbox.html', surface: 'nav' }
+            {
+              id: 'registry',
+              title: 'Registry',
+              entry: 'registry.html',
+              surface: 'settings'
+            },
+            {
+              id: 'inbox',
+              title: 'Inbox',
+              entry: 'inbox.html',
+              surface: 'nav'
+            }
           ],
           commands: [],
           events: []
@@ -106,7 +116,11 @@ describe('buildPluginList consent identity', () => {
     const [entry] = await buildPluginList(serviceWith(plugin), emptyPluginLockfile())
 
     expect(entry?.panels).toEqual([
-      { id: 'dashboard', title: 'Dashboard', tabKey: 'plugin:orca-samples.demo/dashboard' },
+      {
+        id: 'dashboard',
+        title: 'Dashboard',
+        tabKey: 'plugin:orca-samples.demo/dashboard'
+      },
       {
         id: 'registry',
         title: 'Registry',
@@ -160,7 +174,11 @@ describe('buildPluginList consent identity', () => {
         [plugin.pluginKey]: {
           pluginKey: plugin.pluginKey,
           version: '1.0.0',
-          source: { kind: 'git' as const, url: 'https://example.com/demo.git', ref: 'v1' },
+          source: {
+            kind: 'git' as const,
+            url: 'https://example.com/demo.git',
+            ref: 'v1'
+          },
           resolvedCommit: 'a'.repeat(40),
           contentHash: 'b'.repeat(64),
           consentFingerprint: 'sha256-installed',
@@ -239,7 +257,14 @@ describe('buildPluginList consent identity', () => {
     const commandManifest = pluginManifestSchema.parse({
       ...manifest,
       contributes: {
-        commands: [{ id: 'tasks', title: 'Open Tasks', context: 'worktree', action: 'view.tasks' }],
+        commands: [
+          {
+            id: 'tasks',
+            title: 'Open Tasks',
+            context: 'worktree',
+            action: 'view.tasks'
+          }
+        ],
         keybindings: [{ command: 'tasks', key: 'mod+alt+t' }]
       }
     })
@@ -293,7 +318,14 @@ describe('buildPluginList declared settings', () => {
     engines: { orca: '>=1.0.0' },
     pluginApi: 1,
     contributes: {
-      settings: [{ key: 'webhookUrl', type: 'string', label: 'Webhook URL', required: true }]
+      settings: [
+        {
+          key: 'webhookUrl',
+          type: 'string',
+          label: 'Webhook URL',
+          required: true
+        }
+      ]
     },
     capabilities: [{ kind: 'settings:own' }]
   })
@@ -359,7 +391,10 @@ describe('buildPluginList declared settings', () => {
     try {
       const entry = (
         await buildPluginList(
-          serviceWith(discovered(settingsManifest), { activation: 'disabled', userDataPath }),
+          serviceWith(discovered(settingsManifest), {
+            activation: 'disabled',
+            userDataPath
+          }),
           emptyPluginLockfile()
         )
       )[0]!
@@ -369,5 +404,160 @@ describe('buildPluginList declared settings', () => {
     } finally {
       await rm(userDataPath, { recursive: true, force: true })
     }
+  })
+})
+
+describe('buildPluginList nav badge', () => {
+  const navManifest = pluginManifestSchema.parse({
+    manifestVersion: 1,
+    id: 'demo',
+    publisher: 'orca-samples',
+    name: 'Demo',
+    version: '1.0.0',
+    engines: { orca: '>=1.0.0' },
+    pluginApi: 1,
+    contributes: {
+      panels: [
+        { id: 'inbox', title: 'Inbox', entry: 'inbox.html', surface: 'nav' },
+        { id: 'side', title: 'Side', entry: 'side.html' }
+      ]
+    },
+    capabilities: [{ kind: 'storage' }]
+  })
+
+  async function projectBadge(stored: unknown): Promise<number | undefined> {
+    const userDataPath = await mkdtemp(join(tmpdir(), 'orca-nav-badge-'))
+    try {
+      const plugin: ValidDiscoveredPlugin = {
+        pluginKey: 'orca-samples.demo',
+        rootDir: join(tmpdir(), 'plugins', 'demo'),
+        manifest: navManifest,
+        consentFingerprint: 'sha256-current',
+        contentHash: null,
+        isDev: true
+      }
+      if (stored !== undefined) {
+        const dir = join(getPluginsDataDir(userDataPath), plugin.pluginKey)
+        await mkdir(dir, { recursive: true })
+        await writeFile(
+          join(dir, 'storage.json'),
+          JSON.stringify({ navBadge: stored }, null, 2),
+          'utf8'
+        )
+      }
+      const [entry] = await buildPluginList(
+        serviceWith(plugin, { activation: 'approved', userDataPath }),
+        emptyPluginLockfile()
+      )
+      return entry?.panels.find((panel) => panel.id === 'inbox')?.badgeCount
+    } finally {
+      await rm(userDataPath, { recursive: true, force: true })
+    }
+  }
+
+  it('projects a positive count from the reserved key in both accepted shapes', async () => {
+    expect(await projectBadge({ count: 7 })).toBe(7)
+    expect(await projectBadge(3)).toBe(3)
+  })
+
+  it('omits the badge for an absent, non-positive or malformed value', async () => {
+    expect(await projectBadge(undefined)).toBeUndefined()
+    expect(await projectBadge(0)).toBeUndefined()
+    expect(await projectBadge({ count: -4 })).toBeUndefined()
+    expect(await projectBadge('12')).toBeUndefined()
+    expect(await projectBadge({ count: '12' })).toBeUndefined()
+    expect(await projectBadge({ unread: 5 })).toBeUndefined()
+    expect(await projectBadge(2.5)).toBeUndefined()
+  })
+
+  it('keeps the badge off panels that are not nav destinations', async () => {
+    const userDataPath = await mkdtemp(join(tmpdir(), 'orca-nav-badge-'))
+    const plugin: ValidDiscoveredPlugin = {
+      pluginKey: 'orca-samples.demo',
+      rootDir: join(tmpdir(), 'plugins', 'demo'),
+      manifest: navManifest,
+      consentFingerprint: 'sha256-current',
+      contentHash: null,
+      isDev: true
+    }
+    const dir = join(getPluginsDataDir(userDataPath), plugin.pluginKey)
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, 'storage.json'), JSON.stringify({ navBadge: { count: 9 } }), 'utf8')
+
+    const [entry] = await buildPluginList(
+      serviceWith(plugin, { activation: 'approved', userDataPath }),
+      emptyPluginLockfile()
+    )
+
+    expect(entry?.panels.find((panel) => panel.id === 'side')).not.toHaveProperty('badgeCount')
+    await rm(userDataPath, { recursive: true, force: true })
+  })
+})
+
+describe('buildPluginList panel icons', () => {
+  async function projectIcon(
+    icon: string,
+    files: Readonly<Record<string, string>> = {}
+  ): Promise<PluginListPanelEntry | undefined> {
+    const rootDir = await mkdtemp(join(tmpdir(), 'orca-panel-icon-'))
+    try {
+      for (const [name, content] of Object.entries(files)) {
+        await mkdir(join(rootDir, name, '..'), { recursive: true })
+        await writeFile(join(rootDir, name), content, 'utf8')
+      }
+      const plugin: ValidDiscoveredPlugin = {
+        pluginKey: 'orca-samples.demo',
+        rootDir,
+        manifest: pluginManifestSchema.parse({
+          manifestVersion: 1,
+          id: 'demo',
+          publisher: 'orca-samples',
+          name: 'Demo',
+          version: '1.0.0',
+          engines: { orca: '>=1.0.0' },
+          pluginApi: 1,
+          contributes: {
+            panels: [{ id: 'inbox', title: 'Inbox', entry: 'inbox.html', icon, surface: 'nav' }]
+          },
+          capabilities: []
+        }),
+        consentFingerprint: 'sha256-current',
+        contentHash: null,
+        isDev: true
+      }
+      const [entry] = await buildPluginList(
+        serviceWith(plugin, { activation: 'approved' }),
+        emptyPluginLockfile()
+      )
+      return entry?.panels[0]
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  }
+
+  it('ships the sanitized tree of the plugin own svg icon', async () => {
+    const panel = await projectIcon('assets/brand.svg', {
+      'assets/brand.svg':
+        '<svg viewBox="0 0 24 24" width="99"><path d="M2 2h20" fill="#25D366"/></svg>'
+    })
+
+    expect(panel?.iconSvg).toEqual({
+      tag: 'svg',
+      attributes: { viewBox: '0 0 24 24', fill: 'currentColor' },
+      children: [{ tag: 'path', attributes: { d: 'M2 2h20', fill: 'currentColor' }, children: [] }]
+    })
+  })
+
+  it('keeps a curated icon name off the svg path entirely', async () => {
+    const panel = await projectIcon('message-square')
+    expect(panel?.icon).toBe('message-square')
+    expect(panel).not.toHaveProperty('iconSvg')
+  })
+
+  it('projects no icon tree when the declared file is missing or unsafe', async () => {
+    expect(await projectIcon('assets/brand.svg')).not.toHaveProperty('iconSvg')
+    expect(
+      await projectIcon('assets/brand.svg', { 'assets/brand.svg': '<svg><script/></svg>' })
+    ).not.toHaveProperty('iconSvg')
   })
 })

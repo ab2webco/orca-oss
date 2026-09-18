@@ -1,5 +1,5 @@
 import React from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, type LucideProps } from 'lucide-react'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
 import type { CheckStatus } from '../../../../shared/github/pull-request-types'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,8 @@ import { translate } from '@/i18n/i18n'
 
 export type ActivityBarItem = {
   id: ActiveRightSidebarTab
-  icon: React.ComponentType<{ size?: number; className?: string }>
+  // Lucide's prop shape, so a plugin's own sanitized SVG icon fits the same slot.
+  icon: React.ComponentType<LucideProps>
   title: string
   shortcut: string
   /** When true, hidden for non-git (folder-mode) repos. */

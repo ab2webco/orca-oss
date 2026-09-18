@@ -7,17 +7,25 @@ import type { PluginLanguagePackRegistration } from '../../shared/plugins/plugin
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
 import type { PluginMarketplaceGitSource } from '../../shared/plugins/plugin-marketplace'
+import type { PluginPanelIconSvgNode } from '../../shared/plugins/plugin-panel-icon-svg'
 
 /** Panel contribution as surfaced by the main-process plugin service. */
 export type PluginHostPanel = {
   id: string
   title: string
-  /** Lucide icon name declared in the plugin manifest. */
+  /** Curated lucide icon name, or the relative `.svg` path declared in the
+   *  plugin manifest (in which case `iconSvg` carries the sanitized tree). */
   icon?: string
   tabKey: `plugin:${string}`
   /** Absent over the wire when the host predates panel surfaces, or when the
    *  panel uses the default one; both mean `worktree`. */
   surface?: 'worktree' | 'settings' | 'nav'
+  /** Positive counter for a `nav` entry badge, read from the plugin's reserved
+   *  `navBadge` storage key. Absent means no badge. */
+  badgeCount?: number
+  /** Host-sanitized tree of the plugin's own `.svg` icon; absent means the
+   *  renderer falls back to the curated set. */
+  iconSvg?: PluginPanelIconSvgNode
 }
 
 /** `pending` = awaiting (re-)consent; `idle` = enabled, worker not running

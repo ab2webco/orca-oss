@@ -5634,7 +5634,8 @@ export class Store {
       missedRunPolicy: 'run_once_within_grace',
       missedRunGraceMinutes: input.missedRunGraceMinutes ?? 720,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      ...(input.pluginOrigin ? { pluginOrigin: input.pluginOrigin } : {})
     }
     this.state.automations = [...(this.state.automations ?? []), automation]
     this.recordFeatureInteraction('automation-created')
@@ -5721,6 +5722,14 @@ export class Store {
     this.state.automations[index] = updated
     this.flush()
     return updated
+  }
+
+  /** Rows a given plugin declared. Identity, not name matching: renaming an
+   *  automation in the UI must not detach it from its plugin. */
+  listAutomationsByPlugin(pluginKey: string): Automation[] {
+    return (this.state.automations ?? []).filter(
+      (automation) => automation.pluginOrigin?.pluginKey === pluginKey
+    )
   }
 
   deleteAutomation(id: string): void {

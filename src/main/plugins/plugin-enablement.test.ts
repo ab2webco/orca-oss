@@ -31,7 +31,14 @@ function createStore(): {
     settings = { ...settings, ...updates }
   })
   return {
-    store: { getSettings: () => settings, updateSettings } as unknown as Store,
+    store: {
+      getSettings: () => settings,
+      updateSettings,
+      // La reconciliacion de automatizaciones corre en el mismo camino.
+      listAutomations: () => [],
+      createAutomation: vi.fn(),
+      deleteAutomation: vi.fn()
+    } as unknown as Store,
     getSettings: () => settings,
     updateSettings
   }
@@ -55,7 +62,9 @@ function createPluginService(
             ...overrides
           }
         : null,
-    reconcileActivationState: vi.fn().mockResolvedValue(undefined)
+    reconcileActivationState: vi.fn().mockResolvedValue(undefined),
+    getDiscovered: () => [],
+    activationState: () => 'approved' as const
   } as unknown as PluginService
 }
 
