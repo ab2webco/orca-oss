@@ -15592,5 +15592,5 @@
   "auto.components.settings.HostAccountLoginDialog.codeLabel": "そのページのコード",
   "auto.components.settings.HostAccountLoginDialog.cancel": "キャンセル",
   "auto.components.settings.HostAccountLoginDialog.finish": "サインインを完了",
-  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "すべてのプロジェクトのすべてのエージェントに、このプラグインの使い方を教えます。スキルの手順は、要求したエージェントすべてに渡されます"
+  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "すべてのプロジェクトのすべての Agent に、このプラグインの使い方を教えます。スキルの手順は、要求した Agent すべてに渡されます"
 }
