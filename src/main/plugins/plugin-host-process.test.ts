@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const processMocks = vi.hoisted(() => ({ fork: vi.fn() }))
-vi.mock('node:child_process', () => ({ fork: processMocks.fork }))
+const processMocks = vi.hoisted(() => ({ fork: vi.fn(), execFile: vi.fn() }))
+vi.mock('node:child_process', () => processMocks)
 
 import { startPluginWorker } from './plugin-host-process'
 
@@ -13,6 +13,7 @@ class FakeChild extends EventEmitter {
   stderr = new PassThrough()
   send = vi.fn()
   kill = vi.fn()
+  pid = 4321
 }
 
 function start(
@@ -42,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('startPluginWorker', () => {
@@ -115,6 +117,28 @@ describe('startPluginWorker', () => {
     expect(onExit).toHaveBeenCalledOnce()
     expect(onExit).toHaveBeenCalledWith(23)
   })
+
+  it.runIf(process.platform !== 'win32')(
+    'terminates the process group when process spawning was consented',
+    async () => {
+      const child = new FakeChild()
+      const killProcess = vi.spyOn(process, 'kill').mockImplementation(() => true)
+      const pending = start(child, { grantedCapabilities: ['process:spawn'] })
+      child.emit('message', { type: 'ready', commands: [] })
+      const handle = await pending
+
+      handle.kill()
+
+      expect(killProcess).toHaveBeenCalledWith(-child.pid, 'SIGKILL')
+      Object.defineProperty(process, 'platform', { value: 'win32' })
+      processMocks.execFile.mockImplementation((...args) =>
+        args.at(-1)(new Error('taskkill failed'))
+      )
+      handle.kill()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+    }
+  )
 
   it('kills a live worker that disconnects its IPC channel', async () => {
     const child = new FakeChild()

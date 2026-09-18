@@ -13,6 +13,7 @@ import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel
 import { buildPluginWorkerEnv } from './plugin-worker-env'
 import { pipePluginWorkerOutput } from './plugin-worker-output-buffer'
 import { buildPluginWorkerSandboxArgs } from './plugin-worker-sandbox-args'
+import { hasSpawnCapability, terminatePluginWorkerTree } from './plugin-worker-process-tree'
 
 // Grace between the shutdown message and SIGKILL: long enough for plugin
 // cleanup, short enough that disable/quit never feels stuck.
@@ -99,10 +100,13 @@ export async function startPluginWorker(
     // Why: the protocol permits structured-clone values. Node's default JSON
     // fork serialization rejects BigInt, cycles, maps, and typed arrays.
     serialization: 'advanced',
+    detached: hasSpawnCapability(options.grantedCapabilities) && process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe', 'ipc']
   })
   pipePluginWorkerOutput(child.stdout, 'info', log)
   pipePluginWorkerOutput(child.stderr, 'error', log)
+
+  const killWorkerTree = () => terminatePluginWorkerTree(child, options.grantedCapabilities)
 
   const pendingCommands = new Map<number, PendingCall>()
   const pendingEvents = new Map<number, ReturnType<typeof setTimeout>>()
@@ -145,7 +149,7 @@ export async function startPluginWorker(
     // it so the ensuing exit enters the normal supervision/backoff path.
     rejectAllPending(`${tag} worker disconnected before responding`)
     if (!exited) {
-      child.kill('SIGKILL')
+      killWorkerTree()
     }
   })
 
@@ -153,7 +157,7 @@ export async function startPluginWorker(
     let settled = false
     const timer = setTimeout(() => {
       fail(new Error(`${tag} worker did not become ready within ${readyTimeoutMs}ms`))
-      child.kill('SIGKILL')
+      killWorkerTree()
     }, readyTimeoutMs)
     function fail(error: Error): void {
       if (!settled) {
@@ -165,13 +169,13 @@ export async function startPluginWorker(
     }
     const onAbort = (): void => {
       fail(new Error(`${tag} worker startup was cancelled`))
-      child.kill('SIGKILL')
+      killWorkerTree()
     }
     options.signal?.addEventListener('abort', onAbort, { once: true })
     child.on('error', (error) => {
       const failure = new Error(`${tag} worker process error: ${error.message}`)
       fail(failure)
-      child.kill('SIGKILL')
+      killWorkerTree()
       // Why: fail() no-ops once ready; a post-ready channel fault must still
       // reject in-flight calls instead of letting each hit its own timeout.
       rejectAllPending(failure.message)
@@ -245,7 +249,7 @@ export async function startPluginWorker(
         case 'fatal': {
           fail(new Error(`${tag} worker crashed: ${message.error}`))
           rejectAllPending(`${tag} worker crashed: ${message.error}`)
-          child.kill('SIGKILL')
+          killWorkerTree()
         }
       }
     })
@@ -283,7 +287,7 @@ export async function startPluginWorker(
       }
       if (pendingEvents.size >= PLUGIN_WORKER_MAX_PENDING_EVENTS) {
         log('error', `${tag} exceeded the pending event limit`)
-        child.kill('SIGKILL')
+        killWorkerTree()
         return
       }
       lastActivityAt = Date.now()
@@ -291,7 +295,7 @@ export async function startPluginWorker(
       const timer = setTimeout(() => {
         pendingEvents.delete(eventId)
         log('error', `${tag} ${event} did not finish within ${eventTimeoutMs}ms`)
-        child.kill('SIGKILL')
+        killWorkerTree()
       }, eventTimeoutMs)
       pendingEvents.set(eventId, timer)
       sendToChild({ type: 'deliverEvent', eventId, event, payload })
@@ -309,7 +313,7 @@ export async function startPluginWorker(
       sendToChild({ type: 'shutdown' })
       await new Promise<void>((resolve) => {
         const killTimer = setTimeout(() => {
-          child.kill('SIGKILL')
+          killWorkerTree()
         }, PLUGIN_WORKER_SHUTDOWN_GRACE_MS)
         child.once('exit', () => {
           clearTimeout(killTimer)
@@ -322,7 +326,7 @@ export async function startPluginWorker(
       })
     },
     kill() {
-      child.kill('SIGKILL')
+      killWorkerTree()
     },
     onExit(callback) {
       if (exited) {
