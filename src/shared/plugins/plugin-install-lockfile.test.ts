@@ -7,24 +7,24 @@ describe('pluginInstallSourceSchema marketplace provenance', () => {
       pluginInstallSourceSchema.parse({
         kind: 'marketplace',
         marketplace: {
-          url: 'https://github.com/stablyai/orca-plugins.git',
+          url: 'https://github.com/ab2webco/orcalab-plugins.git',
           ref: 'main',
           resolvedCommit: 'a'.repeat(40)
         },
         plugin: {
-          url: 'git@github.com:stablyai/orca-skills.git',
+          url: 'git@github.com:ab2webco/orca-skills.git',
           ref: 'v1.0.0'
         }
       })
     ).toEqual({
       kind: 'marketplace',
       marketplace: {
-        url: 'https://github.com/stablyai/orca-plugins.git',
+        url: 'https://github.com/ab2webco/orcalab-plugins.git',
         ref: 'main',
         resolvedCommit: 'a'.repeat(40)
       },
       plugin: {
-        url: 'git@github.com:stablyai/orca-skills.git',
+        url: 'git@github.com:ab2webco/orca-skills.git',
         ref: 'v1.0.0'
       }
     })
@@ -35,12 +35,12 @@ describe('pluginInstallSourceSchema marketplace provenance', () => {
       pluginInstallSourceSchema.safeParse({
         kind: 'marketplace',
         marketplace: {
-          url: 'https://github.com/stablyai/orca-plugins.git',
+          url: 'https://github.com/ab2webco/orcalab-plugins.git',
           ref: '',
           resolvedCommit: 'main'
         },
         plugin: {
-          url: 'https://github.com/stablyai/orca-skills.git',
+          url: 'https://github.com/ab2webco/orca-skills.git',
           ref: ''
         }
       }).success

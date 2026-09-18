@@ -20,11 +20,11 @@ vi.mock('../ui/dropdown-menu', () => ({
 }))
 
 const plugin: PluginHostListEntry = {
-  pluginKey: 'stablyai.orca-skills',
+  pluginKey: 'ab2web.orca-skills',
   consentFingerprint: 'sha256-consent',
   name: 'Orca Skills',
   version: '1.0.0',
-  publisher: 'stablyai',
+  publisher: 'ab2web',
   status: 'disabled',
   needsReconsent: false,
   isDev: false,
@@ -41,7 +41,7 @@ const plugin: PluginHostListEntry = {
   },
   source: {
     kind: 'bundled',
-    reference: 'bundled:stablyai.orca-skills',
+    reference: 'bundled:ab2web.orca-skills',
     resolvedCommit: null,
     contentHash: 'sha256-content'
   }

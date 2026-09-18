@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,6 +8,7 @@ import {
   pluginMarketplaceSchema
 } from '../../shared/plugins/plugin-marketplace'
 import { bootstrapBundledPlugins, resolveBundledPluginRoot } from './plugin-bundled-bootstrap'
+import { hashPluginTree } from './plugin-content-hash'
 import { inspectPluginInstallTree } from './plugin-install-staging'
 
 const launchRoot = join(process.cwd(), 'resources', 'plugins', 'launch')
@@ -33,12 +34,14 @@ describe('Phase 1 launch plugin content', () => {
       'stablyai.orca-navigation-shortcuts',
       'stablyai.orca-portuguese'
     ])
+    // These packs are upstream's, not Ab2Web's: they keep shipping as installable
+    // content but none of them is official here, so none carries the badge.
     expect(
       marketplace.plugins.filter(
         (plugin) =>
-          isOfficialPluginIdentity(plugin.id) && isOfficialOrganizationGitSource(plugin.source.url)
-      ).length
-    ).toBeGreaterThanOrEqual(2)
+          isOfficialPluginIdentity(plugin.id) || isOfficialOrganizationGitSource(plugin.source.url)
+      )
+    ).toEqual([])
 
     const localPluginDirectories = (await readdir(launchRoot, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
@@ -75,27 +78,58 @@ describe('Phase 1 launch plugin content', () => {
     expect(contributionKinds).toEqual(new Set(['language', 'vm-recipe', 'command-keybinding']))
   })
 
-  it('publishes every bundled pack only when its release hash matches exact bytes', async () => {
+  it('auto-installs nothing, because the bundled index ships empty', async () => {
     const userDataPath = await mkdtemp(join(tmpdir(), 'orca-launch-content-'))
     temporaryRoots.push(userDataPath)
 
-    const result = await bootstrapBundledPlugins({
-      root: launchRoot,
-      userDataPath,
-      hostVersion: '1.4.0'
-    })
+    const index = JSON.parse(
+      await readFile(join(launchRoot, 'bundled-plugins.json'), 'utf8')
+    ) as unknown
+    expect(index).toEqual({ version: 1, plugins: [] })
 
-    expect(result.errors).toEqual([])
-    expect(result.installed.length).toBeGreaterThanOrEqual(1)
-    expect(result.installed.every(isOfficialPluginIdentity)).toBe(true)
+    await expect(
+      bootstrapBundledPlugins({ root: launchRoot, userDataPath, hostVersion: '1.4.0' })
+    ).resolves.toEqual({ installed: [], unchanged: [], errors: [] })
   })
 
+  // The shipped index is empty, so a packaged bootstrap of it proves only that
+  // nothing installs. Index one official pack over the packaged copy so the
+  // resources layout, the hash gate, and the `ab2web.orca-*` identity gate all
+  // still get exercised on the path a release actually takes.
   it('boots release-indexed content from the packaged resources layout', async () => {
     const resourcesPath = await mkdtemp(join(tmpdir(), 'orca-packaged-resources-'))
     const userDataPath = await mkdtemp(join(tmpdir(), 'orca-packaged-user-data-'))
     temporaryRoots.push(resourcesPath, userDataPath)
     const packagedRoot = join(resourcesPath, 'plugins', 'launch')
     await cp(launchRoot, packagedRoot, { recursive: true })
+    const pluginKey = 'ab2web.orca-launch-probe'
+    const pluginRoot = join(packagedRoot, pluginKey)
+    await mkdir(pluginRoot, { recursive: true })
+    await writeFile(
+      join(pluginRoot, 'orca-plugin.json'),
+      JSON.stringify({
+        manifestVersion: 1,
+        id: 'orca-launch-probe',
+        publisher: 'ab2web',
+        name: 'Launch Probe',
+        version: '1.0.0',
+        engines: { orca: '>=1.0.0' },
+        pluginApi: 1,
+        capabilities: []
+      })
+    )
+    const hashed = await hashPluginTree(pluginRoot)
+    expect(hashed).toMatchObject({ ok: true })
+    if (!hashed.ok) {
+      return
+    }
+    await writeFile(
+      join(packagedRoot, 'bundled-plugins.json'),
+      JSON.stringify({
+        version: 1,
+        plugins: [{ pluginKey, path: pluginKey, contentHash: hashed.hash }]
+      })
+    )
 
     const result = await bootstrapBundledPlugins({
       root: resolveBundledPluginRoot({
@@ -107,7 +141,6 @@ describe('Phase 1 launch plugin content', () => {
       hostVersion: '1.4.0'
     })
 
-    expect(result.errors).toEqual([])
-    expect(result.installed).toEqual(['stablyai.orca-navigation-shortcuts'])
+    expect(result).toEqual({ installed: [pluginKey], unchanged: [], errors: [] })
   })
 })

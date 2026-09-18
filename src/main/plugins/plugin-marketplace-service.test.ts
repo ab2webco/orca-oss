@@ -150,13 +150,13 @@ describe('PluginMarketplaceService', () => {
   it('derives the Official badge only from the canonical marketplace and source organization', async () => {
     const officialMarketplace: PluginMarketplace = {
       name: 'Orca Lab Plugins',
-      owner: 'stablyai',
+      owner: 'ab2webco',
       plugins: [
         {
-          id: 'stablyai.orca-shortcuts',
+          id: 'ab2web.orca-shortcuts',
           source: {
             kind: 'git',
-            url: 'git@github.com:stablyai/orca-shortcuts.git',
+            url: 'git@github.com:ab2webco/orca-shortcuts.git',
             ref: 'main'
           },
           categories: ['keybindings']
@@ -168,11 +168,54 @@ describe('PluginMarketplaceService', () => {
       fetcher: async () => fetched(officialMarketplace)
     })
 
-    await service.addSource(source('https://github.com/stablyai/orca-plugins.git'))
+    await service.addSource(source('https://github.com/ab2webco/orcalab-plugins.git'))
 
     await expect(service.listPlugins()).resolves.toEqual([
-      expect.objectContaining({ pluginKey: 'stablyai.orca-shortcuts', official: true })
+      expect.objectContaining({ pluginKey: 'ab2web.orca-shortcuts', official: true })
     ])
+  })
+
+  // A hostile index cannot mint the badge by copying the official owner string
+  // and the official publisher: the host also requires the canonical repository.
+  it('refuses the Official badge to a lookalike marketplace outside the canonical repository', async () => {
+    const impostor: PluginMarketplace = {
+      name: 'Orca Lab Plugins',
+      owner: 'ab2webco',
+      plugins: [
+        {
+          id: 'ab2web.orca-shortcuts',
+          source: { kind: 'git', url: 'git@github.com:ab2webco/orca-shortcuts.git', ref: 'main' },
+          categories: ['keybindings']
+        }
+      ]
+    }
+    const service = new PluginMarketplaceService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () => fetched(impostor)
+    })
+
+    await service.addSource(source('https://github.com/attacker/orcalab-plugins.git'))
+
+    await expect(service.listPlugins()).resolves.toEqual([
+      expect.objectContaining({ pluginKey: 'ab2web.orca-shortcuts', official: false })
+    ])
+  })
+
+  // Publisher `ab2web` is not the org `ab2webco`: a repo under an org named
+  // after the publisher must not host an official identity.
+  it('rejects an official identity served from an organization named after the publisher', async () => {
+    const service = new PluginMarketplaceService({
+      pluginsDataDir: await tempRoot(),
+      fetcher: async () =>
+        fetched(
+          marketplace('Ab2web', 'ab2web.orca-secrets', 'https://github.com/ab2web/orca-secrets.git')
+        )
+    })
+
+    await expect(service.addSource(source())).rejects.toThrow(
+      'reserved plugin identity ab2web.orca-secrets must resolve to the ab2webco organization'
+    )
+    await expect(service.listSources()).resolves.toEqual([])
   })
 
   it('hides listings whose contribution kind this build no longer supports', async () => {
@@ -216,10 +259,10 @@ describe('PluginMarketplaceService', () => {
     const root = await tempRoot()
     const officialMarketplace = marketplace(
       'Orca Lab Plugins',
-      'stablyai.orca-notes',
-      'https://github.com/stablyai/orca-notes.git'
+      'ab2web.orca-notes',
+      'https://github.com/ab2webco/orca-notes.git'
     )
-    officialMarketplace.owner = 'stablyai'
+    officialMarketplace.owner = 'ab2webco'
     const fetcher = vi.fn(async () => fetched(officialMarketplace))
     const first = new PluginMarketplaceService({ pluginsDataDir: root, fetcher })
 
@@ -259,10 +302,10 @@ describe('PluginMarketplaceService', () => {
     }
     const officialMarketplace = marketplace(
       'Orca Lab Plugins',
-      'stablyai.orca-notes',
-      'https://github.com/stablyai/orca-notes.git'
+      'ab2web.orca-notes',
+      'https://github.com/ab2webco/orca-notes.git'
     )
-    officialMarketplace.owner = 'stablyai'
+    officialMarketplace.owner = 'ab2webco'
     const listSources = vi
       .fn<() => Promise<readonly PluginMarketplaceRegisteredSource[]>>()
       .mockRejectedValueOnce(new Error('source store temporarily unavailable'))
@@ -304,10 +347,10 @@ describe('PluginMarketplaceService', () => {
     )
     const officialMarketplace = marketplace(
       'Orca Lab Plugins',
-      'stablyai.orca-notes',
-      'https://github.com/stablyai/orca-notes.git'
+      'ab2web.orca-notes',
+      'https://github.com/ab2webco/orca-notes.git'
     )
-    officialMarketplace.owner = 'stablyai'
+    officialMarketplace.owner = 'ab2webco'
     const service = new PluginMarketplaceService({
       pluginsDataDir: root,
       store,
