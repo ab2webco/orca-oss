@@ -1,3 +1,4 @@
+import type { AutomationPluginOrigin } from './automation-plugin-origin'
 import type { TuiAgent } from './tui-agent'
 import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
@@ -86,14 +87,6 @@ export type AutomationPrecheckResult = {
   error: string | null
   startedAt: number
   completedAt: number
-}
-
-/** Identity of the plugin that declared an automation, and of the declaration
- *  inside its manifest. El host es dueno del ciclo de vida de esa fila: se crea
- *  al habilitar el plugin y se borra al deshabilitarlo o desinstalarlo. */
-export type AutomationPluginOrigin = {
-  pluginKey: string
-  automationId: string
 }
 
 export type Automation = {
@@ -217,7 +210,12 @@ export type AutomationUpdateInput = Partial<
     | 'enabled'
     | 'missedRunGraceMinutes'
   >
->
+> & {
+  /** Solo la reconciliacion de plugins lo escribe: el esquema de
+   *  `automation.update` no lo acepta, asi que ni el CLI ni un cliente remoto
+   *  pueden reclamar una fila como propia de un plugin. */
+  pluginOrigin?: AutomationPluginOrigin
+}
 
 export type AutomationDispatchRequest = {
   automation: Automation

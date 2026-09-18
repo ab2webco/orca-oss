@@ -7,6 +7,12 @@ import {
 import type { Store } from '../persistence'
 import { readContainedPluginArtifactText } from './plugin-artifact-validation'
 import { isInvalidDiscoveredPlugin } from './plugin-discovery'
+import {
+  fingerprintPluginAutomationFields,
+  planPluginAutomationRefresh,
+  pluginDeclaredAutomationFields,
+  type PluginManagedAutomationFields
+} from './plugin-automation-managed-fields'
 import type { PluginService } from './plugin-service'
 
 /**
@@ -22,9 +28,15 @@ import type { PluginService } from './plugin-service'
  *   elige antes de encenderlas.
  * - Nunca `reuseSession`: `workspaceMode: 'new_per_run'` lo fuerza a false en
  *   `createAutomation`, asi que jamas puede apropiarse del terminal de otro.
- * - Si el usuario ya edito una fila creada por un plugin, se respeta tal cual:
- *   la reconciliacion solo crea las que faltan y borra las que el plugin ya no
- *   declara o que dejaron de estar habilitadas.
+ * - Crea las que faltan y borra las que el plugin ya no declara.
+ * - En las que ya existen refresca SOLO los campos del plugin (nombre, prompt,
+ *   comando del precheck, provider, cron y timezone) y solo si nadie los toco
+ *   aca: la huella guardada en `pluginOrigin.managedFingerprints` dice si el
+ *   valor en la fila sigue siendo el que escribio la reconciliacion. Un campo
+ *   editado por el usuario se deja tal cual y queda anotado en
+ *   `pluginOrigin.userEditedFields`, que `orca automations show` imprime.
+ *   Lo que elige el usuario nunca se toca: proyecto, workspace, modo,
+ *   habilitada, timeout del precheck, gracia de corridas perdidas.
  */
 export async function reconcilePluginAutomations(input: {
   store: Store
@@ -37,21 +49,25 @@ export async function reconcilePluginAutomations(input: {
       store.deleteAutomation(automation.id)
     }
   }
-  const stored = new Set(
-    store
-      .listAutomations()
-      .flatMap((automation) =>
-        automation.pluginOrigin
-          ? [originKey(automation.pluginOrigin.pluginKey, automation.pluginOrigin.automationId)]
-          : []
-      )
-  )
+  const stored = new Map<string, Automation>()
+  for (const automation of store.listAutomations()) {
+    const origin = automation.pluginOrigin
+    if (origin) {
+      stored.set(originKey(origin.pluginKey, origin.automationId), automation)
+    }
+  }
   for (const [pluginKey, entry] of declared) {
     for (const contribution of entry.automations) {
-      if (stored.has(originKey(pluginKey, contribution.id))) {
+      const fields = await readDeclaredFields(entry.rootDir, contribution)
+      if (!fields) {
         continue
       }
-      await createPluginAutomation(store, pluginKey, entry.rootDir, contribution)
+      const existing = stored.get(originKey(pluginKey, contribution.id))
+      if (existing) {
+        refreshPluginAutomation(store, existing, fields)
+        continue
+      }
+      createPluginAutomation(store, pluginKey, contribution, fields)
     }
   }
 }
@@ -91,12 +107,12 @@ function shouldDropPluginAutomation(
   return !entry?.automations.some((contribution) => contribution.id === origin.automationId)
 }
 
-async function createPluginAutomation(
-  store: Store,
-  pluginKey: string,
+/** `null` salta esta automatizacion sola: un prompt ilegible no puede hacer
+ *  fallar el habilitar del plugin ni borrar el prompt que ya funcionaba. */
+async function readDeclaredFields(
   rootDir: string,
   contribution: PluginAutomationContribution
-): Promise<void> {
+): Promise<PluginManagedAutomationFields | null> {
   let prompt: string
   try {
     prompt = await readContainedPluginArtifactText(
@@ -105,35 +121,72 @@ async function createPluginAutomation(
       PLUGIN_AUTOMATION_PROMPT_MAX_BYTES
     )
   } catch {
-    // Un prompt ilegible salta esta automatizacion sola; habilitar el plugin
-    // no puede fallar por un archivo que falta.
-    return
+    return null
   }
   if (!prompt.trim()) {
-    return
+    return null
   }
+  return pluginDeclaredAutomationFields(contribution, prompt)
+}
+
+function createPluginAutomation(
+  store: Store,
+  pluginKey: string,
+  contribution: PluginAutomationContribution,
+  fields: PluginManagedAutomationFields
+): void {
   store.createAutomation({
-    name: contribution.title,
-    prompt,
-    ...(contribution.precheck
+    name: fields.name,
+    prompt: fields.prompt,
+    ...(fields.precheck
       ? {
           precheck: {
-            command: contribution.precheck,
+            command: fields.precheck,
             timeoutSeconds: DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS
           }
         }
       : {}),
-    agentId: contribution.provider,
+    agentId: fields.agentId,
     // Sin proyecto hasta que el usuario elija: el plugin no conoce el workspace
     // y adivinarlo correria trabajo ajeno en el repo equivocado.
     projectId: '',
     workspaceMode: 'new_per_run',
-    timezone: contribution.timezone,
-    rrule: contribution.trigger,
+    timezone: fields.timezone,
+    rrule: fields.rrule,
     dtstart: Date.now(),
     enabled: false,
-    pluginOrigin: { pluginKey, automationId: contribution.id }
+    pluginOrigin: {
+      pluginKey,
+      automationId: contribution.id,
+      managedFingerprints: fingerprintPluginAutomationFields(fields)
+    }
   })
+}
+
+function refreshPluginAutomation(
+  store: Store,
+  automation: Automation,
+  declared: PluginManagedAutomationFields
+): void {
+  const origin = automation.pluginOrigin
+  if (!origin) {
+    return
+  }
+  const plan = planPluginAutomationRefresh({ automation, origin, declared })
+  if (!plan) {
+    return
+  }
+  store.updateAutomation(automation.id, plan.updates)
+  if (plan.refreshed.length > 0) {
+    console.info(
+      `[plugins] ${originKey(origin.pluginKey, origin.automationId)}: refreshed ${plan.refreshed.join(', ')} from the plugin`
+    )
+  }
+  if (plan.userEdited.length > 0) {
+    console.info(
+      `[plugins] ${originKey(origin.pluginKey, origin.automationId)}: kept your edited ${plan.userEdited.join(', ')}; the plugin no longer updates ${plan.userEdited.length > 1 ? 'them' : 'it'}`
+    )
+  }
 }
 
 function originKey(pluginKey: string, automationId: string): string {
