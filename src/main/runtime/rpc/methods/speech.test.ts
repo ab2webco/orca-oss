@@ -102,6 +102,63 @@ describe('speech RPC methods', () => {
     expect(response).toMatchObject({ ok: true, result: { started: true } })
   })
 
+  it('transcribes an audio file at an absolute path', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      transcribeSpeechFile: vi.fn().mockResolvedValue({ text: 'hola', segments: ['hola'] })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SPEECH_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('speech.transcribe.file', { filePath: '/tmp/note.opus', language: 'auto' })
+    )
+
+    expect(runtime.transcribeSpeechFile).toHaveBeenCalledWith({
+      filePath: '/tmp/note.opus',
+      language: 'auto'
+    })
+    expect(response).toMatchObject({ ok: true, result: { text: 'hola' } })
+  })
+
+  it('rejects a relative audio path before reaching the runtime', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      transcribeSpeechFile: vi.fn()
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SPEECH_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('speech.transcribe.file', { filePath: 'note.opus' })
+    )
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'invalid_argument' } })
+    expect(runtime.transcribeSpeechFile).not.toHaveBeenCalled()
+  })
+
+  it('forwards a transcription failure code and its recovery data verbatim', async () => {
+    const error = Object.assign(new Error('Speech model is not downloaded.'), {
+      code: 'model_not_downloaded',
+      data: { modelId: 'parakeet-tdt-0.6b-v3-int8' }
+    })
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      transcribeSpeechFile: vi.fn().mockRejectedValue(error)
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: SPEECH_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('speech.transcribe.file', { filePath: '/tmp/note.opus' })
+    )
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: {
+        code: 'model_not_downloaded',
+        data: { modelId: 'parakeet-tdt-0.6b-v3-int8' }
+      }
+    })
+  })
+
   it('deletes a speech model and returns refreshed setup', async () => {
     const setup = { enabled: true, selectedModelId: '', dictationMode: 'toggle', models: [] }
     const runtime = {

@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path'
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalString, requiredString } from '../schemas'
@@ -42,6 +43,17 @@ const SpeechModelAction = z.object({
   modelId: requiredString('Missing model ID')
 })
 
+const TranscribeFile = z.object({
+  // Why: the runtime has no notion of the caller's shell cwd, so the CLI
+  // resolves the user-supplied path and only absolute paths cross the boundary.
+  filePath: requiredString('Missing audio file path').refine(
+    (value) => isAbsolute(value),
+    'Audio file path must be absolute'
+  ),
+  modelId: OptionalString,
+  language: OptionalString
+})
+
 const DictationSetup = z.object({
   enabled: z.boolean().optional(),
   modelId: OptionalString,
@@ -58,6 +70,16 @@ export const SPEECH_METHODS: RpcMethod[] = [
     name: 'speech.models.download',
     params: SpeechModelAction,
     handler: async (params, { runtime }) => runtime.downloadMobileSpeechModel(params.modelId)
+  }),
+  defineMethod({
+    name: 'speech.transcribe.file',
+    params: TranscribeFile,
+    handler: async (params, { runtime }) =>
+      runtime.transcribeSpeechFile({
+        filePath: params.filePath,
+        ...(params.modelId !== undefined ? { modelId: params.modelId } : {}),
+        ...(params.language !== undefined ? { language: params.language } : {})
+      })
   }),
   defineMethod({
     name: 'speech.models.delete',

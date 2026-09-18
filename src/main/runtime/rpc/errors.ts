@@ -9,6 +9,7 @@ import { LINEAR_ERROR_CODES } from '../../../shared/linear/agent-access'
 import { AGENT_SESSION_RPC_ERROR_CODES } from '../../../shared/agent-session-host-authority'
 import { ARTIFACT_SHARING_DISABLED_CODE } from '../../../shared/artifact-sharing-gate'
 import { GIT_DIFF_TOO_LARGE_CODE } from '../../../shared/git-diff-transport-budget'
+import { SPEECH_TRANSCRIBE_ERROR_CODES } from '../../../shared/speech-transcribe-errors'
 
 export function successResponse(id: string, meta: RpcEnvelopeMeta, result: unknown): RpcSuccess {
   return {
@@ -104,7 +105,10 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'waiter_exists',
   'invalid_argument',
   GIT_DIFF_TOO_LARGE_CODE,
-  ARTIFACT_SHARING_DISABLED_CODE
+  ARTIFACT_SHARING_DISABLED_CODE,
+  // Why: `orca speech transcribe` maps each of these to its own CLI exit code,
+  // so the code and its recovery data must survive the RPC boundary verbatim.
+  ...SPEECH_TRANSCRIBE_ERROR_CODES
 ])
 
 export function mapRuntimeError(id: string, meta: RpcEnvelopeMeta, error: unknown): RpcFailure {

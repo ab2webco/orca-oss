@@ -235,6 +235,7 @@ describe('supportsBrowserPageFlag', () => {
 
   it('does not expose browser page targeting on host-local account commands', () => {
     expect(supportsBrowserPageFlag(['account', 'add'])).toBe(false)
+    expect(supportsBrowserPageFlag(['speech', 'transcribe'])).toBe(false)
     expect(supportsBrowserPageFlag(['account', 'list'])).toBe(false)
   })
 })

@@ -888,6 +888,11 @@ export type RuntimeSpeechModelSummary = {
   label: string
   provider: 'local' | 'openai'
   sizeBytes: number | null
+  /** Catalog language coverage: 'multilingual', a tag ('en'), or a set ('zh-en').
+   *  Lets a caller tell "I have the English-only model" from "I have the
+   *  multilingual one" before sending non-English audio to it. Optional: hosts
+   *  older than this field simply omit it. */
+  language?: string
   recommended: boolean
   status: 'ready' | 'not-downloaded' | 'downloading' | 'extracting' | 'error'
   progress: number | null
@@ -899,6 +904,18 @@ export type RuntimeSpeechSetupState = {
   /** 'toggle' = press once to start/stop; 'hold' = dictate while held. */
   dictationMode: 'toggle' | 'hold'
   models: RuntimeSpeechModelSummary[]
+}
+
+/** One file transcription, as `speech.transcribe.file` returns it. */
+export type RuntimeSpeechFileTranscription = {
+  text: string
+  /** One entry per decoded window, in order. */
+  segments: string[]
+  modelId: string
+  /** The normalized language constraint that was applied ('auto' by default). */
+  language: string
+  durationSeconds: number
+  sizeBytes: number
 }
 
 export type RuntimeGitCheckoutResult = {

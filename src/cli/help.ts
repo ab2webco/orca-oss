@@ -145,6 +145,11 @@ Linear:
 Plane:
   plane                     Read and update Plane work items for agents
 
+Speech:
+  speech transcribe         Transcribe an audio file with the local speech models
+  speech models list        List speech models with download state and language coverage
+  speech models download    Download a speech model for local transcription
+
 Mobile Emulator (iOS Simulator):
   emulator list             List available/running emulators (Orca Lab-managed + raw serve-sim)
   emulator attach <device>  Attach/start helper and make active for the worktree
@@ -436,6 +441,18 @@ export function formatGroupHelp(specs: CommandSpec[], group: string): string {
 
 function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   const command = commandPath.join(' ')
+  if (command === 'speech transcribe' && flag === 'file') {
+    return '--file <path>         Audio file to transcribe; also accepted positionally'
+  }
+  if (command === 'speech transcribe' && flag === 'model') {
+    return '--model <id>          Speech model id from `orca speech models list`'
+  }
+  if (command === 'speech transcribe' && flag === 'language') {
+    return '--language <tag|auto>  Language the model must cover; default auto (multilingual)'
+  }
+  if (command === 'speech models download' && flag === 'model-id') {
+    return '--model-id <id>        Catalog model id; also accepted positionally'
+  }
   if (command === 'skills install' && flag === 'agent') {
     return '--agent <names>        Comma-separated install targets; default is detected agents'
   }

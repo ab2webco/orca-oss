@@ -1239,6 +1239,12 @@ import {
   deleteLocalSpeechModel,
   getSpeechModelDeletionErrorCode
 } from '../speech/speech-model-deletion'
+import {
+  transcribeSpeechFile,
+  type SpeechFileTranscriptionParams,
+  type SpeechFileTranscriptionResult
+} from '../speech/file-transcription'
+import { SpeechTranscribeError } from '../speech/file-transcription-error'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import { scanNestedRepos } from '../project-groups/nested-repo-discovery'
 import {
@@ -13576,6 +13582,7 @@ export class OrcaRuntimeService {
         label: manifest.label,
         provider: manifest.provider === 'openai' ? 'openai' : 'local',
         sizeBytes: manifest.sizeBytes ?? null,
+        language: manifest.language,
         recommended: manifest.recommended === true,
         status: state?.status ?? 'not-downloaded',
         progress: state?.progress ?? null
@@ -13587,6 +13594,32 @@ export class OrcaRuntimeService {
       dictationMode: voice.dictationMode === 'hold' ? 'hold' : 'toggle',
       models
     }
+  }
+
+  // Transcribes one audio file with the local models already downloaded, reusing
+  // the dictation worker. Deliberately independent of voice.enabled: that flag
+  // is the push-to-talk dictation toggle, and a plugin handing Orca a voice note
+  // it received is not dictating.
+  async transcribeSpeechFile(
+    params: SpeechFileTranscriptionParams
+  ): Promise<SpeechFileTranscriptionResult> {
+    if (!this.store) {
+      throw new SpeechTranscribeError(
+        'voice_not_configured',
+        'Voice settings are unavailable in this runtime.',
+        { nextSteps: ['Open Settings → Voice in Orca'] }
+      )
+    }
+    const store = this.store
+    const voice = store.getSettings().voice
+    return transcribeSpeechFile(
+      {
+        modelManager: getSpeechModelManager(store),
+        sttService: getSpeechSttService(store),
+        ...(voice?.sttModel ? { preferredModelId: voice.sttModel } : {})
+      },
+      params
+    )
   }
 
   // Fire-and-forget model download; the ModelManager writes progress into its
