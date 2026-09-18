@@ -71,6 +71,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   'set',
   'skills',
   'snapshot',
+  'speech',
   'status',
   'storage',
   'tab',

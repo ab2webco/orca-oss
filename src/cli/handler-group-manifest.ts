@@ -15,6 +15,11 @@ export type HandlerGroup = {
 export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   ...PLANE_HANDLER_GROUPS,
   {
+    name: 'speech',
+    keys: ['speech transcribe', 'speech models list', 'speech models download'],
+    load: async () => (await import('./handlers/speech.js')).SPEECH_HANDLERS
+  },
+  {
     name: 'core',
     keys: ['claude-teams', 'open', 'serve', 'status'],
     load: async () => (await import('./handlers/core.js')).CORE_HANDLERS

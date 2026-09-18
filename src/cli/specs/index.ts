@@ -17,6 +17,7 @@ import { LINEAR_COMMAND_SPECS } from './linear'
 import { PLANE_COMMAND_SPECS } from './plane'
 import { VM_COMMAND_SPECS } from './vm'
 import { SKILL_COMMAND_SPECS } from './skills'
+import { SPEECH_COMMAND_SPECS } from './speech'
 import { ARTIFACT_COMMAND_SPECS } from './artifacts'
 import { DASHBOARD_POPOUT_COMMAND_SPECS } from './dashboard-popout'
 
@@ -40,5 +41,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...PLANE_COMMAND_SPECS,
   ...VM_COMMAND_SPECS,
   ...EMULATOR_COMMAND_SPECS,
-  ...SKILL_COMMAND_SPECS
+  ...SKILL_COMMAND_SPECS,
+  ...SPEECH_COMMAND_SPECS
 ]
