@@ -121,7 +121,7 @@ function resolveCustomIcon(node: PluginPanelIconSvgNode): PluginPanelIconCompone
   function PluginPanelCustomIcon({ className }: LucideProps): React.JSX.Element {
     return (
       <svg {...reactAttributes(node)} className={className} aria-hidden="true" focusable="false">
-        {node.children.map(renderIconNode)}
+        {renderIconChildren(node)}
       </svg>
     )
   }
@@ -129,13 +129,23 @@ function resolveCustomIcon(node: PluginPanelIconSvgNode): PluginPanelIconCompone
   return PluginPanelCustomIcon
 }
 
-function renderIconNode(node: PluginPanelIconSvgNode, index: number): React.JSX.Element {
-  const Tag = node.tag
-  return (
-    <Tag key={index} {...reactAttributes(node)}>
-      {node.children.map(renderIconNode)}
-    </Tag>
-  )
+// La ruta desde la raiz es la identidad estable de un nodo: el arbol ya vino
+// saneado del main y nunca se reordena ni crece, asi que dos hermanos con el
+// mismo tag y los mismos atributos siguen siendo nodos distintos.
+function renderIconChildren(node: PluginPanelIconSvgNode, parentPath = ''): React.JSX.Element[] {
+  const painted: React.JSX.Element[] = []
+  let position = 0
+  for (const child of node.children) {
+    const path = `${parentPath}/${position}.${child.tag}`
+    const Tag = child.tag
+    painted.push(
+      <Tag key={path} {...reactAttributes(child)}>
+        {renderIconChildren(child, path)}
+      </Tag>
+    )
+    position += 1
+  }
+  return painted
 }
 
 // React only understands the camelCase spelling of the hyphenated SVG

@@ -105,4 +105,17 @@ describe('resolvePluginPanelIcon custom svg rendering', () => {
     expect(svg?.querySelector('path')?.getAttribute('onclick')).toBeNull()
     expect(container.innerHTML).not.toContain('alert')
   })
+
+  it('paints a grouped icon at every depth, telling identical siblings apart', () => {
+    const svg = renderIcon(
+      '<svg viewBox="0 0 24 24">' +
+        '<g fill="none"><path d="M2 2h20"/><path d="M2 2h20"/></g>' +
+        '<g fill="none"><circle cx="12" cy="12" r="4"/></g>' +
+        '</svg>'
+    )
+    const groups = svg?.querySelectorAll('g') ?? []
+    expect(groups.length).toBe(2)
+    expect(groups[0]?.querySelectorAll('path').length).toBe(2)
+    expect(groups[1]?.querySelector('circle')?.getAttribute('r')).toBe('4')
+  })
 })
