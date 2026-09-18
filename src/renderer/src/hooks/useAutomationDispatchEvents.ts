@@ -103,7 +103,10 @@ export function useAutomationDispatchEvents(): void {
             runId: run.id,
             status: 'dispatch_failed',
             workspaceId: run.workspaceId,
-            error: 'A command-only automation must not be dispatched to the window.'
+            error: translate(
+              'auto.hooks.useAutomationDispatchEvents.commandOnlyNotDispatchable',
+              'This automation runs a command and cannot be launched in a window.'
+            )
           })
           return
         }
