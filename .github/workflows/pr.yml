@@ -86,6 +86,9 @@ jobs:
       - name: Verify skill freshness manifest
         run: pnpm run verify:skill-bundle-manifest
 
+      - name: Verify panel font data URI
+        run: pnpm run verify:panel-font-data-uri
+
       - name: Verify localization catalog
         run: pnpm run verify:localization-catalog
 

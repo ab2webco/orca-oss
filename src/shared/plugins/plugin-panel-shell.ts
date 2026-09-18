@@ -1,4 +1,9 @@
 import { PANEL_PING_TYPE, PANEL_PONG_TYPE } from './plugin-panel-bridge'
+import {
+  PANEL_SANS_FONT_DATA_URI,
+  PANEL_SANS_FONT_FAMILY,
+  PANEL_SANS_FONT_WEIGHT_RANGE
+} from './plugin-panel-sans-font'
 
 /**
  * Host-generated shell wrapped around plugin panel HTML before it is handed
@@ -51,8 +56,34 @@ export const PANEL_DESIGN_TOKEN_ALLOWLIST = [
   '--border',
   '--input',
   '--ring',
-  '--radius'
+  '--radius',
+  '--font-sans',
+  '--font-mono'
 ] as const
+
+/** Fallback stack for the case where token injection never ran (headless
+ *  serve hands the shell out unfilled); mirrors main.css `--app-font-family`. */
+const PANEL_SANS_FALLBACK_STACK = `'${PANEL_SANS_FONT_FAMILY}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`
+
+/** Base layer, not a component library: the app's font, the radius scale the
+ *  styleguide derives from `--radius`, and the body defaults a panel would
+ *  otherwise re-derive by hand. Every rule here is either an `@font-face`, a
+ *  custom property, a zero-specificity universal selector, or a single-element
+ *  `body` rule — plugin CSS parses later in the same document, so a panel's own
+ *  declaration always wins. Deliberately silent on input/button/select so an
+ *  existing panel's controls keep the look they shipped with. */
+const PANEL_BASE_STYLE =
+  '<style>\n' +
+  `@font-face{font-family:'${PANEL_SANS_FONT_FAMILY}';src:url(${PANEL_SANS_FONT_DATA_URI}) format('woff2');font-weight:${PANEL_SANS_FONT_WEIGHT_RANGE};font-style:normal;font-display:swap}\n` +
+  ':root{--radius-sm:calc(var(--radius) * 0.6);--radius-md:calc(var(--radius) * 0.8);' +
+  '--radius-lg:var(--radius);--radius-xl:calc(var(--radius) * 1.4);' +
+  '--radius-2xl:calc(var(--radius) * 1.8);--radius-3xl:calc(var(--radius) * 2.2);' +
+  '--radius-4xl:calc(var(--radius) * 2.6)}\n' +
+  '*,*::before,*::after{box-sizing:border-box}\n' +
+  `body{font-family:var(--font-sans, ${PANEL_SANS_FALLBACK_STACK});font-size:14px;` +
+  'line-height:1.5;letter-spacing:0.01em;-webkit-font-smoothing:antialiased;' +
+  '-moz-osx-font-smoothing:grayscale}\n' +
+  '</style>\n'
 
 export function buildPluginPanelShellHtml(pluginHtml: string): string {
   // The inline ping responder proves the frame's event loop is alive; the
@@ -63,7 +94,7 @@ export function buildPluginPanelShellHtml(pluginHtml: string): string {
     '<head>\n' +
     '<meta charset="utf-8">\n' +
     `<meta http-equiv="Content-Security-Policy" content="${PLUGIN_PANEL_CSP}">\n` +
-    `<style>:root{${PANEL_SHELL_TOKENS_PLACEHOLDER}}</style>\n` +
+    `${PANEL_BASE_STYLE}<style>:root{${PANEL_SHELL_TOKENS_PLACEHOLDER}}</style>\n` +
     '<script>\n' +
     "'use strict'\n" +
     '// Host policy: plugin panels are documents, never browsing contexts.\n' +

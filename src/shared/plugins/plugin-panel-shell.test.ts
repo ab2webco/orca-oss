@@ -4,14 +4,85 @@ import { describe, expect, it } from 'vitest'
 import {
   buildPluginPanelShellHtml,
   PANEL_DESIGN_TOKEN_ALLOWLIST,
+  PANEL_SHELL_TOKENS_PLACEHOLDER,
   PLUGIN_PANEL_CSP
 } from './plugin-panel-shell'
+import { PANEL_SANS_FONT_DATA_URI } from './plugin-panel-sans-font'
 
 describe('buildPluginPanelShellHtml', () => {
   it('keeps destructive surface and foreground tokens paired', () => {
     expect(PANEL_DESIGN_TOKEN_ALLOWLIST).toEqual(
       expect.arrayContaining(['--destructive', '--destructive-foreground'])
     )
+  })
+
+  it('exposes the app font tokens so a panel can name Orca typography', () => {
+    expect(PANEL_DESIGN_TOKEN_ALLOWLIST).toEqual(
+      expect.arrayContaining(['--font-sans', '--font-mono'])
+    )
+  })
+
+  it('embeds the app font as a data URI the panel CSP can load', () => {
+    const html = buildPluginPanelShellHtml('<main id="plugin-content">Plugin</main>')
+    const pluginOffset = html.indexOf('plugin-content')
+
+    // font-src data: is the only font delivery an opaque-origin frame has.
+    expect(PLUGIN_PANEL_CSP).toContain('font-src data:')
+    expect(PANEL_SANS_FONT_DATA_URI.startsWith('data:font/woff2;base64,')).toBe(true)
+    expect(html).toContain("@font-face{font-family:'Geist'")
+    expect(html).toContain(`src:url(${PANEL_SANS_FONT_DATA_URI}) format('woff2')`)
+    expect(html).toContain('font-weight:100 900')
+    expect(html.indexOf('@font-face')).toBeLessThan(pluginOffset)
+  })
+
+  it('gives a panel Orca body typography, the radius scale, and border-box', () => {
+    const html = buildPluginPanelShellHtml('<main id="plugin-content">Plugin</main>')
+    const pluginOffset = html.indexOf('plugin-content')
+
+    expect(html).toContain('*,*::before,*::after{box-sizing:border-box}')
+    expect(html).toContain('--radius-sm:calc(var(--radius) * 0.6)')
+    expect(html).toContain('--radius-md:calc(var(--radius) * 0.8)')
+    expect(html).toContain('--radius-lg:var(--radius)')
+    expect(html).toContain('--radius-xl:calc(var(--radius) * 1.4)')
+    expect(html).toContain('font-family:var(--font-sans,')
+    expect(html).toContain('font-size:14px')
+    expect(html).toContain('letter-spacing:0.01em')
+    expect(html.indexOf('box-sizing:border-box')).toBeLessThan(pluginOffset)
+
+    // A panel that declares nothing must land on the base layer, not UA defaults.
+    document.write(buildPluginPanelShellHtml('<body><p>Plugin</p></body>'))
+    const bodyStyle = getComputedStyle(document.body)
+    expect(bodyStyle.fontFamily).toContain('--font-sans')
+    expect(bodyStyle.fontSize).toBe('14px')
+    expect(bodyStyle.boxSizing).toBe('border-box')
+    expect(bodyStyle.letterSpacing).not.toBe('normal')
+  })
+
+  it('lets the injected token snapshot override the derived radius scale', () => {
+    const html = buildPluginPanelShellHtml('<main>Plugin</main>')
+
+    // Same specificity, so the later rule wins: real tokens must parse last.
+    expect(html.indexOf('--radius-sm:calc')).toBeLessThan(
+      html.indexOf(PANEL_SHELL_TOKENS_PLACEHOLDER)
+    )
+  })
+
+  it("keeps a panel's own font-family and font-size winning over the base layer", () => {
+    const html = buildPluginPanelShellHtml(
+      '<style>body{font-family:"Courier New",monospace;font-size:11px}</style>' +
+        '<body><p id="plugin-content">Plugin</p></body>'
+    )
+
+    // The base layer is a single-element body rule parsed before plugin markup,
+    // so an equally specific panel declaration overrides it by document order.
+    expect(html.indexOf('font-family:var(--font-sans,')).toBeLessThan(
+      html.indexOf('font-family:"Courier New"')
+    )
+    document.write(html)
+    const bodyStyle = getComputedStyle(document.body)
+    expect(bodyStyle.fontFamily).toContain('Courier New')
+    expect(bodyStyle.fontFamily).not.toContain('--font-sans')
+    expect(bodyStyle.fontSize).toBe('11px')
   })
 
   it('places CSP and navigation guards before plugin content', () => {
