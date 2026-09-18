@@ -295,6 +295,25 @@ When there's no sibling, match the surrounding chrome — button sizes, icon wei
 
 `destructive` is for actions that lose data or can't be undone. **Cancel, Dismiss, Close, and Discard are not destructive** — they back the user out of an in-progress action and should stay quiet (default ghost button, no color, no keyboard chip, no animated affordance). Save the visual weight for the affirmative action so the two don't compete. Keyboard handlers can still honor Esc; the visible decoration is what stays minimal.
 
+## Plugin panels
+
+A plugin panel is a sandboxed iframe with an opaque origin: it cannot reach `main.css`, the app
+DOM, or any bundled asset. The host shell (`src/shared/plugins/plugin-panel-shell.ts`) closes that
+gap and a panel inherits it without opting in:
+
+- **Font.** Geist is declared inside the shell with the same woff2 the app loads, embedded as a
+  `data:` URI (the only font delivery the panel CSP allows). `body` gets `var(--font-sans)` plus the
+  global `letter-spacing: 0.01em`, so panel text renders in the app's typeface by default.
+- **Tokens.** `PANEL_DESIGN_TOKEN_ALLOWLIST` is the plugin-facing token surface — the color set
+  plus `--radius`, `--font-sans`, and `--font-mono`. Adding to it is additive and permanent; renaming
+  or removing an entry is a breaking change for installed plugins.
+- **Base layer.** The `--radius-*` scale derived from `--radius`, `box-sizing: border-box`, and the
+  14px / 1.5 body default. Controls are deliberately unstyled: the shell is a base, not a component
+  library, so a panel's own CSS always wins on document order.
+
+A panel that needs a different look overrides any of it in its own stylesheet. Reach for the tokens
+before a literal — `var(--radius-md)`, not `6px`.
+
 ## Cross-platform
 
 Orca runs on macOS, Linux, and Windows. Every UI change must hold up on all three, in both light and dark mode.

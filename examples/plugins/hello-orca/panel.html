@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <style>
-      /* The host injects Orca design tokens as CSS custom properties, so
-         panels can match the app without any access to it. */
+      /* The host injects Orca design tokens as CSS custom properties and a base
+         layer (app font, radius scale, box-sizing), so panels can match the app
+         without any access to it. Declaring font-family here would opt out. */
       body {
         margin: 0;
         padding: 12px;
-        font-family: system-ui, sans-serif;
         font-size: 13px;
         color: var(--foreground, #ddd);
         background: var(--background, transparent);
@@ -22,7 +22,7 @@
         margin: 6px 0;
         padding: 6px 10px;
         border: 1px solid var(--border, #555);
-        border-radius: 6px;
+        border-radius: var(--radius-md, 6px);
         background: var(--secondary, #2a2a2a);
         color: var(--foreground, #ddd);
         cursor: pointer;
