@@ -2,6 +2,7 @@ import type { Automation } from '../../shared/automations-types'
 import { DEFAULT_AUTOMATION_PRECHECK_TIMEOUT_SECONDS } from '../../shared/automation-precheck'
 import {
   PLUGIN_AUTOMATION_PROMPT_MAX_BYTES,
+  usesPluginOwnedWorkspace,
   type PluginAutomationContribution
 } from '../../shared/plugins/plugin-automation-contribution'
 import type { Store } from '../persistence'
@@ -13,6 +14,10 @@ import {
   pluginDeclaredAutomationFields,
   type PluginManagedAutomationFields
 } from './plugin-automation-managed-fields'
+import {
+  ensurePluginOwnedWorkspaceRepo,
+  pluginOwnedWorkspaceDisplayName
+} from './plugin-owned-workspace'
 import type { PluginService } from './plugin-service'
 
 /**
@@ -24,8 +29,9 @@ import type { PluginService } from './plugin-service'
  *
  * Reglas:
  * - Nacen SIEMPRE deshabilitadas. Un plugin no enciende trabajo automatico.
- * - Nacen SIN proyecto. El plugin no sabe en que workspace corre; el usuario lo
- *   elige antes de encenderlas.
+ * - Nacen SIN proyecto, salvo que la declaracion pida `workspace:
+ *   'plugin-owned'`. El plugin nunca adivina un repo del usuario: o no elige
+ *   nada, o pide la carpeta que Orca crea para el, que no es de nadie mas.
  * - Nunca `reuseSession`: `workspaceMode: 'new_per_run'` lo fuerza a false en
  *   `createAutomation`, asi que jamas puede apropiarse del terminal de otro.
  * - Crea las que faltan y borra las que el plugin ya no declara.
@@ -43,6 +49,7 @@ export async function reconcilePluginAutomations(input: {
   pluginService: PluginService
 }): Promise<void> {
   const { store, pluginService } = input
+  const userDataPath = pluginService.options.userDataPath
   const declared = collectApprovedPluginAutomations(pluginService)
   for (const automation of store.listAutomations()) {
     if (shouldDropPluginAutomation(automation, declared)) {
@@ -58,10 +65,20 @@ export async function reconcilePluginAutomations(input: {
   }
   for (const [pluginKey, entry] of declared) {
     for (const contribution of entry.automations) {
-      const fields = await readDeclaredFields(entry.rootDir, contribution)
-      if (!fields) {
+      // El destino se resuelve DESPUES del prompt: una declaracion que se salta
+      // por prompt ilegible no debe dejar una carpeta creada a medias.
+      const declaredFields = await readDeclaredFields(entry.rootDir, contribution)
+      if (!declaredFields) {
         continue
       }
+      const fields = await withPluginOwnedRunTarget({
+        store,
+        userDataPath,
+        pluginKey,
+        pluginDisplayName: entry.displayName,
+        contribution,
+        fields: declaredFields
+      })
       const existing = stored.get(originKey(pluginKey, contribution.id))
       if (existing) {
         refreshPluginAutomation(store, existing, fields)
@@ -72,9 +89,41 @@ export async function reconcilePluginAutomations(input: {
   }
 }
 
+/** Materializa la carpeta del plugin y la pone como destino declarado. Sin
+ *  opt-in devuelve los campos tal cual: cero cambios para quien no lo pide. */
+async function withPluginOwnedRunTarget(input: {
+  store: Store
+  userDataPath: string
+  pluginKey: string
+  pluginDisplayName: string
+  contribution: PluginAutomationContribution
+  fields: PluginManagedAutomationFields
+}): Promise<PluginManagedAutomationFields> {
+  if (!usesPluginOwnedWorkspace(input.contribution)) {
+    return input.fields
+  }
+  try {
+    const repo = await ensurePluginOwnedWorkspaceRepo({
+      store: input.store,
+      userDataPath: input.userDataPath,
+      pluginKey: input.pluginKey,
+      displayName: pluginOwnedWorkspaceDisplayName(input.pluginDisplayName)
+    })
+    return { ...input.fields, runTarget: repo.id }
+  } catch (error) {
+    // Un disco que no deja crear la carpeta no puede tumbar el habilitar del
+    // plugin: la fila nace sin destino, como sin opt-in, y se dice por que.
+    console.error(
+      `[plugins] ${input.pluginKey}: could not create the plugin workspace; the automation is left without a run target:`,
+      error
+    )
+    return input.fields
+  }
+}
+
 type DeclaredAutomations = Map<
   string,
-  { rootDir: string; automations: readonly PluginAutomationContribution[] }
+  { rootDir: string; displayName: string; automations: readonly PluginAutomationContribution[] }
 >
 
 function collectApprovedPluginAutomations(pluginService: PluginService): DeclaredAutomations {
@@ -86,6 +135,7 @@ function collectApprovedPluginAutomations(pluginService: PluginService): Declare
     if (plugin.manifest.contributes.automations.length > 0) {
       declared.set(plugin.pluginKey, {
         rootDir: plugin.rootDir,
+        displayName: plugin.manifest.name,
         automations: plugin.manifest.contributes.automations
       })
     }
@@ -148,8 +198,10 @@ function createPluginAutomation(
       : {}),
     agentId: fields.agentId,
     // Sin proyecto hasta que el usuario elija: el plugin no conoce el workspace
-    // y adivinarlo correria trabajo ajeno en el repo equivocado.
-    projectId: '',
+    // y adivinarlo correria trabajo ajeno en el repo equivocado. Con
+    // `workspace: 'plugin-owned'` el destino es la carpeta del propio plugin,
+    // que no es un repo del usuario: nadie adivino nada.
+    projectId: fields.runTarget ?? '',
     workspaceMode: 'new_per_run',
     timezone: fields.timezone,
     rrule: fields.rrule,

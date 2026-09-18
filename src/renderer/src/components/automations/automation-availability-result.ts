@@ -32,3 +32,27 @@ export function unavailable(
 ): AutomationTargetAvailability {
   return { canRunNow: false, reason, message }
 }
+
+/**
+ * Razones que ninguna espera arregla: la fila esta configurada de forma que
+ * nunca puede lanzar. Sin esto la unica senal era una corrida `Unavailable` en
+ * el historial, que es donde 76 fallas seguidas pasaron desapercibidas.
+ *
+ * Las de SSH y runtime quedan fuera a proposito: son conectividad, y decir
+ * "no va a correr" de un host que esta reconectando seria mentir al reves.
+ */
+export function isAutomationTargetMisconfigured(
+  availability: AutomationTargetAvailability
+): boolean {
+  switch (availability.reason) {
+    case 'missing-project':
+    case 'missing-project-host-setup':
+    case 'project-host-setup-not-ready':
+    case 'missing-workspace':
+    case 'host-mismatch':
+    case 'unsupported-host':
+      return true
+    default:
+      return false
+  }
+}

@@ -37,6 +37,7 @@ import { getLocalAutomationLastRunSnapshot } from './automation-list-last-run'
 import { AutomationListLastRunCell } from './AutomationListLastRunCell'
 import { formatAutomationDateTimeWithRelative } from './automation-page-parts'
 import { getAutomationTargetAvailability } from './automation-target-availability'
+import { isAutomationTargetMisconfigured } from './automation-availability-result'
 import { getAgentLabel } from './automation-draft-model'
 import { formatAutomationCost } from './automation-usage-model'
 import {
@@ -109,7 +110,18 @@ export function AutomationListLocalRows({
         })
         const projectLabel =
           automationRepo?.displayName ??
-          translate('auto.components.automations.AutomationsPage.13118faadf', 'Unknown project')
+          (automation.pluginOrigin
+            ? // Una fila de plugin sin proyecto no es un proyecto desconocido:
+              // es una que todavia no lo eligio. Decirlo asi evita que se lea
+              // como un repo que se perdio.
+              translate(
+                'auto.components.automations.AutomationListLocalRows.noProjectChosen',
+                'No project chosen yet'
+              )
+            : translate(
+                'auto.components.automations.AutomationsPage.13118faadf',
+                'Unknown project'
+              ))
         const scheduleLabel = formatAutomationSchedule(automation.rrule)
         const nextRunLabel = automation.enabled
           ? formatAutomationDateTimeWithRelative(automation.nextRunAt, relativeNow)
@@ -206,7 +218,14 @@ export function AutomationListLocalRows({
                   {nextRunLabel}
                 </span>
                 <AutomationListLastRunCell snapshot={lastRunSnapshot} now={relativeNow} />
-                <AutomationListStatusCell enabled={automation.enabled} />
+                <AutomationListStatusCell
+                  enabled={automation.enabled}
+                  blockedMessage={
+                    isAutomationTargetMisconfigured(automationRunAvailability)
+                      ? automationRunAvailability.message
+                      : null
+                  }
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span

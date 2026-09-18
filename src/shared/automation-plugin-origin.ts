@@ -8,6 +8,10 @@ export type AutomationPluginManagedField =
   | 'agentId'
   | 'rrule'
   | 'timezone'
+  /** Solo para declaraciones con `workspace: 'plugin-owned'`: el repo de la
+   *  carpeta del plugin. Para el resto el plugin no declara destino y el campo
+   *  vale `null`, que es el comportamiento de siempre. */
+  | 'runTarget'
 
 /** Huella de cada campo del plugin tal como lo escribio la ultima
  *  reconciliacion. Asi una reconciliacion posterior distingue su propia

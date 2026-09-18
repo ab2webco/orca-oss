@@ -63,6 +63,7 @@ function createPluginService(
           }
         : null,
     reconcileActivationState: vi.fn().mockResolvedValue(undefined),
+    options: { userDataPath: '/tmp/orca-plugin-enablement-test' },
     getDiscovered: () => [],
     activationState: () => 'approved' as const
   } as unknown as PluginService
