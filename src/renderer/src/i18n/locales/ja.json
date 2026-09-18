@@ -14467,11 +14467,11 @@
           "commandAction": "コマンド"
         },
         "AutomationEditorPromptSection": {
-          "launchAgent": "エージェントを起動",
+          "launchAgent": "Agent を起動",
           "runCommand": "コマンドを実行",
           "commandLabel": "コマンド",
           "commandPlaceholder": "wa-inbox sync --quiet",
-          "commandHelp": "エージェント・ターミナル・モデルなしで、対象プロジェクトのディレクトリで実行します。終了コード 0 は成功、それ以外は失敗した実行として記録されます。",
+          "commandHelp": "Agent・ターミナル・モデルなしで、対象プロジェクトのディレクトリで実行します。終了コード 0 は成功、それ以外は失敗した実行として記録されます。",
           "commandTimeout": "タイムアウト（秒）"
         },
         "AutomationListStatusCell": {

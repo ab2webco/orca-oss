@@ -14487,11 +14487,11 @@
           "commandAction": "命令"
         },
         "AutomationEditorPromptSection": {
-          "launchAgent": "启动代理",
+          "launchAgent": "启动智能体",
           "runCommand": "运行命令",
           "commandLabel": "命令",
           "commandPlaceholder": "wa-inbox sync --quiet",
-          "commandHelp": "在目标项目目录中运行，不需要代理、终端或模型。退出码 0 表示成功，其他值会记录为失败的运行。",
+          "commandHelp": "在目标项目目录中运行，不需要智能体、终端或模型。退出码 0 表示成功，其他值会记录为失败的运行。",
           "commandTimeout": "超时（秒）"
         },
         "AutomationListStatusCell": {
