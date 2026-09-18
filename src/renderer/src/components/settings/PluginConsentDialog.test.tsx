@@ -111,6 +111,11 @@ describe('PluginConsentDialog', () => {
     // "Panel" the way a panel-only plugin does.
     expect(document.body.textContent).toContain('Instructional')
     expect(document.body.textContent).toContain('Review access and content')
+    // Nothing here fires by itself, so this plugin keeps the use-time warning.
+    expect(document.body.textContent).toContain(
+      'Its instructional content can still cause actions when you or an agent use it.'
+    )
+    expect(document.body.textContent).not.toContain('runs on its own schedule')
   })
 
   it('keeps the displayed fingerprint immutable during a same-key update', async () => {
@@ -248,6 +253,12 @@ describe('PluginConsentDialog', () => {
     // A scheduled shell command is not "validated content only".
     expect(document.body.textContent).not.toContain('Declarative')
     expect(document.body.textContent).not.toContain('contributes validated content only')
+    // Nor does it wait for someone to use it: the warning must say it fires alone.
+    expect(document.body.textContent).toContain(
+      'it runs on its own schedule — the command below is what Orca Lab will run, at the times ' +
+        'shown, whether or not you are here'
+    )
+    expect(document.body.textContent).not.toContain('when you or an agent use it')
     expect(document.body.textContent).toContain('Instructional')
     expect(document.body.textContent).toContain('Mirror the vault')
     expect(document.body.textContent).toContain('*/5 * * * *')

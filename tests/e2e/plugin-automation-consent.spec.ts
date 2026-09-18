@@ -16,6 +16,10 @@ const AUTOMATION_COMMAND =
   'rsync -a --delete "$HOME/Documents/reports/" "$HOME/Backups/reports/" && ' +
   'printf "synced %s\\n" "$(date -u +%FT%TZ)" >> "$HOME/.orca/report-sync.log"'
 const DECLARATIVE_COPY = 'contributes validated content only'
+const USE_TIME_COPY = 'when you or an agent use it'
+const SCHEDULE_COPY =
+  'it runs on its own schedule — the command below is what Orca Lab will run, at the times ' +
+  'shown, whether or not you are here'
 
 const MANIFEST = {
   manifestVersion: 1,
@@ -118,7 +122,9 @@ test('shows the shell command of a command-only plugin automation before consent
     await expect(consent).toContainText(AUTOMATION_COMMAND)
     await expect(consent).toContainText('0 3 * * *')
     await expect(consent).toContainText('Instructional')
+    await expect(consent).toContainText(SCHEDULE_COPY)
     await expect(consent).not.toContainText(DECLARATIVE_COPY)
+    await expect(consent).not.toContainText(USE_TIME_COPY)
 
     const command = consent.locator('pre').filter({ hasText: AUTOMATION_COMMAND })
     for (const width of SCREENSHOT_WIDTHS) {

@@ -222,20 +222,27 @@ export function PluginConsentDialog({
                             'Network access is blocked because this plugin does not request net:fetch.'
                           )
                     }`
-                  : hasInstructionalContent(plugin)
+                  : // An automation fires on its cron with nobody present, so it cannot
+                    // borrow the use-time wording of skills or VM recipes.
+                    (plugin.automations?.length ?? 0) > 0
                     ? translate(
-                        'auto.components.settings.PluginConsentDialog.instructionalWarning',
-                        'This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.'
+                        'auto.components.settings.PluginConsentDialog.automationWarning',
+                        'This plugin has no worker process, but it runs on its own schedule — the command below is what Orca Lab will run, at the times shown, whether or not you are here. Review it before enabling this plugin.'
                       )
-                    : plugin.capabilities.length > 0 || plugin.panels.length > 0
+                    : hasInstructionalContent(plugin)
                       ? translate(
-                          'auto.components.settings.PluginConsentDialog.panelWarning',
-                          "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
+                          'auto.components.settings.PluginConsentDialog.instructionalWarning',
+                          'This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.'
                         )
-                      : translate(
-                          'auto.components.settings.PluginConsentDialog.declarativeWarning',
-                          "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
-                        )}
+                      : plugin.capabilities.length > 0 || plugin.panels.length > 0
+                        ? translate(
+                            'auto.components.settings.PluginConsentDialog.panelWarning',
+                            "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker."
+                          )
+                        : translate(
+                            'auto.components.settings.PluginConsentDialog.declarativeWarning',
+                            "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API."
+                          )}
               </span>
             </div>
             <PluginKeybindingConsentPreview commands={plugin.commands} />

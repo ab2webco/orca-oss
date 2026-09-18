@@ -10536,6 +10536,7 @@
           "reconsent": "Permissions, the worker trust tier, or instructional content changed since you last reviewed this plugin. Review it again before it can run.",
           "capabilities": "This plugin can",
           "instructionalWarning": "This plugin has no worker process. Its instructional content can still cause actions when you or an agent use it. Review the instructions and commands below before enabling it.",
+          "automationWarning": "This plugin has no worker process, but it runs on its own schedule — the command below is what Orca Lab will run, at the times shown, whether or not you are here. Review it before enabling this plugin.",
           "panelWarning": "These permissions limit how the plugin uses Orca Lab's API. This plugin has no background worker.",
           "declarativeWarning": "This plugin contributes validated content only. It does not run a background worker or receive access to Orca Lab's API.",
           "keepDisabled": "Keep Disabled",
