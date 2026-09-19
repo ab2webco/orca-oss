@@ -8,6 +8,12 @@ import type { PluginConsentRequest } from '../../shared/plugins/plugin-consent-r
 import { verifyInstructionalPluginContent } from './plugin-instructional-content-integrity'
 import { reconcilePluginAutomations } from './plugin-automation-reconciliation'
 
+/** Aviso de `repos:changed`. Consentir o habilitar puede registrar la carpeta
+ *  de un plugin, y el catalogo de repos del renderer solo se refresca con ese
+ *  evento; sin el la fila se queda sin proyecto hasta reiniciar. Se inyecta
+ *  porque este modulo tambien corre headless, donde no hay a quien avisar. */
+export type PluginReposChangedNotifier = () => void
+
 /**
  * Single write path for consent + enablement. Consent is recorded as
  * (qualified key → consent fingerprint) — never a bare id — so a capability
@@ -25,6 +31,7 @@ export async function applyPluginConsent(input: {
   reviewedFingerprint: PluginConsentRequest['reviewedFingerprint']
   decision: PluginConsentRequest['decision']
   originWebContentsId?: number
+  onReposChanged?: PluginReposChangedNotifier
 }): Promise<void> {
   const { store, pluginService, pluginKey } = input
   const plugin = pluginService.findValidPlugin(pluginKey)
@@ -55,7 +62,10 @@ export async function applyPluginConsent(input: {
     { notifyListeners: true, originWebContentsId: input.originWebContentsId }
   )
   await pluginService.reconcileActivationState()
-  await reconcilePluginAutomations({ store, pluginService })
+  const reconciled = await reconcilePluginAutomations({ store, pluginService })
+  if (reconciled.createdWorkspaceRepo) {
+    input.onReposChanged?.()
+  }
 }
 
 /** Enables/disables an already-consented plugin. Enabling never bypasses
@@ -67,6 +77,7 @@ export async function applyPluginEnablement(input: {
   pluginKey: string
   enabled: boolean
   originWebContentsId?: number
+  onReposChanged?: PluginReposChangedNotifier
 }): Promise<void> {
   const { store, pluginService, pluginKey, enabled } = input
   if (!pluginService.findValidPlugin(pluginKey)) {
@@ -84,5 +95,8 @@ export async function applyPluginEnablement(input: {
     { notifyListeners: true, originWebContentsId: input.originWebContentsId }
   )
   await pluginService.reconcileActivationState()
-  await reconcilePluginAutomations({ store, pluginService })
+  const reconciled = await reconcilePluginAutomations({ store, pluginService })
+  if (reconciled.createdWorkspaceRepo) {
+    input.onReposChanged?.()
+  }
 }

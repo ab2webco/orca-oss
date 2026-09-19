@@ -10,6 +10,7 @@ import { createStore, testState } from '../persistence-test-harness'
 import type { ValidDiscoveredPlugin } from './plugin-discovery'
 import type { PluginService } from './plugin-service'
 import { reconcilePluginAutomations } from './plugin-automation-reconciliation'
+import { applyPluginEnablement } from './plugin-enablement'
 import { getPluginWorkspaceDir } from './plugin-owned-workspace'
 
 vi.mock('electron', () => ({
@@ -62,7 +63,9 @@ function pluginServiceWith(manifest: PluginManifest, rootDir: string): PluginSer
         isDev: true
       }
     ],
-    activationState: () => 'approved'
+    activationState: () => 'approved',
+    findValidPlugin: () => ({ pluginKey, consentFingerprint: 'sha256-current' }),
+    reconcileActivationState: () => Promise.resolve()
   } as unknown as PluginService
 }
 
@@ -232,5 +235,35 @@ describe('plugin-owned automation workspace', () => {
     await reconcilePluginAutomations({ store, pluginService })
 
     expect(store.listAutomations().find((row) => row.id === legacy.id)?.projectId).toBe(mine.id)
+  })
+})
+
+describe('telling the renderer the plugin workspace exists', () => {
+  // El catalogo de repos del renderer solo se refresca con `repos:changed`, y
+  // registrar la carpeta no pasa por ningun camino que lo emita: sin este
+  // aviso la fila se queda en "todavia sin proyecto" hasta reiniciar.
+  it('avisa cuando registra la carpeta y se calla en la pasada que ya la encuentra', async () => {
+    const pluginService = pluginServiceWith(
+      manifestWith([{ ...sync, workspace: 'plugin-owned' }]),
+      rootDir
+    )
+    const onReposChanged = vi.fn()
+
+    await applyPluginEnablement({ store, pluginService, pluginKey, enabled: true, onReposChanged })
+    expect(onReposChanged).toHaveBeenCalledTimes(1)
+
+    await applyPluginEnablement({ store, pluginService, pluginKey, enabled: true, onReposChanged })
+    expect(onReposChanged).toHaveBeenCalledTimes(1)
+    expect(store.getRepos()).toHaveLength(1)
+  })
+
+  it('no avisa por una declaracion que no pide carpeta', async () => {
+    const pluginService = pluginServiceWith(manifestWith([sync]), rootDir)
+    const onReposChanged = vi.fn()
+
+    await applyPluginEnablement({ store, pluginService, pluginKey, enabled: true, onReposChanged })
+
+    expect(onReposChanged).not.toHaveBeenCalled()
+    expect(store.getRepos()).toHaveLength(0)
   })
 })

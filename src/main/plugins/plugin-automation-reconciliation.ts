@@ -46,10 +46,16 @@ import type { PluginService } from './plugin-service'
  *   Lo que elige el usuario nunca se toca: proyecto, workspace, modo,
  *   habilitada, timeout del precheck, gracia de corridas perdidas.
  */
+
+/** Lo unico que el llamador necesita saber para avisar: si esta pasada
+ *  registro una carpeta de plugin nueva. Sin eso el catalogo de repos del
+ *  renderer queda viejo y la fila se lee "todavia sin proyecto". */
+export type PluginAutomationReconcileResult = { createdWorkspaceRepo: boolean }
+
 export function reconcilePluginAutomations(input: {
   store: Store
   pluginService: PluginService
-}): Promise<void> {
+}): Promise<PluginAutomationReconcileResult> {
   const run = pendingReconcile.then(
     () => reconcileNow(input),
     () => reconcileNow(input)
@@ -69,8 +75,12 @@ export function reconcilePluginAutomations(input: {
  */
 let pendingReconcile: Promise<void> = Promise.resolve()
 
-async function reconcileNow(input: { store: Store; pluginService: PluginService }): Promise<void> {
+async function reconcileNow(input: {
+  store: Store
+  pluginService: PluginService
+}): Promise<PluginAutomationReconcileResult> {
   const { store, pluginService } = input
+  let createdWorkspaceRepo = false
   const userDataPath = pluginService.options.userDataPath
   const declared = collectApprovedPluginAutomations(pluginService)
   for (const automation of store.listAutomations()) {
@@ -93,7 +103,7 @@ async function reconcileNow(input: { store: Store; pluginService: PluginService 
       if (!declaredFields) {
         continue
       }
-      const fields = await withPluginOwnedRunTarget({
+      const target = await withPluginOwnedRunTarget({
         store,
         userDataPath,
         pluginKey,
@@ -101,14 +111,16 @@ async function reconcileNow(input: { store: Store; pluginService: PluginService 
         contribution,
         fields: declaredFields
       })
+      createdWorkspaceRepo ||= target.createdWorkspaceRepo
       const existing = stored.get(originKey(pluginKey, contribution.id))
       if (existing) {
-        refreshPluginAutomation(store, existing, fields)
+        refreshPluginAutomation(store, existing, target.fields)
         continue
       }
-      createPluginAutomation(store, pluginKey, contribution, fields)
+      createPluginAutomation(store, pluginKey, contribution, target.fields)
     }
   }
+  return { createdWorkspaceRepo }
 }
 
 /** Materializa la carpeta del plugin y la pone como destino declarado. Sin
@@ -120,18 +132,21 @@ async function withPluginOwnedRunTarget(input: {
   pluginDisplayName: string
   contribution: PluginAutomationContribution
   fields: PluginManagedAutomationFields
-}): Promise<PluginManagedAutomationFields> {
+}): Promise<{ fields: PluginManagedAutomationFields; createdWorkspaceRepo: boolean }> {
   if (!usesPluginOwnedWorkspace(input.contribution)) {
-    return input.fields
+    return { fields: input.fields, createdWorkspaceRepo: false }
   }
   try {
-    const repo = await ensurePluginOwnedWorkspaceRepo({
+    const workspace = await ensurePluginOwnedWorkspaceRepo({
       store: input.store,
       userDataPath: input.userDataPath,
       pluginKey: input.pluginKey,
       displayName: pluginOwnedWorkspaceDisplayName(input.pluginDisplayName)
     })
-    return { ...input.fields, runTarget: repo.id }
+    return {
+      fields: { ...input.fields, runTarget: workspace.repo.id },
+      createdWorkspaceRepo: workspace.created
+    }
   } catch (error) {
     // Un disco que no deja crear la carpeta no puede tumbar el habilitar del
     // plugin: la fila nace sin destino, como sin opt-in, y se dice por que.
@@ -139,7 +154,7 @@ async function withPluginOwnedRunTarget(input: {
       `[plugins] ${input.pluginKey}: could not create the plugin workspace; the automation is left without a run target:`,
       error
     )
-    return input.fields
+    return { fields: input.fields, createdWorkspaceRepo: false }
   }
 }
 

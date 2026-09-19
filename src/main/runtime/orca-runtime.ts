@@ -5876,6 +5876,13 @@ export class OrcaRuntimeService {
     this.emitClientEvent({ type: 'reposChanged' })
   }
 
+  // Why: plugin lifecycle registers the plugin-owned folder workspace outside
+  // any runtime method and outside the repos IPC, so nobody else invalidates
+  // the catalog — the local renderer needs it too, not only paired clients.
+  notifyReposChangedForEveryClient(): void {
+    this.notifyReposChanged()
+  }
+
   private notifyActivateWorktree(
     repoId: string,
     worktreeId: string,

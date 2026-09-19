@@ -2989,11 +2989,25 @@ void app.whenReady().then(async () => {
   // Why: headless `orca serve` clients reach plugins through the runtime RPC
   // methods, which resolve the service via this module-level setter. Consent
   // over RPC uses the same hash-keyed write path as the desktop dialog.
+  // Consentir por RPC tambien puede registrar la carpeta del plugin, y deja
+  // igual de viejo el catalogo de repos de quien este mirando.
+  const onReposChanged = (): void => runtime?.notifyReposChangedForEveryClient()
   setPluginServiceForRpc(pluginService, {
     applyConsent: (request) =>
-      applyPluginConsent({ store: store!, pluginService: pluginService!, ...request }),
+      applyPluginConsent({
+        store: store!,
+        pluginService: pluginService!,
+        ...request,
+        onReposChanged
+      }),
     applyEnablement: (pluginKey, enabled) =>
-      applyPluginEnablement({ store: store!, pluginService: pluginService!, pluginKey, enabled })
+      applyPluginEnablement({
+        store: store!,
+        pluginService: pluginService!,
+        pluginKey,
+        enabled,
+        onReposChanged
+      })
   })
   // Same module-setter shape, for the same reason: skill discovery runs per
   // workspace and must not learn about the plugin composition root to ask

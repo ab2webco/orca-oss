@@ -14968,7 +14968,8 @@
           "eaa02014f8": "Enabled",
           "29baf8f4c2": "Source",
           "commandAction": "Command",
-          "runsLabel": "Runs"
+          "runsLabel": "Runs",
+          "pluginPausedHint": "A plugin added this automation paused — use Resume to start it."
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "Cancel",
