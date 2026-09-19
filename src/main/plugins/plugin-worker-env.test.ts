@@ -11,6 +11,23 @@ describe('buildPluginWorkerEnv', () => {
     ).toEqual({ PATH: '/safe', HOME: '/home', ELECTRON_RUN_AS_NODE: '1' })
   })
 
+  it('forwards the userData location so a worker reaches this app runtime', () => {
+    expect(
+      buildPluginWorkerEnv(
+        {
+          ORCA_USER_DATA_PATH: '/home/me/.config/orca-ide',
+          XDG_CONFIG_HOME: '/home/me/.config',
+          ORCA_PAIRING_CODE: 'secret'
+        },
+        'linux'
+      )
+    ).toEqual({
+      ORCA_USER_DATA_PATH: '/home/me/.config/orca-ide',
+      XDG_CONFIG_HOME: '/home/me/.config',
+      ELECTRON_RUN_AS_NODE: '1'
+    })
+  })
+
   it('matches Windows environment keys case-insensitively', () => {
     expect(buildPluginWorkerEnv({ Path: 'C:\\safe', systemroot: 'C:\\Windows' }, 'win32')).toEqual({
       PATH: 'C:\\safe',

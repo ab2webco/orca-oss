@@ -1,6 +1,7 @@
 import type { CliStatusResult, RuntimeStatus } from '../../shared/runtime-types'
 import { findTransport } from '../../shared/runtime-bootstrap'
 import { tryReadMetadata } from './metadata'
+import { isProcessRunning } from './runtime-process-liveness'
 import { sendRequest } from './transport'
 import { RuntimeRpcFailureError, type RuntimeRpcSuccess } from './types'
 
@@ -97,27 +98,4 @@ function buildCliStatusResponse(result: CliStatusResult): RuntimeRpcSuccess<CliS
       runtimeId: result.runtime.runtimeId ?? 'none'
     }
   }
-}
-
-function isProcessRunning(pid: number | null | undefined): boolean {
-  if (!pid || pid <= 0) {
-    return false
-  }
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    // Why: EPERM proves the PID exists even when the caller cannot inspect it.
-    if (isPermissionDenied(error)) {
-      return true
-    }
-    return false
-  }
-}
-
-function isPermissionDenied(error: unknown): boolean {
-  if (!error || typeof error !== 'object' || !('code' in error)) {
-    return false
-  }
-  return error.code === 'EPERM' || error.code === 'EACCES'
 }
