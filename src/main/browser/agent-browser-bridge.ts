@@ -166,6 +166,9 @@ type EnqueueTargetedCommandOptions = {
   ensureVisible?: boolean
   // Why: text-mutating commands must never fall back to the global tab (may be a worktree the user is viewing).
   requireScopedTarget?: boolean
+  // Why: hit-testing, input and capture cannot run against an unpainted guest, so
+  // these keep the visibility lease even for a background page (ORCA-512).
+  requiresRenderedPage?: boolean
 }
 
 type AgentBrowserBridgeOptions = {
@@ -821,7 +824,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserClickResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['click', element])) as BrowserClickResult
     })
   }
@@ -831,7 +834,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserClickResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['dblclick', element])) as BrowserClickResult
     })
   }
@@ -931,7 +934,7 @@ export class AgentBrowserBridge {
   ): Promise<BrowserFillResult> {
     await assertClipboardTextWriteWithinLimitWithYield(value)
     // Why: agent-browser's CDP text insertion loses focus in Electron guests; edit through the browser's input pipeline instead.
-    return this.enqueueTargetedCommand(
+    return this.enqueueRenderedCommand(
       worktreeId,
       browserPageId,
       async (sessionName) => {
@@ -970,7 +973,7 @@ export class AgentBrowserBridge {
     browserPageId?: string
   ): Promise<BrowserTypeResult> {
     await assertClipboardTextWriteWithinLimitWithYield(input)
-    return this.enqueueTargetedCommand(
+    return this.enqueueRenderedCommand(
       worktreeId,
       browserPageId,
       async (sessionName) => {
@@ -992,7 +995,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserSelectResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, [
         'select',
         element,
@@ -1007,7 +1010,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserScrollResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['scroll', direction]
       if (amount != null) {
         args.push(String(amount))
@@ -1021,7 +1024,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return await this.execAgentBrowser(sessionName, ['scrollintoview', element])
     })
   }
@@ -1060,7 +1063,7 @@ export class AgentBrowserBridge {
     browserPageId?: string
   ): Promise<unknown> {
     await assertClipboardTextWriteWithinLimitWithYield(text)
-    return this.enqueueTargetedCommand(
+    return this.enqueueRenderedCommand(
       worktreeId,
       browserPageId,
       async (sessionName) => {
@@ -1085,13 +1088,13 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return await this.execAgentBrowser(sessionName, ['mouse', 'move', String(x), String(y)])
     })
   }
 
   async mouseDown(button?: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['mouse', 'down']
       if (button) {
         args.push(button)
@@ -1109,7 +1112,7 @@ export class AgentBrowserBridge {
     radius?: number,
     modifiers?: BrowserMouseModifier[]
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(
+    return this.enqueueRenderedCommand(
       worktreeId,
       browserPageId,
       async (_sessionName, target) => {
@@ -1171,7 +1174,7 @@ export class AgentBrowserBridge {
   }
 
   async mouseUp(button?: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['mouse', 'up']
       if (button) {
         args.push(button)
@@ -1186,7 +1189,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['mouse', 'wheel', String(dy)]
       if (dx != null) {
         args.push(String(dx))
@@ -1205,7 +1208,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['find', locator, value, action]
       if (text) {
         args.push(text)
@@ -1217,7 +1220,7 @@ export class AgentBrowserBridge {
   // ── Set commands ──
 
   async setDevice(name: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return await this.execAgentBrowser(sessionName, ['set', 'device', name])
     })
   }
@@ -1259,7 +1262,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['set', 'media']
       if (colorScheme) {
         args.push(colorScheme)
@@ -1382,7 +1385,7 @@ export class AgentBrowserBridge {
   // ── Highlight command ──
 
   async highlight(selector: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return await this.execAgentBrowser(sessionName, ['highlight', selector])
     })
   }
@@ -1618,7 +1621,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserHoverResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['hover', element])) as BrowserHoverResult
     })
   }
@@ -1629,7 +1632,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserDragResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['drag', from, to])) as BrowserDragResult
     })
   }
@@ -1640,7 +1643,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserUploadResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, [
         'upload',
         element,
@@ -1710,7 +1713,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserCheckResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = checked ? ['check', element] : ['uncheck', element]
       return (await this.execAgentBrowser(sessionName, args)) as BrowserCheckResult
     })
@@ -1721,7 +1724,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserFocusResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['focus', element])) as BrowserFocusResult
     })
   }
@@ -1731,7 +1734,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserClearResult> {
-    return this.enqueueTargetedCommand(
+    return this.enqueueRenderedCommand(
       worktreeId,
       browserPageId,
       async (sessionName) => {
@@ -1753,7 +1756,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserSelectAllResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       // Why: agent-browser has no select-all command — implement as focus + Ctrl+A
       await this.execAgentBrowser(sessionName, ['focus', element])
       return (await this.execAgentBrowser(sessionName, [
@@ -1768,14 +1771,14 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserKeypressResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       return (await this.execAgentBrowser(sessionName, ['press', key])) as BrowserKeypressResult
     })
   }
 
   async pdf(worktreeId?: string, browserPageId?: string): Promise<BrowserPdfResult> {
     // Why: agent-browser's CDP printToPDF hangs in Electron webviews — use the native webContents.printToPDF().
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (_sessionName, target) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (_sessionName, target) => {
       const wc = this.getWebContents(target.webContentsId)
       if (!wc) {
         throw new BrowserError('browser_no_tab', 'Tab is no longer available')
@@ -1861,7 +1864,7 @@ export class AgentBrowserBridge {
     worktreeId?: string,
     browserPageId?: string
   ): Promise<BrowserViewportResult> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (_sessionName, target) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (_sessionName, target) => {
       const wc = this.getWebContents(target.webContentsId)
       if (!wc) {
         throw new BrowserError('browser_tab_not_found', 'Tab is no longer available')
@@ -2028,7 +2031,7 @@ export class AgentBrowserBridge {
   // ── Generic passthrough ──
 
   async exec(command: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
+    return this.enqueueRenderedCommand(worktreeId, browserPageId, async (sessionName) => {
       // Why: strip target/session flags from passthrough so a caller can't override Orca's selected page or CDP proxy.
       const args = stripAgentBrowserTargetArgs(parseShellArgs(command.trim()))
       return await this.execAgentBrowser(sessionName, args)
@@ -2060,6 +2063,18 @@ export class AgentBrowserBridge {
     )
   }
 
+  private async enqueueRenderedCommand<T>(
+    worktreeId: string | undefined,
+    browserPageId: string | undefined,
+    execute: (sessionName: string, target: ResolvedBrowserCommandTarget) => Promise<T>,
+    options: EnqueueTargetedCommandOptions = {}
+  ): Promise<T> {
+    return this.enqueueTargetedCommand(worktreeId, browserPageId, execute, {
+      ...options,
+      requiresRenderedPage: true
+    })
+  }
+
   private async enqueueTargetedCommand<T>(
     worktreeId: string | undefined,
     browserPageId: string | undefined,
@@ -2072,6 +2087,14 @@ export class AgentBrowserBridge {
     if (options.ensureSession !== false) {
       await this.ensureSession(sessionName, target.browserPageId, target.webContentsId)
     }
+
+    // Why: the visibility lease paints the guest, and for a parked page that puts it
+    // on screen over whatever the user is looking at. Naming a page is not a request
+    // to change his view, so only rendered-page commands keep the lease (ORCA-512).
+    const visibilityOptions: EnqueueTargetedCommandOptions =
+      options.requiresRenderedPage === true || !browserPageId
+        ? options
+        : { ...options, ensureVisible: false }
 
     return new Promise<T>((resolve, reject) => {
       let queue = this.commandQueues.get(sessionName)
@@ -2086,7 +2109,7 @@ export class AgentBrowserBridge {
             worktreeId,
             target,
             execute,
-            options
+            visibilityOptions
           )) as () => Promise<unknown>,
         resolve: resolve as (value: unknown) => void,
         reject
