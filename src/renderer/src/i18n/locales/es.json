@@ -15016,6 +15016,15 @@
       },
       "BrowserPane": {
         "streamCapabilityUnsupported": "El entorno de ejecución seleccionado no admite la transmisión remota del navegador."
+      },
+      "plugins": {
+        "PluginPendingApprovalNotice": {
+          "updateTitle": "{{value0}} se actualizó y necesita tu aprobación otra vez",
+          "installTitle": "{{value0}} está esperando tu aprobación",
+          "updateDescription": "La nueva versión cambió lo que declara el plugin, así que queda apagado hasta que lo revises. Mientras tanto aquí no se ejecuta nada.",
+          "installDescription": "Revisa qué puede hacer este plugin antes de que se ejecute por primera vez. Mientras tanto aquí no se ejecuta nada.",
+          "reviewAndEnable": "Revisar y activar"
+        }
       }
     },
     "i18n": {

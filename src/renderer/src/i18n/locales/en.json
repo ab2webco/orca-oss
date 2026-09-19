@@ -15969,6 +15969,15 @@
           "reauthenticatedSince": "This pane still holds an expired Claude sign-in, but {{value0}} was re-authenticated after this pane started. Restart the pane to pick up the new sign-in.",
           "unknown": "Claude sign-in expired in this pane. Orca Lab could not tell which account it runs on."
         }
+      },
+      "plugins": {
+        "PluginPendingApprovalNotice": {
+          "updateTitle": "{{value0}} was updated and needs your approval again",
+          "installTitle": "{{value0}} is waiting for your approval",
+          "updateDescription": "The new version changed what the plugin declares, so it stays off until you review it. Nothing here runs in the meantime.",
+          "installDescription": "Review what this plugin is allowed to do before it runs for the first time. Nothing here runs in the meantime.",
+          "reviewAndEnable": "Review & enable"
+        }
       }
     },
     "i18n": {

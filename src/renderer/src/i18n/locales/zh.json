@@ -15025,6 +15025,15 @@
       },
       "BrowserPane": {
         "streamCapabilityUnsupported": "所选运行时不支持远程浏览器串流。"
+      },
+      "plugins": {
+        "PluginPendingApprovalNotice": {
+          "updateTitle": "{{value0}} 已更新，需要你再次批准",
+          "installTitle": "{{value0}} 正在等待你的批准",
+          "updateDescription": "新版本更改了该插件的声明内容，因此在你审核之前它会保持关闭。在此期间这里不会运行任何内容。",
+          "installDescription": "在该插件首次运行之前，请先审核它被允许执行的操作。在此期间这里不会运行任何内容。",
+          "reviewAndEnable": "审核并启用"
+        }
       }
     },
     "i18n": {

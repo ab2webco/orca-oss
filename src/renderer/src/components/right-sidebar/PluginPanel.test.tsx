@@ -7,15 +7,35 @@ import {
   PANEL_CONTENT_HEIGHT_MAX_PX,
   PANEL_CONTENT_HEIGHT_TYPE
 } from '../../../../shared/plugins/plugin-panel-bridge'
-import type { ActivePluginPanel } from '@/store/plugin-panels'
+import type { ActivePluginPanel, PluginPanelApproval } from '@/store/plugin-panels'
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, string>) =>
+    options?.value0 === undefined ? fallback : fallback.replace('{{value0}}', options.value0)
 }))
 
-const { usePluginPanelsMock, setPanelHealthMock } = vi.hoisted(() => ({
+const { openSettingsPageMock, openSettingsTargetMock } = vi.hoisted(() => ({
+  openSettingsPageMock: vi.fn(),
+  openSettingsTargetMock: vi.fn()
+}))
+
+type AppStoreSlice = {
+  openSettingsPage: typeof openSettingsPageMock
+  openSettingsTarget: typeof openSettingsTargetMock
+}
+
+vi.mock('@/store', () => ({
+  useAppStore: (selector: (state: AppStoreSlice) => unknown) =>
+    selector({
+      openSettingsPage: openSettingsPageMock,
+      openSettingsTarget: openSettingsTargetMock
+    })
+}))
+
+const { usePluginPanelsMock, setPanelHealthMock, usePluginPanelApprovalMock } = vi.hoisted(() => ({
   usePluginPanelsMock: vi.fn<() => ActivePluginPanel[]>(() => []),
-  setPanelHealthMock: vi.fn()
+  setPanelHealthMock: vi.fn(),
+  usePluginPanelApprovalMock: vi.fn<() => PluginPanelApproval>(() => 'approved')
 }))
 
 const { watchdogStartMock, watchdogStopMock, watchdogCallbacks } = vi.hoisted(() => ({
@@ -26,6 +46,7 @@ const { watchdogStartMock, watchdogStopMock, watchdogCallbacks } = vi.hoisted(()
 
 vi.mock('@/store/plugin-panels', () => ({
   usePluginPanels: usePluginPanelsMock,
+  usePluginPanelApproval: usePluginPanelApprovalMock,
   usePluginPanelsStore: (
     selector: (state: { setPanelHealth: typeof setPanelHealthMock }) => unknown
   ) => selector({ setPanelHealth: setPanelHealthMock })
@@ -84,6 +105,9 @@ beforeEach(() => {
   setPanelHealthMock.mockReset()
   document.documentElement.classList.remove('dark')
   pluginChangedListener = null
+  openSettingsPageMock.mockReset()
+  openSettingsTargetMock.mockReset()
+  usePluginPanelApprovalMock.mockReturnValue('approved')
   usePluginPanelsMock.mockReturnValue([dashboardPanel])
   globalThis.window.api = {
     plugins: {
@@ -137,6 +161,22 @@ async function postHeight(source: Window | null, height: unknown): Promise<void>
 }
 
 describe('PluginPanel', () => {
+  it.each([
+    ['pending-install', 'My Plugin is waiting for your approval'],
+    ['pending-update', 'My Plugin was updated and needs your approval again']
+  ] as const)('serves the approval notice instead of a %s panel', async (approval, heading) => {
+    usePluginPanelApprovalMock.mockReturnValue(approval)
+
+    await renderPanel(dashboardPanel.tabKey)
+
+    expect(container.querySelector('[data-testid="plugin-pending-approval"]')).not.toBeNull()
+    expect(container.textContent).toContain(heading)
+    expect(container.querySelector('iframe')).toBeNull()
+    // Pedir la entrada de un plugin pendiente solo devuelve el estado de error
+    // que hace pasar la espera de aprobacion por una falla del panel.
+    expect(readPanelEntryMock).not.toHaveBeenCalled()
+  })
+
   it('renders the panel HTML in a scripts-only sandboxed iframe', async () => {
     readPanelEntryMock.mockResolvedValue({
       html: '<h1>Hello plugin</h1>',

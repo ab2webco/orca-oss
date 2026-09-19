@@ -15027,6 +15027,15 @@
       },
       "BrowserPane": {
         "streamCapabilityUnsupported": "선택한 런타임은 원격 브라우저 스트리밍을 지원하지 않습니다."
+      },
+      "plugins": {
+        "PluginPendingApprovalNotice": {
+          "updateTitle": "{{value0}}이(가) 업데이트되어 다시 승인이 필요합니다",
+          "installTitle": "{{value0}}이(가) 승인을 기다리고 있습니다",
+          "updateDescription": "새 버전에서 플러그인이 선언한 내용이 바뀌었으므로 검토할 때까지 꺼진 상태로 유지됩니다. 그동안 여기서는 아무것도 실행되지 않습니다.",
+          "installDescription": "이 플러그인이 처음 실행되기 전에 무엇을 할 수 있는지 검토하세요. 그동안 여기서는 아무것도 실행되지 않습니다.",
+          "reviewAndEnable": "검토 후 사용"
+        }
       }
     },
     "i18n": {

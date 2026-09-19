@@ -17,7 +17,12 @@ import {
 import { createPanelWatchdog } from './plugin-panel-watchdog'
 import { buildPanelDesignTokenCss, currentPanelColorScheme } from './plugin-panel-design-token-css'
 import { usePluginPanelThemeRevision } from './use-plugin-panel-theme-revision'
-import { usePluginPanels, usePluginPanelsStore } from '@/store/plugin-panels'
+import {
+  usePluginPanelApproval,
+  usePluginPanels,
+  usePluginPanelsStore
+} from '@/store/plugin-panels'
+import { PluginPendingApprovalNotice } from '../plugins/PluginPendingApprovalNotice'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 
@@ -70,6 +75,7 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
 
   const pluginKey = panel?.pluginKey ?? null
   const panelId = panel?.id ?? null
+  const approval = usePluginPanelApproval(pluginKey)
   const panelShell = entryState.status === 'ready' ? entryState.shellHtml : null
   const panelDocument = panelShell ? fillPanelShell(panelShell) : null
   // Why: the shell bakes Orca's color scheme + design tokens into srcdoc, so the
@@ -148,7 +154,9 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
   }, [loadedFrameKey, panelFrameKey, watchdog])
 
   useEffect(() => {
-    if (!pluginKey || !panelId) {
+    // Un plugin pendiente no tiene entrada que servir: pedirla solo produce el
+    // estado de error que hace pasar la espera de aprobacion por una falla.
+    if (!pluginKey || !panelId || approval !== 'approved') {
       return
     }
     let cancelled = false
@@ -209,7 +217,7 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
       loadGeneration += 1
       unsubscribe?.()
     }
-  }, [panelId, pluginKey, setPanelHealth, tabKey])
+  }, [approval, panelId, pluginKey, setPanelHealth, tabKey])
 
   // Persisted plugin tabs can outlive their plugin (uninstalled/disabled);
   // render a graceful empty state instead of a broken frame.
@@ -222,6 +230,10 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
         )}
       </PluginPanelMessage>
     )
+  }
+
+  if (approval !== 'approved') {
+    return <PluginPendingApprovalNotice pluginName={panel.pluginName} approval={approval} />
   }
 
   if (entryState.status === 'loading') {

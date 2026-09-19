@@ -53,10 +53,10 @@ test('renders settings-surface and nav-surface panels as their own pages', async
       state.openSettingsPage()
     })
     await expect(orcaPage.locator('[data-settings-section="plugins"]')).toBeVisible()
-    // A group header with no rows under it is worse than no group: while the
-    // plugin is still pending there is no settings page, so no PLUGINS group.
+    // The group exists from install: a pending plugin keeps its page so it can
+    // say it is waiting for approval instead of vanishing on every update.
     const pluginsGroupHeading = orcaPage.locator('p', { hasText: /^Plugins$/ })
-    await expect(pluginsGroupHeading).toHaveCount(0)
+    await expect(pluginsGroupHeading).toHaveCount(1)
     await orcaPage.getByRole('tab', { name: /^Installed/ }).click()
     const row = orcaPage.locator(`[data-plugin-key="${installed.pluginKey}"]`)
     await row.getByRole('button', { name: 'Review & enable' }).click()

@@ -9,6 +9,7 @@ import {
   isNavSurfacePanel,
   isSettingsSurfacePanel,
   isWorktreeSurfacePanel,
+  pluginPanelApproval,
   usePluginPanelsStore
 } from './plugin-panels'
 
@@ -175,7 +176,7 @@ describe('plugin panel surfaces', () => {
     expect(panels.filter(isNavSurfacePanel).map((panel) => panel.id)).toEqual(['inbox'])
   })
 
-  it.each(['disabled', 'errored', 'pending', 'invalid'] as const)(
+  it.each(['disabled', 'errored', 'invalid'] as const)(
     'offers no panel of any surface for a %s plugin',
     (status) => {
       expect(collectActivePluginPanels([{ ...plugin('demo'), status, panels }])).toEqual([])
@@ -190,6 +191,30 @@ describe('plugin panel surfaces', () => {
           (panel) => panel.tabKey
         )
       ).toEqual(['plugin:demo/dashboard', 'plugin:demo/registry', 'plugin:demo/inbox'])
+    }
+  )
+
+  it('keeps every surface of a pending plugin so it can say it needs approval', () => {
+    expect(
+      collectActivePluginPanels([{ ...plugin('demo'), status: 'pending', panels }]).map(
+        (panel) => panel.tabKey
+      )
+    ).toEqual(['plugin:demo/dashboard', 'plugin:demo/registry', 'plugin:demo/inbox'])
+  })
+})
+
+describe('plugin panel approval', () => {
+  it('reads a first install apart from an update that re-opened consent', () => {
+    expect(pluginPanelApproval({ status: 'pending', needsReconsent: false })).toBe(
+      'pending-install'
+    )
+    expect(pluginPanelApproval({ status: 'pending', needsReconsent: true })).toBe('pending-update')
+  })
+
+  it.each(['running', 'restarting', 'idle', 'disabled', 'errored', 'invalid'] as const)(
+    'treats a %s plugin as approved for panel purposes',
+    (status) => {
+      expect(pluginPanelApproval({ status, needsReconsent: true })).toBe('approved')
     }
   )
 })
