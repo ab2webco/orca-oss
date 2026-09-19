@@ -15005,6 +15005,15 @@
       },
       "BrowserPane": {
         "streamCapabilityUnsupported": "選択したランタイムはリモートブラウザストリーミングに対応していません。"
+      },
+      "plugins": {
+        "PluginPendingApprovalNotice": {
+          "updateTitle": "{{value0}} が更新されたため、再度承認が必要です",
+          "installTitle": "{{value0}} は承認を待っています",
+          "updateDescription": "新しいバージョンでプラグインの宣言内容が変わったため、確認するまで無効のままです。その間、ここでは何も実行されません。",
+          "installDescription": "初めて実行する前に、このプラグインに許可される操作を確認してください。その間、ここでは何も実行されません。",
+          "reviewAndEnable": "確認して有効化"
+        }
       }
     },
     "i18n": {

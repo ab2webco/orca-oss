@@ -8,11 +8,32 @@ export type ActivePluginPanel = PluginHostPanel & {
   pluginName: string
 }
 
+/** Whether the host will serve this panel's document, and if not, why the user
+ *  has to act. An update re-binds consent to the new instructional bytes, so
+ *  `pending-update` is the state a release puts every such plugin in. */
+export type PluginPanelApproval = 'approved' | 'pending-install' | 'pending-update'
+
 /** Statuses whose panels are mounted. `idle` and `restarting` still show panels
  *  — the panel itself never needs a worker — but `errored` does not, so any
  *  surface offering a panel must agree with this or it opens an empty state. */
 export function pluginPanelsAreMounted(plugin: Pick<PluginHostListEntry, 'status'>): boolean {
   return plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
+}
+
+/** `pending` keeps its surface on purpose: sin ella el usuario no tiene donde
+ *  enterarse de que el plugin espera su aprobacion, y el panel desaparece sin
+ *  decir nada en cada actualizacion. */
+export function pluginPanelSurfaceExists(plugin: Pick<PluginHostListEntry, 'status'>): boolean {
+  return pluginPanelsAreMounted(plugin) || plugin.status === 'pending'
+}
+
+export function pluginPanelApproval(
+  plugin: Pick<PluginHostListEntry, 'status' | 'needsReconsent'>
+): PluginPanelApproval {
+  if (plugin.status !== 'pending') {
+    return 'approved'
+  }
+  return plugin.needsReconsent ? 'pending-update' : 'pending-install'
 }
 
 /** No `surface` (host predates them) means worktree; allow-list so an unknown
@@ -158,10 +179,10 @@ export function ensurePluginPanelsLoaded(): void {
   }
 }
 
-/** Panels of plugins the user enabled (consented + not disabled). `idle` and
- *  `restarting` still show panels — the panel itself never needs a worker. */
+/** Panels of plugins the user enabled (consented + not disabled) plus those
+ *  awaiting consent, whose surface renders the approval notice instead. */
 export function collectActivePluginPanels(plugins: PluginHostListEntry[]): ActivePluginPanel[] {
-  return plugins.filter(pluginPanelsAreMounted).flatMap((plugin) =>
+  return plugins.filter(pluginPanelSurfaceExists).flatMap((plugin) =>
     plugin.panels.map((panel) => ({
       ...panel,
       pluginKey: plugin.pluginKey,
@@ -219,6 +240,15 @@ export function usePluginPanels(): ActivePluginPanel[] {
   // Why: derive in useMemo (not the selector) so the store snapshot stays
   // referentially stable and doesn't retrigger useSyncExternalStore loops.
   return useMemo(() => collectActivePluginPanels(plugins), [plugins])
+}
+
+/** Approval state of the plugin owning `pluginKey`; an unknown key reads as
+ *  approved because the panel surface already renders its own empty state. */
+export function usePluginPanelApproval(pluginKey: string | null): PluginPanelApproval {
+  return usePluginPanelsStore((state) => {
+    const plugin = state.plugins.find((entry) => entry.pluginKey === pluginKey)
+    return plugin ? pluginPanelApproval(plugin) : 'approved'
+  })
 }
 
 /** Nav-surface panels of enabled plugins — one left-sidebar destination each;
