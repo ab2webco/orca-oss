@@ -153,6 +153,16 @@ export function AutomationDetail({
           <p className="mt-1 truncate text-sm text-muted-foreground">
             {projectName} / {workspaceName}
           </p>
+          {automation.pluginOrigin && !automation.enabled ? (
+            // Un plugin nunca enciende trabajo solo, asi que su fila nace en
+            // pausa; sin decir que sigue se lee como rota en vez de pendiente.
+            <p className="mt-1 text-sm text-pretty text-muted-foreground">
+              {translate(
+                'auto.components.automations.AutomationDetail.pluginPausedHint',
+                'A plugin added this automation paused — use Resume to start it.'
+              )}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Tooltip>

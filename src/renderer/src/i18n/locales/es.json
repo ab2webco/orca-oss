@@ -14165,6 +14165,7 @@
           "de0fedac06": "nuevo_por_ejecución",
           "51a470b966": "ssh",
           "b09b2384fd": "En pausa",
+          "pluginPausedHint": "Un plugin agregó esta automatización en pausa: usa Reanudar para iniciarla.",
           "eaa02014f8": "Activado",
           "29baf8f4c2": "Source",
           "commandAction": "Comando",

@@ -115,6 +115,8 @@ export function registerPluginHandlers(
     pluginService.setRuntimeDelegate(runtime)
   }
 
+  const onReposChanged = (): void => runtime?.notifyReposChangedForEveryClient()
+
   store.onSettingsChanged((updates) => {
     if ('pluginSystemEnabled' in updates || 'devPluginPaths' in updates) {
       // Main owns plugin lifecycle. Renderer follow-up refreshes are UX only;
@@ -141,7 +143,8 @@ export function registerPluginHandlers(
       pluginKey: parsed.pluginKey,
       reviewedFingerprint: parsed.reviewedFingerprint,
       decision: parsed.decision,
-      originWebContentsId: event.sender.id
+      originWebContentsId: event.sender.id,
+      onReposChanged
     })
     return listPluginsForClients(pluginService)
   })
@@ -154,7 +157,8 @@ export function registerPluginHandlers(
       pluginService,
       pluginKey: parsed.pluginKey,
       enabled: parsed.enabled,
-      originWebContentsId: event.sender.id
+      originWebContentsId: event.sender.id,
+      onReposChanged
     })
     return listPluginsForClients(pluginService)
   })
@@ -251,7 +255,10 @@ export function registerPluginHandlers(
     await pluginService.refresh()
     // El plugin ya no existe, asi que la reconciliacion borra sus (y solo
     // sus) automatizaciones declaradas.
-    await reconcilePluginAutomations({ store, pluginService })
+    const reconciled = await reconcilePluginAutomations({ store, pluginService })
+    if (reconciled.createdWorkspaceRepo) {
+      onReposChanged()
+    }
     return listPluginsForClients(pluginService)
   })
 

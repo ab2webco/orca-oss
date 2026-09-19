@@ -48,18 +48,22 @@ export function pluginOwnedWorkspaceDisplayName(pluginDisplayName: string): stri
  * otro folder workspace, asi que `resolveAutomationRunTarget` la valida por el
  * mismo camino que un proyecto del usuario en vez de tener un caso especial
  * que se salte la validacion.
+ *
+ * `created` dice si esta pasada registro la fila: el catalogo de repos del
+ * renderer solo se refresca con `repos:changed`, y sin ese aviso la fila de la
+ * automatizacion se queda leyendo "todavia sin proyecto" hasta reiniciar.
  */
 export async function ensurePluginOwnedWorkspaceRepo(input: {
   store: Store
   userDataPath: string
   pluginKey: string
   displayName: string
-}): Promise<Repo> {
+}): Promise<{ repo: Repo; created: boolean }> {
   const path = getPluginWorkspaceDir(input.userDataPath, input.pluginKey)
   await mkdir(path, { recursive: true })
   const existing = findLocalRepoByPath(input.store, path)
   if (existing) {
-    return existing
+    return { repo: existing, created: false }
   }
   const repo: Repo = {
     id: randomUUID(),
@@ -70,7 +74,7 @@ export async function ensurePluginOwnedWorkspaceRepo(input: {
     kind: 'folder'
   }
   input.store.addRepo(repo)
-  return repo
+  return { repo, created: true }
 }
 
 function findLocalRepoByPath(store: Store, path: string): Repo | undefined {
