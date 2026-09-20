@@ -16,6 +16,11 @@ const WORKER_ENV_ALLOWLIST = [
   'TMPDIR',
   'TEMP',
   'TMP',
+  // Why: a worker that shells out to the CLI must land on the userData directory
+  // this app wrote its runtime metadata to; without these it resolves its own and
+  // talks to a retired install (ORCA-516). Both are paths Orca already publishes.
+  'ORCA_USER_DATA_PATH',
+  'XDG_CONFIG_HOME',
   // Why: Windows Node/libuv need these to resolve DLLs and the machine root.
   'SYSTEMROOT',
   'SYSTEMDRIVE',
