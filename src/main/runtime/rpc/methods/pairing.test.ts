@@ -3,10 +3,13 @@ import { OrcaRuntimeService } from '../../orca-runtime'
 import { RpcDispatcher } from '../dispatcher'
 import { PAIRING_METHODS } from './pairing'
 
+type DispatchOptions = NonNullable<Parameters<RpcDispatcher['dispatchStreaming']>[2]>
+
 function dispatchPairing(
   method: string,
   params: unknown,
-  pairing: NonNullable<Parameters<RpcDispatcher['dispatchStreaming']>[2]>['pairing']
+  pairing: DispatchOptions['pairing'],
+  mobilePairingQr?: DispatchOptions['mobilePairingQr']
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     const dispatcher = new RpcDispatcher({
@@ -16,7 +19,7 @@ function dispatchPairing(
     void dispatcher.dispatchStreaming(
       { id: 'request-1', authToken: '', method, params },
       (response) => resolve(JSON.parse(response) as Record<string, unknown>),
-      { pairing }
+      { pairing, ...(mobilePairingQr ? { mobilePairingQr } : {}) }
     )
   })
 }
@@ -86,5 +89,41 @@ describe('pairing RPC methods', () => {
     expect(response).toMatchObject({ ok: true })
     const result = (response as { result: { interfaces: unknown } }).result
     expect(Array.isArray(result.interfaces)).toBe(true)
+  })
+
+  // Why the host mints it: a client-built QR would carry the browser's address, not the
+  // address of the machine the phone must reach.
+  it('mints the pairing QR on the host and forwards the caller-picked address', async () => {
+    const mobilePairingQr = vi.fn().mockResolvedValue({
+      available: true,
+      qrDataUrl: 'data:image/png;base64,AAA',
+      pairingUrl: 'orca://pair?code=abc',
+      endpoint: 'ws://100.64.0.2:6768',
+      deviceId: 'device-1',
+      connectionMode: 'local-only'
+    })
+
+    const response = await dispatchPairing(
+      'pairing.createMobileQr',
+      { address: '100.64.0.2', connectionMode: 'local-only', rotate: true },
+      undefined as never,
+      mobilePairingQr
+    )
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: { available: true, endpoint: 'ws://100.64.0.2:6768' }
+    })
+    expect(mobilePairingQr).toHaveBeenCalledWith({
+      address: '100.64.0.2',
+      connectionMode: 'local-only',
+      rotate: true
+    })
+  })
+
+  it('refuses pairing.createMobileQr when no host can mint it', async () => {
+    await expect(
+      dispatchPairing('pairing.createMobileQr', {}, undefined as never)
+    ).resolves.toMatchObject({ ok: false })
   })
 })

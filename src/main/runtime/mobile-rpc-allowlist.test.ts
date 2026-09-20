@@ -126,6 +126,14 @@ describe('mobile RPC allowlist', () => {
     expect(missing).toEqual([])
   })
 
+  // Why: pairing.createMobileQr mints a bearer credential for a NEW device. A paired phone
+  // that could call it would be granting access the user never approved — while a runtime
+  // client (web or remote desktop) calling it is exactly the pairing wizard for that host.
+  it('registers the pairing-code minter as a runtime method the phone cannot call', () => {
+    expect(registeredRuntimeMethods().has('pairing.createMobileQr')).toBe(true)
+    expect(mobileRpcAllowlist().has('pairing.createMobileQr')).toBe(false)
+  })
+
   it('registers every RPC method used by the mobile app', () => {
     // Why: the allowlist check runs before dispatch, but an allowlisted mobile
     // method still fails at runtime if it was never added to ALL_RPC_METHODS.

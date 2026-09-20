@@ -49,6 +49,8 @@ import type {
 } from '../../shared/mobile-relay-credential-contract'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
+import { getDefaultPairingAddress } from './pairing-network-interfaces'
+import { createMobilePairingQrResponse } from './mobile-pairing-qr-offer'
 import {
   decodeTerminalStreamFrame,
   TerminalStreamOpcode,
@@ -1785,6 +1787,17 @@ export class OrcaRuntimeRpcServer {
         clientKind: device.scope,
         clientCapabilities: authenticatedSocket?.clientCapabilities,
         pairing: pairingContext,
+        // Why unconditional while `pairing` is not: minting a QR needs only this server, so a
+        // runtime-scoped client asking for one is the pairing wizard for this very machine.
+        // Phones never reach it — the method is absent from MOBILE_RPC_METHOD_ALLOWLIST.
+        mobilePairingQr: (qrArgs) =>
+          createMobilePairingQrResponse(
+            {
+              resolveDefaultAddress: () => getDefaultPairingAddress(),
+              createOffer: (offerArgs) => this.createMobilePairingOffer(offerArgs)
+            },
+            qrArgs
+          ),
         signal: abortRegistration?.signal,
         sendBinary,
         registerBinaryStreamHandler: (streamId, handler) =>

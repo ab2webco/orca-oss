@@ -1,9 +1,18 @@
+import { z } from 'zod'
 import { defineMethod, type RpcAnyMethod } from '../core'
 import {
   PairingGetEndpointsParamsSchema,
   PairingProvisionRelayParamsSchema
 } from '../../../../shared/mobile-relay-credential-contract'
 import { getPairingNetworkInterfaces } from '../../pairing-network-interfaces'
+
+const PairingCreateMobileQrParamsSchema = z
+  .object({
+    address: z.string().min(1).optional(),
+    connectionMode: z.enum(['automatic', 'local-only']).optional(),
+    rotate: z.boolean().optional()
+  })
+  .optional()
 
 export const PAIRING_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
@@ -19,6 +28,23 @@ export const PAIRING_METHODS: readonly RpcAnyMethod[] = [
     name: 'pairing.listNetworkInterfaces',
     params: null,
     handler: async () => ({ interfaces: await getPairingNetworkInterfaces() })
+  }),
+  defineMethod({
+    // Why the host mints it instead of the caller: the QR carries the address of the machine the
+    // phone pairs with, and on a headless server — or in the web client — that machine is not the
+    // one drawing the wizard. A client-built QR would advertise the browser's own host and fail in
+    // a way the user cannot diagnose.
+    //
+    // Why it is not in MOBILE_RPC_METHOD_ALLOWLIST: a paired phone must never mint credentials for
+    // another device. Only runtime-scoped clients reach it.
+    name: 'pairing.createMobileQr',
+    params: PairingCreateMobileQrParamsSchema,
+    handler: async (params, ctx) => {
+      if (!ctx.mobilePairingQr) {
+        throw new Error('pairing_context_unavailable')
+      }
+      return await ctx.mobilePairingQr(params ?? {})
+    }
   }),
   defineMethod({
     name: 'pairing.getEndpoints',

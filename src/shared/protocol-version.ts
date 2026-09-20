@@ -32,6 +32,12 @@ export const PROJECT_HOST_SETUP_RUNTIME_CAPABILITY = 'project-host-setup.v1' as 
 export const PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY =
   'pairing.network-interfaces.v1' as const
 
+// Why its own capability: the pairing QR must be minted by the machine the phone
+// will reach, so a remote or web client has to ask the host for it. An older host
+// answers method_not_found on click, which reads as a broken button — the wizard
+// keys on this instead and says pairing has to be done from that machine's desktop app.
+export const PAIRING_MOBILE_QR_RUNTIME_CAPABILITY = 'pairing.mobile-qr.v1' as const
+
 // Why a capability: the client only offers "Add Account" against a server that
 // can actually run the sign-in. Against an older runtime the button must keep
 // saying the account is managed on that host instead of failing on click.
@@ -195,6 +201,7 @@ export const RUNTIME_CAPABILITIES = [
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
   PAIRING_NETWORK_INTERFACES_RUNTIME_CAPABILITY,
+  PAIRING_MOBILE_QR_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY,
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
