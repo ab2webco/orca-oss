@@ -191,9 +191,15 @@ function removeUnspecifiedPaneIdentityEnv(
  */
 function promoteAgentTeamsShimPath(
   env: Record<string, string>,
-  requestedPath: string | undefined
+  requestedEnv: Record<string, string> | undefined
 ): void {
-  if (!env.ORCA_AGENT_TEAMS_TEAM_ID || !requestedPath) {
+  // Why (ORCA-517): the caller's request is the only agent-teams intent; `env` inherits
+  // process.env, so a marker from a parent Orca would re-prepend the caller's PATH on every spawn.
+  if (!requestedEnv?.ORCA_AGENT_TEAMS_TEAM_ID) {
+    return
+  }
+  const requestedPath = requestedEnv[resolvePathEnvKey(requestedEnv, process.platform)]
+  if (!requestedPath) {
     return
   }
   const normalizedRequestedPath =
@@ -856,10 +862,7 @@ export class LocalPtyProvider implements IPtyProvider {
     }
     const requestedEnv = args.env
     expandWindowsPathEnvironmentVariables(finalEnv)
-    promoteAgentTeamsShimPath(
-      finalEnv,
-      requestedEnv ? requestedEnv[resolvePathEnvKey(requestedEnv, process.platform)] : undefined
-    )
+    promoteAgentTeamsShimPath(finalEnv, requestedEnv)
 
     // Why: worktree-scoped HISTFILE — without it worktrees share one global history (terminal-history-scope-design §7–§10).
     const worktreeId = args.worktreeId
