@@ -2227,6 +2227,38 @@ describe('createPtySubprocess', () => {
     expect(lastCall[2].env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
   })
 
+  it('ignores an inherited Agent Teams marker when promoting the shim path', () => {
+    // Why (ORCA-517): the daemon inherits Orca's env; promoting on an inherited marker
+    // rewrites a PATH the caller never asked it to touch.
+    const proc = mockPtyProcess()
+    spawnMock.mockReturnValue(proc)
+    const previous = process.env.ORCA_AGENT_TEAMS_TEAM_ID
+    process.env.ORCA_AGENT_TEAMS_TEAM_ID = 'team-inherited'
+
+    try {
+      createPtySubprocess({
+        sessionId: 'test',
+        cols: 80,
+        rows: 24,
+        env: {
+          SHELL: '/bin/bash',
+          // A duplicate entry is what makes the bug visible: promotion de-duplicates.
+          PATH: '/requested/first:/requested/second:/requested/first'
+        }
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ORCA_AGENT_TEAMS_TEAM_ID
+      } else {
+        process.env.ORCA_AGENT_TEAMS_TEAM_ID = previous
+      }
+    }
+
+    expect(spawnMock.mock.calls.at(-1)![2].env.PATH).toBe(
+      '/requested/first:/requested/second:/requested/first'
+    )
+  })
+
   it('collapses its own env merge onto the requested Windows `Path` spelling', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)

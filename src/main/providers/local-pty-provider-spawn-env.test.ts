@@ -286,6 +286,31 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_STALE_TEST_ENV).toBeUndefined()
     })
 
+    it('ignores an inherited Agent Teams marker when promoting the shim path', async () => {
+      // Why (ORCA-517): an Orca launched from an Agent Teams pane inherits the marker;
+      // promoting on it re-prepends the caller's PATH into a PATH the hook deliberately replaced.
+      const previous = process.env.ORCA_AGENT_TEAMS_TEAM_ID
+      process.env.ORCA_AGENT_TEAMS_TEAM_ID = 'team-inherited'
+      provider.configure({
+        buildSpawnEnv: (_id, env) => ({ ...env, PATH: '/hook/bin' })
+      })
+      try {
+        await provider.spawn({
+          cols: 80,
+          rows: 24,
+          env: { PATH: '/requested/first:/requested/second' }
+        })
+      } finally {
+        if (previous === undefined) {
+          delete process.env.ORCA_AGENT_TEAMS_TEAM_ID
+        } else {
+          process.env.ORCA_AGENT_TEAMS_TEAM_ID = previous
+        }
+      }
+
+      expect(spawnMock.mock.calls.at(-1)?.[2].env.PATH).toBe('/hook/bin')
+    })
+
     it('preserves the active attribution path for Agent Teams', async () => {
       await provider.spawn({
         cols: 80,

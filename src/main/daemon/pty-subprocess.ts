@@ -208,9 +208,15 @@ function collapseWindowsPathEnvKeys(
  */
 function promoteAgentTeamsShimPath(
   env: Record<string, string>,
-  requestedPath: string | undefined
+  requestedEnv: Record<string, string> | undefined
 ): void {
-  if (!env.ORCA_AGENT_TEAMS_TEAM_ID || !requestedPath) {
+  // Why (ORCA-517): the caller's request is the only agent-teams intent; `env` inherits
+  // process.env, so a marker from a parent Orca would re-prepend the caller's PATH on every spawn.
+  if (!requestedEnv?.ORCA_AGENT_TEAMS_TEAM_ID) {
+    return
+  }
+  const requestedPath = requestedEnv[resolvePathEnvKey(requestedEnv, process.platform)]
+  if (!requestedPath) {
     return
   }
   const normalizedRequestedPath =
@@ -835,10 +841,7 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
   expandWindowsPathEnvironmentVariables(env)
   // Why: collapse before promoting so the shim lands on the spelling the child actually inherits.
   collapseWindowsPathEnvKeys(env, requestedEnv)
-  const requestedPath = requestedEnv
-    ? requestedEnv[resolvePathEnvKey(requestedEnv, process.platform)]
-    : undefined
-  promoteAgentTeamsShimPath(env, requestedPath)
+  promoteAgentTeamsShimPath(env, requestedEnv)
 
   // Why: asar packaging can strip +x from node-pty's spawn-helper; the daemon is a separate forked process from the main-process fix.
   ensureNodePtySpawnHelperExecutable()
