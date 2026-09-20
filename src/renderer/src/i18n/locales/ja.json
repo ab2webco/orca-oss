@@ -9963,7 +9963,7 @@
           "reconnecting": "再接続中",
           "unavailable": "利用不可",
           "signIn": "Relay にサインイン",
-          "localDescription": "スマートフォンがこの Wi‑Fi または Tailscale に接続されている必要があります。アカウントは不要です。",
+          "localDescription": "スマートフォンは、ペアリングするコンピューターと同じネットワークにあるか、Tailscale で接続されている必要があります。アカウントは不要です。",
           "pathGroup": "スマートフォンがこのコンピュータに到達する方法",
           "anywhereTitle": "Orca Relay",
           "anywhereDescription": "スマートフォンはモバイル回線または任意の Wi‑Fi から接続できます。サインインが必要なのは Relay のみです。",
@@ -12366,7 +12366,10 @@
           "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。",
           "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Lab Mobile にコピーしてください。",
           "directAddressDisclosure": "より速いローカル経路も使う",
-          "directAddressHint": "任意。近く（同じ Wi‑Fi または Tailscale）にいるときにスマホが使うアドレスを選びます。通常は Relay より高速です。外出中は引き続き Relay が使われます。"
+          "directAddressHint": "任意。近く（同じ Wi‑Fi または Tailscale）にいるときにスマホが使うアドレスを選びます。通常は Relay より高速です。外出中は引き続き Relay が使われます。",
+          "qrHostUnsupported": "ここからペアリングを設定することはできません",
+          "qrNoAddress": "コードに入れるネットワークアドレスがありません",
+          "pairingHostUnsupported": "ペアリングするコンピューターでは、ペアリングコードを作成できない古い Orca Lab が動作しています。更新するか、そのコンピューターで Orca Lab を開いてペアリングしてください。"
         },
         "MobilePage": {
           "e17393c6a3": "スマートフォンプレビュー",

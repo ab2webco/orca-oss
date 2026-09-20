@@ -10406,7 +10406,7 @@
           "signIn": "Sign in for Relay",
           "signInAgain": "Sign in again for Relay",
           "localTitle": "LAN",
-          "localDescription": "Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.",
+          "localDescription": "Phone must be on the same network as the computer you are pairing, or connected through Tailscale. No account needed.",
           "retrying": "Retrying"
         },
         "MobilePairingSetupSection": {
@@ -13130,7 +13130,10 @@
           "pairThisPc": "Pair this PC.",
           "pairThisComputer": "Pair this computer.",
           "directAddressDisclosure": "Also use a faster local path",
-          "directAddressHint": "Optional. Pick the Wi‑Fi or Tailscale address your phone should use when nearby — usually faster than Relay. Relay still works when you’re away."
+          "directAddressHint": "Optional. Pick the Wi‑Fi or Tailscale address your phone should use when nearby — usually faster than Relay. Relay still works when you’re away.",
+          "qrHostUnsupported": "Pairing can’t be set up from here",
+          "qrNoAddress": "No network address to put in the code",
+          "pairingHostUnsupported": "The computer you are pairing runs an older Orca Lab that cannot create pairing codes. Update it, or open Orca Lab on that computer and pair from there."
         },
         "MobilePage": {
           "e17393c6a3": "Phone preview",

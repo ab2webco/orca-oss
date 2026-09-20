@@ -13,6 +13,7 @@ import type { MobilePageStage } from './mobile-page-stage'
 import { MobilePageToolbar } from './MobilePageToolbar'
 import { PhoneCarousel } from './PhoneCarousel'
 import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pairing-connection-mode'
+import type { MobilePairingBlock } from './MobileHeroPairingStep'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
 
 type MobilePageContentProps = {
@@ -23,6 +24,7 @@ type MobilePageContentProps = {
   enterFlow: () => void
   generatePairing: (rotate: boolean) => void
   canGeneratePairing: boolean
+  pairingBlock: MobilePairingBlock
   handleAddressChange: (address: string) => void
   customAddresses: readonly string[]
   selectedAddressIsCustom: boolean
@@ -69,6 +71,7 @@ export function MobilePageContent({
   enterFlow,
   generatePairing,
   canGeneratePairing,
+  pairingBlock,
   handleAddressChange,
   customAddresses,
   selectedAddressIsCustom,
@@ -147,6 +150,7 @@ export function MobilePageContent({
               onConnectionModeChange={handleConnectionModeChange}
               onRegeneratePairing={() => generatePairing(true)}
               canGeneratePairing={canGeneratePairing}
+              pairingBlock={pairingBlock}
               onCopyPairingCode={copyPairingCode}
               networkInterfaces={networkInterfaces}
               customAddresses={customAddresses}

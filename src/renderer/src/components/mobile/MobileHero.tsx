@@ -6,7 +6,7 @@ import { AndroidLogo, IosBrandIcon } from './MobileBrandIcons'
 import { getChannelTagline, type InstallCopy, type IosChannel } from './mobile-platform-copy'
 import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pairing-connection-mode'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
-import { MobileHeroPairingStep } from './MobileHeroPairingStep'
+import { MobileHeroPairingStep, type MobilePairingBlock } from './MobileHeroPairingStep'
 export { HeroIntro } from './MobileHeroIntro'
 export { HeroPaired, type PairedDevice } from './MobileHeroPairedDevices'
 import { translate } from '@/i18n/i18n'
@@ -36,6 +36,7 @@ type HeroFlowProps = {
   onConnectionModeChange: (mode: MobilePairingConnectionMode) => void
   onRegeneratePairing: () => void
   canGeneratePairing: boolean
+  pairingBlock: MobilePairingBlock
   onCopyPairingCode: () => void
   networkInterfaces: readonly MobileNetworkInterface[]
   customAddresses: readonly string[]
@@ -74,6 +75,7 @@ export function HeroFlow({
   onConnectionModeChange,
   onRegeneratePairing,
   canGeneratePairing,
+  pairingBlock,
   onCopyPairingCode,
   networkInterfaces,
   customAddresses,
@@ -233,6 +235,7 @@ export function HeroFlow({
             onConnectionModeChange={onConnectionModeChange}
             onRegeneratePairing={onRegeneratePairing}
             canGeneratePairing={canGeneratePairing}
+            pairingBlock={pairingBlock}
             onCopyPairingCode={onCopyPairingCode}
             networkInterfaces={networkInterfaces}
             customAddresses={customAddresses}

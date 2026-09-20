@@ -65,6 +65,7 @@ describe('HeroFlow height', () => {
   ) {
     return render(
       <HeroFlow
+        pairingBlock={null}
         stepIdx={stepIdx}
         platform="ios"
         onPlatformChange={vi.fn()}
@@ -112,6 +113,7 @@ describe('HeroFlow height', () => {
 
     rerender(
       <HeroFlow
+        pairingBlock={null}
         stepIdx={1}
         platform="ios"
         onPlatformChange={vi.fn()}
@@ -230,6 +232,7 @@ describe('HeroFlow height', () => {
 
   it('moves focus to the pairing-code action after recovery succeeds', () => {
     const props: React.ComponentProps<typeof MobileHeroPairingStep> = {
+      pairingBlock: null,
       pairQrDataUrl: null,
       pairingUrl: null,
       pairingQrError: false,
@@ -275,6 +278,7 @@ describe('HeroFlow height', () => {
 
   it('keeps focus on a persistent control when an ordinary remint finishes', () => {
     const props: React.ComponentProps<typeof MobileHeroPairingStep> = {
+      pairingBlock: null,
       pairQrDataUrl: null,
       pairingUrl: null,
       pairingQrError: false,
@@ -317,6 +321,7 @@ describe('HeroFlow height', () => {
 
   it('demotes the network address picker to a disclosure on Orca Relay', async () => {
     const props: React.ComponentProps<typeof MobileHeroPairingStep> = {
+      pairingBlock: null,
       pairQrDataUrl: null,
       pairingUrl: null,
       pairingQrError: false,
@@ -358,9 +363,55 @@ describe('HeroFlow height', () => {
     expect(screen.getByRole('button', { name: 'Refresh network interfaces' })).toBeVisible()
   })
 
+  // ORCA-468. The empty picker plus a refresh button read as a transient failure, and a live
+  // Generate invited a retry — on a host with no pairing RPC no retry can ever work.
+  it('replaces the address picker with the reason when the host cannot mint a code', () => {
+    const props: React.ComponentProps<typeof MobileHeroPairingStep> = {
+      pairingBlock: 'host-unsupported',
+      pairQrDataUrl: null,
+      pairingUrl: null,
+      pairingQrError: false,
+      relayMintFailure: null,
+      onUseLan: vi.fn(),
+      onRetryRelay: vi.fn(),
+      onCopyRelayDiagnostics: vi.fn(),
+      pairLoading: false,
+      connectionMode: 'local-only',
+      onConnectionModeChange: vi.fn(),
+      onRegeneratePairing: vi.fn(),
+      canGeneratePairing: true,
+      onCopyPairingCode: vi.fn(),
+      networkInterfaces: [],
+      customAddresses: [],
+      selectedAddress: undefined,
+      selectedAddressIsCustom: false,
+      onSelectedAddressChange: vi.fn(),
+      onCustomAddressSelect: vi.fn(),
+      onCustomAddressRemove: vi.fn(),
+      beforeCustomAddressChange: vi.fn().mockResolvedValue(true),
+      onRefreshNetworkInterfaces: vi.fn(),
+      refreshingNetworkInterfaces: false
+    }
+    const { rerender } = render(<MobileHeroPairingStep {...props} />)
+
+    expect(screen.getByText(/Pairing can.t be set up from here/i)).toBeVisible()
+    expect(screen.getByText(/open Orca Lab on that computer and pair from there/i)).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Refresh network interfaces' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Generate code/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Copy pairing code/i })).toBeNull()
+
+    // LAN with nothing to advertise is the other standing block: the picker stays, because
+    // joining a network or adding a custom address still fixes it — Generate does not.
+    rerender(<MobileHeroPairingStep {...props} pairingBlock="no-address" />)
+    expect(screen.getByText(/No network address to put in the code/i)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Refresh network interfaces' })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Generate code/i })).toBeDisabled()
+  })
+
   it('keeps a custom address visible on Orca Relay', () => {
     const address = 'host.example:6768'
     const props: React.ComponentProps<typeof MobileHeroPairingStep> = {
+      pairingBlock: null,
       pairQrDataUrl: null,
       pairingUrl: null,
       pairingQrError: false,

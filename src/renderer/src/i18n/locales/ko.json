@@ -9974,7 +9974,7 @@
           "reconnecting": "다시 연결 중",
           "unavailable": "사용할 수 없음",
           "signIn": "Relay용 로그인",
-          "localDescription": "휴대폰이 이 Wi‑Fi에 있거나 Tailscale로 연결되어 있어야 합니다. 계정이 필요하지 않습니다.",
+          "localDescription": "휴대폰이 페어링할 컴퓨터와 같은 네트워크에 있거나 Tailscale로 연결되어 있어야 합니다. 계정이 필요하지 않습니다.",
           "pathGroup": "휴대폰이 이 컴퓨터에 연결되는 방식",
           "anywhereTitle": "Orca Relay",
           "anywhereDescription": "휴대폰이 모바일 네트워크 또는 모든 Wi‑Fi에서 연결할 수 있습니다. 로그인은 Relay에만 필요합니다.",
@@ -12377,7 +12377,10 @@
           "relayDegradedNotice": "Relay에 연결할 수 없습니다 — 이 코드는 LAN 또는 Tailscale에서만 작동합니다.",
           "pairingQrError": "이 페어링 코드를 QR 코드로 표시할 수 없습니다. 대신 Orca Lab Mobile에 복사하세요.",
           "directAddressDisclosure": "더 빠른 로컬 경로도 사용",
-          "directAddressHint": "선택 사항. 근처에 있을 때(같은 Wi‑Fi 또는 Tailscale) 휴대폰이 사용할 주소를 고르세요. 보통 Relay보다 빠릅니다. 외부에 있을 때는 여전히 Relay를 사용합니다."
+          "directAddressHint": "선택 사항. 근처에 있을 때(같은 Wi‑Fi 또는 Tailscale) 휴대폰이 사용할 주소를 고르세요. 보통 Relay보다 빠릅니다. 외부에 있을 때는 여전히 Relay를 사용합니다.",
+          "qrHostUnsupported": "여기에서는 페어링을 설정할 수 없습니다",
+          "qrNoAddress": "코드에 넣을 네트워크 주소가 없습니다",
+          "pairingHostUnsupported": "페어링할 컴퓨터에서 페어링 코드를 만들 수 없는 이전 버전의 Orca Lab이 실행 중입니다. 업데이트하거나, 그 컴퓨터에서 Orca Lab을 열어 페어링하세요."
         },
         "MobilePage": {
           "e17393c6a3": "휴대폰 미리보기",

@@ -180,7 +180,7 @@ describe('MobilePairingConnectionOptions', () => {
     ).toBeVisible()
     expect(
       screen.getByText(
-        'Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.'
+        'Phone must be on the same network as the computer you are pairing, or connected through Tailscale. No account needed.'
       )
     ).toBeVisible()
 

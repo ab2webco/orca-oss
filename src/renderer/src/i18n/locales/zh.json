@@ -9975,7 +9975,7 @@
           "reconnecting": "正在重新连接",
           "unavailable": "不可用",
           "signIn": "登录以使用 Relay",
-          "localDescription": "手机必须连接此 Wi‑Fi 或通过 Tailscale。无需账号。",
+          "localDescription": "手机必须与要配对的电脑处于同一网络，或通过 Tailscale 连接。无需账号。",
           "pathGroup": "手机访问此电脑的方式",
           "anywhereTitle": "Orca Relay",
           "anywhereDescription": "手机可通过蜂窝网络或任意 Wi‑Fi 连接。仅 Relay 需要登录。",
@@ -12386,7 +12386,10 @@
           "relayDegradedNotice": "无法连接 Relay — 此二维码仅在局域网或 Tailscale 内可用。",
           "pairingQrError": "无法将此配对码呈现为二维码。请改为将其复制到 Orca Lab Mobile。",
           "directAddressDisclosure": "也可使用更快的本地连接",
-          "directAddressHint": "可选。选择手机在附近（同一 Wi‑Fi 或 Tailscale）时使用的地址，通常比 Relay 更快。外出时仍走 Relay。"
+          "directAddressHint": "可选。选择手机在附近（同一 Wi‑Fi 或 Tailscale）时使用的地址，通常比 Relay 更快。外出时仍走 Relay。",
+          "qrHostUnsupported": "无法从这里设置配对",
+          "qrNoAddress": "没有可写入配对码的网络地址",
+          "pairingHostUnsupported": "要配对的电脑运行的 Orca Lab 版本过旧，无法生成配对码。请更新它，或在那台电脑上打开 Orca Lab 进行配对。"
         },
         "MobilePage": {
           "e17393c6a3": "手机预览",

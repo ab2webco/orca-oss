@@ -46,6 +46,7 @@ vi.mock('./MobilePageContent', () => ({
   MobilePageContent: (props: {
     connectionMode: MobilePairingConnectionMode
     canGeneratePairing: boolean
+    pairingBlock: string | null
     enterFlow: () => void
     handleConnectionModeChange: (mode: MobilePairingConnectionMode) => void
     handleAddressChange: (address: string) => void
@@ -71,6 +72,7 @@ vi.mock('./MobilePageContent', () => ({
       <span data-testid="step">{props.stepIdx}</span>
       <span data-testid="mode">{props.connectionMode}</span>
       <span data-testid="can-generate">{String(props.canGeneratePairing)}</span>
+      <span data-testid="pairing-block">{props.pairingBlock ?? 'none'}</span>
       <span data-testid="pairing-qr">{props.pairQrDataUrl ?? 'none'}</span>
       <span data-testid="pairing-url">{props.pairingUrl ?? 'none'}</span>
       <span data-testid="pairing-qr-error">{String(props.pairingQrError)}</span>
@@ -155,7 +157,10 @@ describe('MobilePage pairing connection mode', () => {
     })
   })
 
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    Object.defineProperty(window, '__ORCA_WEB_CLIENT__', { configurable: true, value: false })
+  })
 
   async function openPairingStep(): Promise<void> {
     const user = userEvent.setup()
@@ -569,5 +574,71 @@ describe('MobilePage pairing connection mode', () => {
       connectionMode: 'automatic',
       rotate: true
     })
+  })
+
+  // ORCA-468. Why not just let the mint fail: a live Generate button beside an empty
+  // picker invites a retry that cannot ever succeed on this host.
+  it('reports LAN with no address to advertise as a standing block', async () => {
+    const user = userEvent.setup()
+    await openPairingStep()
+    await waitFor(() => expect(screen.getByTestId('pairing-block')).toHaveTextContent('none'))
+
+    await user.click(screen.getByRole('button', { name: 'LAN' }))
+
+    await waitFor(() => expect(screen.getByTestId('pairing-block')).toHaveTextContent('no-address'))
+  })
+
+  it('clears the block once the host reports an address', async () => {
+    listNetworkInterfaces.mockResolvedValue({
+      interfaces: [{ name: 'en0', address: '192.168.10.105' }]
+    })
+    const user = userEvent.setup()
+    await openPairingStep()
+
+    await user.click(screen.getByRole('button', { name: 'LAN' }))
+
+    await waitFor(() => expect(screen.getByTestId('mode')).toHaveTextContent('local-only'))
+    expect(screen.getByTestId('pairing-block')).toHaveTextContent('none')
+  })
+
+  // ORCA-468. The web client's runtime IS the machine being paired, so an older server
+  // there means pairing cannot happen from this screen at all — say so, do not retry.
+  it('says pairing is impossible when the serving host cannot mint a code', async () => {
+    Object.defineProperty(window, '__ORCA_WEB_CLIENT__', { configurable: true, value: true })
+    const call = vi.fn().mockResolvedValue({
+      ok: true,
+      result: { capabilities: ['runtime.environments.v1'] },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ...window.api, runtime: { call } }
+    })
+
+    await openPairingStep()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('pairing-block')).toHaveTextContent('host-unsupported')
+    )
+    expect(screen.getByTestId('can-generate')).toHaveTextContent('false')
+    expect(getPairingQR).not.toHaveBeenCalled()
+  })
+
+  it('pairs normally against a host that advertises the pairing capability', async () => {
+    Object.defineProperty(window, '__ORCA_WEB_CLIENT__', { configurable: true, value: true })
+    const call = vi.fn().mockResolvedValue({
+      ok: true,
+      result: { capabilities: ['pairing.mobile-qr.v1'] },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ...window.api, runtime: { call } }
+    })
+
+    await openPairingStep()
+
+    await waitFor(() => expect(getPairingQR).toHaveBeenCalledWith({ connectionMode: 'automatic' }))
+    expect(screen.getByTestId('pairing-block')).toHaveTextContent('none')
   })
 })

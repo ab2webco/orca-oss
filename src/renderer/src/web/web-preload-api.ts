@@ -949,7 +949,10 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       // advertise. Returning an empty list left the wizard on "No interfaces
       // found" with a refresh button, which reads as a transient failure.
       listNetworkInterfaces: () => callRuntimeResult('pairing.listNetworkInterfaces'),
-      getPairingQR: () => Promise.resolve({ available: false }),
+      // Why the server mints it: the QR carries the address the phone must reach, and that is
+      // this runtime's machine, not the browser's. An older host has no such method — the wizard
+      // probes pairing.mobile-qr.v1 first so the failure is explained instead of retried.
+      getPairingQR: (args) => callRuntimeResult('pairing.createMobileQr', args ?? {}),
       getWindowsFirewallStatus: () => Promise.resolve({ supported: false }),
       repairWindowsFirewall: () => Promise.resolve({ ok: false, reason: 'unsupported' }),
       openWindowsNetworkSettings: () => Promise.resolve(false),
