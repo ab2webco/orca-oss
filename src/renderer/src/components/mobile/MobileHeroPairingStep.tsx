@@ -12,6 +12,13 @@ import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pair
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
 import { translate } from '@/i18n/i18n'
 
+/** Why the wizard cannot mint a code right now, when that is a standing fact and not a retry.
+ *
+ *  `host-unsupported` — the machine being paired runs an Orca without the pairing RPC.
+ *  `no-address` — LAN was picked and there is no address to advertise.
+ */
+export type MobilePairingBlock = 'host-unsupported' | 'no-address' | null
+
 /** Why: one full sentence per device kind so translators own word order and punctuation. */
 function pairDeviceHeading(): string {
   const ua = navigator.userAgent
@@ -31,7 +38,22 @@ function emptyPairingQrMessage(args: {
   connectionMode: MobilePairingConnectionMode
   pairingQrError: boolean
   pairingUrl: string | null
+  pairingBlock: MobilePairingBlock
 }): string {
+  // Ahead of the sign-in and Relay branches: those name a fix the user can apply here, and
+  // neither applies when this machine cannot produce a code at all.
+  if (args.pairingBlock === 'host-unsupported') {
+    return translate(
+      'auto.components.mobile.MobileHero.qrHostUnsupported',
+      'Pairing can’t be set up from here'
+    )
+  }
+  if (args.pairingBlock === 'no-address') {
+    return translate(
+      'auto.components.mobile.MobileHero.qrNoAddress',
+      'No network address to put in the code'
+    )
+  }
   if (args.relayMintFailure != null) {
     return translate('auto.components.mobile.MobileHero.noRelayCode', 'No pairing code available')
   }
@@ -79,7 +101,8 @@ export function MobileHeroPairingStep({
   onCustomAddressRemove,
   beforeCustomAddressChange,
   onRefreshNetworkInterfaces,
-  refreshingNetworkInterfaces
+  refreshingNetworkInterfaces,
+  pairingBlock
 }: {
   pairQrDataUrl: string | null
   pairingUrl: string | null
@@ -104,6 +127,7 @@ export function MobileHeroPairingStep({
   beforeCustomAddressChange: (address: string) => Promise<boolean>
   onRefreshNetworkInterfaces: () => void
   refreshingNetworkInterfaces: boolean
+  pairingBlock: MobilePairingBlock
 }): React.JSX.Element {
   const copyPairingCodeRef = useRef<HTMLButtonElement | null>(null)
   const pairingWasReadyRef = useRef(pairingUrl != null && !pairLoading)
@@ -119,7 +143,8 @@ export function MobileHeroPairingStep({
           canGeneratePairing,
           connectionMode,
           pairingQrError,
-          pairingUrl
+          pairingUrl,
+          pairingBlock
         })
       : null
 
@@ -232,12 +257,12 @@ export function MobileHeroPairingStep({
             ? translate('auto.components.mobile.MobileHero.pairingCodeReady', 'Pairing code ready')
             : ''}
         </span>
-        {relayMintFailure == null ? (
+        {relayMintFailure == null && pairingBlock !== 'host-unsupported' ? (
           <button
             type="button"
             className="mp-link-under"
             onClick={onRegeneratePairing}
-            disabled={pairLoading || !canGeneratePairing}
+            disabled={pairLoading || !canGeneratePairing || pairingBlock != null}
           >
             {pairLoading
               ? translate('auto.components.mobile.MobileHero.65b3f2e8bc', 'Generating…')
@@ -262,7 +287,16 @@ export function MobileHeroPairingStep({
         ) : null}
       </div>
       <div className="mp-pairing-controls">
-        {usingRelay && !networkDisclosurePinned ? (
+        {pairingBlock === 'host-unsupported' ? (
+          // Why replace the picker instead of disabling it: an empty list beside a refresh button
+          // reads as a transient failure, and no amount of refreshing can add the missing RPC.
+          <p className="mp-disclosure-hint" role="status">
+            {translate(
+              'auto.components.mobile.MobileHero.pairingHostUnsupported',
+              'The computer you are pairing runs an older Orca Lab that cannot create pairing codes. Update it, or open Orca Lab on that computer and pair from there.'
+            )}
+          </p>
+        ) : usingRelay && !networkDisclosurePinned ? (
           // Why: Relay is the default path; this only configures the LAN/Tailscale
           // endpoint the phone prefers when nearby. Noun phrasing + muted style so
           // it reads as an alternative, not a mode switch next to "Copy pairing code".
@@ -305,21 +339,23 @@ export function MobileHeroPairingStep({
           networkRow
         )}
 
-        <div className="mp-inline-actions">
-          <span className="mp-action-divider">
-            {translate('auto.components.mobile.MobileHero.4c1df4eba7', "Can't scan?")}
-          </span>
-          <button
-            ref={copyPairingCodeRef}
-            type="button"
-            className="mp-text-link"
-            onClick={onCopyPairingCode}
-            disabled={!pairingUrl || pairLoading}
-          >
-            <Copy className="size-3.5" />
-            {translate('auto.components.mobile.MobileHero.010dddcf27', 'Copy pairing code')}
-          </button>
-        </div>
+        {pairingBlock === 'host-unsupported' ? null : (
+          <div className="mp-inline-actions">
+            <span className="mp-action-divider">
+              {translate('auto.components.mobile.MobileHero.4c1df4eba7', "Can't scan?")}
+            </span>
+            <button
+              ref={copyPairingCodeRef}
+              type="button"
+              className="mp-text-link"
+              onClick={onCopyPairingCode}
+              disabled={!pairingUrl || pairLoading}
+            >
+              <Copy className="size-3.5" />
+              {translate('auto.components.mobile.MobileHero.010dddcf27', 'Copy pairing code')}
+            </button>
+          </div>
+        )}
         <WindowsFirewallNotice
           pairingReady={pairQrDataUrl != null}
           address={selectedAddress}

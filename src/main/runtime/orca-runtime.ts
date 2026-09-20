@@ -550,6 +550,7 @@ import {
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_VERSION,
   REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
+  PAIRING_MOBILE_QR_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES,
   RUNTIME_PROTOCOL_VERSION,
   TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY,
@@ -5392,7 +5393,11 @@ export class OrcaRuntimeService {
         (process.env.ORCA_E2E_DISABLE_RUNTIME_SHARED_CONTROL !== '1' ||
           capability !== REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY) &&
         (process.env.ORCA_E2E_DISABLE_PAIRED_TERMINAL_PARKING !== '1' ||
-          capability !== TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY)
+          capability !== TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY) &&
+        // Why: the pairing wizard's old-host lane needs a host that really withholds the
+        // capability, and no published build predates it yet.
+        (process.env.ORCA_E2E_DISABLE_PAIRING_MOBILE_QR !== '1' ||
+          capability !== PAIRING_MOBILE_QR_RUNTIME_CAPABILITY)
     )
     if (hasOffscreen) {
       capabilities.push(BROWSER_HEADLESS_RUNTIME_CAPABILITY)

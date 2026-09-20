@@ -246,7 +246,7 @@ export function MobilePairingConnectionOptions({
           )}
           description={translate(
             'auto.components.settings.MobilePairingConnectionOptions.localDescription',
-            'Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.'
+            'Phone must be on the same network as the computer you are pairing, or connected through Tailscale. No account needed.'
           )}
         />
       </div>

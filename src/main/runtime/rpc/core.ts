@@ -9,7 +9,13 @@ import type {
   PairingProvisionRelayParams
 } from '../../../shared/mobile-relay-credential-contract'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
+import type { MobilePairingQrArgs, MobilePairingQrResponse } from '../mobile-pairing-qr-offer'
 import type { OrchestrationCompatibilityEvidence } from '../../../shared/orchestration-compatibility-evidence'
+
+/** Mints this host's mobile pairing QR for a remote or web client. */
+export type MobilePairingQrRpcContext = (
+  args: MobilePairingQrArgs
+) => Promise<MobilePairingQrResponse>
 
 export type PairingRpcContext = {
   getEndpoints(params: PairingGetEndpointsParams): Promise<PairingGetEndpointsResult>
@@ -98,6 +104,9 @@ export type RpcContext = {
   // Why: federation pins the authenticated saved-environment caller without exposing its token to handlers or storage.
   authenticatedCallerFingerprint?: string
   pairing?: PairingRpcContext
+  // Why separate from `pairing`: the relay pairing context only exists for an authenticated
+  // relay-capable socket, while minting a QR needs nothing but this server.
+  mobilePairingQr?: MobilePairingQrRpcContext
   // Why: mobile terminal traffic bypasses JSON streaming; undefined on Unix/socket and non-E2EE WebSocket paths.
   sendBinary?: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void
   // Why: binary terminal frames arrive outside JSON-RPC once a stream is established; handlers register only the stream IDs they created.

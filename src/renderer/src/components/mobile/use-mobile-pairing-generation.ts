@@ -6,6 +6,7 @@ import {
   type MobilePairingConnectionMode
 } from '../../../../shared/mobile-pairing-connection-mode'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
+import { createMobilePairingQr } from '@/runtime/runtime-pairing-qr'
 
 type MutableRef<T> = { current: T }
 
@@ -18,6 +19,8 @@ type MutableRef<T> = { current: T }
 export function useMobilePairingGeneration(params: {
   connectionMode: MobilePairingConnectionMode
   signedIn: boolean
+  /** Host that owns the pairing; null means the machine drawing this screen. */
+  activeRuntimeEnvironmentId: string | null
   selectedAddress: string | undefined
   mountedRef: MutableRef<boolean>
   hasGeneratedRef: MutableRef<boolean>
@@ -37,6 +40,7 @@ export function useMobilePairingGeneration(params: {
   const {
     connectionMode,
     signedIn,
+    activeRuntimeEnvironmentId,
     selectedAddress,
     mountedRef,
     hasGeneratedRef,
@@ -65,7 +69,7 @@ export function useMobilePairingGeneration(params: {
       }
       try {
         const address = addressOverride ?? selectedAddress
-        const result = await window.api.mobile.getPairingQR({
+        const result = await createMobilePairingQr(activeRuntimeEnvironmentId, {
           ...(address ? { address } : {}),
           connectionMode: preferredMode,
           ...(rotate ? { rotate: true } : {})
@@ -123,6 +127,7 @@ export function useMobilePairingGeneration(params: {
       }
     },
     [
+      activeRuntimeEnvironmentId,
       connectionMode,
       hasGeneratedRef,
       mountedRef,

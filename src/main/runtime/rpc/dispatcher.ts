@@ -216,6 +216,7 @@ export class RpcDispatcher {
             recordMutationReceipt: mutation?.recordReceipt,
             orchestrationMutation: mutation?.identity,
             pairing: options?.pairing,
+            mobilePairingQr: options?.mobilePairingQr,
             sendBinary: options?.sendBinary,
             registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
             legacyCoordinatorRunId,
@@ -275,6 +276,7 @@ export class RpcDispatcher {
           clientCapabilities: options?.clientCapabilities,
           orchestrationCapability: request.orchestrationCapability,
           pairing: options?.pairing,
+          mobilePairingQr: options?.mobilePairingQr,
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler
         },

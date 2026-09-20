@@ -24,6 +24,8 @@ import {
   useMobilePairingAddressPreference
 } from './use-mobile-pairing-address-preference'
 import { listPairingNetworkInterfaces } from '@/runtime/runtime-pairing-interfaces'
+import { createMobilePairingQr, supportsMobilePairingQr } from '@/runtime/runtime-pairing-qr'
+import type { MobilePairingBlock } from './MobileHeroPairingStep'
 
 export default function MobilePage(): React.JSX.Element {
   const [stepIdx, setStepIdx] = useState<StepIndex>(0)
@@ -84,6 +86,7 @@ export default function MobilePage(): React.JSX.Element {
   const { generatePairing } = useMobilePairingGeneration({
     connectionMode,
     signedIn,
+    activeRuntimeEnvironmentId,
     selectedAddress,
     mountedRef,
     hasGeneratedRef,
@@ -214,13 +217,16 @@ export default function MobilePage(): React.JSX.Element {
         return true
       }
       try {
-        const result = await window.api.mobile.getPairingQR({ address, connectionMode })
+        const result = await createMobilePairingQr(activeRuntimeEnvironmentId, {
+          address,
+          connectionMode
+        })
         return result.available && result.qrDataUrl !== null
       } catch {
         return false
       }
     },
-    [connectionMode, signedIn]
+    [activeRuntimeEnvironmentId, connectionMode, signedIn]
   )
 
   const copyPairingCode = useCallback(async () => {
@@ -244,10 +250,44 @@ export default function MobilePage(): React.JSX.Element {
     }
   }, [mountedRef, pairingUrl])
 
+  // Why probe instead of letting the click fail: an older host has no pairing.createMobileQr,
+  // and a Generate that errors afterwards reads as a transient glitch worth retrying.
+  const [hostMintsPairingQr, setHostMintsPairingQr] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void supportsMobilePairingQr(activeRuntimeEnvironmentId)
+      .then((supported) => {
+        if (!cancelled) {
+          setHostMintsPairingQr(supported)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHostMintsPairingQr(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeRuntimeEnvironmentId])
+
+  // Why LAN alone: Relay carries its own invite, so it mints with no address at all.
+  // Why not while refreshing: an unfinished scan is not the same claim as an empty host.
+  const lanWithoutAddress =
+    connectionMode === 'local-only' &&
+    !refreshingNetworkInterfaces &&
+    networkInterfaces.length === 0 &&
+    customAddresses.length === 0
+  const pairingBlock: MobilePairingBlock =
+    hostMintsPairingQr === false ? 'host-unsupported' : lanWithoutAddress ? 'no-address' : null
+  // Why lanWithoutAddress is not folded in: the auto-mint still returns the host's own
+  // guidance, which beats silence. Only the Generate button must refuse the dead retry.
+  const canGenerate =
+    canMintMobilePairingOffer({ connectionMode, signedIn }) && hostMintsPairingQr === true
+
   // Why: when Step 2 first becomes visible, mint a pairing offer so the
   // user sees a real QR immediately. Subsequent visits keep the existing
   // token unless they hit Regenerate.
-  const canGenerate = canMintMobilePairingOffer({ connectionMode, signedIn })
   useEffect(() => {
     if (stage !== 'flow' || stepIdx !== 1 || hasGeneratedRef.current) {
       return
@@ -313,6 +353,7 @@ export default function MobilePage(): React.JSX.Element {
       enterFlow={enterFlow}
       generatePairing={(rotate) => void generatePairing(rotate)}
       canGeneratePairing={canGenerate}
+      pairingBlock={pairingBlock}
       handleAddressChange={handleAddressChange}
       customAddresses={customAddresses}
       selectedAddressIsCustom={selectedAddressIsCustom}
