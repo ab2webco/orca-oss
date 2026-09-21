@@ -254,18 +254,41 @@
       var ENTRIES_KEY = 'entries'
       var SETTINGS_MIRROR_KEY = 'settings-mirror'
 
+      /** The host answers every well-formed request, but a reply addressed to a
+       *  frame the host has already replaced is dropped on purpose. Without a
+       *  deadline that case is a promise that never settles and a panel frozen
+       *  on its last status line — the failure with no error message at all. */
+      var BRIDGE_TIMEOUT_MS = 8000
+      /** The bridge window is a sliding 10s (plugin-panel-bridge.ts:24), so a
+       *  retry sooner than that just spends another message and is refused
+       *  again. Four attempts outlast one full window. */
+      var RETRY_DELAY_MS = 3500
+      var MAX_ATTEMPTS = 4
+
       var pending = Object.create(null)
       var nextRequestId = 0
       var statusEl = document.getElementById('status')
 
-      /**
-       * Every host call is one message against a per-plugin sliding window of
-       * 30 messages / 10s (src/shared/plugins/plugin-panel-bridge.ts:24), and
-       * the watchdog's pong spends one of them every 10s. Panels that poll a
-       * list of keys on a timer run out of budget exactly when the user clicks,
-       * so this panel only calls on an explicit action and never on an interval.
-       */
-      function call(action, params) {
+      function setStatus(text, tone) {
+        statusEl.textContent = text
+        statusEl.setAttribute('data-tone', tone || 'info')
+      }
+
+      function errorText(error) {
+        return error && error.message ? error.message : String(error)
+      }
+
+      function wait(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms)
+        })
+      }
+
+      /** One message over the bridge. Resolves when the matching reply lands,
+       *  and otherwise never settles — which is the whole reason for the
+       *  deadline that wraps it. A reply that arrives after the deadline just
+       *  resolves a promise nobody is waiting on. */
+      function callOnce(action, params) {
         return new Promise(function (resolve) {
           var requestId = 'worklog-' + ++nextRequestId
           pending[requestId] = resolve
@@ -278,36 +301,100 @@
         })
       }
 
+      /**
+       * Turns silence into something a caller can report. The host answers
+       * every request it receives, but a reply it drops — because the panel
+       * document or its session was replaced mid-flight — arrives never, and a
+       * promise that never settles is a UI frozen on its last status line with
+       * no error anywhere.
+       */
+      function withDeadline(promise, ms, action) {
+        var timer = null
+        return Promise.race([
+          promise.then(function (value) {
+            if (timer !== null) clearTimeout(timer)
+            return value
+          }),
+          new Promise(function (_resolve, reject) {
+            timer = setTimeout(function () {
+              reject(new Error('The host did not answer ' + action + ' within ' + ms + 'ms.'))
+            }, ms)
+          })
+        ])
+      }
+
       window.addEventListener('message', function (event) {
         var data = event.data
         if (!data || data.type !== ACTION_RESULT) return
-        var resolve = pending[data.requestId]
-        if (!resolve) return
+        var settle = pending[data.requestId]
+        if (!settle) return
         delete pending[data.requestId]
-        resolve(data)
+        settle(data)
       })
 
-      function setStatus(text, tone) {
-        statusEl.textContent = text
-        statusEl.setAttribute('data-tone', tone || 'info')
+      /**
+       * Every host call goes through here, and it always resolves to
+       * `{ ok: true, value }` or `{ ok: false, reason }` — never a bare
+       * `undefined` a caller could mistake for an empty answer.
+       *
+       * `rate_limited` is a passing brake, not a failure: the budget is 30
+       * messages per sliding 10s and the liveness pong already spends one every
+       * 10s, so a click can legitimately land on a spent window. Work that
+       * started as a click is retried past that window; every other refusal, and
+       * every timeout, comes back with a reason the caller must show.
+       */
+      function request(action, params) {
+        var attempt = 0
+        function attemptOnce() {
+          attempt += 1
+          return withDeadline(callOnce(action, params), BRIDGE_TIMEOUT_MS, action).then(
+            function (result) {
+              if (result.ok) {
+                return { ok: true, value: result.value }
+              }
+              if (result.errorCode === 'rate_limited') {
+                if (attempt < MAX_ATTEMPTS) {
+                  setStatus(
+                    'Too many requests just now — retrying (' +
+                      attempt +
+                      ' of ' +
+                      (MAX_ATTEMPTS - 1) +
+                      ')…'
+                  )
+                  return wait(RETRY_DELAY_MS).then(attemptOnce)
+                }
+                return { ok: false, reason: 'Too many requests just now — try again in a moment.' }
+              }
+              return {
+                ok: false,
+                reason: (result.error || result.errorCode || 'The request failed') + '.'
+              }
+            },
+            function (error) {
+              return { ok: false, reason: errorText(error) }
+            }
+          )
+        }
+        return attemptOnce()
       }
 
-      /**
-       * A refusal is NOT an empty answer. `rate_limited` and `consent_required`
-       * both arrive as ok:false with a value of undefined; a panel that reads
-       * `result.value` without checking `ok` renders "no entries" over a log
-       * that is still there, and the user's click vanishes without a word.
-       */
-      function unwrap(result, fallback) {
-        if (result.ok) {
-          return { ok: true, value: result.value }
-        }
-        if (result.errorCode === 'rate_limited') {
-          setStatus('Too many requests just now — try again in a moment.', 'error')
-        } else {
-          setStatus((result.error || result.errorCode || 'request failed') + '.', 'error')
-        }
-        return { ok: false, value: fallback }
+      /** The one place a refusal becomes visible. Nothing in this panel returns
+       *  early without going through it — a swallowed `ok: false` is the bug
+       *  that makes a click disappear with the UI still saying "Saving…". */
+      function fail(result) {
+        setStatus(result.reason, 'error')
+        return false
+      }
+
+      /** Last resort: a throw while rendering must not leave a stale status. */
+      function reportUnexpected(error) {
+        setStatus('Unexpected panel error: ' + errorText(error), 'error')
+      }
+
+      /** `storage.get` on a key that was never written answers ok with a null
+       *  value; that is an empty log, which a refusal is not. */
+      function storedArray(result) {
+        return Array.isArray(result.value && result.value.value) ? result.value.value : []
       }
 
       function renderEntries(entries) {
@@ -317,7 +404,9 @@
         ordered.forEach(function (entry) {
           var item = document.createElement('li')
           var when = document.createElement('time')
-          when.textContent = String(entry.at || '').replace('T', ' ').slice(0, 16)
+          when.textContent = String(entry.at || '')
+            .replace('T', ' ')
+            .slice(0, 16)
           var text = document.createElement('span')
           // textContent, never innerHTML: stored entries are the plugin's own
           // data, but they are still strings a user typed.
@@ -338,12 +427,15 @@
           return
         }
         empty.hidden = true
-        var rows = [
+        appendRows(list, [
           ['Author', mirror.author],
           ['Record new worktrees', mirror.recordNewWorktrees ? 'yes' : 'no'],
           ['Entries to keep', String(mirror.maxEntries)],
           ['Export token', mirror.exportTokenConfigured ? 'configured' : 'not set']
-        ]
+        ])
+      }
+
+      function appendRows(list, rows) {
         rows.forEach(function (row) {
           var term = document.createElement('dt')
           term.textContent = row[0]
@@ -358,16 +450,20 @@
         setStatus('Loading…')
         // Two calls, once, on an explicit trigger — not a poll.
         return Promise.all([
-          call('storage.get', { key: ENTRIES_KEY }),
-          call('storage.get', { key: SETTINGS_MIRROR_KEY })
-        ]).then(function (results) {
-          var entries = unwrap(results[0], null)
-          var mirror = unwrap(results[1], null)
-          if (!entries.ok || !mirror.ok) return
-          renderEntries(Array.isArray(entries.value && entries.value.value) ? entries.value.value : [])
-          renderSettings((mirror.value && mirror.value.value) || null)
-          setStatus('')
-        })
+          request('storage.get', { key: ENTRIES_KEY }),
+          request('storage.get', { key: SETTINGS_MIRROR_KEY })
+        ])
+          .then(function (results) {
+            // Report the first refusal and stop: painting an empty log over a
+            // log the host still holds is worse than saying nothing changed.
+            if (!results[0].ok) return fail(results[0])
+            if (!results[1].ok) return fail(results[1])
+            renderEntries(storedArray(results[0]))
+            renderSettings((results[1].value && results[1].value.value) || null)
+            setStatus('')
+            return true
+          })
+          .catch(reportUnexpected)
       }
 
       document.getElementById('refresh').addEventListener('click', load)
@@ -380,57 +476,64 @@
           return
         }
         setStatus('Saving…')
-        call('storage.get', { key: ENTRIES_KEY }).then(function (read) {
-          var current = unwrap(read, null)
-          if (!current.ok) return
-          var entries = Array.isArray(current.value && current.value.value)
-            ? current.value.value
-            : []
-          entries.push({ at: new Date().toISOString(), author: 'panel', source: 'panel', text: text })
-          call('storage.set', { key: ENTRIES_KEY, value: entries }).then(function (write) {
-            if (!unwrap(write, null).ok) return
-            input.value = ''
-            renderEntries(entries)
-            setStatus('Saved.')
+        request('storage.get', { key: ENTRIES_KEY })
+          .then(function (read) {
+            if (!read.ok) return fail(read)
+            var entries = storedArray(read)
+            entries.push({
+              at: new Date().toISOString(),
+              author: 'panel',
+              source: 'panel',
+              text: text
+            })
+            return request('storage.set', { key: ENTRIES_KEY, value: entries }).then(
+              function (write) {
+                if (!write.ok) return fail(write)
+                // Only now: a cleared input after a refused write loses what the
+                // user typed and tells them it was saved.
+                input.value = ''
+                renderEntries(entries)
+                setStatus('Saved.')
+                return true
+              }
+            )
           })
-        })
+          .catch(reportUnexpected)
       })
 
       document.getElementById('context').addEventListener('click', function () {
-        call('workspace.readContext').then(function (result) {
-          var context = unwrap(result, null)
-          if (!context.ok) return
-          var list = document.getElementById('context-out')
-          list.textContent = ''
-          if (!context.value) {
-            setStatus('No worktree is focused right now.')
-            return
-          }
-          var rows = [
-            ['Name', context.value.displayName],
-            ['Branch', context.value.branch],
-            ['Terminals', String(context.value.terminals.length)]
-          ]
-          rows.forEach(function (row) {
-            var term = document.createElement('dt')
-            term.textContent = row[0]
-            var value = document.createElement('dd')
-            value.textContent = row[1]
-            list.appendChild(term)
-            list.appendChild(value)
+        request('workspace.readContext')
+          .then(function (result) {
+            if (!result.ok) return fail(result)
+            var list = document.getElementById('context-out')
+            list.textContent = ''
+            if (!result.value) {
+              setStatus('No worktree is focused right now.')
+              return true
+            }
+            appendRows(list, [
+              ['Name', result.value.displayName],
+              ['Branch', result.value.branch],
+              ['Terminals', String(result.value.terminals.length)]
+            ])
+            setStatus('')
+            return true
           })
-          setStatus('')
-        })
+          .catch(reportUnexpected)
       })
 
       document.getElementById('notify').addEventListener('click', function () {
-        call('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' }).then(
-          function (result) {
-            var shown = unwrap(result, null)
-            if (!shown.ok) return
-            setStatus(shown.value.delivered ? 'Notification delivered.' : 'Notification suppressed.')
-          }
-        )
+        request('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' })
+          .then(function (result) {
+            if (!result.ok) return fail(result)
+            setStatus(
+              result.value && result.value.delivered
+                ? 'Notification delivered.'
+                : 'Notification suppressed.'
+            )
+            return true
+          })
+          .catch(reportUnexpected)
       })
 
       load()

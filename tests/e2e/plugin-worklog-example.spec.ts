@@ -14,6 +14,7 @@ import { expect, test } from './helpers/orca-app'
 
 const PANEL_TITLE = 'Worklog'
 const PANEL_ENTRY_TEXT = 'shipped the plugin guide'
+const RETRY_ENTRY_TEXT = 'saved through a spent bridge budget'
 const AUTOMATION_COMMAND = "require('fs').appendFileSync('worklog-digest.log'"
 const SCREENSHOT_WIDTHS = [1440, 768, 390, 320]
 
@@ -64,6 +65,47 @@ async function waitForPanelData(page: Page): Promise<void> {
       { timeout: 60_000, intervals: [250, 1_000, 3_000, 6_000, 6_000, 6_000] }
     )
     .toContain(PANEL_ENTRY_TEXT)
+}
+
+/**
+ * Spends the plugin's bridge budget from inside the frame. Every message the
+ * panel window sends is charged before the host even parses it
+ * (plugin-panel-bridge-host.ts:115), so junk frames are enough — and the sender
+ * has to be the panel window, which is why this runs in the frame.
+ */
+async function saturateBridge(page: Page): Promise<void> {
+  await panelFrame(page)
+    .locator('body')
+    .evaluate((body) => {
+      const view = body.ownerDocument.defaultView
+      // No requestId: the host charges the budget and answers nothing, so the
+      // flood cannot be mistaken for the panel's own traffic.
+      for (let index = 0; index < 40; index++) {
+        view?.parent.postMessage({ type: 'worklog-e2e-flood' }, '*')
+      }
+    })
+}
+
+/**
+ * Makes every bridge reply go missing, from inside the panel.
+ *
+ * Simulating this host-side is not available to a test: the preload surface is
+ * deeply frozen (`writable: false, configurable: false`), and a well-formed
+ * request always gets an answer. What a panel can be made to do is wait for one
+ * that never comes — which is the same promise that never settles, and the same
+ * frozen UI. The name patched here is the panel's transport, deliberately kept
+ * separate from the deadline that wraps it so this case stays reachable.
+ */
+async function swallowBridgeReplies(page: Page): Promise<void> {
+  await panelFrame(page)
+    .locator('body')
+    .evaluate((body) => {
+      const view = body.ownerDocument.defaultView as (Window & { callOnce?: unknown }) | null
+      if (typeof view?.callOnce !== 'function') {
+        throw new Error('panel transport `callOnce` is not reachable — control cannot run')
+      }
+      view.callOnce = () => new Promise(() => {})
+    })
 }
 
 test('installs, consents, mounts and round-trips the worklog example plugin', async ({
@@ -169,6 +211,29 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     await setTheme(orcaPage, 'dark')
     await expect(panelFrame(orcaPage).locator('#entries')).toContainText(PANEL_ENTRY_TEXT)
 
+    // CONTROL A — a refused click must say so and then land anyway.
+    // This is the defect that broke CI: the old panel reported the refusal and
+    // abandoned the write, so the entry never arrived and the UI never said the
+    // click had been dropped. The budget is a sliding 10s window, so the retry
+    // genuinely has to outlast it; the assertion still demands the real success.
+    await saturateBridge(orcaPage)
+    await panelFrame(orcaPage).locator('#entry').fill(RETRY_ENTRY_TEXT)
+    await panelFrame(orcaPage).getByRole('button', { name: 'Add entry' }).click()
+    await expect(panelFrame(orcaPage).locator('#status')).toContainText('retrying', {
+      timeout: 15_000
+    })
+    await orcaPage.screenshot({
+      path: testInfo.outputPath('control-a-retrying.png'),
+      animations: 'disabled'
+    })
+    // 4 attempts × 3.5s of backoff plus the calls themselves; the text asserted
+    // is still exactly the success, never "success or an error".
+    await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saved.', {
+      timeout: 40_000
+    })
+    await expect(panelFrame(orcaPage).locator('#entries')).toContainText(RETRY_ENTRY_TEXT)
+    await expect(panelFrame(orcaPage).locator('#entry')).toHaveValue('')
+
     for (const width of SCREENSHOT_WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
       for (const theme of ['light', 'dark'] as const) {
@@ -263,6 +328,29 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
         })
       }
     }
+    // CONTROL B — silence is not an acceptable outcome.
+    // A reply that never arrives used to leave the panel on "Saving…" forever:
+    // a failure with no error message anywhere. This runs last because it
+    // leaves the frame's transport patched; the next theme change rebuilds it.
+    await setWindowWidth(electronApp, orcaPage, 1440)
+    await setTheme(orcaPage, 'light')
+    await waitForPanelData(orcaPage)
+    await swallowBridgeReplies(orcaPage)
+    await panelFrame(orcaPage).locator('#entry').fill('this one never reaches the host')
+    await panelFrame(orcaPage).getByRole('button', { name: 'Add entry' }).click()
+    await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saving…')
+    await expect(panelFrame(orcaPage).locator('#status')).toContainText('The host did not answer', {
+      timeout: 20_000
+    })
+    // The typed text survives a failed write; clearing it would have told the
+    // user it was saved.
+    await expect(panelFrame(orcaPage).locator('#entry')).toHaveValue(
+      'this one never reaches the host'
+    )
+    await orcaPage.screenshot({
+      path: testInfo.outputPath('control-b-timeout.png'),
+      animations: 'disabled'
+    })
   } finally {
     // The install itself needs no cleanup: the harness gives each run its own
     // userData, so it goes away with the profile.

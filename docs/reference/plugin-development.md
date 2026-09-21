@@ -315,7 +315,60 @@ indistinguishable from an empty answer. The click vanishes with no error and the
 panel paints stale data over the write that never happened.
 
 Do not poll. Call on explicit user actions, and always branch on `ok` before
-touching `value`. `examples/plugins/worklog/panel.html` has the shape.
+touching `value`.
+
+### Never return without saying why
+
+This is the mistake everyone makes, and the reason it is hard to catch is that
+the code looks defensive. Checking `ok` and returning is only half of it — the
+other half is that the user's click is now gone and nothing on screen says so:
+
+```js
+// WRONG. Two silent returns: on a refusal the write never happens, the panel
+// stays on "Saving…", and the user has no idea their click was dropped.
+call('storage.get', { key: 'entries' }).then(function (read) {
+  if (!read.ok) return
+  call('storage.set', { key: 'entries', value: next }).then(function (write) {
+    if (!write.ok) return
+    setStatus('Saved.')
+  })
+})
+```
+
+```js
+// RIGHT. Every refusal reaches the screen, a rate limit is retried past the
+// 10s window because the work started as a click, and a reply that never
+// arrives becomes a deadline instead of a frozen panel.
+request('storage.get', { key: 'entries' })
+  .then(function (read) {
+    if (!read.ok) return fail(read)           // fail() paints read.reason
+    return request('storage.set', { key: 'entries', value: next }).then(function (write) {
+      if (!write.ok) return fail(write)
+      input.value = ''                         // only after a confirmed write
+      setStatus('Saved.')
+    })
+  })
+  .catch(reportUnexpected)                     // a throw while rendering, too
+```
+
+Three rules behind that shape, all of them in
+[`examples/plugins/worklog/panel.html`](../../examples/plugins/worklog/panel.html):
+
+1. **One funnel for refusals.** Every `ok: false` goes through a single `fail()`
+   that writes the reason into the status line. A bare `return` next to an
+   `if (!ok)` is the bug.
+2. **`rate_limited` is a brake, not a failure.** Work that started as a user
+   action is worth retrying; anything less than the 10s window just spends
+   another message and gets refused again, so back off past it and say that you
+   are retrying.
+3. **Put a deadline on every call.** The host answers every request it receives,
+   but a reply addressed to a document or session it has already replaced is
+   dropped — and a promise that never settles is a panel frozen on its last
+   status line with no error anywhere. That failure is invisible in code review
+   and invisible at runtime; only a timeout makes it speakable.
+
+Do not clear the user's input, or paint a success state, before the write comes
+back `ok`. Both tell them something happened that did not.
 
 Two more panel bounds: a reported content height is clamped to
 **48–8000 px** with **320 px** before the first report
