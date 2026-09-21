@@ -314,6 +314,9 @@ gap and a panel inherits it without opting in:
 A panel that needs a different look overrides any of it in its own stylesheet. Reach for the tokens
 before a literal — `var(--radius-md)`, not `6px`.
 
+The full plugin-authoring reference — the exact token list, the bridge budget, and what the worker
+may do — is [`docs/reference/plugin-development.md`](./reference/plugin-development.md).
+
 ## Cross-platform
 
 Orca runs on macOS, Linux, and Windows. Every UI change must hold up on all three, in both light and dark mode.

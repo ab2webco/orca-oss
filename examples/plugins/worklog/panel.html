@@ -1,0 +1,439 @@
+<!doctype html>
+<!--
+  Worklog settings panel.
+
+  This document is merged into a host-generated shell: a CSP meta, the app font
+  as a data: URI, the curated design tokens, a --radius-* scale, and the
+  liveness/height reporter all parse BEFORE this file
+  (src/shared/plugins/plugin-panel-shell.ts:88). So: no <head> font loading, no
+  network, no framework — style everything from the tokens the shell injected.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      /* Every value here is a host token or derived from one. A literal colour
+         would be wrong in one of the two themes; the shell re-injects these
+         values and rebuilds the frame when the app theme changes. */
+      body {
+        margin: 0;
+        padding: 16px;
+        color: var(--foreground);
+        background: var(--background);
+        /* `anywhere`, not `break-word`: only this variant also shrinks
+           min-content, and the host decides how narrow this frame gets — on the
+           Settings surface it can be under 100px. Inherited, so it covers the
+           whole panel from one declaration. */
+        overflow-wrap: anywhere;
+      }
+
+      /* No fixed widths anywhere: this panel is laid out by the Settings page,
+         which is as narrow as the app window gets (320px). */
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-width: 720px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--card);
+        color: var(--card-foreground);
+        padding: 14px 16px;
+      }
+
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        margin: 0 0 12px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* The shell deliberately leaves controls unstyled so existing panels keep
+         the look they shipped with — matching the app is this file's job. */
+      input[type='text'] {
+        flex: 1 1 180px;
+        min-width: 0;
+        font: inherit;
+        color: var(--foreground);
+        background: var(--background);
+        border: 1px solid var(--input);
+        border-radius: var(--radius-md);
+        padding: 7px 10px;
+      }
+
+      input[type='text']:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        padding: 7px 12px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      button.secondary {
+        background: var(--secondary);
+        color: var(--secondary-foreground);
+        border-color: var(--border);
+      }
+
+      button[disabled] {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        margin: 0;
+        font-size: 13px;
+      }
+
+      dt {
+        color: var(--muted-foreground);
+      }
+
+      dd {
+        margin: 0;
+        font-family: var(--font-mono);
+      }
+
+      /* A grid column sized `auto` never shrinks below its longest label, so
+         without this the panel overflows the box the host gave it. */
+      dt,
+      dd {
+        min-width: 0;
+      }
+
+      ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      li {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        align-items: baseline;
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+        padding-top: 6px;
+      }
+
+      li:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      li time {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted-foreground);
+      }
+
+      .empty {
+        font-size: 13px;
+        color: var(--muted-foreground);
+      }
+
+      .status {
+        font-size: 12px;
+        min-height: 1.4em;
+        margin: 12px 0 0;
+        color: var(--muted-foreground);
+      }
+
+      .status[data-tone='error'] {
+        color: var(--destructive);
+      }
+
+      /* The media query sees the FRAME's width, not the window's: the Settings
+         sidebar is fixed, so a 768px window still gives the panel ~415px while a
+         390px one gives it under 100. Only the second case has to stack. */
+      @media (max-width: 360px) {
+        body {
+          padding: 12px;
+        }
+
+        dl {
+          grid-template-columns: 1fr;
+          gap: 0 0;
+        }
+
+        dt {
+          margin-top: 8px;
+        }
+
+        .row > * {
+          flex: 1 1 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <section class="card">
+        <h2>Worklog</h2>
+        <p class="hint">
+          Entries live in this plugin's own storage. The panel reads and writes them over the
+          postMessage bridge; nothing here touches the app.
+        </p>
+        <div class="row">
+          <input id="entry" type="text" placeholder="What did you just finish?" />
+          <button id="add" type="button">Add entry</button>
+          <button id="refresh" class="secondary" type="button">Refresh</button>
+        </div>
+        <p class="status" id="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Recent entries</h2>
+        <p class="hint">Newest first. The worker trims the log to the configured length.</p>
+        <ol id="entries"></ol>
+        <p class="empty" id="entries-empty" hidden>No entries yet.</p>
+      </section>
+
+      <section class="card">
+        <h2>Settings</h2>
+        <p class="hint">
+          <code>settings.*</code> is worker-only, so the worker mirrors the resolved values into a
+          storage key this panel can read. Absent until the worker has run once.
+        </p>
+        <dl id="settings"></dl>
+        <p class="empty" id="settings-empty" hidden>
+          Not published yet — run "Worklog: Publish settings to the panel" once.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Focused worktree</h2>
+        <p class="hint">
+          <code>workspace.readContext</code> answers for whatever worktree is focused right now, and
+          returns nothing when none is.
+        </p>
+        <div class="row">
+          <button id="context" class="secondary" type="button">Read context</button>
+          <button id="notify" class="secondary" type="button">Send a notification</button>
+        </div>
+        <dl id="context-out"></dl>
+      </section>
+    </div>
+
+    <script>
+      'use strict'
+
+      var ACTION_REQUEST = 'orca-panel-action'
+      var ACTION_RESULT = 'orca-panel-action-result'
+      var ENTRIES_KEY = 'entries'
+      var SETTINGS_MIRROR_KEY = 'settings-mirror'
+
+      var pending = Object.create(null)
+      var nextRequestId = 0
+      var statusEl = document.getElementById('status')
+
+      /**
+       * Every host call is one message against a per-plugin sliding window of
+       * 30 messages / 10s (src/shared/plugins/plugin-panel-bridge.ts:24), and
+       * the watchdog's pong spends one of them every 10s. Panels that poll a
+       * list of keys on a timer run out of budget exactly when the user clicks,
+       * so this panel only calls on an explicit action and never on an interval.
+       */
+      function call(action, params) {
+        return new Promise(function (resolve) {
+          var requestId = 'worklog-' + ++nextRequestId
+          pending[requestId] = resolve
+          // The frame's origin is opaque, so '*' is the only usable target; the
+          // host identifies the sending window instead of trusting the origin.
+          window.parent.postMessage(
+            { type: ACTION_REQUEST, requestId: requestId, action: action, params: params },
+            '*'
+          )
+        })
+      }
+
+      window.addEventListener('message', function (event) {
+        var data = event.data
+        if (!data || data.type !== ACTION_RESULT) return
+        var resolve = pending[data.requestId]
+        if (!resolve) return
+        delete pending[data.requestId]
+        resolve(data)
+      })
+
+      function setStatus(text, tone) {
+        statusEl.textContent = text
+        statusEl.setAttribute('data-tone', tone || 'info')
+      }
+
+      /**
+       * A refusal is NOT an empty answer. `rate_limited` and `consent_required`
+       * both arrive as ok:false with a value of undefined; a panel that reads
+       * `result.value` without checking `ok` renders "no entries" over a log
+       * that is still there, and the user's click vanishes without a word.
+       */
+      function unwrap(result, fallback) {
+        if (result.ok) {
+          return { ok: true, value: result.value }
+        }
+        if (result.errorCode === 'rate_limited') {
+          setStatus('Too many requests just now — try again in a moment.', 'error')
+        } else {
+          setStatus((result.error || result.errorCode || 'request failed') + '.', 'error')
+        }
+        return { ok: false, value: fallback }
+      }
+
+      function renderEntries(entries) {
+        var list = document.getElementById('entries')
+        list.textContent = ''
+        var ordered = entries.slice().reverse()
+        ordered.forEach(function (entry) {
+          var item = document.createElement('li')
+          var when = document.createElement('time')
+          when.textContent = String(entry.at || '').replace('T', ' ').slice(0, 16)
+          var text = document.createElement('span')
+          // textContent, never innerHTML: stored entries are the plugin's own
+          // data, but they are still strings a user typed.
+          text.textContent = entry.text + ' — ' + entry.author + ' (' + entry.source + ')'
+          item.appendChild(when)
+          item.appendChild(text)
+          list.appendChild(item)
+        })
+        document.getElementById('entries-empty').hidden = ordered.length > 0
+      }
+
+      function renderSettings(mirror) {
+        var list = document.getElementById('settings')
+        list.textContent = ''
+        var empty = document.getElementById('settings-empty')
+        if (!mirror) {
+          empty.hidden = false
+          return
+        }
+        empty.hidden = true
+        var rows = [
+          ['Author', mirror.author],
+          ['Record new worktrees', mirror.recordNewWorktrees ? 'yes' : 'no'],
+          ['Entries to keep', String(mirror.maxEntries)],
+          ['Export token', mirror.exportTokenConfigured ? 'configured' : 'not set']
+        ]
+        rows.forEach(function (row) {
+          var term = document.createElement('dt')
+          term.textContent = row[0]
+          var value = document.createElement('dd')
+          value.textContent = row[1]
+          list.appendChild(term)
+          list.appendChild(value)
+        })
+      }
+
+      function load() {
+        setStatus('Loading…')
+        // Two calls, once, on an explicit trigger — not a poll.
+        return Promise.all([
+          call('storage.get', { key: ENTRIES_KEY }),
+          call('storage.get', { key: SETTINGS_MIRROR_KEY })
+        ]).then(function (results) {
+          var entries = unwrap(results[0], null)
+          var mirror = unwrap(results[1], null)
+          if (!entries.ok || !mirror.ok) return
+          renderEntries(Array.isArray(entries.value && entries.value.value) ? entries.value.value : [])
+          renderSettings((mirror.value && mirror.value.value) || null)
+          setStatus('')
+        })
+      }
+
+      document.getElementById('refresh').addEventListener('click', load)
+
+      document.getElementById('add').addEventListener('click', function () {
+        var input = document.getElementById('entry')
+        var text = input.value.trim()
+        if (!text) {
+          setStatus('Type something first.', 'error')
+          return
+        }
+        setStatus('Saving…')
+        call('storage.get', { key: ENTRIES_KEY }).then(function (read) {
+          var current = unwrap(read, null)
+          if (!current.ok) return
+          var entries = Array.isArray(current.value && current.value.value)
+            ? current.value.value
+            : []
+          entries.push({ at: new Date().toISOString(), author: 'panel', source: 'panel', text: text })
+          call('storage.set', { key: ENTRIES_KEY, value: entries }).then(function (write) {
+            if (!unwrap(write, null).ok) return
+            input.value = ''
+            renderEntries(entries)
+            setStatus('Saved.')
+          })
+        })
+      })
+
+      document.getElementById('context').addEventListener('click', function () {
+        call('workspace.readContext').then(function (result) {
+          var context = unwrap(result, null)
+          if (!context.ok) return
+          var list = document.getElementById('context-out')
+          list.textContent = ''
+          if (!context.value) {
+            setStatus('No worktree is focused right now.')
+            return
+          }
+          var rows = [
+            ['Name', context.value.displayName],
+            ['Branch', context.value.branch],
+            ['Terminals', String(context.value.terminals.length)]
+          ]
+          rows.forEach(function (row) {
+            var term = document.createElement('dt')
+            term.textContent = row[0]
+            var value = document.createElement('dd')
+            value.textContent = row[1]
+            list.appendChild(term)
+            list.appendChild(value)
+          })
+          setStatus('')
+        })
+      })
+
+      document.getElementById('notify').addEventListener('click', function () {
+        call('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' }).then(
+          function (result) {
+            var shown = unwrap(result, null)
+            if (!shown.ok) return
+            setStatus(shown.value.delivered ? 'Notification delivered.' : 'Notification suppressed.')
+          }
+        )
+      })
+
+      load()
+    </script>
+  </body>
+</html>
