@@ -140,7 +140,13 @@ async function armPanelJournal(page: Page): Promise<void> {
       const started = Date.now()
       const journal: string[] = []
       view.__wl = journal
-      view.__wlBoot = `boot-${Math.random().toString(36).slice(2, 8)}`
+      // The stamp lives in the DOM, so it belongs to the document rather than
+      // to this arming. A rebuilt frame parses fresh markup and reads back
+      // UNSTAMPED, which is how the fill, the click and the assertion can be
+      // proven to have addressed the same document — or not.
+      const stamp = `doc-${Math.random().toString(36).slice(2, 8)}`
+      body.ownerDocument.documentElement.dataset.wlDoc = stamp
+      view.__wlBoot = stamp
       const jot = (what: string): void => {
         journal.push(`+${String(Date.now() - started).padStart(5)}ms ${what}`)
       }
@@ -199,6 +205,27 @@ async function armPanelJournal(page: Page): Promise<void> {
         true
       )
     })
+}
+
+/** Identity of the panel document addressable right now, plus how many panel
+ *  frames the host currently has — two of them is a rebuild caught mid-swap. */
+async function panelDocIdentity(page: Page, label: string): Promise<string> {
+  const frames = await page.locator(`iframe[title="${PANEL_TITLE}"]`).count()
+  const inner = await panelFrame(page)
+    .locator('body')
+    .evaluate((body) => ({
+      stamp: body.ownerDocument.documentElement.dataset.wlDoc ?? 'UNSTAMPED',
+      armed: Boolean((body.ownerDocument.defaultView as Window & { __wl?: string[] }).__wl),
+      status: body.querySelector('#status')?.textContent ?? null,
+      input: (body.querySelector('#entry') as HTMLInputElement | null)?.value ?? null
+    }))
+    .catch((error: unknown) => ({
+      stamp: `UNREADABLE ${String(error)}`,
+      armed: false,
+      status: null,
+      input: null
+    }))
+  return `${label}: stamp=${inner.stamp} armed=${inner.armed} hostPanelFrames=${frames} status=${JSON.stringify(inner.status)} input=${JSON.stringify(inner.input)}`
 }
 
 async function readPanelJournal(page: Page): Promise<string> {
@@ -325,19 +352,24 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     // storage.set over the bridge, then a re-read that has to come back from
     // main: reloading the panel discards every bit of in-frame state.
     await armPanelJournal(orcaPage)
+    const identity = [await panelDocIdentity(orcaPage, 'armed')]
     await panelFrame(orcaPage).locator('#entry').fill(PANEL_ENTRY_TEXT)
+    identity.push(await panelDocIdentity(orcaPage, 'after fill'))
     await panelFrame(orcaPage).getByRole('button', { name: 'Add entry' }).click()
+    identity.push(await panelDocIdentity(orcaPage, 'after click'))
     try {
       await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saved.')
     } catch (failure) {
       // The assertion stands unchanged; this only makes the CI log say what the
       // panel actually did instead of leaving us another hypothesis.
+      identity.push(await panelDocIdentity(orcaPage, 'at failure'))
       const journal = await readPanelJournal(orcaPage).catch(
         (error: unknown) => `journal unreadable: ${String(error)}`
       )
-      console.log(`WORKLOG PANEL JOURNAL\n${journal}`)
+      const report = `${identity.join('\n')}\n${journal}`
+      console.log(`WORKLOG PANEL JOURNAL\n${report}`)
       await testInfo.attach('worklog-panel-journal', {
-        body: journal,
+        body: report,
         contentType: 'text/plain'
       })
       throw failure

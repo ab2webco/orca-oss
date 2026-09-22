@@ -277,6 +277,22 @@
       var nextRequestId = 0
       var statusEl = document.getElementById('status')
 
+      /**
+       * The status line and the entries list are one shared surface, and more
+       * than one flow writes to them. A flow claims the surface when it starts
+       * and stays silent once a newer one has claimed it — otherwise a load
+       * that began before a click lands after it and reports the older truth,
+       * wiping both the message and the row the click just added.
+       */
+      var surfaceOwner = 0
+      function claimSurface() {
+        surfaceOwner += 1
+        return surfaceOwner
+      }
+      function ownsSurface(owner) {
+        return owner === surfaceOwner
+      }
+
       function setStatus(text, tone) {
         statusEl.textContent = text
         statusEl.setAttribute('data-tone', tone || 'info')
@@ -351,7 +367,7 @@
        * started as a click is retried past that window; every other refusal, and
        * every timeout, comes back with a reason the caller must show.
        */
-      function request(action, params) {
+      function request(action, params, owner) {
         var attempt = 0
         function attemptOnce() {
           attempt += 1
@@ -362,13 +378,15 @@
               }
               if (result.errorCode === 'rate_limited') {
                 if (attempt < MAX_ATTEMPTS) {
-                  setStatus(
+                  if (owner === undefined || ownsSurface(owner)) {
+                    setStatus(
                     'Too many requests just now — retrying (' +
                       attempt +
                       ' of ' +
                       (MAX_ATTEMPTS - 1) +
-                      ')…'
-                  )
+                        ')…'
+                    )
+                  }
                   return wait(RETRY_DELAY_MS).then(attemptOnce)
                 }
                 return { ok: false, reason: 'Too many requests just now — try again in a moment.' }
@@ -455,13 +473,19 @@
       }
 
       function load() {
+        var mine = claimSurface()
         setStatus('Loading…')
         // Two calls, once, on an explicit trigger — not a poll.
         return Promise.all([
-          request('storage.get', { key: ENTRIES_KEY }),
-          request('storage.get', { key: SETTINGS_MIRROR_KEY })
+          request('storage.get', { key: ENTRIES_KEY }, mine),
+          request('storage.get', { key: SETTINGS_MIRROR_KEY }, mine)
         ])
           .then(function (results) {
+            // A click that started after this load owns the surface now, and it
+            // is reading fresher storage than these replies describe.
+            if (!ownsSurface(mine)) {
+              return false
+            }
             // Report the first refusal and stop: painting an empty log over a
             // log the host still holds is worse than saying nothing changed.
             if (!results[0].ok) return fail(results[0])
@@ -483,9 +507,11 @@
           setStatus('Type something first.', 'error')
           return
         }
+        var mine = claimSurface()
         setStatus('Saving…')
-        request('storage.get', { key: ENTRIES_KEY })
+        request('storage.get', { key: ENTRIES_KEY }, mine)
           .then(function (read) {
+            if (!ownsSurface(mine)) return false
             if (!read.ok) return fail(read)
             var entries = storedArray(read)
             entries.push({
@@ -494,8 +520,9 @@
               source: 'panel',
               text: text
             })
-            return request('storage.set', { key: ENTRIES_KEY, value: entries }).then(
+            return request('storage.set', { key: ENTRIES_KEY, value: entries }, mine).then(
               function (write) {
+                if (!ownsSurface(mine)) return false
                 if (!write.ok) return fail(write)
                 // Only now: a cleared input after a refused write loses what the
                 // user typed and tells them it was saved.
@@ -510,8 +537,10 @@
       })
 
       document.getElementById('context').addEventListener('click', function () {
-        request('workspace.readContext')
+        var mine = claimSurface()
+        request('workspace.readContext', undefined, mine)
           .then(function (result) {
+            if (!ownsSurface(mine)) return false
             if (!result.ok) return fail(result)
             var list = document.getElementById('context-out')
             list.textContent = ''
@@ -531,8 +560,10 @@
       })
 
       document.getElementById('notify').addEventListener('click', function () {
-        request('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' })
+        var mine = claimSurface()
+        request('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' }, mine)
           .then(function (result) {
+            if (!ownsSurface(mine)) return false
             if (!result.ok) return fail(result)
             setStatus(
               result.value && result.value.delivered

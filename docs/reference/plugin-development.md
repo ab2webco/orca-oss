@@ -399,6 +399,32 @@ So give every control the state it actually has:
 A dimmed control that becomes live is honest about a panel that is still
 booting. An enabled control that silently drops the click is not.
 
+The same fact has a second consequence: **nothing a panel keeps in its own
+document survives a rebuild.** Scroll position, a half-typed form, a cached
+list, a pending request — all of it goes when the frame is re-keyed, and the
+panel gets no notice and no teardown hook. Anything that must outlive that
+belongs in `storage.*`, which is why this page keeps saying so.
+
+### One surface, several flows
+
+A panel that writes its status line and its list from more than one place has to
+decide which write wins. The flows do not finish in the order they started: a
+`load()` waiting on two bridge replies can land *after* a click that began later
+and already wrote the newer truth, and then it paints the older one back —
+status cleared, the row the click just added gone, and no error anywhere.
+
+Order of completion is not order of intent. Give the shared surface an owner:
+
+```js
+var surfaceOwner = 0
+function claimSurface() { return ++surfaceOwner }
+function ownsSurface(owner) { return owner === surfaceOwner }
+```
+
+Each flow claims it when it starts and checks before it writes, so a superseded
+flow finishes quietly instead of reporting stale state.
+`examples/plugins/worklog/panel.html` does this in `load()` and in every handler.
+
 Two more panel bounds: a reported content height is clamped to
 **48–8000 px** with **320 px** before the first report
 ([`plugin-panel-bridge.ts:54-56`](../../src/shared/plugins/plugin-panel-bridge.ts)),
