@@ -199,6 +199,14 @@
   </head>
   <body>
     <div class="stack">
+      <!--
+        Every control ships `disabled` and is enabled only once the script below
+        has wired it. The panel document is re-parsed from scratch each time the
+        host rebuilds the frame, so between the parser creating this button and
+        the trailing script attaching its listener there is a real window — wide
+        enough on a loaded machine for a click to land on a button that does
+        nothing at all, with no error and nothing on screen. `disabled` closes it.
+      -->
       <section class="card">
         <h2>Worklog</h2>
         <p class="hint">
@@ -206,9 +214,9 @@
           postMessage bridge; nothing here touches the app.
         </p>
         <div class="row">
-          <input id="entry" type="text" placeholder="What did you just finish?" />
-          <button id="add" type="button">Add entry</button>
-          <button id="refresh" class="secondary" type="button">Refresh</button>
+          <input id="entry" type="text" placeholder="What did you just finish?" disabled />
+          <button id="add" type="button" disabled>Add entry</button>
+          <button id="refresh" class="secondary" type="button" disabled>Refresh</button>
         </div>
         <p class="status" id="status"></p>
       </section>
@@ -239,8 +247,8 @@
           returns nothing when none is.
         </p>
         <div class="row">
-          <button id="context" class="secondary" type="button">Read context</button>
-          <button id="notify" class="secondary" type="button">Send a notification</button>
+          <button id="context" class="secondary" type="button" disabled>Read context</button>
+          <button id="notify" class="secondary" type="button" disabled>Send a notification</button>
         </div>
         <dl id="context-out"></dl>
       </section>
@@ -534,6 +542,12 @@
             return true
           })
           .catch(reportUnexpected)
+      })
+
+      // Last line of wiring: from here the controls can actually do what they
+      // offer. Before it they are inert, and saying so is the point.
+      ;['entry', 'add', 'refresh', 'context', 'notify'].forEach(function (id) {
+        document.getElementById(id).disabled = false
       })
 
       load()

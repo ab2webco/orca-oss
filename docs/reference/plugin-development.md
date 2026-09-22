@@ -370,6 +370,35 @@ Three rules behind that shape, all of them in
 Do not clear the user's input, or paint a success state, before the write comes
 back `ok`. Both tell them something happened that did not.
 
+### Ship controls disabled until the script has wired them
+
+The panel document is not long-lived. The host re-parses it from scratch every
+time it rebuilds the frame — and it rebuilds whenever the baked theme snapshot
+changes ([`use-plugin-panel-theme-revision.ts:9-32`](../../src/renderer/src/components/right-sidebar/use-plugin-panel-theme-revision.ts))
+or the entry HTML is re-read ([`PluginPanel.tsx:174-213`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)).
+
+Between the parser creating a `<button>` and the trailing `<script>` attaching
+its listener there is a real window. It is invisible on a fast machine and wide
+enough on a loaded one that a click lands on a control that does nothing: no
+handler, no error, no status change — the panel simply ignores the user.
+
+So give every control the state it actually has:
+
+```html
+<input id="entry" type="text" disabled />
+<button id="add" type="button" disabled>Add entry</button>
+```
+
+```js
+// last line of wiring, after every addEventListener
+;['entry', 'add', 'refresh'].forEach(function (id) {
+  document.getElementById(id).disabled = false
+})
+```
+
+A dimmed control that becomes live is honest about a panel that is still
+booting. An enabled control that silently drops the click is not.
+
 Two more panel bounds: a reported content height is clamped to
 **48–8000 px** with **320 px** before the first report
 ([`plugin-panel-bridge.ts:54-56`](../../src/shared/plugins/plugin-panel-bridge.ts)),

@@ -37,4 +37,22 @@ describe('worklog plugin fixture', () => {
     // An automation is instructional content, so consent binds to the tree hash.
     expect(hasInstructionalPluginContributions(manifest)).toBe(true)
   })
+
+  it('ships every panel control disabled until the script wires it', async () => {
+    // Why this is a test and not a style note: the panel document is re-parsed
+    // whenever the host rebuilds the frame, so the markup is live for a moment
+    // before the trailing script attaches its listeners. A click landing in that
+    // window hits a control that does nothing, silently — it cost a CI red.
+    const panel = await readFile(
+      join(process.cwd(), 'examples', 'plugins', 'worklog', 'panel.html'),
+      'utf8'
+    )
+    const controls = panel.matchAll(/<(?:input|button)\b[^>]*\bid="([^"]+)"[^>]*>/g)
+    const declared = [...controls].map(([tag, id]) => ({ id, disabled: /\bdisabled\b/.test(tag) }))
+
+    expect(declared.length).toBeGreaterThan(0)
+    expect(declared.filter((control) => !control.disabled)).toEqual([])
+    // ...and something has to undo it, or the panel is merely broken.
+    expect(panel).toContain('.disabled = false')
+  })
 })
