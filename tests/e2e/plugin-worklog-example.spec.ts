@@ -196,14 +196,39 @@ async function armPanelJournal(page: Page): Promise<void> {
           )
         }
       }
-      // Capture phase: proves the click reached the element even if no handler
-      // is attached, which is the one thing wrapping functions cannot show.
-      const add = body.querySelector('#add')
-      add?.addEventListener(
-        'click',
-        () => jot(`click reached #add disabled=${(add as HTMLButtonElement).disabled}`),
-        true
-      )
+      // Capture phase on the element: proves the click reached it even with no
+      // handler attached, which wrapping functions cannot show.
+      const add = body.querySelector('#add') as HTMLButtonElement | null
+      add?.addEventListener('click', () => jot(`click reached #add disabled=${add.disabled}`), true)
+
+      // Document level, for the three separate events Playwright dispatches.
+      // A `click` only fires when mousedown and mouseup share a target, so
+      // "mousedown on #add, mouseup elsewhere, no click" is the signature of
+      // the button moving out from under the pointer mid-gesture — and it
+      // raises no error anywhere, which is exactly what we are chasing.
+      const describe = (node: EventTarget | null): string => {
+        const element = node as HTMLElement | null
+        if (!element || !element.tagName) {
+          return String(node)
+        }
+        return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}`
+      }
+      for (const kind of ['mousedown', 'mouseup', 'click'] as const) {
+        body.ownerDocument.addEventListener(
+          kind,
+          (event) => {
+            const mouse = event as MouseEvent
+            const under = body.ownerDocument.elementFromPoint(mouse.clientX, mouse.clientY)
+            const rect = add?.getBoundingClientRect()
+            jot(
+              `${kind} at (${Math.round(mouse.clientX)},${Math.round(mouse.clientY)})` +
+                ` target=${describe(mouse.target)} elementFromPoint=${describe(under)}` +
+                ` addRect=${rect ? `${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}` : 'none'}`
+            )
+          },
+          true
+        )
+      }
     })
 }
 
@@ -226,6 +251,35 @@ async function panelDocIdentity(page: Page, label: string): Promise<string> {
       input: null
     }))
   return `${label}: stamp=${inner.stamp} armed=${inner.armed} hostPanelFrames=${frames} status=${JSON.stringify(inner.status)} input=${JSON.stringify(inner.input)}`
+}
+
+/** Where #add sits, in the panel's own coordinates plus the document height.
+ *  A rect that differs before and after the click is layout moving under the
+ *  pointer, which no error anywhere would report. */
+async function panelAddButtonRect(page: Page, label: string): Promise<string> {
+  const measured = await panelFrame(page)
+    .locator('#add')
+    .evaluate((node) => {
+      const rect = node.getBoundingClientRect()
+      return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height),
+        disabled: (node as HTMLButtonElement).disabled,
+        docHeight: node.ownerDocument.documentElement.scrollHeight
+      }
+    })
+    .catch((error: unknown) => ({
+      x: -1,
+      y: -1,
+      w: -1,
+      h: -1,
+      disabled: null,
+      docHeight: -1,
+      error: String(error)
+    }))
+  return `${label}: ${JSON.stringify(measured)}`
 }
 
 async function readPanelJournal(page: Page): Promise<string> {
@@ -355,7 +409,9 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     const identity = [await panelDocIdentity(orcaPage, 'armed')]
     await panelFrame(orcaPage).locator('#entry').fill(PANEL_ENTRY_TEXT)
     identity.push(await panelDocIdentity(orcaPage, 'after fill'))
+    identity.push(await panelAddButtonRect(orcaPage, 'rect before click'))
     await panelFrame(orcaPage).getByRole('button', { name: 'Add entry' }).click()
+    identity.push(await panelAddButtonRect(orcaPage, 'rect after click'))
     identity.push(await panelDocIdentity(orcaPage, 'after click'))
     try {
       await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saved.')
