@@ -108,6 +108,125 @@ async function swallowBridgeReplies(page: Page): Promise<void> {
     })
 }
 
+/**
+ * Instruments the live panel document from the outside — the example ships
+ * clean. The panel's top-level `function` declarations are properties of its
+ * global object, so wrapping them here is enough to see, from CI's own log:
+ * whether the click reached the button, whether the handler entered, what went
+ * over the bridge and what came back, and every write to the status line.
+ *
+ * The journal lives on the frame's window, so a rebuilt frame loses it. That is
+ * not a gap: "journal missing" is itself the answer to whether the document the
+ * assertion read is the one the click landed on.
+ */
+async function armPanelJournal(page: Page): Promise<void> {
+  await panelFrame(page)
+    .locator('body')
+    .evaluate((body) => {
+      type Panel = Window & {
+        __wl?: string[]
+        __wlBoot?: string
+        setStatus?: (text: string, tone?: string) => void
+        load?: () => Promise<unknown>
+        callOnce?: (action: string, params?: unknown) => Promise<unknown>
+      }
+      const view = body.ownerDocument.defaultView as Panel | null
+      if (!view) {
+        throw new Error('panel frame has no view')
+      }
+      if (view.__wl) {
+        return
+      }
+      const started = Date.now()
+      const journal: string[] = []
+      view.__wl = journal
+      view.__wlBoot = `boot-${Math.random().toString(36).slice(2, 8)}`
+      const jot = (what: string): void => {
+        journal.push(`+${String(Date.now() - started).padStart(5)}ms ${what}`)
+      }
+      jot(
+        `armed boot=${view.__wlBoot} status=${JSON.stringify(body.querySelector('#status')?.textContent ?? null)}`
+      )
+
+      const status = view.setStatus
+      if (status) {
+        view.setStatus = (text, tone) => {
+          jot(`setStatus ${JSON.stringify(text)} tone=${tone ?? 'info'}`)
+          status(text, tone)
+        }
+      }
+      const load = view.load
+      if (load) {
+        view.load = () => {
+          jot('load() called')
+          return load().then(
+            (value) => {
+              jot('load() settled')
+              return value
+            },
+            (error: unknown) => {
+              jot(`load() rejected ${String(error)}`)
+              throw error
+            }
+          )
+        }
+      }
+      const callOnce = view.callOnce
+      if (callOnce) {
+        let calls = 0
+        view.callOnce = (action, params) => {
+          const id = ++calls
+          jot(`bridge#${id} -> ${action}`)
+          return callOnce(action, params).then(
+            (reply) => {
+              const frame = reply as { ok?: boolean; errorCode?: string } | null
+              jot(`bridge#${id} <- ok=${frame?.ok} code=${frame?.errorCode ?? '-'}`)
+              return reply
+            },
+            (error: unknown) => {
+              jot(`bridge#${id} <- threw ${String(error)}`)
+              throw error
+            }
+          )
+        }
+      }
+      // Capture phase: proves the click reached the element even if no handler
+      // is attached, which is the one thing wrapping functions cannot show.
+      const add = body.querySelector('#add')
+      add?.addEventListener(
+        'click',
+        () => jot(`click reached #add disabled=${(add as HTMLButtonElement).disabled}`),
+        true
+      )
+    })
+}
+
+async function readPanelJournal(page: Page): Promise<string> {
+  const lines = await panelFrame(page)
+    .locator('body')
+    .evaluate((body) => {
+      const view = body.ownerDocument.defaultView as (Window & { __wl?: string[] }) | null
+      const status = body.querySelector('#status')
+      return {
+        journal: view?.__wl ?? null,
+        status: status?.textContent ?? null,
+        entriesEmptyShown: !(body.querySelector('#entries-empty') as HTMLElement | null)?.hidden,
+        entriesText: (body.querySelector('#entries') as HTMLElement | null)?.textContent ?? null,
+        inputValue: (body.querySelector('#entry') as HTMLInputElement | null)?.value ?? null
+      }
+    })
+  const header = [
+    `status=${JSON.stringify(lines.status)}`,
+    `entriesEmptyShown=${lines.entriesEmptyShown}`,
+    `entriesText=${JSON.stringify(lines.entriesText)}`,
+    `inputValue=${JSON.stringify(lines.inputValue)}`
+  ].join(' ')
+  const body = lines.journal
+    ? lines.journal.join('\n')
+    : 'NO JOURNAL — this document is not the one that was armed (the frame was rebuilt).'
+  return `${header}\n${body}`
+}
+
 test('installs, consents, mounts and round-trips the worklog example plugin', async ({
   orcaPage,
   electronApp
@@ -205,9 +324,24 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
 
     // storage.set over the bridge, then a re-read that has to come back from
     // main: reloading the panel discards every bit of in-frame state.
+    await armPanelJournal(orcaPage)
     await panelFrame(orcaPage).locator('#entry').fill(PANEL_ENTRY_TEXT)
     await panelFrame(orcaPage).getByRole('button', { name: 'Add entry' }).click()
-    await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saved.')
+    try {
+      await expect(panelFrame(orcaPage).locator('#status')).toHaveText('Saved.')
+    } catch (failure) {
+      // The assertion stands unchanged; this only makes the CI log say what the
+      // panel actually did instead of leaving us another hypothesis.
+      const journal = await readPanelJournal(orcaPage).catch(
+        (error: unknown) => `journal unreadable: ${String(error)}`
+      )
+      console.log(`WORKLOG PANEL JOURNAL\n${journal}`)
+      await testInfo.attach('worklog-panel-journal', {
+        body: journal,
+        contentType: 'text/plain'
+      })
+      throw failure
+    }
     await setTheme(orcaPage, 'dark')
     await expect(panelFrame(orcaPage).locator('#entries')).toContainText(PANEL_ENTRY_TEXT)
 
