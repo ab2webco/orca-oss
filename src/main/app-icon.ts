@@ -13,6 +13,7 @@ import watercolorMacDockIcon from '../../resources/app-icons/orca-watercolor.png
 import blueIcon from '../../resources/app-icons/orca-blue.png?asset'
 import blueMacDockIcon from '../../resources/app-icons/orca-blue.png?asset&asarUnpack'
 import { normalizeAppIconId, type AppIconId } from '../shared/app-icon'
+import { persistLinuxLauncherIcon } from './linux-launcher-icon'
 
 const APP_ICON_PATHS = {
   classic: is.dev ? classicDevIcon : classicIcon,
@@ -301,4 +302,5 @@ export function applyAppIcon(value: unknown): void {
     }
   }
   persistMacDockIcon(value)
+  persistLinuxLauncherIcon(value, image)
 }
