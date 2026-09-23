@@ -91,6 +91,9 @@ export function pinLinuxWindowClass(): void {
   // --wm-class-name/--wm-class-class on some builds; setting the pair keeps the
   // whole property on one name instead of a mixed (orca-ide, Orca) tuple.
   app.commandLine.appendSwitch('class', LINUX_WINDOW_CLASS)
+  // Why: on Wayland Chromium ignores --class and sends the app name (`orca`) as the
+  // xdg app_id, so the dock matches GNOME Orca's launcher; the desktop name is what it uses.
+  app.setDesktopName(`${LINUX_WINDOW_CLASS}.desktop`)
 }
 
 export function disableUnsupportedChromiumFeatures(): void {

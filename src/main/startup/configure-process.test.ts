@@ -14,6 +14,7 @@ vi.mock('electron', () => {
       quit: vi.fn(),
       exit: vi.fn(),
       isPackaged: false,
+      setDesktopName: vi.fn(),
       disableHardwareAcceleration: vi.fn(),
       commandLine: {
         appendSwitch: vi.fn(),
@@ -749,6 +750,19 @@ describe('pinLinuxWindowClass', () => {
     expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('class', 'orca-ide')
   })
 
+  // Why this matters: --class only reaches X11. On Wayland the xdg app_id comes
+  // from the desktop name, and without it the window announces itself as `orca`.
+  it('sets the desktop name so Wayland reports the same app id', async () => {
+    setPlatform('linux')
+    const { app } = await import('electron')
+    const { pinLinuxWindowClass } = await import('./configure-process')
+    vi.mocked(app.setDesktopName).mockClear()
+
+    pinLinuxWindowClass()
+
+    expect(app.setDesktopName).toHaveBeenCalledWith('orca-ide.desktop')
+  })
+
   it.each(['darwin', 'win32'] as NodeJS.Platform[])(
     'leaves %s alone, where WM_CLASS does not exist',
     async (platform) => {
@@ -756,10 +770,12 @@ describe('pinLinuxWindowClass', () => {
       const { app } = await import('electron')
       const { pinLinuxWindowClass } = await import('./configure-process')
       vi.mocked(app.commandLine.appendSwitch).mockClear()
+      vi.mocked(app.setDesktopName).mockClear()
 
       pinLinuxWindowClass()
 
       expect(app.commandLine.appendSwitch).not.toHaveBeenCalled()
+      expect(app.setDesktopName).not.toHaveBeenCalled()
     }
   )
 })
