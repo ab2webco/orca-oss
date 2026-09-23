@@ -31,6 +31,11 @@ export const PLUGIN_PANEL_CSP =
  *  CSS custom-property declarations before mounting the srcdoc. */
 export const PANEL_SHELL_TOKENS_PLACEHOLDER = '/*__ORCA_PANEL_TOKENS__*/'
 export const PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER = '__ORCA_COLOR_SCHEME__'
+/** The resolved UI locale, substituted into `<html lang>` so a panel can read
+ *  `document.documentElement.lang` instead of asking the user what language
+ *  they already told Orca. Main cannot know it either; the renderer fills it
+ *  alongside the theme. */
+export const PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER = '__ORCA_UI_LANGUAGE__'
 
 /** Curated design-token subset injected into panel documents. Deliberately
  *  NOT all of main.css (~257 custom properties): freezing every token as
@@ -98,7 +103,7 @@ export function buildPluginPanelShellHtml(pluginHtml: string): string {
   // right sidebar, the nav page) simply ignores the message.
   const prelude =
     '<!doctype html>\n' +
-    `<html class="${PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER}">\n` +
+    `<html class="${PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER}" lang="${PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER}">\n` +
     '<head>\n' +
     '<meta charset="utf-8">\n' +
     `<meta http-equiv="Content-Security-Policy" content="${PLUGIN_PANEL_CSP}">\n` +

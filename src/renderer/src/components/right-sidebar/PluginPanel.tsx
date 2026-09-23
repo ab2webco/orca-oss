@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { isPluginPanelTabKey } from '../../../../shared/plugins/plugin-manifest'
 import {
   PANEL_CONTENT_HEIGHT_INITIAL_PX,
@@ -8,6 +9,7 @@ import {
 } from '../../../../shared/plugins/plugin-panel-bridge'
 import {
   PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER,
+  PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER,
   PANEL_SHELL_TOKENS_PLACEHOLDER
 } from '../../../../shared/plugins/plugin-panel-shell'
 import {
@@ -23,7 +25,7 @@ import {
   usePluginPanelsStore
 } from '@/store/plugin-panels'
 import { PluginPendingApprovalNotice } from '../plugins/PluginPendingApprovalNotice'
-import { translate } from '@/i18n/i18n'
+import { i18n, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 
 type PluginPanelProps = {
@@ -54,7 +56,16 @@ function PluginPanelMessage({ children }: { children: React.ReactNode }): React.
 function fillPanelShell(html: string): string {
   return html
     .replace(PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER, currentPanelColorScheme())
+    .replace(PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER, currentPanelUiLanguage())
     .replace(PANEL_SHELL_TOKENS_PLACEHOLDER, buildPanelDesignTokenCss())
+}
+
+/** The locale i18next resolved, sanitised to what a `lang` attribute may hold.
+ *  A plugin that ships no translation for it falls back on its own; the point
+ *  is that it no longer has to ask. */
+function currentPanelUiLanguage(): string {
+  const resolved = typeof i18n.language === 'string' ? i18n.language : ''
+  return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(resolved) ? resolved : 'en'
 }
 
 function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React.JSX.Element {
@@ -72,6 +83,8 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
   } | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const themeRevision = usePluginPanelThemeRevision()
+  const { i18n: activeI18n } = useTranslation()
+  const uiLanguage = activeI18n.language
 
   const pluginKey = panel?.pluginKey ?? null
   const panelId = panel?.id ?? null
@@ -82,7 +95,7 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
   // frame must be rebuilt when the app theme changes, not only when the document does.
   const panelFrameKey =
     entryState.status === 'ready'
-      ? `${tabKey}:${entryState.documentRevision}:${themeRevision}`
+      ? `${tabKey}:${entryState.documentRevision}:${themeRevision}:${uiLanguage}`
       : null
   const contentHeight =
     reportedHeight && reportedHeight.frameKey === panelFrameKey ? reportedHeight.height : null
