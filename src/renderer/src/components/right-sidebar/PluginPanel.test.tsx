@@ -11,7 +11,8 @@ import type { ActivePluginPanel, PluginPanelApproval } from '@/store/plugin-pane
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, string>) =>
-    options?.value0 === undefined ? fallback : fallback.replace('{{value0}}', options.value0)
+    options?.value0 === undefined ? fallback : fallback.replace('{{value0}}', options.value0),
+  i18n: { language: 'en' }
 }))
 
 const { openSettingsPageMock, openSettingsTargetMock } = vi.hoisted(() => ({
