@@ -3,7 +3,7 @@
    add/select/reauth/remove flow is tightly coupled to the provider-specific
    error handling and restart prompts below; splitting them into separate files
    would scatter those flows without a meaningful abstraction boundary. */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState,
@@ -1163,6 +1163,12 @@ export function AccountsPane({
   const openGlobalConfigSyncDialog = (accountId: string | null): void => {
     setGlobalConfigSyncDialog({ open: true, accountId })
   }
+
+  // Why stable: an inline arrow here changed identity on every pane render, which
+  // re-ran the dialog's inventory read and reset its scroll (ORCA-525).
+  const setGlobalConfigSyncDialogOpen = useCallback((open: boolean): void => {
+    setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))
+  }, [])
 
   const runClearGlobalConfigForAccount = async (accountId: string): Promise<void> => {
     setClaudeAction('resyncing')
@@ -3098,7 +3104,7 @@ export function AccountsPane({
       <GlobalConfigSyncDialog
         open={globalConfigSyncDialog.open}
         accountId={globalConfigSyncDialog.accountId}
-        onOpenChange={(open) => setGlobalConfigSyncDialog((prev) => ({ ...prev, open }))}
+        onOpenChange={setGlobalConfigSyncDialogOpen}
       />
       <HostAccountLoginDialog
         // Why keyed: a new provider is a new sign-in, and remounting gives it

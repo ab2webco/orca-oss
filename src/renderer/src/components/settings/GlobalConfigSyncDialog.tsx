@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   previewGlobalConfigForProviderAccounts,
@@ -77,7 +77,21 @@ export function GlobalConfigSyncDialog({
 }: GlobalConfigSyncDialogProps): React.JSX.Element {
   // Why from the store and not a prop: every call below has to reach whichever
   // host owns the accounts, and the dialog's callers do not carry that.
-  const settings = useAppStore((state) => state.settings)
+  // Why this one field and not the settings object: it is all the calls read, and
+  // the object's identity churns on every unrelated setting (ORCA-525).
+  const activeRuntimeEnvironmentId = useAppStore(
+    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
+  )
+  const ownerSettings = useMemo(
+    () => ({ activeRuntimeEnvironmentId }),
+    [activeRuntimeEnvironmentId]
+  )
+  // Why a ref: the effect needs it only on the error path, and a caller's inline
+  // arrow in the deps re-read the inventory on every parent render (ORCA-525).
+  const onOpenChangeRef = useRef(onOpenChange)
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  }, [onOpenChange])
   const [inventory, setInventory] = useState<GlobalConfigSyncInventory | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -95,7 +109,7 @@ export function GlobalConfigSyncDialog({
     setInventory(null)
     // Why routed: the owner resolves this selection by name when it seeds, so an
     // inventory read off this desktop would name servers the owner does not have.
-    void previewGlobalConfigForProviderAccounts(settings)
+    void previewGlobalConfigForProviderAccounts(ownerSettings)
       .then((result) => {
         if (cancelled) {
           return
@@ -114,7 +128,7 @@ export function GlobalConfigSyncDialog({
               'Could not read your global config.'
             )
           )
-          onOpenChange(false)
+          onOpenChangeRef.current(false)
         }
       })
       .finally(() => {
@@ -125,7 +139,7 @@ export function GlobalConfigSyncDialog({
     return () => {
       cancelled = true
     }
-  }, [open, onOpenChange, settings])
+  }, [open, ownerSettings])
 
   const totalSelected = selectedMcp.size + selectedSkills.size + selectedHooks.size
 
@@ -139,7 +153,7 @@ export function GlobalConfigSyncDialog({
     setSubmitting(true)
     try {
       if (accountId) {
-        await syncGlobalConfigForProviderAccount(settings, { accountId, selection })
+        await syncGlobalConfigForProviderAccount(ownerSettings, { accountId, selection })
         toast.success(
           translate(
             'auto.components.settings.GlobalConfigSyncDialog.syncedAccount',
@@ -147,7 +161,7 @@ export function GlobalConfigSyncDialog({
           )
         )
       } else {
-        const processed = await resyncGlobalConfigForProviderAccounts(settings, { selection })
+        const processed = await resyncGlobalConfigForProviderAccounts(ownerSettings, { selection })
         toast.success(
           translate(
             'auto.components.settings.GlobalConfigSyncDialog.syncedAll',
@@ -172,10 +186,10 @@ export function GlobalConfigSyncDialog({
     accountId,
     onOpenChange,
     onSynced,
+    ownerSettings,
     selectedHooks,
     selectedMcp,
     selectedSkills,
-    settings,
     writeGlobalHooks
   ])
 
@@ -222,7 +236,11 @@ export function GlobalConfigSyncDialog({
             )}
           </div>
         ) : (
-          <ScrollArea className="pr-3" viewportClassName="max-h-[360px]">
+          // Why min-w-0: DialogContent is a grid, and this item's automatic minimum
+          // size let the list push ~64px past the dialog. Why [&>div]:!block: Radix's
+          // `display: table` wrapper is shrink-to-fit, so rows grew to the longest
+          // label's full width instead of truncating (ORCA-525).
+          <ScrollArea className="min-w-0 pr-3" viewportClassName="max-h-[360px] [&>div]:!block">
             <div className="flex flex-col gap-5">
               <ConfigSection
                 icon={<PlugZap className="size-3.5" />}
