@@ -10,6 +10,19 @@ The procedure, including how to seed a provider-backed screen and why a screensh
 that does not scroll proves nothing, is in
 [`docs/reference/rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md).
 
+# Plugins
+
+A plugin is a folder with an `orca-plugin.json`, and it runs in two places at once: a sandboxed
+panel iframe that only receives a curated list of design tokens, and an out-of-process worker under
+Node's permission model with an env allowlist instead of `process.env`. The manifest fields, the
+capability/consent model (consent is bound to the installed tree's hash whenever the manifest
+contributes automations, skills, keybindings, VM recipes or agent profiles, so those plugins
+re-prompt on every update), the panel bridge's message budget, and the publishing flow are in
+[`docs/reference/plugin-development.md`](./docs/reference/plugin-development.md).
+
+[`examples/plugins/worklog`](./examples/plugins/worklog) is the template that exercises all of it;
+`examples/plugins/hello-orca` stays as the minimal demo.
+
 # Style
 
 ## Concise/Brief Non-obviosu comments ONLY

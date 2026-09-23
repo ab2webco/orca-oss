@@ -1,0 +1,587 @@
+<!doctype html>
+<!--
+  Worklog settings panel.
+
+  This document is merged into a host-generated shell: a CSP meta, the app font
+  as a data: URI, the curated design tokens, a --radius-* scale, and the
+  liveness/height reporter all parse BEFORE this file
+  (src/shared/plugins/plugin-panel-shell.ts:88). So: no <head> font loading, no
+  network, no framework — style everything from the tokens the shell injected.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      /* Every value here is a host token or derived from one. A literal colour
+         would be wrong in one of the two themes; the shell re-injects these
+         values and rebuilds the frame when the app theme changes. */
+      body {
+        margin: 0;
+        padding: 16px;
+        color: var(--foreground);
+        background: var(--background);
+        /* `anywhere`, not `break-word`: only this variant also shrinks
+           min-content, and the host decides how narrow this frame gets — on the
+           Settings surface it can be under 100px. Inherited, so it covers the
+           whole panel from one declaration. */
+        overflow-wrap: anywhere;
+      }
+
+      /* No fixed widths anywhere: this panel is laid out by the Settings page,
+         which is as narrow as the app window gets (320px). */
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-width: 720px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--card);
+        color: var(--card-foreground);
+        padding: 14px 16px;
+      }
+
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        margin: 0 0 12px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* The shell deliberately leaves controls unstyled so existing panels keep
+         the look they shipped with — matching the app is this file's job. */
+      input[type='text'] {
+        flex: 1 1 180px;
+        min-width: 0;
+        font: inherit;
+        color: var(--foreground);
+        background: var(--background);
+        border: 1px solid var(--input);
+        border-radius: var(--radius-md);
+        padding: 7px 10px;
+      }
+
+      input[type='text']:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        padding: 7px 12px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      button.secondary {
+        background: var(--secondary);
+        color: var(--secondary-foreground);
+        border-color: var(--border);
+      }
+
+      button[disabled] {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        margin: 0;
+        font-size: 13px;
+      }
+
+      dt {
+        color: var(--muted-foreground);
+      }
+
+      dd {
+        margin: 0;
+        font-family: var(--font-mono);
+      }
+
+      /* A grid column sized `auto` never shrinks below its longest label, so
+         without this the panel overflows the box the host gave it. */
+      dt,
+      dd {
+        min-width: 0;
+      }
+
+      ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      li {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        align-items: baseline;
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+        padding-top: 6px;
+      }
+
+      li:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      li time {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted-foreground);
+      }
+
+      .empty {
+        font-size: 13px;
+        color: var(--muted-foreground);
+      }
+
+      .status {
+        font-size: 12px;
+        min-height: 1.4em;
+        margin: 12px 0 0;
+        color: var(--muted-foreground);
+      }
+
+      .status[data-tone='error'] {
+        color: var(--destructive);
+      }
+
+      /* The media query sees the FRAME's width, not the window's: the Settings
+         sidebar is fixed, so a 768px window still gives the panel ~415px while a
+         390px one gives it under 100. Only the second case has to stack. */
+      @media (max-width: 360px) {
+        body {
+          padding: 12px;
+        }
+
+        dl {
+          grid-template-columns: 1fr;
+          gap: 0 0;
+        }
+
+        dt {
+          margin-top: 8px;
+        }
+
+        .row > * {
+          flex: 1 1 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <!--
+        Every control ships `disabled` and is enabled only once the script below
+        has wired it. The panel document is re-parsed from scratch each time the
+        host rebuilds the frame, so between the parser creating this button and
+        the trailing script attaching its listener there is a real window — wide
+        enough on a loaded machine for a click to land on a button that does
+        nothing at all, with no error and nothing on screen. `disabled` closes it.
+      -->
+      <section class="card">
+        <h2>Worklog</h2>
+        <p class="hint">
+          Entries live in this plugin's own storage. The panel reads and writes them over the
+          postMessage bridge; nothing here touches the app.
+        </p>
+        <div class="row">
+          <input id="entry" type="text" placeholder="What did you just finish?" disabled />
+          <button id="add" type="button" disabled>Add entry</button>
+          <button id="refresh" class="secondary" type="button" disabled>Refresh</button>
+        </div>
+        <p class="status" id="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Recent entries</h2>
+        <p class="hint">Newest first. The worker trims the log to the configured length.</p>
+        <ol id="entries"></ol>
+        <p class="empty" id="entries-empty" hidden>No entries yet.</p>
+      </section>
+
+      <section class="card">
+        <h2>Settings</h2>
+        <p class="hint">
+          <code>settings.*</code> is worker-only, so the worker mirrors the resolved values into a
+          storage key this panel can read. Absent until the worker has run once.
+        </p>
+        <dl id="settings"></dl>
+        <p class="empty" id="settings-empty" hidden>
+          Not published yet — run "Worklog: Publish settings to the panel" once.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Focused worktree</h2>
+        <p class="hint">
+          <code>workspace.readContext</code> answers for whatever worktree is focused right now, and
+          returns nothing when none is.
+        </p>
+        <div class="row">
+          <button id="context" class="secondary" type="button" disabled>Read context</button>
+          <button id="notify" class="secondary" type="button" disabled>Send a notification</button>
+        </div>
+        <dl id="context-out"></dl>
+      </section>
+    </div>
+
+    <script>
+      'use strict'
+
+      var ACTION_REQUEST = 'orca-panel-action'
+      var ACTION_RESULT = 'orca-panel-action-result'
+      var ENTRIES_KEY = 'entries'
+      var SETTINGS_MIRROR_KEY = 'settings-mirror'
+
+      /** The host answers every well-formed request, but a reply addressed to a
+       *  frame the host has already replaced is dropped on purpose. Without a
+       *  deadline that case is a promise that never settles and a panel frozen
+       *  on its last status line — the failure with no error message at all. */
+      var BRIDGE_TIMEOUT_MS = 8000
+      /** The bridge window is a sliding 10s (plugin-panel-bridge.ts:24), so a
+       *  retry sooner than that just spends another message and is refused
+       *  again. Four attempts outlast one full window. */
+      var RETRY_DELAY_MS = 3500
+      var MAX_ATTEMPTS = 4
+
+      var pending = Object.create(null)
+      var nextRequestId = 0
+      var statusEl = document.getElementById('status')
+
+      /**
+       * The status line and the entries list are one shared surface, and more
+       * than one flow writes to them. A flow claims the surface when it starts
+       * and stays silent once a newer one has claimed it — otherwise a load
+       * that began before a click lands after it and reports the older truth,
+       * wiping both the message and the row the click just added.
+       */
+      var surfaceOwner = 0
+      function claimSurface() {
+        surfaceOwner += 1
+        return surfaceOwner
+      }
+      function ownsSurface(owner) {
+        return owner === surfaceOwner
+      }
+
+      function setStatus(text, tone) {
+        statusEl.textContent = text
+        statusEl.setAttribute('data-tone', tone || 'info')
+      }
+
+      function errorText(error) {
+        return error && error.message ? error.message : String(error)
+      }
+
+      function wait(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms)
+        })
+      }
+
+      /** One message over the bridge. Resolves when the matching reply lands,
+       *  and otherwise never settles — which is the whole reason for the
+       *  deadline that wraps it. A reply that arrives after the deadline just
+       *  resolves a promise nobody is waiting on. */
+      function callOnce(action, params) {
+        return new Promise(function (resolve) {
+          var requestId = 'worklog-' + ++nextRequestId
+          pending[requestId] = resolve
+          // The frame's origin is opaque, so '*' is the only usable target; the
+          // host identifies the sending window instead of trusting the origin.
+          window.parent.postMessage(
+            { type: ACTION_REQUEST, requestId: requestId, action: action, params: params },
+            '*'
+          )
+        })
+      }
+
+      /**
+       * Turns silence into something a caller can report. The host answers
+       * every request it receives, but a reply it drops — because the panel
+       * document or its session was replaced mid-flight — arrives never, and a
+       * promise that never settles is a UI frozen on its last status line with
+       * no error anywhere.
+       */
+      function withDeadline(promise, ms, action) {
+        var timer = null
+        return Promise.race([
+          promise.then(function (value) {
+            if (timer !== null) clearTimeout(timer)
+            return value
+          }),
+          new Promise(function (_resolve, reject) {
+            timer = setTimeout(function () {
+              reject(new Error('The host did not answer ' + action + ' within ' + ms + 'ms.'))
+            }, ms)
+          })
+        ])
+      }
+
+      window.addEventListener('message', function (event) {
+        var data = event.data
+        if (!data || data.type !== ACTION_RESULT) return
+        var settle = pending[data.requestId]
+        if (!settle) return
+        delete pending[data.requestId]
+        settle(data)
+      })
+
+      /**
+       * Every host call goes through here, and it always resolves to
+       * `{ ok: true, value }` or `{ ok: false, reason }` — never a bare
+       * `undefined` a caller could mistake for an empty answer.
+       *
+       * `rate_limited` is a passing brake, not a failure: the budget is 30
+       * messages per sliding 10s and the liveness pong already spends one every
+       * 10s, so a click can legitimately land on a spent window. Work that
+       * started as a click is retried past that window; every other refusal, and
+       * every timeout, comes back with a reason the caller must show.
+       */
+      function request(action, params, owner) {
+        var attempt = 0
+        function attemptOnce() {
+          attempt += 1
+          return withDeadline(callOnce(action, params), BRIDGE_TIMEOUT_MS, action).then(
+            function (result) {
+              if (result.ok) {
+                return { ok: true, value: result.value }
+              }
+              if (result.errorCode === 'rate_limited') {
+                if (attempt < MAX_ATTEMPTS) {
+                  if (owner === undefined || ownsSurface(owner)) {
+                    setStatus(
+                    'Too many requests just now — retrying (' +
+                      attempt +
+                      ' of ' +
+                      (MAX_ATTEMPTS - 1) +
+                        ')…'
+                    )
+                  }
+                  return wait(RETRY_DELAY_MS).then(attemptOnce)
+                }
+                return { ok: false, reason: 'Too many requests just now — try again in a moment.' }
+              }
+              return {
+                ok: false,
+                reason: (result.error || result.errorCode || 'The request failed') + '.'
+              }
+            },
+            function (error) {
+              return { ok: false, reason: errorText(error) }
+            }
+          )
+        }
+        return attemptOnce()
+      }
+
+      /** The one place a refusal becomes visible. Nothing in this panel returns
+       *  early without going through it — a swallowed `ok: false` is the bug
+       *  that makes a click disappear with the UI still saying "Saving…". */
+      function fail(result) {
+        setStatus(result.reason, 'error')
+        return false
+      }
+
+      /** Last resort: a throw while rendering must not leave a stale status. */
+      function reportUnexpected(error) {
+        setStatus('Unexpected panel error: ' + errorText(error), 'error')
+      }
+
+      /** `storage.get` on a key that was never written answers ok with a null
+       *  value; that is an empty log, which a refusal is not. */
+      function storedArray(result) {
+        return Array.isArray(result.value && result.value.value) ? result.value.value : []
+      }
+
+      function renderEntries(entries) {
+        var list = document.getElementById('entries')
+        list.textContent = ''
+        var ordered = entries.slice().reverse()
+        ordered.forEach(function (entry) {
+          var item = document.createElement('li')
+          var when = document.createElement('time')
+          when.textContent = String(entry.at || '')
+            .replace('T', ' ')
+            .slice(0, 16)
+          var text = document.createElement('span')
+          // textContent, never innerHTML: stored entries are the plugin's own
+          // data, but they are still strings a user typed.
+          text.textContent = entry.text + ' — ' + entry.author + ' (' + entry.source + ')'
+          item.appendChild(when)
+          item.appendChild(text)
+          list.appendChild(item)
+        })
+        document.getElementById('entries-empty').hidden = ordered.length > 0
+      }
+
+      function renderSettings(mirror) {
+        var list = document.getElementById('settings')
+        list.textContent = ''
+        var empty = document.getElementById('settings-empty')
+        if (!mirror) {
+          empty.hidden = false
+          return
+        }
+        empty.hidden = true
+        appendRows(list, [
+          ['Author', mirror.author],
+          ['Record new worktrees', mirror.recordNewWorktrees ? 'yes' : 'no'],
+          ['Entries to keep', String(mirror.maxEntries)],
+          ['Export token', mirror.exportTokenConfigured ? 'configured' : 'not set']
+        ])
+      }
+
+      function appendRows(list, rows) {
+        rows.forEach(function (row) {
+          var term = document.createElement('dt')
+          term.textContent = row[0]
+          var value = document.createElement('dd')
+          value.textContent = row[1]
+          list.appendChild(term)
+          list.appendChild(value)
+        })
+      }
+
+      function load() {
+        var mine = claimSurface()
+        setStatus('Loading…')
+        // Two calls, once, on an explicit trigger — not a poll.
+        return Promise.all([
+          request('storage.get', { key: ENTRIES_KEY }, mine),
+          request('storage.get', { key: SETTINGS_MIRROR_KEY }, mine)
+        ])
+          .then(function (results) {
+            // A click that started after this load owns the surface now, and it
+            // is reading fresher storage than these replies describe.
+            if (!ownsSurface(mine)) {
+              return false
+            }
+            // Report the first refusal and stop: painting an empty log over a
+            // log the host still holds is worse than saying nothing changed.
+            if (!results[0].ok) return fail(results[0])
+            if (!results[1].ok) return fail(results[1])
+            renderEntries(storedArray(results[0]))
+            renderSettings((results[1].value && results[1].value.value) || null)
+            setStatus('')
+            return true
+          })
+          .catch(reportUnexpected)
+      }
+
+      document.getElementById('refresh').addEventListener('click', load)
+
+      document.getElementById('add').addEventListener('click', function () {
+        var input = document.getElementById('entry')
+        var text = input.value.trim()
+        if (!text) {
+          setStatus('Type something first.', 'error')
+          return
+        }
+        var mine = claimSurface()
+        setStatus('Saving…')
+        request('storage.get', { key: ENTRIES_KEY }, mine)
+          .then(function (read) {
+            if (!ownsSurface(mine)) return false
+            if (!read.ok) return fail(read)
+            var entries = storedArray(read)
+            entries.push({
+              at: new Date().toISOString(),
+              author: 'panel',
+              source: 'panel',
+              text: text
+            })
+            return request('storage.set', { key: ENTRIES_KEY, value: entries }, mine).then(
+              function (write) {
+                if (!ownsSurface(mine)) return false
+                if (!write.ok) return fail(write)
+                // Only now: a cleared input after a refused write loses what the
+                // user typed and tells them it was saved.
+                input.value = ''
+                renderEntries(entries)
+                setStatus('Saved.')
+                return true
+              }
+            )
+          })
+          .catch(reportUnexpected)
+      })
+
+      document.getElementById('context').addEventListener('click', function () {
+        var mine = claimSurface()
+        request('workspace.readContext', undefined, mine)
+          .then(function (result) {
+            if (!ownsSurface(mine)) return false
+            if (!result.ok) return fail(result)
+            var list = document.getElementById('context-out')
+            list.textContent = ''
+            if (!result.value) {
+              setStatus('No worktree is focused right now.')
+              return true
+            }
+            appendRows(list, [
+              ['Name', result.value.displayName],
+              ['Branch', result.value.branch],
+              ['Terminals', String(result.value.terminals.length)]
+            ])
+            setStatus('')
+            return true
+          })
+          .catch(reportUnexpected)
+      })
+
+      document.getElementById('notify').addEventListener('click', function () {
+        var mine = claimSurface()
+        request('notifications.show', { title: 'Worklog', body: 'Hello from the panel.' }, mine)
+          .then(function (result) {
+            if (!ownsSurface(mine)) return false
+            if (!result.ok) return fail(result)
+            setStatus(
+              result.value && result.value.delivered
+                ? 'Notification delivered.'
+                : 'Notification suppressed.'
+            )
+            return true
+          })
+          .catch(reportUnexpected)
+      })
+
+      // Last line of wiring: from here the controls can actually do what they
+      // offer. Before it they are inert, and saying so is the point.
+      ;['entry', 'add', 'refresh', 'context', 'notify'].forEach(function (id) {
+        document.getElementById(id).disabled = false
+      })
+
+      load()
+    </script>
+  </body>
+</html>

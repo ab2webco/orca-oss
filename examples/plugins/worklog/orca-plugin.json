@@ -1,0 +1,79 @@
+{
+  "manifestVersion": 1,
+  "id": "worklog",
+  "publisher": "orca-samples",
+  "name": "Worklog",
+  "version": "1.0.0",
+  "description": "Template plugin: a Settings-surface panel painted with the host design tokens, plugin storage read and written from the panel, declared settings including a secret, a worker with commands and an event subscription, and a contributed automation.",
+  "engines": { "orca": ">=1.4.0" },
+  "pluginApi": 1,
+  "main": "main.mjs",
+  "contributes": {
+    "panels": [
+      {
+        "id": "worklog",
+        "title": "Worklog",
+        "icon": "book",
+        "entry": "panel.html",
+        "surface": "settings"
+      }
+    ],
+    "commands": [
+      { "id": "worklog.note", "title": "Worklog: Note the focused worktree" },
+      { "id": "worklog.publish-settings", "title": "Worklog: Publish settings to the panel" },
+      { "id": "worklog.clear", "title": "Worklog: Clear all entries" }
+    ],
+    "events": [{ "on": "worktree.created" }],
+    "settings": [
+      {
+        "key": "author",
+        "type": "string",
+        "label": "Author",
+        "description": "Name stamped on every entry this plugin records.",
+        "placeholder": "Your name",
+        "default": "me"
+      },
+      {
+        "key": "recordNewWorktrees",
+        "type": "boolean",
+        "label": "Record new worktrees",
+        "description": "Append an entry whenever Orca creates a worktree.",
+        "default": true
+      },
+      {
+        "key": "maxEntries",
+        "type": "number",
+        "label": "Entries to keep",
+        "description": "Older entries are dropped once the log passes this length.",
+        "min": 1,
+        "max": 500,
+        "default": 50
+      },
+      {
+        "key": "exportToken",
+        "type": "string",
+        "label": "Export token",
+        "description": "Stored in the plugin's encrypted vault, never in settings.json.",
+        "secret": true
+      }
+    ],
+    "automations": [
+      {
+        "id": "daily-digest",
+        "title": "Worklog: daily digest",
+        "trigger": "0 18 * * 1-5",
+        "timezone": "UTC",
+        "workspace": "plugin-owned",
+        "command": "node --eval \"require('fs').appendFileSync('worklog-digest.log', new Date().toISOString() + ' digest' + require('os').EOL)\""
+      }
+    ]
+  },
+  "capabilities": [
+    { "kind": "workspace:read" },
+    { "kind": "notifications:show" },
+    { "kind": "storage" },
+    { "kind": "settings:own" },
+    { "kind": "secrets" },
+    { "kind": "events:subscribe" }
+  ]
+}
