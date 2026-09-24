@@ -54,6 +54,12 @@ jobs:
             || git remote set-url upstream https://github.com/stablyai/orca.git
           git fetch --filter=blob:none --no-tags upstream main:refs/remotes/upstream/main
 
+      # Why here and not earlier: the gate excludes upstream's commits from the PR range, which
+      # needs the fetch above. Why the base SHA: only this PR's commits are judged, so the two
+      # AI-credited commits already in main do not make it red forever (ORCA-529).
+      - name: Reject AI attribution in commit messages
+        run: pnpm run check:ai-attribution -- "${{ github.event.pull_request.base.sha }}"
+
       - name: Enforce changed-code quality
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
 

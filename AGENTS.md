@@ -53,6 +53,13 @@ sin pipe, o `set -o pipefail`, cuando lo que estás midiendo es el exit code
 ([detalle](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status));
 y un test que pasa igual contra el código viejo no prueba nada.
 
+## Atribución en los commits
+
+Los mensajes acreditan personas, no herramientas: nada de `Co-Authored-By` de un asistente ni
+firmas tipo "Generated with …". Un co-autor humano sigue siendo válido, y `Claude-Session:` es
+procedencia, no crédito. Lo verifica `npm run check:ai-attribution` en el job `static analysis`,
+sobre los commits del PR — los que ya están en `main` quedan fuera del rango.
+
 # Verification
 
 **Everything in your run is yours.** A failure you did not cause is still a failure you own: never dismiss one as flaky, pre-existing, or someone else's and move on. Explaining a failure is not the same as closing it — if you cannot fix it in scope, say so plainly and leave it tracked with the evidence you gathered. The same applies to anything handed to you: a delegated worker's report, an upstream PR, another agent's "verified". Review it before you build on it or contradict it.
