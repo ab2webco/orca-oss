@@ -54,7 +54,7 @@ import {
   parsePtyStartupIngressIntent,
   type PtyIngressEmission
 } from '../shared/pty-startup-ingress'
-import { extractOnlyCookedEchoSafeQueryReplies } from '../shared/terminal-query-reply'
+import { takeLiveQueryReply } from '../shared/terminal-query-reply'
 import { resolvePtyOwnerBackend, type PtyOwnerBackend } from '../shared/pty-owner-backend'
 import { RecentPtyOutputBuffer } from '../main/runtime/recent-pty-output-buffer'
 import { expandWindowsPathEnvironmentVariables } from '../shared/windows-environment-expansion'
@@ -1771,10 +1771,7 @@ export class PtyHandler {
       this.lastInputAtByPty.set(id, performance.now())
       this.interactiveOutputCharsByPty.set(id, 0)
       // Relay PTYs need the local provider's cooked-echo containment (#13137).
-      if (
-        extractOnlyCookedEchoSafeQueryReplies(data) &&
-        managed.startupIngress?.answerLiveQueryReply(data)
-      ) {
+      if (takeLiveQueryReply(managed.startupIngress, data)) {
         return
       }
       managed.pty.write(data)
