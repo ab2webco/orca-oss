@@ -15980,6 +15980,9 @@
           "updateDescription": "The new version changed what the plugin declares, so it stays off until you review it. Nothing here runs in the meantime.",
           "installDescription": "Review what this plugin is allowed to do before it runs for the first time. Nothing here runs in the meantime.",
           "reviewAndEnable": "Review & enable"
+        },
+        "PluginNavPage": {
+          "back": "Back"
         }
       }
     },
