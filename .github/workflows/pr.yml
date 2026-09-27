@@ -287,6 +287,7 @@ jobs:
             src/main/pty/omp-shell-wrapper.node-pty.test.ts \
             src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts \
             src/shared/fish-query-reply-child-stdin.node-pty.test.ts \
+            src/shared/pty-reply-echo-shapes.node-pty.test.ts \
             src/shared/posix-command-path-lookup.test.ts
 
   cli_subprocess:
@@ -367,6 +368,7 @@ jobs:
             --exclude=src/main/pty/omp-shell-wrapper.node-pty.test.ts \
             --exclude=src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts \
             --exclude=src/shared/fish-query-reply-child-stdin.node-pty.test.ts \
+            --exclude=src/shared/pty-reply-echo-shapes.node-pty.test.ts \
             --exclude=src/shared/posix-command-path-lookup.test.ts \
             --exclude=tests/e2e/cross-version-wire/** \
             --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
