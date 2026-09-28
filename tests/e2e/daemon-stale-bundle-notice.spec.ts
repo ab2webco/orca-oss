@@ -39,15 +39,13 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     .toBe(theme)
 }
 
-const SCREENSHOT_DIR =
-  '/Volumes/Data/claude-tmp/claude-501/-Users-fabolivar-Projects-orca-oss/25493b05-5b3a-43ba-aebf-ecb1d1b991fb/orca-534-shots'
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
 
 test('daemon stale-bundle notice toast shows the restart remedy (ORCA-534)', async ({
   electronApp,
   orcaPage
-}) => {
+}, testInfo) => {
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
 
@@ -73,7 +71,9 @@ test('daemon stale-bundle notice toast shows the restart remedy (ORCA-534)', asy
       // The toast must survive every resize/theme swap in this loop — assert
       // it instead of only trusting the screenshot.
       await expect(toast).toBeVisible()
-      await orcaPage.screenshot({ path: `${SCREENSHOT_DIR}/${width}-${theme}.png` })
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`stale-daemon-notice-${width}-${theme}.png`)
+      })
     }
   }
 })
