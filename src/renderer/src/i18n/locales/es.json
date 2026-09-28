@@ -925,6 +925,12 @@
         "description": "Las terminales de Orca Lab en ejecución dependen de un daemon iniciado por una instalación anterior de Orca Lab. Puede que macOS no les aplique los permisos de Accesibilidad, Automatización o archivos protegidos de Orca Lab. Reiniciá el daemon desde Administrar sesiones para restaurar el acceso. Esto cerrará todas las terminales de Orca Lab en ejecución.",
         "openManageSessions": "Abrir Administrar sesiones",
         "dismiss": "Descartar"
+      },
+      "useDaemonStaleBundleNotice": {
+        "title": "Una corrección de terminal necesita reiniciar el daemon",
+        "description": "Esta actualización incluye correcciones de terminal que solo se aplican después de reiniciar el servicio de terminal. Las terminales en ejecución mantienen viva la versión anterior. Reinicialo desde Administrar sesiones — esto cerrará todas las terminales en ejecución.",
+        "openManageSessions": "Abrir Administrar sesiones",
+        "dismiss": "Descartar"
       }
     },
     "components": {

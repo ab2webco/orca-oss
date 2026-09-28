@@ -1,18 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DaemonSessionInfo } from '../daemon/types'
+import type { DaemonStaleBundleNoticeStatus } from '../daemon/daemon-stale-bundle-notice'
 
 const {
   handleMock,
   removeHandlerMock,
   getDaemonProviderMock,
   restartDaemonMock,
-  getCurrentDaemonMacTccAttributionHealthMock
+  getCurrentDaemonMacTccAttributionHealthMock,
+  getCurrentDaemonStaleBundleNoticeStatusMock,
+  dismissStaleBundleNoticeMock
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   removeHandlerMock: vi.fn(),
   getDaemonProviderMock: vi.fn(),
   restartDaemonMock: vi.fn(),
-  getCurrentDaemonMacTccAttributionHealthMock: vi.fn(async () => 'unknown')
+  getCurrentDaemonMacTccAttributionHealthMock: vi.fn(async () => 'unknown'),
+  getCurrentDaemonStaleBundleNoticeStatusMock: vi.fn(
+    async (): Promise<DaemonStaleBundleNoticeStatus> => ({ stale: false })
+  ),
+  dismissStaleBundleNoticeMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -22,7 +29,12 @@ vi.mock('electron', () => ({
 vi.mock('../daemon/daemon-init', () => ({
   getDaemonProvider: getDaemonProviderMock,
   restartDaemon: restartDaemonMock,
-  getCurrentDaemonMacTccAttributionHealth: getCurrentDaemonMacTccAttributionHealthMock
+  getCurrentDaemonMacTccAttributionHealth: getCurrentDaemonMacTccAttributionHealthMock,
+  getCurrentDaemonStaleBundleNoticeStatus: getCurrentDaemonStaleBundleNoticeStatusMock
+}))
+
+vi.mock('../daemon/daemon-stale-bundle-notice', () => ({
+  dismissStaleBundleNotice: dismissStaleBundleNoticeMock
 }))
 
 // Why: the handler uses `provider instanceof DaemonPtyRouter` to branch
@@ -520,6 +532,67 @@ describe('pty:management IPC handlers', () => {
       consoleErrorSpy.mockRestore()
 
       expect(result.success).toBe(false)
+    })
+  })
+
+  describe('staleBundleNotice', () => {
+    it('reports the current daemon stale-bundle notice status', async () => {
+      getCurrentDaemonStaleBundleNoticeStatusMock.mockResolvedValue({
+        stale: true,
+        pid: 42,
+        startedAtMs: 1_000,
+        dismissed: false
+      })
+
+      const { registerDaemonManagementHandlers } = await importFresh()
+      registerDaemonManagementHandlers()
+
+      const handlers = buildHandlerMap()
+      const result = await handlers['pty:management:staleBundleNotice']({})
+
+      expect(result).toEqual({ stale: true, pid: 42, startedAtMs: 1_000, dismissed: false })
+    })
+
+    it('fails open to not-stale when the probe throws', async () => {
+      getCurrentDaemonStaleBundleNoticeStatusMock.mockRejectedValue(new Error('no pid record'))
+
+      const { registerDaemonManagementHandlers } = await importFresh()
+      registerDaemonManagementHandlers()
+
+      const handlers = buildHandlerMap()
+      const result = await handlers['pty:management:staleBundleNotice']({})
+
+      expect(result).toEqual({ stale: false })
+    })
+  })
+
+  describe('dismissStaleBundleNotice', () => {
+    it('persists the dismissal for the given daemon instance', async () => {
+      const { registerDaemonManagementHandlers } = await importFresh()
+      registerDaemonManagementHandlers()
+
+      const handlers = buildHandlerMap()
+      const result = (await handlers['pty:management:dismissStaleBundleNotice'](
+        {},
+        { pid: 42, startedAtMs: 1_000 }
+      )) as { success: boolean }
+
+      expect(result.success).toBe(true)
+      expect(dismissStaleBundleNoticeMock).toHaveBeenCalledWith(42, 1_000)
+    })
+
+    it('rejects a payload missing a numeric pid', async () => {
+      const { registerDaemonManagementHandlers } = await importFresh()
+      registerDaemonManagementHandlers()
+
+      const handlers = buildHandlerMap()
+      const result = (await handlers['pty:management:dismissStaleBundleNotice'](
+        {},
+        { startedAtMs: 1_000 }
+      )) as { success: boolean }
+
+      expect(result.success).toBe(false)
+      expect(dismissStaleBundleNoticeMock).not.toHaveBeenCalled()
     })
   })
 })

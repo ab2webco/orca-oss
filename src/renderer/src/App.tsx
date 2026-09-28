@@ -116,6 +116,7 @@ import {
 } from './runtime/sync-runtime-graph'
 import { useWebSessionTabsSync } from './runtime/web-session-tabs-sync'
 import { useGlobalFileDrop } from './hooks/useGlobalFileDrop'
+import { DaemonStaleBundleNoticeHost } from './hooks/DaemonStaleBundleNoticeHost'
 import { MacosTccPromptNoticeHost } from './hooks/MacosTccPromptNoticeHost'
 import { useRadixBodyPointerEventsRecovery } from './hooks/useRadixBodyPointerEventsRecovery'
 import {
@@ -2274,6 +2275,8 @@ function App(): React.JSX.Element {
             <WorkspacePortScanner enabled={workspaceSessionReady} />
             {/* Why: plugin language-pack discovery must not re-render the App shell. */}
             <MacosTccPromptNoticeHost />
+            {/* Why: cross-platform daemon-bundle-staleness notice (ORCA-534) — not macOS-specific, so it stays a sibling rather than joining MacosTccPromptNoticeHost. */}
+            <DaemonStaleBundleNoticeHost />
             {/* Why: leaf-mounted retention sync keeps agent-status subscriptions out of the App render tree. */}
             <RetainedAgentsSyncGate />
             <AiVaultTabTitleSyncGate />

@@ -925,6 +925,12 @@
         "description": "正在运行的 Orca Lab 终端由此前某次 Orca Lab 安装启动的守护进程托管。macOS 可能不会将 Orca Lab 的辅助功能、自动化或受保护文件权限应用到这些终端。请在“管理会话”中重启守护进程以恢复访问权限。此操作会关闭所有正在运行的 Orca Lab 终端。",
         "openManageSessions": "打开管理会话",
         "dismiss": "关闭"
+      },
+      "useDaemonStaleBundleNotice": {
+        "title": "终端修复需要重启守护进程",
+        "description": "此更新包含的终端修复仅在重启终端服务后生效。正在运行的终端使旧版本继续保持运行。请在“管理会话”中重启它 — 这会关闭所有正在运行的终端。",
+        "openManageSessions": "打开管理会话",
+        "dismiss": "关闭"
       }
     },
     "components": {
