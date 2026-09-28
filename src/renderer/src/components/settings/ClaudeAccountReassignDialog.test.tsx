@@ -203,4 +203,34 @@ describe('ClaudeAccountReassignDialog', () => {
     expect(markup).toContain('Remove a@example.com?')
     expect(markup).toContain('Remove Account')
   })
+
+  describe('a worktree name that is one long unbroken path (ORCA-533)', () => {
+    const longName =
+      '/Users/fabolivar/Downloads/codecanyon-W3GXMzgS-doctorio-appointment-online-diagnostic-booking-management-multivendor-app-with-admin-panel/doctorio'
+
+    it('keeps the row name shrinkable, truncated, and exposes the full path as a title', () => {
+      render({
+        report: report({
+          worktrees: [{ worktreeId: 'repo::a', displayName: longName, hasLiveTerminal: true }]
+        })
+      })
+
+      const nameEl = screen.getByText(longName)
+      expect(nameEl.className).toContain('min-w-0')
+      expect(nameEl.className).toContain('truncate')
+      expect(nameEl.getAttribute('title')).toBe(longName)
+    })
+
+    it('keeps the list viewport from growing to the longest row (no table shrink-to-fit)', () => {
+      render({
+        report: report({
+          worktrees: [{ worktreeId: 'repo::a', displayName: longName, hasLiveTerminal: true }]
+        })
+      })
+
+      const viewport = document.querySelector('[data-slot="scroll-area-viewport"]')
+      expect(viewport).not.toBeNull()
+      expect(viewport?.className).toContain('[&>div]:!block')
+    })
+  })
 })

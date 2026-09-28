@@ -67,7 +67,9 @@ export type ClaudeAccountReassignDialogProps = {
 function WorktreeRow({ worktree }: { worktree: ClaudeAccountWorktreeUsage }): React.JSX.Element {
   return (
     <li className="flex items-center justify-between gap-3 py-1.5 text-sm">
-      <span className="truncate font-medium">{worktree.displayName}</span>
+      <span className="min-w-0 flex-1 truncate font-medium" title={worktree.displayName}>
+        {worktree.displayName}
+      </span>
       {worktree.hasLiveTerminal ? (
         <Badge variant="destructive" className="shrink-0 gap-1">
           <TerminalSquare size={11} />
@@ -95,7 +97,14 @@ function WorktreeList({
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <ScrollArea className="rounded-md border px-3" viewportClassName="max-h-44">
+      {/* Why min-w-0: DialogContent is a grid, and this item's automatic minimum
+          size let the list push past the dialog. Why [&>div]:!block: Radix's
+          `display: table` wrapper is shrink-to-fit, so rows grew to the longest
+          name's full width instead of truncating (ORCA-533, same as ORCA-525). */}
+      <ScrollArea
+        className="min-w-0 rounded-md border px-3"
+        viewportClassName="max-h-44 [&>div]:!block"
+      >
         <ul className="divide-y">
           {worktrees.map((worktree) => (
             <WorktreeRow key={worktree.worktreeId} worktree={worktree} />
@@ -188,7 +197,12 @@ export function ClaudeAccountReassignDialog({
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          // Why min-w-0: this div is DialogContent's actual grid item (`grid`
+          // has one implicit column), and its default `min-width: auto` let a
+          // worktree's unbroken path inflate that column and overflow the
+          // dialog — the ScrollArea two levels below is too deep to matter
+          // (ORCA-533).
+          <div className="min-w-0 space-y-4">
             {isReauth && worktrees.length > 0 ? (
               <WorktreeList
                 label={translate(
