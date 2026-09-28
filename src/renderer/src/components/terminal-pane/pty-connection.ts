@@ -261,7 +261,6 @@ import { createTerminalGitHubPRLinkDetector } from '../../../../shared/terminal-
 import {
   CONPTY_DA1_RESPONSE,
   DEFAULT_DA1_RESPONSE,
-  createTerminalPixelSizeQueryResponder,
   installTerminalCapabilityReplyHandlers,
   sendTerminalOscColorQueryReplies
 } from './terminal-capability-replies'
@@ -4003,10 +4002,6 @@ export function connectPanePty(
     isReplaying: () => isPaneReplaying(deps.replayingPanesRef, pane.id),
     ...(isNativeWindowsConpty ? { da1Response: CONPTY_DA1_RESPONSE } : {})
   })
-  const respondToTerminalPixelSizeQueries = createTerminalPixelSizeQueryResponder(
-    pane.terminal,
-    sendDesktopQueryReplyImmediate
-  )
 
   const claimViewportForUserActivity = (): void => {
     const currentPtyId = transport.getPtyId()
@@ -8004,7 +7999,6 @@ export function connectPanePty(
       ) {
         void notifyClaudeAuthFailure(currentPtyId, claudeAuthFailureDetection.boundAt)
       }
-      respondToTerminalPixelSizeQueries(data)
       observeTerminalBracketedPasteModeOutput(pane.terminal, data)
       // Why: under main side-effect authority these facts arrive via pty:sideEffect; byte-scanning here would double-fire. Remote PTYs / kill-switch-off keep this path.
       if (!mainSideEffectAuthority) {

@@ -21,6 +21,8 @@ type PendingPtyInputWrite = {
   id: string
   text: string
   replyOnly: boolean
+  // Non-echo-risk replies (DA1, pixel-size): a merged payload escapes the host's in-order reply gate (ORCA-536).
+  queryReply: boolean
   tooLarge: boolean | Promise<boolean>
   chunks?: Iterator<string>
   nextChunk?: string
@@ -42,7 +44,12 @@ export type PtyInputWriteQueueDeps = {
 
 function isCoalescibleInput(input: PendingPtyInputWrite): boolean {
   // Echo-risk replies stay atomic so host classifiers cannot miss them (#13137).
-  return input.text.length <= TERMINAL_INPUT_COALESCE_MAX_CODE_UNITS && !input.replyOnly
+  // Other query replies (DA1, pixel-size) stay atomic too, for the same reason (ORCA-536).
+  return (
+    input.text.length <= TERMINAL_INPUT_COALESCE_MAX_CODE_UNITS &&
+    !input.replyOnly &&
+    !input.queryReply
+  )
 }
 
 export function createPtyInputWriteQueue(deps: PtyInputWriteQueueDeps): PtyInputWriteQueue {
@@ -270,7 +277,7 @@ export function createPtyInputWriteQueue(deps: PtyInputWriteQueueDeps): PtyInput
       if (tooLarge === true) {
         return false
       }
-      const item = { sequence: nextSequence, id, text: data, replyOnly, tooLarge }
+      const item = { sequence: nextSequence, id, text: data, replyOnly, queryReply, tooLarge }
       nextSequence += 1
       if (replyOnly) {
         pendingReplies.push(item)

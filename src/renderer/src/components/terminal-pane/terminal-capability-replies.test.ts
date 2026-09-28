@@ -3,7 +3,6 @@ import { Terminal } from '@xterm/headless'
 import {
   CONPTY_DA1_RESPONSE,
   DEFAULT_DA1_RESPONSE,
-  createTerminalPixelSizeQueryResponder,
   installTerminalCapabilityReplyHandlers,
   sendTerminalOscColorQueryReplies
 } from './terminal-capability-replies'
@@ -19,6 +18,17 @@ function createElement(width: number, height: number): HTMLElement {
     })
   } as unknown as HTMLElement
 }
+
+// Why not object-spread: `options` (and other Terminal members) are prototype
+// accessors, so `{ ...term }` silently drops them; attach `element` in place instead.
+function withElement(term: Terminal, width: number, height: number): Terminal {
+  ;(term as unknown as { element: HTMLElement }).element = createElement(width, height)
+  return term
+}
+
+// xterm gates 14t/16t behind these (disabled by default); matches production's
+// buildDefaultTerminalOptions so the CSI handler under test actually runs.
+const PIXEL_SIZE_WINDOW_OPTIONS = { getWinSizePixels: true, getCellSizePixels: true }
 
 describe('installTerminalCapabilityReplyHandlers', () => {
   it('answers primary DA1 with the default xterm-compatible response', async () => {
@@ -259,38 +269,122 @@ describe('installTerminalCapabilityReplyHandlers', () => {
     }
   })
 
-  it('answers window and cell pixel-size reports from renderer geometry', () => {
+  it('answers window and cell pixel-size reports from renderer geometry', async () => {
+    const term = new Terminal({
+      cols: 100,
+      rows: 40,
+      allowProposedApi: true,
+      windowOptions: PIXEL_SIZE_WINDOW_OPTIONS
+    })
     const sendInput = vi.fn<(data: string) => boolean>(() => true)
-    const observe = createTerminalPixelSizeQueryResponder(
-      {
-        cols: 100,
-        rows: 40,
-        element: createElement(900, 720)
-      },
-      sendInput
-    )
+    const disposable = installTerminalCapabilityReplyHandlers({
+      terminal: withElement(term, 900, 720) as never,
+      parser: term.parser,
+      sendInput,
+      isReplaying: () => false
+    })
 
-    observe('\x1b[14t\x1b[16t')
+    try {
+      await writeTerminal(term, '\x1b[14t\x1b[16t')
 
-    expect(sendInput).toHaveBeenCalledWith('\x1b[4;720;900t')
-    expect(sendInput).toHaveBeenCalledWith('\x1b[6;18;9t')
+      expect(sendInput).toHaveBeenCalledWith('\x1b[4;720;900t')
+      expect(sendInput).toHaveBeenCalledWith('\x1b[6;18;9t')
+    } finally {
+      disposable.dispose()
+      term.dispose()
+    }
   })
 
-  it('answers split pixel-size reports', () => {
+  it('answers a pixel-size query split across two writes', async () => {
+    const term = new Terminal({
+      cols: 100,
+      rows: 40,
+      allowProposedApi: true,
+      windowOptions: PIXEL_SIZE_WINDOW_OPTIONS
+    })
     const sendInput = vi.fn<(data: string) => boolean>(() => true)
-    const observe = createTerminalPixelSizeQueryResponder(
-      {
-        cols: 100,
-        rows: 40,
-        element: createElement(900, 720)
-      },
-      sendInput
-    )
+    const disposable = installTerminalCapabilityReplyHandlers({
+      terminal: withElement(term, 900, 720) as never,
+      parser: term.parser,
+      sendInput,
+      isReplaying: () => false
+    })
 
-    observe('\x1b[')
-    observe('16t')
+    try {
+      await writeTerminal(term, '\x1b[1')
+      await writeTerminal(term, '6t')
 
-    expect(sendInput).toHaveBeenCalledWith('\x1b[6;18;9t')
+      expect(sendInput).toHaveBeenCalledWith('\x1b[6;18;9t')
+    } finally {
+      disposable.dispose()
+      term.dispose()
+    }
+  })
+
+  it('leaves 18t (window size in characters) unanswered, like xterm without windowOptions.getWinSizeChars', async () => {
+    const term = new Terminal({
+      cols: 100,
+      rows: 40,
+      allowProposedApi: true,
+      windowOptions: PIXEL_SIZE_WINDOW_OPTIONS
+    })
+    const sendInput = vi.fn<(data: string) => boolean>(() => true)
+    const disposable = installTerminalCapabilityReplyHandlers({
+      terminal: withElement(term, 900, 720) as never,
+      parser: term.parser,
+      sendInput,
+      isReplaying: () => false
+    })
+
+    try {
+      await writeTerminal(term, '\x1b[18t')
+
+      expect(sendInput).not.toHaveBeenCalled()
+    } finally {
+      disposable.dispose()
+      term.dispose()
+    }
+  })
+
+  // ORCA-536: a raw-data scanner answered 14t/16t before xterm's own parser reached the
+  // earlier-queued DA1/OSC 11/XTVERSION queries, so replies arrived out of stream order.
+  it('answers pixel-size queries in the same parser pass as DA1 and OSC 11, preserving stream order', async () => {
+    const term = new Terminal({
+      cols: 100,
+      rows: 40,
+      allowProposedApi: true,
+      windowOptions: PIXEL_SIZE_WINDOW_OPTIONS
+    })
+    term.options.theme = { background: '#ffffff' }
+    const order: string[] = []
+    const sendInput = vi.fn<(data: string) => boolean>((data) => {
+      if (data === DEFAULT_DA1_RESPONSE) {
+        order.push('da1')
+      } else if (data.startsWith('\x1b]11;')) {
+        order.push('osc11')
+      } else if (data === '\x1b[4;720;900t') {
+        order.push('winpx')
+      } else if (data === '\x1b[6;18;9t') {
+        order.push('cellpx')
+      }
+      return true
+    })
+    const disposable = installTerminalCapabilityReplyHandlers({
+      terminal: withElement(term, 900, 720) as never,
+      parser: term.parser,
+      sendInput,
+      isReplaying: () => false
+    })
+
+    try {
+      // Same bytes/order as codex's startup burst: DA1, OSC 11, XTVERSION, 14t, 16t.
+      await writeTerminal(term, '\x1b[c\x1b]11;?\x1b\\\x1b[>q\x1b[14t\x1b[16t')
+
+      expect(order).toEqual(['da1', 'osc11', 'winpx', 'cellpx'])
+    } finally {
+      disposable.dispose()
+      term.dispose()
+    }
   })
 
   it('consumes replayed capability queries without sending input to the shell', async () => {
