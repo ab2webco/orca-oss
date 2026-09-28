@@ -34,6 +34,10 @@ import {
 } from './daemon-tcc-attribution'
 import { getDaemonLaunchIdentity } from './daemon-pid-identity'
 import { isDaemonStaleForCurrentBundle } from './daemon-bundle-staleness'
+import {
+  getDaemonStaleBundleNoticeStatus,
+  type DaemonStaleBundleNoticeStatus
+} from './daemon-stale-bundle-notice'
 import { killStaleDaemon } from './daemon-stale-kill'
 import { parseDaemonPidFile } from './daemon-pid-file-parse'
 import {
@@ -1161,6 +1165,19 @@ export async function getCurrentDaemonMacTccAttributionHealth(): Promise<MacDaem
     getDaemonSocketPath(runtimeDir),
     getDaemonTokenPath(runtimeDir)
   )
+}
+
+// Why: computed from the pid record on demand, same as the TCC health getter above — a daemon
+// this still finds stale was kept adopted only because it owns live sessions (ORCA-534).
+export async function getCurrentDaemonStaleBundleNoticeStatus(): Promise<DaemonStaleBundleNoticeStatus> {
+  const runtimeDir = getRuntimeDir()
+  return getDaemonStaleBundleNoticeStatus({
+    runtimeDir,
+    socketPath: getDaemonSocketPath(runtimeDir),
+    tokenPath: getDaemonTokenPath(runtimeDir),
+    currentAppVersion: app.getVersion(),
+    isPackaged: app.isPackaged
+  })
 }
 
 /** Returns null unless every daemon generation supplied an authoritative inventory. */

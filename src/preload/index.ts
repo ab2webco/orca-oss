@@ -1365,7 +1365,10 @@ const api = {
       killAll: () => ipcRenderer.invoke('pty:management:killAll'),
       killOne: (args: { sessionId: string }) => ipcRenderer.invoke('pty:management:killOne', args),
       restart: () => ipcRenderer.invoke('pty:management:restart'),
-      macTccAttribution: () => ipcRenderer.invoke('pty:management:macTccAttribution')
+      macTccAttribution: () => ipcRenderer.invoke('pty:management:macTccAttribution'),
+      staleBundleNotice: () => ipcRenderer.invoke('pty:management:staleBundleNotice'),
+      dismissStaleBundleNotice: (args: { pid: number; startedAtMs: number | null }) =>
+        ipcRenderer.invoke('pty:management:dismissStaleBundleNotice', args)
     }
   },
 

@@ -4,10 +4,13 @@ import { DegradedDaemonPtyProvider } from '../daemon/degraded-daemon-pty-provide
 import type { DaemonPtyAdapter } from '../daemon/daemon-pty-adapter'
 import {
   getCurrentDaemonMacTccAttributionHealth,
+  getCurrentDaemonStaleBundleNoticeStatus,
   getDaemonProvider,
   restartDaemon
 } from '../daemon/daemon-init'
 import type { MacDaemonTccAttributionHealth } from '../daemon/daemon-tcc-attribution'
+import { dismissStaleBundleNotice } from '../daemon/daemon-stale-bundle-notice'
+import type { DaemonStaleBundleNoticeStatus } from '../daemon/daemon-stale-bundle-notice'
 import type { DaemonSessionInfo } from '../daemon/types'
 
 // Why: poll past the daemon's 5s SIGTERM→SIGKILL ladder (KILL_TIMEOUT_MS in session.ts), else slow-exiting shells falsely look "refused".
@@ -57,6 +60,8 @@ export function registerDaemonManagementHandlers(): void {
   ipcMain.removeHandler('pty:management:killOne')
   ipcMain.removeHandler('pty:management:restart')
   ipcMain.removeHandler('pty:management:macTccAttribution')
+  ipcMain.removeHandler('pty:management:staleBundleNotice')
+  ipcMain.removeHandler('pty:management:dismissStaleBundleNotice')
 
   // Why: lets Settings warn that macOS privacy grants no longer reach daemon terminals (STA-3491).
   ipcMain.handle(
@@ -171,4 +176,35 @@ export function registerDaemonManagementHandlers(): void {
       return { success: false }
     }
   })
+
+  // Why: lets the renderer surface the "restart to apply terminal fixes" notice (ORCA-534).
+  ipcMain.handle(
+    'pty:management:staleBundleNotice',
+    async (): Promise<DaemonStaleBundleNoticeStatus> => {
+      try {
+        return await getCurrentDaemonStaleBundleNoticeStatus()
+      } catch {
+        return { stale: false }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'pty:management:dismissStaleBundleNotice',
+    async (
+      _event,
+      args: { pid: number; startedAtMs: number | null }
+    ): Promise<{
+      success: boolean
+    }> => {
+      if (typeof args?.pid !== 'number') {
+        return { success: false }
+      }
+      dismissStaleBundleNotice(
+        args.pid,
+        typeof args.startedAtMs === 'number' ? args.startedAtMs : null
+      )
+      return { success: true }
+    }
+  )
 }

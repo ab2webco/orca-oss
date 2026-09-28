@@ -1042,6 +1042,12 @@
         "description": "Running Orca Lab terminals are hosted by a daemon started by a previous Orca Lab installation. macOS may not apply Orca Lab’s Accessibility, Automation, or protected-file permissions to them. Restart the daemon from Manage Sessions to restore access. This will close all running Orca Lab terminals.",
         "openManageSessions": "Open Manage Sessions",
         "dismiss": "Dismiss"
+      },
+      "useDaemonStaleBundleNotice": {
+        "title": "A terminal fix needs a daemon restart",
+        "description": "This update includes terminal fixes that only apply after the terminal service restarts. Running terminals are keeping the previous version alive. Restart it from Manage Sessions — this closes every running terminal.",
+        "openManageSessions": "Open Manage Sessions",
+        "dismiss": "Dismiss"
       }
     },
     "components": {
