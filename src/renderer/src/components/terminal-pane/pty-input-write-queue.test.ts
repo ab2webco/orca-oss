@@ -206,6 +206,28 @@ describe('pty input write queue', () => {
     ])
   })
 
+  // ORCA-536: a merged payload (e.g. xtversion+pixel-size) can't be recognized by
+  // the host's single-reply classifier that holds it behind a still-deferred
+  // color reply, so it jumps the queue and lands out of order.
+  it('does not coalesce a non-echo-risk query reply with ordinary input', async () => {
+    const { writes, queue } = createRecordingQueue()
+    const da1Reply = '\x1b[?1;2c'
+    const xtversionReply = '\x1bP>|xterm.js(6.1.0-beta.287)\x1b\\'
+    const pixelSizeReply = '\x1b[4;720;900t'
+
+    queue.enqueueQueryReply('pty-1', da1Reply)
+    // xterm's own XTVERSION reply is forwarded as ordinary input, not a query reply.
+    queue.enqueue('pty-1', xtversionReply)
+    queue.enqueueQueryReply('pty-1', pixelSizeReply)
+    await queue.waitForDrain()
+
+    expect(writes).toEqual([
+      { id: 'pty-1', data: da1Reply },
+      { id: 'pty-1', data: xtversionReply },
+      { id: 'pty-1', data: pixelSizeReply }
+    ])
+  })
+
   it('bounds an OSC 10/11 reply flood and drains a following keystroke', async () => {
     const { writes, pendingYields, queue } = createParkedQueue()
     const replies: string[] = []

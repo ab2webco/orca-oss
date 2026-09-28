@@ -71,6 +71,11 @@ export function buildDefaultTerminalOptions(): ITerminalOptions {
     // Matches VS Code's xtermTerminal.ts.
     vtExtensions: {
       kittyKeyboard: true
+    },
+    // xterm skips 14t/16t handlers unless enabled; lets Orca's existing reply run in parse order (ORCA-536).
+    windowOptions: {
+      getWinSizePixels: true,
+      getCellSizePixels: true
     }
   }
 }

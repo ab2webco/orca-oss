@@ -76,43 +76,18 @@ function sendTerminalOscColorQueryRepliesForSlots(
   return true
 }
 
-export function createTerminalPixelSizeQueryResponder(
-  terminal: Pick<Terminal, 'cols' | 'rows' | 'element'>,
-  sendInput: (data: string) => boolean | void
-): (data: string) => void {
-  let pending = ''
-  const respond = (reportsWindowPixels: boolean): void => {
-    const cell = measureCellPixels(terminal)
-    if (!cell) {
-      return
-    }
-    const width = cell.width * (reportsWindowPixels ? terminal.cols : 1)
-    const height = cell.height * (reportsWindowPixels ? terminal.rows : 1)
-    sendInput(`\x1b[${reportsWindowPixels ? 4 : 6};${height};${width}t`)
+// 14t (window, px) and 16t (cell, px); anything else (e.g. 18t) is left for xterm's default handling.
+function pixelSizeReplyKind(params: (number | number[])[]): 'window' | 'cell' | null {
+  if (params.length !== 1) {
+    return null
   }
-  return (data) => {
-    const input = pending + data
-    pending = input.endsWith('\x1b') || input.endsWith('\x1b[') ? input.slice(-2) : ''
-    let offset = 0
-    while (offset < input.length) {
-      const queryIndex = input.indexOf('\x1b[', offset)
-      if (queryIndex === -1) {
-        break
-      }
-      const query = input.slice(queryIndex, queryIndex + 5)
-      if (query === '\x1b[14t') {
-        respond(true)
-        offset = queryIndex + 5
-        continue
-      }
-      if (query === '\x1b[16t') {
-        respond(false)
-        offset = queryIndex + 5
-        continue
-      }
-      offset = queryIndex + 2
-    }
+  if (params[0] === 14) {
+    return 'window'
   }
+  if (params[0] === 16) {
+    return 'cell'
+  }
+  return null
 }
 
 export function installTerminalCapabilityReplyHandlers(
@@ -157,6 +132,26 @@ export function installTerminalCapabilityReplyHandlers(
           return true
         }
         return sendTerminalOscColorQueryRepliesForSlots(slots, deps.terminal, deps.sendInput)
+      })
+    ),
+    // ORCA-536: answered here (parser pass), not via a raw pre-write scan, so replies
+    // land in the same stream-order slot as DA1/OSC/XTVERSION instead of jumping ahead.
+    deps.parser.registerCsiHandler(
+      { final: 't' },
+      guardParserHandler('csi-pixel-size', (params) => {
+        const kind = pixelSizeReplyKind(params)
+        if (kind === null) {
+          return false
+        }
+        const cell = measureCellPixels(deps.terminal)
+        if (!cell) {
+          return false
+        }
+        const reportsWindowPixels = kind === 'window'
+        const width = cell.width * (reportsWindowPixels ? deps.terminal.cols : 1)
+        const height = cell.height * (reportsWindowPixels ? deps.terminal.rows : 1)
+        deps.sendInput(`\x1b[${reportsWindowPixels ? 4 : 6};${height};${width}t`)
+        return true
       })
     )
   ]
