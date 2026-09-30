@@ -32,11 +32,13 @@ const PANEL_HTML = `<!doctype html>
         }
       })
       document.getElementById('close').addEventListener('click', function () {
+        document.getElementById('reply').textContent = 'sent'
         window.parent.postMessage(
           { type: 'orca-panel-action', requestId: 'close-1', action: 'panel.close' },
           '*'
         )
       })
+      document.body.dataset.ready = 'true'
     </script>
   </body>
 </html>
@@ -121,6 +123,8 @@ test('a nav plugin page closes from the host button, Escape and panel.close', as
 
     await openInbox(orcaPage)
     const frame = orcaPage.frameLocator('iframe[title="Inbox"]')
+    // Why: the button can be clickable before the script that wires it has run.
+    await expect(frame.locator('body[data-ready="true"]')).toHaveCount(1)
     await frame.getByRole('button', { name: 'Close from inside the panel' }).click()
     // Why: a refused call leaves the page open; name the bridge reply instead of a bare count.
     await expect
