@@ -13,7 +13,7 @@ contain two kinds of code, and they are very different places to be:
 | | **Panel** | **Worker** |
 | --- | --- | --- |
 | Runtime | Sandboxed iframe, opaque origin, `sandbox="allow-scripts"` only ([`PluginPanel.tsx:273-276`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)) | `child_process.fork` of the Electron binary as plain Node ([`plugin-host-process.ts:78-93`](../../src/main/plugins/plugin-host-process.ts)) |
-| Host API reach | 5 of the 13 methods ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)) | all 13 |
+| Host API reach | 5 of the 13 methods, plus the bridge-level `panel.close` ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)) | all 13 |
 | Network | CSP `default-src 'none'; connect-src 'none'` ([`plugin-panel-shell.ts:25-27`](../../src/shared/plugins/plugin-panel-shell.ts)) | only hosts declared under `net:fetch` ([`plugin-host-preload.ts:66-78`](../../src/main/plugins/plugin-host-preload.ts)) |
 | Filesystem | none | read-only, own folder ([`plugin-worker-sandbox-args.ts:11-19`](../../src/main/plugins/plugin-worker-sandbox-args.ts)) |
 | Lifetime | while its surface is mounted | lazy: forked on the first command or subscribed event, reaped after 5 min idle ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
@@ -186,6 +186,9 @@ A panel contributes `{ id, title, entry, icon?, surface? }`
   `overflow-wrap: anywhere` and a single-column fallback, or it will overflow a
   box it never chose.
 - `nav` — a first-level destination in the left sidebar, for global content.
+  Orca draws a header above the frame with the panel title and a close button
+  (Escape too), which returns to the view the user left; the panel itself can
+  close it with `panel.close`.
 
 `icon` is either a name from a curated set of 32 lucide icons
 ([`plugin-panel-icon.tsx:42-75`](../../src/renderer/src/components/right-sidebar/plugin-panel-icon.tsx);
@@ -262,19 +265,46 @@ nothing a token contains can break out of the `<style>` block.
 The panel posts to `window.parent` with `targetOrigin: '*'` — the frame's origin
 is opaque, so anything stricter is silently dropped; the host identifies the
 *sending window* instead of trusting an origin
-([`plugin-panel-bridge-host.ts:76-90`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
+([`plugin-panel-bridge-host.ts:79-93`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
 
 Request: `{ type: 'orca-panel-action', requestId, action, params }`.
 Reply: `{ type: 'orca-panel-action-result', requestId, ok, value?, errorCode?, error? }`
-([`plugin-panel-bridge.ts:15-19, 58-98`](../../src/shared/plugins/plugin-panel-bridge.ts)).
+([`plugin-panel-bridge.ts:15-19, 68-108`](../../src/shared/plugins/plugin-panel-bridge.ts)).
 `requestId` is yours, 1–128 chars.
 
-Only five methods are panel-callable — the set is derived from the host API
-table so it can never drift from the gate
-([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)):
+Six actions are panel-callable: five host API methods, derived from the host
+API table so they can never drift from the gate
+([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)),
+plus one bridge-level action
+([`plugin-panel-bridge.ts:58-66`](../../src/shared/plugins/plugin-panel-bridge.ts)):
 
-`workspace.readContext`, `terminal.sendText`, `notifications.show`,
-`storage.get`, `storage.set`.
+| Action | Capability | Notes |
+| --- | --- | --- |
+| `workspace.readContext` | `workspace:read` | focused worktree, or `null` |
+| `terminal.sendText` | `terminal:send` | explicit `terminalId`, never "the active terminal" |
+| `notifications.show` | `notifications:show` | |
+| `storage.get` | `storage` | plugin-private namespace |
+| `storage.set` | `storage` | plugin-private namespace |
+| `panel.close` | none | asks the host to close the page this panel is on; params must be absent or `{}`; answers `{ closed: true }` |
+
+`panel.close` is not a host API method, so workers cannot call it (they have no
+page) and it needs no capability — closing its own page grants the panel
+nothing the user cannot do with one click, and a new capability kind would fail
+manifest validation on every older Orca. It still passes every bridge check the
+other five do: the sending-window check and message budget in the renderer, then
+the session binding, admission budget and approval checks in main
+([`plugin-panel-controller.ts:74-103`](../../src/main/plugins/plugin-panel-controller.ts)).
+Only `nav` pages close; on `worktree` and `settings` surfaces, where Orca's own
+chrome already closes the sidebar or leaves Settings, it answers
+`ok: false, errorCode: 'unavailable'`
+([`plugin-panel-bridge-host.ts:161-190`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
+An older remote server answers `unknown_method`.
+
+Every `nav` page also gets a host close button and Escape, whatever the plugin
+does. Keys pressed inside the frame never reach Orca's window, so while focus
+is in your panel Escape is yours: if your panel should close on Escape, listen
+for it and call `panel.close` — after your own dialogs and inputs had their
+turn.
 
 Notably **not** panel-callable: `storage.delete`, `storage.keys`, all of
 `secrets.*`, all of `settings.*`, `events.subscribe`. A panel that needs a
@@ -284,7 +314,7 @@ what `examples/plugins/worklog` does.
 `errorCode` is one of `invalid_request`, `unknown_method`, `capability_denied`,
 `consent_required`, `panel_forbidden`, `invalid_params`, `rate_limited`,
 `unavailable`, `action_failed`
-([`plugin-panel-bridge.ts:73-82`](../../src/shared/plugins/plugin-panel-bridge.ts)).
+([`plugin-panel-bridge.ts:83-92`](../../src/shared/plugins/plugin-panel-bridge.ts)).
 
 ### The message budget — and the bug it causes
 
@@ -294,12 +324,12 @@ caps a single message at **64 KiB**
 enforcement at [`plugin-panel-message-budget.ts:19-45`](../../src/shared/plugins/plugin-panel-message-budget.ts)).
 Oversized and malformed traffic still spends budget. Over the limit, the host
 answers `ok: false, errorCode: 'rate_limited'`
-([`plugin-panel-bridge-host.ts:115-140`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
+([`plugin-panel-bridge-host.ts:118-143`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
 
 Two things eat into those 30 before you do:
 
 - The watchdog pings every 10 s and your pong is charged to the data budget too
-  ([`:107`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts),
+  ([`:110`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts),
   interval at [`plugin-panel-bridge.ts:36`](../../src/shared/plugins/plugin-panel-bridge.ts)).
   A pong has its own reserved 1 KiB lane so a saturated data budget can never
   make a live panel look dead ([`:31`](../../src/shared/plugins/plugin-panel-bridge.ts)),

@@ -177,3 +177,79 @@ describe('PluginPanelController identity binding', () => {
     expect(executeHostCall).not.toHaveBeenCalled()
   })
 })
+
+describe('PluginPanelController panel.close', () => {
+  async function openDashboard(overrides: { approved?: () => boolean } = {}) {
+    const plugin = await createPlugin()
+    const executeHostCall = vi.fn()
+    const approved = overrides.approved ?? (() => true)
+    const controller = new PluginPanelController({
+      resolveApprovedPlugin: () => (approved() ? plugin : null),
+      contentVerifier: { verify: vi.fn().mockResolvedValue(undefined) },
+      executeHostCall,
+      log: vi.fn()
+    })
+    const entry = await controller.open('runtime:one', plugin.pluginKey, 'dashboard')
+    return { controller, executeHostCall, sessionToken: entry!.sessionToken }
+  }
+
+  it('authorizes a close without dispatching a host method', async () => {
+    const { controller, executeHostCall, sessionToken } = await openDashboard()
+
+    await expect(
+      controller.execute('runtime:one', { sessionToken, action: 'panel.close' })
+    ).resolves.toEqual({ ok: true, value: null })
+    await expect(
+      controller.execute('runtime:one', { sessionToken, action: 'panel.close', params: {} })
+    ).resolves.toEqual({ ok: true, value: null })
+    expect(executeHostCall).not.toHaveBeenCalled()
+  })
+
+  it('rejects params the action does not take', async () => {
+    const { controller, executeHostCall, sessionToken } = await openDashboard()
+
+    await expect(
+      controller.execute('runtime:one', {
+        sessionToken,
+        action: 'panel.close',
+        params: { tabKey: 'someone-else' }
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_params' })
+    expect(executeHostCall).not.toHaveBeenCalled()
+  })
+
+  it('refuses a close from a session that is no longer bound or approved', async () => {
+    let approved = true
+    const { controller, sessionToken } = await openDashboard({ approved: () => approved })
+
+    await expect(
+      controller.execute('runtime:other', { sessionToken, action: 'panel.close' })
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_request' })
+    approved = false
+    await expect(
+      controller.execute('runtime:one', { sessionToken, action: 'panel.close' })
+    ).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+  })
+
+  it('spends the same admission budget as every other panel action', async () => {
+    const plugin = await createPlugin()
+    const controller = new PluginPanelController({
+      resolveApprovedPlugin: () => plugin,
+      contentVerifier: { verify: vi.fn().mockResolvedValue(undefined) },
+      executeHostCall: vi.fn(),
+      log: vi.fn(),
+      panelAdmission: createPluginPanelCallAdmission({
+        limits: { maxMessages: 1, perMs: 10_000 },
+        now: () => 0
+      })
+    })
+    const entry = await controller.open('runtime:one', plugin.pluginKey, 'dashboard')
+    const call = { sessionToken: entry!.sessionToken, action: 'panel.close' }
+
+    await expect(controller.execute('runtime:one', call)).resolves.toMatchObject({ ok: true })
+    await expect(controller.execute('runtime:one', call)).resolves.toMatchObject({
+      ok: false,
+      code: 'rate_limited'
+    })
+  })
+})

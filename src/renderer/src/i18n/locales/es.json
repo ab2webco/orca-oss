@@ -14664,7 +14664,8 @@
         "pluginPanelBridgeHost": {
           "actionsUnavailable": "Las acciones de plugins no están disponibles en este cliente.",
           "messageTooLarge": "El mensaje supera el límite de tamaño.",
-          "tooManyRequests": "Demasiadas solicitudes."
+          "tooManyRequests": "Demasiadas solicitudes.",
+          "closeUnavailable": "Este panel no se puede cerrar desde dentro."
         }
       },
       "link": {
@@ -15033,6 +15034,11 @@
           "updateDescription": "La nueva versión cambió lo que declara el plugin, así que queda apagado hasta que lo revises. Mientras tanto aquí no se ejecuta nada.",
           "installDescription": "Revisa qué puede hacer este plugin antes de que se ejecute por primera vez. Mientras tanto aquí no se ejecuta nada.",
           "reviewAndEnable": "Revisar y activar"
+        },
+        "PluginNavPage": {
+          "closePanel": "Cerrar {{title}}",
+          "close": "Cerrar",
+          "closeTooltip": "Cerrar · Esc"
         }
       }
     },

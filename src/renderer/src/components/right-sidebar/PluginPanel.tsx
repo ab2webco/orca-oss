@@ -34,6 +34,8 @@ type PluginPanelProps = {
    *  instead of filling the box. For a host that scrolls as one page; omitted,
    *  the frame keeps filling whatever height it is handed. */
   flowWithContentHeight?: boolean
+  /** Supplied by hosts whose page the panel may close via `panel.close`. */
+  onCloseRequested?: () => void
 }
 
 type PluginPanelEntryState =
@@ -68,7 +70,11 @@ function currentPanelUiLanguage(): string {
   return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(resolved) ? resolved : 'en'
 }
 
-function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React.JSX.Element {
+function PluginPanel({
+  tabKey,
+  flowWithContentHeight,
+  onCloseRequested
+}: PluginPanelProps): React.JSX.Element {
   const panels = usePluginPanels()
   const setPanelHealth = usePluginPanelsStore((state) => state.setPanelHealth)
   const panel = isPluginPanelTabKey(tabKey)
@@ -122,14 +128,15 @@ function PluginPanel({ tabKey, flowWithContentHeight }: PluginPanelProps): React
       getPanelWindow: () => iframeRef.current?.contentWindow ?? null,
       callPanelAction: callPanelActionViaPreload,
       isActive: () => active,
-      onPong: (pingId) => watchdog.handlePong(pingId)
+      onPong: (pingId) => watchdog.handlePong(pingId),
+      closePanel: onCloseRequested
     })
     window.addEventListener('message', handler)
     return () => {
       active = false
       window.removeEventListener('message', handler)
     }
-  }, [panelDocument, sessionToken, watchdog])
+  }, [onCloseRequested, panelDocument, sessionToken, watchdog])
 
   useEffect(() => {
     if (!flowWithContentHeight || !panelFrameKey) {

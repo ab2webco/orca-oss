@@ -292,6 +292,47 @@ describe('PluginPanel', () => {
     })
   })
 
+  it('hands panel.close to the host that offers a close, and only that host', async () => {
+    readPanelEntryMock.mockResolvedValue({
+      html: '<h1>Hello plugin</h1>',
+      sessionToken: SESSION_TOKEN
+    })
+    panelActionMock.mockResolvedValue({ ok: true, value: null })
+    const onCloseRequested = vi.fn()
+    const postClose = async (requestId: string): Promise<void> => {
+      const event = new MessageEvent('message', {
+        data: { type: 'orca-panel-action', requestId, action: 'panel.close' }
+      })
+      Object.defineProperty(event, 'source', {
+        value: container.querySelector('iframe')?.contentWindow
+      })
+      await act(async () => {
+        window.dispatchEvent(event)
+        await waitForHappyDomTasks()
+      })
+    }
+
+    await renderPanel('plugin:orca-samples.my-plugin/dashboard')
+    await postClose('without-host-close')
+    expect(panelActionMock).not.toHaveBeenCalled()
+
+    await act(async () => {
+      root.render(
+        <PluginPanel
+          tabKey="plugin:orca-samples.my-plugin/dashboard"
+          onCloseRequested={onCloseRequested}
+        />
+      )
+    })
+    await postClose('with-host-close')
+    expect(panelActionMock).toHaveBeenCalledWith({
+      sessionToken: SESSION_TOKEN,
+      action: 'panel.close',
+      params: undefined
+    })
+    expect(onCloseRequested).toHaveBeenCalledOnce()
+  })
+
   it('ignores an obsolete panel reload that finishes after a newer one', async () => {
     readPanelEntryMock.mockResolvedValueOnce({
       html: '<h1>Initial plugin</h1>',
