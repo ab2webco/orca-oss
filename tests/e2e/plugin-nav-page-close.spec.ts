@@ -23,8 +23,14 @@ const PANEL_HTML = `<!doctype html>
     <h1>Inbox</h1>
     <p>Plugin content.</p>
     <button id="close">Close from inside the panel</button>
+    <p id="reply"></p>
     <script>
       'use strict'
+      window.addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'orca-panel-action-result') {
+          document.getElementById('reply').textContent = JSON.stringify(event.data)
+        }
+      })
       document.getElementById('close').addEventListener('click', function () {
         window.parent.postMessage(
           { type: 'orca-panel-action', requestId: 'close-1', action: 'panel.close' },
@@ -114,11 +120,25 @@ test('a nav plugin page closes from the host button, Escape and panel.close', as
     expect(await activeView(orcaPage)).toBe(before)
 
     await openInbox(orcaPage)
-    await orcaPage
-      .frameLocator('iframe[title="Inbox"]')
-      .getByRole('button', { name: 'Close from inside the panel' })
-      .click()
-    await expect(orcaPage.locator('iframe[title="Inbox"]')).toHaveCount(0)
+    const frame = orcaPage.frameLocator('iframe[title="Inbox"]')
+    await frame.getByRole('button', { name: 'Close from inside the panel' }).click()
+    // Why: a refused call leaves the page open; name the bridge reply instead of a bare count.
+    await expect
+      .poll(
+        async () => {
+          if ((await orcaPage.locator('iframe[title="Inbox"]').count()) === 0) {
+            return 'closed'
+          }
+          return (
+            (await frame
+              .locator('#reply')
+              .textContent({ timeout: 500 })
+              .catch(() => null)) || 'no reply yet'
+          )
+        },
+        { timeout: 10_000 }
+      )
+      .toBe('closed')
     expect(await activeView(orcaPage)).toBe(before)
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
