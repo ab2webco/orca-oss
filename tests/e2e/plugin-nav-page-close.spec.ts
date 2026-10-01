@@ -26,7 +26,6 @@ const PANEL_HTML = `<!doctype html>
     <p id="reply"></p>
     <script>
       'use strict'
-      document.body.dataset.loadedAt = String(Date.now()) + '-' + String(Math.random()).slice(2, 8)
       window.addEventListener('message', function (event) {
         if (event.data && event.data.type === 'orca-panel-action-result') {
           document.getElementById('reply').textContent = JSON.stringify(event.data)
@@ -122,69 +121,25 @@ test('a nav plugin page closes from the host button, Escape and panel.close', as
     await expect(orcaPage.locator('iframe[title="Inbox"]')).toHaveCount(0)
     expect(await activeView(orcaPage)).toBe(before)
 
-    await orcaPage.evaluate(() => {
-      const w = window as unknown as { __probe: { loads: number; srcdoc: number; msgs: string[] } }
-      w.__probe = { loads: 0, srcdoc: 0, msgs: [] }
-      window.addEventListener(
-        'message',
-        (event) => {
-          const data = event.data as { type?: string; action?: string } | null
-          if (data && data.type === 'orca-panel-action') {
-            const iframe = document.querySelector(
-              'iframe[title="Inbox"]'
-            ) as HTMLIFrameElement | null
-            w.__probe.msgs.push(`${data.action}:${event.source === iframe?.contentWindow}`)
-          }
-        },
-        true
-      )
-      new MutationObserver((records) => {
-        for (const r of records) {
-          for (const n of Array.from(r.addedNodes)) {
-            if (n instanceof HTMLIFrameElement && n.title === 'Inbox') {
-              n.addEventListener('load', () => (w.__probe.loads += 1))
-            }
-            if (n instanceof HTMLElement) {
-              for (const f of Array.from(n.querySelectorAll('iframe[title="Inbox"]'))) {
-                f.addEventListener('load', () => (w.__probe.loads += 1))
-              }
-            }
-          }
-          if (r.type === 'attributes' && r.attributeName === 'srcdoc') {
-            w.__probe.srcdoc += 1
-          }
-        }
-      }).observe(document.body, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ['srcdoc']
-      })
-    })
     await openInbox(orcaPage)
     const frame = orcaPage.frameLocator('iframe[title="Inbox"]')
     // Why: the button can be clickable before the script that wires it has run.
     await expect(frame.locator('body[data-ready="true"]')).toHaveCount(1)
-    const loadedAt = await frame.locator('body').getAttribute('data-loaded-at')
-    await frame.getByRole('button', { name: 'Close from inside the panel' }).click()
+    // Why: the E2E window is never shown, so a coordinate click never reaches the sandboxed frame.
+    await frame.getByRole('button', { name: 'Close from inside the panel' }).dispatchEvent('click')
+    // Why: a refused call leaves the page open; name the bridge reply instead of a bare count.
     await expect
       .poll(
         async () => {
-          const probe = await orcaPage.evaluate(() =>
-            JSON.stringify((window as unknown as { __probe: unknown }).__probe)
-          )
           if ((await orcaPage.locator('iframe[title="Inbox"]').count()) === 0) {
             return 'closed'
           }
-          const reply = await frame
-            .locator('#reply')
-            .textContent({ timeout: 500 })
-            .catch(() => '<unreadable>')
-          const nowLoaded = await frame
-            .locator('body')
-            .getAttribute('data-loaded-at', { timeout: 500 })
-            .catch(() => '<unreadable>')
-          return `reply=${reply}|doc=${nowLoaded === loadedAt ? 'same' : 'changed'}|probe=${probe}`
+          return (
+            (await frame
+              .locator('#reply')
+              .textContent({ timeout: 500 })
+              .catch(() => '<unreadable>')) || 'no reply yet'
+          )
         },
         { timeout: 10_000 }
       )
