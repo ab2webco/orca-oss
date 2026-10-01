@@ -54,7 +54,6 @@ import {
   parsePtyStartupIngressIntent,
   type PtyIngressEmission
 } from '../shared/pty-startup-ingress'
-import { takeLiveQueryReply } from '../shared/terminal-query-reply'
 import { resolvePtyOwnerBackend, type PtyOwnerBackend } from '../shared/pty-owner-backend'
 import { RecentPtyOutputBuffer } from '../main/runtime/recent-pty-output-buffer'
 import { expandWindowsPathEnvironmentVariables } from '../shared/windows-environment-expansion'
@@ -78,7 +77,7 @@ import {
   isAgentSessionSurfaceBinding,
   type AgentSessionOwnerBinding
 } from '../shared/agent-session-host-authority'
-import { createPtySlaveEchoProbe, readPtySlavePath } from '../shared/pty-slave-line-discipline-echo'
+import { readPtySlavePath } from '../shared/pty-slave-line-discipline-echo'
 
 // Why: only Linux compiles node-pty (no prebuilt), so the build-tools remedy is a closable setup gap
 // there and wrong advice anywhere node-pty ships one. The relay only sees an unloadable binding, never
@@ -728,13 +727,11 @@ export class PtyHandler {
           : {}
       )
     }
-    const echoProbe = createPtySlaveEchoProbe(readPtySlavePath(managed.pty))
     managed.startupIngress ??= new PtyStartupIngress({
       ...(managed.startupIngressIntent ? { intent: managed.startupIngressIntent } : {}),
       ownerBackend: managed.ownerBackend,
       write: (data) => managed.pty.write(data),
-      onEmission: emitIngressData,
-      ...(echoProbe ? { echoProbe } : {})
+      onEmission: emitIngressData
     })
     const startup = managed.startupCommand
     if (startup?.waitForShellReady) {
@@ -1771,7 +1768,8 @@ export class PtyHandler {
       this.lastInputAtByPty.set(id, performance.now())
       this.interactiveOutputCharsByPty.set(id, 0)
       // Relay PTYs need the local provider's cooked-echo containment (#13137).
-      if (takeLiveQueryReply(managed.startupIngress, data)) {
+      // DA1/CPR stay immediate unless an echo-risk reply is already held (#13892, #15559).
+      if (managed.startupIngress?.answerLiveQueryReply(data)) {
         return
       }
       managed.pty.write(data)

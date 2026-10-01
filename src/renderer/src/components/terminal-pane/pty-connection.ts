@@ -8067,11 +8067,7 @@ export function connectPanePty(
         schedulePendingStartupCommandDelivery()
         return
       }
-      if (pendingForegroundQuery?.statelessQueryData) {
-        writePtyOutputToXterm(pendingForegroundQuery.statelessQueryData, true, {
-          hiddenStartupRendererQuery: true
-        })
-      }
+      // Keep source order aligned with sibling producers; xterm's async write buffer made the old inversion latent.
       if (pendingForegroundQuery?.oscColorQueryData) {
         sendTerminalOscColorQueryReplies(
           pendingForegroundQuery.oscColorQueryData,
@@ -8079,6 +8075,11 @@ export function connectPanePty(
           // Why: OSC color reply sent immediately so the remote debounce can't delay it past the program's read window (#7329).
           sendDesktopQueryReplyImmediate
         )
+      }
+      if (pendingForegroundQuery?.statelessQueryData) {
+        writePtyOutputToXterm(pendingForegroundQuery.statelessQueryData, true, {
+          hiddenStartupRendererQuery: true
+        })
       }
       const restoreAppliesToCurrentPty =
         hiddenOutputRestorePtyId !== null && transport.getPtyId() === hiddenOutputRestorePtyId
