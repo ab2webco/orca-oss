@@ -14653,7 +14653,8 @@
         "pluginPanelBridgeHost": {
           "actionsUnavailable": "このクライアントではプラグイン操作を利用できません。",
           "messageTooLarge": "メッセージがサイズ制限を超えています。",
-          "tooManyRequests": "リクエストが多すぎます。"
+          "tooManyRequests": "リクエストが多すぎます。",
+          "closeUnavailable": "このパネルは内側から閉じることができません。"
         }
       },
       "link": {
@@ -15022,6 +15023,11 @@
           "updateDescription": "新しいバージョンでプラグインの宣言内容が変わったため、確認するまで無効のままです。その間、ここでは何も実行されません。",
           "installDescription": "初めて実行する前に、このプラグインに許可される操作を確認してください。その間、ここでは何も実行されません。",
           "reviewAndEnable": "確認して有効化"
+        },
+        "PluginNavPage": {
+          "closePanel": "{{title}}を閉じる",
+          "close": "閉じる",
+          "closeTooltip": "閉じる・Esc"
         }
       }
     },

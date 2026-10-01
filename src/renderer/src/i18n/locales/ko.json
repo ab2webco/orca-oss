@@ -14675,7 +14675,8 @@
         "pluginPanelBridgeHost": {
           "actionsUnavailable": "이 클라이언트에서는 플러그인 작업을 사용할 수 없습니다.",
           "messageTooLarge": "메시지가 크기 제한을 초과합니다.",
-          "tooManyRequests": "요청이 너무 많습니다."
+          "tooManyRequests": "요청이 너무 많습니다.",
+          "closeUnavailable": "이 패널은 내부에서 닫을 수 없습니다."
         }
       },
       "link": {
@@ -15044,6 +15045,11 @@
           "updateDescription": "새 버전에서 플러그인이 선언한 내용이 바뀌었으므로 검토할 때까지 꺼진 상태로 유지됩니다. 그동안 여기서는 아무것도 실행되지 않습니다.",
           "installDescription": "이 플러그인이 처음 실행되기 전에 무엇을 할 수 있는지 검토하세요. 그동안 여기서는 아무것도 실행되지 않습니다.",
           "reviewAndEnable": "검토 후 사용"
+        },
+        "PluginNavPage": {
+          "closePanel": "{{title}} 닫기",
+          "close": "닫기",
+          "closeTooltip": "닫기 · Esc"
         }
       }
     },

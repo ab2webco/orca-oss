@@ -1,5 +1,6 @@
 import {
   PANEL_ACTION_RESULT_TYPE,
+  PANEL_CLOSE_ACTION,
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
   looksLikePanelActionRequest,
   parsePanelActionRequest,
@@ -39,6 +40,8 @@ export type PanelBridgeHostOptions = {
   /** False once the requesting panel document/session has been replaced. */
   isActive?: () => boolean
   onPong?: (pingId: number) => void
+  /** Closes the page hosting this panel; omitted on surfaces with nothing to close. */
+  closePanel?: () => void
   /** Injectable for tests; defaults to the shared per-plugin budget. */
   budget?: PanelMessageBudget
   /** Reserved liveness budget; defaults to the shared control-frame budget. */
@@ -155,9 +158,38 @@ export function createPanelBridgeMessageHandler(
       return
     }
     const { requestId, action, params } = parsed.request
+    const closePanel = options.closePanel
+    if (action === PANEL_CLOSE_ACTION && !closePanel) {
+      respond({
+        type: PANEL_ACTION_RESULT_TYPE,
+        requestId,
+        ok: false,
+        errorCode: 'unavailable',
+        error: translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.closeUnavailable',
+          'This panel cannot be closed from inside it.'
+        )
+      })
+      return
+    }
     options
       .callPanelAction({ sessionToken: options.sessionToken, action, params })
       .then((outcome) => {
+        if (action === PANEL_CLOSE_ACTION && outcome.ok && closePanel) {
+          const stillMounted =
+            options.isActive?.() !== false && options.getPanelWindow() === requestingWindow
+          if (stillMounted) {
+            // Why: reply first — closing unmounts the frame and a later reply is dropped.
+            respond({
+              type: PANEL_ACTION_RESULT_TYPE,
+              requestId,
+              ok: true,
+              value: { closed: true }
+            })
+            closePanel()
+          }
+          return
+        }
         respond(
           outcome.ok
             ? { type: PANEL_ACTION_RESULT_TYPE, requestId, ok: true, value: outcome.value }

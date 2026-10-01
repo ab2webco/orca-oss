@@ -2,7 +2,11 @@ import type {
   PluginPanelActionOutcome,
   PluginPanelEntry
 } from '../../shared/plugins/plugin-panel-bridge'
-import { panelActionCallSchema } from '../../shared/plugins/plugin-panel-bridge'
+import {
+  PANEL_CLOSE_ACTION,
+  panelActionCallSchema,
+  panelCloseParamsSchema
+} from '../../shared/plugins/plugin-panel-bridge'
 import {
   admitPluginPanelCall,
   createPluginPanelCallAdmission,
@@ -90,6 +94,12 @@ export class PluginPanelController {
       !panelExists
     ) {
       return { ok: false, code: 'unavailable', error: 'panel session is no longer available' }
+    }
+    if (parsed.data.action === PANEL_CLOSE_ACTION) {
+      // Why: main only authorizes; the page is renderer state, closed by its host.
+      return panelCloseParamsSchema.safeParse(parsed.data.params).success
+        ? { ok: true, value: null }
+        : { ok: false, code: 'invalid_params', error: 'panel.close takes no params' }
     }
     return this.options.executeHostCall(binding.pluginKey, parsed.data.action, parsed.data.params)
   }

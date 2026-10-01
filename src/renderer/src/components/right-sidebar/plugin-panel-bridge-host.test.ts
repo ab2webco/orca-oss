@@ -328,3 +328,135 @@ describe('createPanelBridgeMessageHandler', () => {
     expect(onPong).not.toHaveBeenCalled()
   })
 })
+
+describe('createPanelBridgeMessageHandler panel.close', () => {
+  const CLOSE_DATA = { type: 'orca-panel-action', requestId: 'close-1', action: 'panel.close' }
+
+  function createCloseHandler(
+    panelWindow: FakePanelWindow,
+    options: {
+      outcome?: PluginPanelActionOutcome
+      closePanel?: () => void
+      isActive?: () => boolean
+    } = {}
+  ): { handler: (event: MessageEvent) => void; callPanelAction: ReturnType<typeof vi.fn> } {
+    const callPanelAction = vi.fn().mockResolvedValue(options.outcome ?? { ok: true, value: null })
+    const handler = createPanelBridgeMessageHandler({
+      sessionToken: SESSION_TOKEN,
+      getPanelWindow: () => panelWindow,
+      callPanelAction,
+      closePanel: options.closePanel,
+      isActive: options.isActive
+    })
+    return { handler, callPanelAction }
+  }
+
+  it('closes the page once main authorizes it, answering before the frame goes away', async () => {
+    const panelWindow = createFakePanelWindow()
+    const closePanel = vi.fn()
+    const { handler, callPanelAction } = createCloseHandler(panelWindow, { closePanel })
+
+    handler(messageEvent(CLOSE_DATA, panelWindow))
+    await flush()
+
+    expect(callPanelAction).toHaveBeenCalledWith({
+      sessionToken: SESSION_TOKEN,
+      action: 'panel.close',
+      params: undefined
+    })
+    expect(panelWindow.postMessage).toHaveBeenCalledWith(
+      {
+        type: 'orca-panel-action-result',
+        requestId: 'close-1',
+        ok: true,
+        value: { closed: true }
+      },
+      '*'
+    )
+    expect(closePanel).toHaveBeenCalledTimes(1)
+    expect(panelWindow.postMessage.mock.invocationCallOrder[0]).toBeLessThan(
+      closePanel.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('answers unavailable on a surface whose host offers no close', async () => {
+    const panelWindow = createFakePanelWindow()
+    const { handler, callPanelAction } = createCloseHandler(panelWindow)
+
+    handler(messageEvent(CLOSE_DATA, panelWindow))
+    await flush()
+
+    expect(callPanelAction).not.toHaveBeenCalled()
+    expect(panelWindow.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'close-1', ok: false, errorCode: 'unavailable' }),
+      '*'
+    )
+  })
+
+  it('keeps the page open when main refuses the call', async () => {
+    const panelWindow = createFakePanelWindow()
+    const closePanel = vi.fn()
+    const { handler } = createCloseHandler(panelWindow, {
+      closePanel,
+      outcome: { ok: false, code: 'invalid_params', error: 'panel.close takes no params' }
+    })
+
+    handler(messageEvent({ ...CLOSE_DATA, params: { tabKey: 'other' } }, panelWindow))
+    await flush()
+
+    expect(closePanel).not.toHaveBeenCalled()
+    expect(panelWindow.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ ok: false, errorCode: 'invalid_params' }),
+      '*'
+    )
+  })
+
+  it('does not close a page whose panel session was replaced while main answered', async () => {
+    const panelWindow = createFakePanelWindow()
+    const closePanel = vi.fn()
+    let active = true
+    const { handler } = createCloseHandler(panelWindow, { closePanel, isActive: () => active })
+
+    handler(messageEvent(CLOSE_DATA, panelWindow))
+    active = false
+    await flush()
+
+    expect(closePanel).not.toHaveBeenCalled()
+  })
+
+  it('ignores a close request from any window other than the panel', async () => {
+    const panelWindow = createFakePanelWindow()
+    const closePanel = vi.fn()
+    const { handler, callPanelAction } = createCloseHandler(panelWindow, { closePanel })
+
+    handler(messageEvent(CLOSE_DATA, createFakePanelWindow()))
+    await flush()
+
+    expect(callPanelAction).not.toHaveBeenCalled()
+    expect(closePanel).not.toHaveBeenCalled()
+  })
+
+  it('spends the panel message budget like every other action', async () => {
+    const panelWindow = createFakePanelWindow()
+    const closePanel = vi.fn()
+    const callPanelAction = vi.fn().mockResolvedValue({ ok: true, value: null })
+    const handler = createPanelBridgeMessageHandler({
+      sessionToken: SESSION_TOKEN,
+      getPanelWindow: () => panelWindow,
+      callPanelAction,
+      closePanel,
+      budget: createPanelMessageBudget({ maxMessages: 1, perMs: 10_000 }),
+      now: () => 0
+    })
+
+    handler(messageEvent({ ...CLOSE_DATA, requestId: 'close-a' }, panelWindow))
+    handler(messageEvent({ ...CLOSE_DATA, requestId: 'close-b' }, panelWindow))
+    await flush()
+
+    expect(callPanelAction).toHaveBeenCalledTimes(1)
+    expect(panelWindow.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'close-b', ok: false, errorCode: 'rate_limited' }),
+      '*'
+    )
+  })
+})
