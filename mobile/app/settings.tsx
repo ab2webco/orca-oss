@@ -30,6 +30,7 @@ import {
   subscribePendingHostCredentialCleanup
 } from '../src/transport/host-credential-cleanup'
 import { retryPendingHostCredentialCleanup } from '../src/transport/host-store'
+import { ORCA_REPOSITORY_URL } from '../../src/shared/orca-repository-url'
 
 export default function SettingsScreen() {
   const router = useRouter()
@@ -224,7 +225,7 @@ export default function SettingsScreen() {
           <View style={styles.separator} />
           <Pressable
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => void Linking.openURL('https://github.com/stablyai/orca/issues')}
+            onPress={() => void Linking.openURL(`${ORCA_REPOSITORY_URL}/issues`)}
           >
             <LifeBuoy size={16} color={colors.textSecondary} />
             <Text style={styles.rowLabel}>Support</Text>

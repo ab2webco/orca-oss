@@ -1,7 +1,8 @@
 import { Fragment, type ReactNode } from 'react'
 import { View, Text, StyleSheet, Pressable, Linking } from 'react-native'
-import { Globe } from 'lucide-react-native'
+import { UserRound } from 'lucide-react-native'
 import Svg, { Path } from 'react-native-svg'
+import { ORCA_REPOSITORY_LABEL, ORCA_REPOSITORY_URL } from '../../../src/shared/orca-repository-url'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 
 function GithubIcon({ size = 16, color = colors.textSecondary }) {
@@ -20,43 +21,66 @@ function XIcon({ size = 16, color = colors.textSecondary }) {
   )
 }
 
-type AboutLink = {
+type AboutRow = {
   key: string
   icon: ReactNode
   label: string
-  url: string
+  url: string | null
 }
 
-const ABOUT_LINKS: readonly AboutLink[] = [
+const AUTHOR_NAME = 'Fabian Altahona'
+const AUTHOR_X_HANDLE = 'fabolivar23'
+
+const ABOUT_ROWS: readonly AboutRow[] = [
   {
-    key: 'site',
-    icon: <Globe size={16} color={colors.textSecondary} />,
-    label: 'onOrca.dev',
-    url: 'https://onOrca.dev'
+    key: 'author',
+    icon: <UserRound size={16} color={colors.textSecondary} />,
+    label: AUTHOR_NAME,
+    url: null
   },
   {
     key: 'github',
     icon: <GithubIcon />,
-    label: 'stablyai/orca',
-    url: 'https://github.com/stablyai/orca'
+    label: ORCA_REPOSITORY_LABEL.replace('github.com/', ''),
+    url: ORCA_REPOSITORY_URL
   },
-  { key: 'x', icon: <XIcon />, label: '@orca_build', url: 'https://x.com/orca_build' }
+  {
+    key: 'x',
+    icon: <XIcon />,
+    label: `@${AUTHOR_X_HANDLE}`,
+    url: `https://x.com/${AUTHOR_X_HANDLE}`
+  }
 ]
+
+function AboutRowView({ row }: { row: AboutRow }) {
+  const content = (
+    <>
+      {row.icon}
+      <Text style={styles.rowValue}>{row.label}</Text>
+    </>
+  )
+  const url = row.url
+  if (url === null) {
+    return <View style={styles.row}>{content}</View>
+  }
+  return (
+    <Pressable
+      accessibilityRole="link"
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={() => void Linking.openURL(url)}
+    >
+      {content}
+    </Pressable>
+  )
+}
 
 export function AboutLinks() {
   return (
     <View style={styles.section}>
-      {ABOUT_LINKS.map((link, index) => (
-        <Fragment key={link.key}>
+      {ABOUT_ROWS.map((row, index) => (
+        <Fragment key={row.key}>
           {index > 0 ? <View style={styles.separator} /> : null}
-          <Pressable
-            accessibilityRole="link"
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => void Linking.openURL(link.url)}
-          >
-            {link.icon}
-            <Text style={styles.rowValue}>{link.label}</Text>
-          </Pressable>
+          <AboutRowView row={row} />
         </Fragment>
       ))}
     </View>
