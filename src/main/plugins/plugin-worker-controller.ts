@@ -28,6 +28,7 @@ export type PluginWorkerControllerOptions = {
   capabilities: (pluginKey: string) => readonly PluginCapabilityKind[] | null
   findPlugin: (pluginKey: string) => ValidDiscoveredPlugin | null
   isCurrentApproved: (plugin: ValidDiscoveredPlugin) => boolean
+  whenRefreshSettled: () => Promise<void>
   invokeCommand: (pluginKey: string, commandId: string, args: unknown) => Promise<unknown>
   executeHostCall: (
     pluginKey: string,
@@ -49,7 +50,8 @@ export class PluginWorkerController {
     this.restore = new PluginWorkerRestore({
       findPlugin: options.findPlugin,
       isRestorable: options.isCurrentApproved,
-      ensure: (plugin) => this.ensure(plugin)
+      ensure: (plugin) => this.ensure(plugin),
+      whenSettled: options.whenRefreshSettled
     })
     this.manager = new PluginWorkerManager({
       entryPath: options.entryPath,
@@ -162,8 +164,8 @@ export class PluginWorkerController {
   }
 
   async dispose(): Promise<void> {
+    await this.restore.stop()
     await this.manager.disposeAll()
-    await this.restore.settled()
   }
 
   private registerCommands(

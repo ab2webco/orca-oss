@@ -324,6 +324,23 @@ describe('PluginService worker reconciliation', () => {
     expect(harness.service.activationError(pluginKey)).toBeNull()
   })
 
+  it('restarts a running worker when a second refresh replaces the revision mid-restore', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await writeFile(
+      join(root, 'orca-plugin.json'),
+      JSON.stringify(manifest({ main: 'worker-v2.js' }))
+    )
+
+    // A settings write refreshes on its own, and callers often refresh right after it.
+    await Promise.all([harness.service.refresh(), harness.service.refresh()])
+    await settleWorkerRestore()
+
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+    expect(harness.service.activationError(pluginKey)).toBeNull()
+  })
+
   it('does not start a worker that was not running when its spec changes', async () => {
     const root = await pluginRoot()
     const harness = createHarness(root)

@@ -36,7 +36,7 @@ import {
 import { PluginContentPackRegistry } from './plugin-content-pack-registry'
 import type { PluginServiceOptions } from './plugin-service-options'
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
-import { waitForPluginRefreshSettlement } from './plugin-refresh-settlement'
+import { PluginRefreshQueue } from './plugin-refresh-settlement'
 import { assertPluginWorkerCommand } from './plugin-command-invocation'
 import { deliverPluginEvent } from './plugin-event-delivery'
 
@@ -59,7 +59,7 @@ export class PluginService {
   private discovered: DiscoveredPlugin[] = []
   private runtimeDelegate: PluginRuntimeDelegate | null = null
   private initPromise: Promise<void> | null = null
-  private refreshChain: Promise<void> = Promise.resolve()
+  private readonly refreshQueue = new PluginRefreshQueue()
   private contentPacksReady = false
   private disposed = false
 
@@ -90,6 +90,7 @@ export class PluginService {
       findPlugin: (pluginKey) => this.findValidPlugin(pluginKey),
       isCurrentApproved: (plugin) =>
         this.findValidPlugin(plugin.pluginKey) === plugin && this.isRuntimeApproved(plugin),
+      whenRefreshSettled: () => this.refreshQueue.settled(),
       invokeCommand: (pluginKey, commandId, args) => this.invokeCommand(pluginKey, commandId, args),
       executeHostCall: (pluginKey, method, params) =>
         this.executeHostCall(pluginKey, method, params, { viaPanel: false }),
@@ -123,16 +124,14 @@ export class PluginService {
     await (this.initPromise ?? Promise.resolve()).catch(() => undefined)
     // Client reads wait for the complete transaction so rollback-based content
     // validation cannot expose a partially activated plugin between passes.
-    await waitForPluginRefreshSettlement(() => this.refreshChain)
+    await this.refreshQueue.settled()
   }
 
   refresh(): Promise<void> {
     // Snapshot settings at request time so a quick off→on sequence still
     // processes the off transition and revokes old workers/panel sessions.
     const inputs = snapshotPluginRefreshInputs(this.options)
-    const refresh = this.refreshChain.then(() => this.performRefresh(inputs))
-    this.refreshChain = refresh.catch(() => undefined)
-    return refresh
+    return this.refreshQueue.enqueue(() => this.performRefresh(inputs))
   }
 
   private async performRefresh({
@@ -308,9 +307,7 @@ export class PluginService {
   /** Reconciles live workers and client projections after consent or
    * enablement changes without re-reading plugin files or starting workers. */
   async reconcileActivationState(): Promise<void> {
-    const reconcile = this.refreshChain.then(() => this.performActivationStateReconciliation())
-    this.refreshChain = reconcile.catch(() => undefined)
-    return reconcile
+    return this.refreshQueue.enqueue(() => this.performActivationStateReconciliation())
   }
 
   private async performActivationStateReconciliation(): Promise<void> {
@@ -332,7 +329,7 @@ export class PluginService {
     this.disposed = true
     this.housekeeping.dispose()
     this.panels.dispose()
-    await this.refreshChain.catch(() => undefined)
+    await this.refreshQueue.settled()
     await this.workerController.dispose()
     await this.audit.flush()
   }

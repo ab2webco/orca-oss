@@ -5,6 +5,8 @@ export type PluginWorkerRestoreOptions = {
   findPlugin: (pluginKey: string) => ValidDiscoveredPlugin | null
   isRestorable: (plugin: ValidDiscoveredPlugin) => boolean
   ensure: (plugin: ValidDiscoveredPlugin) => Promise<unknown>
+  /** Resolves once no refresh is in flight. */
+  whenSettled: () => Promise<void>
 }
 
 /**
@@ -15,6 +17,7 @@ export type PluginWorkerRestoreOptions = {
 export class PluginWorkerRestore {
   private readonly pending = new Set<string>()
   private chain: Promise<void> = Promise.resolve()
+  private stopped = false
 
   constructor(private readonly options: PluginWorkerRestoreOptions) {}
 
@@ -29,28 +32,38 @@ export class PluginWorkerRestore {
     }
   }
 
-  settled(): Promise<void> {
+  /** Starts no further worker; resolves when the pass in flight is done. */
+  stop(): Promise<void> {
+    this.stopped = true
     return this.chain
   }
 
   private async restorePending(): Promise<void> {
-    await Promise.all(
-      [...this.pending].map(async (pluginKey) => {
-        const plugin = this.options.findPlugin(pluginKey)
-        if (!plugin?.manifest.main || !this.options.isRestorable(plugin)) {
+    // A refresh in flight has already revoked runtime approval but not yet
+    // published its revision, so starting now would fail for no real reason.
+    await this.options.whenSettled()
+    await Promise.all([...this.pending].map((pluginKey) => this.restore(pluginKey)))
+  }
+
+  private async restore(pluginKey: string): Promise<void> {
+    for (;;) {
+      const plugin = this.options.findPlugin(pluginKey)
+      if (this.stopped || !plugin?.manifest.main || !this.options.isRestorable(plugin)) {
+        this.pending.delete(pluginKey)
+        return
+      }
+      try {
+        await this.options.ensure(plugin)
+        this.pending.delete(pluginKey)
+        return
+      } catch {
+        await this.options.whenSettled()
+        // A newer refresh replaced this revision mid-start; start that one instead.
+        if (this.options.findPlugin(pluginKey) === plugin) {
           this.pending.delete(pluginKey)
           return
         }
-        try {
-          await this.options.ensure(plugin)
-          this.pending.delete(pluginKey)
-        } catch {
-          // A newer refresh replaced this revision; its own pass retries it.
-          if (this.options.findPlugin(pluginKey) === plugin) {
-            this.pending.delete(pluginKey)
-          }
-        }
-      })
-    )
+      }
+    }
   }
 }

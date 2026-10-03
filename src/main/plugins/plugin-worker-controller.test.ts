@@ -71,6 +71,7 @@ function controller(options: {
     capabilities: () => (options.isApproved() ? [] : null),
     findPlugin: () => null,
     isCurrentApproved: () => options.isApproved(),
+    whenRefreshSettled: async () => undefined,
     invokeCommand: vi.fn(async () => null),
     executeHostCall: vi.fn(async () => ({ ok: true as const, value: null })),
     log: vi.fn(),
