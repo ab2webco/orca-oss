@@ -15,6 +15,7 @@ import {
 } from './plugin-worker-manager'
 import { buildPluginWorkerSpawnSpec, pluginWorkerSpawnSpecsEqual } from './plugin-worker-spawn-spec'
 import type { PluginWorkerHandle } from './plugin-host-process'
+import { PluginWorkerRestore } from './plugin-worker-restore'
 import type { PluginRunState } from './plugin-supervisor'
 
 export type PluginWorkerControllerOptions = {
@@ -25,6 +26,7 @@ export type PluginWorkerControllerOptions = {
   registry: PluginExtensionRegistry
   contentVerifier: PluginContentVerifier
   capabilities: (pluginKey: string) => readonly PluginCapabilityKind[] | null
+  findPlugin: (pluginKey: string) => ValidDiscoveredPlugin | null
   isCurrentApproved: (plugin: ValidDiscoveredPlugin) => boolean
   invokeCommand: (pluginKey: string, commandId: string, args: unknown) => Promise<unknown>
   executeHostCall: (
@@ -41,8 +43,14 @@ export class PluginWorkerController {
   private readonly manager: PluginWorkerManager
   private readonly activationErrors = new Map<string, string>()
   private readonly registeredSpecs = new Map<string, PluginWorkerSpawnSpec>()
+  private readonly restore: PluginWorkerRestore
 
   constructor(private readonly options: PluginWorkerControllerOptions) {
+    this.restore = new PluginWorkerRestore({
+      findPlugin: options.findPlugin,
+      isRestorable: options.isCurrentApproved,
+      ensure: (plugin) => this.ensure(plugin)
+    })
     this.manager = new PluginWorkerManager({
       entryPath: options.entryPath,
       maxActive: options.maxActive,
@@ -116,18 +124,26 @@ export class PluginWorkerController {
     }
   }
 
+  /** Stops workers whose spec changed or left, then restarts the ones that were
+   * running and are still approved; a stopped idle worker stays down. */
   async reconcile(nextSpecs: ReadonlyMap<string, PluginWorkerSpawnSpec>): Promise<void> {
     const current = new Map([...this.registeredSpecs, ...this.manager.trackedSpecs()])
+    const stoppedWhileRunning: string[] = []
     for (const [pluginKey, spec] of current) {
       const next = nextSpecs.get(pluginKey)
       if (next && pluginWorkerSpawnSpecsEqual(spec, next)) {
         continue
+      }
+      const runState = this.manager.runState(pluginKey)
+      if (runState === 'running' || runState === 'restarting') {
+        stoppedWhileRunning.push(pluginKey)
       }
       this.options.registry.clearPlugin(pluginKey)
       this.registeredSpecs.delete(pluginKey)
       this.activationErrors.delete(pluginKey)
       await this.manager.deactivate(pluginKey)
     }
+    this.restore.schedule(stoppedWhileRunning, new Set(nextSpecs.keys()))
   }
 
   async deactivate(pluginKey: string): Promise<void> {
@@ -145,8 +161,9 @@ export class PluginWorkerController {
     this.manager.deliverEventIfRunning(pluginKey, event, payload)
   }
 
-  dispose(): Promise<void> {
-    return this.manager.disposeAll()
+  async dispose(): Promise<void> {
+    await this.manager.disposeAll()
+    await this.restore.settled()
   }
 
   private registerCommands(

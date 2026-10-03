@@ -69,6 +69,7 @@ function controller(options: {
     registry: createPluginExtensionRegistry(),
     contentVerifier: { verify: options.verify } as unknown as PluginContentVerifier,
     capabilities: () => (options.isApproved() ? [] : null),
+    findPlugin: () => null,
     isCurrentApproved: () => options.isApproved(),
     invokeCommand: vi.fn(async () => null),
     executeHostCall: vi.fn(async () => ({ ok: true as const, value: null })),

@@ -87,6 +87,7 @@ export class PluginService {
       registry: this.registry,
       contentVerifier: this.contentVerifier,
       capabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
+      findPlugin: (pluginKey) => this.findValidPlugin(pluginKey),
       isCurrentApproved: (plugin) =>
         this.findValidPlugin(plugin.pluginKey) === plugin && this.isRuntimeApproved(plugin),
       invokeCommand: (pluginKey, commandId, args) => this.invokeCommand(pluginKey, commandId, args),

@@ -101,6 +101,9 @@ function createHarness(root: string) {
   }
 }
 
+// Post-refresh restores run off the refresh chain, so give them a few turns to land.
+const settleWorkerRestore = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 50))
+
 async function activate(service: PluginService): Promise<void> {
   await service.initialize()
   await service.invokeCommand(pluginKey, 'run')
@@ -294,13 +297,15 @@ describe('PluginService worker reconciliation', () => {
 
     await harness.service.refresh()
 
+    await settleWorkerRestore()
     expect(harness.workers[0]!.dispose).toHaveBeenCalledOnce()
+    expect(harness.factory).toHaveBeenCalledTimes(1)
     expect(harness.service.activationState(harness.service.findValidPlugin(pluginKey)!)).toBe(
       'pending'
     )
   })
 
-  it('cancels the old generation when a worker spec changes without eager reactivation', async () => {
+  it('restarts a running worker on its new spec when a refresh replaces it', async () => {
     const root = await pluginRoot()
     const harness = createHarness(root)
     await activate(harness.service)
@@ -310,12 +315,47 @@ describe('PluginService worker reconciliation', () => {
     )
 
     await harness.service.refresh()
+    await settleWorkerRestore()
 
     expect(harness.workers[0]!.dispose).toHaveBeenCalledOnce()
-    expect(harness.factory).toHaveBeenCalledTimes(1)
-    await harness.service.invokeCommand(pluginKey, 'run')
     expect(harness.factory).toHaveBeenCalledTimes(2)
     expect(harness.factory.mock.calls[1]?.[0].mainEntry).toBe('worker-v2.js')
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+    expect(harness.service.activationError(pluginKey)).toBeNull()
+  })
+
+  it('does not start a worker that was not running when its spec changes', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await harness.service.initialize()
+    await writeFile(
+      join(root, 'orca-plugin.json'),
+      JSON.stringify(manifest({ main: 'worker-v2.js' }))
+    )
+
+    await harness.service.refresh()
+    await settleWorkerRestore()
+
+    expect(harness.factory).not.toHaveBeenCalled()
+    await harness.service.invokeCommand(pluginKey, 'run')
+    expect(harness.factory.mock.calls[0]?.[0].mainEntry).toBe('worker-v2.js')
+  })
+
+  it('does not restart a worker the idle reaper already stopped', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    harness.workers[0]!.lastActivityAt = () => 0
+    harness.service['workerController'].reapIdle()
+    await writeFile(
+      join(root, 'orca-plugin.json'),
+      JSON.stringify(manifest({ main: 'worker-v2.js' }))
+    )
+
+    await harness.service.refresh()
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(1)
   })
 
   it('cannot reactivate the old revision while refresh awaits worker shutdown', async () => {
