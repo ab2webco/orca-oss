@@ -7,7 +7,8 @@ import type { ValidDiscoveredPlugin } from './plugin-discovery'
 export async function verifyInstructionalPluginContent(
   plugin: ValidDiscoveredPlugin
 ): Promise<void> {
-  if (!hasInstructionalPluginContributions(plugin.manifest)) {
+  // A trusted dev folder's consent deliberately does not cover its bytes.
+  if (!hasInstructionalPluginContributions(plugin.manifest) || plugin.trustedDevFolder) {
     return
   }
   if (!plugin.consentContentHash) {

@@ -11,6 +11,10 @@ type PluginConsentSubject = Pick<PluginManifest, 'capabilities' | 'main'> & {
   >
 }
 
+/** Consent identity for instructional content in a dev folder the user trusts:
+ * stable across edits, but distinct from any tree hash so trusting re-prompts once. */
+export const TRUSTED_DEV_FOLDER_CONTENT_IDENTITY = 'trusted-dev-folder'
+
 export function hasInstructionalPluginContributions(manifest: PluginConsentSubject): boolean {
   const contributions = manifest.contributes
   return Boolean(
