@@ -166,9 +166,19 @@ plugin with none of those five contributions keeps its consent across an update
 that does not change capabilities or add `main`.
 
 For a dev-path plugin the identity is a live hash of the folder
-([`plugin-discovery.ts:131-137`](../../src/main/plugins/plugin-discovery.ts)), so
-editing any file in a plugin that declares an automation sends it back to
-`pending`. Budget for that while developing.
+([`plugin-discovery.ts:135-143`](../../src/main/plugins/plugin-discovery.ts)), so
+editing any file in a plugin that declares an automation — `.git` and caches
+included — sends it back to `pending`.
+
+To stop that while developing, tick **Trust changes in this folder** under the
+folder in **Settings → Plugins → Development**. The list is
+`trustedDevPluginPaths` ([`global-settings-types.ts:341`](../../src/shared/global-settings-types.ts)),
+empty by default. For a trusted folder part 3 is a fixed identity instead of the
+tree hash ([`plugin-consent-fingerprint.ts:16`](../../src/shared/plugins/plugin-consent-fingerprint.ts)):
+content edits keep the approval and instructional reads serve the current bytes,
+while a capability change or a new `main` still asks again. Ticking the box
+re-prompts once, because the fingerprint moves from the tree to the trusted
+identity. Untrusted folders and installed plugins keep the tree hash.
 
 ## Panels
 
@@ -592,6 +602,14 @@ event arrives ([`plugin-worker-manager.ts:46`](../../src/main/plugins/plugin-wor
 A manifest subscription is a durable activation trigger; a runtime
 `events.subscribe` only reaches a worker that is already running and dies with
 it ([`plugin-event-bus.ts:1-30`](../../src/main/plugins/plugin-event-bus.ts)).
+
+A refresh that changes a plugin's worker spec (its manifest, root or granted
+capabilities) stops the old worker. If that worker was running and the plugin is
+still approved, Orca starts it again on the new spec without waiting for a
+trigger ([`plugin-worker-controller.ts:129-147`](../../src/main/plugins/plugin-worker-controller.ts)).
+An idle or never-started worker stays down. Editing only the worker's code,
+with the manifest unchanged, does not stop it: the running worker keeps the old
+code until it stops (idle reap, disable and re-enable, or an app restart).
 
 ### Event payloads
 
