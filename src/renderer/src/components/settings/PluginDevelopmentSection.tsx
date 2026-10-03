@@ -43,9 +43,11 @@ export function PluginDevelopmentSection({
   const save = async (next: PluginDevelopmentFolders): Promise<boolean> => {
     setError(null)
     try {
+      // Main loads each folder once, so a repeat add is a no-op rather than a second row.
+      const paths = [...new Set(next.paths)]
       await onChange({
-        paths: next.paths,
-        trustedPaths: next.trustedPaths.filter((path) => next.paths.includes(path))
+        paths,
+        trustedPaths: [...new Set(next.trustedPaths)].filter((path) => paths.includes(path))
       })
       return true
     } catch (cause) {
@@ -100,7 +102,7 @@ export function PluginDevelopmentSection({
           )}
         </p>
         {paths.map((path, index) => (
-          <div key={`${path}-${index}`} className="space-y-2">
+          <div key={path} className="space-y-2">
             <div className="flex min-w-0 items-center gap-2">
               <span
                 className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs"

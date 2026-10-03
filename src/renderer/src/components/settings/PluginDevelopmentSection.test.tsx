@@ -72,4 +72,20 @@ describe('PluginDevelopmentSection folder trust', () => {
 
     expect(onChange).toHaveBeenCalledWith({ paths: ['/plugins/b'], trustedPaths: [] })
   })
+
+  it('does not load the same folder twice', async () => {
+    const { container, onChange } = render(['/plugins/a'], ['/plugins/a'])
+    const input = container.querySelector<HTMLInputElement>('input')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        '/plugins/a'
+      )
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    await act(async () => container.querySelector('form')!.requestSubmit())
+
+    expect(onChange).toHaveBeenCalledWith({ paths: ['/plugins/a'], trustedPaths: ['/plugins/a'] })
+  })
 })
