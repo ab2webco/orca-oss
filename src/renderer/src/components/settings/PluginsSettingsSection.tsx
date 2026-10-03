@@ -8,6 +8,7 @@ import { PluginConsentDialog } from './PluginConsentDialog'
 import { PluginInstallDialog } from './PluginInstallDialog'
 import { PluginRemoveDialog } from './PluginRemoveDialog'
 import { PluginRollbackDialog } from './PluginRollbackDialog'
+import type { PluginDevelopmentFolders } from './PluginDevelopmentSection'
 import { PluginSettingsOverview } from './PluginSettingsOverview'
 import { getPluginsSectionPresentation } from './plugins-search'
 import { SettingsSection } from './SettingsSection'
@@ -284,11 +285,14 @@ export function PluginsSettingsSection({
     await loadPluginList(window.api.plugins.refresh())
   }
 
-  const updateDevPaths = async (paths: string[]): Promise<void> => {
+  const updateDevPaths = async (folders: PluginDevelopmentFolders): Promise<void> => {
     setDevPathsBusy(true)
     setSettingsError(null)
     try {
-      await updateSettings({ devPluginPaths: paths })
+      await updateSettings({
+        devPluginPaths: folders.paths,
+        trustedDevPluginPaths: folders.trustedPaths
+      })
       await loadPluginList(window.api.plugins.refresh())
     } catch {
       const message = translate(
@@ -336,6 +340,7 @@ export function PluginsSettingsSection({
         openSettings={pluginSettings.openSettings}
         settingsFormByPlugin={pluginSettings.formStateByPlugin}
         devPaths={settings.devPluginPaths}
+        trustedDevPaths={settings.trustedDevPluginPaths}
         devPathsBusy={devPathsBusy}
         onToggleFeature={() => void toggleFeature()}
         onRefresh={refresh}

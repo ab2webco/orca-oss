@@ -10146,7 +10146,9 @@
           "remove": "削除",
           "pathLabel": "開発用プラグインのフォルダーパス",
           "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "add": "パスを追加"
+          "add": "パスを追加",
+          "trustLabel": "このフォルダーの変更を信頼する",
+          "trustHelp": "ここでファイルを編集しても、プラグインは承認されたままで、ワーカーも実行し続けます。新しい権限には引き続き確認が必要です。"
         },
         "PluginInstallDialog": {
           "localRequired": "プラグインフォルダーのパスを入力してください。",

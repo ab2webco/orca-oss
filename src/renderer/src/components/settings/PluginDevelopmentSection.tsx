@@ -2,13 +2,21 @@ import { useState } from 'react'
 import { ChevronRight, Loader2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 
+export type PluginDevelopmentFolders = {
+  paths: string[]
+  /** Subset of `paths` whose content edits keep the plugin approved. */
+  trustedPaths: string[]
+}
+
 type PluginDevelopmentSectionProps = {
   paths: readonly string[]
+  trustedPaths: readonly string[]
   busy: boolean
-  onChange: (paths: string[]) => Promise<void>
+  onChange: (folders: PluginDevelopmentFolders) => Promise<void>
 }
 
 function saveErrorMessage(cause: unknown): string {
@@ -21,11 +29,30 @@ function saveErrorMessage(cause: unknown): string {
 
 export function PluginDevelopmentSection({
   paths,
+  trustedPaths,
   busy,
   onChange
 }: PluginDevelopmentSectionProps): React.JSX.Element {
   const [pathInput, setPathInput] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const trustLabel = translate(
+    'auto.components.settings.PluginDevelopmentSection.trustLabel',
+    'Trust changes in this folder'
+  )
+
+  const save = async (next: PluginDevelopmentFolders): Promise<boolean> => {
+    setError(null)
+    try {
+      await onChange({
+        paths: next.paths,
+        trustedPaths: next.trustedPaths.filter((path) => next.paths.includes(path))
+      })
+      return true
+    } catch (cause) {
+      setError(saveErrorMessage(cause))
+      return false
+    }
+  }
 
   const addPath = async (): Promise<void> => {
     const path = pathInput.trim()
@@ -38,22 +65,25 @@ export function PluginDevelopmentSection({
       )
       return
     }
-    setError(null)
-    try {
-      await onChange([...paths, path])
+    if (await save({ paths: [...paths, path], trustedPaths: [...trustedPaths] })) {
       setPathInput('')
-    } catch (cause) {
-      setError(saveErrorMessage(cause))
     }
   }
 
   const removePath = async (index: number): Promise<void> => {
-    setError(null)
-    try {
-      await onChange(paths.filter((_, pathIndex) => pathIndex !== index))
-    } catch (cause) {
-      setError(saveErrorMessage(cause))
-    }
+    await save({
+      paths: paths.filter((_, pathIndex) => pathIndex !== index),
+      trustedPaths: [...trustedPaths]
+    })
+  }
+
+  const setTrusted = async (path: string, trusted: boolean): Promise<void> => {
+    await save({
+      paths: [...paths],
+      trustedPaths: trusted
+        ? [...trustedPaths, path]
+        : trustedPaths.filter((trustedPath) => trustedPath !== path)
+    })
   }
 
   return (
@@ -70,21 +100,41 @@ export function PluginDevelopmentSection({
           )}
         </p>
         {paths.map((path, index) => (
-          <div key={`${path}-${index}`} className="flex min-w-0 items-center gap-2">
-            <span
-              className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs"
-              title={path}
-            >
-              {path}
-            </span>
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={busy}
-              onClick={() => void removePath(index)}
-            >
-              {translate('auto.components.settings.PluginDevelopmentSection.remove', 'Remove')}
-            </Button>
+          <div key={`${path}-${index}`} className="space-y-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs"
+                title={path}
+              >
+                {path}
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={busy}
+                onClick={() => void removePath(index)}
+              >
+                {translate('auto.components.settings.PluginDevelopmentSection.remove', 'Remove')}
+              </Button>
+            </div>
+            <label className="flex w-fit max-w-2xl cursor-pointer items-start gap-2 pl-0.5 text-xs">
+              <Checkbox
+                className="mt-0.5"
+                checked={trustedPaths.includes(path)}
+                disabled={busy}
+                aria-label={`${trustLabel}: ${path}`}
+                onCheckedChange={(checked) => void setTrusted(path, checked === true)}
+              />
+              <span className="space-y-0.5">
+                <span className="block font-medium text-foreground">{trustLabel}</span>
+                <span className="block leading-5 text-muted-foreground">
+                  {translate(
+                    'auto.components.settings.PluginDevelopmentSection.trustHelp',
+                    'Edits to files here keep the plugin approved and its worker running. New permissions still need your review.'
+                  )}
+                </span>
+              </span>
+            </label>
           </div>
         ))}
         <form

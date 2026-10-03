@@ -483,7 +483,10 @@ describe('PluginsSettingsSection lifecycle', () => {
 
     await act(async () => click(add))
 
-    expect(updateSettings).toHaveBeenCalledWith({ devPluginPaths: ['C:\\plugins\\demo'] })
+    expect(updateSettings).toHaveBeenCalledWith({
+      devPluginPaths: ['C:\\plugins\\demo'],
+      trustedDevPluginPaths: []
+    })
     expect(window.api.plugins.refresh).toHaveBeenCalled()
   })
 

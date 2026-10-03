@@ -10157,7 +10157,9 @@
           "remove": "Eliminar",
           "pathLabel": "Ruta de la carpeta del plugin de desarrollo",
           "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "add": "Añadir ruta"
+          "add": "Añadir ruta",
+          "trustLabel": "Confiar en los cambios de esta carpeta",
+          "trustHelp": "Editar archivos aquí mantiene el plugin aprobado y su worker en ejecución. Los permisos nuevos siguen necesitando tu revisión."
         },
         "PluginInstallDialog": {
           "localRequired": "Introduce la ruta de la carpeta del plugin.",

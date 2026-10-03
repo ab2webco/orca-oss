@@ -10158,7 +10158,9 @@
           "remove": "移除",
           "pathLabel": "开发插件文件夹路径",
           "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "add": "添加路径"
+          "add": "添加路径",
+          "trustLabel": "信任此文件夹中的更改",
+          "trustHelp": "在此处编辑文件时，插件保持已批准状态，其 worker 继续运行。新权限仍需你审核。"
         },
         "PluginInstallDialog": {
           "localRequired": "请输入插件文件夹路径。",
