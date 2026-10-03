@@ -105,7 +105,7 @@ export function PluginDevelopmentSection({
           <div key={path} className="space-y-2">
             <div className="flex min-w-0 items-center gap-2">
               <span
-                className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs"
+                className="w-0 min-w-0 flex-1 truncate rounded-md border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs"
                 title={path}
               >
                 {path}
