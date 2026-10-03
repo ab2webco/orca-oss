@@ -3,10 +3,7 @@ import {
   capabilityKinds,
   type PluginCapabilityKind
 } from '../../shared/plugins/plugin-capabilities'
-import {
-  getPluginActivationState,
-  type PluginConsentLists
-} from '../../shared/plugins/plugin-consent-state'
+import { getPluginActivationState } from '../../shared/plugins/plugin-consent-state'
 import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel-bridge'
 import {
   createPluginExtensionRegistry,
@@ -31,7 +28,11 @@ import { PluginWorkerController } from './plugin-worker-controller'
 import { pluginDataWatchDir, PluginServiceHousekeeping } from './plugin-service-housekeeping'
 import { collectApprovedWorkerSpecs } from './plugin-worker-reconciliation'
 import type { PluginRunState } from './plugin-supervisor'
-import { isPluginApproved, snapshotPluginConsentLists } from './plugin-activation-policy'
+import {
+  isPluginApproved,
+  snapshotPluginRefreshInputs,
+  type PluginRefreshInputs
+} from './plugin-activation-policy'
 import { PluginContentPackRegistry } from './plugin-content-pack-registry'
 import type { PluginServiceOptions } from './plugin-service-options'
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
@@ -127,21 +128,17 @@ export class PluginService {
   refresh(): Promise<void> {
     // Snapshot settings at request time so a quick off→on sequence still
     // processes the off transition and revokes old workers/panel sessions.
-    const enabled = this.options.isPluginSystemEnabled()
-    const devPaths = this.options.getDevPluginPaths()
-    const consentLists = snapshotPluginConsentLists(this.options)
-    const refresh = this.refreshChain.then(() =>
-      this.performRefresh(enabled, devPaths, consentLists)
-    )
+    const inputs = snapshotPluginRefreshInputs(this.options)
+    const refresh = this.refreshChain.then(() => this.performRefresh(inputs))
     this.refreshChain = refresh.catch(() => undefined)
     return refresh
   }
 
-  private async performRefresh(
-    enabled: boolean,
-    devPaths: string[],
-    consentLists: PluginConsentLists
-  ): Promise<void> {
+  private async performRefresh({
+    enabled,
+    devPaths,
+    consentLists
+  }: PluginRefreshInputs): Promise<void> {
     if (this.disposed) {
       return
     }
