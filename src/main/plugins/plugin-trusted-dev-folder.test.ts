@@ -1,7 +1,15 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  fingerprintPluginConsent,
+  TRUSTED_DEV_FOLDER_CONTENT_IDENTITY
+} from '../../shared/plugins/plugin-consent-fingerprint'
+import { pluginManifestSchema } from '../../shared/plugins/plugin-manifest'
+import type { PluginWorkerHandle } from './plugin-host-process'
+import { PluginService } from './plugin-service'
+import type { PluginWorkerFactory } from './plugin-worker-manager'
 import {
   discoverPlugins,
   isInvalidDiscoveredPlugin,
@@ -10,8 +18,10 @@ import {
 import { verifyInstructionalPluginContent } from './plugin-instructional-content-integrity'
 
 const roots: string[] = []
+const services: PluginService[] = []
 
 afterEach(async () => {
+  await Promise.all(services.splice(0).map((service) => service.dispose()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -155,5 +165,64 @@ describe('trusted dev folder instructional reads', () => {
     await expect(verifyInstructionalPluginContent(plugin)).rejects.toThrow(
       'changed since it was reviewed'
     )
+  })
+})
+
+describe('trusted dev folder runtime', () => {
+  function serviceFor(root: string, trusted: string[]) {
+    const consent = fingerprintPluginConsent(
+      pluginManifestSchema.parse(skillManifest()),
+      TRUSTED_DEV_FOLDER_CONTENT_IDENTITY
+    )
+    const workers: { dispose: ReturnType<typeof vi.fn> }[] = []
+    const factory = vi.fn<PluginWorkerFactory>(async () => {
+      const handle: PluginWorkerHandle & { dispose: ReturnType<typeof vi.fn> } = {
+        commands: [],
+        invokeCommand: vi.fn(async () => null),
+        deliverEvent: vi.fn(),
+        lastActivityAt: () => Date.now(),
+        inFlightCount: () => 0,
+        dispose: vi.fn(async () => undefined),
+        kill: vi.fn(),
+        onExit: vi.fn()
+      }
+      workers.push(handle)
+      return handle
+    })
+    const service = new PluginService({
+      userDataPath: root,
+      hostVersion: '1.4.0',
+      isPluginSystemEnabled: () => true,
+      getDisabledPlugins: () => [],
+      getPluginConsents: () => ({ 'acme.whatsapp': consent }),
+      getDevPluginPaths: () => [root],
+      getTrustedDevPluginPaths: () => trusted,
+      workerFactory: factory
+    })
+    services.push(service)
+    return { service, workers }
+  }
+
+  it('keeps a trusted dev plugin approved and its worker up across content edits', async () => {
+    const root = await tempDir()
+    await skillPlugin(root)
+    const { service, workers } = serviceFor(root, [root])
+    await service.initialize()
+    await service['workerController'].ensure(service.findValidPlugin('acme.whatsapp')!)
+
+    await editContent(root)
+    await service.refresh()
+
+    expect(service.activationState(service.findValidPlugin('acme.whatsapp')!)).toBe('approved')
+    expect(workers[0]!.dispose).not.toHaveBeenCalled()
+  })
+
+  it('makes an untrusted dev plugin with the same consent pending', async () => {
+    const root = await tempDir()
+    await skillPlugin(root)
+    const { service } = serviceFor(root, [])
+    await service.initialize()
+
+    expect(service.activationState(service.findValidPlugin('acme.whatsapp')!)).toBe('pending')
   })
 })

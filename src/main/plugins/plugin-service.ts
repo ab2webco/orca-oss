@@ -138,6 +138,7 @@ export class PluginService {
   private async performRefresh({
     enabled,
     devPaths,
+    trustedDevPaths,
     consentLists
   }: PluginRefreshInputs): Promise<void> {
     if (this.disposed) {
@@ -152,6 +153,7 @@ export class PluginService {
       ? await discoverPlugins({
           pluginsDir: getUserPluginsDir(this.options.userDataPath),
           devPluginPaths: devPaths,
+          trustedDevPluginPaths: trustedDevPaths,
           hostVersion: this.options.hostVersion
         })
       : []

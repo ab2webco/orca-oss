@@ -330,6 +330,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     disabledPlugins: [],
     pluginConsents: {},
     devPluginPaths: [],
+    trustedDevPluginPaths: [],
     claudeAgentTeamsDefaultDisabledMigrated: true,
     skipDeleteWorktreeConfirm: false,
     skipCloseTerminalWithRunningProcessConfirm: false,

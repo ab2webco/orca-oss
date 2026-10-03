@@ -9,6 +9,7 @@ export type PluginServiceOptions = {
   getDisabledPlugins: () => string[]
   getPluginConsents: () => Record<string, string>
   getDevPluginPaths: () => string[]
+  getTrustedDevPluginPaths?: () => string[]
   getKeybindings?: () => KeybindingOverrides
   getPluginKillListEntry?: (pluginKey: string) => PluginKillListEntry | null
   hostEntryPath?: string

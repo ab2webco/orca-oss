@@ -2942,6 +2942,8 @@ void app.whenReady().then(async () => {
     getDisabledPlugins: () => normalizePluginIdList(store?.getSettings().disabledPlugins),
     getPluginConsents: () => normalizePluginConsents(store?.getSettings().pluginConsents),
     getDevPluginPaths: () => normalizePluginIdList(store?.getSettings().devPluginPaths),
+    getTrustedDevPluginPaths: () =>
+      normalizePluginIdList(store?.getSettings().trustedDevPluginPaths),
     getKeybindings: () => keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
     hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged)

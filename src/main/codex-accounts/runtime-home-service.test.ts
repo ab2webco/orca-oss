@@ -138,6 +138,7 @@ function createSettings(overrides: TestSettingsOverrides = {}): GlobalSettings {
     disabledPlugins: [],
     pluginConsents: {},
     devPluginPaths: [],
+    trustedDevPluginPaths: [],
     skipDeleteWorktreeConfirm: false,
     skipCloseTerminalWithRunningProcessConfirm: false,
     skipDeleteAutomationConfirm: false,
