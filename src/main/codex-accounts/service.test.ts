@@ -21,6 +21,12 @@ import type { CodexResetCreditAttemptLedger } from '../../shared/codex-reset-cre
 import { buildWslCodexAvailabilityArgs, buildWslCodexLoginArgs } from './wsl-codex-command'
 import type { readHookTrustEntries as ReadHookTrustEntries } from '../codex/config-toml-trust'
 
+// Why: temp homes exceed sun_path on macOS but not on Linux; keep asserted config bytes host-independent.
+vi.mock('../codex/codex-daemon-socket-path-guard', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  applyCodexDaemonSocketGuard: (config: string) => config
+}))
+
 const testState = {
   userDataDir: '',
   fakeHomeDir: '',
