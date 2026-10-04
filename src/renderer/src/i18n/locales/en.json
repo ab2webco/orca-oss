@@ -10585,7 +10585,9 @@
           "remove": "Remove",
           "pathLabel": "Development plugin folder path",
           "placeholder": "/Users/you/plugins/my-plugin or C:\\Users\\you\\plugins\\my-plugin",
-          "add": "Add path"
+          "add": "Add path",
+          "trustLabel": "Trust changes in this folder",
+          "trustHelp": "Edits to files here keep the plugin approved and its worker running. New permissions still need your review."
         },
         "PluginInstallDialog": {
           "localRequired": "Enter the plugin folder path.",

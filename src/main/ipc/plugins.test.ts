@@ -156,4 +156,23 @@ describe('plugin settings lifecycle authority', () => {
 
     expect(service.refresh).toHaveBeenCalledOnce()
   })
+
+  it('refreshes when the trusted dev folders change', () => {
+    let settingsListener!: (updates: { trustedDevPluginPaths?: string[] }) => void
+    const store = {
+      onSettingsChanged: vi.fn((listener) => {
+        settingsListener = listener
+        return vi.fn()
+      })
+    } as unknown as Store
+    const service = {
+      setRuntimeDelegate: vi.fn(),
+      refresh: vi.fn().mockResolvedValue(undefined)
+    } as unknown as PluginService
+    registerPluginHandlers(store, service, null)
+
+    settingsListener({ trustedDevPluginPaths: ['/plugins/demo'] })
+
+    expect(service.refresh).toHaveBeenCalledOnce()
+  })
 })

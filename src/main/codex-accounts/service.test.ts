@@ -130,6 +130,7 @@ function createSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings
     disabledPlugins: [],
     pluginConsents: {},
     devPluginPaths: [],
+    trustedDevPluginPaths: [],
     skipDeleteWorktreeConfirm: false,
     skipCloseTerminalWithRunningProcessConfirm: false,
     skipDeleteAutomationConfirm: false,

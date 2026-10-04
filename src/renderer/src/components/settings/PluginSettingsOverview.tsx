@@ -2,7 +2,7 @@ import { Blocks, Loader2, SearchX } from 'lucide-react'
 import type { PluginHostListEntry } from '../../../../preload/api-types'
 import { translate } from '@/i18n/i18n'
 import { PluginCatalogEmptyState } from '../plugin-catalog/PluginCatalogEmptyState'
-import { PluginDevelopmentSection } from './PluginDevelopmentSection'
+import { PluginDevelopmentSection, type PluginDevelopmentFolders } from './PluginDevelopmentSection'
 import { PluginMarketplaceBrowser } from './PluginMarketplaceBrowser'
 import { PluginSettingsRow, type PluginLogsState } from './PluginSettingsRow'
 import type { PluginSettingsFormState } from './PluginSettingsForm'
@@ -21,6 +21,7 @@ type PluginSettingsOverviewProps = {
   openSettings: ReadonlySet<string>
   settingsFormByPlugin: Readonly<Record<string, PluginSettingsFormState>>
   devPaths: readonly string[]
+  trustedDevPaths: readonly string[]
   devPathsBusy: boolean
   onToggleFeature: () => void
   onRefresh: () => Promise<void>
@@ -32,7 +33,7 @@ type PluginSettingsOverviewProps = {
   onMarketplaceInstalled: (pluginKey: string) => Promise<void>
   onRollbackRequest: (pluginKey: string) => void
   onRemoveRequest: (pluginKey: string) => void
-  onUpdateDevPaths: (paths: string[]) => Promise<void>
+  onUpdateDevPaths: (folders: PluginDevelopmentFolders) => Promise<void>
 }
 
 function matchesInstalledPlugin(plugin: PluginHostListEntry, search: string): boolean {
@@ -58,6 +59,7 @@ export function PluginSettingsOverview({
   openSettings,
   settingsFormByPlugin,
   devPaths,
+  trustedDevPaths,
   devPathsBusy,
   onToggleFeature,
   onRefresh,
@@ -178,6 +180,7 @@ export function PluginSettingsOverview({
           <div className="my-4 border-t border-border/60" />
           <PluginDevelopmentSection
             paths={devPaths}
+            trustedPaths={trustedDevPaths}
             busy={devPathsBusy}
             onChange={onUpdateDevPaths}
           />

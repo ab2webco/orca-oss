@@ -12,7 +12,8 @@ import {
 } from '../../shared/plugins/plugin-manifest'
 import {
   fingerprintPluginConsent,
-  hasInstructionalPluginContributions
+  hasInstructionalPluginContributions,
+  TRUSTED_DEV_FOLDER_CONTENT_IDENTITY
 } from '../../shared/plugins/plugin-consent-fingerprint'
 import { validateDeclaredPluginArtifacts } from './plugin-artifact-validation'
 import { readPluginManifestText } from './plugin-manifest-file'
@@ -47,6 +48,8 @@ export type ValidDiscoveredPlugin = {
   /** Content hash the install dir is named by; null for dev plugins. */
   contentHash: string | null
   isDev: boolean
+  /** Dev folder the user trusts: content edits keep consent, capability changes do not. */
+  trustedDevFolder?: boolean
 }
 
 export type InvalidDiscoveredPlugin = {
@@ -76,7 +79,8 @@ async function readManifestDir(
   rootDir: string,
   hostVersion: string,
   isDev: boolean,
-  installedContentHash?: string
+  installedContentHash?: string,
+  trustedDevFolder = false
 ): Promise<DiscoveredPlugin> {
   let rawText: string
   try {
@@ -128,7 +132,9 @@ async function readManifestDir(
   if (installedContentHash && hasInstructionalPluginContributions(manifest)) {
     consentContentIdentity = installedContentHash
   }
-  if (isDev && hasInstructionalPluginContributions(manifest)) {
+  if (isDev && trustedDevFolder && hasInstructionalPluginContributions(manifest)) {
+    consentContentIdentity = TRUSTED_DEV_FOLDER_CONTENT_IDENTITY
+  } else if (isDev && hasInstructionalPluginContributions(manifest)) {
     const treeHash = await hashPluginTree(rootDir)
     if (!treeHash.ok) {
       return { pluginKey, rootDir, error: treeHash.error, isDev }
@@ -140,9 +146,10 @@ async function readManifestDir(
     rootDir,
     manifest,
     consentFingerprint: fingerprintPluginConsent(manifest, consentContentIdentity),
-    consentContentHash: consentContentIdentity ?? null,
+    consentContentHash: trustedDevFolder ? null : (consentContentIdentity ?? null),
     contentHash: null,
-    isDev
+    isDev,
+    trustedDevFolder: isDev && trustedDevFolder
   }
 }
 
@@ -218,6 +225,8 @@ async function readInstalledPlugins(
 export async function discoverPlugins(options: {
   pluginsDir: string
   devPluginPaths: readonly string[]
+  /** Subset of `devPluginPaths` whose content edits keep consent. */
+  trustedDevPluginPaths?: readonly string[]
   hostVersion: string
 }): Promise<DiscoveredPlugin[]> {
   const discovered: DiscoveredPlugin[] = []
@@ -236,7 +245,13 @@ export async function discoverPlugins(options: {
     ...(await readInstalledPlugins(options.pluginsDir, installedEntries, options.hostVersion))
   )
   for (const devPath of options.devPluginPaths) {
-    const plugin = await readManifestDir(devPath, options.hostVersion, true)
+    const plugin = await readManifestDir(
+      devPath,
+      options.hostVersion,
+      true,
+      undefined,
+      options.trustedDevPluginPaths?.includes(devPath) ?? false
+    )
     // A dev path that duplicates an installed plugin's identity wins — that
     // is the point of dev mode — but two dev paths must not collide.
     if (!isInvalidDiscoveredPlugin(plugin)) {
