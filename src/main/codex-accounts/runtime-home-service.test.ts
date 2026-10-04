@@ -19,6 +19,12 @@ import { join } from 'node:path'
 import type { CodexManagedAccount, GlobalSettings } from '../../shared/types'
 import type * as ShellStartupEnv from '../pty/shell-startup-env'
 
+// Why: temp homes exceed sun_path on macOS but not on Linux; keep asserted config bytes host-independent.
+vi.mock('../codex/codex-daemon-socket-path-guard', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  applyCodexDaemonSocketGuard: (config: string) => config
+}))
+
 const testState = {
   userDataDir: '',
   fakeHomeDir: '',

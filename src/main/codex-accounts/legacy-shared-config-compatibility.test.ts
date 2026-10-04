@@ -5,6 +5,12 @@ import { join } from 'node:path'
 import { syncLegacySharedCodexConfigForRetainedPanes } from './legacy-shared-config-compatibility'
 import type * as FsUtils from './fs-utils'
 
+// Why: temp homes exceed sun_path on macOS but not on Linux; keep asserted config bytes host-independent.
+vi.mock('../codex/codex-daemon-socket-path-guard', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  applyCodexDaemonSocketGuard: (config: string) => config
+}))
+
 const generationRace = vi.hoisted(() => ({
   path: null as string | null,
   beforeGuardedReplace: null as (() => void) | null

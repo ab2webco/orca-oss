@@ -31,7 +31,10 @@ import { writeFileAtomically } from './fs-utils'
 import { rewriteRelativePathConfigValues } from '../codex/codex-config-path-reference-rewrite'
 import { stripCodexManagedHookTrustEntriesFromConfig } from '../codex/codex-managed-trust-reconciliation'
 import { getCodexManagedHookInstallMaterial } from '../codex/hook-service'
-import { syncSystemConfigIntoManagedCodexHome } from '../codex/codex-config-mirror'
+import {
+  ensureCodexDaemonSocketGuard,
+  syncSystemConfigIntoManagedCodexHome
+} from '../codex/codex-config-mirror'
 import { getSystemCodexHomePath } from '../codex/codex-home-paths'
 import { MANAGED_HOOK_TIMEOUT_SECONDS } from '../agent-hooks/installer-utils'
 import { readCodexTopLevelModelProvider } from '../codex/codex-model-provider-config'
@@ -1366,6 +1369,11 @@ export class CodexAccountService {
     expectedAccountId?: string
   ): void {
     if (canonicalConfig === null) {
+      // Why: with no ~/.codex/config.toml there is nothing to mirror, but Codex still cannot start in a long home without the daemon guard.
+      // WSL homes are skipped: their ownership check is a blocking wsl.exe call (startup, account switch), and WSL launch prep guards the home it launches.
+      if (!parseWslUncPath(managedHomePath)) {
+        ensureCodexDaemonSocketGuard(this.assertManagedHomePath(managedHomePath, expectedAccountId))
+      }
       return
     }
 

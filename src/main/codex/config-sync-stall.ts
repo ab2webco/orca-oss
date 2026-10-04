@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readAgentStateFileSync } from '../agent-state-file-reader'
+import { isOnlyCodexDaemonOverride } from './codex-daemon-socket-path-guard'
 import { getOrcaManagedCodexHomePath, getSystemCodexHomePath } from './codex-home-paths'
 import type { CodexSettingsPromotionHomes } from './config-settings-promotion'
 import type {
@@ -28,7 +29,8 @@ export function getCodexConfigSyncStatus(
   const runtimeConfigPath = join(homes.runtimeHomePath, 'config.toml')
   // Why: a stall only withholds settings once a managed runtime config exists;
   // without one the mirror seeds it and there is nothing yet to fall behind.
-  if (!existsSync(runtimeConfigPath)) {
+  // Why: a config holding only Orca's daemon override withholds no user settings.
+  if (!existsSync(runtimeConfigPath) || runtimeConfigHoldsOnlyDaemonOverride(runtimeConfigPath)) {
     return { state: 'synced', reason: null, systemConfigPath }
   }
   if (!existsSync(systemConfigPath)) {
@@ -46,6 +48,14 @@ export function getCodexConfigSyncStatus(
     return { state: 'stalled', reason: 'blank-source', systemConfigPath }
   }
   return { state: 'synced', reason: null, systemConfigPath }
+}
+
+function runtimeConfigHoldsOnlyDaemonOverride(runtimeConfigPath: string): boolean {
+  try {
+    return isOnlyCodexDaemonOverride(readAgentStateFileSync(runtimeConfigPath))
+  } catch {
+    return false
+  }
 }
 
 // Why: the mirror runs on every launch and on the quota poll, so logging each
