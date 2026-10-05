@@ -15,6 +15,7 @@ export const PLUGIN_CAPABILITY_KINDS = [
   'workspace:read',
   'terminal:send',
   'notifications:show',
+  'notifications:observe',
   'storage',
   'secrets',
   'events:subscribe',
@@ -91,6 +92,10 @@ export const PLUGIN_CAPABILITY_DESCRIPTIONS: Record<PluginCapabilityKind, string
   'workspace:read': 'Read the name, branch, and terminal list of your focused worktree',
   'terminal:send': 'Type text into a terminal you can see (always a specific terminal)',
   'notifications:show': 'Show desktop notifications labeled with the plugin name',
+  // Why: the body previews the agent's last reply, tool input or terminal title, and
+  // the relay fires before desktop focus suppression and the OS permission check.
+  'notifications:observe':
+    'Receive a copy of the notifications Orca Lab raises, even ones this computer does not show, including their text, which can quote agent replies, tool input and terminal titles',
   storage: "Store data in the plugin's own storage folder",
   secrets: "Store and read secrets in the plugin's own encrypted vault",
   'events:subscribe':

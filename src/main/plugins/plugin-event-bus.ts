@@ -1,4 +1,8 @@
-import { PLUGIN_EVENT_PAYLOAD_SCHEMAS } from '../../shared/plugins/plugin-events'
+import type { PluginCapabilityKind } from '../../shared/plugins/plugin-capabilities'
+import {
+  isPluginEventGranted,
+  PLUGIN_EVENT_PAYLOAD_SCHEMAS
+} from '../../shared/plugins/plugin-events'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 
 /**
@@ -11,10 +15,25 @@ import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 export class PluginEventBus {
   private readonly dynamicSubscriptions = new Map<string, Set<PluginEventName>>()
 
+  private readonly grantedCapabilities: (
+    pluginKey: string
+  ) => readonly PluginCapabilityKind[] | null
+
+  /** `grantedCapabilities` returns null for an unknown, disabled or
+   *  stale-consent plugin, which subscribes to nothing. */
+  constructor(grantedCapabilities: (pluginKey: string) => readonly PluginCapabilityKind[] | null) {
+    this.grantedCapabilities = grantedCapabilities
+  }
+
+  /** Records only the events the plugin's consented capabilities allow, so the
+   *  returned list tells the plugin what it will actually receive. */
   subscribe(pluginKey: string, events: PluginEventName[]): PluginEventName[] {
     const existing = this.dynamicSubscriptions.get(pluginKey) ?? new Set<PluginEventName>()
+    const grantedCapabilities = this.grantedCapabilities(pluginKey)
     for (const event of events) {
-      existing.add(event)
+      if (isPluginEventGranted(grantedCapabilities, event)) {
+        existing.add(event)
+      }
     }
     this.dynamicSubscriptions.set(pluginKey, existing)
     return [...existing]

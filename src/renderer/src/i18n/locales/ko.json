@@ -15672,5 +15672,6 @@
   "auto.components.settings.HostAccountLoginDialog.cancel": "취소",
   "auto.components.settings.HostAccountLoginDialog.finish": "로그인 완료",
   "auto.components.settings.PluginConsentDialog.capability.processSpawn": "사용자 권한으로 프로그램을 시작합니다. 시작된 프로그램은 이 플러그인 워커의 파일 또는 네트워크 권한에 의해 제한되지 않습니다.",
-  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "모든 프로젝트의 모든 에이전트에게 이 플러그인 사용법을 알려줍니다. 스킬 지침은 요청하는 모든 에이전트에게 제공됩니다"
+  "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "모든 프로젝트의 모든 에이전트에게 이 플러그인 사용법을 알려줍니다. 스킬 지침은 요청하는 모든 에이전트에게 제공됩니다",
+  "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Orca Lab이 보내는 알림의 사본을 이 컴퓨터에 표시되지 않은 알림까지 포함해 본문과 함께 받습니다. 본문에는 에이전트의 응답, 도구 입력, 터미널 제목이 인용될 수 있습니다"
 }
