@@ -36,3 +36,22 @@ export function projectAgentStatusChangedEvent(
       : {})
   }
 }
+
+type AgentStatusEventTap = {
+  subscribeEnrichedStatus(listener: (event: AgentStatusEventSource) => void): () => void
+}
+
+type EmitAgentStatusChanged = (
+  event: 'agent.status.changed',
+  payload: PluginAgentStatusChangedPayload
+) => void
+
+/** Routes every enriched hook status through the bounded projection to the plugin bus. */
+export function wirePluginAgentStatusEvents(
+  tap: AgentStatusEventTap,
+  emit: EmitAgentStatusChanged
+): () => void {
+  return tap.subscribeEnrichedStatus((enriched) => {
+    emit('agent.status.changed', projectAgentStatusChangedEvent(enriched))
+  })
+}
