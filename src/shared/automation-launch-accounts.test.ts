@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { automationLaunchAccounts } from './automation-launch-accounts'
+import { AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY, RUNTIME_CAPABILITIES } from './protocol-version'
 
 const pins = { claudeAccountId: 'claude-acc', codexAccountId: 'codex-acc' }
 
@@ -33,5 +34,11 @@ describe('automationLaunchAccounts', () => {
   it('inherits when the matching pin is null or absent', () => {
     expect(automationLaunchAccounts({ agentId: 'claude', claudeAccountId: null })).toEqual({})
     expect(automationLaunchAccounts({ agentId: 'codex' })).toEqual({})
+  })
+})
+
+describe('automation account pin capability', () => {
+  it('is advertised by runtimes that launch with the pin', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY)
   })
 })
