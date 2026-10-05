@@ -157,6 +157,7 @@ export const MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY =
 
 // Why a capability: an old host strips `claudeAccountId`/`codexAccountId` from
 // automation.create/update and answers ok, so the pin would be silently lost.
+// Advertised only once runs also launch with the pin (dispatch), not when it is merely stored.
 export const AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY = 'automation.account-pin.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
@@ -209,8 +210,7 @@ export const RUNTIME_CAPABILITIES = [
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY,
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
-  GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
-  AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY
+  GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
