@@ -12,6 +12,7 @@ const AUTOMATION_TARGET_FLAGS = [
   'base-branch'
 ]
 const AUTOMATION_SCHEDULE_FLAGS = ['trigger', 'schedule', 'time', 'day', 'timezone']
+const AUTOMATION_ACCOUNT_FLAGS = ['claude-account', 'codex-account']
 const AUTOMATION_PRECHECK_FLAGS = ['precheck', 'precheck-timeout']
 const AUTOMATION_STATE_FLAGS = [
   'enabled',
@@ -42,7 +43,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
     path: ['automations', 'create'],
     summary: 'Create a scheduled Orca Lab automation',
     usage:
-      'orca automations create --name <name> --trigger <preset|cron|rrule> (--prompt <text> --provider <agent> | --command <shell command>) [--precheck <command>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
+      'orca automations create --name <name> --trigger <preset|cron|rrule> (--prompt <text> --provider <agent> | --command <shell command>) [--precheck <command>] [--claude-account <email|id>] [--codex-account <email|id>] [--repo <selector>|--workspace <selector>|--project <id> [--host <id>]|--project-host-setup <id>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'name',
@@ -50,6 +51,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'provider',
       'command',
       'command-timeout',
+      ...AUTOMATION_ACCOUNT_FLAGS,
       ...AUTOMATION_PRECHECK_FLAGS,
       ...AUTOMATION_TARGET_FLAGS,
       ...AUTOMATION_SCHEDULE_FLAGS,
@@ -64,7 +66,8 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'Use --precheck to run a bounded command before scheduled runs; exit code 0 continues, anything else records a skipped run.',
       'Use --command instead of --prompt/--provider to schedule a plain command: it runs in the target directory with no agent, terminal or model. Exit code 0 records a completed run, anything else a command-failed run.',
       'Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.',
-      'Use --target-pane <paneKey> with --reuse-session to send runs to a specific open agent pane (pane keys appear as terminalPaneKey in `orca automations runs --json`). If that pane is gone at run time, Orca Lab falls back to the previous automation session or a fresh one. Pass an empty value to clear it.'
+      'Use --target-pane <paneKey> with --reuse-session to send runs to a specific open agent pane (pane keys appear as terminalPaneKey in `orca automations runs --json`). If that pane is gone at run time, Orca Lab falls back to the previous automation session or a fresh one. Pass an empty value to clear it.',
+      'Use --claude-account / --codex-account <email|id> to pin a managed account (see `orca account list`) that this automation launches with; only the one matching --provider is used. Without them the automation inherits the account assigned to its worktree or the global one. On edit, pass an empty value or `inherit` to go back to inheriting.'
     ],
     examples: [
       'orca automations create --name "Daily review" --trigger daily --prompt "Review open changes" --provider codex',
@@ -85,6 +88,7 @@ export const AUTOMATION_COMMAND_SPECS: CommandSpec[] = [
       'provider',
       'command',
       'command-timeout',
+      ...AUTOMATION_ACCOUNT_FLAGS,
       ...AUTOMATION_PRECHECK_FLAGS,
       ...AUTOMATION_TARGET_FLAGS,
       ...AUTOMATION_SCHEDULE_FLAGS,

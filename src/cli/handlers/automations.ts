@@ -41,6 +41,10 @@ import {
   getPresentStringFlag,
   getRequiredStringFlag
 } from '../flags'
+import {
+  hasAutomationAccountFlag,
+  resolveAutomationAccountFlags
+} from '../automation-account-flags'
 import { RuntimeClientError } from '../runtime-client'
 import { getOptionalWorktreeSelector, resolveCurrentWorktreeSelector } from '../selectors'
 import {
@@ -496,6 +500,13 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
         '--command runs instead of an agent: pass --command or --provider/--prompt, not both'
       )
     }
+    if (command && hasAutomationAccountFlag(flags)) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--claude-account/--codex-account apply to agent automations, not --command'
+      )
+    }
+    const accountPins = await resolveAutomationAccountFlags(flags, client)
     const result = await client.call<{ automation: Automation }>('automation.create', {
       name: getRequiredStringFlag(flags, 'name'),
       ...(command
@@ -510,6 +521,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       baseBranch: getOptionalStringFlag(flags, 'base-branch'),
       reuseSession: getReuseSessionFlag(flags),
       targetPaneKey: getTargetPaneFlag(flags),
+      ...accountPins,
       timezone: getOptionalStringFlag(flags, 'timezone'),
       enabled: getEnabledFlag(flags),
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
@@ -521,6 +533,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const target = await getExplicitTarget(flags, cwd, client)
     const schedule = getScheduleFlag(flags, false)
     const sourceContext = getSourceContextFlag(flags)
+    const accountPins = await resolveAutomationAccountFlags(flags, client)
     const result = await client.call<{ automation: Automation }>('automation.update', {
       id: getRequiredStringFlag(flags, 'id'),
       updates: {
@@ -537,6 +550,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
         baseBranch: getOptionalStringFlag(flags, 'base-branch'),
         reuseSession: getReuseSessionFlag(flags),
         targetPaneKey: getTargetPaneFlag(flags),
+        ...accountPins,
         timezone: getOptionalStringFlag(flags, 'timezone'),
         enabled: getEnabledFlag(flags),
         missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),

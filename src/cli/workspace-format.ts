@@ -222,6 +222,8 @@ export function formatAutomationShow(result: { automation: Automation }): string
     `baseBranch: ${automation.baseBranch ?? 'null'}`,
     `reuseSession: ${automation.reuseSession}`,
     `targetPane: ${automation.targetPaneKey ?? 'null'}`,
+    `claudeAccount: ${automation.claudeAccountId ?? 'inherit'}`,
+    `codexAccount: ${automation.codexAccountId ?? 'inherit'}`,
     `target: ${automation.executionTargetType}:${automation.executionTargetId}`,
     ...formatAutomationPluginOrigin(automation),
     // Una fila command-only no tiene prompt: imprimir el comando y su techo de

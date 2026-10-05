@@ -31,6 +31,18 @@ describe('formatAutomationShow', () => {
     }
   }
 
+  it('prints pinned accounts, or inherit when none is set', () => {
+    const pinned = formatAutomationShow({
+      automation: automation({ claudeAccountId: 'acc-claude', codexAccountId: 'acc-codex' })
+    })
+    expect(pinned).toContain('claudeAccount: acc-claude')
+    expect(pinned).toContain('codexAccount: acc-codex')
+
+    const inherited = formatAutomationShow({ automation: automation() })
+    expect(inherited).toContain('claudeAccount: inherit')
+    expect(inherited).toContain('codexAccount: inherit')
+  })
+
   it('shows explicit run context before the legacy repo id', () => {
     const output = formatAutomationShow({
       automation: automation({
