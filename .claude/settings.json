@@ -15,6 +15,12 @@
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/coordinator-sweep.sh --once",
             "timeout": 90,
             "statusMessage": "Barriendo PRs y worktrees..."
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/merged-worktree-close-hook.mjs\"",
+            "timeout": 90,
+            "statusMessage": "Cerrando worktrees de PRs mergeados..."
           }
         ]
       },
@@ -46,6 +52,11 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/oversized-pr-review-guard.py"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/merged-worktree-close-hook.mjs\"",
+            "timeout": 90
           }
         ]
       },
@@ -73,6 +84,11 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-merge-board-close.py",
             "if": "Bash(gh pr merge*)",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/merged-worktree-close-hook.mjs\"",
+            "timeout": 90
           }
         ]
       },
