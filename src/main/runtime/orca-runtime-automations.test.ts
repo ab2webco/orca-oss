@@ -220,6 +220,40 @@ describe('OrcaRuntimeService automation methods', () => {
     expect(store.updateAutomation).toHaveBeenCalledWith('auto-1', { targetPaneKey: null })
   })
 
+  it('passes account pins on create and distinguishes null clears from omission on update', async () => {
+    const store = makeStore([existingAutomation])
+    const runtime = new OrcaRuntimeService(store as never)
+
+    await runtime.createAutomation({
+      name: 'Pinned',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      repo: 'repo-1',
+      workspaceMode: 'new_per_run',
+      claudeAccountId: 'acc-claude',
+      codexAccountId: 'acc-codex',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: 1
+    })
+    expect(store.createAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ claudeAccountId: 'acc-claude', codexAccountId: 'acc-codex' })
+    )
+
+    await runtime.updateAutomation('auto-1', { claudeAccountId: 'acc-2' })
+    expect(store.updateAutomation).toHaveBeenLastCalledWith('auto-1', { claudeAccountId: 'acc-2' })
+
+    await runtime.updateAutomation('auto-1', { claudeAccountId: null, codexAccountId: null })
+    expect(store.updateAutomation).toHaveBeenLastCalledWith('auto-1', {
+      claudeAccountId: null,
+      codexAccountId: null
+    })
+
+    await runtime.updateAutomation('auto-1', { enabled: false })
+    const omitted = store.updateAutomation.mock.lastCall?.[1] ?? {}
+    expect(Object.hasOwn(omitted, 'claudeAccountId')).toBe(false)
+    expect(Object.hasOwn(omitted, 'codexAccountId')).toBe(false)
+  })
+
   it('rejects a target pane without session reuse', async () => {
     const store = makeStore()
     const runtime = new OrcaRuntimeService(store as never)

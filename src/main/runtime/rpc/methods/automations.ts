@@ -131,6 +131,8 @@ const AutomationCreate = z
     setupDecision: SetupDecision,
     reuseSession: OptionalBoolean,
     targetPaneKey: OptionalNullablePlainString,
+    claudeAccountId: OptionalNullablePlainString,
+    codexAccountId: OptionalNullablePlainString,
     timezone: OptionalString,
     rrule: AutomationSchedule,
     dtstart: requiredNumber('Missing trigger start time'),
@@ -163,6 +165,9 @@ const AutomationUpdateFields = z.object({
   reuseSession: OptionalBoolean,
   // Why: update patches distinguish omitted from null so callers can clear a saved target pane.
   targetPaneKey: OptionalNullablePlainString,
+  // Why: null clears a pinned account back to inherit; omitted leaves it untouched.
+  claudeAccountId: OptionalNullablePlainString,
+  codexAccountId: OptionalNullablePlainString,
   timezone: OptionalString,
   rrule: AutomationSchedule.optional(),
   dtstart: requiredNumber('Missing trigger start time').optional(),
