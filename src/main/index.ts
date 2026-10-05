@@ -318,7 +318,10 @@ import { initializeBrowserSessionsForApp } from './browser/browser-session-start
 import { setUnreadDockBadgeCount } from './dock/unread-badge'
 import { AutomationService } from './automations/service'
 import { createHeadlessAutomationOutputSnapshotBuffer } from './automations/headless-dispatch'
-import { buildHeadlessAutomationWorktreeCreateArgs } from './automations/headless-workspace-create'
+import {
+  buildHeadlessAutomationAgentLaunchOptions,
+  buildHeadlessAutomationWorktreeCreateArgs
+} from './automations/headless-workspace-create'
 import { AgentAwakeService } from './agent-awake-service'
 import { normalizeComputerAwakeMode } from '../shared/computer-awake-mode'
 import { registerSystemResumeBroadcast } from './system-resume-broadcast'
@@ -2834,11 +2837,7 @@ void app.whenReady().then(async () => {
             }
             const terminal = await runtimeService.launchAgentTerminal(
               `id:${automation.workspaceId}`,
-              {
-                agent: action.agentId,
-                prompt: action.prompt,
-                title: run.title
-              }
+              buildHeadlessAutomationAgentLaunchOptions(automation, run, action)
             )
             terminalHandle = terminal.handle
             terminalSessionId = terminal.tabId ?? null

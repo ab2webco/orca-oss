@@ -2,7 +2,10 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Automation } from '../../shared/automations-types'
 import type { Repo } from '../../shared/repo-types'
-import { buildHeadlessAutomationWorktreeCreateArgs } from './headless-workspace-create'
+import {
+  buildHeadlessAutomationAgentLaunchOptions,
+  buildHeadlessAutomationWorktreeCreateArgs
+} from './headless-workspace-create'
 
 const repoPath = path.join('tmp', 'orca')
 
@@ -102,5 +105,33 @@ describe('headless automation workspace create args', () => {
     })
 
     expect(args.setupDecision).toBe('skip')
+  })
+
+  it('pins only the account matching the agent on a new_per_run workspace', () => {
+    const args = buildHeadlessAutomationWorktreeCreateArgs({
+      automation: { ...automation, claudeAccountId: 'claude-acc', codexAccountId: 'codex-acc' },
+      run: { id: 'run-1', title: 'Nightly review run', scheduledFor: 1 },
+      repo
+    })
+
+    expect(args.codexAccountId).toBe('codex-acc')
+    expect(args).not.toHaveProperty('claudeAccountId')
+  })
+})
+
+describe('headless automation agent launch options', () => {
+  it('launches an existing-workspace run with the matching launch-scoped account', () => {
+    expect(
+      buildHeadlessAutomationAgentLaunchOptions(
+        { ...automation, agentId: 'claude', claudeAccountId: 'claude-acc', codexAccountId: 'x' },
+        { title: 'Nightly review run' },
+        { kind: 'agent', agentId: 'claude', prompt: 'Review changes' }
+      )
+    ).toEqual({
+      agent: 'claude',
+      prompt: 'Review changes',
+      title: 'Nightly review run',
+      claudeAccountId: 'claude-acc'
+    })
   })
 })

@@ -3,6 +3,7 @@ import {
   makeAutomation,
   mockCreateWorktree,
   mockLaunchAgentBackgroundSession,
+  mockMarkDispatchResult,
   mockSubmitPromptToAgentPty,
   mockFindReusableAutomationSession,
   mockObserveExistingAutomationSession,
@@ -72,5 +73,19 @@ describe('useAutomationDispatchEvents account pins', () => {
       content: 'run this'
     })
     expect(mockLaunchAgentBackgroundSession).not.toHaveBeenCalled()
+  })
+
+  it('records a run whose pinned account was removed as a visible dispatch failure', async () => {
+    mockCreateWorktree.mockRejectedValue(new Error('That Claude account no longer exists.'))
+
+    await registerAndDispatch(makeAutomation(pins))
+
+    expect(mockLaunchAgentBackgroundSession).not.toHaveBeenCalled()
+    expect(mockMarkDispatchResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'dispatch_failed',
+        error: 'That Claude account no longer exists.'
+      })
+    )
   })
 })

@@ -1,10 +1,13 @@
 import type { Automation, AutomationRun } from '../../shared/automations-types'
+import type { AutomationAction } from '../../shared/automation-action'
+import { automationLaunchAccounts } from '../../shared/automation-launch-accounts'
 import { buildAutomationWorkspaceProvenance } from '../../shared/automation-workspace-provenance'
 import type { Repo } from '../../shared/repo-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
 type HeadlessAutomationRunForWorkspace = Pick<AutomationRun, 'id' | 'title' | 'scheduledFor'>
 type RuntimeCreateManagedWorktreeArgs = Parameters<OrcaRuntimeService['createManagedWorktree']>[0]
+type RuntimeLaunchAgentTerminalOptions = Parameters<OrcaRuntimeService['launchAgentTerminal']>[1]
 
 export function buildHeadlessAutomationWorkspaceName(
   runTitle: string,
@@ -44,6 +47,20 @@ export function buildHeadlessAutomationWorktreeCreateArgs({
     startupAgent: automation.agentId ?? undefined,
     startupPrompt: automation.prompt,
     telemetrySource: 'unknown',
-    automationProvenance: buildAutomationWorkspaceProvenance(automation, run, repo, createdAt)
+    automationProvenance: buildAutomationWorkspaceProvenance(automation, run, repo, createdAt),
+    ...automationLaunchAccounts(automation)
+  }
+}
+
+export function buildHeadlessAutomationAgentLaunchOptions(
+  automation: Automation,
+  run: Pick<AutomationRun, 'title'>,
+  action: Extract<AutomationAction, { kind: 'agent' }>
+): RuntimeLaunchAgentTerminalOptions {
+  return {
+    agent: action.agentId,
+    prompt: action.prompt,
+    title: run.title,
+    ...automationLaunchAccounts(automation)
   }
 }

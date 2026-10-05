@@ -2288,6 +2288,9 @@ export function registerWorktreeHandlers(
 
         let result: CreateWorktreeResult
         try {
+          // Why: a removed pin fails visibly like the runtime create; the later normalize only covers a mid-create removal.
+          assertValidClaudeAccountPin(store, args.claudeAccountId)
+          assertValidCodexAccountPin(store, args.codexAccountId)
           // Why: wrap only the helpers; the pre-validation throws above are IPC-shape bugs, not the git/filesystem failures the funnel tracks.
           result = isFolderRepo(repo)
             ? createFolderWorkspace(createArgs, repo, store)

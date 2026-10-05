@@ -500,6 +500,23 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
+  // Why: matches runtime createManagedWorktree; a silent inherit would run on the global account.
+  it.each([
+    ['Claude', { claudeAccountId: 'removed' }],
+    ['Codex', { codexAccountId: 'removed' }]
+  ])('refuses to create a workspace pinned to a removed %s account', async (label, pin) => {
+    store.getSettings.mockReturnValue({
+      workspaceDir: '/workspace',
+      claudeManagedAccounts: [],
+      codexManagedAccounts: []
+    } as never)
+
+    await expect(
+      handlers['worktrees:create'](null, { repoId: 'repo-1', name: 'feature', ...pin })
+    ).rejects.toThrow(`That ${label} account no longer exists.`)
+    expect(addWorktreeMock).not.toHaveBeenCalled()
+  })
+
   it('pins the requested Codex account on a new folder-mode workspace', async () => {
     store.getRepo.mockReturnValue({
       id: 'repo-folder',
