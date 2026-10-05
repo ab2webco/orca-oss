@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AGENT_TYPE_MAX_LENGTH } from '../agent-status-types'
 import type { PluginCapabilityKind } from './plugin-capabilities'
 import type { PluginEventName } from './plugin-manifest'
 
@@ -31,7 +32,10 @@ export const agentStatusChangedPayloadSchema = z.object({
   worktreeId: z.string().min(1).max(2048).nullable(),
   paneKey: z.string().min(1).max(2048),
   state: z.string().min(1).max(256),
-  receivedAt: z.number().finite().positive()
+  receivedAt: z.number().finite().positive(),
+  agentType: z.string().min(1).max(AGENT_TYPE_MAX_LENGTH).optional(),
+  // Why: a `done` that only marks a connect/resume/clear landing idle, not a finished turn.
+  sessionBoundary: z.literal(true).optional()
 })
 
 export const NOTIFICATION_DISPATCHED_TITLE_MAX_LENGTH = 256
