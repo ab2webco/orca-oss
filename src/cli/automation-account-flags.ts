@@ -1,6 +1,8 @@
 import { getPresentStringFlag } from './flags'
 import { resolveAccountSelectorFlags } from './account-selector'
-import type { RuntimeClient } from './runtime-client'
+import { RuntimeClientError, type RuntimeClient } from './runtime-client'
+import { AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY } from '../shared/protocol-version'
+import type { RuntimeStatus } from '../shared/runtime-types'
 
 export const AUTOMATION_ACCOUNT_FLAGS = ['claude-account', 'codex-account'] as const
 
@@ -21,6 +23,10 @@ export async function resolveAutomationAccountFlags(
   flags: Map<string, string | boolean>,
   client: RuntimeClient
 ): Promise<AutomationAccountPins> {
+  if (!hasAutomationAccountFlag(flags)) {
+    return {}
+  }
+  await assertAutomationAccountPinSupported(client)
   const pins: AutomationAccountPins = {}
   const toResolve = new Map<string, string | boolean>()
   for (const flag of AUTOMATION_ACCOUNT_FLAGS) {
@@ -39,4 +45,15 @@ export async function resolveAutomationAccountFlags(
 
 export function hasAutomationAccountFlag(flags: Map<string, string | boolean>): boolean {
   return AUTOMATION_ACCOUNT_FLAGS.some((flag) => flags.has(flag))
+}
+
+// Why: an older runtime strips the pin fields and still answers ok.
+async function assertAutomationAccountPinSupported(client: RuntimeClient): Promise<void> {
+  const status = await client.call<RuntimeStatus>('status.get')
+  if (!status.result.capabilities?.includes(AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY)) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'The connected Orca Lab runtime does not support account pins on automations. Update or restart Orca Lab and try again.'
+    )
+  }
 }

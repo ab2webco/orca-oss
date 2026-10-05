@@ -43,6 +43,10 @@ vi.mock('child_process', async () => {
 import { main } from './index'
 import { buildWorktree, okFixture, queueFixtures, worktreeListFixture } from './test-fixtures'
 import { useWorktreeAwarenessEnvironment } from './index-test-harness'
+import { AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY } from '../shared/protocol-version'
+
+const statusFixture = (capabilities: string[] = [AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY]) =>
+  okFixture('req_status', { capabilities })
 
 const accountsSnapshot = () =>
   okFixture('req_accounts', {
@@ -89,7 +93,13 @@ describe('orca cli automation account pins', () => {
     worktreeListFixture([buildWorktree('/tmp/repo/feature', 'feature/foo', 'abc', 'repo-1')])
 
   it('resolves email and id selectors on create', async () => {
-    queueFixtures(callMock, worktrees(), accountsSnapshot(), automationFixture('req_create'))
+    queueFixtures(
+      callMock,
+      worktrees(),
+      statusFixture(),
+      accountsSnapshot(),
+      automationFixture('req_create')
+    )
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
@@ -116,8 +126,23 @@ describe('orca cli automation account pins', () => {
     expect(Object.hasOwn(params, 'codexAccountId')).toBe(false)
   })
 
+  it('refuses pins on a runtime too old to store them, before creating anything', async () => {
+    queueFixtures(callMock, worktrees(), statusFixture([]))
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+
+    await main([...createArgs, '--claude-account', 'claude@example.com'], '/tmp/repo/feature/src')
+
+    expect(callMock).not.toHaveBeenCalledWith('automation.create', expect.anything())
+    expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
+      'does not support account pins on automations'
+    )
+    process.exitCode = priorExitCode
+  })
+
   it('sets one pin and clears the other back to inherit on edit', async () => {
-    queueFixtures(callMock, accountsSnapshot(), automationFixture('req_edit'))
+    queueFixtures(callMock, statusFixture(), accountsSnapshot(), automationFixture('req_edit'))
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
@@ -141,7 +166,7 @@ describe('orca cli automation account pins', () => {
   })
 
   it('clears with an empty value, like --target-pane, without fetching the roster', async () => {
-    queueFixtures(callMock, automationFixture('req_edit'))
+    queueFixtures(callMock, statusFixture(), automationFixture('req_edit'))
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(['automations', 'edit', 'auto-1', '--claude-account', '', '--json'], '/tmp/repo')
@@ -154,7 +179,7 @@ describe('orca cli automation account pins', () => {
   })
 
   it('rejects an unknown account before creating anything', async () => {
-    queueFixtures(callMock, worktrees(), accountsSnapshot())
+    queueFixtures(callMock, worktrees(), statusFixture(), accountsSnapshot())
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const priorExitCode = process.exitCode
