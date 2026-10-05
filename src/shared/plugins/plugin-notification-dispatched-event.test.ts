@@ -57,6 +57,11 @@ describe('notification.dispatched manifest contract', () => {
     const description = describePluginCapability({ kind: 'notifications:observe' })
     expect(description).toContain('notifications')
     expect(description).toContain('agent replies')
+    // Why: the relay runs before focus suppression and the OS permission check.
+    expect(description).toContain('even ones this computer does not show')
+    expect(description).not.toContain('shows you')
+    // Why: the fallback body carries the terminal title, which can echo the prompt.
+    expect(description).toContain('terminal titles')
   })
 
   it('changes the consent fingerprint so adding it re-prompts', () => {

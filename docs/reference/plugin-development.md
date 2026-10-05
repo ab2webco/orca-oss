@@ -119,7 +119,7 @@ A typo fails manifest validation rather than silently granting nothing.
 | `workspace:read` | `workspace.readContext` | "Read the name, branch, and terminal list of your focused worktree" |
 | `terminal:send` | `terminal.sendText` | "Type text into a terminal you can see (always a specific terminal)" |
 | `notifications:show` | `notifications.show` | "Show desktop notifications labeled with the plugin name" |
-| `notifications:observe` | the `notification.dispatched` event (with `events:subscribe`) | "Receive a copy of the notifications Orca Lab shows you, including their text, which can quote agent replies and tool input" |
+| `notifications:observe` | the `notification.dispatched` event (with `events:subscribe`) | "Receive a copy of the notifications Orca Lab raises, even ones this computer does not show, including their text, which can quote agent replies, tool input and terminal titles" |
 | `storage` | `storage.get/set/delete/keys` | "Store data in the plugin's own storage folder" |
 | `secrets` | `secrets.get/set/delete` | "Store and read secrets in the plugin's own encrypted vault" |
 | `settings:own` | `settings.get/set` | "Read and change the plugin's own settings" |
@@ -637,7 +637,8 @@ so a plugin receives exactly what the phone would:
 - only after Orca's **Notifications** switch and the per-source switch
   (agent task complete, terminal bell) allow it;
 - once per burst per worktree (the same 5 s cooldown as the phone), and even
-  when the desktop banner is suppressed because the worktree is focused;
+  when this computer shows no banner: the worktree is focused, the desktop
+  cooldown holds it back, or the OS does not support or permit notifications;
 - never for the Settings test notification, and never for a notification a
   plugin raised with `notifications.show` (source `plugin`), so plugins cannot
   echo each other.
@@ -645,7 +646,8 @@ so a plugin receives exactly what the phone would:
 `source` is Orca's source string (`agent-task-complete`, `terminal-bell`);
 `title` is at most 256 characters and `body` at most 1024, truncated with `…`;
 `at` is the epoch milliseconds when Orca relayed it. The body previews the
-agent's last reply or tool input, so this event needs its own
+agent's last reply or tool input, or, with no fresh agent snapshot, the terminal
+title (which for Claude Code summarizes your task), so this event needs its own
 `notifications:observe` capability on top of `events:subscribe`. The host
 enforces it twice: `events.subscribe` leaves the event out of the returned
 `subscribed` list, and delivery re-checks the consented capabilities, so a

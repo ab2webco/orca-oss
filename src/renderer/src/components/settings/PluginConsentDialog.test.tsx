@@ -99,8 +99,8 @@ describe('PluginConsentDialog', () => {
     )
 
     expect(document.body.textContent).toContain(
-      'Receive a copy of the notifications Orca Lab shows you, including their text, which can ' +
-        'quote agent replies and tool input'
+      'Receive a copy of the notifications Orca Lab raises, even ones this computer does not ' +
+        'show, including their text, which can quote agent replies, tool input and terminal titles'
     )
     expect(document.body.textContent).toContain('(notifications:observe)')
   })
