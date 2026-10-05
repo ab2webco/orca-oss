@@ -47,7 +47,7 @@ export type { PluginServiceOptions } from './plugin-service-options'
 export class PluginService {
   readonly options: PluginServiceOptions
   private readonly registry: PluginExtensionRegistry = createPluginExtensionRegistry()
-  private readonly eventBus = new PluginEventBus()
+  private readonly eventBus = new PluginEventBus((key) => this.getGrantedCapabilities(key))
   private readonly audit: PluginAuditLog
   private readonly workerController: PluginWorkerController
   private readonly logBuffer = new PluginLogBuffer()

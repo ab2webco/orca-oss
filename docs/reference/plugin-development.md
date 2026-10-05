@@ -79,7 +79,7 @@ Pick something else.
 | --- | --- | --- |
 | `panels` | 64 ([`:55`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, `entry`, optional `icon`, `surface` |
 | `commands` | 256 ([`:56`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, optional `context` (`global`\|`worktree`) and `action` |
-| `events` | 3 — the whole closed set ([`:91-96`](../../src/shared/plugins/plugin-manifest.ts)) | `worktree.created`, `worktree.removed`, `agent.status.changed` |
+| `events` | 4 — the whole closed set ([`:91-96`](../../src/shared/plugins/plugin-manifest.ts)) | `worktree.created`, `worktree.removed`, `agent.status.changed`, `notification.dispatched` |
 | `settings` | 32 ([`plugin-settings-contribution.ts:15`](../../src/shared/plugins/plugin-settings-contribution.ts)) | declarative form, rendered by Orca |
 | `automations` | 16 ([`plugin-automation-contribution.ts:32`](../../src/shared/plugins/plugin-automation-contribution.ts)) | scheduled work |
 | `keybindings` | 256 ([`plugin-content-pack-contributions.ts:10`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | must name a contributed command, and match its context ([`plugin-manifest-contribution-validation.ts:99-117`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts)) |
@@ -87,15 +87,16 @@ Pick something else.
 | `vmRecipes` | 64 ([`:11`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | |
 | `agents` | 64 ([`:12`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | agent profiles |
 | `skills` | 32 ([`:15`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | a directory holding a `SKILL.md`, served to **any** agent in **any** workspace |
-| `capabilities` | 32 ([`plugin-manifest.ts:166`](../../src/shared/plugins/plugin-manifest.ts)) | see below |
+| `capabilities` | 32 ([`plugin-manifest.ts:167`](../../src/shared/plugins/plugin-manifest.ts)) | see below |
 
 Cross-field rules that reject a manifest outright
-([`plugin-manifest-contribution-validation.ts:119-168`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts),
+([`plugin-manifest-contribution-validation.ts:121-181`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts),
 [`plugin-settings-contribution.ts:116-142`](../../src/shared/plugins/plugin-settings-contribution.ts)):
 
 - `main` is required when any command has no built-in `action`, when
   `contributes.events` is non-empty, or when `process:spawn` is declared.
-- `contributes.events` requires the `events:subscribe` capability.
+- `contributes.events` requires the `events:subscribe` capability; subscribing
+  to `notification.dispatched` also requires `notifications:observe`.
 - `contributes.skills` requires `skills:contribute`.
 - `contributes.settings` requires `settings:own`; a `secret` setting also
   requires `secrets`.
@@ -109,15 +110,16 @@ VM recipe 256 KB, agent profile 1 MB, `SKILL.md` 256 KB.
 
 ## Capabilities and consent
 
-Ten capability kinds exist, and only these
-([`plugin-capabilities.ts:14-25`](../../src/shared/plugins/plugin-capabilities.ts)).
+Eleven capability kinds exist, and only these
+([`plugin-capabilities.ts:14-26`](../../src/shared/plugins/plugin-capabilities.ts)).
 A typo fails manifest validation rather than silently granting nothing.
 
-| Kind | Unlocks | Shown to the user as ([`:90-107`](../../src/shared/plugins/plugin-capabilities.ts)) |
+| Kind | Unlocks | Shown to the user as ([`:91-113`](../../src/shared/plugins/plugin-capabilities.ts)) |
 | --- | --- | --- |
 | `workspace:read` | `workspace.readContext` | "Read the name, branch, and terminal list of your focused worktree" |
 | `terminal:send` | `terminal.sendText` | "Type text into a terminal you can see (always a specific terminal)" |
 | `notifications:show` | `notifications.show` | "Show desktop notifications labeled with the plugin name" |
+| `notifications:observe` | the `notification.dispatched` event (with `events:subscribe`) | "Receive a copy of the notifications Orca Lab shows you, including their text, which can quote agent replies and tool input" |
 | `storage` | `storage.get/set/delete/keys` | "Store data in the plugin's own storage folder" |
 | `secrets` | `secrets.get/set/delete` | "Store and read secrets in the plugin's own encrypted vault" |
 | `settings:own` | `settings.get/set` | "Read and change the plugin's own settings" |
@@ -618,11 +620,53 @@ code until it stops (idle reap, disable and re-enable, or an app restart).
 ### Event payloads
 
 Bounded projections, validated before they reach any plugin
-([`plugin-events.ts:11-39`](../../src/shared/plugins/plugin-events.ts)):
+([`plugin-events.ts:12-82`](../../src/shared/plugins/plugin-events.ts)):
 
 - `worktree.created` → `{ worktreeId, path, branch }`
 - `worktree.removed` → `{ worktreeId, path }`
 - `agent.status.changed` → `{ worktreeId | null, paneKey, state, receivedAt }`
+- `notification.dispatched` → `{ source, worktreeId | null, title, body, at }`
+
+`notification.dispatched` lets a plugin be one more delivery channel for the
+notifications Orca itself decided to show — a messaging bridge that forwards
+"agent needs input" to your phone, for example. It fires from the same fan-out
+the paired mobile app reads
+([`plugin-notification-event-bridge.ts`](../../src/main/plugins/plugin-notification-event-bridge.ts)),
+so a plugin receives exactly what the phone would:
+
+- only after Orca's **Notifications** switch and the per-source switch
+  (agent task complete, terminal bell) allow it;
+- once per burst per worktree (the same 5 s cooldown as the phone), and even
+  when the desktop banner is suppressed because the worktree is focused;
+- never for the Settings test notification, and never for a notification a
+  plugin raised with `notifications.show` (source `plugin`), so plugins cannot
+  echo each other.
+
+`source` is Orca's source string (`agent-task-complete`, `terminal-bell`);
+`title` is at most 256 characters and `body` at most 1024, truncated with `…`;
+`at` is the epoch milliseconds when Orca relayed it. The body previews the
+agent's last reply or tool input, so this event needs its own
+`notifications:observe` capability on top of `events:subscribe`. The host
+enforces it twice: `events.subscribe` leaves the event out of the returned
+`subscribed` list, and delivery re-checks the consented capabilities, so a
+plugin without the grant never receives the event
+([`plugin-event-delivery.ts`](../../src/main/plugins/plugin-event-delivery.ts)).
+An Orca Lab older than this event rejects a manifest that names it, so set
+`engines.orca` to the first version that ships it.
+
+```json
+{
+  "main": "worker.mjs",
+  "contributes": { "events": [{ "on": "notification.dispatched" }] },
+  "capabilities": [{ "kind": "events:subscribe" }, { "kind": "notifications:observe" }]
+}
+```
+
+```js
+orca.events.on('notification.dispatched', async ({ source, title, body, worktreeId }) => {
+  // Forward to your channel. The handler has 5 minutes before the worker is killed.
+})
+```
 
 ## Automations
 

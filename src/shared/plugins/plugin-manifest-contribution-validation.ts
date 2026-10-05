@@ -1,6 +1,8 @@
 import type { RefinementCtx } from 'zod'
 import { isPluginCommandAliasActionId } from './plugin-command-actions'
 import { getKeybindingConflictIdentity } from '../keybindings'
+import { PLUGIN_EVENT_REQUIRED_CAPABILITY } from './plugin-events'
+import type { PluginEventName } from './plugin-manifest'
 
 type IdentifiedContribution = { id: string }
 type PathContribution = { path: string }
@@ -10,7 +12,7 @@ type ContributionValidationManifest = {
   contributes: {
     panels: IdentifiedContribution[]
     commands: (IdentifiedContribution & { action?: string; context?: 'global' | 'worktree' })[]
-    events: { on: string }[]
+    events: { on: PluginEventName }[]
     languagePacks: { locale: string }[]
     keybindings: { command: string; key: string; when?: 'global' | 'worktree' }[]
     vmRecipes: PathContribution[]
@@ -152,6 +154,16 @@ export function validatePluginManifestContributions(
       path: ['capabilities'],
       message: 'events:subscribe capability required when contributes.events is non-empty'
     })
+  }
+  for (const [index, subscription] of manifest.contributes.events.entries()) {
+    const required = PLUGIN_EVENT_REQUIRED_CAPABILITY[subscription.on]
+    if (required && !manifest.capabilities.some((capability) => capability.kind === required)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributes', 'events', index, 'on'],
+        message: `${required} capability required to subscribe to ${subscription.on}`
+      })
+    }
   }
   // A skill teaches any agent, in any project, how to run this plugin. Authors
   // get the error here; the host still re-checks the granted capability before

@@ -1,3 +1,5 @@
+import { capabilityKinds } from '../../shared/plugins/plugin-capabilities'
+import { isPluginEventGranted } from '../../shared/plugins/plugin-events'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 import {
   isInvalidDiscoveredPlugin,
@@ -12,7 +14,7 @@ export function deliverPluginEvent(options: {
   payload: unknown
   plugins: readonly DiscoveredPlugin[]
   eventBus: PluginEventBus
-  workerController: PluginWorkerController
+  workerController: Pick<PluginWorkerController, 'ensure' | 'deliverEventIfRunning'>
   isRuntimeApproved: (plugin: ValidDiscoveredPlugin) => boolean
   logWarning: (pluginKey: string, line: string) => void
 }): void {
@@ -22,6 +24,11 @@ export function deliverPluginEvent(options: {
   }
   for (const plugin of options.plugins) {
     if (isInvalidDiscoveredPlugin(plugin) || !options.isRuntimeApproved(plugin)) {
+      continue
+    }
+    // Why: re-checked at delivery, not only at subscribe, so no subscription
+    // path can outlive or bypass the consented capability set.
+    if (!isPluginEventGranted(capabilityKinds(plugin.manifest.capabilities), options.event)) {
       continue
     }
     const manifestSubscribed = plugin.manifest.contributes.events.some(

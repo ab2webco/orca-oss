@@ -17,6 +17,11 @@ export function pluginCapabilityDescription(kind: string, fallback: string): str
         'auto.components.settings.PluginConsentDialog.capability.notificationsShow',
         'Show desktop notifications labeled with the plugin name'
       )
+    case 'notifications:observe':
+      return translate(
+        'auto.components.settings.PluginConsentDialog.capability.notificationsObserve',
+        'Receive a copy of the notifications Orca Lab shows you, including their text, which can quote agent replies and tool input'
+      )
     case 'storage':
       return translate(
         'auto.components.settings.PluginConsentDialog.capability.storage',

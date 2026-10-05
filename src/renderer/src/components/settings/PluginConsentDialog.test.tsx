@@ -86,6 +86,25 @@ describe('PluginConsentDialog', () => {
     expect(document.body.textContent).not.toContain('unsafe fallback')
   })
 
+  it('spells out that a notifications:observe plugin reads notification text', async () => {
+    await renderConsent(
+      {
+        ...plugin,
+        capabilities: [
+          { kind: 'events:subscribe', description: 'Get notified' },
+          { kind: 'notifications:observe', description: 'Receive a copy of the notifications' }
+        ]
+      },
+      vi.fn().mockResolvedValue(undefined)
+    )
+
+    expect(document.body.textContent).toContain(
+      'Receive a copy of the notifications Orca Lab shows you, including their text, which can ' +
+        'quote agent replies and tool input'
+    )
+    expect(document.body.textContent).toContain('(notifications:observe)')
+  })
+
   it('spells out that a skills:contribute plugin reaches every agent', async () => {
     await renderConsent(
       {

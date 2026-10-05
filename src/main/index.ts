@@ -327,6 +327,7 @@ import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
+import { forwardOrcaNotificationsToPlugins } from './plugins/plugin-notification-event-bridge'
 import { getAutomationAction } from '../shared/automation-action'
 import { getPluginsDataDir } from './plugins/plugin-discovery'
 import { PluginMarketplaceService } from './plugins/plugin-marketplace-service'
@@ -3054,8 +3055,12 @@ void app.whenReady().then(async () => {
   })
   requestBundledPluginBootstrap()
   requestOfficialMarketplaceSeed()
-  // v0 plugin event seams: agent status (hook pipeline tap) + worktree
-  // lifecycle (runtime tap). Server-side filtered per plugin subscription.
+  // v0 plugin event seams: agent status (hook pipeline tap), worktree
+  // lifecycle and relayed notifications (runtime taps). Server-side filtered
+  // per plugin subscription and capability.
+  forwardOrcaNotificationsToPlugins(runtimeService, (payload) => {
+    pluginService?.emitEvent('notification.dispatched', payload)
+  })
   agentHookServer.subscribeEnrichedStatus((enriched) => {
     pluginService?.emitEvent('agent.status.changed', {
       worktreeId: enriched.worktreeId ?? null,
