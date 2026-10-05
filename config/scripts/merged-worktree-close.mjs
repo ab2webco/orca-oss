@@ -101,7 +101,7 @@ export function planWorktreeClose({
       plan.push({
         ...base,
         action: 'keep',
-        reason: `could not read Orca terminals (${terminalsError})`
+        reason: `could not read Orca terminals (${String(terminalsError)})`
       })
     } else if (activeTerminals.has(wt.path)) {
       plan.push({
