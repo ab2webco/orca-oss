@@ -620,12 +620,21 @@ code until it stops (idle reap, disable and re-enable, or an app restart).
 ### Event payloads
 
 Bounded projections, validated before they reach any plugin
-([`plugin-events.ts:13-59`](../../src/shared/plugins/plugin-events.ts)):
+([`plugin-events.ts:14-63`](../../src/shared/plugins/plugin-events.ts)):
 
 - `worktree.created` → `{ worktreeId, path, branch }`
 - `worktree.removed` → `{ worktreeId, path }`
-- `agent.status.changed` → `{ worktreeId | null, paneKey, state, receivedAt }`
+- `agent.status.changed` → `{ worktreeId | null, paneKey, state, receivedAt, agentType?, sessionBoundary? }`
 - `notification.dispatched` → `{ source, worktreeId | null, title, body, at }`
+
+Both `agent.status.changed` extras are optional and absent rather than empty
+([`plugin-agent-status-event.ts`](../../src/main/plugins/plugin-agent-status-event.ts)).
+`agentType` names the agent (`claude`, `codex`, …) and is omitted when the hook
+did not say. A longer value is truncated to 40 characters by the hook pipeline,
+as everywhere else in Orca. `sessionBoundary: true` appears only on a
+`done` that marks a session starting, resuming or clearing into idle, not a
+finished turn; a plugin that notifies on completions should skip it. Prompts,
+tool calls and assistant output are never part of the payload.
 
 `notification.dispatched` lets a plugin be one more delivery channel for the
 notifications Orca itself decided to show — a messaging bridge that forwards

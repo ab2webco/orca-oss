@@ -326,6 +326,7 @@ import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
+import { wirePluginAgentStatusEvents } from './plugins/plugin-agent-status-event'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
 import { forwardOrcaNotificationsToPlugins } from './plugins/plugin-notification-event-bridge'
 import { getAutomationAction } from '../shared/automation-action'
@@ -3061,13 +3062,8 @@ void app.whenReady().then(async () => {
   forwardOrcaNotificationsToPlugins(runtimeService, (payload) => {
     pluginService?.emitEvent('notification.dispatched', payload)
   })
-  agentHookServer.subscribeEnrichedStatus((enriched) => {
-    pluginService?.emitEvent('agent.status.changed', {
-      worktreeId: enriched.worktreeId ?? null,
-      paneKey: enriched.paneKey,
-      state: enriched.payload.state,
-      receivedAt: enriched.receivedAt
-    })
+  wirePluginAgentStatusEvents(agentHookServer, (event, payload) => {
+    pluginService?.emitEvent(event, payload)
   })
   runtimeService.onWorktreeLifecycle((event) => {
     emitPluginWorktreeLifecycle(event)
