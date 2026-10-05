@@ -53,6 +53,8 @@ function makeDraft(overrides: Partial<AutomationDraft> = {}): AutomationDraft {
     customSchedule: '',
     missedRunGraceMinutes: '720',
     scheduleWarning: null,
+    claudeAccountId: null,
+    codexAccountId: null,
     ...overrides
   }
 }

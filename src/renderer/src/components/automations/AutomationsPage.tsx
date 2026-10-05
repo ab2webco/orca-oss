@@ -98,6 +98,7 @@ import {
   getDefaultWorktree,
   parseDraftTime
 } from './automation-draft-model'
+import { accountDraftFromAutomation, automationAccountSaveFields } from './automation-account-draft'
 import {
   getRepoBackedAutomationSourceContext,
   getRuntimeSourceHostAvailability,
@@ -279,7 +280,9 @@ export default function AutomationsPage(): React.JSX.Element {
     dayOfWeek: '1',
     customSchedule: '',
     missedRunGraceMinutes: '720',
-    scheduleWarning: null
+    scheduleWarning: null,
+    claudeAccountId: null,
+    codexAccountId: null
   })
 
   const externalAutomationEntries = useMemo(
@@ -1095,7 +1098,9 @@ export default function AutomationsPage(): React.JSX.Element {
       dayOfWeek: '1',
       customSchedule: '',
       missedRunGraceMinutes: '720',
-      scheduleWarning: null
+      scheduleWarning: null,
+      claudeAccountId: null,
+      codexAccountId: null
     }
     const nextDraft = template
       ? {
@@ -1159,6 +1164,7 @@ export default function AutomationsPage(): React.JSX.Element {
       dayOfWeek: String(schedule?.dayOfWeek ?? 1),
       customSchedule: hasCustomSchedule ? latest.rrule : '',
       missedRunGraceMinutes: String(latest.missedRunGraceMinutes),
+      ...accountDraftFromAutomation(latest),
       scheduleWarning:
         schedule || hasCustomSchedule
           ? null
@@ -1213,7 +1219,9 @@ export default function AutomationsPage(): React.JSX.Element {
       missedRunGraceMinutes: '720',
       scheduleWarning: hasCustomSchedule
         ? null
-        : 'This Hermes automation has an unsupported saved schedule. Pick a supported schedule before saving changes.'
+        : 'This Hermes automation has an unsupported saved schedule. Pick a supported schedule before saving changes.',
+      claudeAccountId: null,
+      codexAccountId: null
     }
     setEditingAutomationId(null)
     setEditingExternalTarget({ manager, job })
@@ -1493,7 +1501,8 @@ export default function AutomationsPage(): React.JSX.Element {
             ? draft.targetPaneKey.trim() || null
             : null,
         timezone,
-        missedRunGraceMinutes
+        missedRunGraceMinutes,
+        ...automationAccountSaveFields(draft, 'update')
       }
       if (!currentAutomation || currentAutomation.rrule !== rrule) {
         // Why: non-schedule edits should not reset dtstart or move nextRunAt.
@@ -1527,7 +1536,8 @@ export default function AutomationsPage(): React.JSX.Element {
             timezone,
             rrule,
             dtstart: now,
-            missedRunGraceMinutes
+            missedRunGraceMinutes,
+            ...automationAccountSaveFields(draft, 'create')
           })
       if (!editingAutomationId) {
         await hydratePersistedUIState()

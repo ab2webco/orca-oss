@@ -55,6 +55,10 @@ export type AutomationDraft = {
   customSchedule: string
   missedRunGraceMinutes: string
   scheduleWarning: string | null
+  /** Managed Claude account pin; null = inherit the worktree or global account. */
+  claudeAccountId: string | null
+  /** Managed Codex account pin; null = inherit the worktree or global account. */
+  codexAccountId: string | null
 }
 
 export type AutomationCreateTarget = 'orca' | 'hermes'
