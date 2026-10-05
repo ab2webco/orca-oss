@@ -14512,6 +14512,14 @@
         },
         "AutomationListStatusCell": {
           "willNotRun": "No se ejecutará"
+        },
+        "AutomationAccountField": {
+          "claudeLabel": "Cuenta de Claude",
+          "codexLabel": "Cuenta de Codex",
+          "inherit": "Heredar (worktree o global)",
+          "removed": "Cuenta eliminada",
+          "hostUnsupported": "Actualice el host para elegir una cuenta en las automatizaciones.",
+          "removedWarning": "La cuenta guardada ya no está disponible. Elija otra o herede."
         }
       },
       "agent": {
