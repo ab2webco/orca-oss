@@ -200,6 +200,23 @@ describe('agent-session create operation ledger', () => {
     expect(createTerminal).toHaveBeenCalledOnce()
   })
 
+  it('launches with the requested accounts and fingerprints them', async () => {
+    const runtime = createRuntime()
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+    const id = operationId()
+
+    await runtime.createAgentSession(request(id, { codexAccountId: 'codex-acc' }), {
+      clientId: 'device-a'
+    })
+
+    expect(createTerminal.mock.calls[0]?.[1]).toMatchObject({ codexAccountId: 'codex-acc' })
+    await expect(
+      runtime.createAgentSession(request(id, { codexAccountId: 'codex-other' }), {
+        clientId: 'device-a'
+      })
+    ).rejects.toThrow('agent_session_operation_conflict')
+  })
+
   it('isolates operation ids by authenticated caller', async () => {
     const runtime = createRuntime()
     const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())

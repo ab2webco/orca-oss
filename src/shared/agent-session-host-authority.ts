@@ -132,6 +132,9 @@ export type RuntimeCreateAgentSessionRequest = {
   presentation?: RuntimeTerminalPresentation
   placement?: { tabId?: string; leafId?: string }
   viewMode?: 'terminal' | 'chat'
+  /** Launch-scoped managed accounts; hosts without `automation.account-pin.v1` reject them. */
+  claudeAccountId?: string
+  codexAccountId?: string
 }
 
 export type RuntimeCreateAgentSessionResult = {

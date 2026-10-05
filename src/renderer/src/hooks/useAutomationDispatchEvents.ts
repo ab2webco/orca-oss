@@ -607,6 +607,8 @@ export function useAutomationDispatchEvents(): void {
             prompt: automation.prompt,
             launchSource: 'unknown',
             title: run.title,
+            // Why also for new_per_run: a create may persist no pin (it nulls a removed account); the launch fails closed instead.
+            launchAccounts,
             onData: (chunk) => {
               outputSnapshotBuffer.append(chunk)
             },

@@ -301,6 +301,20 @@ describe('launchAgentBackgroundSession', () => {
     })
   })
 
+  it('passes launch-scoped accounts to the local PTY spawn', async () => {
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await launchAgentBackgroundSession({
+      agent: 'codex',
+      worktreeId: 'wt-1',
+      prompt: 'run the automation',
+      launchAccounts: { codexAccountId: 'codex-acc' }
+    })
+
+    expect(mockSpawn.mock.calls[0]?.[0]).toMatchObject({ codexAccountId: 'codex-acc' })
+    expect(mockSpawn.mock.calls[0]?.[0]).not.toHaveProperty('claudeAccountId')
+  })
+
   it('uses WSL launch quoting for Windows-path projects forced to WSL', async () => {
     state.projects = [
       {

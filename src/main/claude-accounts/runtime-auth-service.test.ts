@@ -4616,6 +4616,51 @@ describe('ClaudeRuntimeAuthService', () => {
     }
   })
 
+  // ORCA-553 acceptance: an automation's launch-scoped account is not blocked by the global one.
+  it('launches with a launch-scoped account while the global account is in use by an assigned worktree', async () => {
+    const globalAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('one@example.com', 'token-one')
+    )
+    const automationAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-2',
+      createClaudeCredentialsJson('two@example.com', 'token-two')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('account-1', globalAuthPath),
+        createClaudeAccount('account-2', automationAuthPath, { email: 'two@example.com' })
+      ],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+    const {
+      markClaudePtyExited,
+      markInjectedClaudePtySpawned,
+      releaseInjectedClaudeAccountLaunch
+    } = await import('./live-pty-gate')
+    markInjectedClaudePtySpawned('assigned-worktree-pty', 'account-1')
+    try {
+      const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+      const service = new ClaudeRuntimeAuthService(store as never)
+
+      await expect(
+        service.prepareForClaudeLaunch(undefined, { reservePtyAccount: true })
+      ).rejects.toThrow('in use by an assigned worktree')
+      const preparation = await service.prepareForClaudeLaunch(
+        { runtime: 'host', overrideAccountId: 'account-2' },
+        { reservePtyAccount: true }
+      )
+      expect(preparation).toMatchObject({ injectedAccountId: 'account-2' })
+      expect(preparation.sharedAccountReservationId).toBeUndefined()
+      releaseInjectedClaudeAccountLaunch(preparation.injectedAccountReservationId)
+    } finally {
+      markClaudePtyExited('assigned-worktree-pty')
+    }
+  })
+
   it('rejects a same-account pin while the shared global CLI still owns its token', async () => {
     const pinnedAuthPath = createManagedClaudeAuth(
       testState.userDataDir,

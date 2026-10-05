@@ -5,6 +5,11 @@ import {
   resetAgentBackgroundSessionTestHarness,
   useRemoteAgentBackgroundRuntime
 } from '@/lib/agent-background-session-test-state'
+import { createCompatibleRuntimeStatusResponse } from '@/runtime/runtime-compatibility-test-fixture'
+import {
+  AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY,
+  RUNTIME_CAPABILITIES
+} from '../../../shared/protocol-version'
 
 const mockSpawn = vi.fn()
 const mockKill = vi.fn()
@@ -449,6 +454,61 @@ describe('launchAgentBackgroundSession remote runtime and SSH startup delivery',
           launchAgent: 'claude',
           presentation: 'background'
         })
+      })
+    )
+  })
+
+  it('sends launch accounts with the structured agent session on an account-pin host', async () => {
+    useRemoteAgentBackgroundRuntime(state)
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await launchAgentBackgroundSession({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      prompt: 'run remotely',
+      launchAccounts: { claudeAccountId: 'claude-acc' }
+    })
+
+    expect(mockRuntimeEnvironmentCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'terminal.createAgentSession',
+        params: expect.objectContaining({ claudeAccountId: 'claude-acc' })
+      })
+    )
+  })
+
+  // Why: createAgentSession params are strict, so a host without account pins would reject the key.
+  it('launches through terminal.create with the account on a host without account pins', async () => {
+    useRemoteAgentBackgroundRuntime(state)
+    const status = createCompatibleRuntimeStatusResponse()
+    if (!status.ok) {
+      throw new Error('status fixture must be ok')
+    }
+    const capabilities = RUNTIME_CAPABILITIES.filter(
+      (capability) => capability !== AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY
+    )
+    mockRuntimeEnvironmentTransportCall.mockImplementation((request: { method: string }) =>
+      Promise.resolve(
+        request.method === 'status.get'
+          ? { ...status, result: { ...status.result, capabilities } }
+          : { id: 'create', ok: true, result: { terminal: { handle: 'legacy-terminal-1' } } }
+      )
+    )
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await launchAgentBackgroundSession({
+      agent: 'codex',
+      worktreeId: 'wt-1',
+      prompt: 'run remotely',
+      launchAccounts: { codexAccountId: 'codex-acc' }
+    })
+
+    const methods = mockRuntimeEnvironmentTransportCall.mock.calls.map(([call]) => call.method)
+    expect(methods).not.toContain('terminal.createAgentSession')
+    expect(mockRuntimeEnvironmentTransportCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'terminal.create',
+        params: expect.objectContaining({ codexAccountId: 'codex-acc' })
       })
     )
   })
