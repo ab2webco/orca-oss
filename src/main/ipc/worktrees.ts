@@ -7,7 +7,10 @@ import {
   assertValidClaudeAccountPin,
   normalizeClaudeAccountPinForCreate
 } from '../claude-accounts/worktree-account-pin'
-import { assertValidCodexAccountPin } from '../codex-accounts/worktree-account-pin'
+import {
+  assertValidCodexAccountPin,
+  normalizeCodexAccountPinForCreate
+} from '../codex-accounts/worktree-account-pin'
 import { pruneLineageForMissingRepoWorktrees } from '../worktree-lineage-pruning'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { readBranchRenameFailureOutputForDisplay } from '../agent-hooks/branch-rename-failure-output'
@@ -1084,6 +1087,7 @@ function createFolderWorkspace(
   const instanceId = randomUUID()
   const worktreeId = getFolderWorkspaceInstanceId(repo, instanceId)
   const claudeAccountId = normalizeClaudeAccountPinForCreate(store, args.claudeAccountId)
+  const codexAccountId = normalizeCodexAccountPinForCreate(store, args.codexAccountId)
   const meta = store.setWorktreeMeta(worktreeId, {
     instanceId,
     ...(store.getProjectHostSetups
@@ -1113,6 +1117,7 @@ function createFolderWorkspace(
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
     ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+    ...(codexAccountId !== undefined ? { codexAccountId } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
     ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.linkedBitbucketPR !== undefined ? { linkedBitbucketPR: args.linkedBitbucketPR } : {}),

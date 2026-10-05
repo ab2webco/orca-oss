@@ -14,6 +14,7 @@ import type {
 } from '../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../shared/automation-run-identity'
 import { getAutomationAction } from '../../../shared/automation-action'
+import { automationLaunchAccounts } from '../../../shared/automation-launch-accounts'
 import {
   didAutomationShellRunSucceed,
   formatAutomationShellFailure
@@ -266,6 +267,7 @@ export function useAutomationDispatchEvents(): void {
           }
 
           const automationWorkspaceCreateRequestId = createBrowserUuid()
+          const launchAccounts = automationLaunchAccounts(automation)
           const createResult =
             automation.workspaceMode === 'new_per_run'
               ? await useAppStore.getState().createWorktree(
@@ -302,7 +304,8 @@ export function useAutomationDispatchEvents(): void {
                       automationRunId: run.id,
                       dispatchToken,
                       createRequestId: automationWorkspaceCreateRequestId
-                    }
+                    },
+                    ...launchAccounts
                   }
                 )
               : null

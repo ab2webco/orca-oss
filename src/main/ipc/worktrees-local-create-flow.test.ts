@@ -500,6 +500,33 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
+  it('pins the requested Codex account on a new folder-mode workspace', async () => {
+    store.getRepo.mockReturnValue({
+      id: 'repo-folder',
+      path: '/workspace/folder',
+      displayName: 'folder',
+      badgeColor: '#000',
+      addedAt: 0,
+      kind: 'folder' as const
+    })
+    store.getSettings.mockReturnValue({
+      workspaceDir: '/workspace',
+      claudeManagedAccounts: [],
+      codexManagedAccounts: [{ id: 'codex-acc' }]
+    } as never)
+
+    await handlers['worktrees:create'](null, {
+      repoId: 'repo-folder',
+      name: 'folder-session',
+      codexAccountId: 'codex-acc'
+    })
+
+    expect(store.setWorktreeMeta).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ codexAccountId: 'codex-acc' })
+    )
+  })
+
   it('spawns a startup terminal and setup terminal after local worktree registration', async () => {
     addWorktreeMock.mockResolvedValue({})
     listWorktreesMock.mockResolvedValueOnce([
