@@ -128,6 +128,111 @@ describe('Store', () => {
     expect(reloaded.listAutomations()[0].reuseSession).toBe(false)
   })
 
+  it('pins and clears managed accounts on agent automations', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const base = {
+      name: 'Pinned',
+      prompt: 'Run checks',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'new_per_run',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    } as const
+    const pinned = store.createAutomation({
+      ...base,
+      claudeAccountId: 'acc-claude',
+      codexAccountId: 'acc-codex'
+    })
+    const inherit = store.createAutomation({
+      ...base,
+      claudeAccountId: '',
+      codexAccountId: undefined
+    })
+    expect(pinned.claudeAccountId).toBe('acc-claude')
+    expect(pinned.codexAccountId).toBe('acc-codex')
+    expect(inherit.claudeAccountId).toBeNull()
+    expect(inherit.codexAccountId).toBeNull()
+
+    const untouched = store.updateAutomation(pinned.id, { name: 'Renamed' })
+    expect(untouched.claudeAccountId).toBe('acc-claude')
+    expect(untouched.codexAccountId).toBe('acc-codex')
+
+    const swapped = store.updateAutomation(pinned.id, { claudeAccountId: 'acc-2' })
+    expect(swapped.claudeAccountId).toBe('acc-2')
+    expect(swapped.codexAccountId).toBe('acc-codex')
+
+    const cleared = store.updateAutomation(pinned.id, {
+      claudeAccountId: null,
+      codexAccountId: null
+    })
+    expect(cleared.claudeAccountId).toBeNull()
+    expect(cleared.codexAccountId).toBeNull()
+  })
+
+  it('drops account pins on command-only automations', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const command = { command: 'echo hi', timeoutSeconds: 30 }
+    const created = store.createAutomation({
+      name: 'Cmd',
+      command,
+      projectId: 'r1',
+      workspaceMode: 'new_per_run',
+      claudeAccountId: 'acc-claude',
+      codexAccountId: 'acc-codex',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+    expect(created.claudeAccountId).toBeNull()
+    expect(created.codexAccountId).toBeNull()
+
+    const agent = store.createAutomation({
+      name: 'Agent',
+      prompt: 'x',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'new_per_run',
+      claudeAccountId: 'acc-claude',
+      codexAccountId: 'acc-codex',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+    const becameCommand = store.updateAutomation(agent.id, { command })
+    expect(becameCommand.claudeAccountId).toBeNull()
+    expect(becameCommand.codexAccountId).toBeNull()
+  })
+
+  it('loads legacy automations without account pins as inherit', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const automation = store.createAutomation({
+      name: 'Legacy',
+      prompt: 'x',
+      agentId: 'claude',
+      projectId: 'r1',
+      workspaceMode: 'new_per_run',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-13T00:00:00Z').getTime()
+    })
+    const persisted = readDataFile() as { automations: Record<string, unknown>[] }
+    delete persisted.automations[0].claudeAccountId
+    delete persisted.automations[0].codexAccountId
+    writeDataFile(persisted)
+
+    const reloaded = await createStore()
+    const loaded = reloaded.listAutomations()[0]
+    expect(loaded.claudeAccountId ?? null).toBeNull()
+    const updated = reloaded.updateAutomation(automation.id, { codexAccountId: 'acc-codex' })
+    expect(updated.codexAccountId).toBe('acc-codex')
+    expect(updated.claudeAccountId).toBeNull()
+  })
+
   it('persists setup decisions only for new-per-run automations', async () => {
     const store = await createStore()
     store.addRepo(makeRepo())

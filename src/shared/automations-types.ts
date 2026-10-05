@@ -136,6 +136,10 @@ export type Automation = {
   /** Why: a user-picked live pane to receive reuse runs; null means reuse the
    *  previous automation session. Resolvable only in the renderer store. */
   targetPaneKey?: string | null
+  /** Managed Claude account pinned for this automation's runs; null/absent inherits. */
+  claudeAccountId?: string | null
+  /** Managed Codex account pinned for this automation's runs; null/absent inherits. */
+  codexAccountId?: string | null
   timezone: string
   rrule: string
   dtstart: number
@@ -200,6 +204,8 @@ type AutomationCreateBase = {
   setupDecision?: SetupDecision
   reuseSession?: boolean
   targetPaneKey?: string | null
+  claudeAccountId?: string | null
+  codexAccountId?: string | null
   timezone: string
   rrule: string
   dtstart: number
@@ -235,6 +241,8 @@ export type AutomationUpdateInput = Partial<
     | 'setupDecision'
     | 'reuseSession'
     | 'targetPaneKey'
+    | 'claudeAccountId'
+    | 'codexAccountId'
     | 'timezone'
     | 'rrule'
     | 'dtstart'

@@ -1115,6 +1115,11 @@ function normalizeAutomationSessionReuse(automation: Automation): Automation {
   }
 }
 
+function normalizeAutomationAccountPin(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 function normalizeAutomationSetupDecisionForWorkspaceMode(
   workspaceMode: Automation['workspaceMode'],
   setupDecision: unknown
@@ -5641,6 +5646,8 @@ export class Store {
         !command && input.workspaceMode === 'existing' && input.reuseSession === true
           ? (input.targetPaneKey ?? null)
           : null,
+      claudeAccountId: command ? null : normalizeAutomationAccountPin(input.claudeAccountId),
+      codexAccountId: command ? null : normalizeAutomationAccountPin(input.codexAccountId),
       timezone: input.timezone,
       rrule: input.rrule,
       dtstart: input.dtstart,
@@ -5742,6 +5749,16 @@ export class Store {
           : nextWorkspaceId !== current.workspaceId
             ? null
             : (current.targetPaneKey ?? null),
+      claudeAccountId: nextCommand
+        ? null
+        : Object.hasOwn(updates, 'claudeAccountId')
+          ? normalizeAutomationAccountPin(updates.claudeAccountId)
+          : normalizeAutomationAccountPin(current.claudeAccountId),
+      codexAccountId: nextCommand
+        ? null
+        : Object.hasOwn(updates, 'codexAccountId')
+          ? normalizeAutomationAccountPin(updates.codexAccountId)
+          : normalizeAutomationAccountPin(current.codexAccountId),
       rrule,
       dtstart,
       nextRunAt: scheduleChanged

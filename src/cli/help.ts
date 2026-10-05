@@ -536,6 +536,12 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   }
   // Why: the shared --agent help describes launching a TUI agent in a terminal,
   // which is the wrong meaning here — this selects the account provider.
+  if (command.startsWith('automations ') && flag === 'claude-account') {
+    return '--claude-account <email|id>  Managed Claude account this automation launches with (empty or `inherit` on edit clears)'
+  }
+  if (command.startsWith('automations ') && flag === 'codex-account') {
+    return '--codex-account <email|id>   Managed Codex account this automation launches with (empty or `inherit` on edit clears)'
+  }
   if (command === 'account switch' && flag === 'terminal') {
     return '--terminal <handle>    Terminal to switch; defaults to the terminal this command runs in'
   }

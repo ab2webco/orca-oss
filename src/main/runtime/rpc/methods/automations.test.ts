@@ -149,4 +149,47 @@ describe('automation RPC methods', () => {
 
     expect(runtime.updateAutomation).toHaveBeenCalledWith('auto-1', { baseBranch: null })
   })
+
+  it('passes account pins through create and keeps omitted distinct from null on update', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      createAutomation: vi.fn().mockResolvedValue({ id: 'auto-2' }),
+      updateAutomation: vi.fn().mockResolvedValue({ id: 'auto-1' })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: AUTOMATION_METHODS })
+
+    await dispatcher.dispatch(
+      makeRequest('automation.create', {
+        name: 'Pinned',
+        prompt: 'Review changes',
+        agentId: 'claude',
+        repo: 'repo-1',
+        claudeAccountId: 'acc-claude',
+        codexAccountId: 'acc-codex',
+        rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+        dtstart: 1
+      })
+    )
+    expect(runtime.createAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ claudeAccountId: 'acc-claude', codexAccountId: 'acc-codex' })
+    )
+
+    await dispatcher.dispatch(
+      makeRequest('automation.update', {
+        id: 'auto-1',
+        updates: { claudeAccountId: null, codexAccountId: 'acc-codex' }
+      })
+    )
+    expect(runtime.updateAutomation).toHaveBeenLastCalledWith('auto-1', {
+      claudeAccountId: null,
+      codexAccountId: 'acc-codex'
+    })
+
+    await dispatcher.dispatch(
+      makeRequest('automation.update', { id: 'auto-1', updates: { enabled: false } })
+    )
+    const omitted = vi.mocked(runtime.updateAutomation).mock.lastCall?.[1] ?? {}
+    expect(Object.hasOwn(omitted, 'claudeAccountId')).toBe(false)
+    expect(Object.hasOwn(omitted, 'codexAccountId')).toBe(false)
+  })
 })

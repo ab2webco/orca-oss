@@ -4069,6 +4069,8 @@ export class OrcaRuntimeService {
       setupDecision: input.setupDecision,
       reuseSession: input.reuseSession,
       targetPaneKey: input.targetPaneKey,
+      claudeAccountId: input.claudeAccountId,
+      codexAccountId: input.codexAccountId,
       timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       rrule: input.rrule,
       dtstart: input.dtstart,
@@ -4127,6 +4129,12 @@ export class OrcaRuntimeService {
     if (Object.hasOwn(updates, 'targetPaneKey')) {
       // Why: null must reach the store — it clears a saved target pane.
       patch.targetPaneKey = updates.targetPaneKey ?? null
+    }
+    for (const key of ['claudeAccountId', 'codexAccountId'] as const) {
+      if (Object.hasOwn(updates, key)) {
+        // Why: null must reach the store — it clears a pinned account back to inherit.
+        patch[key] = updates[key] ?? null
+      }
     }
     if (hasRuntimeAutomationUpdateValue(updates, 'timezone')) {
       patch.timezone = updates.timezone
