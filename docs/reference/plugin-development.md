@@ -629,8 +629,9 @@ Bounded projections, validated before they reach any plugin
 
 Both `agent.status.changed` extras are optional and absent rather than empty
 ([`plugin-agent-status-event.ts`](../../src/main/plugins/plugin-agent-status-event.ts)).
-`agentType` names the agent (`claude`, `codex`, …, at most 40 characters) and
-is omitted when the hook did not say. `sessionBoundary: true` appears only on a
+`agentType` names the agent (`claude`, `codex`, …) and is omitted when the hook
+did not say. A longer value is truncated to 40 characters by the hook pipeline,
+as everywhere else in Orca. `sessionBoundary: true` appears only on a
 `done` that marks a session starting, resuming or clearing into idle, not a
 finished turn; a plugin that notifies on completions should skip it. Prompts,
 tool calls and assistant output are never part of the payload.

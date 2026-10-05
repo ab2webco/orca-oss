@@ -11,8 +11,9 @@ export type AgentStatusEventSource = {
 
 function projectAgentType(agentType: string | undefined): string | undefined {
   const trimmed = agentType?.trim()
-  // Why: the hook pipeline treats a literal 'unknown' as no claim; an oversized value would
-  // fail the schema and drop the whole event, so omit it instead.
+  // Why: the hook pipeline treats a literal 'unknown' as no claim. It already truncates
+  // agentType to AGENT_TYPE_MAX_LENGTH, so the length check only guards a source that skips
+  // that normalizer: an oversized value would fail the schema and drop the whole event.
   if (!trimmed || trimmed === 'unknown' || trimmed.length > AGENT_TYPE_MAX_LENGTH) {
     return undefined
   }

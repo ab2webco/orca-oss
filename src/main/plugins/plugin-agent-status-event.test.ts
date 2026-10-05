@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AGENT_TYPE_MAX_LENGTH } from '../../shared/agent-status-types'
+import { AGENT_TYPE_MAX_LENGTH, normalizeAgentStatusPayload } from '../../shared/agent-status-types'
 import { agentStatusChangedPayloadSchema } from '../../shared/plugins/plugin-events'
 import {
   projectAgentStatusChangedEvent,
@@ -36,6 +36,15 @@ describe('projectAgentStatusChangedEvent', () => {
       receivedAt: 1_700_000_000_000,
       agentType: 'codex'
     })
+  })
+
+  it('carries an overlong hook agent type truncated to the bound, as the hook pipeline caps it', () => {
+    const raw = 'a'.repeat(AGENT_TYPE_MAX_LENGTH + 20)
+    const parsed = normalizeAgentStatusPayload({ state: 'working', agentType: raw })
+    expect(parsed).not.toBeNull()
+    const payload = projectAgentStatusChangedEvent(source({ payload: parsed! }))
+    expect(payload.agentType).toBe(raw.slice(0, AGENT_TYPE_MAX_LENGTH))
+    expect(agentStatusChangedPayloadSchema.safeParse(payload).success).toBe(true)
   })
 
   it("omits an agent type that carries no identity ('unknown', empty) or exceeds the bound", () => {
