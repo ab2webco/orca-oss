@@ -305,7 +305,8 @@ export class PluginService {
   }
 
   /** Reconciles live workers and client projections after consent or
-   * enablement changes without re-reading plugin files or starting workers. */
+   * enablement changes without re-reading plugin files. The only worker it
+   * starts is one a refresh or disable stopped while running, once approved. */
   async reconcileActivationState(): Promise<void> {
     return this.refreshQueue.enqueue(() => this.performActivationStateReconciliation())
   }
@@ -323,6 +324,10 @@ export class PluginService {
     )
     await this.workerController.reconcile(nextSpecs)
     this.notifyChanged(true)
+  }
+
+  forgetStoppedWorker(pluginKey: string): void {
+    this.workerController.forgetStoppedWorker(pluginKey)
   }
 
   async dispose(): Promise<void> {

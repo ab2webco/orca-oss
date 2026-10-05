@@ -9,6 +9,10 @@ import type { PluginWorkerHandle } from './plugin-host-process'
 import { PluginService } from './plugin-service'
 import type { PluginWorkerFactory } from './plugin-worker-manager'
 import { hashPluginTree } from './plugin-content-hash'
+import { getDefaultSettings } from '../../shared/constants'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import type { Store } from '../persistence'
+import { applyPluginConsent, applyPluginEnablement } from './plugin-enablement'
 
 const roots: string[] = []
 const services: PluginService[] = []
@@ -61,7 +65,7 @@ function createHarness(root: string) {
   let disabled: string[] = []
   let devPaths = [root]
   let killed = false
-  const consent = fingerprintPluginConsent(manifest())
+  let consents: Record<string, string> = { [pluginKey]: fingerprintPluginConsent(manifest()) }
   const workers: ReturnType<typeof testWorker>[] = []
   const factory = vi.fn<PluginWorkerFactory>(async () => {
     const handle = testWorker()
@@ -73,7 +77,7 @@ function createHarness(root: string) {
     hostVersion: '1.4.0',
     isPluginSystemEnabled: () => enabled,
     getDisabledPlugins: () => disabled,
-    getPluginConsents: () => ({ [pluginKey]: consent }),
+    getPluginConsents: () => consents,
     getDevPluginPaths: () => devPaths,
     getPluginKillListEntry: (key) =>
       killed && key === pluginKey
@@ -97,7 +101,22 @@ function createHarness(root: string) {
     },
     setKilled: (value: boolean) => {
       killed = value
-    }
+    },
+    // The consent and enablement writers read and write these same settings.
+    store: {
+      getSettings: () => ({
+        ...getDefaultSettings(root),
+        disabledPlugins: disabled,
+        pluginConsents: consents
+      }),
+      updateSettings: (updates: Partial<GlobalSettings>) => {
+        disabled = updates.disabledPlugins ?? disabled
+        consents = updates.pluginConsents ?? consents
+      },
+      listAutomations: () => [],
+      createAutomation: vi.fn(),
+      deleteAutomation: vi.fn()
+    } as unknown as Store
   }
 }
 
@@ -515,5 +534,156 @@ describe('PluginService worker reconciliation', () => {
       'disabled'
     )
     expect(harness.service.workerState(pluginKey).state).toBe('inactive')
+  })
+})
+
+describe('PluginService worker restore after approval', () => {
+  const storageManifest = manifest({ capabilities: [{ kind: 'storage' }] })
+
+  /** An update whose new capabilities make consent pending stops the running worker. */
+  async function updateToPendingRevision(harness: ReturnType<typeof createHarness>, root: string) {
+    await writeFile(join(root, 'orca-plugin.json'), JSON.stringify(storageManifest))
+    await harness.service.refresh()
+    await settleWorkerRestore()
+    expect(harness.service.activationState(harness.service.findValidPlugin(pluginKey)!)).toBe(
+      'pending'
+    )
+    expect(harness.service.workerState(pluginKey).state).toBe('inactive')
+  }
+
+  function answerConsent(
+    harness: ReturnType<typeof createHarness>,
+    decision: 'approve' | 'keep-disabled'
+  ): Promise<void> {
+    return applyPluginConsent({
+      store: harness.store,
+      pluginService: harness.service,
+      pluginKey,
+      reviewedFingerprint: fingerprintPluginConsent(storageManifest),
+      decision
+    })
+  }
+
+  it('starts a worker an update stopped once the user approves the new revision', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await updateToPendingRevision(harness, root)
+
+    await answerConsent(harness, 'approve')
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(2)
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+    expect(harness.service.activationError(pluginKey)).toBeNull()
+  })
+
+  it('keeps a never-started worker lazy when its update is approved', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await harness.service.initialize()
+    await updateToPendingRevision(harness, root)
+
+    await answerConsent(harness, 'approve')
+    await settleWorkerRestore()
+
+    expect(harness.factory).not.toHaveBeenCalled()
+  })
+
+  it('forgets the running worker when the user declines, even if approved later', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await updateToPendingRevision(harness, root)
+
+    await answerConsent(harness, 'keep-disabled')
+    await answerConsent(harness, 'approve')
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(1)
+    expect(harness.service.workerState(pluginKey).state).toBe('inactive')
+  })
+
+  it('starts the worker when a second update lands while consent is still pending', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await updateToPendingRevision(harness, root)
+    await writeFile(join(root, 'orca-plugin.json'), JSON.stringify(storageManifest))
+    await harness.service.refresh()
+
+    await answerConsent(harness, 'approve')
+    await settleWorkerRestore()
+
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+  })
+
+  it('starts the worker when the pending update is rolled back to the approved revision', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await updateToPendingRevision(harness, root)
+
+    await writeFile(join(root, 'orca-plugin.json'), JSON.stringify(manifest()))
+    await harness.service.refresh()
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(2)
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+  })
+
+  it('forgets the running worker once the plugin is uninstalled', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    await updateToPendingRevision(harness, root)
+
+    harness.setDevPaths([])
+    await harness.service.refresh()
+    harness.setDevPaths([root])
+    await harness.service.refresh()
+    await answerConsent(harness, 'approve')
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(1)
+  })
+
+  it('restarts a worker that was running when the plugin was disabled and enabled again', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await activate(harness.service)
+    const setEnabled = (enabled: boolean) =>
+      applyPluginEnablement({
+        store: harness.store,
+        pluginService: harness.service,
+        pluginKey,
+        enabled
+      })
+
+    await setEnabled(false)
+    await settleWorkerRestore()
+    expect(harness.service.workerState(pluginKey).state).toBe('inactive')
+    await setEnabled(true)
+    await settleWorkerRestore()
+
+    expect(harness.factory).toHaveBeenCalledTimes(2)
+    expect(harness.service.workerState(pluginKey).state).toBe('running')
+  })
+
+  it('keeps an idle plugin lazy when it is disabled and enabled again', async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await harness.service.initialize()
+    for (const enabled of [false, true]) {
+      await applyPluginEnablement({
+        store: harness.store,
+        pluginService: harness.service,
+        pluginKey,
+        enabled
+      })
+    }
+    await settleWorkerRestore()
+
+    expect(harness.factory).not.toHaveBeenCalled()
   })
 })

@@ -127,7 +127,8 @@ export class PluginWorkerController {
   }
 
   /** Stops workers whose spec changed or left, then restarts the ones that were
-   * running and are still approved; a stopped idle worker stays down. */
+   * running once their plugin is approved, now or on a later pass; a stopped
+   * idle worker stays down. */
   async reconcile(nextSpecs: ReadonlyMap<string, PluginWorkerSpawnSpec>): Promise<void> {
     const current = new Map([...this.registeredSpecs, ...this.manager.trackedSpecs()])
     const stoppedWhileRunning: string[] = []
@@ -146,6 +147,11 @@ export class PluginWorkerController {
       await this.manager.deactivate(pluginKey)
     }
     this.restore.schedule(stoppedWhileRunning, new Set(nextSpecs.keys()))
+  }
+
+  /** The user declined the plugin: a later approval must not start its worker. */
+  forgetStoppedWorker(pluginKey: string): void {
+    this.restore.forget(pluginKey)
   }
 
   async deactivate(pluginKey: string): Promise<void> {
