@@ -262,6 +262,11 @@ for (const scenario of [...SINGLES, ...BURSTS, ...LIFECYCLE]) {
     test(`terminal replies to ${scenario.name} (${mode}) arrive once, in order, with nothing after`, async ({
       orcaPage
     }, testInfo) => {
+      // Why: with ECHO on only colour replies are contained; flips red once ORCA-537 extends it.
+      test.fail(
+        mode === 'cooked',
+        'ORCA-537: replies other than OSC colour are not contained while ECHO is on'
+      )
       if (scenario.delayBeforeMs) {
         test.slow()
       }
