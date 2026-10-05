@@ -63,6 +63,7 @@ function createPluginService(
           }
         : null,
     reconcileActivationState: vi.fn().mockResolvedValue(undefined),
+    forgetStoppedWorker: vi.fn(),
     options: { userDataPath: '/tmp/orca-plugin-enablement-test' },
     getDiscovered: () => [],
     activationState: () => 'approved' as const
@@ -120,6 +121,7 @@ describe('applyPluginConsent', () => {
 
     expect(harness.getSettings().disabledPlugins).toContain(pluginKey)
     expect(pluginService.reconcileActivationState).toHaveBeenCalledOnce()
+    expect(pluginService.forgetStoppedWorker).toHaveBeenCalledWith(pluginKey)
   })
 })
 

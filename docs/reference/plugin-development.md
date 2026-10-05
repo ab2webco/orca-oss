@@ -606,7 +606,11 @@ it ([`plugin-event-bus.ts:1-30`](../../src/main/plugins/plugin-event-bus.ts)).
 A refresh that changes a plugin's worker spec (its manifest, root or granted
 capabilities) stops the old worker. If that worker was running and the plugin is
 still approved, Orca starts it again on the new spec without waiting for a
-trigger ([`plugin-worker-controller.ts:129-147`](../../src/main/plugins/plugin-worker-controller.ts)).
+trigger ([`plugin-worker-controller.ts:129-150`](../../src/main/plugins/plugin-worker-controller.ts)).
+If the update left the plugin pending consent, or the plugin was disabled while
+its worker ran, Orca remembers that worker and starts it as soon as the plugin is
+approved or enabled again; declining the consent dialog or uninstalling the
+plugin forgets it ([`plugin-worker-restore.ts`](../../src/main/plugins/plugin-worker-restore.ts)).
 An idle or never-started worker stays down. Editing only the worker's code,
 with the manifest unchanged, does not stop it: the running worker keeps the old
 code until it stops (idle reap, disable and re-enable, or an app restart).

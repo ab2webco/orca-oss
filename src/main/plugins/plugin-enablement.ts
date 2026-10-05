@@ -62,6 +62,11 @@ export async function applyPluginConsent(input: {
     { notifyListeners: true, originWebContentsId: input.originWebContentsId }
   )
   await pluginService.reconcileActivationState()
+  if (input.decision !== 'approve') {
+    // Why: declining is a deliberate no; approving later must not bring back a
+    // worker the update stopped, it starts lazily like any other.
+    pluginService.forgetStoppedWorker(pluginKey)
+  }
   const reconciled = await reconcilePluginAutomations({ store, pluginService })
   if (reconciled.createdWorkspaceRepo) {
     input.onReposChanged?.()
