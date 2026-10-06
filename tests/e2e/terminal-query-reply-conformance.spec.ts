@@ -60,6 +60,18 @@ const Q = {
 } satisfies Record<string, Query>
 
 type Mode = 'raw' | 'cooked'
+
+// Reply kinds Orca holds back while the tty still echoes (ORCA-537 scope).
+const CONTAINED_WHILE_ECHO = new Set(['osc10', 'osc11', 'osc12', 'osc4;0', 'colorscheme'])
+
+function cookedFailureReason(queries: Query[]): string | null {
+  if (process.platform === 'darwin') {
+    return 'ORCA-537: on macOS a cooked probe reads no reply at all, colour included'
+  }
+  return queries.some((query) => query.reply !== null && !CONTAINED_WHILE_ECHO.has(query.reply))
+    ? 'ORCA-537: replies other than OSC colour are not contained while ECHO is on'
+    : null
+}
 type Scenario = {
   name: string
   queries: Query[]
@@ -262,11 +274,9 @@ for (const scenario of [...SINGLES, ...BURSTS, ...LIFECYCLE]) {
     test(`terminal replies to ${scenario.name} (${mode}) arrive once, in order, with nothing after`, async ({
       orcaPage
     }, testInfo) => {
-      // Why: with ECHO on only colour replies are contained; flips red once ORCA-537 extends it.
-      test.fail(
-        mode === 'cooked',
-        'ORCA-537: replies other than OSC colour are not contained while ECHO is on'
-      )
+      // Why: known ORCA-537 gaps; test.fail flips red once containment covers them.
+      const knownFailure = mode === 'cooked' ? cookedFailureReason(scenario.queries) : null
+      test.fail(knownFailure !== null, knownFailure ?? '')
       if (scenario.delayBeforeMs) {
         test.slow()
       }
