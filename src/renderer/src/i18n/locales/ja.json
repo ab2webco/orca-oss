@@ -14501,6 +14501,14 @@
         },
         "AutomationListStatusCell": {
           "willNotRun": "実行されません"
+        },
+        "AutomationAccountField": {
+          "claudeLabel": "Claude アカウント",
+          "codexLabel": "Codex アカウント",
+          "inherit": "継承（ワークツリーまたはグローバル）",
+          "removed": "削除されたアカウント",
+          "hostUnsupported": "オートメーションのアカウントを選択するには、ホストを更新してください。",
+          "removedWarning": "保存されたアカウントは利用できなくなりました。別のアカウントを選ぶか、継承してください。"
         }
       },
       "agent": {

@@ -14523,6 +14523,14 @@
         },
         "AutomationListStatusCell": {
           "willNotRun": "실행되지 않음"
+        },
+        "AutomationAccountField": {
+          "claudeLabel": "Claude 계정",
+          "codexLabel": "Codex 계정",
+          "inherit": "상속(워크트리 또는 전역)",
+          "removed": "삭제된 계정",
+          "hostUnsupported": "자동화에 사용할 계정을 선택하려면 호스트를 업데이트하세요.",
+          "removedWarning": "저장된 계정을 더 이상 사용할 수 없습니다. 다른 계정을 선택하거나 상속하세요."
         }
       },
       "agent": {

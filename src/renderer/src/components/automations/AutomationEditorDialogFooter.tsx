@@ -14,6 +14,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { Field } from './automation-page-parts'
+import { AutomationAccountField } from './AutomationAccountField'
 import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
 import { AutomationSessionField } from './AutomationSessionField'
 import { AutomationTargetPaneField } from './AutomationTargetPaneField'
@@ -248,6 +249,14 @@ export function AutomationEditorDialogFooter({
                   allowNarrowTrigger
                 />
               </Field>
+            )}
+            {isHermesTarget ? null : (
+              <AutomationAccountField
+                draft={draft}
+                repo={repoMap.get(draft.projectId) ?? null}
+                triggerClassName={pickerTriggerClassName}
+                onDraftChange={onDraftChange}
+              />
             )}
             {/* Ni sesion ni panel: un comando no abre terminal. */}
             {draft.actionKind === 'command' ? null : (

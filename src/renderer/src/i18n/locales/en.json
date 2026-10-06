@@ -15336,6 +15336,14 @@
         },
         "AutomationListStatusCell": {
           "willNotRun": "Will not run"
+        },
+        "AutomationAccountField": {
+          "claudeLabel": "Claude account",
+          "codexLabel": "Codex account",
+          "inherit": "Inherit (worktree or global)",
+          "removed": "Removed account",
+          "hostUnsupported": "Update the host to pick an account for automations.",
+          "removedWarning": "The saved account is no longer available. Pick another or inherit."
         }
       },
       "agent": {

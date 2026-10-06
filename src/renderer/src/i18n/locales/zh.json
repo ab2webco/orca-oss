@@ -14521,6 +14521,14 @@
         },
         "AutomationListStatusCell": {
           "willNotRun": "不会运行"
+        },
+        "AutomationAccountField": {
+          "claudeLabel": "Claude 账户",
+          "codexLabel": "Codex 账户",
+          "inherit": "继承（工作树或全局）",
+          "removed": "已删除的账户",
+          "hostUnsupported": "请更新主机以为自动化选择账户。",
+          "removedWarning": "已保存的账户不再可用。请选择其他账户或继承。"
         }
       },
       "agent": {

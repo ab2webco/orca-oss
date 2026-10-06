@@ -35,7 +35,9 @@ const BASE_DRAFT: AutomationDraft = {
   dayOfWeek: '1',
   customSchedule: '',
   missedRunGraceMinutes: '720',
-  scheduleWarning: null
+  scheduleWarning: null,
+  claudeAccountId: null,
+  codexAccountId: null
 }
 
 describe('AutomationSchedulePicker', () => {
