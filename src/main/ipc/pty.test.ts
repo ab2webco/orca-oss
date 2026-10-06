@@ -2855,6 +2855,53 @@ describe('registerPtyHandlers', () => {
       await handlers.get('pty:kill')!(null, { id: result.id })
     })
 
+    it('lets a launch-scoped Codex account beat the worktree pin on the renderer spawn path', async () => {
+      installExitOnKillSpawnMock()
+      const getSelectedCodexHomePath = vi.fn(
+        (_target: unknown, _launchEnv?: unknown, _context?: unknown) => null
+      )
+      const store = { getWorktreeMeta: vi.fn(() => ({ codexAccountId: 'codex-pinned' })) }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        getSelectedCodexHomePath as never,
+        undefined,
+        undefined,
+        store as never
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex',
+        codexAccountId: 'codex-launch'
+      })) as { id: string }
+
+      expect(getSelectedCodexHomePath.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ overrideAccountId: 'codex-launch' })
+      )
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    it('records a directed Codex binding for a daemon-hosted renderer launch with an account', async () => {
+      installDaemonTestProvider()
+      registerPtyHandlers(mainWindow as never, undefined, vi.fn(() => null) as never)
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'codex',
+        worktreeId: 'wt-codex-directed-renderer',
+        codexAccountId: 'codex-launch'
+      })) as { id: string }
+
+      expect(directedCodexPtyBinding.getDirectedCodexPtyAccountId(spawnResult.id)).toBe(
+        'codex-launch'
+      )
+      directedCodexPtyBinding.releaseDirectedCodexPtyBinding(spawnResult.id)
+    })
+
     // Why (ORCA-130): the spawn is the only moment the launch account exists —
     // the restore that must reattach comes back through the renderer handler,
     // which never carries it, so the fact has to be recorded here or nowhere.

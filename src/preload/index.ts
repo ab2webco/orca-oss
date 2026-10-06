@@ -1005,6 +1005,8 @@ const api = {
       initiallyHidden?: boolean
       // Launch-scoped Claude account override (transcript-owning universe on resume); null forces the shared home.
       claudeAccountId?: string | null
+      // Launch-scoped Codex account override; beats the worktree pin for this spawn only.
+      codexAccountId?: string
       // Why: closes the SIGKILL race (INVESTIGATION.md) — main sync-flushes the (worktreeId, tabId, leafId → ptyId) binding before pty:spawn returns.
       tabId?: string
       leafId?: string

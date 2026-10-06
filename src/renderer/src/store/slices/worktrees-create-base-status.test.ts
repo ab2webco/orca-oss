@@ -725,4 +725,83 @@ describe('createWorktree base status merge', () => {
       behind: 2
     })
   })
+
+  const accountPins = { claudeAccountId: 'claude-acc', codexAccountId: 'codex-acc' }
+  function createWithAccountPins(store: ReturnType<typeof createTestStore>, repoId: string) {
+    return store
+      .getState()
+      .createWorktree(
+        repoId,
+        'feature',
+        'origin/main',
+        'inherit',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        accountPins
+      )
+  }
+
+  it('forwards Claude and Codex account pins through the local create IPC payload', async () => {
+    const store = createTestStore()
+    mockApi.worktrees.create.mockResolvedValue({
+      worktree: makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    })
+
+    await createWithAccountPins(store, 'repo1')
+
+    expect(mockApi.worktrees.create.mock.calls[0][0]).toMatchObject(accountPins)
+  })
+
+  it('forwards Claude and Codex account pins through runtime worktree.create', async () => {
+    const store = createTestStore()
+    store.setState({
+      repos: [
+        {
+          id: 'repo-remote',
+          path: '/remote/repo',
+          displayName: 'repo',
+          badgeColor: '#000',
+          addedAt: 0,
+          executionHostId: 'runtime:env-1'
+        }
+      ]
+    } as Partial<AppState>)
+    const created = makeWorktree({ id: 'repo-remote::/remote/feature', repoId: 'repo-remote' })
+    runtimeEnvironmentCall.mockImplementation(({ method }: RuntimeEnvironmentCallRequest) =>
+      Promise.resolve({
+        id: 'rpc-remote-create',
+        ok: true,
+        result: method === 'worktree.create' ? { worktree: created } : null,
+        _meta: { runtimeId: 'runtime-remote' }
+      })
+    )
+
+    await createWithAccountPins(store, 'repo-remote')
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'worktree.create',
+        params: expect.objectContaining(accountPins)
+      })
+    )
+  })
 })

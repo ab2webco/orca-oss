@@ -27381,6 +27381,11 @@ export class OrcaRuntimeService {
     }
     const callerKey = caller.clientId?.trim() || `trusted-local:${caller.clientKind ?? 'runtime'}`
     const operationKey = `${callerKey}\0${request.clientOperationId}`
+    // Why only when present: account-less requests keep their pre-existing fingerprints.
+    const launchAccountFingerprint =
+      request.claudeAccountId || request.codexAccountId
+        ? [request.claudeAccountId ?? null, request.codexAccountId ?? null]
+        : []
     const requestFingerprint = createHash('sha256')
       .update(
         JSON.stringify([
@@ -27397,7 +27402,8 @@ export class OrcaRuntimeService {
           request.presentation ?? null,
           request.placement?.tabId ?? null,
           request.placement?.leafId ?? null,
-          request.viewMode ?? null
+          request.viewMode ?? null,
+          ...launchAccountFingerprint
         ])
       )
       .digest('base64url')
@@ -27463,7 +27469,8 @@ export class OrcaRuntimeService {
             request.presentation ?? null,
             request.placement?.tabId ?? null,
             request.placement?.leafId ?? null,
-            request.viewMode ?? null
+            request.viewMode ?? null,
+            ...launchAccountFingerprint
           ])
         )
         .digest('base64url')
@@ -27542,6 +27549,8 @@ export class OrcaRuntimeService {
           leafId: operationLeafId,
           preAllocatedHandle: operationHandle,
           viewMode: request.viewMode,
+          ...(request.claudeAccountId ? { claudeAccountId: request.claudeAccountId } : {}),
+          ...(request.codexAccountId ? { codexAccountId: request.codexAccountId } : {}),
           persistHostSessionBinding: true,
           agentSessionCreateOperationId: executionOperationId,
           signal: caller.signal,
@@ -28213,7 +28222,13 @@ export class OrcaRuntimeService {
 
   async launchAgentTerminal(
     worktreeSelector: string,
-    opts: { agent: TuiAgent; prompt: string; title?: string }
+    opts: {
+      agent: TuiAgent
+      prompt: string
+      title?: string
+      claudeAccountId?: string
+      codexAccountId?: string
+    }
   ): Promise<RuntimeTerminalCreate> {
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const repo = this.store?.getRepo(worktree.repoId)
@@ -28233,7 +28248,9 @@ export class OrcaRuntimeService {
       launchAgent: startup.agent,
       startupCommandDelivery: startup.startup.startupCommandDelivery,
       telemetry: startup.startup.telemetry,
-      title: opts.title
+      title: opts.title,
+      ...(opts.claudeAccountId ? { claudeAccountId: opts.claudeAccountId } : {}),
+      ...(opts.codexAccountId ? { codexAccountId: opts.codexAccountId } : {})
     })
   }
 

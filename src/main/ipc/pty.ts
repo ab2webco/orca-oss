@@ -6541,6 +6541,8 @@ export function registerPtyHandlers(
         // Launch-scoped Claude account override for this spawn only (transcript-owning
         // universe on resume). Null forces the shared home; undefined keeps the pin.
         claudeAccountId?: string | null
+        // Launch-scoped Codex account override for this spawn only; undefined keeps the pin.
+        codexAccountId?: string
         // Why: closes the SIGKILL race (INVESTIGATION.md) by letting main sync-flush the binding before pty:spawn returns; only the Ctrl+T daemon-host path threads these.
         tabId?: string
         leafId?: string
@@ -7054,7 +7056,8 @@ export function registerPtyHandlers(
                             codexSelectionTarget,
                             store,
                             args.worktreeId,
-                            args.command
+                            args.command,
+                            args.codexAccountId
                           ),
                           baseEnv,
                           {
@@ -7069,7 +7072,8 @@ export function registerPtyHandlers(
                         codexSelectionTarget,
                         store,
                         args.worktreeId,
-                        args.command
+                        args.command,
+                        args.codexAccountId
                       ),
                       baseEnv,
                       {
@@ -7210,6 +7214,14 @@ export function registerPtyHandlers(
         if (!args.connectionId && !isDaemonHostSpawn) {
           spawnOptions.codexHomePathOverride = { value: selectedCodexHomePath }
         }
+        if (!args.connectionId && args.codexAccountId) {
+          spawnOptions.codexLaunchAccountId = args.codexAccountId
+        }
+        // Why daemon-hosted only: same ORCA-130 reattach gate as the runtime-controller spawn.
+        const codexDirectedAccountId =
+          isDaemonHostSpawn && args.codexAccountId && isCodexLaunchCommand(args.command)
+            ? args.codexAccountId
+            : undefined
         if (combinedEnvToDelete) {
           spawnOptions.envToDelete = combinedEnvToDelete
         }
@@ -7738,6 +7750,9 @@ export function registerPtyHandlers(
         }
         // Why every account mark is gated on stablePaneOwner: it is non-null only when this
         // spawn adopted an existing pane PTY, which launched no CLI here.
+        if (codexDirectedAccountId && !stablePaneOwner) {
+          markDirectedCodexPtySpawned(result.id, codexDirectedAccountId)
+        }
         if (isClaudeLaunch && !stablePaneOwner && !didPrepareInjectedClaudeAuth) {
           try {
             markClaudePtySpawned(

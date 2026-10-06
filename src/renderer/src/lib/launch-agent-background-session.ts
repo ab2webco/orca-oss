@@ -181,6 +181,7 @@ export async function launchAgentBackgroundSession(
         agent,
         ...(hasPrompt && !isFollowupPath ? { prompt: trimmedPrompt } : {}),
         ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
+        launchAccounts: args.launchAccounts,
         legacy: {
           command: startupPlan.launchCommand,
           env: paneEnv,
@@ -208,6 +209,7 @@ export async function launchAgentBackgroundSession(
         launchConfig: startupPlan.launchConfig,
         launchToken,
         launchAgent: agent,
+        ...args.launchAccounts,
         connectionId: sshConnectionId,
         worktreeId,
         tabId: reservedTabId,

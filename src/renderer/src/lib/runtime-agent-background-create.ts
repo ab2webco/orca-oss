@@ -11,6 +11,8 @@ import {
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { runRemoteAgentSessionLaunch } from '@/runtime/remote-agent-session-launch'
+import type { AutomationLaunchAccounts } from '../../../shared/automation-launch-accounts'
+import { AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 
 export async function createRuntimeAgentBackgroundTerminal(args: {
   environmentId: string
@@ -20,6 +22,7 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
   agent: TuiAgent
   prompt?: string
   sessionOptions?: Record<string, SessionOptionValue>
+  launchAccounts?: AutomationLaunchAccounts
   legacy: {
     command: string
     env: Record<string, string>
@@ -31,8 +34,14 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
 }): Promise<{ terminal: RuntimeTerminalCreate }> {
   const operation = createAgentSessionCreateOperation()
   const launchPreferences = toAgentLaunchPreferences(args.sessionOptions)
+  const launchAccounts = args.launchAccounts ?? {}
+  const hasLaunchAccounts = Object.keys(launchAccounts).length > 0
   return await runRemoteAgentSessionLaunch({
     environmentId: args.environmentId,
+    // Why: createAgentSession params are strict, so only a host that knows account pins may receive them.
+    ...(hasLaunchAccounts
+      ? { hostAuthorityCapability: AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY }
+      : {}),
     hostAuthority: () =>
       operation.run((clientOperationId) =>
         callRuntimeRpc<{ terminal: RuntimeTerminalCreate }>(
@@ -46,6 +55,7 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
                 ? { prompt: args.prompt, promptDelivery: 'auto-submit' as const }
                 : {}),
               ...(launchPreferences ? { launchPreferences } : {}),
+              ...launchAccounts,
               placement: { tabId: args.tabId, leafId: args.leafId },
               // Why: local renderer owns the hidden tab; remote runtime should not reveal UI.
               presentation: 'background'
@@ -69,6 +79,7 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
           launchConfig: args.legacy.launchConfig,
           launchToken: args.legacy.launchToken,
           launchAgent: args.agent,
+          ...launchAccounts,
           ...(args.legacy.title ? { title: args.legacy.title } : {}),
           tabId: args.tabId,
           leafId: args.leafId,

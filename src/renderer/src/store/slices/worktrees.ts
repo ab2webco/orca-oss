@@ -3928,6 +3928,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   ) => {
     const automationProvenanceRequest = options?.automationProvenanceRequest
     const claudeAccountId = options?.claudeAccountId
+    const codexAccountId = options?.codexAccountId
     const linkedPlaneWorkItem = options?.linkedPlaneWorkItem
     const linkedWorkItem = options?.linkedWorkItem
     const linkedTaskSourceContext = options?.linkedTaskSourceContext
@@ -3980,6 +3981,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(parentWorkspace ? { parentWorkspace } : {}),
             ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
             ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+            ...(codexAccountId !== undefined ? { codexAccountId } : {}),
             ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
             ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
             ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),
@@ -4047,6 +4049,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(parentWorkspace ? { parentWorkspace } : {}),
                     ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
                     ...(claudeAccountId !== undefined ? { claudeAccountId } : {}),
+                    ...(codexAccountId !== undefined ? { codexAccountId } : {}),
                     ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
                     ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
                     ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),
