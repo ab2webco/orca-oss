@@ -69,6 +69,10 @@ function isOwnedTabIdentityCurrent(
   return layoutPtyId === undefined || layoutPtyId === args.ptyId
 }
 
+function isTabPresent(state: AppState, tabId: string): boolean {
+  return Object.values(state.tabsByWorktree).some((tabs) => tabs.some((tab) => tab.id === tabId))
+}
+
 export function createAutomationTerminalOwnership(
   args: CreateAutomationTerminalOwnershipArgs
 ): AutomationTerminalOwnership {
@@ -118,6 +122,11 @@ export function createAutomationTerminalOwnership(
       }
       const state = args.store.getState()
       if (!isOwnedTabIdentityCurrent(state, args)) {
+        // Why: a pty-exit close keeps the record on purpose, but a finished run is never
+        // resumed, so its tab vanishing must not leave a sleeping row (ORCA-560).
+        if (!isTabPresent(state, args.tabId)) {
+          state.clearSleepingAgentSession(args.paneKey)
+        }
         return false
       }
       try {
@@ -130,6 +139,9 @@ export function createAutomationTerminalOwnership(
         console.error('[automations] Failed to close owned automation terminal:', error)
         return false
       }
+      // Why: a cleanup close keeps records it cannot prove finished (ORCA-272); a
+      // completed run is that proof.
+      state.clearSleepingAgentSession(args.paneKey)
       return true
     }
   }
