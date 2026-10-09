@@ -166,6 +166,7 @@ import type {
 import { translate } from '@/i18n/i18n'
 import { redactKagiSessionToken } from '../../../shared/browser-url'
 import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
+import { clearSleepingAgentSessionsForClosedTab } from '@/components/terminal/clear-closed-tab-sleeping-agents'
 import { initialAgentTabViewModeProps } from '@/lib/native-chat-initial-view-mode'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
@@ -2098,6 +2099,21 @@ export function useIpcEvents(): void {
         void runSleepWorktree(worktreeId)
       })
     )
+
+    // Why: a runtime-driven close arrives `runtimeInitiated` and keeps the record, so an
+    // explicit retirement must clear it here or the next persist brings it back (ORCA-560).
+    const unsubscribeRetireSleepingAgentSessions = window.api.ui.onRetireSleepingAgentSessions?.(
+      ({ tabId, paneKey }) => {
+        if (paneKey) {
+          useAppStore.getState().clearSleepingAgentSession(paneKey)
+        } else {
+          clearSleepingAgentSessionsForClosedTab(tabId)
+        }
+      }
+    )
+    if (unsubscribeRetireSleepingAgentSessions) {
+      unsubs.push(unsubscribeRetireSleepingAgentSessions)
+    }
 
     unsubs.push(
       window.api.ui.onResumeSleepingAgents(({ worktreeId }) => {

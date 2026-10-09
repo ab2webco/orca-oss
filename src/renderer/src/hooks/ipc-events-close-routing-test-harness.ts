@@ -10,6 +10,10 @@ export type CloseActiveTabListener = () => void
 export type CloseFloatingItemListener = (payload: { sourceId: string }) => void
 export type SelectFloatingIndexListener = (payload: { index: number }) => void
 export type CloseTerminalListener = (data: { tabId: string; paneRuntimeId?: number | null }) => void
+export type RetireSleepingAgentSessionsListener = (data: {
+  tabId: string
+  paneKey?: string
+}) => void
 export type CloseSessionTabListener = (data: { tabId: string; worktreeId: string }) => void
 export type TerminalTabCloseRequestListener = (data: {
   requestId: string
@@ -23,6 +27,7 @@ export async function useIpcEventsForCloseRouting({
   selectFloatingIndexListenerRef,
   closeSessionTabListenerRef,
   closeTerminalListenerRef,
+  retireSleepingAgentSessionsListenerRef,
   getState,
   requestTabCloseListenerRef,
   replyTabClose = vi.fn(),
@@ -35,6 +40,9 @@ export async function useIpcEventsForCloseRouting({
   selectFloatingIndexListenerRef?: { current: SelectFloatingIndexListener | null }
   closeSessionTabListenerRef?: { current: CloseSessionTabListener | null }
   closeTerminalListenerRef?: { current: CloseTerminalListener | null }
+  retireSleepingAgentSessionsListenerRef?: {
+    current: RetireSleepingAgentSessionsListener | null
+  }
   getState: () => Record<string, unknown>
   requestTabCloseListenerRef?: { current: RequestTabCloseListener | null }
   replyTabClose?: ReturnType<typeof vi.fn>
@@ -174,6 +182,12 @@ export async function useIpcEventsForCloseRouting({
         onCloseTerminal: (listener: CloseTerminalListener) => {
           if (closeTerminalListenerRef) {
             closeTerminalListenerRef.current = listener
+          }
+          return () => {}
+        },
+        onRetireSleepingAgentSessions: (listener: RetireSleepingAgentSessionsListener) => {
+          if (retireSleepingAgentSessionsListenerRef) {
+            retireSleepingAgentSessionsListenerRef.current = listener
           }
           return () => {}
         },

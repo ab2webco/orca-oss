@@ -88,13 +88,18 @@ function makeRuntime(
 
 /** Same shape as makeRuntime, but with a session the runtime can write back to,
  *  so a test can observe the resume record a close is supposed to retire. */
-function makeWritableRuntime(sleeping: Record<string, SleepingAgentSessionRecord>): {
+function makeWritableRuntime(
+  sleeping: Record<string, SleepingAgentSessionRecord>,
+  sessionOverrides: Partial<WorkspaceSessionState> = {}
+): {
   runtime: OrcaRuntimeService
   getSleeping: () => Record<string, SleepingAgentSessionRecord>
   closeTerminalNotification: ReturnType<typeof vi.fn>
+  retireSleepingAgentSessions: ReturnType<typeof vi.fn>
 } {
   let session: WorkspaceSessionState = {
     ...getDefaultWorkspaceSession(),
+    ...sessionOverrides,
     sleepingAgentSessionsByPaneKey: sleeping
   }
   const runtime = new OrcaRuntimeService({
@@ -110,11 +115,17 @@ function makeWritableRuntime(sleeping: Record<string, SleepingAgentSessionRecord
     flushOrThrow: vi.fn()
   } as never)
   const closeTerminalNotification = vi.fn()
-  runtime.setNotifier({ closeTerminal: closeTerminalNotification } as never)
+  const retireSleepingAgentSessions = vi.fn()
+  runtime.setNotifier({
+    closeTerminal: closeTerminalNotification,
+    closeTerminalTab: vi.fn(async () => {}),
+    retireSleepingAgentSessions
+  } as never)
   return {
     runtime,
     getSleeping: () => session.sleepingAgentSessionsByPaneKey ?? {},
-    closeTerminalNotification
+    closeTerminalNotification,
+    retireSleepingAgentSessions
   }
 }
 
@@ -526,6 +537,24 @@ describe('terminal.list liveness for sleeping workers', () => {
     expect(getSleeping()[WORKER_PANE_KEY]).toBeUndefined()
   })
 
+  // Why the renderer too: it owns the records and re-persists them, so a close
+  // that forgets only main's copy relists the pane under a new handle (ORCA-560).
+  it('asks the renderer to retire the record of a closed sleeping pane', async () => {
+    const { runtime, retireSleepingAgentSessions } = makeWritableRuntime({
+      [WORKER_PANE_KEY]: sleepingRecord()
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    await runtime.closeTerminalTab(handle)
+
+    expect(retireSleepingAgentSessions).toHaveBeenCalledWith({
+      tabId: WORKER_TAB_ID,
+      paneKey: WORKER_PANE_KEY
+    })
+  })
+
   it('drops the sleeping handle once the pane wakes', async () => {
     let sleeping: Record<string, SleepingAgentSessionRecord> = {
       [WORKER_PANE_KEY]: sleepingRecord()
@@ -539,5 +568,90 @@ describe('terminal.list liveness for sleeping workers', () => {
 
     expect((await runtime.listTerminals(WORKTREE_SELECTOR)).terminals).toEqual([])
     await expect(runtime.showTerminal(handle)).rejects.toThrow()
+  })
+})
+
+describe('closing a live worker tab', () => {
+  const WORKER_PTY_ID = 'pty-worker'
+
+  function makeLiveWorkerRuntime(): ReturnType<typeof makeWritableRuntime> {
+    const harness = makeWritableRuntime(
+      { [WORKER_PANE_KEY]: sleepingRecord({ origin: 'live' }) },
+      {
+        tabsByWorktree: {
+          [WORKTREE_ID]: [
+            {
+              id: WORKER_TAB_ID,
+              ptyId: WORKER_PTY_ID,
+              worktreeId: WORKTREE_ID,
+              title: 'Worker',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 1
+            }
+          ]
+        },
+        terminalLayoutsByTabId: {
+          [WORKER_TAB_ID]: {
+            root: { type: 'leaf', leafId: WORKER_LEAF_ID },
+            activeLeafId: WORKER_LEAF_ID,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [WORKER_LEAF_ID]: WORKER_PTY_ID }
+          }
+        }
+      }
+    )
+    harness.runtime.setPtyController({
+      write: () => true,
+      kill: vi.fn(() => true),
+      stopAndWait: vi.fn(async () => true),
+      getForegroundProcess: async () => null,
+      listProcesses: async () => []
+    } as never)
+    harness.runtime.attachWindow(1)
+    harness.runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          title: 'Worker',
+          activeLeafId: WORKER_LEAF_ID,
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: WORKER_TAB_ID,
+          worktreeId: WORKTREE_ID,
+          leafId: WORKER_LEAF_ID,
+          paneRuntimeId: 1,
+          ptyId: WORKER_PTY_ID
+        }
+      ]
+    })
+    return harness
+  }
+
+  // Why: `--tab` is the caller asking for the whole tab to go; keeping the record
+  // left a sleeping row behind every automation tab closed this way (ORCA-560).
+  it('retires the resume record when the whole tab is closed', async () => {
+    const { runtime, getSleeping, retireSleepingAgentSessions } = makeLiveWorkerRuntime()
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    await runtime.closeTerminalTab(handle)
+
+    expect(getSleeping()[WORKER_PANE_KEY]).toBeUndefined()
+    expect(retireSleepingAgentSessions).toHaveBeenCalledWith({ tabId: WORKER_TAB_ID })
+  })
+
+  it('keeps the resume record when only the pane is closed (ORCA-487)', async () => {
+    const { runtime, getSleeping, retireSleepingAgentSessions } = makeLiveWorkerRuntime()
+    const handle = (await runtime.listTerminals(WORKTREE_SELECTOR)).terminals[0]!.handle
+
+    await runtime.closeTerminal(handle)
+
+    expect(getSleeping()[WORKER_PANE_KEY]).toBeDefined()
+    expect(retireSleepingAgentSessions).not.toHaveBeenCalled()
   })
 })

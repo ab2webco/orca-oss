@@ -512,6 +512,7 @@ function registerRuntimeWindowLifecycle(
     // renderer looking like the user's own.
     closeTerminalTab: (tabId, options) =>
       requestTerminalTabCloseFromRenderer(mainWindow, tabId, options),
+    retireSleepingAgentSessions: (target) => send('ui:retireSleepingAgentSessions', target),
     sleepWorktree: (worktreeId) => send('ui:sleepWorktree', { worktreeId }),
     resumeSleepingAgents: (worktreeId) => send('ui:resumeSleepingAgents', { worktreeId }),
     terminalFitOverrideChanged: (ptyId, mode, cols, rows) =>
