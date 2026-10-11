@@ -93,6 +93,17 @@ test.describe('closing a sleeping row through the runtime', () => {
     worktreeId = await waitForActiveWorktree(orcaPage)
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     client = new RuntimeClient(userDataDir, 30_000, null, null)
+    // Why: main lists sleeping rows only for worktrees it has resolved; on a slow CI
+    // runner a record seeded right after boot stayed unlisted past the poll timeout.
+    await expect
+      .poll(
+        async () =>
+          (
+            await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
+          ).result.worktrees.some((worktree) => worktree.id === worktreeId),
+        { timeout: 30_000, message: `main never resolved worktree ${worktreeId}` }
+      )
+      .toBe(true)
   })
 
   test('an orphaned sleeping row closed with --tab stays gone', async ({ orcaPage }) => {
