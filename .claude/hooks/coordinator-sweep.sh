@@ -31,12 +31,26 @@ sweep_line() {
   live=$(orca terminal list --json 2>/dev/null |
     jq -r '[.result.terminals[]?|select(.liveness=="running")|.worktreePath]|join("\n")' 2>/dev/null)
 
+  # Unshipped: commits past main, no PR, untouched for a day. Skipping these as "in progress"
+  # left ORCA-560 finished and invisible for three days (ORCA-562).
   stale=""
+  local unshipped="" now last
+  now=$(date +%s)
   while read -r path branch; do
     [ -z "$branch" ] || [ "$branch" = "main" ] && continue
     grep -qxF "$path" <<<"$live" && continue
     [ -n "$(gh pr list -R "$REPO" --head "$branch" --state open --json number --jq '.[].number' 2>/dev/null)" ] && continue
-    [ "$(git rev-list --count "origin/main..$branch" 2>/dev/null || echo 0)" -gt 0 ] && continue
+    if [ "$(git rev-list --count "origin/main..$branch" 2>/dev/null || echo 0)" -gt 0 ]; then
+      # A squash merge leaves the branch ahead of main forever.
+      if [ -n "$(gh pr list -R "$REPO" --head "$branch" --state merged --json number --jq '.[].number' 2>/dev/null)" ]; then
+        stale="$stale ${branch##*/}"
+        continue
+      fi
+      last=$(git log -1 --format=%ct "$branch" 2>/dev/null)
+      [ -n "$last" ] && [ $((now - last)) -ge 86400 ] &&
+        unshipped="$unshipped ${branch##*/}($(((now - last) / 86400))d)"
+      continue
+    fi
     stale="$stale ${branch##*/}"
   done < <(git worktree list --porcelain 2>/dev/null |
     awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print p, $2}')
@@ -69,7 +83,8 @@ sweep_line() {
     drift=$(comm -12 <(sort -u <<<"$inprog") <(echo "$merged") | tr '\n' ' ' | sed 's/ $//')
   fi
 
-  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | board-drift:${drift:-none} | board-open:${board:-?}"
+  stale=${stale# } unshipped=${unshipped# }
+  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | unshipped:${unshipped:-none} | board-drift:${drift:-none} | board-open:${board:-?}"
 }
 
 if [ "${1:-}" = "--once" ]; then
@@ -77,7 +92,7 @@ if [ "${1:-}" = "--once" ]; then
     hookSpecificOutput: {
       hookEventName: "SessionStart",
       additionalContext: ("Estado de coordinación al iniciar:\n" + $line +
-        "\n\nArmá el monitor de barrido con la herramienta Monitor: comando `bash .claude/hooks/coordinator-sweep.sh`, persistent, para que reporte cada 30 minutos. Mergeá lo que esté verde después de verificarlo, retomá lo rojo, y borrá worktrees y ramas sobrantes.")
+        "\n\nArmá el monitor de barrido con la herramienta Monitor: comando `bash .claude/hooks/coordinator-sweep.sh`, persistent, para que reporte cada 30 minutos. Mergeá lo que esté verde después de verificarlo, retomá lo rojo, abrí el PR de lo unshipped, y borrá worktrees y ramas sobrantes.")
     }
   }'
   exit 0
