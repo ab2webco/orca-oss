@@ -150,6 +150,17 @@ jobs:
           path: mobile/build/*.ipa
           if-no-files-found: ignore
 
+      # Why: TestFlight crash reports name no Orca function without the dSYM, and the
+      # runner discards it (ORCA-561). Warn, not fail: the build is already uploaded.
+      - name: Upload dSYM artifact
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-mobile-dsym-${{ github.run_number }}
+          path: mobile/build/*.dSYM.zip
+          if-no-files-found: warn
+          retention-days: 90
+
   ios-distribute:
     name: Distribute to external TestFlight testers
     needs: ios-build
