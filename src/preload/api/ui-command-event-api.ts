@@ -29,11 +29,7 @@ import type {
 } from '../../shared/terminal-tab-close'
 
 export type UiCommandEventApi = {
-  replyTerminalCreateFailure: (failure: {
-    requestId: string
-    tabId: string
-    error: string
-  }) => void
+  replyTerminalCreateFailure: (failure: { requestId: string; tabId: string; error: string }) => void
   get: () => Promise<PersistedUIState>
   set: (args: Partial<PersistedUIState>) => Promise<void>
   recordFeatureInteraction: (id: FeatureInteractionId) => Promise<PersistedUIState>
@@ -205,6 +201,10 @@ export type UiCommandEventApi = {
     callback: (data: { tabId: string; paneRuntimeId?: number }) => void
   ) => () => void
   onTerminalTabCloseRequest: (callback: (request: TerminalTabCloseRequest) => void) => () => void
+  /** Optional: an older preload can linger across an in-place renderer reload. */
+  onRetireSleepingAgentSessions?: (
+    callback: (data: { tabId: string; paneKey?: string }) => void
+  ) => () => void
   respondTerminalTabClose: (response: TerminalTabCloseResponse) => void
   onSleepWorktree: (callback: (data: { worktreeId: string }) => void) => () => void
   onResumeSleepingAgents: (callback: (data: { worktreeId: string }) => void) => () => void

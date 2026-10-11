@@ -23,10 +23,12 @@ type OwnershipState = Pick<
   | 'terminalLayoutsByTabId'
   | 'lastTerminalInputAtByPaneKey'
   | 'closeTab'
+  | 'clearSleepingAgentSession'
 >
 
 function createStore() {
   const closeTab = vi.fn()
+  const clearSleepingAgentSession = vi.fn()
   let state: OwnershipState = {
     activeWorktreeId: 'other-worktree',
     activeTabId: 'other-tab',
@@ -50,7 +52,8 @@ function createStore() {
       [TAB_ID]: singlePaneLayoutSnapshot(LEAF_ID, PTY_ID)
     },
     lastTerminalInputAtByPaneKey: {},
-    closeTab
+    closeTab,
+    clearSleepingAgentSession
   }
   const listeners = new Set<(state: AppState, previousState: AppState) => void>()
   const store: AutomationTerminalOwnershipStore = {
@@ -67,7 +70,7 @@ function createStore() {
       listener(state as unknown as AppState, previousState as unknown as AppState)
     }
   }
-  return { closeTab, getState: () => state, store, update }
+  return { closeTab, clearSleepingAgentSession, getState: () => state, store, update }
 }
 
 function own(
@@ -106,6 +109,37 @@ describe('automation terminal ownership', () => {
       recordInteraction: false,
       reason: 'cleanup'
     })
+  })
+
+  // Why: a close is not evidence the agent finished (ORCA-272), but a completed run
+  // is — and nobody resumes a finished new_per_run tab (ORCA-560).
+  it("retires the run pane's resume record when it closes the tab", () => {
+    const { clearSleepingAgentSession, store } = createStore()
+
+    expect(own(store).finalize()).toBe(true)
+    expect(clearSleepingAgentSession).toHaveBeenCalledWith(PANE_KEY)
+  })
+
+  // Why: a mounted pane closes its tab on pty exit and keeps the record on purpose;
+  // the run then finalizes against a tab that is already gone (ORCA-560).
+  it("retires the run pane's resume record when the tab already closed on exit", () => {
+    const { clearSleepingAgentSession, closeTab, store, update } = createStore()
+    const ownership = own(store)
+    update({ tabsByWorktree: { [WORKTREE_ID]: [] }, ptyIdsByTabId: {}, terminalLayoutsByTabId: {} })
+
+    expect(ownership.finalize()).toBe(false)
+    expect(closeTab).not.toHaveBeenCalled()
+    expect(clearSleepingAgentSession).toHaveBeenCalledWith(PANE_KEY)
+  })
+
+  it('keeps the resume record of a taken-over tab that already closed', () => {
+    const { clearSleepingAgentSession, store, update } = createStore()
+    const ownership = own(store)
+    update({ lastTerminalInputAtByPaneKey: { [PANE_KEY]: 200 } })
+    update({ tabsByWorktree: { [WORKTREE_ID]: [] }, ptyIdsByTabId: {}, terminalLayoutsByTabId: {} })
+
+    expect(ownership.finalize()).toBe(false)
+    expect(clearSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('preserves a tab activated after launch even when focus later moves away', () => {
@@ -165,7 +199,7 @@ describe('automation terminal ownership', () => {
   })
 
   it('refuses a tab recreated with the same id', () => {
-    const { closeTab, getState, store, update } = createStore()
+    const { clearSleepingAgentSession, closeTab, getState, store, update } = createStore()
     const ownership = own(store)
     update({
       tabsByWorktree: {
@@ -177,6 +211,7 @@ describe('automation terminal ownership', () => {
 
     expect(ownership.finalize()).toBe(false)
     expect(closeTab).not.toHaveBeenCalled()
+    expect(clearSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it.each([

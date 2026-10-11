@@ -2232,6 +2232,9 @@ type RuntimeNotifier = {
     tabId: string,
     options?: { localPtyTeardownOwnedExternally?: boolean; origin?: TerminalTabCloseOrigin }
   ): Promise<void>
+  // Why: the renderer owns the resume records and re-persists them, so a close that
+  // forgets only main's copy brings the sleeping row back (ORCA-560).
+  retireSleepingAgentSessions?(target: { tabId: string; paneKey?: string }): void
   sleepWorktree(worktreeId: string): void
   // Why: a phone opening a worktree wakes its slept agents by asking the host
   // renderer to run its own navigation-free wake (experimental agent sleep);
@@ -29595,6 +29598,7 @@ export class OrcaRuntimeService {
     // Why: the resume record outlives the PTY, so leaving it behind relists the
     // pane as sleeping on the caller's very next `terminal.list`.
     this.forgetSleepingAgentSession(record)
+    this.notifier?.retireSleepingAgentSessions?.({ tabId, paneKey: record.paneKey })
     this.sleepingHandlesByPaneKey.delete(record.paneKey)
     this.sleepingHandleRecords.delete(handle)
     this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
@@ -29608,26 +29612,46 @@ export class OrcaRuntimeService {
   /** Drops a sleeping pane's resume record so the pane cannot be relisted or
    *  resumed after it was explicitly closed. */
   private forgetSleepingAgentSession(record: SleepingAgentSessionRecord): void {
+    this.forgetSleepingAgentSessions(record.worktreeId, (paneKey) => paneKey === record.paneKey)
+  }
+
+  private forgetSleepingAgentSessions(
+    worktreeId: string,
+    matches: (paneKey: string) => boolean
+  ): void {
     const store = this.store
-    const session = this.getWorkspaceSessionForWorktree(record.worktreeId)
+    const session = this.getWorkspaceSessionForWorktree(worktreeId)
     if (!store?.setWorkspaceSession || !store.flushOrThrow || !session) {
       return
     }
-    if (!session.sleepingAgentSessionsByPaneKey?.[record.paneKey]) {
+    const paneKeys = Object.keys(session.sleepingAgentSessionsByPaneKey ?? {}).filter(matches)
+    if (paneKeys.length === 0) {
       return
     }
     const next = structuredClone(session)
-    delete next.sleepingAgentSessionsByPaneKey?.[record.paneKey]
+    for (const paneKey of paneKeys) {
+      delete next.sleepingAgentSessionsByPaneKey?.[paneKey]
+    }
     try {
-      this.setWorkspaceSessionForWorktree(record.worktreeId, next)
+      this.setWorkspaceSessionForWorktree(worktreeId, next)
       store.flushOrThrow()
     } catch (error) {
-      this.setWorkspaceSessionForWorktree(record.worktreeId, session)
-      console.warn('[terminal] failed to drop the sleeping agent session record', {
-        paneKey: record.paneKey,
+      this.setWorkspaceSessionForWorktree(worktreeId, session)
+      console.warn('[terminal] failed to drop the sleeping agent session records', {
+        paneKeys,
         error
       })
     }
+  }
+
+  /** `--tab` asks for the whole tab to go, so unlike a pane close (ORCA-487) it
+   *  must not leave a resume record that relists the tab as sleeping (ORCA-560). */
+  private retireClosedTabSleepingAgentSessions(worktreeId: string, tabId: string): void {
+    this.forgetSleepingAgentSessions(
+      worktreeId,
+      (paneKey) => parsePaneKey(paneKey)?.tabId === tabId
+    )
+    this.notifier?.retireSleepingAgentSessions?.({ tabId })
   }
 
   async closeTerminalTab(handle: string): Promise<RuntimeTerminalClose> {
@@ -29652,6 +29676,7 @@ export class OrcaRuntimeService {
       })
       const ptyKilled = await this.stopPtysAndWait(ptyIds)
       this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
+      this.retireClosedTabSleepingAgentSessions(pty.pty.worktreeId, tabId)
       return { handle, tabId, closeMode: 'tab', ptyKilled }
     }
     this.assertGraphReady()
@@ -29663,6 +29688,7 @@ export class OrcaRuntimeService {
     })
     const ptyKilled = await this.stopPtysAndWait(ptyIds)
     this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
+    this.retireClosedTabSleepingAgentSessions(leaf.worktreeId, leaf.tabId)
     return { handle, tabId: leaf.tabId, closeMode: 'tab', ptyKilled }
   }
 

@@ -4414,6 +4414,16 @@ const api = {
       ipcRenderer.on('ui:sleepWorktree', listener)
       return () => ipcRenderer.removeListener('ui:sleepWorktree', listener)
     },
+    onRetireSleepingAgentSessions: (
+      callback: (data: { tabId: string; paneKey?: string }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { tabId: string; paneKey?: string }
+      ) => callback(data)
+      ipcRenderer.on('ui:retireSleepingAgentSessions', listener)
+      return () => ipcRenderer.removeListener('ui:retireSleepingAgentSessions', listener)
+    },
     onResumeSleepingAgents: (callback: (data: { worktreeId: string }) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, data: { worktreeId: string }) =>
         callback(data)
