@@ -53,7 +53,7 @@ vi.mock('@/store/plugin-panels', () => ({
   ) => selector({ setPanelHealth: setPanelHealthMock })
 }))
 
-vi.mock('./plugin-panel-watchdog', () => ({
+vi.mock('../../../../shared/plugins/plugin-panel-watchdog', () => ({
   createPanelWatchdog: (options: { onUnresponsive: () => void }) => {
     watchdogCallbacks.onUnresponsive = options.onUnresponsive
     return {
