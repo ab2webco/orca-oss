@@ -1,10 +1,12 @@
+import type { WebViewProps } from 'react-native-webview'
+
 /**
  * WebView configuration for a plugin panel: the native half of the desktop
  * sandbox. JavaScript runs only for the outer relay and the sandboxed frame;
  * everything that could reach files, storage, cookies, other windows or media
  * is off.
  */
-export const PLUGIN_PANEL_WEBVIEW_PROPS = {
+export const PLUGIN_PANEL_WEBVIEW_PROPS: Partial<WebViewProps> = {
   // Why '*': a URL outside the whitelist is handed to Linking.openURL by the
   // library; the navigation policy below refuses it instead of opening it.
   originWhitelist: ['*'],
@@ -34,7 +36,7 @@ export const PLUGIN_PANEL_WEBVIEW_PROPS = {
   allowsProtectedMedia: false,
   paymentRequestEnabled: false,
   webviewDebuggingEnabled: false
-} as const
+}
 
 export type PanelNavigationRequest = { url: string; isTopFrame?: boolean }
 
