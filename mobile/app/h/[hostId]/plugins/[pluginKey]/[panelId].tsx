@@ -8,7 +8,7 @@ import {
   View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, RefreshCw, X } from 'lucide-react-native'
 import { useHostClient } from '../../../../../src/transport/client-context'
 import { useHostProtocolGates } from '../../../../../src/components/HostProtocolGate'
@@ -38,6 +38,15 @@ export default function PluginPanelScreen() {
     })
   const [unresponsive, setUnresponsive] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // Why: Android pauses a WebView covered by another screen, so its pongs stop
+  // and the watchdog would suspend a healthy panel.
+  const [focused, setFocused] = useState(true)
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true)
+      return () => setFocused(false)
+    }, [])
+  )
 
   const close = useCallback(() => router.back(), [router])
   const reload = () => {
@@ -71,7 +80,7 @@ export default function PluginPanelScreen() {
         key={`${state.documentRevision}:${reloadKey}`}
         shellHtml={state.html}
         session={session}
-        active={foreground}
+        active={foreground && focused}
         onUnresponsive={() => setUnresponsive(true)}
         onCloseRequested={close}
       />
