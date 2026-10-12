@@ -155,6 +155,8 @@ export class PluginPanelSession {
         }
         this.openingGeneration = null
         if (!response.ok) {
+          // Why: the next good answer must re-emit the document, not match a stale one.
+          this.currentHtml = null
           this.options.onState({ status: 'error', message: response.error.message })
           return
         }
@@ -162,6 +164,9 @@ export class PluginPanelSession {
           this.currentHtml = null
           this.options.onState({ status: 'unavailable' })
           return
+        }
+        if (this.token && this.token !== entry.sessionToken) {
+          this.release(this.token)
         }
         this.token = entry.sessionToken
         if (entry.html !== this.currentHtml) {

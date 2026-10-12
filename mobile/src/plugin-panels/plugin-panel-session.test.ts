@@ -204,4 +204,49 @@ describe('PluginPanelSession', () => {
     expect(calls('plugins.readPanelEntry')).toHaveLength(1)
     expect(states).toHaveLength(before)
   })
+
+  it('recovers to the panel when a retry after a failed re-open serves the same document', async () => {
+    let reads = 0
+    const { session, states } = setup({
+      'plugins.readPanelEntry': () => {
+        reads += 1
+        return reads === 2
+          ? Promise.resolve(fail('host busy'))
+          : Promise.resolve(ok({ html: '<p>a</p>', sessionToken: TOKEN_A }))
+      }
+    })
+    session.setConditions({ connected: true, foreground: true })
+    await vi.waitFor(() => expect(session.getSessionToken()).toBe(TOKEN_A))
+    session.setConditions({ connected: false, foreground: true })
+    session.setConditions({ connected: true, foreground: true })
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ status: 'error' }))
+
+    session.retry()
+
+    await vi.waitFor(() =>
+      expect(states.at(-1)).toEqual({ status: 'ready', html: '<p>a</p>', documentRevision: 2 })
+    )
+  })
+
+  it('releases the session it already holds when a retry replaces it', async () => {
+    let reads = 0
+    const { session, calls } = setup({
+      'plugins.readPanelEntry': () => {
+        reads += 1
+        return Promise.resolve(
+          ok({ html: '<p>a</p>', sessionToken: reads === 1 ? TOKEN_A : TOKEN_B })
+        )
+      },
+      'plugins.releasePanel': () => Promise.resolve(ok({ released: true }))
+    })
+    session.setConditions({ connected: true, foreground: true })
+    await vi.waitFor(() => expect(session.getSessionToken()).toBe(TOKEN_A))
+
+    session.retry()
+
+    await vi.waitFor(() => expect(session.getSessionToken()).toBe(TOKEN_B))
+    expect(calls('plugins.releasePanel').map(([, params]) => params)).toEqual([
+      { sessionToken: TOKEN_A }
+    ])
+  })
 })

@@ -21,6 +21,8 @@ export function useHostPluginPanels(args: {
 
   useEffect(() => {
     if (!client || connState !== 'connected' || !supported) {
+      // Why: the cancelled request's finally never clears the spinner.
+      setRefreshing(false)
       return
     }
     let cancelled = false
