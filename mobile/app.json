@@ -2,7 +2,7 @@
   "expo": {
     "name": "Orca Lab",
     "slug": "orca-mobile",
-    "version": "0.0.53",
+    "version": "0.0.54",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -75,7 +75,7 @@
       "allowBackup": false,
       "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
       "package": "com.ab2web.orca.mobile",
-      "versionCode": 23
+      "versionCode": 24
     },
     "plugins": [
       "expo-router",
