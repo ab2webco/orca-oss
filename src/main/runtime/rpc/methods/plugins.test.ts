@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RpcContext, RpcMethod } from '../core'
 import type { PluginService } from '../../../plugins/plugin-service'
-import { PLUGIN_METHODS, setPluginServiceForRpc } from './plugins'
+import { PLUGIN_METHODS, revokeRpcPanelOwnerForConnection, setPluginServiceForRpc } from './plugins'
 
 const SESSION_TOKEN = 's'.repeat(43)
 
@@ -21,6 +21,45 @@ function context(connectionId?: string): RpcContext {
 }
 
 afterEach(() => setPluginServiceForRpc(null))
+
+describe('plugins.releasePanel', () => {
+  it('releases the session only under the calling connection owner', async () => {
+    const release = vi.fn().mockReturnValue(true)
+    setPluginServiceForRpc({
+      whenReady: vi.fn().mockResolvedValue(undefined),
+      panels: { release }
+    } as unknown as PluginService)
+
+    await expect(
+      method('plugins.releasePanel').handler(
+        { sessionToken: SESSION_TOKEN },
+        context('connection-one')
+      )
+    ).resolves.toEqual({ released: true })
+    expect(release).toHaveBeenCalledWith('runtime:connection-one', SESSION_TOKEN)
+  })
+
+  it('rejects a malformed token before reaching the service', () => {
+    const schema = method('plugins.releasePanel').params
+    expect(schema?.safeParse({ sessionToken: 'short' }).success).toBe(false)
+    expect(schema?.safeParse({ sessionToken: SESSION_TOKEN, extra: 1 }).success).toBe(false)
+  })
+})
+
+describe('revokeRpcPanelOwnerForConnection', () => {
+  it('revokes the owner key the connection bound its panels to', () => {
+    const revokeOwner = vi.fn()
+    setPluginServiceForRpc({ panels: { revokeOwner } } as unknown as PluginService)
+
+    revokeRpcPanelOwnerForConnection('connection-one')
+
+    expect(revokeOwner).toHaveBeenCalledWith('runtime:connection-one')
+  })
+
+  it('is a no-op on runtimes without a plugin service', () => {
+    expect(() => revokeRpcPanelOwnerForConnection('connection-one')).not.toThrow()
+  })
+})
 
 describe('plugin panel serve RPC identity', () => {
   it('leaves the raw panel envelope for session resolution and admission', () => {

@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { defineMethod, type RpcContext, type RpcMethod } from '../core'
-import type { PluginPanelEntry } from '../../../../shared/plugins/plugin-panel-bridge'
+import {
+  panelSessionTokenSchema,
+  type PluginPanelEntry
+} from '../../../../shared/plugins/plugin-panel-bridge'
 import { listPluginsForClients } from '../../../ipc/plugins'
 import type { PluginListEntry } from '../../../plugins/plugin-list-projection'
 import type { PluginService } from '../../../plugins/plugin-service'
@@ -55,6 +58,8 @@ const PluginReadPanelEntryParams = z.object({
   panelId: z.string().min(1)
 })
 
+const PluginReleasePanelParams = z.object({ sessionToken: panelSessionTokenSchema }).strict()
+
 const PluginInvokeCommandParams = z.object({
   pluginKey: z.string().min(1),
   commandId: z.string().min(1),
@@ -75,6 +80,12 @@ function bindRpcPanelOwner(service: PluginService, context: RpcContext): string 
   const ownerKey = rpcPanelOwner(context)
   service.panels.bindOwnerSignal(ownerKey, context.signal)
   return ownerKey
+}
+
+/** Called when a socket closes. Why: the per-request signal bound above is
+ *  disposed once its request settles, so it never fires on a later close. */
+export function revokeRpcPanelOwnerForConnection(connectionId: string): void {
+  pluginServiceForRpc?.panels.revokeOwner(rpcPanelOwner({ connectionId } as RpcContext))
 }
 
 export const PLUGIN_METHODS: readonly RpcMethod[] = [
@@ -140,6 +151,16 @@ export const PLUGIN_METHODS: readonly RpcMethod[] = [
         return null
       }
       return entry
+    }
+  }),
+  defineMethod({
+    // Why: a phone keeps one connection while panels open and close, so it
+    // ends a panel's authority explicitly instead of waiting for the socket.
+    name: 'plugins.releasePanel',
+    params: PluginReleasePanelParams,
+    handler: async (params, context) => {
+      const service = requirePluginService()
+      return { released: service.panels.release(rpcPanelOwner(context), params.sessionToken) }
     }
   }),
   defineMethod({
