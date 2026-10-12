@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import type { PluginHostListEntry, PluginHostPanel } from '../../../preload/api-types'
+import { isPluginPanelMountedStatus } from '../../../shared/plugins/plugin-panel-mount-status'
 
 /** A panel contribution from an enabled plugin, flattened for sidebar use. */
 export type ActivePluginPanel = PluginHostPanel & {
@@ -13,11 +14,8 @@ export type ActivePluginPanel = PluginHostPanel & {
  *  `pending-update` is the state a release puts every such plugin in. */
 export type PluginPanelApproval = 'approved' | 'pending-install' | 'pending-update'
 
-/** Statuses whose panels are mounted. `idle` and `restarting` still show panels
- *  — the panel itself never needs a worker — but `errored` does not, so any
- *  surface offering a panel must agree with this or it opens an empty state. */
 export function pluginPanelsAreMounted(plugin: Pick<PluginHostListEntry, 'status'>): boolean {
-  return plugin.status === 'running' || plugin.status === 'restarting' || plugin.status === 'idle'
+  return isPluginPanelMountedStatus(plugin.status)
 }
 
 /** `pending` keeps its surface on purpose: sin ella el usuario no tiene donde
