@@ -9,6 +9,7 @@ import {
   MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
+  MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../../shared/protocol-version'
 
@@ -230,6 +231,22 @@ describe('mobile RPC allowlist', () => {
   it('advertises date clears as their own capability', () => {
     // Why: a writes.v1 host decodes a null date as undefined and answers ok without clearing it.
     expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY)
+  })
+
+  it('opens exactly the plugin panel surface to the phone, as one advertised capability', () => {
+    // Why exact: consent, enablement and raw commands stay desktop decisions; a
+    // phone only shows panels and relays their bridge calls through panelAction.
+    const pluginMethods = [...mobileRpcAllowlist()]
+      .filter((method) => method.startsWith('plugins.'))
+      .sort()
+
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY)
+    expect(pluginMethods).toEqual([
+      'plugins.list',
+      'plugins.panelAction',
+      'plugins.readPanelEntry',
+      'plugins.releasePanel'
+    ])
   })
 
   it('does not grant mobile credentials control over host updates', () => {

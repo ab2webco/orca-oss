@@ -83,6 +83,29 @@ describe('PluginPanelController identity binding', () => {
     ).resolves.toMatchObject({ ok: false, code: 'invalid_request' })
   })
 
+  it('refuses actions from a released session without touching the host', async () => {
+    const plugin = await createPlugin()
+    const executeHostCall = vi.fn().mockResolvedValue({ ok: true, value: null })
+    const controller = new PluginPanelController({
+      resolveApprovedPlugin: (pluginKey) => (pluginKey === plugin.pluginKey ? plugin : null),
+      contentVerifier: { verify: vi.fn().mockResolvedValue(undefined) },
+      executeHostCall,
+      log: vi.fn()
+    })
+    const entry = await controller.open('runtime:phone', plugin.pluginKey, 'dashboard')
+
+    expect(controller.release('runtime:other', entry!.sessionToken)).toBe(false)
+    expect(controller.release('runtime:phone', entry!.sessionToken)).toBe(true)
+    await expect(
+      controller.execute('runtime:phone', {
+        sessionToken: entry!.sessionToken,
+        action: 'notifications.show',
+        params: { title: 'Hello' }
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_request' })
+    expect(executeHostCall).not.toHaveBeenCalled()
+  })
+
   it('charges raw malformed and oversized calls before strict parsing', async () => {
     const plugin = await createPlugin()
     const executeHostCall = vi.fn()
