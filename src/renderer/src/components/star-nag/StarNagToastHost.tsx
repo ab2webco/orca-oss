@@ -3,8 +3,9 @@ import { Check, ExternalLink, Loader2, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
+import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository-url'
 
-const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
+const ORCA_REPO_URL = ORCA_REPOSITORY_URL
 type StarNagMode = 'gh' | 'web'
 type StarNagToastStatus = 'idle' | 'busy' | 'starred' | 'opened'
 
