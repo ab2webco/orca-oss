@@ -1,19 +1,9 @@
+import type { PluginPanelActionOutcome } from '../../../../shared/plugins/plugin-panel-bridge'
 import {
-  PANEL_ACTION_RESULT_TYPE,
-  PANEL_CLOSE_ACTION,
-  PANEL_CONTROL_MESSAGE_MAX_BYTES,
-  looksLikePanelActionRequest,
-  parsePanelActionRequest,
-  readPanelPongId,
-  type PluginPanelActionOutcome,
-  type PluginPanelActionResultMessage
-} from '../../../../shared/plugins/plugin-panel-bridge'
-import {
-  createPanelControlMessageBudget,
-  createPanelMessageBudget,
-  structuredCloneMessageBytes,
-  type PanelMessageBudget
-} from '../../../../shared/plugins/plugin-panel-message-budget'
+  createPanelBridgeRelay,
+  type PanelActionCall
+} from '../../../../shared/plugins/plugin-panel-bridge-relay'
+import type { PanelMessageBudget } from '../../../../shared/plugins/plugin-panel-message-budget'
 import { translate } from '@/i18n/i18n'
 
 /**
@@ -26,11 +16,7 @@ import { translate } from '@/i18n/i18n'
  * never sees or supplies plugin identity, and main binds the session again.
  */
 
-export type PanelActionCall = {
-  sessionToken: string
-  action: string
-  params?: unknown
-}
+export type { PanelActionCall }
 
 export type PanelBridgeHostOptions = {
   sessionToken: string
@@ -71,9 +57,40 @@ export function callPanelActionViaPreload(
 export function createPanelBridgeMessageHandler(
   options: PanelBridgeHostOptions
 ): (event: MessageEvent) => void {
-  const budget = options.budget ?? createPanelMessageBudget()
-  const controlBudget = options.controlBudget ?? createPanelControlMessageBudget()
-  const now = options.now ?? (() => Date.now())
+  const relay = createPanelBridgeRelay({
+    getSessionToken: () => options.sessionToken,
+    callPanelAction: options.callPanelAction,
+    onPong: options.onPong,
+    closePanel: options.closePanel,
+    budget: options.budget,
+    controlBudget: options.controlBudget,
+    now: options.now,
+    // Getters: translated when a reply is built, in the language active then.
+    messages: {
+      get messageTooLarge() {
+        return translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.messageTooLarge',
+          'Message exceeds the size limit.'
+        )
+      },
+      get tooManyRequests() {
+        return translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.tooManyRequests',
+          'Too many requests.'
+        )
+      },
+      get closeUnavailable() {
+        return translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.closeUnavailable',
+          'This panel cannot be closed from inside it.'
+        )
+      },
+      // Desktop always holds its session while the frame is mounted, and caps
+      // no results, so these two never reach a desktop panel.
+      sessionUnavailable: '',
+      resultTooLarge: ''
+    }
+  })
   return (event: MessageEvent): void => {
     const panelWindow = options.getPanelWindow()
     // Why: the sandboxed srcdoc frame has an opaque origin ("null"), so the
@@ -83,133 +100,12 @@ export function createPanelBridgeMessageHandler(
       return
     }
     const requestingWindow = panelWindow
-    const respond = (message: PluginPanelActionResultMessage): void => {
-      if (options.isActive?.() === false || options.getPanelWindow() !== requestingWindow) {
-        return
-      }
+    relay(event.data, {
+      isCurrent: () =>
+        options.isActive?.() !== false && options.getPanelWindow() === requestingWindow,
       // Why: targetOrigin must be '*' — an opaque origin never matches a
       // concrete origin, so anything stricter would silently drop the reply.
-      requestingWindow.postMessage(message, '*')
-    }
-    // A valid pong is the one frame the host must never lose: it takes a
-    // reserved lane so a panel saturating its data budget can still prove it
-    // is alive. Only schema-valid pongs qualify, so near-miss pong-shaped junk
-    // cannot drain the lane the real reply needs — it falls through to the
-    // data budget below like any other malformed frame.
-    const pongId = readPanelPongId(event.data)
-    if (pongId !== null) {
-      const timestamp = now()
-      // One walk, capped at the smaller lane bound, serves both budgets: a
-      // pong above that cap is refused here anyway.
-      const pongBytes = structuredCloneMessageBytes(
-        event.data,
-        controlBudget.maxBytes ?? PANEL_CONTROL_MESSAGE_MAX_BYTES
-      )
-      // Charged to both: the data budget still meters this traffic, while a
-      // refusal there cannot by itself silence liveness.
-      budget.admit(timestamp, pongBytes)
-      if (!controlBudget.admit(timestamp, pongBytes)) {
-        options.onPong?.(pongId)
-      }
-      return
-    }
-    // Budgets run before parsing: a flood of malformed junk must not buy
-    // free schema-validation CPU either.
-    const refusal = budget.admit(now(), structuredCloneMessageBytes(event.data, budget.maxBytes))
-    if (refusal) {
-      const requestId =
-        typeof event.data === 'object' && event.data !== null
-          ? (event.data as { requestId?: unknown }).requestId
-          : undefined
-      if (typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 128) {
-        respond({
-          type: PANEL_ACTION_RESULT_TYPE,
-          requestId,
-          ok: false,
-          errorCode: refusal === 'oversized' ? 'invalid_request' : 'rate_limited',
-          error:
-            refusal === 'oversized'
-              ? translate(
-                  'auto.components.rightSidebar.pluginPanelBridgeHost.messageTooLarge',
-                  'Message exceeds the size limit.'
-                )
-              : translate(
-                  'auto.components.rightSidebar.pluginPanelBridgeHost.tooManyRequests',
-                  'Too many requests.'
-                )
-        })
-      }
-      return
-    }
-    if (!looksLikePanelActionRequest(event.data)) {
-      return
-    }
-    const parsed = parsePanelActionRequest(event.data)
-    if (!parsed.ok) {
-      if (parsed.requestId) {
-        respond({
-          type: PANEL_ACTION_RESULT_TYPE,
-          requestId: parsed.requestId,
-          ok: false,
-          errorCode: 'invalid_request',
-          error: parsed.error
-        })
-      }
-      return
-    }
-    const { requestId, action, params } = parsed.request
-    const closePanel = options.closePanel
-    if (action === PANEL_CLOSE_ACTION && !closePanel) {
-      respond({
-        type: PANEL_ACTION_RESULT_TYPE,
-        requestId,
-        ok: false,
-        errorCode: 'unavailable',
-        error: translate(
-          'auto.components.rightSidebar.pluginPanelBridgeHost.closeUnavailable',
-          'This panel cannot be closed from inside it.'
-        )
-      })
-      return
-    }
-    options
-      .callPanelAction({ sessionToken: options.sessionToken, action, params })
-      .then((outcome) => {
-        if (action === PANEL_CLOSE_ACTION && outcome.ok && closePanel) {
-          const stillMounted =
-            options.isActive?.() !== false && options.getPanelWindow() === requestingWindow
-          if (stillMounted) {
-            // Why: reply first — closing unmounts the frame and a later reply is dropped.
-            respond({
-              type: PANEL_ACTION_RESULT_TYPE,
-              requestId,
-              ok: true,
-              value: { closed: true }
-            })
-            closePanel()
-          }
-          return
-        }
-        respond(
-          outcome.ok
-            ? { type: PANEL_ACTION_RESULT_TYPE, requestId, ok: true, value: outcome.value }
-            : {
-                type: PANEL_ACTION_RESULT_TYPE,
-                requestId,
-                ok: false,
-                errorCode: outcome.code,
-                error: outcome.error
-              }
-        )
-      })
-      .catch((error: unknown) => {
-        respond({
-          type: PANEL_ACTION_RESULT_TYPE,
-          requestId,
-          ok: false,
-          errorCode: 'action_failed',
-          error: error instanceof Error ? error.message : String(error)
-        })
-      })
+      post: (message) => requestingWindow.postMessage(message, '*')
+    })
   }
 }
