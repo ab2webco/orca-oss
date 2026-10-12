@@ -44,6 +44,10 @@ function HostStack({ animation }: { animation: 'none' | 'default' }) {
       <Stack.Screen name="[hostId]/accounts" options={{ title: 'Accounts' }} />
       <Stack.Screen name="[hostId]/tasks" options={{ title: 'Tasks' }} />
       <Stack.Screen name="[hostId]/plugins/index" options={{ title: 'Plugins' }} />
+      <Stack.Screen
+        name="[hostId]/plugins/[pluginKey]/[panelId]"
+        options={{ title: 'Plugin panel' }}
+      />
       <Stack.Screen name="[hostId]/session/[worktreeId]" options={{ title: 'Terminal' }} />
       <Stack.Screen
         name="[hostId]/source-control/[worktreeId]"
