@@ -16,7 +16,7 @@ import {
   callPanelActionViaPreload,
   createPanelBridgeMessageHandler
 } from './plugin-panel-bridge-host'
-import { createPanelWatchdog } from './plugin-panel-watchdog'
+import { createPanelWatchdog } from '../../../../shared/plugins/plugin-panel-watchdog'
 import { buildPanelDesignTokenCss, currentPanelColorScheme } from './plugin-panel-design-token-css'
 import { usePluginPanelThemeRevision } from './use-plugin-panel-theme-revision'
 import {

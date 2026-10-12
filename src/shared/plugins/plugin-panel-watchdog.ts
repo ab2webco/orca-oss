@@ -1,7 +1,7 @@
 import {
   PANEL_WATCHDOG_PING_INTERVAL_MS,
   PANEL_WATCHDOG_PONG_TIMEOUT_MS
-} from '../../../../shared/plugins/plugin-panel-bridge'
+} from './plugin-panel-bridge'
 
 /**
  * Panel responsiveness watchdog: pings the sandboxed frame on an interval
