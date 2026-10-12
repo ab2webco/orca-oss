@@ -52,7 +52,9 @@ export function PluginPanelWebView({
   const webViewRef = useRef<WebView>(null)
   const [loaded, setLoaded] = useState(false)
   const callbacks = useRef({ onUnresponsive, onCloseRequested })
-  callbacks.current = { onUnresponsive, onCloseRequested }
+  useEffect(() => {
+    callbacks.current = { onUnresponsive, onCloseRequested }
+  })
 
   // One nonce, policy and relay per document load; a new document is a new load.
   const load = useMemo(() => {
