@@ -7,11 +7,7 @@ import {
   PLUGIN_PANEL_FRAME_NAME_PREFIX,
   readPanelContentHeight
 } from '../../../../shared/plugins/plugin-panel-bridge'
-import {
-  PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER,
-  PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER,
-  PANEL_SHELL_TOKENS_PLACEHOLDER
-} from '../../../../shared/plugins/plugin-panel-shell'
+import { fillPluginPanelShell } from '../../../../shared/plugins/plugin-panel-shell-fill'
 import {
   callPanelActionViaPreload,
   createPanelBridgeMessageHandler
@@ -52,22 +48,15 @@ function PluginPanelMessage({ children }: { children: React.ReactNode }): React.
   )
 }
 
-/** Fills the shell placeholders main cannot know (theme class + token
- *  values). First-occurrence replace: the prelude parses before any plugin
- *  content, so a plugin echoing the placeholder string is inert. */
+/** Fills the shell placeholders main cannot know (theme class + token values).
+ *  The locale is the one i18next resolved: a plugin that ships no translation
+ *  for it falls back on its own; the point is that it no longer has to ask. */
 function fillPanelShell(html: string): string {
-  return html
-    .replace(PANEL_SHELL_COLOR_SCHEME_PLACEHOLDER, currentPanelColorScheme())
-    .replace(PANEL_SHELL_UI_LANGUAGE_PLACEHOLDER, currentPanelUiLanguage())
-    .replace(PANEL_SHELL_TOKENS_PLACEHOLDER, buildPanelDesignTokenCss())
-}
-
-/** The locale i18next resolved, sanitised to what a `lang` attribute may hold.
- *  A plugin that ships no translation for it falls back on its own; the point
- *  is that it no longer has to ask. */
-function currentPanelUiLanguage(): string {
-  const resolved = typeof i18n.language === 'string' ? i18n.language : ''
-  return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(resolved) ? resolved : 'en'
+  return fillPluginPanelShell(html, {
+    colorScheme: currentPanelColorScheme(),
+    uiLanguage: typeof i18n.language === 'string' ? i18n.language : '',
+    tokenCss: buildPanelDesignTokenCss()
+  })
 }
 
 function PluginPanel({
