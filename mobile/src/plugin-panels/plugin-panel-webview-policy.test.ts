@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PLUGIN_PANEL_IOS_WEBVIEW_PROPS,
   PLUGIN_PANEL_WEBVIEW_PROPS,
   createPanelNavigationPolicy
 } from './plugin-panel-webview-policy'
@@ -26,7 +27,6 @@ describe('PLUGIN_PANEL_WEBVIEW_PROPS', () => {
       geolocationEnabled: false,
       mixedContentMode: 'never',
       allowsLinkPreview: false,
-      dataDetectorTypes: 'none',
       allowsBackForwardNavigationGestures: false,
       mediaPlaybackRequiresUserAction: true,
       allowsInlineMediaPlayback: false,
@@ -34,6 +34,13 @@ describe('PLUGIN_PANEL_WEBVIEW_PROPS', () => {
       allowsProtectedMedia: false,
       webviewDebuggingEnabled: false
     })
+  })
+})
+
+describe('PLUGIN_PANEL_IOS_WEBVIEW_PROPS', () => {
+  it('keeps data detectors off on iOS and out of the shared set Android parses', () => {
+    expect(PLUGIN_PANEL_IOS_WEBVIEW_PROPS).toEqual({ dataDetectorTypes: ['none'] })
+    expect(PLUGIN_PANEL_WEBVIEW_PROPS).not.toHaveProperty('dataDetectorTypes')
   })
 })
 

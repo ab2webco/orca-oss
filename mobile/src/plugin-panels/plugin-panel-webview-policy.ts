@@ -27,7 +27,6 @@ export const PLUGIN_PANEL_WEBVIEW_PROPS: Partial<WebViewProps> = {
   geolocationEnabled: false,
   mixedContentMode: 'never',
   allowsLinkPreview: false,
-  dataDetectorTypes: 'none',
   allowsBackForwardNavigationGestures: false,
   mediaPlaybackRequiresUserAction: true,
   allowsInlineMediaPlayback: false,
@@ -36,6 +35,12 @@ export const PLUGIN_PANEL_WEBVIEW_PROPS: Partial<WebViewProps> = {
   allowsProtectedMedia: false,
   paymentRequestEnabled: false,
   webviewDebuggingEnabled: false
+}
+
+/** iOS only: Android's Fabric props parser aborts the app on dataDetectorTypes
+ *  in any shape, and Android has no data detectors to turn off. */
+export const PLUGIN_PANEL_IOS_WEBVIEW_PROPS: Partial<WebViewProps> = {
+  dataDetectorTypes: ['none']
 }
 
 export type PanelNavigationRequest = { url: string; isTopFrame?: boolean }

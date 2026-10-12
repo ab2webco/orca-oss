@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import * as ExpoCrypto from 'expo-crypto'
 import { PANEL_PING_TYPE } from '../../../src/shared/plugins/plugin-panel-bridge'
@@ -17,6 +17,7 @@ import {
 import { createPluginPanelHostRelay } from './plugin-panel-host-relay'
 import type { PluginPanelSession } from './plugin-panel-session'
 import {
+  PLUGIN_PANEL_IOS_WEBVIEW_PROPS,
   PLUGIN_PANEL_WEBVIEW_PROPS,
   createPanelNavigationPolicy
 } from './plugin-panel-webview-policy'
@@ -111,6 +112,7 @@ export function PluginPanelWebView({
     <WebView
       ref={webViewRef}
       {...PLUGIN_PANEL_WEBVIEW_PROPS}
+      {...(Platform.OS === 'ios' ? PLUGIN_PANEL_IOS_WEBVIEW_PROPS : {})}
       style={styles.webview}
       source={{ html: load.html }}
       onShouldStartLoadWithRequest={load.allowNavigation}
