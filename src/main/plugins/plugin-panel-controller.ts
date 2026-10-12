@@ -104,6 +104,10 @@ export class PluginPanelController {
     return this.options.executeHostCall(binding.pluginKey, parsed.data.action, parsed.data.params)
   }
 
+  release(ownerKey: string, sessionToken: string): boolean {
+    return this.sessions.release(ownerKey, sessionToken)
+  }
+
   revokeOwner(ownerKey: string): void {
     this.sessions.revokeOwner(ownerKey)
   }
