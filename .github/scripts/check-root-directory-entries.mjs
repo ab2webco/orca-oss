@@ -25,6 +25,8 @@ function checkRootDirectoryEntries(argv) {
   baseEntries.add('site')
   // Why: Claude Code reads the project's MCP servers only from a root .mcp.json.
   baseEntries.add('.mcp.json')
+  // Why: ripgrep reads its .ignore overrides only from the directory it searches.
+  baseEntries.add('.ignore')
   const blockedEntries = readRootEntries(headSha).filter((entry) => !baseEntries.has(entry))
 
   if (blockedEntries.length === 0) {
