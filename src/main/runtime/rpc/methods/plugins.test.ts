@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RpcContext, RpcMethod } from '../core'
 import type { PluginService } from '../../../plugins/plugin-service'
-import { PLUGIN_METHODS, revokeRpcPanelOwnerForConnection, setPluginServiceForRpc } from './plugins'
+import { PLUGIN_METHODS, setPluginServiceForRpc } from './plugins'
+import { revokeRpcPanelOwnerForConnection } from '../rpc-panel-owner'
 
 const SESSION_TOKEN = 's'.repeat(43)
 

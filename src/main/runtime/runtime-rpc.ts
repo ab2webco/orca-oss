@@ -51,7 +51,7 @@ import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
 import { getDefaultPairingAddress } from './pairing-network-interfaces'
 import { createMobilePairingQrResponse } from './mobile-pairing-qr-offer'
-import { revokeRpcPanelOwnerForConnection } from './rpc/methods/plugins'
+import { revokeRpcPanelOwnerForConnection } from './rpc/rpc-panel-owner'
 import {
   decodeTerminalStreamFrame,
   TerminalStreamOpcode,

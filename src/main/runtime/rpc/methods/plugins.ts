@@ -12,6 +12,7 @@ import {
   type PluginConsentRequest
 } from '../../../../shared/plugins/plugin-consent-request'
 import { isQualifiedPluginKey } from '../../../../shared/plugins/plugin-manifest'
+import { rpcPanelOwnerKey, setRpcPanelOwnerRevoker } from '../rpc-panel-owner'
 
 /**
  * Serve/headless parity surface: the same consent, enablement, panel-action,
@@ -37,6 +38,7 @@ export function setPluginServiceForRpc(
   }
 ): void {
   pluginServiceForRpc = service
+  setRpcPanelOwnerRevoker(service ? (ownerKey) => service.panels.revokeOwner(ownerKey) : null)
   pluginConsentForRpc = writes?.applyConsent ?? null
   pluginEnablementForRpc = writes?.applyEnablement ?? null
 }
@@ -71,21 +73,13 @@ async function listForRpc(): Promise<PluginListEntry[]> {
 }
 
 function rpcPanelOwner(context: RpcContext): string {
-  // Why: the bearer session must not cross paired-client connections even
-  // when two sockets authenticate as the same device.
-  return `runtime:${context.connectionId ?? context.clientId ?? 'local'}`
+  return rpcPanelOwnerKey(context.connectionId, context.clientId)
 }
 
 function bindRpcPanelOwner(service: PluginService, context: RpcContext): string {
   const ownerKey = rpcPanelOwner(context)
   service.panels.bindOwnerSignal(ownerKey, context.signal)
   return ownerKey
-}
-
-/** Called when a socket closes. Why: the per-request signal bound above is
- *  disposed once its request settles, so it never fires on a later close. */
-export function revokeRpcPanelOwnerForConnection(connectionId: string): void {
-  pluginServiceForRpc?.panels.revokeOwner(rpcPanelOwner({ connectionId } as RpcContext))
 }
 
 export const PLUGIN_METHODS: readonly RpcMethod[] = [
