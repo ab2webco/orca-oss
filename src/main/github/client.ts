@@ -128,11 +128,12 @@ import {
   GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
 } from '../../shared/github/check-details-deadline'
 import { hydrateGitHubPRStack, mergeGitHubPRStack } from './github-pr-stack'
+import { ORCA_REPOSITORY_SLUG } from '../../shared/orca-repository-url'
 
 type GhExecOptions = GitHubRepoExecOptions & { signal?: AbortSignal }
 type HostedReviewLocalGitOptions = ReturnType<typeof getHostedReviewLocalGitOptions>
 
-const ORCA_REPO = 'stablyai/orca'
+const ORCA_REPO = ORCA_REPOSITORY_SLUG
 const PR_CHECK_LOG_TAIL_JOB_LIMIT = 5
 // Why: each entry holds up to 16KB of log text; bound the cache so a long session can't grow it unbounded.
 const PR_CHECK_LOG_TAIL_CACHE_MAX_ENTRIES = 128

@@ -47,7 +47,7 @@ describe('checkOrcaStarred', () => {
 
     expect(execFileAsyncMock).toHaveBeenCalledWith(
       'gh',
-      ['api', '--include', 'user/starred/stablyai/orca'],
+      ['api', '--include', 'user/starred/ab2webco/orca-oss'],
       { encoding: 'utf-8' }
     )
   })
