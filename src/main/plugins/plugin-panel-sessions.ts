@@ -64,6 +64,17 @@ export class PluginPanelSessions {
     }
   }
 
+  /** Drops one session, only for the owner holding it: a token alone is never
+   *  enough to end another transport's panel. */
+  release(ownerKey: string, token: string): boolean {
+    const session = this.sessions.get(token)
+    if (!session || session.ownerKey !== ownerKey) {
+      return false
+    }
+    this.delete(token, session)
+    return true
+  }
+
   revokeOwner(ownerKey: string): void {
     for (const [token, session] of this.sessions) {
       if (session.ownerKey === ownerKey) {

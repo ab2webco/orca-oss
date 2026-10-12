@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { defineMethod, type RpcContext, type RpcMethod } from '../core'
-import type { PluginPanelEntry } from '../../../../shared/plugins/plugin-panel-bridge'
+import {
+  panelSessionTokenSchema,
+  type PluginPanelEntry
+} from '../../../../shared/plugins/plugin-panel-bridge'
 import { listPluginsForClients } from '../../../ipc/plugins'
 import type { PluginListEntry } from '../../../plugins/plugin-list-projection'
 import type { PluginService } from '../../../plugins/plugin-service'
@@ -9,6 +12,7 @@ import {
   type PluginConsentRequest
 } from '../../../../shared/plugins/plugin-consent-request'
 import { isQualifiedPluginKey } from '../../../../shared/plugins/plugin-manifest'
+import { rpcPanelOwnerKey, setRpcPanelOwnerRevoker } from '../rpc-panel-owner'
 
 /**
  * Serve/headless parity surface: the same consent, enablement, panel-action,
@@ -34,6 +38,7 @@ export function setPluginServiceForRpc(
   }
 ): void {
   pluginServiceForRpc = service
+  setRpcPanelOwnerRevoker(service ? (ownerKey) => service.panels.revokeOwner(ownerKey) : null)
   pluginConsentForRpc = writes?.applyConsent ?? null
   pluginEnablementForRpc = writes?.applyEnablement ?? null
 }
@@ -55,6 +60,8 @@ const PluginReadPanelEntryParams = z.object({
   panelId: z.string().min(1)
 })
 
+const PluginReleasePanelParams = z.object({ sessionToken: panelSessionTokenSchema }).strict()
+
 const PluginInvokeCommandParams = z.object({
   pluginKey: z.string().min(1),
   commandId: z.string().min(1),
@@ -66,9 +73,7 @@ async function listForRpc(): Promise<PluginListEntry[]> {
 }
 
 function rpcPanelOwner(context: RpcContext): string {
-  // Why: the bearer session must not cross paired-client connections even
-  // when two sockets authenticate as the same device.
-  return `runtime:${context.connectionId ?? context.clientId ?? 'local'}`
+  return rpcPanelOwnerKey(context.connectionId, context.clientId)
 }
 
 function bindRpcPanelOwner(service: PluginService, context: RpcContext): string {
@@ -140,6 +145,16 @@ export const PLUGIN_METHODS: readonly RpcMethod[] = [
         return null
       }
       return entry
+    }
+  }),
+  defineMethod({
+    // Why: a phone keeps one connection while panels open and close, so it
+    // ends a panel's authority explicitly instead of waiting for the socket.
+    name: 'plugins.releasePanel',
+    params: PluginReleasePanelParams,
+    handler: async (params, context) => {
+      const service = requirePluginService()
+      return { released: service.panels.release(rpcPanelOwner(context), params.sessionToken) }
     }
   }),
   defineMethod({

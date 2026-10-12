@@ -51,6 +51,7 @@ import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { resolveAdvertisedPairingEndpoint } from './pairing-endpoint'
 import { getDefaultPairingAddress } from './pairing-network-interfaces'
 import { createMobilePairingQrResponse } from './mobile-pairing-qr-offer'
+import { revokeRpcPanelOwnerForConnection } from './rpc/rpc-panel-owner'
 import {
   decodeTerminalStreamFrame,
   TerminalStreamOpcode,
@@ -350,6 +351,12 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // One work item, gated by MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY: the
   // list no longer carries `description`, so the detail reads it here on open (ORCA-464).
   'plane.getWorkItem',
+  // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
+  // Consent, enablement and invokeCommand stay off: those are desktop decisions.
+  'plugins.list',
+  'plugins.readPanelEntry',
+  'plugins.panelAction',
+  'plugins.releasePanel',
   'linear.getCustomView',
   'linear.getIssue',
   'linear.getProject',
@@ -1400,6 +1407,7 @@ export class OrcaRuntimeRpcServer {
         // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
         this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
         this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+        revokeRpcPanelOwnerForConnection(socket.connectionId)
         this.binaryStreamHandlers.delete(socket.connectionId)
         for (const key of this.unroutedTerminalInputStreams) {
           if (key.startsWith(`${socket.connectionId}:`)) {

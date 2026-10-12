@@ -35,4 +35,19 @@ describe('PluginPanelSessions', () => {
     expect(sessions.resolve('connection:one', second)).toBeNull()
     expect(sessions.resolve('connection:two', other)).toEqual(binding)
   })
+
+  it('releases one session only for the owner that holds it', () => {
+    const sessions = new PluginPanelSessions()
+    const board = sessions.issue('connection:one', binding)
+    const settings = sessions.issue('connection:one', { ...binding, panelId: 'settings' })
+
+    expect(sessions.release('connection:two', board)).toBe(false)
+    expect(sessions.resolve('connection:one', board)).toEqual(binding)
+
+    expect(sessions.release('connection:one', board)).toBe(true)
+    expect(sessions.resolve('connection:one', board)).toBeNull()
+    expect(sessions.resolve('connection:one', settings)).not.toBeNull()
+    // A released binding re-opens with a fresh token, never the dead one.
+    expect(sessions.issue('connection:one', binding)).not.toBe(board)
+  })
 })
