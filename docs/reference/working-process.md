@@ -211,6 +211,11 @@ frene a Android:
   `expo.version` y `expo.android.versionCode` de `mobile/app.json` tal como están commiteados: el tag
   y `release_version` sólo pueden coincidir con esa versión, y cualquier cambio de versión o
   `versionCode` se commitea antes en `app.json`.
+- **Links de instalación** ([`orca-mobile-install-links.ts`](../../src/shared/orca-mobile-install-links.ts)):
+  el QR y los links del desktop y la pantalla de actualización de la app salen de ese módulo. El PR
+  que sube `expo.version` sube también `ORCA_MOBILE_ANDROID_VERSION`; un test falla si no coinciden.
+  Cuando existan las fichas en las tiendas, se cambian ahí: `ORCA_MOBILE_IOS_APP_STORE_URL` deja de
+  ser `null` y vuelve a aparecer el canal Stable.
 
 ## Verificación: lo que no se puede dar por bueno
 

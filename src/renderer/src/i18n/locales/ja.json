@@ -6562,7 +6562,7 @@
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub リリース",
           "b0088412a1": "または Android APK から",
-          "b5a2ed83ff": "アプリストア",
+          "testFlightLabel": "TestFlight",
           "c8491c17ef": "QR コードをスキャンしてスマートフォンから Orca Lab を制御します。ベータ/早期プレビュー - バグや重大な変更が予想されます。 iOS アプリを次の場所から入手します。",
           "e7a3ae8c4e": "モバイル",
           "174f4a3c6d": "スマートフォンからターミナルと Agent を操作します。",

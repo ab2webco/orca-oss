@@ -3,7 +3,12 @@ import { ArrowLeft, ArrowRight, Copy } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { MobileNetworkInterface } from '../settings/mobile-network-interface-selection'
 import { AndroidLogo, IosBrandIcon } from './MobileBrandIcons'
-import { getChannelTagline, type InstallCopy, type IosChannel } from './mobile-platform-copy'
+import {
+  getChannelTagline,
+  hasIosStableChannel,
+  type InstallCopy,
+  type IosChannel
+} from './mobile-platform-copy'
 import type { MobilePairingConnectionMode } from '../../../../shared/mobile-pairing-connection-mode'
 import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
 import { MobileHeroPairingStep, type MobilePairingBlock } from './MobileHeroPairingStep'
@@ -163,7 +168,7 @@ export function HeroFlow({
                   {translate('auto.components.mobile.MobileHero.ac1eb64952', 'Android')}
                 </button>
               </div>
-              {platform === 'ios' ? (
+              {platform === 'ios' && hasIosStableChannel() ? (
                 <div
                   className="mp-channel-toggle"
                   role="radiogroup"

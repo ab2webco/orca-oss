@@ -6551,14 +6551,14 @@
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub Releases",
           "b0088412a1": "o el APK de Android desde",
-          "b5a2ed83ff": "App Store",
+          "testFlightLabel": "TestFlight",
           "c8491c17ef": "Controla Orca Lab desde tu teléfono escaneando un código QR. Beta/vista previa temprana: espera errores y cambios importantes. Obtén la app para iOS en",
           "e7a3ae8c4e": "Móvil",
           "174f4a3c6d": "Controla terminales y agentes desde tu teléfono.",
           "1de96ec8a6": "Mostrar botón de Orca Lab Mobile",
           "682293cadf": "Mostrar el botón de Orca Lab Mobile en la parte superior de la barra lateral izquierda.",
           "d4f2b65f30": "Mostrar el acceso directo de Orca Lab Mobile en la barra lateral.",
-          "installIntro": "Instala Orca Lab Mobile desde la",
+          "installIntro": "Instala Orca Lab Mobile desde",
           "installOutro": ", luego empareja a continuación.",
           "androidApkLabel": "Android APK"
         },

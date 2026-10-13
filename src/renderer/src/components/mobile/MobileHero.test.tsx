@@ -105,6 +105,12 @@ describe('HeroFlow height', () => {
     )
   }
 
+  it('offers no Stable channel on iOS while Orca Lab has no App Store listing', () => {
+    renderFlow(0)
+    expect(screen.queryByRole('radiogroup', { name: 'Release channel' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Stable' })).toBeNull()
+  })
+
   it('sizes to the active step and updates when the taller pairing step opens', () => {
     const { rerender } = renderFlow(0)
     const viewport = document.querySelector<HTMLElement>('.mp-flow-viewport')
