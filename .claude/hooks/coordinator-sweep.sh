@@ -34,21 +34,24 @@ sweep_line() {
   # Unshipped: commits past main, no PR, untouched for a day. Skipping these as "in progress"
   # left ORCA-560 finished and invisible for three days (ORCA-562).
   stale=""
-  local unshipped="" now last
+  local unshipped="" now last pr_state
   now=$(date +%s)
   while read -r path branch; do
     [ -z "$branch" ] || [ "$branch" = "main" ] && continue
-    grep -qxF "$path" <<<"$live" && continue
     [ -n "$(gh pr list -R "$REPO" --head "$branch" --state open --json number --jq '.[].number' 2>/dev/null)" ] && continue
-    if [ "$(git rev-list --count "origin/main..$branch" 2>/dev/null || echo 0)" -gt 0 ]; then
-      # A squash merge leaves the branch ahead of main forever.
-      if [ -n "$(gh pr list -R "$REPO" --head "$branch" --state merged --json number --jq '.[].number' 2>/dev/null)" ]; then
-        stale="$stale ${branch##*/}"
+    # A merged PR wins over a live terminal and over commits a squash merge leaves ahead of main.
+    if [ -z "$(gh pr list -R "$REPO" --head "$branch" --state merged --json number --jq '.[].number' 2>/dev/null)" ]; then
+      grep -qxF "$path" <<<"$live" && continue
+      if [ "$(git rev-list --count "origin/main..$branch" 2>/dev/null || echo 0)" -gt 0 ]; then
+        last=$(git log -1 --format=%ct "$branch" 2>/dev/null)
+        [ -n "$last" ] && [ $((now - last)) -ge 86400 ] &&
+          unshipped="$unshipped ${branch##*/}($(((now - last) / 86400))d)"
         continue
       fi
-      last=$(git log -1 --format=%ct "$branch" 2>/dev/null)
-      [ -n "$last" ] && [ $((now - last)) -ge 86400 ] &&
-        unshipped="$unshipped ${branch##*/}($(((now - last) / 86400))d)"
+    fi
+    # Uncommitted work is flagged apart, never treated as safe to delete.
+    if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+      stale="$stale ${branch##*/}(sin-commitear)"
       continue
     fi
     stale="$stale ${branch##*/}"
