@@ -6,12 +6,13 @@
 // away. See design doc §3.1.
 import { createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, existsSync, rmSync } from 'node:fs'
-import type { RpcMessageContext, RpcTransport } from './transport'
+import type { LocalStreamWrite, RpcMessageContext, RpcTransport } from './transport'
 
 const MAX_RUNTIME_RPC_MESSAGE_BYTES = 1024 * 1024
 const RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS = 30_000
 const MAX_RUNTIME_RPC_CONNECTIONS = 32
 const DEFAULT_KEEPALIVE_INTERVAL_MS = 10_000
+const MAX_LOCAL_STREAM_BACKLOG_BYTES = 1024 * 1024
 
 export type UnixSocketTransportOptions = {
   endpoint: string
@@ -196,6 +197,18 @@ export class UnixSocketTransport implements RpcTransport {
       }
     }
 
+    const sendFrame = (response: string): LocalStreamWrite => {
+      if (replied || socket.destroyed || !socket.writable) {
+        return 'closed'
+      }
+      // Why: a reader that stopped draining must not grow main's write buffer without bound.
+      if (socket.writableLength > MAX_LOCAL_STREAM_BACKLOG_BYTES) {
+        return 'dropped'
+      }
+      socket.write(`${response}\n`)
+      return 'written'
+    }
+
     const startKeepalive = (): void => {
       if (keepaliveTimer || replied) {
         return
@@ -215,7 +228,8 @@ export class UnixSocketTransport implements RpcTransport {
 
     this.messageHandler?.(rawMessage, reply, {
       signal: abortController.signal,
-      startKeepalive
+      startKeepalive,
+      sendFrame
     })
   }
 }

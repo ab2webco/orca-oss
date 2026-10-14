@@ -11,9 +11,13 @@
 // when the underlying connection terminates so long-poll handlers can bail
 // out. `startKeepalive` is opt-in per request — only long-poll dispatches
 // call it, so short RPCs pay no timer overhead. See design doc §3.1.
+export type LocalStreamWrite = 'written' | 'dropped' | 'closed'
+
 export type RpcMessageContext = {
   signal: AbortSignal
   startKeepalive: () => void
+  // Why: a local event stream writes many frames before its final reply; a slow reader drops frames, never blocks main.
+  sendFrame: (response: string) => LocalStreamWrite
 }
 
 export type RpcTransport = {
