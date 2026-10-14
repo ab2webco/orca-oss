@@ -77,6 +77,23 @@ describe('projectAgentStatusChangedEvent', () => {
     ).not.toHaveProperty('sessionBoundary')
   })
 
+  it('marks an interrupted done so plugins can tell it from a finished turn', () => {
+    expect(
+      projectAgentStatusChangedEvent(source({ payload: { state: 'done', interrupted: true } }))
+    ).toMatchObject({ state: 'done', interrupted: true })
+    expect(
+      projectAgentStatusChangedEvent(source({ payload: { state: 'done', interrupted: false } }))
+    ).not.toHaveProperty('interrupted')
+    expect(
+      projectAgentStatusChangedEvent(source({ payload: { state: 'working', interrupted: true } }))
+    ).not.toHaveProperty('interrupted')
+    expect(
+      agentStatusChangedPayloadSchema.safeParse(
+        projectAgentStatusChangedEvent(source({ payload: { state: 'done', interrupted: true } }))
+      ).success
+    ).toBe(true)
+  })
+
   it('always produces a payload the plugin event schema accepts', () => {
     const sources: AgentStatusEventSource[] = [
       source(),

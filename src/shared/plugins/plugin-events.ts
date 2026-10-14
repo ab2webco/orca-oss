@@ -35,7 +35,9 @@ export const agentStatusChangedPayloadSchema = z.object({
   receivedAt: z.number().finite().positive(),
   agentType: z.string().min(1).max(AGENT_TYPE_MAX_LENGTH).optional(),
   // Why: a `done` that only marks a connect/resume/clear landing idle, not a finished turn.
-  sessionBoundary: z.literal(true).optional()
+  sessionBoundary: z.literal(true).optional(),
+  // Why: a `done` the user interrupted, not a finished turn.
+  interrupted: z.literal(true).optional()
 })
 
 export const NOTIFICATION_DISPATCHED_TITLE_MAX_LENGTH = 256
