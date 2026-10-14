@@ -1,6 +1,7 @@
 import { createElement, useEffect } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ORCA_MOBILE_IOS_TESTFLIGHT_URL } from '../../../src/shared/orca-mobile-install-links'
 import type { RpcClient } from '../transport/rpc-client'
 import { HostProtocolGate, useHostProtocolGates } from './HostProtocolGate'
 
@@ -99,8 +100,11 @@ describe('HostProtocolGate', () => {
     renderer = await renderGate()
     const output = renderedText(renderer)
     expect(output).toContain('Update Orca Lab Mobile')
-    expect(output).toContain('Open App Store')
+    expect(output).toContain('Open TestFlight')
+    expect(output).not.toContain('App Store')
     expect(output).not.toContain('HostContent')
+    act(() => renderer?.root.findAllByType('Pressable')[0]?.props.onPress())
+    expect(nativeTestState.openUrl).toHaveBeenCalledWith(ORCA_MOBILE_IOS_TESTFLIGHT_URL)
   })
 
   it('routes Android mobile updates to GitHub Releases', async () => {
