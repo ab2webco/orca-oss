@@ -1253,6 +1253,9 @@ import {
   resolveNestedRepoSelection
 } from '../project-groups/nested-repo-import'
 import { createNestedRepoImportTargetResolver } from '../project-groups/nested-repo-import-target'
+import type { OrcaEvent, OrcaEventFilter } from '../../shared/orca-events'
+import type { AgentStatusEventSource } from '../plugins/plugin-agent-status-event'
+import { subscribeOrcaEvents } from './orca-events/orca-event-stream'
 
 function sanitizeNestedRepoRuntimeImportError(context: string, error: unknown): string {
   console.warn(`[project-groups] ${context}`, error)
@@ -3555,6 +3558,9 @@ export class OrcaRuntimeService {
   private readonly getSshProviderFn: ((connectionId: string) => IPtyProvider | undefined) | null
   private readonly onPtyStopped: ((ptyId: string) => void) | null
   private readonly onTerminalAgentStatus: ((event: RuntimeTerminalAgentStatusEvent) => void) | null
+  private readonly subscribeAgentStatusEventsFn:
+    | ((listener: (event: AgentStatusEventSource) => void) => () => void)
+    | null
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -3632,6 +3638,8 @@ export class OrcaRuntimeService {
       getSshProvider?: (connectionId: string) => IPtyProvider | undefined
       onPtyStopped?: (ptyId: string) => void
       onTerminalAgentStatus?: (event: RuntimeTerminalAgentStatusEvent) => void
+      // Why: `orca events` reads the hook pipeline, which lives outside the runtime.
+      subscribeAgentStatusEvents?: (listener: (event: AgentStatusEventSource) => void) => () => void
       onTerminalSideEffects?: (batch: TerminalSideEffectBatch) => void
       // Why: agent status mostly arrives via hooks (agent-hooks/server), not OSC
       // terminal output. worktree.ps reads this at query time so mobile shows the
@@ -3715,6 +3723,7 @@ export class OrcaRuntimeService {
     this.getSshProviderFn = deps?.getSshProvider ?? null
     this.onPtyStopped = deps?.onPtyStopped ?? null
     this.onTerminalAgentStatus = deps?.onTerminalAgentStatus ?? null
+    this.subscribeAgentStatusEventsFn = deps?.subscribeAgentStatusEvents ?? null
     this.buildAgentHookPtyEnv = deps?.buildAgentHookPtyEnv ?? null
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
@@ -5759,6 +5768,34 @@ export class OrcaRuntimeService {
     return () => {
       this.worktreeLifecycleListeners.delete(listener)
     }
+  }
+
+  /** Resolves a CLI worktree selector (id:, path:, branch:, ...) to the worktree id events carry. */
+  async resolveWorktreeIdForSelector(selector: string): Promise<string> {
+    return (
+      this.getValidatedExplicitWorktreeIdSelector(selector) ??
+      (await this.resolveWorktreeSelector(selector)).id
+    )
+  }
+
+  /** Streams `orca events` for one subscriber; sources attach only for the families it asks for. */
+  subscribeOrcaEvents(
+    filter: OrcaEventFilter,
+    emit: (event: OrcaEvent) => void
+  ): Promise<() => void> {
+    return subscribeOrcaEvents(
+      {
+        now: () => Date.now(),
+        handleForPaneKey: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+        onAgentStatus: (listener) => this.subscribeAgentStatusEventsFn?.(listener) ?? (() => {}),
+        onWorktreeLifecycle: (listener) => this.onWorktreeLifecycle(listener),
+        onNotificationDispatched: (listener) => this.onNotificationDispatched(listener),
+        listSessionTabs: () => this.listAllMobileSessionTabs(),
+        onSessionTabsChanged: (listener) => this.onMobileSessionTabsChanged(listener)
+      },
+      filter,
+      emit
+    )
   }
 
   private emitWorktreeLifecycle(event: RuntimeWorktreeLifecycleEvent): void {
