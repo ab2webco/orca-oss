@@ -320,7 +320,8 @@ jobs:
           # Why: a skipped suite and a passing one both leave the job green.
           test -f out/cli/index.js
           pnpm exec vitest run --config config/vitest.config.ts \
-            src/main/runtime/orchestration-cli-subprocess.test.ts
+            src/main/runtime/orchestration-cli-subprocess.test.ts \
+            src/main/runtime/events-cli-subprocess.test.ts
 
   test:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
