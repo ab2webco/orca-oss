@@ -48,6 +48,64 @@ export function collectGlobalHooks(homeDir: string): PluginHookEntry[] {
  * per event and deduped by command — this preserves any hooks already present
  * (e.g. Orca's own status hooks) and stays idempotent across repeated syncs.
  */
+type PluginVersionPaths = { versionsRoot: string; current: string }
+
+// Claude installs plugins at plugins/cache/<marketplace>/<plugin>/<version>; null for any other layout.
+function pluginVersionPaths(installPath: string): PluginVersionPaths | null {
+  const trimmed = installPath.replace(/[\\/]+$/, '')
+  const parts = trimmed.split(/[\\/]+/)
+  if (parts.length < 5 || parts.at(-4) !== 'cache' || parts.at(-5) !== 'plugins') {
+    return null
+  }
+  const versionsRoot = trimmed.slice(0, trimmed.length - (parts.at(-1) ?? '').length)
+  const separator = versionsRoot.slice(-1)
+  return { versionsRoot, current: `${trimmed}${separator}` }
+}
+
+// Why: hooks are copied with the versioned path expanded, so after a plugin update
+// the old version's hooks would keep running (or failing) next to the new ones.
+function removeOtherVersionHooks(
+  hooksByEvent: Record<string, HookDefinition[]>,
+  incoming: PluginHookEntry[]
+): boolean {
+  const versions = incoming
+    .map((entry) => (entry.installPath ? pluginVersionPaths(entry.installPath) : null))
+    .filter((paths): paths is PluginVersionPaths => paths !== null)
+  if (versions.length === 0) {
+    return false
+  }
+  const isStale = (command: unknown): boolean =>
+    typeof command === 'string' &&
+    versions.some(
+      ({ versionsRoot, current }) => command.includes(versionsRoot) && !command.includes(current)
+    )
+  let removed = false
+  for (const [event, definitions] of Object.entries(hooksByEvent)) {
+    const kept: HookDefinition[] = []
+    for (const def of definitions) {
+      if (!Array.isArray(def.hooks)) {
+        kept.push(def)
+        continue
+      }
+      const live = def.hooks.filter((hook) => !isStale(hook.command))
+      if (live.length === def.hooks.length) {
+        kept.push(def)
+        continue
+      }
+      removed = true
+      if (live.length > 0) {
+        kept.push({ ...def, hooks: live })
+      }
+    }
+    if (kept.length > 0) {
+      hooksByEvent[event] = kept
+    } else {
+      delete hooksByEvent[event]
+    }
+  }
+  return removed
+}
+
 export function mergeHooksIntoSettingsObject(
   base: Record<string, unknown>,
   hooks: PluginHookEntry[]
@@ -59,7 +117,7 @@ export function mergeHooksIntoSettingsObject(
   for (const [event, definitions] of Object.entries(existingHooks)) {
     nextHooks[event] = Array.isArray(definitions) ? definitions.map((def) => ({ ...def })) : []
   }
-  let changed = false
+  let changed = removeOtherVersionHooks(nextHooks, hooks)
   for (const entry of hooks) {
     const list = (nextHooks[entry.event] ??= [])
     const alreadyPresent = list.some(

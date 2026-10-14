@@ -37,6 +37,7 @@ describe('collectGlobalHooks', () => {
     expect(hooks).toHaveLength(1)
     expect(hooks[0].command).toBe(join(installPath, 's.sh'))
     expect(hooks[0].event).toBe('SessionStart')
+    expect(hooks[0].installPath).toBe(installPath)
   })
 
   it('returns [] when no plugins are installed', () => {
@@ -89,6 +90,59 @@ describe('mergeHooksIntoVaultSettings', () => {
       }
     })
     expect(mergeHooksIntoVaultSettings(existing, [hook])).toBeNull()
+  })
+
+  describe('after a plugin update', () => {
+    const cacheRoot = join('/home/u', '.claude', 'plugins', 'cache', 'engram', 'engram')
+    const current: PluginHookEntry = {
+      id: 'engram:SessionStart::session-start',
+      pluginName: 'engram',
+      installPath: join(cacheRoot, '0.1.12'),
+      event: 'SessionStart',
+      command: join(cacheRoot, '0.1.12', 'scripts', 'session-start.sh')
+    }
+
+    it('replaces hooks that point at an older version of the same plugin', () => {
+      const existing = JSON.stringify({
+        hooks: {
+          SessionStart: [
+            { hooks: [{ type: 'command', command: join(cacheRoot, '0.1.0', 'scripts', 's.sh') }] },
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: `"${join(cacheRoot, '0.1.3', 'scripts', 'session-start.sh')}"`
+                }
+              ]
+            },
+            { hooks: [{ type: 'command', command: '/orca/claude-hook.sh' }] }
+          ],
+          SessionEnd: [
+            { hooks: [{ type: 'command', command: join(cacheRoot, '0.1.3', 'scripts', 'e.sh') }] }
+          ]
+        }
+      })
+      const parsed = JSON.parse(mergeHooksIntoVaultSettings(existing, [current]) as string)
+      expect(
+        parsed.hooks.SessionStart.map((d: { hooks: { command: string }[] }) => d.hooks[0].command)
+      ).toEqual(['/orca/claude-hook.sh', current.command])
+      expect(parsed.hooks.SessionEnd).toBeUndefined()
+    })
+
+    it('leaves hooks alone for a plugin installed outside the plugin cache', () => {
+      const local: PluginHookEntry = {
+        ...current,
+        installPath: join('/home/u', 'Projects', 'my-plugin'),
+        command: join('/home/u', 'Projects', 'my-plugin', 'hook.sh')
+      }
+      const sibling = join('/home/u', 'Projects', 'other-tool', 'hook.sh')
+      const existing = JSON.stringify({
+        hooks: { SessionStart: [{ hooks: [{ type: 'command', command: sibling }] }] }
+      })
+      const parsed = JSON.parse(mergeHooksIntoVaultSettings(existing, [local]) as string)
+      expect(parsed.hooks.SessionStart[0].hooks[0].command).toBe(sibling)
+      expect(parsed.hooks.SessionStart).toHaveLength(2)
+    })
   })
 
   it('returns null for empty hooks or unparseable settings (never clobbers)', () => {
