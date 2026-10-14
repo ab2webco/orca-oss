@@ -142,6 +142,48 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     })
   })
 
+  it('hands each streaming frame to the caller and resolves on the final frame', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-transport-'))
+    const endpoint = join(userDataPath, 'runtime.sock')
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      socket.once('data', (data) => {
+        const request = JSON.parse(String(data).trim()) as { id: string }
+        const frame = (result: unknown, streaming: boolean) =>
+          `${JSON.stringify({
+            id: request.id,
+            ok: true,
+            result,
+            ...(streaming ? { streaming: true } : {}),
+            _meta: { runtimeId: 'runtime-1' }
+          })}\n`
+        // Why: frames spaced past the client timeout prove each one refreshes it.
+        socket.write(frame({ type: 'ready' }, true))
+        setTimeout(() => socket.write(frame({ type: 'event', n: 1 }, true)), 150)
+        setTimeout(() => socket.write('{"_keepalive":true}\n'), 300)
+        setTimeout(() => socket.write(frame({ type: 'ended' }, false)), 450)
+      })
+    })
+    servers.add(server)
+    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
+
+    const metadata: RuntimeMetadata = {
+      runtimeId: 'runtime-1',
+      pid: 123,
+      transports: [{ kind: 'unix', endpoint }],
+      authToken: 'token',
+      startedAt: 1
+    }
+    const streamed: unknown[] = []
+    const response = await sendRequest(metadata, 'events.subscribe', {}, 250, undefined, {
+      onStreamFrame: (result) => streamed.push(result)
+    })
+
+    expect(streamed).toEqual([{ type: 'ready' }, { type: 'event', n: 1 }])
+    expect(response).toMatchObject({ ok: true, result: { type: 'ended' } })
+  })
+
   it('rejects promptly when the runtime closes the socket before responding', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-transport-'))
     const endpoint = join(userDataPath, 'runtime.sock')

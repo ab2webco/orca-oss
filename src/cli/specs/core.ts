@@ -246,6 +246,18 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'terminal', 'for', 'timeout-ms']
   },
   {
+    path: ['events'],
+    summary: 'Stream agent, terminal, worktree and notification events as they happen',
+    usage:
+      'orca events [--event <name|family.*>]... [--worktree <selector>] [--terminal <handle>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'event', 'worktree', 'terminal'],
+    examples: [
+      'orca events --json',
+      'orca events --event agent.status.changed --json',
+      'orca events --event terminal.*,worktree.* --worktree active'
+    ]
+  },
+  {
     path: ['terminal', 'stop'],
     summary: 'Stop terminals for a worktree',
     usage: 'orca terminal stop --worktree <selector> [--json]',
