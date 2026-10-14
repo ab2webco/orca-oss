@@ -357,8 +357,7 @@ describe('runManagedAccountSwitchRelaunch', () => {
     ['terminal-not-found' as const],
     ['missing-launch-config' as const],
     ['missing-session' as const],
-    ['unsupported-runtime' as const],
-    ['concurrent' as const]
+    ['unsupported-runtime' as const]
   ])('falls back to a new tab when the pane cannot host the switch (%s)', async (reason) => {
     callRuntimeRpc.mockResolvedValue(
       switchResponse({ state: 'preflighting', failure: { reason, message: 'refused' } })
@@ -378,6 +377,28 @@ describe('runManagedAccountSwitchRelaunch', () => {
       'wt-1',
       expect.objectContaining({ claudeAccountId: TARGET_ACCOUNT.id })
     )
+  })
+
+  // Why: a switch already running on this pane will relaunch it in place; a fresh tab
+  // would resume the same session a second time, in parallel (ORCA-574).
+  it('opens no tab when a switch is already running on this terminal', async () => {
+    callRuntimeRpc.mockResolvedValue(
+      switchResponse({
+        state: 'preflighting',
+        failure: { reason: 'concurrent', message: 'A switch is already running.' }
+      })
+    )
+
+    const result = await run()
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'resume-failed',
+      message: expect.stringContaining('already running')
+    })
+    expect(store.createTab).not.toHaveBeenCalled()
+    expect(copySessionForAccountSwitch).not.toHaveBeenCalled()
+    expect(store.updateWorktreeMeta).not.toHaveBeenCalled()
   })
 
   it('reports "launched" when the continuation prompt could not be delivered', async () => {

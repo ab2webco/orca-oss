@@ -38,8 +38,9 @@ const NOT_SWITCHABLE_IN_PLACE: ReadonlySet<ClaudeTerminalAccountSwitchFailureRea
   'unsupported-runtime',
   'source-unknown',
   'missing-launch-config',
-  'missing-session',
-  'concurrent'
+  'missing-session'
+  // Why not `concurrent`: a switch is already relaunching this pane in place; a fresh
+  // tab would resume the same session a second time, in parallel (ORCA-574).
 ])
 
 type SwitchResponse = {
