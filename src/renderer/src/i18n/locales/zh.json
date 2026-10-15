@@ -7507,7 +7507,18 @@
           "e90afcc44f": "关",
           "16c471ee03": "开",
           "typographyAdvanced": "排版",
-          "dimUnfocusedPanes": "调暗未聚焦的窗格。"
+          "dimUnfocusedPanes": "调暗未聚焦的窗格。",
+          "paneActionsPosition": {
+            "title": "窗格操作按钮位置",
+            "description": "在没有标题的窗格中，拆分、关闭和代理按钮的显示位置。",
+            "edge": "窗格操作按钮边缘",
+            "align": "窗格操作按钮对齐",
+            "top": "顶部",
+            "bottom": "底部",
+            "left": "左侧",
+            "center": "居中",
+            "right": "右侧"
+          }
         },
         "TerminalFontSizeSetting": {
           "9b5252c85a": "像素",
@@ -9361,7 +9372,14 @@
               "title": "主题模式",
               "keyword_target": "目标",
               "keyword_editing": "编辑"
-            }
+            },
+            "paneActionsPosition": {
+              "title": "窗格操作按钮位置",
+              "description": "在没有标题的窗格中，拆分、关闭和代理按钮的显示位置。"
+            },
+            "actions": "操作",
+            "buttons": "按钮",
+            "position": "位置"
           },
           "windows": {
             "search": {

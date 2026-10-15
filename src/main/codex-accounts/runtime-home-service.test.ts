@@ -97,6 +97,7 @@ function createSettings(overrides: TestSettingsOverrides = {}): GlobalSettings {
     terminalThemeLight: 'orca-light',
     terminalDividerColorLight: '#ffffff',
     terminalInactivePaneOpacity: 0.5,
+    terminalPaneActionsPosition: 'bottom-right',
     terminalActivePaneOpacity: 1,
     terminalPaneOpacityTransitionMs: 150,
     terminalDividerThicknessPx: 1,

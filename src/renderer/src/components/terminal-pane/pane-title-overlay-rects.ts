@@ -21,7 +21,8 @@ export function arePaneTitleOverlayRectsEqual(
     const left = Math.abs((a[paneId]?.left ?? 0) - (b[paneId]?.left ?? 0))
     const top = Math.abs((a[paneId]?.top ?? 0) - (b[paneId]?.top ?? 0))
     const width = Math.abs((a[paneId]?.width ?? 0) - (b[paneId]?.width ?? 0))
-    return left < 0.5 && top < 0.5 && width < 0.5
+    const height = Math.abs((a[paneId]?.height ?? 0) - (b[paneId]?.height ?? 0))
+    return left < 0.5 && top < 0.5 && width < 0.5 && height < 0.5
   })
 }
 

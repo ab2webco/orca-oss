@@ -7947,7 +7947,18 @@
           "e90afcc44f": "off",
           "16c471ee03": "on",
           "typographyAdvanced": "Typography",
-          "dimUnfocusedPanes": "Dim unfocused panes."
+          "dimUnfocusedPanes": "Dim unfocused panes.",
+          "paneActionsPosition": {
+            "title": "Pane Actions Position",
+            "description": "Where the split, close and agent buttons float on a pane without a title.",
+            "edge": "Pane actions edge",
+            "align": "Pane actions alignment",
+            "top": "Top",
+            "bottom": "Bottom",
+            "left": "Left",
+            "center": "Center",
+            "right": "Right"
+          }
         },
         "TerminalFontSizeSetting": {
           "9b5252c85a": "px",
@@ -9814,7 +9825,14 @@
               "title": "Theme Mode",
               "keyword_target": "target",
               "keyword_editing": "editing"
-            }
+            },
+            "paneActionsPosition": {
+              "title": "Pane Actions Position",
+              "description": "Where the split, close and agent buttons float on a pane without a title."
+            },
+            "actions": "actions",
+            "buttons": "buttons",
+            "position": "position"
           },
           "windows": {
             "search": {

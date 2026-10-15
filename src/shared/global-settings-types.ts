@@ -8,6 +8,7 @@ import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
+import type { TerminalPaneActionsPosition } from './terminal-pane-actions-position'
 import type { UiLanguage } from './ui-language'
 import type { GlobalWindowsRuntimeDefault } from './project-execution-runtime'
 import type { PersistedNativeChatSessionOptions } from './native-chat-session-options'
@@ -145,6 +146,8 @@ export type GlobalSettings = {
   terminalThemeLight: string
   terminalDividerColorLight: string
   terminalInactivePaneOpacity: number
+  /** Where the floating actions of an untitled terminal pane sit. */
+  terminalPaneActionsPosition: TerminalPaneActionsPosition
   terminalActivePaneOpacity: number
   terminalPaneOpacityTransitionMs: number
   terminalDividerThicknessPx: number

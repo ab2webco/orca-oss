@@ -7532,7 +7532,18 @@
           "e90afcc44f": "オフ",
           "16c471ee03": "オン",
           "typographyAdvanced": "タイポグラフィ",
-          "dimUnfocusedPanes": "フォーカスされていないペインを暗くします。"
+          "dimUnfocusedPanes": "フォーカスされていないペインを暗くします。",
+          "paneActionsPosition": {
+            "title": "ペインのアクションの位置",
+            "description": "タイトルのないペインで、分割や閉じるなどのボタンを表示する位置。",
+            "edge": "ペインのアクションの端",
+            "align": "ペインのアクションの配置",
+            "top": "上",
+            "bottom": "下",
+            "left": "左",
+            "center": "中央",
+            "right": "右"
+          }
         },
         "TerminalFontSizeSetting": {
           "9b5252c85a": "ピクセル",
@@ -9386,7 +9397,14 @@
               "title": "テーマモード",
               "keyword_target": "対象",
               "keyword_editing": "編集"
-            }
+            },
+            "paneActionsPosition": {
+              "title": "ペインのアクションの位置",
+              "description": "タイトルのないペインで、分割や閉じるなどのボタンを表示する位置。"
+            },
+            "actions": "アクション",
+            "buttons": "ボタン",
+            "position": "位置"
           },
           "windows": {
             "search": {

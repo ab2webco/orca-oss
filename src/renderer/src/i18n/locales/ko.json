@@ -7506,7 +7506,18 @@
           "e90afcc44f": "끔",
           "16c471ee03": "켜짐",
           "typographyAdvanced": "타이포그래피",
-          "dimUnfocusedPanes": "포커스되지 않은 창을 흐리게 표시합니다."
+          "dimUnfocusedPanes": "포커스되지 않은 창을 흐리게 표시합니다.",
+          "paneActionsPosition": {
+            "title": "창 작업 버튼 위치",
+            "description": "제목이 없는 창에서 분할, 닫기, 에이전트 버튼이 표시되는 위치입니다.",
+            "edge": "창 작업 버튼 가장자리",
+            "align": "창 작업 버튼 정렬",
+            "top": "위",
+            "bottom": "아래",
+            "left": "왼쪽",
+            "center": "가운데",
+            "right": "오른쪽"
+          }
         },
         "TerminalFontSizeSetting": {
           "9b5252c85a": "px",
@@ -9360,7 +9371,14 @@
               "title": "테마 모드",
               "keyword_target": "대상",
               "keyword_editing": "편집"
-            }
+            },
+            "paneActionsPosition": {
+              "title": "창 작업 버튼 위치",
+              "description": "제목이 없는 창에서 분할, 닫기, 에이전트 버튼이 표시되는 위치입니다."
+            },
+            "actions": "작업",
+            "buttons": "버튼",
+            "position": "위치"
           },
           "windows": {
             "search": {

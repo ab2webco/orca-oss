@@ -13,7 +13,7 @@ describe('clearPaneTitleOverlayRects', () => {
   })
 
   it('clears a populated map to a new empty object', () => {
-    const prev = { 1: { left: 10, top: 20, width: 30 } }
+    const prev = { 1: { left: 10, top: 20, width: 30, height: 40 } }
     const next = clearPaneTitleOverlayRects(prev)
 
     expect(next).not.toBe(prev)
@@ -21,7 +21,7 @@ describe('clearPaneTitleOverlayRects', () => {
   })
 
   it('is stable across repeated calls once empty', () => {
-    const first = clearPaneTitleOverlayRects({ 1: { left: 1, top: 2, width: 3 } })
+    const first = clearPaneTitleOverlayRects({ 1: { left: 1, top: 2, width: 3, height: 40 } })
     expect(clearPaneTitleOverlayRects(first)).toBe(first)
   })
 })
@@ -30,8 +30,8 @@ describe('arePaneTitleOverlayRectsEqual', () => {
   it('treats sub-pixel drift as equal', () => {
     expect(
       arePaneTitleOverlayRectsEqual(
-        { 1: { left: 10, top: 20, width: 30 } },
-        { 1: { left: 10.4, top: 20.4, width: 30.4 } }
+        { 1: { left: 10, top: 20, width: 30, height: 40 } },
+        { 1: { left: 10.4, top: 20.4, width: 30.4, height: 40.4 } }
       )
     ).toBe(true)
   })
@@ -39,8 +39,19 @@ describe('arePaneTitleOverlayRectsEqual', () => {
   it('treats a half-pixel-or-greater move as different', () => {
     expect(
       arePaneTitleOverlayRectsEqual(
-        { 1: { left: 10, top: 20, width: 30 } },
-        { 1: { left: 10.5, top: 20, width: 30 } }
+        { 1: { left: 10, top: 20, width: 30, height: 40 } },
+        { 1: { left: 10.5, top: 20, width: 30, height: 40 } }
+      )
+    ).toBe(false)
+  })
+
+  // Why: bottom-edge pane actions anchor at top + height, so a pane that only
+  // grows or shrinks vertically must still move them.
+  it('treats a height-only change as different', () => {
+    expect(
+      arePaneTitleOverlayRectsEqual(
+        { 1: { left: 10, top: 20, width: 30, height: 40 } },
+        { 1: { left: 10, top: 20, width: 30, height: 80 } }
       )
     ).toBe(false)
   })
@@ -48,8 +59,11 @@ describe('arePaneTitleOverlayRectsEqual', () => {
   it('treats differing pane counts as different', () => {
     expect(
       arePaneTitleOverlayRectsEqual(
-        { 1: { left: 0, top: 0, width: 10 } },
-        { 1: { left: 0, top: 0, width: 10 }, 2: { left: 0, top: 0, width: 10 } }
+        { 1: { left: 0, top: 0, width: 10, height: 40 } },
+        {
+          1: { left: 0, top: 0, width: 10, height: 40 },
+          2: { left: 0, top: 0, width: 10, height: 40 }
+        }
       )
     ).toBe(false)
   })

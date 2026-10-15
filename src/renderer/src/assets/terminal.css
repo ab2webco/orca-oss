@@ -401,6 +401,20 @@
   pointer-events: auto;
 }
 
+/* Why: bottom strips are anchored at the pane's bottom edge; lift them by their own height. */
+.pane-title-bar[data-chromeless][data-actions-edge='bottom'] {
+  transform: translateY(-100%);
+}
+
+.pane-title-bar[data-chromeless][data-actions-align='left'] .pane-title-actions {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.pane-title-bar[data-chromeless][data-actions-align='center'] .pane-title-actions {
+  margin-inline: auto;
+}
+
 .pane-title-bar[data-chromeless] .pane-title-split-trigger,
 .pane-title-bar[data-chromeless] .pane-title-close {
   position: relative;

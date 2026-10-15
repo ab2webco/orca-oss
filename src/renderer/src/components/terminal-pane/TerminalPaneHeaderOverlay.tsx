@@ -10,18 +10,20 @@ import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import { WORKSPACE_FILE_PATH_MIME, WORKSPACE_FILE_PATHS_MIME } from '@/lib/workspace-file-drag'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import type { PtyTransport } from './pty-transport'
-import { handleInternalTerminalFileDrop } from './terminal-drop-handler'
+import { createPaneTitleFileDropHandlers } from './pane-title-file-drop'
 import { TerminalClaudeAccountSwitchButton } from './TerminalClaudeAccountSwitchButton'
 import { resolvePaneOwnerEnvironmentId } from './pane-owner-environment'
 import type { ClaudeManagedAccountSummary } from '../../../../shared/types'
+import type { TerminalPaneActionsPosition } from '../../../../shared/terminal-pane-actions-position'
+import { resolvePaneTitleBarPlacement } from './pane-title-bar-placement'
 
 export type PaneTitleOverlayRect = {
   left: number
   top: number
   width: number
+  height: number
 }
 
 type TerminalPaneHeaderOverlayProps = {
@@ -36,6 +38,8 @@ type TerminalPaneHeaderOverlayProps = {
   panes: readonly ManagedPane[]
   paneTitles: Readonly<Record<number, string>>
   paneTitleOverlayRects: Readonly<Record<number, PaneTitleOverlayRect>>
+  /** Where an untitled (chromeless) pane's floating actions sit; titled headers stay on top. */
+  actionsPosition: TerminalPaneActionsPosition
   renamingPaneId: number | null
   renameValue: string
   renameInputRef: RefObject<HTMLInputElement | null>
@@ -82,6 +86,7 @@ export default function TerminalPaneHeaderOverlay({
   panes,
   paneTitles,
   paneTitleOverlayRects,
+  actionsPosition,
   renamingPaneId,
   renameValue,
   renameInputRef,
@@ -135,6 +140,11 @@ export default function TerminalPaneHeaderOverlay({
         if (!showHeader || !overlayRect) {
           return null
         }
+        const placement = resolvePaneTitleBarPlacement({
+          rect: overlayRect,
+          isChromeless,
+          position: actionsPosition
+        })
 
         return (
           <div
@@ -144,49 +154,24 @@ export default function TerminalPaneHeaderOverlay({
             data-terminal-tab-id={tabId}
             data-pane-prevent-terminal-focus=""
             {...(isActivePane ? { 'data-active-pane': '' } : {})}
-            {...(isChromeless ? { 'data-chromeless': '' } : {})}
+            {...placement.attributes}
             {...(isEditing ? { 'data-editing': '' } : {})}
             onPointerDownCapture={
               title || isEditing ? () => onActivatePaneTitleInteraction(pane.id) : undefined
             }
-            onDragOver={(event) => {
-              onActivatePaneTitleInteraction(pane.id)
-              if (
-                event.dataTransfer.types.includes(WORKSPACE_FILE_PATH_MIME) ||
-                event.dataTransfer.types.includes(WORKSPACE_FILE_PATHS_MIME)
-              ) {
-                event.preventDefault()
-                event.dataTransfer.dropEffect = 'copy'
-              }
-            }}
-            onDrop={(event) => {
-              if (
-                !event.dataTransfer.types.includes(WORKSPACE_FILE_PATH_MIME) &&
-                !event.dataTransfer.types.includes(WORKSPACE_FILE_PATHS_MIME)
-              ) {
-                return
-              }
-              event.preventDefault()
-              event.stopPropagation()
-              onActivatePaneTitleInteraction(pane.id)
-              const manager = managerRef.current
-              if (!manager) {
-                return
-              }
-              void handleInternalTerminalFileDrop({
-                manager,
-                paneTransports: paneTransportsRef.current,
-                worktreeId,
-                tabId,
-                cwd,
-                dataTransfer: event.dataTransfer,
-                dropTarget: event.target
-              })
-            }}
+            {...createPaneTitleFileDropHandlers({
+              paneId: pane.id,
+              tabId,
+              worktreeId,
+              cwd,
+              managerRef,
+              paneTransportsRef,
+              onActivatePaneTitleInteraction
+            })}
             onContextMenuCapture={(event) => onPaneTitleContextMenu(event, pane.id)}
             style={{
               left: overlayRect.left,
-              top: overlayRect.top,
+              top: placement.top,
               width: overlayRect.width
             }}
           >
