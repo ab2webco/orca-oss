@@ -2,7 +2,8 @@ import type { AgentTrustPreset } from './agent-trust-presets'
 import { upsertProjectTrustLevelInContent } from './codex/config-toml-trust'
 import { getActiveMultiplexer } from './ipc/ssh'
 import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import type { IFilesystemProvider } from './providers/types'
+import type { FileReadResult, IFilesystemProvider } from './providers/types'
+import { isENOENT } from './ipc/filesystem-path-containment'
 import {
   isWindowsAbsolutePathLike,
   normalizeRuntimePathSeparators
@@ -67,12 +68,28 @@ async function readRemoteTextFile(
   fsProvider: IFilesystemProvider,
   filePath: string
 ): Promise<string> {
+  let result: FileReadResult
   try {
-    const result = await fsProvider.readFile(filePath)
-    return result.isBinary ? '' : result.content
-  } catch {
-    return ''
+    result = await fsProvider.readFile(filePath)
+  } catch (error) {
+    // Why: only definitive absence may seed empty; a failed read would otherwise overwrite the user's config.
+    if (isRemoteENOENT(error)) {
+      return ''
+    }
+    throw error
   }
+  if (result.isBinary) {
+    throw new Error(`Refusing to rewrite non-text remote config: ${filePath}`)
+  }
+  return result.content
+}
+
+function isRemoteENOENT(error: unknown): boolean {
+  // Why: the relay rebuilds remote errors without Node's .code; only the message survives.
+  return (
+    isENOENT(error) ||
+    (error instanceof Error && /\bENOENT: no such file or directory\b/.test(error.message))
+  )
 }
 
 async function markRemoteCodexProjectTrusted(

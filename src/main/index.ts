@@ -62,9 +62,10 @@ import {
   sweepRestoredSubagentsWithoutLiveAgent
 } from './agent-hooks/restored-subagent-liveness-sweep'
 import {
-  applyAgentStatusHooksEnabled,
   isAgentStatusHooksEnabled,
-  removeManagedAgentHooks
+  reconcileStartupManagedAgentHooks,
+  resolveStartupManagedHookAction,
+  shouldInstallStartupManagedAgentHook
 } from './agent-hooks/managed-agent-hook-controls'
 import { claudeHookService } from './claude/hook-service'
 import {
@@ -3089,31 +3090,34 @@ void app.whenReady().then(async () => {
     console.warn('[worktrees] Failed to sweep leftover worktree directories:', error)
   })
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
-  if (codexRuntimeHome.isHostSystemDefaultRealHomeSelected()) {
+  const startupManagedHookSettings = store.getSettings()
+  const shouldReconcileStartupManagedHooks =
+    shouldInstallManagedHooks(is.dev) &&
+    resolveStartupManagedHookAction(startupManagedHookSettings) === 'install'
+  if (
+    shouldReconcileStartupManagedHooks &&
+    shouldInstallStartupManagedAgentHook(startupManagedHookSettings, 'codex') &&
+    codexRuntimeHome.isHostSystemDefaultRealHomeSelected()
+  ) {
     // Why: establish capability before managed-hook reconciliation so an
     // incapable host re-arms and completes the legacy real-home sweep now.
     ensureRealHomeCodexHookState({
-      hooksEnabled: isAgentStatusHooksEnabled(store.getSettings()),
+      hooksEnabled: true,
       userDataPath: app.getPath('userData')
     })
   }
-  if (shouldInstallManagedHooks(is.dev)) {
-    // Why: check the persisted off switch before any auto-install so removed hooks don't silently reappear on launch.
-    if (isAgentStatusHooksEnabled(store.getSettings())) {
-      const managedHookStore = store
-      void applyAgentStatusHooksEnabled(true, managedHookStore.getSettings(), {
-        shouldHydrateShellPath: app.isPackaged,
-        onInstallError: recordManagedHookInstallFailure,
-        shouldContinue: (agent) => {
-          const settings = managedHookStore.getSettings()
-          return isAgentStatusHooksEnabled(settings) && !settings.disabledTuiAgents.includes(agent)
-        }
-      }).catch((error) => {
-        console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
-      })
-    } else {
-      removeManagedAgentHooks()
-    }
+  // Why skip rather than remove when the off switch is set: the hook files are user-global, so a
+  // startup removal deletes the hooks every other Orca instance depends on (upstream #16980).
+  if (shouldReconcileStartupManagedHooks) {
+    const managedHookStore = store
+    void reconcileStartupManagedAgentHooks(managedHookStore.getSettings(), {
+      shouldHydrateShellPath: app.isPackaged,
+      onInstallError: recordManagedHookInstallFailure,
+      shouldContinue: (agent) =>
+        shouldInstallStartupManagedAgentHook(managedHookStore.getSettings(), agent)
+    }).catch((error) => {
+      console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
+    })
   }
   app.on('child-process-gone', (_event, details) => {
     recordProcessGoneCrash('child', details.type, details.reason, details.exitCode ?? null, {
