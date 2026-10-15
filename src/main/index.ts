@@ -2717,6 +2717,7 @@ void app.whenReady().then(async () => {
     onTerminalAgentStatus: (event) => {
       agentHookServer.ingestTerminalStatus(event)
     },
+    subscribeAgentStatusEvents: (listener) => agentHookServer.subscribeEnrichedStatus(listener),
     // Why: serve can be promoted in place, so wire the listener from startup; runtime enables desktop-only scanners only for a ready renderer.
     onTerminalSideEffects: (batch: TerminalSideEffectBatch) => {
       if (mainWindow && !mainWindow.isDestroyed()) {

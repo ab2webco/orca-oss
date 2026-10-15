@@ -14,7 +14,8 @@ import {
 } from './runtime-metadata-ownership-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
 import type { RpcRequest, RpcResponse } from './rpc/core'
-import { errorResponse } from './rpc/errors'
+import { errorResponse, successResponse } from './rpc/errors'
+import { createLocalStreamFrameWriter } from './rpc/local-stream-frame-writer'
 import { fingerprintAuthenticatedPairingCredential } from './rpc/orchestration-mutation-executor'
 import type { RpcMessageContext, RpcTransport } from './rpc/transport'
 import { UnixSocketTransport } from './rpc/unix-socket-transport'
@@ -159,6 +160,10 @@ const KEEPALIVE_INTERVAL_MS = 10_000
 
 // Why: cap long-polls at half the 32-slot connection budget so they can't starve short RPCs; overflow → runtime_busy. See §7 risk #2.
 const LONG_POLL_CAP = 16
+// Why: only these streams run on the local socket; the rest assume a paired WebSocket's lifecycle.
+const LOCAL_STREAMING_METHODS: ReadonlySet<string> = new Set(['events.subscribe'])
+// Why: each stream holds one of the socket's 32 connections for as long as it runs.
+const MAX_LOCAL_STREAMS = 8
 
 // Why: orchestration.ask blocks on a human/agent reply for minutes, an order of
 // magnitude longer than terminal.wait or check --wait, so a fleet of asking
@@ -581,6 +586,7 @@ export class OrcaRuntimeRpcServer {
   >()
   // Why: separate from server.maxConnections — count only long-running dispatches, not short RPCs. See §3.1 + §7 risk #2.
   private activeLongPolls = 0
+  private activeLocalStreams = 0
   // Why: subset of activeLongPolls held by orchestration.ask, fenced by askLongPollCap.
   private activeAskLongPolls = 0
 
@@ -1606,6 +1612,10 @@ export class OrcaRuntimeRpcServer {
     }
     const request = parsed.request
 
+    if (context && LOCAL_STREAMING_METHODS.has(request.method)) {
+      return this.handleLocalStream(request, context)
+    }
+
     // Why: long-poll admission fence; short RPCs bypass the counter. See §7 risk #2.
     const longPoll = longPollClassOf(request)
     const rejection = this.admitLongPoll(longPoll)
@@ -1624,6 +1634,48 @@ export class OrcaRuntimeRpcServer {
     } finally {
       this.releaseLongPoll(longPoll)
     }
+  }
+
+  // Why: streams frames on the request's own socket until the client leaves; the returned
+  // response is the final frame (an error, or `ended` once the subscription closes).
+  private async handleLocalStream(
+    request: RpcRequest,
+    context: RpcMessageContext
+  ): Promise<RpcResponse> {
+    if (this.activeLocalStreams >= MAX_LOCAL_STREAMS) {
+      return this.buildError(
+        request.id,
+        'runtime_busy',
+        'event stream capacity reached; close another `orca events` first'
+      )
+    }
+    this.activeLocalStreams += 1
+    context.startKeepalive()
+    const meta = { runtimeId: this.runtime.getRuntimeId() }
+    const writeFrame = createLocalStreamFrameWriter(context.sendFrame, (count) =>
+      JSON.stringify({
+        ...successResponse(request.id, meta, { type: 'dropped', count }),
+        streaming: true
+      })
+    )
+    let final: RpcResponse | null = null
+    try {
+      await this.dispatcher.dispatchStreaming(
+        request,
+        (response) => {
+          const frame = JSON.parse(response) as RpcResponse
+          if (frame.ok && frame.streaming === true) {
+            writeFrame(response)
+          } else {
+            final = frame
+          }
+        },
+        { signal: context.signal }
+      )
+    } finally {
+      this.activeLocalStreams -= 1
+    }
+    return final ?? successResponse(request.id, meta, { type: 'ended' })
   }
 
   // Why: one fence for both transports — the total cap protects short RPCs, the ask

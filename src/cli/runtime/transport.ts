@@ -22,6 +22,11 @@ export function classifyRuntimeConnectionError(error: unknown): RuntimeClientErr
   )
 }
 
+// Why: the envelope schema strips unknown keys, so read the marker off the raw frame.
+function isStreamingFrame(raw: unknown): boolean {
+  return typeof raw === 'object' && raw !== null && 'streaming' in raw && raw.streaming === true
+}
+
 function getErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== 'object' || !('code' in error)) {
     return undefined
@@ -34,7 +39,9 @@ export async function sendRequest<TResult>(
   method: string,
   params: unknown,
   timeoutMs: number,
-  envelope?: RuntimeOrchestrationEnvelope
+  envelope?: RuntimeOrchestrationEnvelope,
+  // Why: a streaming method (events.subscribe) sends many `streaming: true` frames before its final one.
+  stream?: { onStreamFrame: (result: unknown) => void }
 ): Promise<RuntimeRpcResponse<TResult>> {
   if (!isSafeTimerDelayMs(timeoutMs)) {
     throw new RuntimeClientError(
@@ -195,6 +202,12 @@ export async function sendRequest<TResult>(
             )
           })
           return
+        }
+        if (stream && response.ok && isStreamingFrame(raw)) {
+          timeout.refresh()
+          stream.onStreamFrame(response.result)
+          newlineIndex = buffer.indexOf('\n')
+          continue
         }
         finish({ ok: true, response })
         return

@@ -624,16 +624,17 @@ Bounded projections, validated before they reach any plugin
 
 - `worktree.created` → `{ worktreeId, path, branch }`
 - `worktree.removed` → `{ worktreeId, path }`
-- `agent.status.changed` → `{ worktreeId | null, paneKey, state, receivedAt, agentType?, sessionBoundary? }`
+- `agent.status.changed` → `{ worktreeId | null, paneKey, state, receivedAt, agentType?, sessionBoundary?, interrupted? }`
 - `notification.dispatched` → `{ source, worktreeId | null, title, body, at }`
 
-Both `agent.status.changed` extras are optional and absent rather than empty
+The `agent.status.changed` extras are optional and absent rather than empty
 ([`plugin-agent-status-event.ts`](../../src/main/plugins/plugin-agent-status-event.ts)).
 `agentType` names the agent (`claude`, `codex`, …) and is omitted when the hook
 did not say. A longer value is truncated to 40 characters by the hook pipeline,
 as everywhere else in Orca. `sessionBoundary: true` appears only on a
 `done` that marks a session starting, resuming or clearing into idle, not a
-finished turn; a plugin that notifies on completions should skip it. Prompts,
+finished turn; a plugin that notifies on completions should skip it.
+`interrupted: true` appears only on a `done` the user stopped mid-turn. Prompts,
 tool calls and assistant output are never part of the payload.
 
 `notification.dispatched` lets a plugin be one more delivery channel for the

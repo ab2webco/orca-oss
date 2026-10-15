@@ -31,6 +31,7 @@ import { SSH_METHODS } from './ssh'
 import { SPEECH_METHODS } from './speech'
 import { CLIENT_UI_METHODS } from './client-ui'
 import { CLIENT_EVENT_METHODS } from './client-events'
+import { EVENT_METHODS } from './events'
 import { WORKSPACE_PORT_METHODS } from './workspace-ports'
 import { PLUGIN_METHODS } from './plugins'
 import { SKILL_METHODS } from './skills'
@@ -86,6 +87,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...CLIPBOARD_METHODS,
   ...HOST_CAPABILITY_METHODS,
   ...CLIENT_EVENT_METHODS,
+  ...EVENT_METHODS,
   ...CLIENT_UI_METHODS,
   ...EMULATOR_METHODS,
   ...PAIRING_METHODS,

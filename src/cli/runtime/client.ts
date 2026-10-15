@@ -132,6 +132,17 @@ export class RuntimeClient {
     return response
   }
 
+  /** Runs a local streaming RPC until the runtime ends it; keepalives hold the 60 s idle timer open. */
+  async stream(method: string, params: unknown, onFrame: (result: unknown) => void): Promise<void> {
+    const metadata = readMetadata(this.userDataPath)
+    const response = await sendRequest(metadata, method, params, this.requestTimeoutMs, undefined, {
+      onStreamFrame: onFrame
+    })
+    if (response.ok === false) {
+      throw new RuntimeRpcFailureError(response)
+    }
+  }
+
   // Why: centralises the per-method timeout policy. Long-poll inner waiter
   // budgets live in `params.timeoutMs`; widen the client-side socket timeout
   // to `timeoutMs + grace` so it doesn't fire before the server has a chance

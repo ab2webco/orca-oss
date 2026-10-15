@@ -208,6 +208,27 @@ Terminal rules:
 - For long output, use cursor reads. After a limited tail preview, page from `oldestCursor`; after a cursor read, continue with `nextCursor` while `limited` is true and `nextCursor !== latestCursor`.
 - `--direction horizontal` splits left/right. `--direction vertical` splits top/bottom.
 
+## Events
+
+`orca events` streams what happens in Orca Lab as it happens, so a script or agent can react instead of polling `terminal list` / `terminal state` in a loop. It runs until interrupted.
+
+```text
+ORCA events --json
+ORCA events --event agent.status.changed --json
+ORCA events --event agent.*,terminal.closed --worktree active --json
+ORCA events --terminal <handle> --json
+```
+
+Events: `agent.status.changed`, `terminal.created`, `terminal.closed`, `terminal.title.changed`, `worktree.created`, `worktree.removed`, `notification.dispatched`.
+
+- Each `--json` line is either an event `{ name, at, worktreeId, terminal, payload }` or a control line: `{"ready":true}` once the subscription is live, `{"dropped":n}` when this reader fell behind and lost `n` events.
+- Act only after `{"ready":true}`; anything that happens before it is not reported.
+- `terminal` is the handle `terminal read|send|switch` accept; a `terminal.closed` event keeps the handle the pane had.
+- `--event` takes exact names or a family (`agent.*`), repeated or comma-separated. An unknown name is rejected before connecting.
+- `agent.status.changed` `payload.state` is `working`, `blocked`, `waiting` or `done`. A `done` with `sessionBoundary: true` is a session start, resume or clear, not a finished turn; `interrupted: true` marks a turn the user stopped. A finished turn is `done` with neither.
+- Payloads never include prompts, tool input or terminal output; read the terminal for those.
+- Local app only for now: with a paired remote host it fails with a clear message. An older Orca Lab answers with an update hint.
+
 ## Automations
 
 An automation is a scheduled Orca Lab prompt run by a chosen provider against either a repo-created worktree or an existing workspace.

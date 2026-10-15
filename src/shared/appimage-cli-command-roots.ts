@@ -35,6 +35,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   'drag',
   'emulator',
   'environment',
+  'events',
   'eval',
   'exec',
   'file',

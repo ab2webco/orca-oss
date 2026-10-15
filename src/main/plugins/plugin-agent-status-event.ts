@@ -6,7 +6,7 @@ export type AgentStatusEventSource = {
   worktreeId?: string
   paneKey: string
   receivedAt: number
-  payload: Pick<AgentStatusPayload, 'state' | 'agentType' | 'sessionBoundary'>
+  payload: Pick<AgentStatusPayload, 'state' | 'agentType' | 'sessionBoundary' | 'interrupted'>
 }
 
 function projectAgentType(agentType: string | undefined): string | undefined {
@@ -34,6 +34,9 @@ export function projectAgentStatusChangedEvent(
     ...(agentType !== undefined ? { agentType } : {}),
     ...(state === 'done' && source.payload.sessionBoundary === true
       ? { sessionBoundary: true as const }
+      : {}),
+    ...(state === 'done' && source.payload.interrupted === true
+      ? { interrupted: true as const }
       : {})
   }
 }
