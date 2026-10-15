@@ -76,6 +76,7 @@ describe('parsePluginHookEntries', () => {
       {
         id: 'engram:SessionStart:startup|clear:session-start',
         pluginName: 'engram',
+        installPath: root,
         event: 'SessionStart',
         matcher: 'startup|clear',
         command: '/plugins/engram/0.1.0/scripts/session-start.sh',
@@ -84,6 +85,7 @@ describe('parsePluginHookEntries', () => {
       {
         id: 'engram:Stop::session-stop',
         pluginName: 'engram',
+        installPath: root,
         event: 'Stop',
         command: '/plugins/engram/0.1.0/scripts/session-stop.sh',
         timeout: 5,

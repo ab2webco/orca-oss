@@ -22,6 +22,8 @@ export type GlobalConfigMcpEntry = {
 export type PluginHookEntry = {
   id: string
   pluginName: string
+  /** Plugin install dir the command was expanded from; lets a resync drop other versions' hooks. */
+  installPath?: string
   event: string
   matcher?: string
   command: string
@@ -168,6 +170,7 @@ export function parsePluginHookEntries(
         entries.push({
           id: `${pluginName}:${event}:${matcher ?? ''}:${scriptStem(command)}`,
           pluginName,
+          installPath,
           event,
           ...(matcher !== undefined ? { matcher } : {}),
           command,
