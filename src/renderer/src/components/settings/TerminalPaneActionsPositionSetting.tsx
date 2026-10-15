@@ -36,10 +36,12 @@ export function TerminalPaneActionsPositionSetting({
       )}
       keywords={['pane', 'actions', 'buttons', 'position', 'split', 'close']}
     >
+      {/* Why: two segmented controls outgrow a narrow settings column; stack them and let the row wrap under the label. */}
       <SettingsRow
         label={title}
+        className="flex-wrap"
         control={
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-col items-end gap-2">
             <SettingsSegmentedControl<TerminalPaneActionsEdge>
               ariaLabel={translate(
                 'auto.components.settings.TerminalAppearanceSection.paneActionsPosition.edge',
