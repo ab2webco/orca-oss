@@ -4,6 +4,7 @@ import { NumberField, SettingsSubsectionHeader } from './SettingsFormControls'
 import { SearchableSetting } from './SearchableSetting'
 import { clampNumber, resolvePaneStyleOptions } from '@/lib/terminal-theme'
 import { translate } from '@/i18n/i18n'
+import { TerminalPaneActionsPositionSetting } from './TerminalPaneActionsPositionSetting'
 
 type TerminalPaneAppearanceSectionProps = {
   settings: GlobalSettings
@@ -90,6 +91,7 @@ export function TerminalPaneAppearanceSection({
             }
           />
         </SearchableSetting>
+        <TerminalPaneActionsPositionSetting settings={settings} updateSettings={updateSettings} />
       </div>
     </section>
   )

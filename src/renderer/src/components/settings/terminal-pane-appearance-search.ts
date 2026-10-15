@@ -30,6 +30,22 @@ export const getTerminalPaneAppearanceSearchEntries = createLocalizedCatalog(() 
       ...translateSearchKeyword('auto.components.settings.terminal.search.781f49d942', 'divider'),
       ...translateSearchKeyword('auto.components.settings.terminal.search.f637a7dee9', 'thickness')
     ]
+  },
+  {
+    title: translate(
+      'auto.components.settings.terminal.search.paneActionsPosition.title',
+      'Pane Actions Position'
+    ),
+    description: translate(
+      'auto.components.settings.terminal.search.paneActionsPosition.description',
+      'Where the split, close and agent buttons float on a pane without a title.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.terminal.search.846a7a1204', 'pane'),
+      ...translateSearchKeyword('auto.components.settings.terminal.search.actions', 'actions'),
+      ...translateSearchKeyword('auto.components.settings.terminal.search.buttons', 'buttons'),
+      ...translateSearchKeyword('auto.components.settings.terminal.search.position', 'position')
+    ]
   }
 ])
 

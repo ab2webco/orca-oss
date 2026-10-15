@@ -7521,7 +7521,18 @@
           "e90afcc44f": "apagado",
           "16c471ee03": "activado",
           "typographyAdvanced": "Tipografía",
-          "dimUnfocusedPanes": "Atenuar paneles sin foco."
+          "dimUnfocusedPanes": "Atenuar paneles sin foco.",
+          "paneActionsPosition": {
+            "title": "Posición de las acciones del panel",
+            "description": "Dónde flotan los botones de dividir, cerrar y del agente en un panel sin título.",
+            "edge": "Borde de las acciones del panel",
+            "align": "Alineación de las acciones del panel",
+            "top": "Arriba",
+            "bottom": "Abajo",
+            "left": "Izquierda",
+            "center": "Centro",
+            "right": "Derecha"
+          }
         },
         "TerminalFontSizeSetting": {
           "9b5252c85a": "px",
@@ -9375,7 +9386,14 @@
               "title": "Modo del tema",
               "keyword_target": "destino",
               "keyword_editing": "edición"
-            }
+            },
+            "paneActionsPosition": {
+              "title": "Posición de las acciones del panel",
+              "description": "Dónde flotan los botones de dividir, cerrar y del agente en un panel sin título."
+            },
+            "actions": "acciones",
+            "buttons": "botones",
+            "position": "posición"
           },
           "windows": {
             "search": {
