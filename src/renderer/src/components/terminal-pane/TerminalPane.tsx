@@ -66,6 +66,7 @@ import { stripSshReconnectOwnedErrorLines, TerminalErrorToast } from './Terminal
 import { TerminalSessionStateSaveFailureDialog } from './TerminalSessionStateSaveFailureDialog'
 import TerminalContextMenu from './TerminalContextMenu'
 import TerminalPaneHeaderOverlay, { type PaneTitleOverlayRect } from './TerminalPaneHeaderOverlay'
+import { resolveTerminalPaneActionsPosition } from '../../../../shared/terminal-pane-actions-position'
 import {
   arePaneTitleOverlayRectsEqual,
   clearPaneTitleOverlayRects
@@ -774,6 +775,9 @@ function TerminalPane(
   const openSpacePage = useAppStore((store) => store.openSpacePage)
   const refreshWorkspaceSpace = useAppStore((store) => store.refreshWorkspaceSpace)
   const settings = useAppStore((store) => store.settings)
+  const paneActionsPosition = resolveTerminalPaneActionsPosition(
+    settings?.terminalPaneActionsPosition
+  )
   const updateSettings = useAppStore((store) => store.updateSettings)
   const requestLinkRoutingPreference = useLinkRoutingPreferenceDialog()
   const keybindings = useAppStore((store) => store.keybindings)
@@ -2533,7 +2537,8 @@ function TerminalPane(
       nextRects[pane.id] = {
         left: paneRect.left - containerRect.left,
         top: paneRect.top - containerRect.top,
-        width: paneRect.width
+        width: paneRect.width,
+        height: paneRect.height
       }
     }
     setPaneTitleOverlayRects((prev) =>
@@ -3493,6 +3498,7 @@ function TerminalPane(
         panes={managedPanes}
         paneTitles={paneTitles}
         paneTitleOverlayRects={paneTitleOverlayRects}
+        actionsPosition={paneActionsPosition}
         renamingPaneId={renamingPaneId}
         renameValue={renameValue}
         renameInputRef={renameInputRef}

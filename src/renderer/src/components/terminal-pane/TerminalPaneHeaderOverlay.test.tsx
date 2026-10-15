@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
 import type { PtyTransport } from './pty-transport'
 import TerminalPaneHeaderOverlay from './TerminalPaneHeaderOverlay'
+import type { TerminalPaneActionsPosition } from '../../../../shared/terminal-pane-actions-position'
 
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children?: ReactNode }) => children,
@@ -60,7 +61,8 @@ function renderOverlay({
   canSwitchClaudeAccount = false,
   onSwitchClaudeAccount = vi.fn(),
   renameValue = '',
-  renamingPaneId = null
+  renamingPaneId = null,
+  actionsPosition = 'top-right'
 }: {
   paneTitles: Record<number, string>
   paneCount?: number
@@ -75,6 +77,7 @@ function renderOverlay({
   onSwitchClaudeAccount?: ReturnType<typeof vi.fn>
   renameValue?: string
   renamingPaneId?: number | null
+  actionsPosition?: TerminalPaneActionsPosition
 }): {
   container: HTMLDivElement
   onClosePane: ReturnType<typeof vi.fn>
@@ -98,9 +101,10 @@ function renderOverlay({
         panes={panes}
         paneTitles={paneTitles}
         paneTitleOverlayRects={{
-          1: { left: 0, top: 0, width: 200 },
-          2: { left: 220, top: 0, width: 200 }
+          1: { left: 0, top: 0, width: 200, height: 300 },
+          2: { left: 220, top: 40, width: 200, height: 260 }
         }}
+        actionsPosition={actionsPosition}
         renamingPaneId={renamingPaneId}
         renameValue={renameValue}
         renameInputRef={createRef<HTMLInputElement>()}
@@ -159,6 +163,36 @@ afterEach(() => {
 })
 
 describe('TerminalPaneHeaderOverlay', () => {
+  it('pins untitled pane actions to the configured edge and alignment', () => {
+    const { container } = renderOverlay({ paneTitles: {}, actionsPosition: 'bottom-center' })
+    const bars = Array.from(container.querySelectorAll<HTMLElement>('.pane-title-bar'))
+    expect(bars).toHaveLength(2)
+    expect(bars.map((bar) => bar.dataset.actionsEdge)).toEqual(['bottom', 'bottom'])
+    expect(bars.map((bar) => bar.dataset.actionsAlign)).toEqual(['center', 'center'])
+    // Why: a bottom strip anchors at the pane's bottom edge; CSS lifts it by its own height.
+    expect(bars.map((bar) => bar.style.top)).toEqual(['300px', '300px'])
+  })
+
+  it('keeps top-edge untitled actions at the top of each pane', () => {
+    const { container } = renderOverlay({ paneTitles: {}, actionsPosition: 'top-left' })
+    const bars = Array.from(container.querySelectorAll<HTMLElement>('.pane-title-bar'))
+    expect(bars.map((bar) => bar.dataset.actionsEdge)).toEqual(['top', 'top'])
+    expect(bars.map((bar) => bar.dataset.actionsAlign)).toEqual(['left', 'left'])
+    expect(bars.map((bar) => bar.style.top)).toEqual(['0px', '40px'])
+  })
+
+  it('leaves a titled pane header at the top regardless of the actions position', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: 'Build' },
+      actionsPosition: 'bottom-left'
+    })
+    const titled = Array.from(container.querySelectorAll<HTMLElement>('.pane-title-bar')).find(
+      (bar) => bar.textContent?.includes('Build')
+    )
+    expect(titled?.dataset.actionsEdge).toBeUndefined()
+    expect(titled?.dataset.actionsAlign).toBeUndefined()
+    expect(titled?.style.top).toBe('0px')
+  })
   it('keeps the titled-pane close affordance as remove-title while headers are always on', () => {
     const { container, onClosePane, onRemoveTitle } = renderOverlay({
       paneTitles: { 1: 'server', 2: '' }
