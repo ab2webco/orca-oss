@@ -1,26 +1,38 @@
 import type { Platform } from './MobileHero'
 import { translate } from '@/i18n/i18n'
+import {
+  ORCA_MOBILE_ANDROID_APK_URL,
+  ORCA_MOBILE_IOS_APP_STORE_URL,
+  ORCA_MOBILE_IOS_TESTFLIGHT_URL
+} from '../../../../shared/orca-mobile-install-links'
 
-// iOS ships two App Store tracks: the public App Store build (slower, ~weekly)
-// and the TestFlight preview build (daily). Android only ships one APK track.
+// iOS has a TestFlight preview track and, once listed, an App Store stable track.
+// Android only ships one APK track.
 export type IosChannel = 'stable' | 'preview'
 
 export type InstallCopy = { ctaLabel: string; url: string }
 
+const IOS_TESTFLIGHT_COPY: InstallCopy = {
+  ctaLabel: 'Open TestFlight',
+  url: ORCA_MOBILE_IOS_TESTFLIGHT_URL
+}
+
+// Why: without an App Store listing the stable channel would install upstream's
+// app, so it falls back to TestFlight and the channel picker stays hidden.
 const IOS_CHANNEL_COPY: Record<IosChannel, InstallCopy> = {
-  stable: {
-    ctaLabel: 'Open App Store',
-    url: 'https://apps.apple.com/app/orca-ide/id6766130217'
-  },
-  preview: {
-    ctaLabel: 'Open TestFlight',
-    url: 'https://testflight.apple.com/join/YjeGMQBA'
-  }
+  stable: ORCA_MOBILE_IOS_APP_STORE_URL
+    ? { ctaLabel: 'Open App Store', url: ORCA_MOBILE_IOS_APP_STORE_URL }
+    : IOS_TESTFLIGHT_COPY,
+  preview: IOS_TESTFLIGHT_COPY
+}
+
+export function hasIosStableChannel(): boolean {
+  return ORCA_MOBILE_IOS_APP_STORE_URL !== null
 }
 
 const ANDROID_COPY: InstallCopy = {
   ctaLabel: 'Download APK',
-  url: 'https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.43/app-release.apk'
+  url: ORCA_MOBILE_ANDROID_APK_URL
 }
 
 export function getInstallCopy(platform: Platform, iosChannel: IosChannel): InstallCopy {

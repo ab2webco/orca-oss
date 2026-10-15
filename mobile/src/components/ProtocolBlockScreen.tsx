@@ -3,9 +3,9 @@ import { router } from 'expo-router'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { CompatVerdict } from '../transport/protocol-compat'
 import { ORCA_REPOSITORY_URL } from '../../../src/shared/orca-repository-url'
+import { ORCA_MOBILE_IOS_TESTFLIGHT_URL } from '../../../src/shared/orca-mobile-install-links'
 
 const RELEASES_URL = `${ORCA_REPOSITORY_URL}/releases`
-const IOS_APP_STORE_URL = 'itms-apps://apps.apple.com/app/orca-ide/id6766130217'
 
 type Props = {
   verdict: Extract<CompatVerdict, { kind: 'blocked' }>
@@ -13,10 +13,11 @@ type Props = {
 
 export function ProtocolBlockScreen({ verdict }: Props) {
   const isMobileTooOld = verdict.reason === 'mobile-too-old'
-  // Why: Android APKs ship through GitHub Releases until a Play Store listing exists.
+  // Why: Orca Lab Mobile ships through TestFlight on iOS and GitHub Releases on
+  // Android until it has its own store listings.
   const mobileUpdateTarget =
     Platform.OS === 'ios'
-      ? { label: 'Open App Store', url: IOS_APP_STORE_URL, storeName: 'the App Store' }
+      ? { label: 'Open TestFlight', url: ORCA_MOBILE_IOS_TESTFLIGHT_URL, storeName: 'TestFlight' }
       : { label: 'Open GitHub Releases', url: RELEASES_URL, storeName: 'GitHub Releases' }
   const primaryAction = isMobileTooOld
     ? { label: mobileUpdateTarget.label, url: mobileUpdateTarget.url }
