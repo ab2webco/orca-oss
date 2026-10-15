@@ -18,7 +18,7 @@ export { MANAGED_AGENT_HOOK_INSTALLERS } from './managed-agent-hook-registry'
 export { prepareManagedCodexHomeBeforeShellLaunch } from '../codex/managed-home-shell-preflight'
 
 type ManagedHookSettings = Partial<
-  Pick<GlobalSettings, 'agentCmdOverrides' | 'disabledTuiAgents'>
+  Pick<GlobalSettings, 'agentCmdOverrides' | 'disabledTuiAgents' | 'agentStatusHooksEnabled'>
 > | null
 
 type InstallOptions = {
@@ -36,6 +36,34 @@ export function isAgentStatusHooksEnabled(
   settings: Partial<Pick<GlobalSettings, 'agentStatusHooksEnabled'>> | null | undefined
 ): boolean {
   return settings?.agentStatusHooksEnabled !== false
+}
+
+export type StartupManagedHookAction = 'install' | 'skip'
+
+// Why never 'remove': the hook files are user-global (~/.claude/settings.json, ~/.cursor/hooks.json)
+// but this reads only THIS profile's settings; removal stays on the explicit Settings toggle.
+export function resolveStartupManagedHookAction(
+  settings: ManagedHookSettings
+): StartupManagedHookAction {
+  return isAgentStatusHooksEnabled(settings) ? 'install' : 'skip'
+}
+
+export function shouldInstallStartupManagedAgentHook(
+  settings: ManagedHookSettings,
+  agent: AgentHookTarget
+): boolean {
+  return (
+    resolveStartupManagedHookAction(settings) === 'install' &&
+    !normalizeDisabledTuiAgents(settings?.disabledTuiAgents).includes(agent)
+  )
+}
+
+export function reconcileStartupManagedAgentHooks(
+  settings: ManagedHookSettings,
+  options: InstallOptions = {}
+): Promise<AgentHookInstallStatus[]> {
+  // Why install-only: removing a disabled agent's hooks here would hit other instances' global files too.
+  return installManagedAgentHooks(settings, options)
 }
 
 function errorStatus(agent: AgentHookTarget, error: unknown): AgentHookInstallStatus {

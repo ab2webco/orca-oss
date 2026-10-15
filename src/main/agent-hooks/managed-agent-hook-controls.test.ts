@@ -37,7 +37,10 @@ vi.mock('./managed-agent-hook-registry', () => ({
 
 import {
   applyAgentStatusHooksEnabled,
-  installManagedAgentHooks
+  installManagedAgentHooks,
+  reconcileStartupManagedAgentHooks,
+  resolveStartupManagedHookAction,
+  shouldInstallStartupManagedAgentHook
 } from './managed-agent-hook-controls'
 
 function status(agent: 'claude' | 'codex', state: 'installed' | 'not_installed') {
@@ -225,6 +228,70 @@ describe('managed agent hook controls', () => {
     await applyAgentStatusHooksEnabled(false)
 
     expect(mocks.detect).not.toHaveBeenCalled()
+    expect(mocks.removeClaude).toHaveBeenCalledTimes(1)
+    expect(mocks.removeCodex).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('startup managed hook reconciliation (upstream #16980)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('skips instead of removing when this profile has the off switch set', () => {
+    // Why: the hook files are user-global, so a startup removal deletes every other Orca instance's hooks.
+    expect(resolveStartupManagedHookAction({ agentStatusHooksEnabled: false })).toBe('skip')
+  })
+
+  it('installs when hooks are enabled or the setting is unset', () => {
+    expect(resolveStartupManagedHookAction({ agentStatusHooksEnabled: true })).toBe('install')
+    expect(resolveStartupManagedHookAction({})).toBe('install')
+    expect(resolveStartupManagedHookAction(null)).toBe('install')
+  })
+
+  it('only allows startup installs for globally enabled and agent-enabled hooks', () => {
+    expect(shouldInstallStartupManagedAgentHook({ agentStatusHooksEnabled: false }, 'codex')).toBe(
+      false
+    )
+    expect(
+      shouldInstallStartupManagedAgentHook(
+        { agentStatusHooksEnabled: true, disabledTuiAgents: ['codex'] },
+        'codex'
+      )
+    ).toBe(false)
+    expect(
+      shouldInstallStartupManagedAgentHook(
+        { agentStatusHooksEnabled: true, disabledTuiAgents: ['claude'] },
+        'codex'
+      )
+    ).toBe(true)
+  })
+
+  it('does not remove disabled agents during startup reconciliation', async () => {
+    const settings = {
+      agentStatusHooksEnabled: true,
+      agentCmdOverrides: {},
+      disabledTuiAgents: ['claude' as const]
+    }
+    mocks.detect.mockResolvedValue({ codex: { state: 'found' } })
+    mocks.installCodex.mockReturnValue(status('codex', 'installed'))
+
+    await reconcileStartupManagedAgentHooks(settings, {
+      shouldContinue: (agent) => shouldInstallStartupManagedAgentHook(settings, agent)
+    })
+
+    expect(mocks.removeClaude).not.toHaveBeenCalled()
+    expect(mocks.installClaude).not.toHaveBeenCalled()
+    expect(mocks.installCodex).toHaveBeenCalledTimes(1)
+  })
+
+  it('still removes through the explicit Settings toggle', async () => {
+    // Anchors the assertions above: the removers are wired, so skipping is a real difference.
+    mocks.removeClaude.mockReturnValue(status('claude', 'not_installed'))
+    mocks.removeCodex.mockReturnValue(status('codex', 'not_installed'))
+
+    await applyAgentStatusHooksEnabled(false, { agentStatusHooksEnabled: false })
+
     expect(mocks.removeClaude).toHaveBeenCalledTimes(1)
     expect(mocks.removeCodex).toHaveBeenCalledTimes(1)
   })
