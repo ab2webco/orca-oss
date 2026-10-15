@@ -1,6 +1,6 @@
 import { resolve, dirname, basename } from 'node:path'
 import { realpathSync } from 'node:fs'
-import { realpath } from 'node:fs/promises'
+import { lstat, realpath } from 'node:fs/promises'
 import type { Store } from '../persistence'
 import { getAllowedRoots } from './filesystem-allowed-roots'
 import { isDescendantOrEqual, isENOENT, normalizeExistingPath } from './filesystem-path-containment'
@@ -129,6 +129,10 @@ async function resolveAuthorizedMissingPath(resolvedTarget: string, store: Store
       if (!isENOENT(error)) {
         throw error
       }
+      if (await isSymlink(existingAncestor)) {
+        // Why: realpath can't say where a dangling link leads, but a write follows it and creates its target.
+        throw new Error(PATH_ACCESS_DENIED_MESSAGE)
+      }
       const parent = dirname(existingAncestor)
       if (parent === existingAncestor) {
         throw error
@@ -137,6 +141,17 @@ async function resolveAuthorizedMissingPath(resolvedTarget: string, store: Store
       missingSegments.unshift(basename(existingAncestor))
       existingAncestor = parent
     }
+  }
+}
+
+async function isSymlink(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isSymbolicLink()
+  } catch (error) {
+    if (isENOENT(error)) {
+      return false
+    }
+    throw error
   }
 }
 
