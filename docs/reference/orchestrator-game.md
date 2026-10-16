@@ -258,6 +258,7 @@ orchestratorGame:
   actions: # at most 6; a later layer replaces the whole list
     - label: Test runs # at most 24 characters
       command: test-runs # optional: /test-runs; lowercase, digits and -, up to 24 characters
+      key: x # optional: its Panel hotkey, one letter or digit
       prompt: Have members run the Tambora test runs of my QA tickets and report pass/fail.
     - label: Runs
       mcp: { server: tambora, tool: list_test_runs, args: { project: CIN } }
@@ -270,8 +271,10 @@ orchestratorGame:
   A member gets none. `orchestratorGame.orchestrator.actions: false` turns them off; a project
   action whose command a lead button already uses keeps its button without the command.
 - **Where they show.** The band draws one chip row (`▸ Ola`, `▸ Estado`… in the session language;
-  the rest behind `+N`), the Panel an Actions row with hotkeys `e f h j k l`. Typing to the lead
-  keeps working as before.
+  the rest behind `+N`), the Panel an Actions row where each button is `key: label`. An action's
+  `key` is its own; the Panel's keys (`r p q`, `g t i o c w a`, `1`–`9`) and a key another action
+  took are dropped with a warning, and the button keeps working. An action with no key takes the
+  next free letter of `e f h j k l m n s u v x y z b d`. Typing to the lead keeps working as before.
 - **Slash commands.** The mod registers each command after a refresh and again when the list
   changes. A name Claude Code refuses (its own `/status`, say) is skipped and noted once; the
   button still works. Text after the command is appended to the prompt: `/wave CIN-1,CIN-2`. An

@@ -47,7 +47,7 @@ export const registerFleetPane = (on: On): void => {
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
-    // Digits follow tile order; r p q are the menu's, i o c w a g t the links', e f h j k l the actions'.
+    // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
         key={`view-${agent.paneKey}`}
@@ -67,7 +67,7 @@ export const registerFleetPane = (on: On): void => {
       </Button>
     )
     const menuRow = (
-      <Box flexDirection="row" gap={1} flexWrap="wrap" marginTop={1}>
+      <Box flexDirection="row" columnGap={1} flexWrap="wrap">
         {menu(
           'refresh',
           'r',
@@ -129,13 +129,7 @@ export const registerFleetPane = (on: On): void => {
             : void runAction($, one.action, v.isDemo).catch(() => undefined)
         }
       >
-        <Text backgroundColor={palette.panel} color={palette.parchment}>
-          {' '}
-          <Text color={palette.gold} bold>
-            {one.hotkey}
-          </Text>
-          {` ${one.label} `}
-        </Text>
+        <Text backgroundColor={palette.panel} color={palette.parchment}>{` ${one.label} `}</Text>
       </Button>
     )
     const links = paneLinksOf(state)
@@ -143,7 +137,7 @@ export const registerFleetPane = (on: On): void => {
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
-        <Box flexDirection="row" gap={1} flexWrap="wrap">
+        <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           <Text backgroundColor={palette.gold} color={palette.ink} bold>
             {` ⚑ ${text.fleet} `}
           </Text>
@@ -263,7 +257,7 @@ export const registerFleetPane = (on: On): void => {
         )}
         {projectRows}
         {links.length > 0 && (
-          <Box key="pane-links" flexDirection="row" gap={1} flexWrap="wrap">
+          <Box key="pane-links" flexDirection="row" columnGap={1} flexWrap="wrap">
             <Text dimColor>{text.openHeading}</Text>
             {links.map(linkButton)}
           </Box>

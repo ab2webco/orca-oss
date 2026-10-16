@@ -7,7 +7,7 @@ import type {
   GameProjectList,
   GameState
 } from '../types'
-import { ACTION_HOTKEYS } from './action-results'
+import { actionHotkeysOf } from './action-results'
 import { reviewKindOf } from './band-chips'
 import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
 import { gameStrings } from './game-strings'
@@ -106,8 +106,7 @@ export async function projectRowsOf(
       </Box>
     )
   }
-  const actionButton = (action: GameAction, index: number) => {
-    const hotkey = ACTION_HOTKEYS[index]
+  const actionButton = (action: GameAction, hotkey: string | undefined) => {
     return (
       <Button
         key={`action-${action.id}`}
@@ -116,13 +115,7 @@ export async function projectRowsOf(
         onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
       >
         <Text backgroundColor={palette.panel} color={palette.parchment}>
-          {' '}
-          {hotkey !== undefined && (
-            <Text color={palette.gold} bold>
-              {`${hotkey} `}
-            </Text>
-          )}
-          {`${actionLabelOf(action)} `}
+          {` ${actionLabelOf(action)} `}
           {'mcp' in action && <Text dimColor>{`${mcpCallTextOf(action.mcp)} `}</Text>}
         </Text>
       </Button>
@@ -152,6 +145,7 @@ export async function projectRowsOf(
   const reviews = state.project?.reviews ?? null
   const todo = state.project?.todo ?? null
   const actions = state.actions ?? []
+  const hotkeys = actionHotkeysOf(actions)
   return [
     ...(reviews === null
       ? []
@@ -164,9 +158,9 @@ export async function projectRowsOf(
     ...(actions.length === 0
       ? []
       : [
-          <Box key="project-actions" flexDirection="row" gap={1} flexWrap="wrap">
+          <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
             <Text dimColor>{text.actionsHeading}</Text>
-            {actions.map(actionButton)}
+            {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
           </Box>,
           ...actions.flatMap(resultRows)
         ])

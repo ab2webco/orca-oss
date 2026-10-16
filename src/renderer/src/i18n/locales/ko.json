@@ -10782,7 +10782,10 @@
           "noneHere": "이 기기에 작업이 없습니다.",
           "add": "작업 추가",
           "save": "작업 저장",
-          "inherit": "orca.yaml에서 상속"
+          "inherit": "orca.yaml에서 상속",
+          "key": "키",
+          "keyPlaceholder": "x",
+          "keyInvalid": "패널이 쓰지 않는 소문자나 숫자 하나를 작업마다 다르게 지정하세요 (r p q g t i o c w a, 1-9 제외)."
         }
       },
       "right": {

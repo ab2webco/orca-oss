@@ -103,8 +103,8 @@ export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProje
 export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
 
 /** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
-/** `command` names the slash command that runs it, as `/<command>`. */
-export type GameAction = { id: string; label: string; command?: string } & (
+/** `command` names the slash command that runs it, as `/<command>`; `key` its Panel hotkey. */
+export type GameAction = { id: string; label: string; command?: string; key?: string } & (
   | { prompt: string }
   | { mcp: GameMcpCall }
 )

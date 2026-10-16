@@ -62,6 +62,32 @@ describe('parseGameActions', () => {
     ])
   })
 
+  it('takes a Panel key per action, dropping one the Panel reserves or another action took', () => {
+    const parsed = parseGameActions([
+      { label: 'Runs', key: ' x ', prompt: 'a' },
+      { label: 'Digit', key: '0', prompt: 'b' },
+      { label: 'Refresh', key: 'r', prompt: 'c' },
+      { label: 'Tile', key: '3', prompt: 'd' },
+      { label: 'Twice', key: 'x', prompt: 'e' },
+      { label: 'Word', key: 'xy', prompt: 'f' }
+    ])
+    // Why kept: a bad key costs the action its key, never its button.
+    expect(parsed.value).toEqual([
+      { label: 'Runs', key: 'x', prompt: 'a' },
+      { label: 'Digit', key: '0', prompt: 'b' },
+      { label: 'Refresh', prompt: 'c' },
+      { label: 'Tile', prompt: 'd' },
+      { label: 'Twice', prompt: 'e' },
+      { label: 'Word', prompt: 'f' }
+    ])
+    expect(parsed.warnings).toEqual([
+      'orchestratorGame.actions[2].key r is taken by the Panel',
+      'orchestratorGame.actions[3].key 3 is taken by the Panel',
+      "orchestratorGame.actions[4].key x is already another action's",
+      'orchestratorGame.actions[5].key must be one lowercase letter or digit'
+    ])
+  })
+
   it('keeps the first six and refuses a non-list', () => {
     const many = Array.from({ length: 8 }, (_, at) => ({ label: `A${at}`, prompt: 'x' }))
     expect(parseGameActions(many).value).toHaveLength(6)

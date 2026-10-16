@@ -11410,7 +11410,10 @@
           "noneHere": "No actions on this machine.",
           "add": "Add action",
           "save": "Save actions",
-          "inherit": "Inherit from orca.yaml"
+          "inherit": "Inherit from orca.yaml",
+          "keyInvalid": "Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.",
+          "key": "Key",
+          "keyPlaceholder": "x"
         }
       },
       "right": {

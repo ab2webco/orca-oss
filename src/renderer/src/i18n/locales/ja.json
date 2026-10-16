@@ -10771,7 +10771,10 @@
           "noneHere": "このマシンにはアクションがありません。",
           "add": "アクションを追加",
           "save": "アクションを保存",
-          "inherit": "orca.yaml から継承"
+          "inherit": "orca.yaml から継承",
+          "key": "キー",
+          "keyPlaceholder": "x",
+          "keyInvalid": "パネルが使っていない英小文字か数字を 1 つ、アクションごとに別々に指定してください (r p q g t i o c w a、1-9 は使用不可)。"
         }
       },
       "right": {

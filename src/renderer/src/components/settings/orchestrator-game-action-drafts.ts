@@ -8,6 +8,7 @@ import { GAME_LEAD_ACTIONS } from '../../../../shared/orchestrator-game-lead-act
 export type ActionDraft = {
   label: string
   command: string
+  key: string
   kind: 'prompt' | 'mcp'
   prompt: string
   server: string
@@ -15,11 +16,19 @@ export type ActionDraft = {
   args: string
 }
 
-export type ActionDraftProblem = 'label' | 'command' | 'commandTaken' | 'prompt' | 'mcp' | 'args'
+export type ActionDraftProblem =
+  | 'label'
+  | 'command'
+  | 'commandTaken'
+  | 'key'
+  | 'prompt'
+  | 'mcp'
+  | 'args'
 
 export const EMPTY_ACTION_DRAFT: ActionDraft = {
   label: '',
   command: '',
+  key: '',
   kind: 'prompt',
   prompt: '',
   server: '',
@@ -32,7 +41,12 @@ const LEAD_COMMANDS: ReadonlySet<string> = new Set(
 )
 
 export function actionDraftOf(action: OrchestratorGameAction): ActionDraft {
-  const head = { ...EMPTY_ACTION_DRAFT, label: action.label, command: action.command ?? '' }
+  const head = {
+    ...EMPTY_ACTION_DRAFT,
+    label: action.label,
+    command: action.command ?? '',
+    key: action.key ?? ''
+  }
   if ('prompt' in action) {
     return { ...head, prompt: action.prompt }
   }
@@ -53,6 +67,9 @@ const problemOfWarning = (warning: string): ActionDraftProblem => {
   if (warning.includes('.command ')) {
     return 'command'
   }
+  if (warning.includes('.key ')) {
+    return 'key'
+  }
   if (warning.includes('.mcp.args ')) {
     return 'args'
   }
@@ -61,7 +78,12 @@ const problemOfWarning = (warning: string): ActionDraftProblem => {
 
 function rawOf(draft: ActionDraft): Record<string, unknown> | 'args' {
   const command = draft.command.trim()
-  const head = { label: draft.label, ...(command === '' ? {} : { command }) }
+  const key = draft.key.trim()
+  const head = {
+    label: draft.label,
+    ...(command === '' ? {} : { command }),
+    ...(key === '' ? {} : { key })
+  }
   if (draft.kind === 'prompt') {
     return { ...head, prompt: draft.prompt }
   }
@@ -87,6 +109,7 @@ export function actionsOfDrafts(drafts: readonly ActionDraft[]): {
 } {
   const actions: OrchestratorGameAction[] = []
   const seen = new Set<string>()
+  const keys = new Set<string>()
   const problems = drafts.map((draft): ActionDraftProblem | null => {
     const raw = rawOf(draft)
     if (raw === 'args') {
@@ -94,8 +117,15 @@ export function actionsOfDrafts(drafts: readonly ActionDraft[]): {
     }
     const parsed = parseGameActions([raw])
     const action = parsed.value?.[0]
-    if (action === undefined) {
+    // Why warnings too: a refused key keeps the action but must not save silently without it.
+    if (action === undefined || parsed.warnings.length > 0) {
       return problemOfWarning(parsed.warnings[0] ?? '')
+    }
+    if (action.key !== undefined) {
+      if (keys.has(action.key)) {
+        return 'key'
+      }
+      keys.add(action.key)
     }
     if (action.command !== undefined) {
       if (LEAD_COMMANDS.has(action.command) || seen.has(action.command)) {

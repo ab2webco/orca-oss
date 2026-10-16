@@ -80,7 +80,7 @@ export function parseGameList<T>(
   raw: unknown,
   key: string,
   max: number,
-  parseOne: (entry: unknown, at: string) => T | string
+  parseOne: (entry: unknown, at: string, index: number) => T | string
 ): Parsed<T> {
   if (raw === undefined || raw === null) {
     return { value: undefined, warnings: [] }
@@ -91,7 +91,7 @@ export function parseGameList<T>(
   const value: T[] = []
   const warnings: string[] = []
   raw.slice(0, max).forEach((entry, index) => {
-    const parsed = parseOne(entry, `orchestratorGame.${key}[${index}]`)
+    const parsed = parseOne(entry, `orchestratorGame.${key}[${index}]`, index)
     if (typeof parsed === 'string') {
       warnings.push(parsed)
     } else {

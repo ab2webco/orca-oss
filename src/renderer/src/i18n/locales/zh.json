@@ -10791,7 +10791,10 @@
           "noneHere": "本机没有操作。",
           "add": "添加操作",
           "save": "保存操作",
-          "inherit": "从 orca.yaml 继承"
+          "inherit": "从 orca.yaml 继承",
+          "key": "按键",
+          "keyPlaceholder": "x",
+          "keyInvalid": "请为每个操作使用一个面板未占用的小写字母或数字 (不可用 r p q g t i o c w a、1-9)。"
         }
       },
       "right": {

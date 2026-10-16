@@ -5,7 +5,7 @@ import {
 } from './orchestrator-game-integrations'
 
 /** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
-export type OrchestratorGameAction = { label: string; command?: string } & (
+export type OrchestratorGameAction = { label: string; command?: string; key?: string } & (
   | { prompt: string }
   | { mcp: GameMcpCall }
 )
@@ -22,6 +22,12 @@ const GAME_MCP_ARGS_MAX = 4096
 const MCP_SERVER = /^[A-Za-z0-9 _.-]{1,64}$/
 const MCP_TOOL = /^[A-Za-z0-9_.-]{1,64}$/
 const PLACEHOLDER = /\{([^{}]*)\}/g
+/** Panel keys the menu (r p q), links (g t i o c w a) and tiles (1-9) own; mirrored in the mod. */
+export const GAME_PANEL_RESERVED_KEYS: ReadonlySet<string> = new Set([
+  ...'rpqgtiocwa',
+  ...'123456789'
+])
+const ACTION_KEY = /^[a-z0-9]$/
 /** A slash command the mod registers for the action, as `/<command>`. */
 export const GAME_ACTION_COMMAND = /^[a-z][a-z0-9-]{0,23}$/
 
@@ -112,11 +118,48 @@ function parseAction(entry: unknown, at: string): OrchestratorGameAction | strin
     : `${at}.prompt uses an unknown placeholder {${unknown}}`
 }
 
+// Why up front: a duplicate is only seen across the list, and a bad key costs the key, not the button.
+function actionKeysOf(raw: unknown): { keys: (string | undefined)[]; warnings: string[] } {
+  const keys: (string | undefined)[] = []
+  const warnings: string[] = []
+  const taken = new Set<string>()
+  const list = Array.isArray(raw) ? raw.slice(0, GAME_ACTIONS_MAX) : []
+  list.forEach((entry: unknown, index) => {
+    const said = isRecord(entry) ? entry.key : undefined
+    if (said === undefined) {
+      keys.push(undefined)
+      return
+    }
+    const at = `orchestratorGame.actions[${index}].key`
+    const key = typeof said === 'string' ? said.trim() : ''
+    const refusal = !ACTION_KEY.test(key)
+      ? `${at} must be one lowercase letter or digit`
+      : GAME_PANEL_RESERVED_KEYS.has(key)
+        ? `${at} ${key} is taken by the Panel`
+        : taken.has(key)
+          ? `${at} ${key} is already another action's`
+          : null
+    if (refusal !== null) {
+      warnings.push(refusal)
+    } else {
+      taken.add(key)
+    }
+    keys.push(refusal === null ? key : undefined)
+  })
+  return { keys, warnings }
+}
+
 export function parseGameActions(raw: unknown): {
   value: OrchestratorGameAction[] | undefined
   warnings: string[]
 } {
-  return parseGameList(raw, 'actions', GAME_ACTIONS_MAX, parseAction)
+  const { keys, warnings } = actionKeysOf(raw)
+  const parsed = parseGameList(raw, 'actions', GAME_ACTIONS_MAX, (entry, at, index) => {
+    const action = parseAction(entry, at)
+    const key = keys[index]
+    return typeof action === 'string' || key === undefined ? action : { ...action, key }
+  })
+  return { value: parsed.value, warnings: [...parsed.warnings, ...warnings] }
 }
 
 /** The project's actions for this worktree; a prompt whose placeholder has no value is left out. */

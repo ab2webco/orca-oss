@@ -37,6 +37,10 @@ const problemText = (problem: ActionDraftProblem): string =>
       'auto.components.settings.OrchestratorGameActionsSetting.commandTaken',
       'A lead button or another action already uses this command.'
     ),
+    key: translate(
+      'auto.components.settings.OrchestratorGameActionsSetting.keyInvalid',
+      'Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.'
+    ),
     prompt: translate(
       'auto.components.settings.OrchestratorGameActionsSetting.promptInvalid',
       'Write a prompt of 1 to 2000 characters, with only the placeholders orca.yaml allows.'
@@ -55,6 +59,7 @@ const PROBLEM_FIELDS = new Map<ActionDraftProblem, readonly (keyof ActionDraft)[
   ['label', ['label']],
   ['command', ['command']],
   ['commandTaken', ['command']],
+  ['key', ['key']],
   ['prompt', ['prompt']],
   ['mcp', ['server', 'tool']],
   ['args', ['args']]
@@ -110,6 +115,17 @@ function ActionRow({
             ),
             true
           )}
+          <div className="w-12 shrink-0">
+            {field(
+              'key',
+              translate('auto.components.settings.OrchestratorGameActionsSetting.key', 'Key'),
+              translate(
+                'auto.components.settings.OrchestratorGameActionsSetting.keyPlaceholder',
+                'x'
+              ),
+              true
+            )}
+          </div>
         </div>
         <div className="flex items-center justify-between gap-2">
           <SettingsSegmentedControl

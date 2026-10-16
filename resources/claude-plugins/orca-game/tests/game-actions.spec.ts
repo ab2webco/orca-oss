@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { GameProjectItem, GameProjectList, GameState, GameStatusGroup } from '../types'
 import { stateChipsOf, type BandChip } from '../hooks/band-chips'
-import { ACTION_HOTKEYS, actionErrorOf, actionResultOf } from '../hooks/action-results'
+import {
+  ACTION_HOTKEYS,
+  PANEL_RESERVED_KEYS,
+  actionErrorOf,
+  actionHotkeysOf,
+  actionResultOf
+} from '../hooks/action-results'
 import { gameStateOf } from '../hooks/game-state'
 import { todoDrawnCountOf, todoSectionsOf } from '../hooks/todo-sections'
 import { setGameLocale } from '../hooks/game-strings'
@@ -285,7 +291,8 @@ describe('an MCP action result', () => {
   })
 
   it('uses hotkeys no other pane button takes', () => {
-    expect(ACTION_HOTKEYS).toEqual(['e', 'f', 'h', 'j', 'k', 'l'])
+    expect(ACTION_HOTKEYS).toEqual([...'efhjklmnsuvxyzbd'])
+    expect(ACTION_HOTKEYS.some((one) => PANEL_RESERVED_KEYS.has(one))).toBe(false)
   })
 })
 
@@ -330,5 +337,47 @@ describe("the lead's buttons", () => {
   it('appends what the person typed after the command to the prompt', () => {
     expect(commandPromptOf('Run a wave', '  CIN-1,CIN-2 ')).toBe('Run a wave\n\nCIN-1,CIN-2')
     expect(commandPromptOf('Run a wave', '   ')).toBe('Run a wave')
+  })
+})
+
+describe('Panel keys for actions', () => {
+  const action = (id: string, key?: string) => ({
+    id,
+    label: id,
+    prompt: 'x',
+    ...(key === undefined ? {} : { key })
+  })
+
+  it('keeps the key Orca sends and drops one the Panel owns', () => {
+    const state = gameStateOf({
+      ...STATE,
+      actions: [action('a0', 'x'), action('a1', 'r'), action('a2', 'XY')]
+    })
+    expect(state?.actions?.map((one) => one.key)).toEqual(['x', undefined, undefined])
+  })
+
+  it('gives each action its own key, then the free letters of the pool, so a seventh gets one too', () => {
+    const keys = actionHotkeysOf([
+      action('a0'),
+      action('a1', 'e'),
+      action('a2'),
+      action('a3', 'x'),
+      action('a4'),
+      action('a5'),
+      action('a6'),
+      action('a7'),
+      action('a8')
+    ])
+    expect([...keys.entries()]).toEqual([
+      ['a0', 'f'],
+      ['a1', 'e'],
+      ['a2', 'h'],
+      ['a3', 'x'],
+      ['a4', 'j'],
+      ['a5', 'k'],
+      ['a6', 'l'],
+      ['a7', 'm'],
+      ['a8', 'n']
+    ])
   })
 })

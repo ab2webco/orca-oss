@@ -10782,7 +10782,10 @@
           "noneHere": "No hay acciones en este equipo.",
           "add": "Añadir acción",
           "save": "Guardar acciones",
-          "inherit": "Heredar de orca.yaml"
+          "inherit": "Heredar de orca.yaml",
+          "key": "Tecla",
+          "keyPlaceholder": "x",
+          "keyInvalid": "Usa una letra o un dígito que el Panel no use (r p q g t i o c w a, 1-9), una vez por acción."
         }
       },
       "right": {

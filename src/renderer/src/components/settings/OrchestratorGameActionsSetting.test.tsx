@@ -125,6 +125,12 @@ describe('ProjectOrchestratorGameActionsSetting', () => {
     )
     expect(button(view.container, 'Save actions')?.disabled).toBe(true)
 
+    type(view.container, 'Command 1', 'test-runs')
+    type(view.container, 'Key 1', 'q')
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
+      'Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.'
+    )
+    type(view.container, 'Key 1', '')
     type(view.container, 'Command 1', 'Bad Name')
     expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
       'Use a lowercase name like test-runs, up to 24 characters.'

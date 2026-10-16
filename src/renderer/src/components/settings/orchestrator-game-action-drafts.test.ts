@@ -53,6 +53,20 @@ describe('action drafts', () => {
     ])
   })
 
+  it('keeps a Panel key and refuses one the Panel owns or another row took', () => {
+    expect(actionsOfDrafts([prompt({ key: 'x' })]).actions).toEqual([
+      { label: 'Test runs', command: 'test-runs', key: 'x', prompt: 'Run the QA test runs' }
+    ])
+    expect(actionDraftOf({ label: 'A', key: 'x', prompt: 'p' }).key).toBe('x')
+    expect(
+      actionsOfDrafts([
+        prompt({ key: 'r' }),
+        prompt({ command: 'a', key: 'x' }),
+        prompt({ command: 'b', key: 'x' })
+      ]).problems
+    ).toEqual(['key', null, 'key'])
+  })
+
   it('leaves out an empty command', () => {
     expect(actionsOfDrafts([prompt({ command: '  ' })]).actions).toEqual([
       { label: 'Test runs', prompt: 'Run the QA test runs' }

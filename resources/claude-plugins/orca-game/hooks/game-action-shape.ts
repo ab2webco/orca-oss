@@ -1,10 +1,12 @@
 import type { GameAction, GameMcpCall } from '../types'
+import { PANEL_RESERVED_KEYS } from './action-results'
 
 // Mirrors Orca's own limits in src/shared/orchestrator-game-actions.ts.
 export const GAME_ACTIONS_MAX = 6
 // Why 5 more: Orca puts its lead buttons (wave, status, push, sweep, stop) before the project's.
 const GAME_STATE_ACTIONS_MAX = GAME_ACTIONS_MAX + 5
 const COMMAND = /^[a-z][a-z0-9-]{0,23}$/
+const KEY = /^[a-z0-9]$/
 const LABEL_MAX = 24
 const ID_MAX = 64
 export const GAME_PROMPT_MAX = 2000
@@ -51,7 +53,13 @@ const actionOf = (value: unknown): GameAction[] => {
     return []
   }
   const command = typeof value.command === 'string' ? value.command.trim() : ''
-  const head = COMMAND.test(command) ? { id, label, command } : { id, label }
+  const key = typeof value.key === 'string' ? value.key.trim() : ''
+  const head = {
+    id,
+    label,
+    ...(COMMAND.test(command) ? { command } : {}),
+    ...(KEY.test(key) && !PANEL_RESERVED_KEYS.has(key) ? { key } : {})
+  }
   if (value.mcp !== undefined) {
     const mcp = mcpCallOf(value.mcp)
     return mcp === undefined ? [] : [{ ...head, mcp }]
