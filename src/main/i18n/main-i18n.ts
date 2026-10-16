@@ -56,6 +56,16 @@ export function getMainSystemLocale(): string {
   }
 }
 
+/** The person's first preferred OS language, for surfaces outside Orca's own window. */
+export function getPreferredSystemLocale(): string {
+  try {
+    // Why: on macOS getLocale() follows the app bundle's localizations, so a Spanish Mac reads en.
+    return app.getPreferredSystemLanguages()[0] ?? app.getLocale()
+  } catch {
+    return DEFAULT_UI_LOCALE
+  }
+}
+
 export async function ensureMainI18n(): Promise<I18nInstance> {
   if (!initialized) {
     await mainI18n.use(lazyLocaleBackend).init({

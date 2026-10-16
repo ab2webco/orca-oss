@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { resolveClaudeCommand } from '../codex-cli/command'
-import { getMainSystemLocale } from '../i18n/main-i18n'
+import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import { resolveClaudeAgentTeamsShimBin } from '../runtime/claude-agent-teams-shim-env'
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { parseClaudeCodeVersion } from './hook-event-versions'
@@ -82,7 +82,7 @@ export async function prepareOrchestratorGameLaunch(args: {
       args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli,
     locale: orchestratorGameLocaleOf(
       args.settings?.uiLanguage,
-      args.systemLocale ?? getMainSystemLocale()
+      args.systemLocale ?? getPreferredSystemLocale()
     )
   })
 }
