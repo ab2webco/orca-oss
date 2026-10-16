@@ -1,9 +1,10 @@
 // Runs under `claude plugin test`: game links in the band and the fleet pane.
 import { describe, expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
+import type { GameState } from '../types'
 
 const ORCA_CLI = '/opt/orca/bin/orca'
 const CHECKS = 'https://github.com/o/r/pull/42/checks'
@@ -291,4 +292,39 @@ describe('fleet pane links', () => {
     expect(world.toasts).toEqual(['Could not open CI'])
     await ui.unmount()
   })
+})
+
+// What a mod from before game links stored: its fleet state had no `links` and no `activity`.
+const OLDER_MOD: Plugin = {
+  name: 'older-orca-game',
+  register(on) {
+    on('state.set', { plugin: 'orca-game', key: 'fleet' }, (_$, e, next) => {
+      if (e.key !== 'fleet' || e.value.state === null) {
+        return next(e)
+      }
+      const { links: _links, activity: _activity, ...older } = e.value.state
+      // Why: the stored shape is the older mod's, which this version's types no longer describe.
+      return next({ ...e, value: { ...e.value, state: older as GameState } })
+    })
+  }
+}
+
+describe('a fleet left by an older mod', () => {
+  // Why: a hot reload keeps the plugin's atoms, so the new mod first draws the old version's state.
+  test(
+    'the band and the pane still draw a state with no links',
+    { plugins: [OLDER_MOD] },
+    async ($, on) => {
+      const clock = mock.clock(on)
+      engine(on, worldOf())
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      const ui = await band($, 60)
+      expect(await ui.find({ type: 'Button', key: 'band-panel' })).toBeDefined()
+      await ui.unmount()
+      const fleetPane = await pane($, 60)
+      expect(await fleetPane.find({ type: 'Button', key: 'refresh' })).toBeDefined()
+      await fleetPane.unmount()
+    }
+  )
 })

@@ -212,7 +212,11 @@ export const parseGameState = (stdout: string): GameState | undefined => {
   if (!isShape(parsed)) {
     return undefined
   }
-  const body = 'result' in parsed ? parsed.result : parsed
+  return gameStateOf('result' in parsed ? parsed.result : parsed)
+}
+
+/** A game state from any value, such as one an older version of the mod stored. */
+export const gameStateOf = (body: unknown): GameState | undefined => {
   if (!isShape(body)) {
     return undefined
   }

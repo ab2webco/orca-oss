@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
 import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
-import { parseGameState } from './game-state'
+import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
 import { fleetPhaseOf, partyOf } from './party'
 import {
@@ -25,6 +25,12 @@ const XP_KEY = 'xp-ledger'
 const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note: '', xp: 0 }
 
 export const fleet = atom({ plugin: 'orca-game', key: 'fleet' } as const, EMPTY)
+
+// Why: a hot reload keeps the atom, so its state may have the shape an older mod stored.
+async function readFleet($: EngineInterface): Promise<FleetState> {
+  const v = await read($, fleet)
+  return { ...v, state: v.state === null ? null : (gameStateOf(v.state) ?? null) }
+}
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
   const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
@@ -78,7 +84,7 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
 }
 
 export async function refresh($: EngineInterface): Promise<void> {
-  const before = await read($, fleet)
+  const before = await readFleet($)
   const startedAt = await $.clock.now()
   await update($, fleet, (s) => ({ ...s, isLoading: true, refreshedAt: startedAt }))
   const next = await readState($)
@@ -123,7 +129,7 @@ export async function refreshSoon($: EngineInterface): Promise<void> {
 export type FleetView = FleetState & { isDemo: boolean }
 
 export async function viewOf($: EngineInterface): Promise<FleetView> {
-  const v = await read($, fleet)
+  const v = await readFleet($)
   if (!quest.isDemo) {
     return { ...v, isDemo: false }
   }
