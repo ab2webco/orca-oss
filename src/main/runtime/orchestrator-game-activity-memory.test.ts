@@ -39,11 +39,4 @@ describe('GameActivityMemory', () => {
     expect(memory.recall('a', null)?.id).toBe('TR-A2')
     expect(memory.recall('c', null)?.id).toBe('TR-C')
   })
-
-  it('forgets a pane on request', () => {
-    const memory = new GameActivityMemory()
-    memory.recall('tab:qa', activity('TR-1', 5))
-    memory.forget('tab:qa')
-    expect(memory.recall('tab:qa', null)).toBeNull()
-  })
 })

@@ -25,8 +25,4 @@ export class GameActivityMemory {
     }
     return kept ? { ...kept, running: false } : null
   }
-
-  forget(paneKey: string): void {
-    this.byPane.delete(paneKey)
-  }
 }
