@@ -30155,9 +30155,21 @@ export class OrcaRuntimeService {
       worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
     }
     const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
-    const summary = worktree
-      ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
-      : undefined
+    const summaries = (await this.getWorktreePs()).worktrees
+    const summary = worktree ? summaries.find((row) => row.worktreeId === worktree.id) : undefined
+    // Why: a member the lead launched with `orca orchestration` runs in its own child worktree.
+    const members = args.paneKey
+      ? summaries.flatMap((one) =>
+          one.worktreeId === worktree?.id
+            ? []
+            : one.agents
+                .filter((row) => row.parentPaneKey === args.paneKey)
+                .map((row) => ({
+                  row,
+                  worktree: { id: one.worktreeId, branch: one.branch, displayName: one.displayName }
+                }))
+        )
+      : []
     const callerHandle =
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
     return await buildOrchestratorGameState({
@@ -30174,6 +30186,7 @@ export class OrcaRuntimeService {
           }
         : null,
       agents: summary?.agents ?? [],
+      members,
       leaderPaneKey: args.paneKey ?? null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,

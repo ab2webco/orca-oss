@@ -37,7 +37,13 @@ export type GameAgent = {
   terminalHandle?: string
   /** Optional on the wire: older hosts send none, and an agent no rule matched gets none. */
   activity?: GameActivity
+  /** A session the lead launched through `orca orchestration`, which reports to it. */
+  isMember?: boolean
+  /** The member's own worktree, when it is not the lead's. */
+  worktree?: GameMemberWorktree
 }
+
+export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 
 export type GameReview = {
   provider: Exclude<HostedReviewProvider, 'unsupported'>

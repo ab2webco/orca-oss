@@ -173,6 +173,12 @@ export const registerFleetPane = (on: On): void => {
                 {agent.isLeader && <Text color={palette.gold}>{`♛ ${text.lead}`}</Text>}
                 <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
                 <Text dimColor>{agent.agentType}</Text>
+                {agent.worktree !== undefined && (
+                  <Text
+                    dimColor
+                    wrap="truncate-end"
+                  >{`⎇ ${agent.worktree.branch || agent.worktree.displayName}`}</Text>
+                )}
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
               <Text wrap="truncate-end">{member.says}</Text>

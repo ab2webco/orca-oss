@@ -179,6 +179,59 @@ describe('buildOrchestratorGameState', () => {
     ])
   })
 
+  it('counts the members the lead launched, in its worktree or in their own, as the fleet', async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: null,
+      toolName: null
+    }
+    const handles: Record<string, string> = {
+      'tab-1:lead': 'term_lead',
+      'tab-1:mate': 'term_mate',
+      'tab-4:here': 'term_here',
+      'tab-5:stranger': 'term_stranger'
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-1:mate' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead', taskTitle: 'CIN-7 Login' },
+        { ...row, paneKey: 'tab-5:stranger', parentPaneKey: 'tab-9:other-lead' }
+      ],
+      members: [
+        {
+          row: { ...row, paneKey: 'tab-6:away', taskTitle: 'CIN-8 Seats', state: 'blocked' },
+          worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+        }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      terminalHandleOf: (paneKey) =>
+        handles[paneKey] ?? (paneKey === 'tab-6:away' ? 'term_away' : null),
+      teamHandles: new Set(['term_lead', 'term_mate']),
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(
+      state.agents.map((agent) => [agent.paneKey, agent.displayName, agent.isMember ?? false])
+    ).toEqual([
+      ['tab-1:lead', null, false],
+      ['tab-1:mate', null, false],
+      ['tab-4:here', 'CIN-7 Login', true],
+      ['tab-6:away', 'CIN-8 Seats', true]
+    ])
+    expect(state.agents[3]).toMatchObject({
+      state: 'waiting',
+      terminalHandle: 'term_away',
+      worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+    })
+  })
+
   it('falls back to a linked item without status when no tracker answers', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

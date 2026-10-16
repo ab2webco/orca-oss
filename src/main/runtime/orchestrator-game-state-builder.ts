@@ -32,6 +32,8 @@ import {
   statusGroupOfName,
   statusGroupOfPlane,
   type GameActivity,
+  type GameAgent,
+  type GameMemberWorktree,
   type GameStatusGroup,
   type GameWorkItem,
   type OrchestratorGameState
@@ -58,10 +60,9 @@ export type OrchestratorGameStateInput = {
     displayName: string
     linkedWorkItem: WorkspaceLinkedItem | null | undefined
   } | null
-  agents: Pick<
-    RuntimeWorktreeAgentRow,
-    'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
-  >[]
+  agents: GameAgentRow[]
+  /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
+  members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   terminalHandleOf?: (paneKey: string) => string | null
   /** The calling Team's terminals; when known, agents outside it are left out. */
@@ -83,6 +84,11 @@ export type OrchestratorGameStateInput = {
     workItem: GameWorkItem | null
   }) => Promise<GameProjectWork>
 }
+
+type GameAgentRow = Pick<
+  RuntimeWorktreeAgentRow,
+  'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
+> & { parentPaneKey?: string | null }
 
 // Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
 const settle = <T>(read: () => Promise<T | null>): Promise<T | null> => read().catch(() => null)
@@ -241,18 +247,28 @@ export async function buildOrchestratorGameState(
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
   const teamHandles = input.teamHandles
+  const leaderPaneKey = input.leaderPaneKey
+  const isMemberRow = (row: GameAgentRow): boolean =>
+    leaderPaneKey !== null && row.parentPaneKey === leaderPaneKey
+  // Why: a member reports to this lead wherever it runs; another lead's member is never ours.
   const rows = teamHandles
     ? input.agents.filter((row) => {
         const handle = input.terminalHandleOf?.(row.paneKey)
-        return handle !== null && handle !== undefined && teamHandles.has(handle)
+        return (
+          isMemberRow(row) || (handle !== null && handle !== undefined && teamHandles.has(handle))
+        )
       })
-    : input.agents
-  const agents = rows.map((row) => {
-    const agent = gameAgentOf(
-      row,
-      input.leaderPaneKey,
-      input.terminalHandleOf?.(row.paneKey) ?? null
-    )
+    : input.agents.filter((row) => !row.parentPaneKey || isMemberRow(row))
+  const sourced = [
+    ...rows.map((row) => ({ row, worktree: undefined })),
+    ...(input.members ?? []).filter((one) => !rows.some((row) => row.paneKey === one.row.paneKey))
+  ]
+  const agents = sourced.map(({ row, worktree }) => {
+    const agent: GameAgent = {
+      ...gameAgentOf(row, leaderPaneKey, input.terminalHandleOf?.(row.paneKey) ?? null),
+      ...(isMemberRow(row) || worktree ? { isMember: true } : {}),
+      ...(worktree ? { worktree } : {})
+    }
     const activity = activityOf(row.paneKey)
     return activity ? { ...agent, activity } : agent
   })

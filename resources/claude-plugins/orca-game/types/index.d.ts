@@ -18,7 +18,13 @@ export type GameAgent = {
   terminalHandle?: string
   /** Only an agent a project or built-in activity rule matched has one. */
   activity?: GameActivity
+  /** A session the lead launched, which reports to it; false for the lead and its teammates. */
+  isMember?: boolean
+  /** The member's own worktree, when it is not the lead's. */
+  worktree?: GameMemberWorktree
 }
+
+export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 
 export type GameCi = 'pending' | 'success' | 'failure' | 'neutral' | 'none'
 

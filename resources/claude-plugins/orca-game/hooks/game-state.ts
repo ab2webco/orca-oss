@@ -1,6 +1,7 @@
 import type {
   GameActivity,
   GameAgent,
+  GameMemberWorktree,
   GameCi,
   GameConfig,
   GameLink,
@@ -185,6 +186,18 @@ const worktreeOf = (value: unknown): GameWorktree | null => {
   }
 }
 
+const memberWorktreeOf = (value: unknown): GameMemberWorktree | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const id = str(value.id)
+  const branch = str(value.branch)
+  const displayName = str(value.displayName)
+  return id && branch !== undefined && displayName !== undefined
+    ? { id, branch, displayName }
+    : undefined
+}
+
 const agentOf = (value: unknown): GameAgent[] => {
   if (!isShape(value)) {
     return []
@@ -198,6 +211,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   // Orca sends null for a pane with no title or task yet; it is still on the team.
   const displayName = str(value.displayName) || agentType || paneKey
   const activity = activityOf(value.activity)
+  const worktree = memberWorktreeOf(value.worktree)
   return [
     {
       paneKey,
@@ -207,7 +221,9 @@ const agentOf = (value: unknown): GameAgent[] => {
       toolName: str(value.toolName) ?? null,
       isLeader: value.isLeader === true,
       ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {}),
-      ...(activity === undefined ? {} : { activity })
+      ...(activity === undefined ? {} : { activity }),
+      ...(value.isMember === true ? { isMember: true } : {}),
+      ...(worktree === undefined ? {} : { worktree })
     }
   ]
 }
