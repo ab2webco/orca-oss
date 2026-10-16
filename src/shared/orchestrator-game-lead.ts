@@ -20,6 +20,8 @@ export type OrchestratorGameLead = {
   label?: string
   /** What a member is told about its ticket; placeholders {id}, {title}, {url}, {status}. */
   launchPrompt?: string
+  /** What `orca game push` sends a stopped member; same placeholders as launchPrompt. */
+  pushPrompt?: string
   /** The project's own standing rules, appended to Orca's. */
   rules?: string
 }
@@ -34,6 +36,9 @@ const MODEL_ID = /^[A-Za-z0-9._:[\]/-]{1,80}$/
 const EFFORT = /^[a-z]{1,16}$/
 
 export const DEFAULT_GAME_LEAD: OrchestratorGameLead = { autostart: false, cap: 4, agent: 'claude' }
+
+export const DEFAULT_GAME_PUSH_PROMPT =
+  'Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.'
 
 const at = (key: string): string => `orchestratorGame.orchestrator.${key}`
 
@@ -61,6 +66,19 @@ const textKey =
     return text === null ? `${at(key)} must be 1 to ${max} characters` : { [key]: text }
   }
 
+const promptKey =
+  (key: 'launchPrompt' | 'pushPrompt'): KeyParser =>
+  (value) => {
+    const text = textOf(value, GAME_PROMPT_MAX)
+    if (text === null) {
+      return `${at(key)} must be 1 to ${GAME_PROMPT_MAX} characters`
+    }
+    const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
+    return unknown === null
+      ? { [key]: text }
+      : `${at(key)} uses an unknown placeholder {${unknown}}`
+  }
+
 const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   autostart: (value) =>
     typeof value === 'boolean' ? { autostart: value } : `${at('autostart')} must be true or false`,
@@ -73,16 +91,8 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   effort: idKey('effort', EFFORT, 'must be an effort level like high'),
   label: textKey('label', GAME_LEAD_LABEL_MAX),
   rules: textKey('rules', GAME_LEAD_RULES_MAX),
-  launchPrompt: (value) => {
-    const text = textOf(value, GAME_PROMPT_MAX)
-    if (text === null) {
-      return `${at('launchPrompt')} must be 1 to ${GAME_PROMPT_MAX} characters`
-    }
-    const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
-    return unknown === null
-      ? { launchPrompt: text }
-      : `${at('launchPrompt')} uses an unknown placeholder {${unknown}}`
-  }
+  launchPrompt: promptKey('launchPrompt'),
+  pushPrompt: promptKey('pushPrompt')
 }
 
 const isLeadKey = (key: string): key is keyof OrchestratorGameLead => key in KEY_PARSERS

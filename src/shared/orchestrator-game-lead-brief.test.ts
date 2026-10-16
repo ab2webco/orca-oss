@@ -15,6 +15,16 @@ describe('gameLeadBriefOf', () => {
     expect(brief).not.toContain('Project rules')
   })
 
+  it('names the fleet verbs: status, a wave from the To Do, a verified sweep and a push', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('`orca game fleet`')
+    expect(brief).toContain('`orca game wave --dry-run`')
+    expect(brief).toContain('`orca game sweep`')
+    expect(brief).toContain('`orca game sweep --close`')
+    expect(brief).toContain('`orca game push`')
+  })
+
   it('writes every command with the CLI this session runs', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
 

@@ -147,7 +147,7 @@ function LeadTextRow({
   )
 }
 
-/** The project lead's overrides for this machine; launchPrompt and rules stay in orca.yaml. */
+/** The project lead's overrides for this machine; launchPrompt, pushPrompt and rules stay in orca.yaml. */
 export function ProjectOrchestratorGameLeadSetting({
   repoId,
   settings,

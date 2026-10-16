@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_GAME_LEAD,
+  DEFAULT_GAME_PUSH_PROMPT,
   GAME_LEAD_CAP_MAX,
   parseGameLead,
   renderGameLaunchPrompt,
@@ -19,6 +20,7 @@ describe('parseGameLead', () => {
         effort: 'high',
         label: ' Orquestador ',
         launchPrompt: 'Implement {id}: {title}\n{url}',
+        pushPrompt: ' Keep going on {id} ',
         rules: '  Report TERMINADO {id}.  '
       })
     ).toEqual({
@@ -30,6 +32,7 @@ describe('parseGameLead', () => {
         effort: 'high',
         label: 'Orquestador',
         launchPrompt: 'Implement {id}: {title}\n{url}',
+        pushPrompt: 'Keep going on {id}',
         rules: 'Report TERMINADO {id}.'
       },
       warnings: []
@@ -42,6 +45,7 @@ describe('parseGameLead', () => {
       cap: GAME_LEAD_CAP_MAX + 1,
       agent: 'Claude Code',
       launchPrompt: 'Do {ticket}',
+      pushPrompt: 'Resume {branch}',
       rules: '',
       label: 'Lead',
       color: 'red'
@@ -52,6 +56,7 @@ describe('parseGameLead', () => {
       `orchestratorGame.orchestrator.cap must be a whole number from 1 to ${GAME_LEAD_CAP_MAX}`,
       'orchestratorGame.orchestrator.agent must be an agent id like claude or codex',
       'orchestratorGame.orchestrator.launchPrompt uses an unknown placeholder {ticket}',
+      'orchestratorGame.orchestrator.pushPrompt uses an unknown placeholder {branch}',
       'orchestratorGame.orchestrator.rules must be 1 to 4000 characters',
       'orchestratorGame.orchestrator.color is not a known setting'
     ])
@@ -98,6 +103,12 @@ describe('renderGameLaunchPrompt', () => {
     expect(
       renderGameLaunchPrompt('/implement {id}\nNow: {status}\n{title}', { ...item, title: '' })
     ).toBe('/implement CIN-12\nNow:\n')
+  })
+
+  it('fills the default push prompt with the ticket id', () => {
+    expect(renderGameLaunchPrompt(DEFAULT_GAME_PUSH_PROMPT, item)).toBe(
+      'Continue CIN-12 to the end on your own. Report to your lead when it is done or when only the person can decide.'
+    )
   })
 
   it('is the default work prompt without a template', () => {

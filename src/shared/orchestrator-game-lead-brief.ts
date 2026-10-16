@@ -27,6 +27,12 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  A member ending a turn is not news.',
     '- A report is a claim. Check its PR, CI and ticket before saying it is done, then free its tab with',
     `  ${run('orchestration worker-release --dispatch <dispatch_id> --json')}.`,
+    `- ${run('game fleet')} is the members' status: ticket, state, PR, CI, phase and what to do next.`,
+    `- Asked for a wave, fill the free slots from the To Do: ${run('game wave --dry-run')} shows the plan,`,
+    `  ${run('game wave')} launches it (or name the tickets); it never passes the cap.`,
+    `- ${run('game sweep')} lists finished members (PR merged, ticket in review or done). Verify each,`,
+    `  then ${run('game sweep --close')} frees their tabs; worktrees stay for the person.`,
+    `- ${run('game push')} tells stopped members to continue; one waiting on a question is left to you.`,
     `- ${run('game state --json')} lists every member (\`isMember\`) with its state, PR, CI and ticket.`,
     `- For anything else about members, load ${run('skills get orchestration')}.`
   ]
