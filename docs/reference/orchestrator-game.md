@@ -73,6 +73,66 @@ orchestratorGame:
 An invalid value is dropped and reported (Settings shows the source of every value,
 `orca game state` lists the warnings); it never stops the launch.
 
+For an SSH worktree the project layer is read from the host over the SSH filesystem
+([`worktree-orca-yaml.ts`](../../src/main/worktree-orca-yaml.ts)); while the host is disconnected
+the other layers still apply.
+
+`links` and `activity` (below) are lists, so a later layer that sets one replaces the whole list
+instead of merging it. Settings has no editor for them; `orca.yaml` is where they are written, and
+a value in a Settings layer is validated the same way.
+
+## Project links and activity
+
+Every project shows its own integrations in the scene. Orca's own (the review, its CI and the
+work item) are built in; anything else, such as a test manager reached through an MCP server, is
+declared in `orca.yaml` ([`orchestrator-game-integrations.ts`](../../src/shared/orchestrator-game-integrations.ts)):
+
+```yaml
+# orca.yaml
+orchestratorGame:
+  links: # static, at most 6
+    - label: Test plan # at most 24 characters
+      url: https://<your-tambora-host>/projects/CIN
+    - label: Ticket
+      url: https://jira.example.com/browse/{workItem.identifier}
+  activity: # at most 8 rules
+    - name: Tambora run # at most 24 characters
+      tools: mcp__tambora__* # tool name glob; every MCP tool when omitted
+      match: 'TR-([A-Z]+)-\d+' # regular expression, at most 200 characters
+      url: https://<your-tambora-host>/projects/{1}/testruns/{0}
+    - name: Tambora case
+      tools: mcp__tambora__*
+      match: 'TC-([A-Z]+)-\d+'
+      url: https://<your-tambora-host>/{1}/testcase/{0}
+```
+
+- **Link URLs** may use `{workItem.identifier}`, `{workItem.provider}`, `{branch}` and
+  `{review.number}`. Values are URL-encoded, and a link whose placeholder has no value in this
+  worktree is left out.
+- **Activity URLs** use `{0}` for the whole match and `{1}`–`{9}` for its groups; a group the
+  pattern does not have is rejected.
+- **Validation.** A URL must be `http` or `https` with a literal host: no placeholder, brace or
+  `user@` before the path, so a value can never change where a link points. A pattern must compile
+  and must not match empty text. Each invalid entry is dropped with a warning in
+  `orca game state`, like any other `orchestratorGame` field.
+- **Matching.** For every `mcp__*` tool call an agent makes, the hook server keeps the call in
+  memory: the input as JSON (at most 2 KB) and the result text (at most 4 KB), the last eight calls
+  per pane ([`orchestrator-game-mcp-calls.ts`](../../src/main/agent-hooks/orchestrator-game-mcp-calls.ts)).
+  `orca game state` runs the rules over the input followed by the result, cut to the first 4 KB,
+  newest call first; the first rule that matches wins. Only the matched id and the URL it built
+  leave memory. A call is `running` from its `PreToolUse` until its `PostToolUse`, a failure or the
+  turn's `Stop`.
+- **SSH agents.** The relay forwards no raw tool input, so a remote call is matched on its result
+  text alone.
+- **Built-in rules** follow the project's rules and exist only for a host this worktree already
+  revealed: a key of the work item's project (`ORCA-12` next to `ORCA-586`) in a Plane, Jira or
+  Linear MCP call links through the work item's own URL, and a `pullNumber`/`issue_number`
+  (GitHub) or `merge_request_iid`/`issue_iid` (GitLab) in that provider's MCP input links into the
+  review's repository. Without a work item or review there is no host, and no rule.
+
+Nothing project-specific lives in Orca: the Koombea cineco example (its Tambora host and keys)
+is in that project's own `orca.yaml`.
+
 ## What the game reads: `orca game state --json`
 
 The plugin polls this every 30 seconds and after each turn. It resolves the calling pane from
@@ -88,9 +148,18 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   Bitbucket, Azure DevOps, Gitea) with its aggregate CI status;
 - `workItem` — the linked item with a live status for Plane, Linear, Jira, GitHub and GitLab, and
   a `statusGroup` (`backlog`, `todo`, `in_progress`, `review`, `done`, `cancelled`, `unknown`)
-  so the game never needs to know the tracker. `tracker: false` leaves it out.
+  so the game never needs to know the tracker. `tracker: false` leaves it out;
+- `links` (optional) — what the scene can make clickable, each
+  `{ id, kind, provider, label, url, status?, tone? }`: `review`, `ci` (the GitHub checks or GitLab
+  pipelines page of the review, when it has checks), `workItem`, the project's `project` links and
+  one `activity` link per distinct URL the agents' activity points at. `tone` is `neutral`,
+  `pending`, `success` or `danger`; every `url` is `http(s)`;
+- `activity` (optional, on an agent row and at the top for the calling pane) —
+  `{ name, id, url, at, running }`, the newest MCP call a rule matched (see
+  [Project links and activity](#project-links-and-activity)).
 
-A provider that is offline or unauthenticated only drops its own field.
+A provider that is offline or unauthenticated only drops its own field. `links` and `activity`
+are new optional fields: a mod built before them reads the state exactly as before.
 
 ## Built-in scenes
 
