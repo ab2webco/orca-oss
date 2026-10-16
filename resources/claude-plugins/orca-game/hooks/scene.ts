@@ -1,4 +1,5 @@
 import { actionPixel } from './action-props'
+import { gameStrings } from './game-strings'
 import { cellsOf, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import type { Costume, Look, SceneDefinition } from './scenes/index'
@@ -144,7 +145,10 @@ export const REACTION_TICKS = 24
 
 export type Reaction = { kind: 'pet' | 'hello' | 'level'; age: number }
 
-const REACTION_SAYS = { pet: '♥ thanks!', hello: 'on it!', level: '★ level up!' } as const
+const reactionSaysOf = (kind: Reaction['kind']): string => {
+  const art = gameStrings().art
+  return kind === 'pet' ? art.thanks : kind === 'hello' ? art.onIt : art.levelUp
+}
 
 const SNORES = ['z  ', 'zz ', 'zzz'] as const
 
@@ -159,7 +163,8 @@ export const bubbleTextOf = (
   since: number,
   room: number
 ): string => {
-  const said = caption === '' ? `thinking${DOTS[Math.floor(tick / 4) % DOTS.length]}` : caption
+  const thinking = `${gameStrings().art.thinking}${DOTS[Math.floor(tick / 4) % DOTS.length]}`
+  const said = caption === '' ? thinking : caption
   const fitted = said.length <= room ? said : `${said.slice(0, Math.max(0, room - 1))}…`
   // A caption types itself in, three letters a tick.
   const shown = caption === '' ? fitted.length : Math.max(1, (tick - since) * 3)
@@ -210,7 +215,7 @@ export const sceneGridOf = (
       grid.push([UPPER_HALF, at(x, row * 2), at(x, row * 2 + 1)])
     }
   }
-  const said = reacting ? REACTION_SAYS[reaction.kind] : resting ? snoreOf(tick) : caption
+  const said = reacting ? reactionSaysOf(reaction.kind) : resting ? snoreOf(tick) : caption
   const typedSince = reacting ? tick - reaction.age : resting ? -Infinity : since
   const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, columns - 8))} `
   const width = text.length + 2

@@ -2,6 +2,7 @@ import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import { CI_COLORS, needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from './fleet-labels'
 import { HUD_KEY, HUD_ROWS, hudCellsOf } from './fleet-hud'
+import { gameStrings } from './game-strings'
 import { openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
 import { countsOf, needsOf, partyOf } from './party'
@@ -39,6 +40,7 @@ export const registerBand = (on: On): void => {
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
     const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const text = gameStrings().text
     const showPet = isClawdReacting() && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
     const menu = (
@@ -66,9 +68,9 @@ export const registerBand = (on: On): void => {
     )
     const menuRow = (
       <Box flexDirection="row" gap={1} flexWrap="wrap">
-        {menu('band-panel', '▤', 'Panel', () => openFleet($), true)}
-        {menu('band-refresh', '↻', 'Refresh', () => void refreshSoon($).catch(() => undefined))}
-        {menu('band-pet', '♥', 'Pet Clawd', () => clawdReact($, 'pet'))}
+        {menu('band-panel', '▤', text.panel, () => openFleet($), true)}
+        {menu('band-refresh', '↻', text.refresh, () => void refreshSoon($).catch(() => undefined))}
+        {menu('band-pet', '♥', text.petClawd, () => clawdReact($, 'pet'))}
       </Box>
     )
     if (v.state === null) {
@@ -76,7 +78,7 @@ export const registerBand = (on: On): void => {
       return (
         <Box flexDirection="column">
           {art.get(PET_KEY)}
-          <Text dimColor>{`Team · ${v.note === '' ? 'loading…' : v.note}`}</Text>
+          <Text dimColor>{`${text.team} · ${v.note === '' ? text.loading : v.note}`}</Text>
           {menuRow}
         </Box>
       )
@@ -117,12 +119,12 @@ export const registerBand = (on: On): void => {
               <Text bold>{teammatesOf(party.length)}</Text>{' '}
             </Text>
           </Button>
-          {pill('working', `${counts.working} working`, 'cyan')}
-          {pill('idle', `${counts.idle} idle`, 'gray')}
-          {counts.done > 0 && pill('done', `${counts.done} done`, 'green')}
+          {pill('working', text.working(counts.working), 'cyan')}
+          {pill('idle', text.idle(counts.idle), 'gray')}
+          {counts.done > 0 && pill('done', text.done(counts.done), 'green')}
           {pill(
             'waiting',
-            `${counts.waiting} waiting on you`,
+            text.waiting(counts.waiting),
             counts.waiting > 0 ? 'red' : 'gray',
             counts.waiting > 0
           )}

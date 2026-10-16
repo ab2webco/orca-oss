@@ -1,4 +1,5 @@
 import { actionPixel } from './action-props'
+import { gameStrings } from './game-strings'
 import {
   IDLE,
   isBlink,
@@ -96,7 +97,8 @@ const hudWrite = (
 export const xpTextOf = (level: Level): string => {
   const filled = Math.min(XP_CELLS, Math.floor((level.into / Math.max(1, level.need)) * XP_CELLS))
   const bar = `${'■'.repeat(filled)}${'□'.repeat(XP_CELLS - filled)}`
-  return `Lv ${level.level} ${bar} ${level.into}/${level.need} XP`
+  const art = gameStrings().art
+  return `${art.level} ${level.level} ${bar} ${level.into}/${level.need} ${art.xp}`
 }
 
 const heroStateOf = (members: readonly HudMember[], extras: HudExtras): MemberState => {
@@ -108,10 +110,11 @@ const heroStateOf = (members: readonly HudMember[], extras: HudExtras): MemberSt
 }
 
 const memberLine = (one: HudMember): string => {
+  const art = gameStrings().art
   if (one.state === 'waiting') {
-    return 'needs you!'
+    return art.needsYou
   }
-  return one.mood === 'hurt' ? 'CI is red' : one.says
+  return one.mood === 'hurt' ? art.ciIsRed : one.says
 }
 
 export const hudGridOf = (
@@ -161,8 +164,9 @@ export const hudGridOf = (
   }
   const room = columns - PARTY_AT - 2
   if (shown.length === 0) {
-    hudWrite(grid, columns, 1, PARTY_AT, 'No party yet.', HUD_TEXT, room)
-    hudWrite(grid, columns, 2, PARTY_AT, 'Teammates join when the lead spawns them.', HUD_DIM, room)
+    const art = gameStrings().art
+    hudWrite(grid, columns, 1, PARTY_AT, art.noParty, HUD_TEXT, room)
+    hudWrite(grid, columns, 2, PARTY_AT, art.teammatesJoin, HUD_DIM, room)
   }
   shown.forEach((one, slot) => {
     const left = PARTY_AT + slot * SLOT + SPRITE_WIDTH + 1

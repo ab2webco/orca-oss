@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { HUD_ROWS, hudGridOf, xpTextOf } from '../hooks/fleet-hud'
+import { setGameLocale } from '../hooks/game-strings'
 import { isRestingOf } from '../hooks/party-sprites'
 import { TILE_COLUMNS, TILE_ROWS, tileGridOf } from '../hooks/fleet-tiles'
 import { levelOf } from '../hooks/rewards'
@@ -60,6 +61,20 @@ describe('hud', () => {
     expect(digest(hudGridOf(QUEST, acting, 90, 4))).toBe('9e35f468')
     expect(digest(hudGridOf(QUEST, acting, 90, 0, { isDemo: true }))).toBe('56cd3324')
     expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('8c4630ff')
+  })
+
+  // Why: the HUD is a Raster, so a language drawn two columns wide keeps its English art.
+  it('writes the HUD in Spanish, and in English for a language a Raster cannot draw', () => {
+    try {
+      setGameLocale('es')
+      expect(glyphs(hudGridOf(QUEST, party, 90, 4))).toContain('CI en rojo')
+      expect(glyphs(hudGridOf(QUEST, [], 80, 0))).toContain('Aún no hay grupo.')
+      expect(xpTextOf(levelOf(130))).toBe('Nv 2 □□□□□ 30/200 XP')
+      setGameLocale('ja')
+      expect(glyphs(hudGridOf(QUEST, [], 80, 0))).toContain('No party yet.')
+    } finally {
+      setGameLocale('en')
+    }
   })
 
   it('an empty party says how teammates join, and the demo wears a tag', () => {

@@ -11,6 +11,7 @@ import {
   questCommandOf,
   restoredNotesOf
 } from '../hooks/quest-policy'
+import { setGameLocale } from '../hooks/game-strings'
 
 describe('quest policy', () => {
   it('/quest with no argument shows the mode and rejects an unknown one', () => {
@@ -38,6 +39,19 @@ describe('quest policy', () => {
       'Using claude_ai_Slack slack_read_thread'
     )
     expect(activityOf('Bash', { command: 'x'.repeat(80) })).toHaveLength(60)
+  })
+
+  it('the bubble and /quest speak the language the session was launched with', () => {
+    setGameLocale('es')
+    try {
+      expect(activityOf('Read', { file_path: '/repo/hooks/quest.tsx' })).toBe('Leyendo quest.tsx')
+      expect(activityOf('Grep', { pattern: 'x' })).toBe('Buscando en el código')
+      expect(questCommandOf('loud')).toEqual({
+        error: 'Modo desconocido "loud". Usa /quest off, /quest on, /quest zen o /quest demo.'
+      })
+    } finally {
+      setGameLocale('en')
+    }
   })
 
   it('short text before a tool call is a working note; long or multi-line text is a reply', () => {

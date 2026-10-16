@@ -12,10 +12,8 @@ import {
   startDemo,
   type Animated
 } from './quest-runtime'
+import { gameStrings } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
-
-const MODES_HELP =
-  '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party.'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 
@@ -57,8 +55,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
   await $.command
     .register({
       name: 'quest',
-      description:
-        'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
+      description: gameStrings().text.questDescription,
       argumentHint: '[off|on|zen|demo]',
       immediate: true
     })
@@ -69,18 +66,18 @@ const registerCommand = (on: On) => {
   on('command.run', { command: 'quest' }, async ($, e) => {
     await ready($)
     const asked = questCommandOf(e.args)
+    const text = gameStrings().text
     if ('error' in asked) {
       return { text: asked.error }
     }
     if ('show' in asked) {
-      return { text: `Quest: ${quest.isDemo ? 'demo' : gameConfig().mode}. ${MODES_HELP}` }
+      const mode = quest.isDemo ? 'demo' : gameConfig().mode
+      return { text: `${text.questShown(mode)} ${text.questModesHelp}` }
     }
     if ('demo' in asked) {
       startDemo()
       $.ui.invalidate('ui.render')
-      return {
-        text: 'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.'
-      }
+      return { text: text.questDemo }
     }
     quest.isDemo = false
     quest.modeOverride = asked.mode
@@ -88,7 +85,7 @@ const registerCommand = (on: On) => {
       quest.stages.clear()
     }
     $.ui.invalidate('ui.render')
-    return { text: `Quest: ${asked.mode}.` }
+    return { text: text.questShown(asked.mode) }
   })
 }
 

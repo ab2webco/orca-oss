@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from '../hooks/fleet-labels'
+import { setGameLocale } from '../hooks/game-strings'
 
 describe('fleet labels', () => {
   it('names a review by its provider sign, state and CI', () => {
@@ -29,5 +30,24 @@ describe('fleet labels', () => {
         { name: '#4', text: 'CI failing', url: 'u' }
       ])
     ).toBe('Needs you: x waiting on you · #4 CI failing')
+  })
+
+  // Why: agent names, review numbers and tracker statuses are data and stay as Orca sent them.
+  it('speaks the language the session was launched with', () => {
+    setGameLocale('es')
+    try {
+      const review = { provider: 'github', number: 4, title: '', url: 'u', state: 'open' } as const
+      expect(teammatesOf(2)).toBe('Equipo: 2 compañeros')
+      expect(reviewTextOf({ ...review, ci: 'failure' })).toBe('#4 abierto · CI fallando')
+      const item = { provider: 'linear', identifier: 'ENG-1', title: 't', url: '' } as const
+      expect(workItemTextOf({ ...item, status: 'In Review', statusGroup: 'review' })).toBe(
+        'ENG-1 In Review'
+      )
+      expect(needsLineOf([{ name: 'x', text: 'te espera', url: null }])).toBe(
+        'Te necesitan: x te espera'
+      )
+    } finally {
+      setGameLocale('en')
+    }
   })
 })

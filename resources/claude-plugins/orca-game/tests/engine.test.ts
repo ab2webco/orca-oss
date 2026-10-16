@@ -324,6 +324,58 @@ describe('quest mode', () => {
   })
 })
 
+describe('language', () => {
+  test('ORCA_GAME_LOCALE=es speaks Spanish in the band, the pane and /quest', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Raster' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Equipo: 2 compañeros$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^1 trabajando$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^1 te espera$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /#42 abierto · CI fallando/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ORCA-580 In Progress/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: / ↻ Actualizar / })).toBeDefined()
+    await ui.unmount()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Text', text: /^ ✕ Cerrar $/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /^builder$/ })).toBeDefined()
+    await pane.unmount()
+    const loud = await $.command.run({ command: 'quest', args: 'loud' } as never)
+    expect(loud).toMatchObject({ text: expect.stringMatching(/^Modo desconocido/) })
+  })
+
+  // Why: a Raster refuses characters drawn two columns wide, so CJK keeps English pixel art.
+  test('ORCA_GAME_LOCALE=ja translates the text and still draws the art', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'ja' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Raster' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^チーム 2 人$/ })).toBeDefined()
+    await ui.unmount()
+    const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
+    expect(await spinner.find({ type: 'Raster' })).toBeDefined()
+    await spinner.unmount()
+  })
+
+  test('an unknown ORCA_GAME_LOCALE falls back to English', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'fr' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Text', text: /^Team 2 teammates$/ })).toBeDefined()
+    await ui.unmount()
+  })
+})
+
 describe('rewards', () => {
   const merged = JSON.stringify({ ...STATE, review: review('merged', 'success') })
   const open = JSON.stringify({ ...STATE, review: review('open', 'pending') })

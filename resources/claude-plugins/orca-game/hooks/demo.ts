@@ -1,4 +1,5 @@
 import type { GameAgent, GameCi, GameState, GameStatusGroup } from '../types'
+import { gameStrings, type ArtStrings } from './game-strings'
 import type { Action, FlowPhase } from './quest-policy'
 import { levelOf } from './rewards'
 
@@ -24,7 +25,7 @@ type Step = {
   xp: number
   phase: FlowPhase
   action: Action | undefined
-  caption: string
+  caption: (art: ArtStrings) => string
   isResting?: boolean
 }
 
@@ -40,7 +41,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'docs',
     action: 'read',
-    caption: 'DEMO · Reading quest.tsx'
+    caption: (art) => `DEMO · ${art.reading} quest.tsx`
   },
   {
     seats: [
@@ -53,7 +54,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'build',
     action: 'edit',
-    caption: 'DEMO · Editing scene.ts'
+    caption: (art) => `DEMO · ${art.editing} scene.ts`
   },
   {
     seats: [
@@ -66,7 +67,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'verify',
     action: 'test',
-    caption: 'DEMO · pnpm test'
+    caption: () => 'DEMO · pnpm test'
   },
   {
     seats: [
@@ -79,7 +80,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'build',
     action: 'commit',
-    caption: 'DEMO · git commit'
+    caption: () => 'DEMO · git commit'
   },
   {
     seats: [
@@ -92,7 +93,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'pr',
     action: 'push',
-    caption: 'DEMO · git push'
+    caption: () => 'DEMO · git push'
   },
   {
     seats: [
@@ -106,7 +107,7 @@ const SCRIPT: readonly Step[] = [
     xp: 130,
     phase: 'pr',
     action: 'merge',
-    caption: 'DEMO · gh pr merge'
+    caption: () => 'DEMO · gh pr merge'
   },
   {
     seats: [
@@ -120,7 +121,7 @@ const SCRIPT: readonly Step[] = [
     xp: 130,
     phase: 'handoff',
     action: 'track',
-    caption: 'DEMO · Moving ORCA-1 to Done'
+    caption: (art) => `DEMO · ${art.movingTo('ORCA-1', 'Done')}`
   },
   {
     seats: [
@@ -134,7 +135,7 @@ const SCRIPT: readonly Step[] = [
     xp: 180,
     phase: 'handoff',
     action: undefined,
-    caption: '',
+    caption: () => '',
     isResting: true
   }
 ]
@@ -194,7 +195,7 @@ export const demoFrameOf = (step: number): DemoFrame => {
     xp: frame.xp,
     phase: frame.phase,
     action: frame.action,
-    caption: frame.caption,
+    caption: frame.caption(gameStrings().art),
     isResting: frame.isResting === true,
     isLevelUp: at !== 0 && levelOf(frame.xp).level > levelOf(before.xp).level
   }

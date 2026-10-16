@@ -4,6 +4,7 @@ import type { EngineInterface } from 'claude-code'
 import type { FleetState, GameState } from '../types'
 import { gameStateArgvOf, terminalFocusArgvOf } from './game-config'
 import { parseGameState } from './game-state'
+import { gameStrings } from './game-strings'
 import { fleetPhaseOf, partyOf } from './party'
 import {
   clawdReact,
@@ -20,7 +21,6 @@ export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
 const CLI_TIMEOUT_MS = 15000
 const XP_KEY = 'xp-ledger'
-export const UNAVAILABLE = 'orca game state unavailable'
 
 const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note: '', xp: 0 }
 
@@ -78,7 +78,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     next !== undefined && config.rewards
       ? await syncXp($, before.state, next).catch(() => before.xp)
       : before.xp
-  const note = next === undefined ? UNAVAILABLE : (next.warnings[0] ?? '')
+  const note = next === undefined ? gameStrings().text.unavailable : (next.warnings[0] ?? '')
   const doneAt = await $.clock.now()
   await update($, fleet, (s) => ({
     ...s,

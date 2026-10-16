@@ -5,6 +5,7 @@ import { AGENT_COLORS, CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-l
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { focusTerminal, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
+import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
@@ -14,7 +15,8 @@ export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
 
 export async function openPane($: EngineInterface): Promise<void> {
-  await $.ui.open({ id: PANE_ID, title: 'Fleet', closeOnEscape: true, focus: true })
+  const title = gameStrings().text.fleet
+  await $.ui.open({ id: PANE_ID, title, closeOnEscape: true, focus: true })
 }
 
 export const registerFleetPane = (on: On): void => {
@@ -25,6 +27,7 @@ export const registerFleetPane = (on: On): void => {
     const scene = currentScene()
     const palette = scene.band
     const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const text = gameStrings().text
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
       <Button key={key} plain hotkey={hotkey} onPress={onPress}>
@@ -40,27 +43,32 @@ export const registerFleetPane = (on: On): void => {
         onPress={() =>
           void focusTerminal($, handle).then((isFocused) => {
             if (!isFocused) {
-              $.ui.toast(`Could not open ${agent.displayName}'s pane`)
+              $.ui.toast(text.couldNotOpen(agent.displayName))
             }
           })
         }
       >
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>
-          {' View '}
+          {` ${text.view} `}
         </Text>
       </Button>
     )
     const menuRow = (
       <Box flexDirection="row" gap={1} flexWrap="wrap" marginTop={1}>
-        {menu('refresh', 'r', '↻ Refresh', () => void refreshSoon($).catch(() => undefined))}
-        {menu('pet', 'c', '♥ Pet Clawd', () => clawdReact($, 'pet'))}
-        {menu('quit', 'q', '✕ Close', close)}
+        {menu(
+          'refresh',
+          'r',
+          `↻ ${text.refresh}`,
+          () => void refreshSoon($).catch(() => undefined)
+        )}
+        {menu('pet', 'c', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
+        {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
     if (v.state === null) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>{`Fleet · ${v.note === '' ? 'loading…' : v.note}`}</Text>
+          <Text dimColor>{`${text.fleet} · ${v.note === '' ? text.loading : v.note}`}</Text>
           {menuRow}
         </Box>
       )
@@ -96,16 +104,16 @@ export const registerFleetPane = (on: On): void => {
         {art.get(HUD_KEY)}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Text backgroundColor={palette.gold} color={palette.ink} bold>
-            {' ⚑ Fleet '}
+            {` ⚑ ${text.fleet} `}
           </Text>
-          <Text color="cyan">{`${counts.working} working`}</Text>
-          <Text color="gray">{`${counts.idle} idle`}</Text>
-          <Text color="green">{`${counts.done} done`}</Text>
+          <Text color="cyan">{text.working(counts.working)}</Text>
+          <Text color="gray">{text.idle(counts.idle)}</Text>
+          <Text color="green">{text.done(counts.done)}</Text>
           <Text color={counts.waiting > 0 ? 'red' : 'gray'} bold={counts.waiting > 0}>
-            {`${counts.waiting} waiting on you`}
+            {text.waiting(counts.waiting)}
           </Text>
           {v.note !== '' && <Text color="yellow">{v.note}</Text>}
-          {v.isLoading && <Text dimColor>(refreshing)</Text>}
+          {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
         </Box>
         {needs.map((need) => (
           <Text key={`need-${need.name}`} color="red" wrap="truncate-end">
@@ -125,10 +133,8 @@ export const registerFleetPane = (on: On): void => {
                 <Text color={AGENT_COLORS[agent.state]} bold>
                   {agent.displayName}
                 </Text>
-                {agent.isLeader && <Text color={palette.gold}>♛ lead</Text>}
-                <Text color={AGENT_COLORS[agent.state]}>
-                  {agent.state === 'waiting' ? '! waiting' : agent.state}
-                </Text>
+                {agent.isLeader && <Text color={palette.gold}>{`♛ ${text.lead}`}</Text>}
+                <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
                 <Text dimColor>{agent.agentType}</Text>
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
@@ -139,7 +145,7 @@ export const registerFleetPane = (on: On): void => {
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
-              <Text dimColor>Review</Text>
+              <Text dimColor>{text.reviewHeading}</Text>
             </Box>
             <Link href={state.review.url}>
               <Text color={CI_COLORS[state.review.ci]} underline>
@@ -154,7 +160,7 @@ export const registerFleetPane = (on: On): void => {
         {state.workItem !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
-              <Text dimColor>Work item</Text>
+              <Text dimColor>{text.workItemHeading}</Text>
             </Box>
             {state.workItem.url === '' ? (
               <Text>{workItemTextOf(state.workItem)}</Text>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GameAgent, GameState } from '../types'
+import { setGameLocale } from '../hooks/game-strings'
 import { countsOf, fleetPhaseOf, needsOf, partyOf, worktreePhaseOf } from '../hooks/party'
 
 const agent = (patch: Partial<GameAgent>): GameAgent => ({
@@ -105,6 +106,23 @@ describe('counts and needs', () => {
       { name: 'x', text: 'waiting on you', url: null },
       { name: '!3', text: 'CI failing', url: REVIEW.url }
     ])
+  })
+
+  it('says what is needed, and what a teammate does, in the launch language', () => {
+    setGameLocale('es')
+    try {
+      const agents = [agent({ displayName: 'x', state: 'waiting' }), agent({ state: 'idle' })]
+      expect(needsOf(state({ agents, review: REVIEW })).map((need) => need.text)).toEqual([
+        'te espera',
+        'CI fallando'
+      ])
+      expect(partyOf(state({ agents }), true).map((member) => member.says)).toEqual([
+        'esperando',
+        'inactivo'
+      ])
+    } finally {
+      setGameLocale('en')
+    }
   })
 })
 
