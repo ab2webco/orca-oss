@@ -4,6 +4,7 @@ import {
   type OrchestratorGameLinkTemplate
 } from './orchestrator-game-integrations'
 import type {
+  GameActivity,
   GameLink,
   GameLinkTone,
   GameReview,
@@ -98,6 +99,30 @@ export function projectGameLinksOf(
           }
         ]
       : []
+  })
+}
+
+/** One link per distinct activity URL among the agents, so a shared run is not listed twice. */
+export function activityGameLinksOf(
+  agents: readonly { paneKey: string; activity?: GameActivity }[]
+): GameLink[] {
+  const seen = new Set<string>()
+  return agents.flatMap(({ paneKey, activity }) => {
+    if (!activity || seen.has(activity.url)) {
+      return []
+    }
+    seen.add(activity.url)
+    return [
+      {
+        id: `activity:${paneKey}`,
+        kind: 'activity' as const,
+        provider: activity.name,
+        label: activity.id,
+        url: activity.url,
+        status: activity.running ? 'running' : 'done',
+        tone: activity.running ? ('pending' as const) : ('neutral' as const)
+      }
+    ]
   })
 }
 

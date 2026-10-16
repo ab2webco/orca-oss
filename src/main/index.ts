@@ -2723,6 +2723,7 @@ void app.whenReady().then(async () => {
       agentHookServer.ingestTerminalStatus(event)
     },
     subscribeAgentStatusEvents: (listener) => agentHookServer.subscribeEnrichedStatus(listener),
+    readGameMcpCalls: (paneKey) => agentHookServer.gameMcpCallsOf(paneKey),
     // Why: serve can be promoted in place, so wire the listener from startup; runtime enables desktop-only scanners only for a ready renderer.
     onTerminalSideEffects: (batch: TerminalSideEffectBatch) => {
       if (mainWindow && !mainWindow.isDestroyed()) {

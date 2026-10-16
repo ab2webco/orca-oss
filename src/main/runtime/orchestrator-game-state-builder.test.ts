@@ -322,6 +322,70 @@ describe('buildOrchestratorGameState', () => {
     expect(state.config).toMatchObject({ mode: 'on', hud: false })
   })
 
+  it("shows each agent's latest matched MCP activity as a row field, the leader's and a link", async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: 'tester',
+      taskTitle: null,
+      toolName: null
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(
+        checkout(`orchestratorGame:
+  activity:
+    - name: Tambora run
+      tools: mcp__tambora__*
+      match: 'TR-([A-Z]+)-\\d+'
+      url: https://tambora.example/projects/{1}/testruns/{0}
+`)
+      ),
+      agents: [
+        { ...row, paneKey: 'tab:lead' },
+        { ...row, paneKey: 'tab:qa' }
+      ],
+      leaderPaneKey: 'tab:qa',
+      mcpCallsOf: (paneKey) =>
+        paneKey === 'tab:qa'
+          ? [
+              {
+                toolName: 'mcp__tambora__create_test_run',
+                input: '{"project_key":"CIN"}',
+                result: 'Created TR-CIN-12',
+                running: true,
+                at: 5
+              }
+            ]
+          : [],
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+    const activity = {
+      name: 'Tambora run',
+      id: 'TR-CIN-12',
+      url: 'https://tambora.example/projects/CIN/testruns/TR-CIN-12',
+      at: 5,
+      running: true
+    }
+
+    expect(state.agents[0]).not.toHaveProperty('activity')
+    expect(state.agents[1]?.activity).toEqual(activity)
+    expect(state.activity).toEqual(activity)
+    expect(state.links).toEqual([
+      {
+        id: 'activity:tab:qa',
+        kind: 'activity',
+        provider: 'Tambora run',
+        label: 'TR-CIN-12',
+        url: activity.url,
+        status: 'running',
+        tone: 'pending'
+      }
+    ])
+  })
+
   it("adds the project's links, dropping one whose placeholder has no value here", async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

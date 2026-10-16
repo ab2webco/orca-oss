@@ -86,7 +86,7 @@ const AGENT_HOOK_JSON_STRUCTURE_LIMITS = {
   nestingDepth: 64
 } as const
 
-function parseAgentHookJson(content: string): unknown {
+export function parseAgentHookJson(content: string): unknown {
   // Why: Cursor on Windows writes UTF-8-with-BOM to the hook's stdin and `JSON.parse` rejects U+FEFF,
   // so the whole event was dropped. Strip exactly one leading BOM — not a trim — to keep every other
   // malformed payload rejected as before.
@@ -964,7 +964,7 @@ function parseJsonObjectString(value: unknown): Record<string, unknown> | undefi
   }
 }
 
-function extractToolResponseText(toolResponse: unknown): string | undefined {
+export function extractToolResponseText(toolResponse: unknown): string | undefined {
   if (typeof toolResponse === 'string' && toolResponse.length > 0) {
     return toolResponse
   }

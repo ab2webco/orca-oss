@@ -3,7 +3,17 @@ import {
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations
 } from '../../shared/orchestrator-game-config'
-import { gameLinksOf, projectGameLinksOf } from '../../shared/orchestrator-game-links'
+import {
+  builtInGameActivityRules,
+  gameActivityOf,
+  type GameActivityCall
+} from '../../shared/orchestrator-game-activity'
+import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
+import {
+  activityGameLinksOf,
+  gameLinksOf,
+  projectGameLinksOf
+} from '../../shared/orchestrator-game-links'
 import {
   orchestratorGameScenesOf,
   type OrchestratorGameSceneSource
@@ -13,6 +23,7 @@ import {
   gameReviewOf,
   statusGroupOfName,
   statusGroupOfPlane,
+  type GameActivity,
   type GameStatusGroup,
   type GameWorkItem,
   type OrchestratorGameState
@@ -41,6 +52,8 @@ export type OrchestratorGameStateInput = {
   >[]
   leaderPaneKey: string | null
   terminalHandleOf?: (paneKey: string) => string | null
+  /** A pane's recent MCP calls, newest first, held by the hook server in memory. */
+  mcpCallsOf?: (paneKey: string) => readonly GameActivityCall[]
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
@@ -136,6 +149,23 @@ export async function buildOrchestratorGameState(
     branch: input.worktree?.branch,
     'review.number': gameReview ? String(gameReview.number) : undefined
   })
+  // Why: project rules first, so a repo can override what Orca's own integrations would link.
+  const rules = [
+    ...integrations.activity.flatMap((rule) => compileGameActivityRule(rule) ?? []),
+    ...builtInGameActivityRules({ workItem, review: gameReview })
+  ]
+  const activityOf = (paneKey: string): GameActivity | null =>
+    input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
+  const agents = input.agents.map((row) => {
+    const agent = gameAgentOf(
+      row,
+      input.leaderPaneKey,
+      input.terminalHandleOf?.(row.paneKey) ?? null
+    )
+    const activity = activityOf(row.paneKey)
+    return activity ? { ...agent, activity } : agent
+  })
+  const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {
     config: resolved.config,
     sources: resolved.sources,
@@ -148,12 +178,15 @@ export async function buildOrchestratorGameState(
           displayName: input.worktree.displayName
         }
       : null,
-    agents: input.agents.map((row) =>
-      gameAgentOf(row, input.leaderPaneKey, input.terminalHandleOf?.(row.paneKey) ?? null)
-    ),
+    agents,
     review: gameReview,
     workItem,
     extensions: { scenes: scenes.scenes },
-    links: gameLinksOf({ review: gameReview, workItem, extra: projectLinks })
+    links: gameLinksOf({
+      review: gameReview,
+      workItem,
+      extra: [...projectLinks, ...activityGameLinksOf(agents)]
+    }),
+    ...(leaderActivity ? { activity: leaderActivity } : {})
   }
 }

@@ -654,6 +654,7 @@ import {
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -3571,6 +3572,7 @@ export class OrcaRuntimeService {
   private readonly subscribeAgentStatusEventsFn:
     | ((listener: (event: AgentStatusEventSource) => void) => () => void)
     | null
+  private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -3650,6 +3652,8 @@ export class OrcaRuntimeService {
       onTerminalAgentStatus?: (event: RuntimeTerminalAgentStatusEvent) => void
       // Why: `orca events` reads the hook pipeline, which lives outside the runtime.
       subscribeAgentStatusEvents?: (listener: (event: AgentStatusEventSource) => void) => () => void
+      // Why: the game's activity rules read recent MCP calls the hook server keeps in memory.
+      readGameMcpCalls?: (paneKey: string) => readonly GameActivityCall[]
       onTerminalSideEffects?: (batch: TerminalSideEffectBatch) => void
       // Why: agent status mostly arrives via hooks (agent-hooks/server), not OSC
       // terminal output. worktree.ps reads this at query time so mobile shows the
@@ -3734,6 +3738,7 @@ export class OrcaRuntimeService {
     this.onPtyStopped = deps?.onPtyStopped ?? null
     this.onTerminalAgentStatus = deps?.onTerminalAgentStatus ?? null
     this.subscribeAgentStatusEventsFn = deps?.subscribeAgentStatusEvents ?? null
+    this.readGameMcpCallsFn = deps?.readGameMcpCalls ?? null
     this.buildAgentHookPtyEnv = deps?.buildAgentHookPtyEnv ?? null
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
@@ -30157,6 +30162,7 @@ export class OrcaRuntimeService {
       agents: summary?.agents ?? [],
       leaderPaneKey: args.paneKey ?? null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+      mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       readScenes: () => readPluginGameSceneSources(),
       readReview: async () =>
         worktree?.repoId && summary?.branch

@@ -14,6 +14,16 @@ export type GameStatusGroup =
   | 'cancelled'
   | 'unknown'
 
+/** The latest id an agent's MCP calls mentioned that a rule turned into a link. */
+export type GameActivity = {
+  name: string
+  id: string
+  url: string
+  at: number
+  /** True between the tool's PreToolUse and PostToolUse. */
+  running: boolean
+}
+
 export type GameAgent = {
   paneKey: string
   displayName: string | null
@@ -23,6 +33,8 @@ export type GameAgent = {
   isLeader: boolean
   /** Optional on the wire: older hosts send none, and a pane with no terminal gets none. */
   terminalHandle?: string
+  /** Optional on the wire: older hosts send none, and an agent no rule matched gets none. */
+  activity?: GameActivity
 }
 
 export type GameReview = {
@@ -70,6 +82,8 @@ export type OrchestratorGameState = {
   extensions?: { scenes: OrchestratorGameSceneExtension[] }
   /** Optional on the wire: a host older than game links sends none. */
   links?: GameLink[]
+  /** The calling pane's own activity; optional on the wire like `links`. */
+  activity?: GameActivity
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i
