@@ -142,7 +142,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/graft-statusline.cjs\""
+    "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/statusline.cjs\""
   },
   "subagentStatusLine": {
     "type": "command",
