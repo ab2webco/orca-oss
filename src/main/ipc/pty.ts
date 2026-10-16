@@ -268,6 +268,8 @@ import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
 import { isPtyIncarnationId } from '../../shared/pty-incarnation'
 import type { PtyListedSession } from '../../shared/pty-listed-session'
+import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
+import { withAgentTeamsGameCommand } from './pty-agent-teams-game-launch'
 
 // ─── Provider Registry ──────────────────────────────────────────────
 // Routes PTY operations by connectionId (null = local provider).
@@ -6945,6 +6947,8 @@ export function registerPtyHandlers(
             launchConfig: args.launchConfig
           })
         let effectiveLaunchConfig = args.launchConfig
+        const noGame: OrchestratorGameLaunch = { args: [], env: {} }
+        let agentTeamsGameLaunch = noGame
         const shouldPreAllocateTerminalHandle =
           runtime !== undefined &&
           ((!(provider instanceof LocalPtyProvider) &&
@@ -6963,12 +6967,21 @@ export function registerPtyHandlers(
             ...baseEnv,
             ...prepared.env
           }
+          // Why: the game plugin lives on this machine and Windows shells cannot take the POSIX-quoted dir.
+          const game =
+            process.platform !== 'win32' && typeof args.worktreeId === 'string'
+              ? ((await runtime.prepareOrchestratorGameForWorktree?.(args.worktreeId)) ?? noGame)
+              : noGame
+          agentTeamsGameLaunch = game
+          baseEnv = { ...baseEnv, ...game.env }
           if (args.launchConfig) {
             effectiveLaunchConfig = {
               ...args.launchConfig,
+              agentCommand: withAgentTeamsGameCommand(args.launchConfig.agentCommand, game),
               agentEnv: {
                 ...args.launchConfig.agentEnv,
-                ...prepared.env
+                ...prepared.env,
+                ...game.env
               }
             }
           }
@@ -7038,7 +7051,10 @@ export function registerPtyHandlers(
           ? await resolveCodexResumeLaunch(args.command, codexResumePreparation)
           : noCodexResumeLaunch(preAdoptedStablePane ? undefined : args.command)
         const codexResumeHome = codexResumeLaunch.codexResumeHome
-        const launchCommand = codexResumeLaunch.command
+        const launchCommand = withAgentTeamsGameCommand(
+          codexResumeLaunch.command,
+          agentTeamsGameLaunch
+        )
         baseEnv = stripSequencedStartupResumeArgv(baseEnv, codexResumeLaunch)
         // Why: declared after the strip so a local-provider spawn cannot capture the
         // pre-strip env — only the daemon branch below re-derives this from baseEnv.
