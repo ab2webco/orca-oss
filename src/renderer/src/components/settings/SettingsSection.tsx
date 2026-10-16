@@ -75,16 +75,18 @@ export function SettingsSection({
             ) : null}
             {badgeAccessory}
           </h2>
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground wrap-break-word">
+            {description}
+          </p>
         </div>
-        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+        {headerAction ? <div className="max-w-full">{headerAction}</div> : null}
       </div>
       {/* Why: body content sits in a visually distinct band — a soft card with
           rounded corners and tight inner padding — so each row group reads as
           contained inside the section, not as a continuation of the sidebar. */}
       <div
         className={cn(
-          'rounded-xl border border-border/50 bg-card/50 px-7 py-6 shadow-xs',
+          '@container min-w-0 rounded-xl border border-border/50 bg-card/50 px-7 py-6 shadow-xs max-sm:px-4 max-sm:py-4',
           bodyClassName
         )}
       >
