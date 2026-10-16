@@ -21,6 +21,7 @@ export type {
 export class ClaudeAgentTeamsService {
   private readonly teams = new Map<string, AgentTeam>()
   private readonly dispatcher = new ClaudeAgentTeamsTmuxDispatcher()
+  private readonly queues = new Map<string, Promise<void>>()
 
   createLaunchEnv(args: {
     leaderHandle: string
@@ -92,6 +93,24 @@ export class ClaudeAgentTeamsService {
   }
 
   async handleTmuxCompat(
+    request: AgentTeamsTmuxCompatRequest,
+    api: AgentTeamsTerminalApi
+  ): Promise<AgentTeamsTmuxCompatResponse> {
+    // Why: Claude releases its pane lock before respawn-pane, and a split binds the tab's first new
+    // leaf, so a team's commands overlapping would hand two teammates the same pane.
+    const previous = this.queues.get(request.teamId) ?? Promise.resolve()
+    const run = previous.then(() => this.runTmuxCompat(request, api))
+    const tail = run.then(() => undefined)
+    this.queues.set(request.teamId, tail)
+    void tail.then(() => {
+      if (this.queues.get(request.teamId) === tail) {
+        this.queues.delete(request.teamId)
+      }
+    })
+    return run
+  }
+
+  private async runTmuxCompat(
     request: AgentTeamsTmuxCompatRequest,
     api: AgentTeamsTerminalApi
   ): Promise<AgentTeamsTmuxCompatResponse> {

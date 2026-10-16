@@ -190,6 +190,64 @@ describe('ClaudeAgentTeamsService', () => {
     expect(api.closeTerminal).toHaveBeenLastCalledWith('teammate-2')
   })
 
+  // Why: Claude releases its pane lock before respawn-pane, so one teammate's respawn overlaps the
+  // next teammate's split; Orca binds a split to the first new leaf in the tab, so two at once collide.
+  it("runs a team's splits one at a time when a respawn overlaps the next teammate's split", async () => {
+    const { service, teamId, token, leaderPane, api } = createServiceWithLeader()
+    const request = (argv: string[]) =>
+      service.handleTmuxCompat({ teamId, token, envPane: leaderPane, argv }, api)
+    let created = 0
+    let inFlight = 0
+    let maxInFlight = 0
+    vi.mocked(api.splitTerminal).mockImplementation(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      created += 1
+      return { handle: `teammate-${created}`, tabId: 'tab-1', paneRuntimeId: -1 }
+    })
+    const placeholder = (target: string) => [
+      'split-window',
+      '-d',
+      '-t',
+      target,
+      '-h',
+      '-P',
+      '-F',
+      '#{pane_id}',
+      '--',
+      'cat'
+    ]
+
+    await request(placeholder(leaderPane))
+    const [respawned, second] = await Promise.all([
+      request(['respawn-pane', '-k', '-t', '%2', '--', 'claude --agent-id a']),
+      request(placeholder('%2'))
+    ])
+
+    expect(respawned).toMatchObject({ exitCode: 0 })
+    expect(second).toMatchObject({ stdout: '%3\n', exitCode: 0 })
+    expect(maxInFlight).toBe(1)
+    expect(api.closeTerminal).toHaveBeenCalledTimes(1)
+    expect(api.closeTerminal).toHaveBeenCalledWith('teammate-1')
+  })
+
+  it('keeps serving a team after one of its commands fails', async () => {
+    const { service, teamId, token, leaderPane, api } = createServiceWithLeader()
+    const request = (argv: string[]) =>
+      service.handleTmuxCompat({ teamId, token, envPane: leaderPane, argv }, api)
+    vi.mocked(api.splitTerminal).mockRejectedValueOnce(new Error('no space for new pane'))
+
+    const [failed, next] = await Promise.all([
+      request(['split-window', '-t', leaderPane, '-h', '-P', '-F', '#{pane_id}']),
+      request(['split-window', '-t', leaderPane, '-h', '-P', '-F', '#{pane_id}'])
+    ])
+
+    expect(failed).toMatchObject({ exitCode: 1, stderr: 'tmux: no space for new pane\n' })
+    expect(next).toMatchObject({ exitCode: 0 })
+  })
+
   it('keeps the placeholder handle when the respawn split fails', async () => {
     const { service, teamId, token, leaderPane, api } = createServiceWithLeader()
     const request = (argv: string[], envPane = leaderPane) =>
