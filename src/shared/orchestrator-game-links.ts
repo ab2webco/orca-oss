@@ -1,3 +1,8 @@
+import {
+  isHttpUrl,
+  renderGameUrlTemplate,
+  type OrchestratorGameLinkTemplate
+} from './orchestrator-game-integrations'
 import type {
   GameLink,
   GameLinkTone,
@@ -5,15 +10,6 @@ import type {
   GameStatusGroup,
   GameWorkItem
 } from './orchestrator-game-state'
-
-export function isHttpUrl(value: string): boolean {
-  try {
-    const { protocol } = new URL(value)
-    return protocol === 'https:' || protocol === 'http:'
-  } catch {
-    return false
-  }
-}
 
 const REVIEW_TONES: Record<GameReview['state'], GameLinkTone> = {
   open: 'pending',
@@ -83,6 +79,26 @@ function workItemLink(item: GameWorkItem): GameLink {
     ...(item.status ? { status: item.status } : {}),
     tone: WORK_ITEM_TONES[item.statusGroup]
   }
+}
+
+export function projectGameLinksOf(
+  templates: readonly OrchestratorGameLinkTemplate[],
+  values: Readonly<Record<string, string | undefined>>
+): GameLink[] {
+  return templates.flatMap((template, index) => {
+    const url = renderGameUrlTemplate(template.url, values)
+    return url
+      ? [
+          {
+            id: `project:${index}`,
+            kind: 'project' as const,
+            provider: 'project',
+            label: template.label,
+            url
+          }
+        ]
+      : []
+  })
 }
 
 export function gameLinksOf(input: {

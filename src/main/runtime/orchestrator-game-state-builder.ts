@@ -1,6 +1,9 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
-import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
-import { gameLinksOf } from '../../shared/orchestrator-game-links'
+import {
+  resolveOrchestratorGameConfig,
+  resolveOrchestratorGameIntegrations
+} from '../../shared/orchestrator-game-config'
+import { gameLinksOf, projectGameLinksOf } from '../../shared/orchestrator-game-links'
 import {
   orchestratorGameScenesOf,
   type OrchestratorGameSceneSource
@@ -75,13 +78,15 @@ export async function buildOrchestratorGameState(
   const project = input.worktree
     ? await readWorktreeOrcaYaml(input.worktree.path, input.worktree.connectionId)
     : null
-  const resolved = resolveOrchestratorGameConfig({
+  const layers = {
     global: input.settings?.orchestratorGame,
     project: project?.orchestratorGame,
     local: input.worktree?.repoId
       ? input.settings?.orchestratorGameProjects?.[input.worktree.repoId]
       : undefined
-  })
+  }
+  const resolved = resolveOrchestratorGameConfig(layers)
+  const integrations = resolveOrchestratorGameIntegrations(layers)
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
   const [review, plane, linear, sceneSources] = await Promise.all([
@@ -125,6 +130,12 @@ export async function buildOrchestratorGameState(
     }
   }
   const gameReview = gameReviewOf(review)
+  const projectLinks = projectGameLinksOf(integrations.links, {
+    'workItem.identifier': workItem?.identifier,
+    'workItem.provider': workItem?.provider,
+    branch: input.worktree?.branch,
+    'review.number': gameReview ? String(gameReview.number) : undefined
+  })
   return {
     config: resolved.config,
     sources: resolved.sources,
@@ -143,6 +154,6 @@ export async function buildOrchestratorGameState(
     review: gameReview,
     workItem,
     extensions: { scenes: scenes.scenes },
-    links: gameLinksOf({ review: gameReview, workItem })
+    links: gameLinksOf({ review: gameReview, workItem, extra: projectLinks })
   }
 }

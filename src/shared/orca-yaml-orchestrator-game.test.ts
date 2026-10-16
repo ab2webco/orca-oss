@@ -18,6 +18,36 @@ describe('parseOrcaYaml orchestratorGame', () => {
     ])
   })
 
+  it('reads project links and activity rules, reporting the invalid ones', () => {
+    const parsed = parseOrcaYaml(`orchestratorGame:
+  links:
+    - label: Board
+      url: https://plane.example/ws
+    - label: Bad
+      url: ftp://plane.example/ws
+  activity:
+    - name: Tambora run
+      tools: mcp__tambora__*
+      match: 'TR-([A-Z]+)-\\d+'
+      url: https://tambora.example/projects/{1}/testruns/{0}
+`)
+
+    expect(parsed?.orchestratorGame).toEqual({
+      links: [{ label: 'Board', url: 'https://plane.example/ws' }],
+      activity: [
+        {
+          name: 'Tambora run',
+          tools: 'mcp__tambora__*',
+          match: 'TR-([A-Z]+)-\\d+',
+          url: 'https://tambora.example/projects/{1}/testruns/{0}'
+        }
+      ]
+    })
+    expect(parsed?.orchestratorGameWarnings).toEqual([
+      'orchestratorGame.links[1].url must be an http(s) URL with a literal host'
+    ])
+  })
+
   it('leaves the other project defaults untouched', () => {
     const parsed = parseOrcaYaml('scripts:\n  setup: pnpm install\n')
 

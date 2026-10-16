@@ -321,4 +321,34 @@ describe('buildOrchestratorGameState', () => {
 
     expect(state.config).toMatchObject({ mode: 'on', hud: false })
   })
+
+  it("adds the project's links, dropping one whose placeholder has no value here", async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(
+        checkout(`orchestratorGame:
+  links:
+    - label: Branch CI
+      url: https://ci.example/branches/{branch}
+    - label: Ticket
+      url: https://jira.example/browse/{workItem.identifier}
+`)
+      ),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.links).toEqual([
+      {
+        id: 'project:0',
+        kind: 'project',
+        provider: 'project',
+        label: 'Branch CI',
+        url: 'https://ci.example/branches/feat%2Fgame'
+      }
+    ])
+  })
 })
