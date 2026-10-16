@@ -648,6 +648,8 @@ import { collectMemorySnapshot } from '../memory/collector'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
+import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -30106,6 +30108,83 @@ export class OrcaRuntimeService {
       this.prepareOrchestratorGameForHandle(handle)
     ])
     return { env: { ...leader.env, ...game.env }, args: game.args }
+  }
+
+  async getOrchestratorGameState(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    paneKey?: string
+  }): Promise<OrchestratorGameState> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    let worktreeId = args.worktreeId
+    if (!worktreeId && args.terminalHandle) {
+      worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+    }
+    const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
+    const summary = worktree
+      ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
+      : undefined
+    return await buildOrchestratorGameState({
+      settings: this.store?.getSettings?.(),
+      worktree: worktree
+        ? {
+            id: worktree.id,
+            repoId: worktree.repoId ?? null,
+            path: worktree.path,
+            branch: summary?.branch ?? worktree.branch ?? '',
+            displayName: summary?.displayName ?? worktree.displayName ?? '',
+            linkedWorkItem: worktree.linkedWorkItem
+          }
+        : null,
+      agents: summary?.agents ?? [],
+      leaderPaneKey: args.paneKey ?? null,
+      readReview: async () =>
+        worktree?.repoId && summary?.branch
+          ? await this.getHostedReviewForBranch({
+              repoSelector: `id:${worktree.repoId}`,
+              branch: summary.branch,
+              linkedGitHubPR: summary.linkedPR?.number ?? null,
+              linkedGitLabMR: summary.linkedGitLabMR ?? null
+            })
+          : null,
+      readPlane: async () => {
+        const current = worktree
+          ? await this.planeResolveCurrentWorkItem({ worktreeId: worktree.id })
+          : null
+        return current?.workItem
+          ? {
+              identifier: current.identifier,
+              title: current.workItem.title,
+              url: current.url ?? '',
+              stateName: current.workItem.state.name,
+              stateGroup: current.workItem.state.group
+            }
+          : null
+      },
+      readLinear: async () => {
+        if (!worktree?.linkedLinearIssue) {
+          return null
+        }
+        const context = await this.linearIssueContext({
+          current: true,
+          include: {
+            comments: false,
+            children: false,
+            attachments: false,
+            relations: false,
+            activity: false
+          },
+          depth: 0,
+          context: { worktreeId: worktree.id }
+        })
+        return {
+          identifier: context.issue.identifier,
+          title: context.issue.title,
+          url: context.issue.url,
+          stateName: context.issue.state?.name ?? ''
+        }
+      }
+    })
   }
 
   // Why: the game is optional decoration; any failure resolving it must still launch Claude.
