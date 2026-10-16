@@ -1,17 +1,31 @@
-import type { GameState } from '../types'
+import type { GameAction, GameState } from '../types'
 import { fitCells } from './cell-width'
 import { reviewKindOf } from './band-chips'
 import { activityLinksOf, activityTextOf, linkOfKind } from './fleet-labels'
 import { gameStrings } from './game-strings'
 import { httpUrlOf } from './http-url'
+import { todoActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
 
 /** A link the fleet pane opens on a hotkey. */
-export type PaneLink = { key: string; hotkey: string; label: string; url: string }
+export type PaneLink = {
+  key: string
+  hotkey: string
+  label: string
+  url: string
+  /** Pressing it runs this action instead; `url` is then empty. */
+  action?: GameAction
+}
 
 const MAX_LABEL_CELLS = 32
 
-type Candidate = { key: string; hotkey: string; label: string | undefined; url: unknown }
+type Candidate = {
+  key: string
+  hotkey: string
+  label: string | undefined
+  url: unknown
+  action?: GameAction
+}
 
 /** The work item, review, CI, first project link, own activity, then my PRs and To Do lists. */
 export const paneLinksOf = (state: GameState): PaneLink[] => {
@@ -61,13 +75,19 @@ export const paneLinksOf = (state: GameState): PaneLink[] => {
       key: 'open-todo',
       hotkey: 't',
       label: todo && gameStrings().text.todo(todo.total),
-      url: todo?.url
+      url: todo?.url,
+      action: todoActionOf(state)
     }
   ]
-  return candidates.flatMap(({ key, hotkey, label, url }) => {
+  return candidates.flatMap(({ key, hotkey, label, url, action }) => {
+    if (label === undefined) {
+      return []
+    }
+    const fitted = fitCells(label, MAX_LABEL_CELLS)
+    if (action !== undefined) {
+      return [{ key, hotkey, label: fitted, url: '', action }]
+    }
     const href = httpUrlOf(url)
-    return label === undefined || href === undefined
-      ? []
-      : [{ key, hotkey, label: fitCells(label, MAX_LABEL_CELLS), url: href }]
+    return href === undefined ? [] : [{ key, hotkey, label: fitted, url: href }]
   })
 }

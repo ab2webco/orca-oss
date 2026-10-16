@@ -26,6 +26,8 @@ export type OrchestratorGameTodoSource =
       workspace?: string
       /** What "work on" sends the lead: `{id}`, `{title}`, `{url}`, `{status}`. */
       workPrompt?: string
+      /** An action's command or id the To Do link runs instead of opening the list. */
+      action?: string
     }
 
 export type GameProjectItem = {
@@ -48,11 +50,14 @@ export type GameProjectList = {
   items: GameProjectItem[]
   /** Open tickets per status group, all of them and not only the items kept. */
   groups?: Partial<Record<GameStatusGroup, number>>
+  /** The `game.state` action the To Do link runs instead of opening `url`. */
+  actionId?: string
 }
 
 export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
 
 const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,31}$/
+const TODO_ACTION = /^[a-z][a-z0-9:-]{0,63}$/
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -100,7 +105,18 @@ export function parseGameTodoSource(raw: unknown): {
     }
     source.workPrompt = workPrompt
   }
-  return { value: source, warnings: [] }
+  if (raw.action === undefined) {
+    return { value: source, warnings: [] }
+  }
+  // Why keep the rest: a mistyped action should cost the shortcut, never the To Do itself.
+  const action = typeof raw.action === 'string' ? raw.action.trim() : ''
+  if (!TODO_ACTION.test(action)) {
+    return {
+      value: source,
+      warnings: ['orchestratorGame.todo.action must name an action by its command or id, like jira']
+    }
+  }
+  return { value: { ...source, action }, warnings: [] }
 }
 
 // Why this order: what is being worked on first, then what waits on QA, then what is next.

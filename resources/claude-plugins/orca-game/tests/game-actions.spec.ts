@@ -310,7 +310,7 @@ describe("the lead's buttons", () => {
       'Detener',
       'Ship it'
     ])
-    expect(actionLabelOf({ id: 'lead:dance', label: 'Dance', prompt: 'x' })).toBe('Dance')
+    expect(actionLabelOf({ id: 'lead:dance', label: 'Dance' })).toBe('Dance')
   })
 
   it('draws one chip per action, in order, the later ones dropped first', () => {

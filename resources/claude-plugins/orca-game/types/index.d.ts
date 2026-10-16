@@ -93,6 +93,8 @@ export type GameProjectList = {
   items: GameProjectItem[]
   /** Open tickets per status group, all of them and not only `items`. */
   groups?: Partial<Record<GameStatusGroup, number>>
+  /** The action (an id in `actions`) the To Do link runs instead of opening `url`. */
+  actionId?: string
 }
 
 /** My open PRs and tickets across the project, not only this worktree's. */

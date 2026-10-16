@@ -357,3 +357,43 @@ describe("the lead's buttons in the band", () => {
     await ui.unmount()
   })
 })
+
+describe('a To Do that runs an action', () => {
+  const TODO_STATE = {
+    ...STATE,
+    project: { ...STATE.project, todo: { ...STATE.project.todo, actionId: 'action-0' } }
+  }
+
+  test('the t link, the Panel heading and the band chip send its prompt instead of opening the list', async ($, on) => {
+    const world = worldOf({ state: TODO_STATE })
+    const clock = await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'open-todo' })
+    await clock.advance(3001)
+    await ui.press({ key: 'project-todo-action' })
+    await ui.unmount()
+    await clock.advance(3001)
+    const strip = await $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      viewport: { columns: 164, rows: 40, isFullscreen: true },
+      props: {
+        hasSurvey: false,
+        isWorking: false,
+        maxRows: 8,
+        bodyColumns: 160,
+        scroll: { offset: 0, bodyRows: 7 },
+        view: {}
+      }
+    })
+    await strip.press({ key: 'band-todo' })
+    await clock.settle()
+    expect(world.prompts).toEqual([
+      'Open a PR for ORCA-1',
+      'Open a PR for ORCA-1',
+      'Open a PR for ORCA-1'
+    ])
+    await strip.unmount()
+  })
+})

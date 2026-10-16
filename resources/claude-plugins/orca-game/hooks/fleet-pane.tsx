@@ -14,6 +14,7 @@ import { projectRowsOf } from './fleet-project'
 import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
+import { runAction } from './game-actions'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
@@ -119,11 +120,13 @@ export const registerFleetPane = (on: On): void => {
         plain
         hotkey={one.hotkey}
         onPress={() =>
-          void openInOrca($, one.url, worktreeId).then((isOpen) => {
-            if (!isOpen) {
-              $.ui.toast(text.couldNotOpenLink(one.label))
-            }
-          })
+          one.action === undefined
+            ? void openInOrca($, one.url, worktreeId).then((isOpen) => {
+                if (!isOpen) {
+                  $.ui.toast(text.couldNotOpenLink(one.label))
+                }
+              })
+            : void runAction($, one.action, v.isDemo).catch(() => undefined)
         }
       >
         <Text backgroundColor={palette.panel} color={palette.parchment}>

@@ -1,4 +1,4 @@
-import type { GameAction } from '../types'
+import type { GameAction, GameState } from '../types'
 import type { Chip } from './chip-rows'
 import { gameStrings, type LeadActionKey } from './game-strings'
 
@@ -25,4 +25,12 @@ export const actionChipsOf = (actions: readonly GameAction[]): Chip[] =>
 export const commandPromptOf = (prompt: string, args: string): string => {
   const extra = args.trim()
   return extra === '' ? prompt : `${prompt}\n\n${extra}`
+}
+
+/** The action Orca says the To Do link runs, when the state still has it. */
+export const todoActionOf = (
+  state: Pick<GameState, 'actions' | 'project'>
+): GameAction | undefined => {
+  const id = state.project?.todo?.actionId
+  return id === undefined ? undefined : state.actions?.find((one) => one.id === id)
 }

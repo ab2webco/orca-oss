@@ -55,3 +55,7 @@ export function gameStateActionsOf(args: {
   })
   return [...builtIn, ...project]
 }
+
+/** The id of the action a setting names by its command or its id, as `todo.action` does. */
+export const gameActionIdOf = (actions: readonly GameAction[], name: string): string | undefined =>
+  (actions.find((one) => one.command === name) ?? actions.find((one) => one.id === name))?.id

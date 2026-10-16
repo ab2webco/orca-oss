@@ -22,6 +22,21 @@ describe('parseGameTodoSource', () => {
     ).toEqual({ value: { provider: 'jira', project: 'CIN', workspace: 'koombea' }, warnings: [] })
   })
 
+  it('takes the action the To Do runs instead of opening its list, by command or id', () => {
+    expect(parseGameTodoSource({ provider: 'jira', action: ' jira ' })).toEqual({
+      value: { provider: 'jira', action: 'jira' },
+      warnings: []
+    })
+    expect(parseGameTodoSource({ provider: 'jira', action: 'lead:status' }).value).toEqual({
+      provider: 'jira',
+      action: 'lead:status'
+    })
+    expect(parseGameTodoSource({ provider: 'jira', action: 'Show my To Do' })).toEqual({
+      value: { provider: 'jira' },
+      warnings: ['orchestratorGame.todo.action must name an action by its command or id, like jira']
+    })
+  })
+
   it('refuses an unknown provider or an oversized project with a warning naming the key', () => {
     expect(parseGameTodoSource({ provider: 'trello' })).toEqual({
       value: undefined,

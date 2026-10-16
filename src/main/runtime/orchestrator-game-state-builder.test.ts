@@ -489,6 +489,43 @@ describe('buildOrchestratorGameState', () => {
     expect(off.actions).toBeUndefined()
   })
 
+  it('names the action the To Do runs, by command or id, and warns when none has that name', async () => {
+    const stateWith = (action: string) =>
+      buildOrchestratorGameState({
+        settings: undefined,
+        worktree: worktree(
+          checkout(
+            [
+              'orchestratorGame:',
+              '  todo:',
+              '    provider: jira',
+              `    action: ${action}`,
+              '  actions:',
+              '    - label: Jira',
+              '      command: jira',
+              "      prompt: 'Show my To Do with the jira CLI'",
+              ''
+            ].join('\n')
+          )
+        ),
+        agents: [],
+        leaderPaneKey: null,
+        readReview: none,
+        readPlane: none,
+        readLinear: none,
+        readProjectWork: async () => ({
+          reviews: null,
+          todo: { provider: 'jira', total: 0, url: 'https://jira.example/issues/', items: [] }
+        })
+      })
+
+    expect((await stateWith('jira')).project?.todo?.actionId).toBe('action-0')
+    expect((await stateWith('lead:status')).project?.todo?.actionId).toBe('lead:status')
+    const missing = await stateWith('nope')
+    expect(missing.project?.todo?.actionId).toBeUndefined()
+    expect(missing.warnings).toContain('orchestratorGame.todo.action names no action: nope')
+  })
+
   it("sends the project's actions filled for this worktree and each ticket's work prompt", async () => {
     const yaml = [
       'orchestratorGame:',

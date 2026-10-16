@@ -23,7 +23,7 @@ import {
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
-import { gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
+import { gameActionIdOf, gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
 import {
   activityGameLinksOf,
   gameLinksOf,
@@ -199,6 +199,8 @@ export async function buildOrchestratorGameState(
     project: gameActionsOf(integrations.actions, placeholders)
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
+  const todoAction = integrations.todo === 'off' ? undefined : integrations.todo?.action
+  const todoActionId = todoAction === undefined ? undefined : gameActionIdOf(actions, todoAction)
   const todo = projectWork?.todo
   const projectState =
     projectWork && todo
@@ -206,6 +208,7 @@ export async function buildOrchestratorGameState(
           ...projectWork,
           todo: {
             ...todo,
+            ...(todoActionId === undefined ? {} : { actionId: todoActionId }),
             items: todo.items.map((one) => ({
               ...one,
               prompt: renderGameWorkPrompt(workPrompt, one)
@@ -241,7 +244,10 @@ export async function buildOrchestratorGameState(
       ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),
       ...(project?.orchestratorGameWarnings ?? []),
       ...resolved.warnings,
-      ...scenes.warnings
+      ...scenes.warnings,
+      ...(todoAction !== undefined && todoActionId === undefined
+        ? [`orchestratorGame.todo.action names no action: ${todoAction}`]
+        : [])
     ],
     worktree: input.worktree
       ? {

@@ -15,10 +15,17 @@ import {
   workItemTextOf
 } from './fleet-labels'
 import { gameStrings } from './game-strings'
+import { todoActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
 
 /** A link chip opens `href` when it has one and is drawn in `color`, else the scene's parchment. */
-export type BandChip = Chip & { isLink?: boolean; href?: string; color?: string }
+export type BandChip = Chip & {
+  isLink?: boolean
+  href?: string
+  color?: string
+  /** Pressing it runs this action instead of opening `href`. */
+  actionId?: string
+}
 
 export type Counts = { working: number; idle: number; done: number; waiting: number }
 
@@ -56,6 +63,17 @@ const projectChipOf = (
   ...(list.url === null ? {} : { href: list.url }),
   ...(color === undefined ? {} : { color })
 })
+
+// Why no href with an action: the project asked for its To Do through the lead, not a URL.
+const todoChipOf = (state: GameState, label: string, todo: GameProjectList): BandChip => {
+  const chip = projectChipOf('band-todo', '☐', label, todo)
+  const action = todoActionOf(state)
+  if (action === undefined) {
+    return chip
+  }
+  const { href: _href, ...rest } = chip
+  return { ...rest, actionId: action.id }
+}
 
 // Open PRs drawn one by one before the band falls back to a count.
 const BAND_PRS_MAX = 3
@@ -107,7 +125,7 @@ const projectChipsOf = (state: GameState): BandChip[] => {
           )
         ]
       : []),
-    ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)]),
+    ...(todo === null ? [] : [todoChipOf(state, text.todo(todo.total), todo)]),
     ...qaChips
   ]
 }

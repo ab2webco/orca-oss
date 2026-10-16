@@ -135,8 +135,28 @@ export const registerBand = (on: On): void => {
     )
     const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
     const linked = new Map(chips.filter((one) => one.isLink).map((one) => [one.key, one]))
+    const actions = new Map(
+      (state.actions ?? []).map((one) => [`${ACTION_CHIP_PREFIX}${one.id}`, one])
+    )
     const chipOf = (chip: PlacedChip): RenderElement => {
       const link = linked.get(chip.key)
+      const todoAction =
+        link?.actionId === undefined
+          ? undefined
+          : actions.get(`${ACTION_CHIP_PREFIX}${link.actionId}`)
+      if (todoAction !== undefined) {
+        return (
+          <Button
+            key={chip.key}
+            plain
+            onPress={() => void runAction($, todoAction, v.isDemo).catch(() => undefined)}
+          >
+            <Text color={link?.color ?? palette.parchment} backgroundColor={palette.panel}>
+              {` ${chip.label} `}
+            </Text>
+          </Button>
+        )
+      }
       if (link !== undefined) {
         return linkOf(
           chip.key,
@@ -176,9 +196,6 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'gray')
       }
     }
-    const actions = new Map(
-      (state.actions ?? []).map((one) => [`${ACTION_CHIP_PREFIX}${one.id}`, one])
-    )
     // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
     const actionRows = rowsOf(
       'band-actions',

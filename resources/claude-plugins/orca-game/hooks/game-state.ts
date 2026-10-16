@@ -121,6 +121,13 @@ const groupCountsOf = (value: unknown): { groups?: Partial<Record<GameStatusGrou
   return counts.length === 0 ? {} : { groups: Object.fromEntries(counts) }
 }
 
+const ACTION_ID_MAX = 64
+
+const actionIdOf = (value: unknown): { actionId?: string } =>
+  typeof value === 'string' && value.trim() !== '' && value.trim().length <= ACTION_ID_MAX
+    ? { actionId: value.trim() }
+    : {}
+
 const projectListOf = (value: unknown): GameProjectList | null => {
   if (!isShape(value) || typeof value.total !== 'number' || !Number.isFinite(value.total)) {
     return null
@@ -131,7 +138,8 @@ const projectListOf = (value: unknown): GameProjectList | null => {
     total: Math.max(0, Math.floor(value.total)),
     url: httpUrlOf(value.url) ?? null,
     items: items.flatMap(projectItemOf).slice(0, MAX_PROJECT_ITEMS),
-    ...groupCountsOf(value.groups)
+    ...groupCountsOf(value.groups),
+    ...actionIdOf(value.actionId)
   }
 }
 

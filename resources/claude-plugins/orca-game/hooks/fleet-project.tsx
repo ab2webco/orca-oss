@@ -12,7 +12,7 @@ import { reviewKindOf } from './band-chips'
 import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
-import { actionLabelOf } from './lead-actions'
+import { actionLabelOf, todoActionOf } from './lead-actions'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
 const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
@@ -65,12 +65,22 @@ export async function projectRowsOf(
     </Box>
   )
   // A heading that opens the list, then the items, under a heading per status when they have one.
-  const listRows = (key: string, heading: string, list: GameProjectList) => {
+  const listRows = (key: string, heading: string, list: GameProjectList, action?: GameAction) => {
     const sections = todoSectionsOf(list)
     return (
       <Box key={key} flexDirection="column">
         <Box flexDirection="row" gap={1}>
-          {list.url === null ? (
+          {action !== undefined ? (
+            <Button
+              key={`${key}-action`}
+              plain
+              onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
+            >
+              <Text bold underline>
+                {heading}
+              </Text>
+            </Button>
+          ) : list.url === null ? (
             <Text bold>{heading}</Text>
           ) : (
             <Link href={list.url}>
@@ -148,7 +158,9 @@ export async function projectRowsOf(
       : [
           listRows('project-reviews', text.myReviews(reviewKindOf(reviews), reviews.total), reviews)
         ]),
-    ...(todo === null ? [] : [listRows('project-todo', text.todo(todo.total), todo)]),
+    ...(todo === null
+      ? []
+      : [listRows('project-todo', text.todo(todo.total), todo, todoActionOf(state))]),
     ...(actions.length === 0
       ? []
       : [

@@ -4,6 +4,7 @@ import type { GameProjectWork, GameState } from '../types'
 import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import { gameStateOf } from '../hooks/game-state'
 import { paneLinksOf } from '../hooks/pane-links'
+import { todoActionOf } from '../hooks/lead-actions'
 
 const PROJECT: GameProjectWork = {
   reviews: {
@@ -202,5 +203,46 @@ describe('project pane links', () => {
         url: 'https://app.plane.so/w/workspace-views/assigned/'
       }
     ])
+  })
+})
+
+describe('a To Do that runs an action', () => {
+  const JIRA = { id: 'action-0', label: 'Jira', command: 'jira', prompt: 'Show my To Do' }
+  const withAction = (actionId?: string): GameState => ({
+    ...STATE,
+    actions: [JIRA],
+    project: {
+      reviews: null,
+      todo: {
+        ...(PROJECT.todo as NonNullable<GameProjectWork['todo']>),
+        ...(actionId === undefined ? {} : { actionId })
+      }
+    }
+  })
+
+  it('keeps the action Orca names for the To Do', () => {
+    const parsed = gameStateOf(withAction('action-0'))
+    expect(parsed?.project?.todo?.actionId).toBe('action-0')
+    expect(todoActionOf(parsed as GameState)).toEqual(JIRA)
+  })
+
+  it('makes the band chip and the t link run it instead of opening the list', () => {
+    const state = withAction('action-0')
+    const chip = byKey(chipsOf(state), 'band-todo')
+    expect(chip?.href).toBeUndefined()
+    expect(chip?.actionId).toBe('action-0')
+    expect(paneLinksOf(state).find((one) => one.key === 'open-todo')).toMatchObject({
+      hotkey: 't',
+      url: '',
+      action: JIRA
+    })
+  })
+
+  it('keeps the link when the action is missing or unset', () => {
+    for (const state of [withAction('action-9'), withAction()]) {
+      expect(todoActionOf(state)).toBeUndefined()
+      expect(byKey(chipsOf(state), 'band-todo')?.href).toBe(PROJECT.todo?.url)
+      expect(paneLinksOf(state).find((one) => one.key === 'open-todo')?.url).toBe(PROJECT.todo?.url)
+    }
   })
 })

@@ -221,8 +221,14 @@ Where the To Do comes from, first match wins:
        provider: plane # plane | jira | linear | github | gitlab
        project: e665c0d5-22e7-495e-9ecf-3effee3ae370 # optional: Plane project id, Jira key, Linear team key
        workspace: ab2web # optional: Plane workspace slug, Jira site id or Linear workspace id
+       action: jira # optional: the command or id of an action the To Do link runs instead
    ```
 
+   With `action`, the To Do chip, the Panel's To Do heading and its `t` link run that action
+   (one of the project's `actions` by its `command` or id, or a lead button like `lead:status`)
+   instead of opening the tracker's list, so the lead shows the To Do with whatever the project
+   uses (a CLI, an MCP server). An action that does not exist is reported in `orca game state`
+   and the link opens the list as before.
    Without `workspace` Orca uses the workspace or site selected on its Tasks page. `todo: off`
    hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
    since it goes into the JQL.
