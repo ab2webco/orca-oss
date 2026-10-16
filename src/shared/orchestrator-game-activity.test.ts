@@ -84,6 +84,28 @@ describe('builtInGameActivityRules', () => {
     ).toMatchObject({ id: '#9', url: 'https://github.com/o/r/issues/9' })
   })
 
+  it('links a merge request or issue iid a GitLab MCP call names in the review project', () => {
+    const rules = builtInGameActivityRules({
+      workItem: null,
+      review: {
+        ...github,
+        provider: 'gitlab',
+        url: 'https://gitlab.com/g/sub/p/-/merge_requests/5'
+      }
+    })
+
+    expect(
+      gameActivityOf([call('mcp__gitlab__get_merge_request', '{"merge_request_iid":6}')], rules)
+    ).toMatchObject({
+      name: 'GitLab',
+      id: '!6',
+      url: 'https://gitlab.com/g/sub/p/-/merge_requests/6'
+    })
+    expect(
+      gameActivityOf([call('mcp__gitlab__get_issue', '{"issue_iid":3}')], rules)
+    ).toMatchObject({ id: '#3', url: 'https://gitlab.com/g/sub/p/-/issues/3' })
+  })
+
   it('knows no host, and adds no rule, without a work item or review', () => {
     expect(builtInGameActivityRules({ workItem: null, review: null })).toEqual([])
     expect(builtInGameActivityRules({ workItem: { ...plane, url: '' }, review: null })).toEqual([])
