@@ -138,17 +138,26 @@ describe('HostPluginPanelsRow', () => {
     expect(hook.args?.supported).toBe(false)
   })
 
-  it('renders nothing before the first list arrives or without nav panels', () => {
+  it('renders nothing before the first list arrives or without any panel', () => {
     render('disconnected')
     expect(renderer!.toJSON()).toBeNull()
 
     hook.panels = []
     render()
     expect(renderer!.toJSON()).toBeNull()
+  })
 
+  it('keeps the All entry when only settings panels exist', () => {
     hook.panels = [panel({ surface: 'settings' })]
-    render()
-    expect(renderer!.toJSON()).toBeNull()
+    const open = render()
+
+    expect(cards()).toHaveLength(0)
+    expect(renderer!.root.findAllByType('ScrollView')).toHaveLength(0)
+    const all = renderer!.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'All plugins')!
+    act(() => all.props.onPress())
+    expect(open).toHaveBeenLastCalledWith('/h/desk/plugins')
   })
 
   it('keeps the last list while the host reconnects', () => {

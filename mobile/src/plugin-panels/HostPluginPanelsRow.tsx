@@ -17,7 +17,9 @@ type Props = {
 }
 
 function pluginPanelRoute(hostId: string, panel: HostablePluginPanel): string {
-  return `/h/${hostId}/plugins/${encodeURIComponent(panel.pluginKey)}/${encodeURIComponent(panel.panelId)}?title=${encodeURIComponent(panel.title)}`
+  return `/h/${hostId}/plugins/${encodeURIComponent(
+    panel.pluginKey
+  )}/${encodeURIComponent(panel.panelId)}?title=${encodeURIComponent(panel.title)}`
 }
 
 /** One-tap entry to each sidecar plugin panel; settings panels stay on the full Plugins screen. */
@@ -26,12 +28,13 @@ export function HostPluginPanelsRow({ hostId, client, connState, open }: Props) 
   const supported = arePluginPanelsSupportedByHost(hostCapabilities)
   const { panels } = useHostPluginPanels({ client, connState, supported })
   const navPanels = panels?.filter((panel) => panel.surface === 'nav') ?? []
-  if (!hostId || !supported || navPanels.length === 0) {
+  // Why: this row is the host view's only way into plugins, so settings-only hosts still get All.
+  if (!hostId || !supported || !panels || panels.length === 0) {
     return null
   }
   return (
-    <View style={styles.section}>
-      <View style={styles.headingRow}>
+    <View style={[styles.section, navPanels.length === 0 && styles.sectionHeadingOnly]}>
+      <View style={[styles.headingRow, navPanels.length === 0 && styles.headingRowOnly]}>
         <Text style={styles.sectionHeading}>Plugins</Text>
         <Pressable
           style={styles.allButton}
@@ -44,38 +47,40 @@ export function HostPluginPanelsRow({ hostId, client, connState, open }: Props) 
           <ChevronRight size={12} color={colors.textMuted} />
         </Pressable>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.cards}
-      >
-        {navPanels.map((panel) => (
-          <Pressable
-            key={`${panel.pluginKey}/${panel.panelId}`}
-            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() => open(pluginPanelRoute(hostId, panel))}
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${panel.title}`}
-          >
-            <View style={styles.iconTile}>
-              <PluginPanelIcon
-                icon={panel.icon}
-                iconSvg={panel.iconSvg}
-                size={16}
-                color={colors.textSecondary}
-              />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {panel.title}
-              </Text>
-              <Text style={styles.cardMeta} numberOfLines={1}>
-                {panel.pluginName}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {navPanels.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cards}
+        >
+          {navPanels.map((panel) => (
+            <Pressable
+              key={`${panel.pluginKey}/${panel.panelId}`}
+              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+              onPress={() => open(pluginPanelRoute(hostId, panel))}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${panel.title}`}
+            >
+              <View style={styles.iconTile}>
+                <PluginPanelIcon
+                  icon={panel.icon}
+                  iconSvg={panel.iconSvg}
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {panel.title}
+                </Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>
+                  {panel.pluginName}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   )
 }
@@ -93,6 +98,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm
+  },
+  sectionHeadingOnly: {
+    paddingBottom: spacing.xs
+  },
+  headingRowOnly: {
+    minHeight: 32,
+    marginBottom: 0
   },
   sectionHeading: {
     paddingHorizontal: spacing.xs,
