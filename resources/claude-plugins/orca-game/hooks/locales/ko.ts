@@ -43,6 +43,7 @@ export const KO: GameCatalog = {
     questDemo:
       'Quest: demo. 스크립트로 짜인 가상 파티가 모든 반응을 재생합니다. 아무것도 읽거나 쓰지 않습니다. /quest on으로 실제 데이터로 돌아갑니다.',
     unknownMode: (asked) =>
-      `알 수 없는 모드 "${asked}"입니다. /quest off, /quest on, /quest zen 또는 /quest demo를 사용하세요.`
+      `알 수 없는 모드 "${asked}"입니다. /quest off, /quest on, /quest zen 또는 /quest demo를 사용하세요.`,
+    moreAllies: (count) => `외 ${count}개`
   }
 }

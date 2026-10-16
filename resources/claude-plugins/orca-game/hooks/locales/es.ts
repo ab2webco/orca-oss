@@ -51,7 +51,8 @@ export const ES: GameCatalog = {
     questDemo:
       'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /quest on vuelve a los datos reales.',
     unknownMode: (asked) =>
-      `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`
+      `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
+    moreAllies: (count) => `+${count} más`
   },
   art: {
     needsYou: '¡te necesita!',

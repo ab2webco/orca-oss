@@ -68,9 +68,16 @@ export type FleetState = {
   xp: number
 }
 
+/** A line another plugin set with `$.ui.status`, held for the allies strip while the game draws. */
+export type AllyStatus = { plugin: string; text: string }
+
+export type AlliesState = { statuses: AllyStatus[] }
+
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
-    'orca-game': { fleet: FleetState }
+    'orca-game': { fleet: FleetState; allies: AlliesState }
+    // Read, never depended on: hooks/allies.ts checks the shape at runtime.
+    'orca-jev-mod-skills': { advisor: unknown }
   }
 }

@@ -1,5 +1,6 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
+import { alliesStrip } from './allies-strip'
 import { CI_COLORS, needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from './fleet-labels'
 import { HUD_KEY, HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { gameStrings } from './game-strings'
@@ -20,6 +21,10 @@ import { levelOf } from './rewards'
 
 const PET_KEY = 'band-pet-scene'
 
+// Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
+const beneathOf = (drawn: RenderElement): RenderElement | undefined =>
+  drawn.type === 'engine' ? undefined : drawn
+
 function openFleet($: EngineInterface): void {
   void openPane($)
     .then(() => refreshSoon($))
@@ -39,6 +44,10 @@ export const registerBand = (on: On): void => {
     const v = await viewOf($)
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
+    const [beneath, allies] = await Promise.all([
+      next(e).then(beneathOf),
+      alliesStrip($, e, palette, columns)
+    ])
     const { Box, Text, Button, Link } = $.ui.resolve(e)
     const text = gameStrings().text
     const showPet = isClawdReacting() && !isSceneShown()
@@ -80,6 +89,8 @@ export const registerBand = (on: On): void => {
           {art.get(PET_KEY)}
           <Text dimColor>{`${text.team} · ${v.note === '' ? text.loading : v.note}`}</Text>
           {menuRow}
+          {allies}
+          {beneath}
         </Box>
       )
     }
@@ -155,6 +166,8 @@ export const registerBand = (on: On): void => {
           </Box>
         )}
         {menuRow}
+        {allies}
+        {beneath}
       </Box>
     )
   })
