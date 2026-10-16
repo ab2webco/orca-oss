@@ -652,6 +652,7 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
@@ -30153,6 +30154,7 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       leaderPaneKey: args.paneKey ?? null,
+      readScenes: () => readPluginGameSceneSources(),
       readReview: async () =>
         worktree?.repoId && summary?.branch
           ? await this.getHostedReviewForBranch({

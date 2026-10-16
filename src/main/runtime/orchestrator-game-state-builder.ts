@@ -1,6 +1,10 @@
 import { loadHooks } from '../hooks'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import {
+  orchestratorGameScenesOf,
+  type OrchestratorGameSceneSource
+} from '../../shared/orchestrator-game-scene'
+import {
   gameAgentOf,
   gameReviewOf,
   statusGroupOfName,
@@ -36,6 +40,7 @@ export type OrchestratorGameStateInput = {
   readLinkedStatus?: (
     linked: WorkspaceLinkedItem
   ) => Promise<{ name: string; group?: GameStatusGroup } | null>
+  readScenes?: () => Promise<OrchestratorGameSceneSource[]>
 }
 
 // Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
@@ -72,11 +77,14 @@ export async function buildOrchestratorGameState(
       : undefined
   })
   const tracker = resolved.config.tracker && input.worktree !== null
-  const [review, plane, linear] = await Promise.all([
+  const readScenes = input.readScenes
+  const [review, plane, linear, sceneSources] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
-    tracker ? settle(input.readLinear) : Promise.resolve(null)
+    tracker ? settle(input.readLinear) : Promise.resolve(null),
+    readScenes ? settle(readScenes) : Promise.resolve(null)
   ])
+  const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   let workItem: GameWorkItem | null = null
   if (plane) {
     workItem = {
@@ -113,7 +121,7 @@ export async function buildOrchestratorGameState(
   return {
     config: resolved.config,
     sources: resolved.sources,
-    warnings: project?.orchestratorGameWarnings ?? [],
+    warnings: [...(project?.orchestratorGameWarnings ?? []), ...scenes.warnings],
     worktree: input.worktree
       ? {
           id: input.worktree.id,
@@ -124,6 +132,7 @@ export async function buildOrchestratorGameState(
       : null,
     agents: input.agents.map((row) => gameAgentOf(row, input.leaderPaneKey)),
     review: gameReviewOf(review),
-    workItem
+    workItem,
+    extensions: { scenes: scenes.scenes }
   }
 }

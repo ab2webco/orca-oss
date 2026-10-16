@@ -2,6 +2,7 @@ import type { AgentStatusState } from './agent-status-types'
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
+import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 
 export type GameStatusGroup =
@@ -48,6 +49,8 @@ export type OrchestratorGameState = {
   agents: GameAgent[]
   review: GameReview | null
   workItem: GameWorkItem | null
+  /** Optional on the wire: a host older than plugin scenes sends none. */
+  extensions?: { scenes: OrchestratorGameSceneExtension[] }
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

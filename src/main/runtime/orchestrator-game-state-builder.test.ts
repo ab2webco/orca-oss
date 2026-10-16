@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { sceneFile } from '../../shared/__fixtures__/orchestrator-game-scene'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const dirs: string[] = []
@@ -189,6 +190,48 @@ describe('buildOrchestratorGameState', () => {
     })
 
     expect(state.worktree).toBeNull()
+    expect(state.config.mode).toBe('on')
+    expect(state.extensions).toEqual({ scenes: [] })
+  })
+
+  it('serves contributed scenes namespaced by plugin and warns about the ones it drops', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout('orchestratorGame:\n  scene: acme.space/orbit\n')),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readScenes: async () => [
+        { pluginId: 'acme.space', id: 'orbit', text: JSON.stringify(sceneFile()) },
+        { pluginId: 'acme.space', id: 'flat', text: JSON.stringify(sceneFile({ band: {} })) }
+      ]
+    })
+
+    expect(state.config.scene).toBe('acme.space/orbit')
+    expect(state.extensions?.scenes.map((one) => [one.id, one.pluginId])).toEqual([
+      ['acme.space/orbit', 'acme.space']
+    ])
+    expect(state.extensions?.scenes[0]?.definition.id).toBe('acme.space/orbit')
+    expect(state.warnings).toEqual([expect.stringContaining('game scene acme.space/flat dropped')])
+  })
+
+  it('keeps the rest of the state when reading scenes fails', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readScenes: async () => {
+        throw new Error('plugin service gone')
+      }
+    })
+
+    expect(state.extensions).toEqual({ scenes: [] })
     expect(state.config.mode).toBe('on')
   })
 })
