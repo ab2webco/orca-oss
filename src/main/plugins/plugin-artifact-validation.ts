@@ -9,6 +9,7 @@ import {
 import { isPluginPanelIconPath } from '../../shared/plugins/plugin-manifest-fields'
 import { PLUGIN_PANEL_ICON_SVG_MAX_BYTES } from '../../shared/plugins/plugin-panel-icon-svg'
 import { parsePluginVmRecipeArtifact } from '../../shared/plugins/plugin-vm-recipe-artifact'
+import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../shared/orchestrator-game-scene'
 
 export type PluginArtifactValidationResult = { ok: true } | { ok: false; error: string }
 
@@ -99,6 +100,12 @@ function declaredArtifactPaths(manifest: PluginManifest): DeclaredArtifact[] {
             }
           ]
     ),
+    ...manifest.contributes.gameScenes.map((scene) => ({
+      label: `game scene "${scene.id}"`,
+      path: scene.path,
+      kind: 'file' as const,
+      maxBytes: ORCHESTRATOR_GAME_SCENE_MAX_BYTES
+    })),
     // Both entries matter: the directory proves containment of what discovery
     // will walk, the file proves the skill an agent would be served exists.
     ...manifest.contributes.skills.flatMap((skill) => [

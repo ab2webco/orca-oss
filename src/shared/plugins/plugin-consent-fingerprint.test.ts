@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { canonicalizeCapabilitySet, type PluginCapability } from './plugin-capabilities'
-import { fingerprintPluginConsent } from './plugin-consent-fingerprint'
+import {
+  fingerprintPluginConsent,
+  hasInstructionalPluginContributions
+} from './plugin-consent-fingerprint'
+import { parsePluginManifest } from './plugin-manifest'
 import {
   getPluginActivationState,
   needsReconsent,
@@ -178,6 +182,27 @@ describe('fingerprintPluginConsent', () => {
 
     expect(fingerprintPluginConsent(subject, 'a'.repeat(64))).toBe(
       fingerprintPluginConsent(subject, 'b'.repeat(64))
+    )
+  })
+  it('keeps consent across scene edits: game scenes are inert data, never executed', () => {
+    const parsed = parsePluginManifest({
+      manifestVersion: 1,
+      id: 'scenes',
+      publisher: 'orca-samples',
+      name: 'Scenes',
+      version: '1.0.0',
+      engines: { orca: '>=1.0.0' },
+      pluginApi: 1,
+      contributes: { gameScenes: [{ id: 'space', path: 'scenes/space.json' }] }
+    })
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) {
+      return
+    }
+
+    expect(hasInstructionalPluginContributions(parsed.manifest)).toBe(false)
+    expect(fingerprintPluginConsent(parsed.manifest, 'tree-hash-a')).toBe(
+      fingerprintPluginConsent({ main: undefined, capabilities: [] })
     )
   })
 })

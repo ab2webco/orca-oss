@@ -2,11 +2,13 @@ import { z } from 'zod'
 import { pluginCapabilitySchema } from './plugin-capabilities'
 import {
   PLUGIN_AGENT_PROFILE_LIMIT,
+  PLUGIN_GAME_SCENE_LIMIT,
   PLUGIN_KEYBINDING_LIMIT,
   PLUGIN_LANGUAGE_PACK_LIMIT,
   PLUGIN_SKILL_LIMIT,
   PLUGIN_VM_RECIPE_LIMIT,
   pluginAgentProfileContributionSchema,
+  pluginGameSceneContributionSchema,
   pluginKeybindingContributionSchema,
   pluginLanguagePackContributionSchema,
   pluginSkillContributionSchema,
@@ -149,6 +151,10 @@ export const pluginManifestSchema = z
           .max(PLUGIN_AUTOMATION_LIMIT)
           .default([]),
         skills: z.array(pluginSkillContributionSchema).max(PLUGIN_SKILL_LIMIT).default([]),
+        gameScenes: z
+          .array(pluginGameSceneContributionSchema)
+          .max(PLUGIN_GAME_SCENE_LIMIT)
+          .default([]),
         settings: pluginSettingsContributionSchema
       })
       .strict()
@@ -162,6 +168,7 @@ export const pluginManifestSchema = z
         agents: [],
         automations: [],
         skills: [],
+        gameScenes: [],
         settings: []
       })),
     capabilities: z.array(pluginCapabilitySchema).max(32).default([])

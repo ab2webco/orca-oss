@@ -19,6 +19,7 @@ type ContributionValidationManifest = {
     agents: PathContribution[]
     automations: IdentifiedContribution[]
     skills: PathContribution[]
+    gameScenes: IdentifiedContribution[]
   }
   capabilities: { kind: string }[]
 }
@@ -48,7 +49,7 @@ export function validatePluginManifestContributions(
   manifest: ContributionValidationManifest,
   ctx: RefinementCtx
 ): void {
-  for (const path of ['panels', 'commands', 'automations'] as const) {
+  for (const path of ['panels', 'commands', 'automations', 'gameScenes'] as const) {
     rejectDuplicateValues(
       manifest.contributes[path],
       (entry) => (entry as IdentifiedContribution).id,
