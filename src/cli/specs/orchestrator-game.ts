@@ -23,15 +23,19 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own child worktree, as this project's lead",
-    usage: 'orca game launch <ticket> [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket'],
+    usage: 'orca game launch <ticket> [--repo <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo'],
     positionalArgs: ['ticket'],
     notes: [
       'Run it from the lead terminal: the member reports to it through Orca orchestration.',
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
-      'Refused when the project cap of running members is reached.'
+      'Refused when the project cap of running members is reached.',
+      "--repo starts the member in that repo's own new worktree instead of a child of the lead's."
     ],
-    examples: ['orca game launch CIN-1232 --json']
+    examples: [
+      'orca game launch CIN-1232 --json',
+      'orca game launch CIN-1232 --repo name:cineco-frontend --json'
+    ]
   },
   {
     path: ['game', 'scene', 'new'],

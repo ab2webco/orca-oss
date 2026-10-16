@@ -61,6 +61,8 @@ async function requireLaunchPreferences(client: Client): Promise<void> {
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {
     const ticket = requiredTicket(flags)
+    const rawRepo = flags.get('repo')
+    const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const { result: state } = await client.call<OrchestratorGameState>('game.state', {
       worktreeId: process.env.ORCA_WORKTREE_ID,
       terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
@@ -100,7 +102,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       'orchestration.workerStart',
       {
         task: task.result.task.id,
-        worktree: 'new-child',
+        // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
+        ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
         name: ticket.toLowerCase(),
         displayName: title,
         agent: lead.agent,

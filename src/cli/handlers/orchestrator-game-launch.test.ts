@@ -48,9 +48,9 @@ function fakeClient(state: unknown, run: { id: string } | null = { id: 'run_1' }
   return { client, calls }
 }
 
-const launch = (client: RuntimeClient, ticket = 'cin-12') =>
+const launch = (client: RuntimeClient, ticket = 'cin-12', extra: [string, string][] = []) =>
   ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
-    flags: new Map([['ticket', ticket]]),
+    flags: new Map([['ticket', ticket], ...extra]),
     client,
     cwd: '/repo',
     json: true
@@ -161,6 +161,16 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
       expect.objectContaining({ spec: 'Work on CIN-99', taskTitle: 'CIN-99' })
+    )
+  })
+
+  it('starts the member in another repo of the project in its own top-level worktree', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client, 'CIN-12', [['repo', 'name:cineco-frontend']])
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ worktree: 'new-top-level', repo: 'name:cineco-frontend' })
     )
   })
 })
