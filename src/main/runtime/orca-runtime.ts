@@ -654,6 +654,7 @@ import {
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import {
   GameProjectWorkCache,
+  myOpenPullRequestsOf,
   planeWorkspaceIdOf,
   readGameProjectWork,
   type GameProjectWorkPort
@@ -30276,10 +30277,21 @@ export class OrcaRuntimeService {
     const isFolder = this.store?.getRepo(repoId)?.kind === 'folder'
     return {
       githubRepo: async () => (isFolder ? null : await this.getRepoSlug(selector)),
-      githubPullRequests: async () =>
-        (await this.listRepoWorkItems(selector, 20, 'author:@me is:pr is:open')).items.filter(
-          (item) => item.type === 'pr'
-        ),
+      githubPullRequests: async () => {
+        const repo = await this.resolveRepoSelector(selector)
+        return myOpenPullRequestsOf((preference) =>
+          listWorkItems(
+            repo.path,
+            20,
+            'author:@me is:pr is:open',
+            undefined,
+            preference,
+            repo.connectionId ?? null,
+            undefined,
+            ...this.getLocalGitExecutionOptionArgs(repo)
+          )
+        )
+      },
       githubChecks: (pr) =>
         this.getRepoPRChecks(selector, pr.number, pr.headSha, pr.prRepo ?? null),
       githubIssues: async () =>

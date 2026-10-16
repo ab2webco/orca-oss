@@ -104,6 +104,8 @@ export const todoToneOf = (group: GameStatusGroup): GameLinkTone =>
 type ListUrlSource = {
   provider: string
   repo?: GitHubRepositoryIdentity | null
+  /** Every repo the PRs were searched in, e.g. a fork and its upstream. */
+  repos?: readonly GitHubRepositoryIdentity[]
   sampleUrl?: string | null
   project?: string
 }
@@ -125,9 +127,18 @@ const gitlabProjectOf = (sampleUrl: string | null | undefined): string | null =>
   return url && at > 0 ? `${url.origin}${url.pathname.slice(0, at)}` : null
 }
 
+const MY_OPEN_PRS = 'is:pr is:open author:@me'
+
 export function reviewsListUrlOf(source: ListUrlSource): string | null {
-  if (source.provider === 'github' && source.repo) {
-    return `${githubBase(source.repo)}/pulls?q=${encodeURIComponent('is:pr is:open author:@me')}`
+  const repos = source.repos ?? []
+  if (source.provider === 'github' && repos.length > 1) {
+    const scope = repos.map((one) => `repo:${one.owner}/${one.repo}`).join(' ')
+    const host = repos[0]?.host ?? 'github.com'
+    return `https://${host}/pulls?q=${encodeURIComponent(`${MY_OPEN_PRS} ${scope}`)}`
+  }
+  const repo = repos[0] ?? source.repo
+  if (source.provider === 'github' && repo) {
+    return `${githubBase(repo)}/pulls?q=${encodeURIComponent(MY_OPEN_PRS)}`
   }
   if (source.provider === 'gitlab') {
     const project = gitlabProjectOf(source.sampleUrl)

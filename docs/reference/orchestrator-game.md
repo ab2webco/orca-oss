@@ -201,8 +201,9 @@ source, so polling never multiplies GitHub or tracker calls
 ([reader](../../src/main/runtime/orchestrator-game-project-work.ts)).
 
 - **`⇄ #471`** — each of my open PRs on GitHub (`author:@me is:pr is:open`), up to 3, as its own
-  chip that opens that PR, colored by its CI (red failing, yellow running, green passing). The
-  first 5 get their CI (one checks call each, cached 60 seconds by `gh`). The worktree's own PR
+  chip that opens that PR. A fork is searched with its `upstream` remote, since own work lives on
+  the fork and contributions upstream; the list then opens one search over both. Each chip is
+  colored by its CI (red failing, yellow running, green passing). The first 5 get their CI (one checks call each, cached 60 seconds by `gh`). The worktree's own PR
   is left out, since its review chip already shows it. When more are open than the band draws,
   or none are, **`⇄ My PRs N`** opens the host's list in the worst color. On GitLab it is
   **My MRs**, the project's open merge requests.

@@ -3,6 +3,7 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import {
   autoTodoSourceOf,
   GameProjectWorkCache,
+  myOpenPullRequestsOf,
   planeWorkspaceIdOf,
   readGameProjectWork,
   type GameProjectWorkPort
@@ -38,14 +39,17 @@ describe('readGameProjectWork', () => {
     const work = await readGameProjectWork(
       port({
         githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
-        githubPullRequests: async () => [
-          {
-            number: 469,
-            title: 'Spawn race',
-            url: 'https://github.com/ab2webco/orca-oss/pull/469'
-          },
-          { number: 470, title: 'Settings', url: 'https://github.com/ab2webco/orca-oss/pull/470' }
-        ],
+        githubPullRequests: async () => ({
+          repos: [{ owner: 'ab2webco', repo: 'orca-oss' }],
+          items: [
+            {
+              number: 469,
+              title: 'Spawn race',
+              url: 'https://github.com/ab2webco/orca-oss/pull/469'
+            },
+            { number: 470, title: 'Settings', url: 'https://github.com/ab2webco/orca-oss/pull/470' }
+          ]
+        }),
         githubChecks: async (pr) => {
           asked.push(pr.number)
           return pr.number === 469 ? [check('success'), check('failure')] : [check('pending')]
@@ -87,13 +91,49 @@ describe('readGameProjectWork', () => {
     })
   })
 
+  it("lists a fork's PRs with its upstream's, once each, opening one search over both", async () => {
+    const pr = (repo: string, number: number) => ({
+      number,
+      title: `${repo} ${number}`,
+      url: `https://github.com/${repo}/pull/${number}`
+    })
+    const work = await readGameProjectWork(
+      port({
+        githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
+        githubPullRequests: async () => ({
+          repos: [
+            { owner: 'ab2webco', repo: 'orca-oss' },
+            { owner: 'stablyai', repo: 'orca' }
+          ],
+          items: [
+            pr('ab2webco/orca-oss', 471),
+            pr('stablyai/orca', 90),
+            pr('ab2webco/orca-oss', 471)
+          ]
+        }),
+        githubChecks: async () => [check('success')]
+      }),
+      { todo: 'off', workItem: null }
+    )
+
+    expect(work.reviews?.total).toBe(2)
+    expect(work.reviews?.items.map((one) => one.url)).toEqual([
+      'https://github.com/ab2webco/orca-oss/pull/471',
+      'https://github.com/stablyai/orca/pull/90'
+    ])
+    expect(work.reviews?.url).toBe(
+      'https://github.com/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me%20repo%3Aab2webco%2Forca-oss%20repo%3Astablyai%2Forca'
+    )
+  })
+
   it('keeps the PRs when one PR has no readable checks', async () => {
     const work = await readGameProjectWork(
       port({
         githubRepo: async () => ({ owner: 'o', repo: 'r' }),
-        githubPullRequests: async () => [
-          { number: 1, title: 'One', url: 'https://github.com/o/r/pull/1' }
-        ],
+        githubPullRequests: async () => ({
+          repos: [{ owner: 'o', repo: 'r' }],
+          items: [{ number: 1, title: 'One', url: 'https://github.com/o/r/pull/1' }]
+        }),
         githubChecks: async () => {
           throw new Error('rate limited')
         }
@@ -248,7 +288,7 @@ describe('readGameProjectWork', () => {
     const work = await readGameProjectWork(
       port({
         githubRepo: async () => ({ owner: 'o', repo: 'r' }),
-        githubPullRequests: async () => [],
+        githubPullRequests: async () => ({ repos: [{ owner: 'o', repo: 'r' }], items: [] }),
         jiraSearch: async () => {
           throw new Error('offline')
         }
@@ -318,5 +358,42 @@ describe('GameProjectWorkCache', () => {
     expect(loads).toBe(2)
     await cache.read('other', load)
     expect(loads).toBe(3)
+  })
+})
+
+describe('myOpenPullRequestsOf', () => {
+  const fork = { owner: 'ab2webco', repo: 'orca-oss' }
+  const upstream = { owner: 'stablyai', repo: 'orca' }
+  const result = (prs: typeof fork, items: { number: number; type: 'pr' | 'issue' }[]) => ({
+    items: items.map((one) => ({ ...one, url: `https://github.com/x/pull/${one.number}` })),
+    sources: { prs, originCandidate: fork }
+  })
+
+  it("searches a fork's upstream, then the fork itself, keeping only PRs", async () => {
+    const asked: string[] = []
+    const found = await myOpenPullRequestsOf(async (preference) => {
+      asked.push(preference)
+      return preference === 'upstream'
+        ? result(upstream, [{ number: 90, type: 'pr' }])
+        : result(fork, [
+            { number: 471, type: 'pr' },
+            { number: 7, type: 'issue' }
+          ])
+    })
+
+    expect(asked).toEqual(['upstream', 'origin'])
+    expect(found.repos).toEqual([fork, upstream])
+    expect(found.items.map((one) => one.number)).toEqual([471, 90])
+  })
+
+  it('searches once when the repo has no upstream', async () => {
+    const asked: string[] = []
+    const found = await myOpenPullRequestsOf(async (preference) => {
+      asked.push(preference)
+      return result(fork, [{ number: 3, type: 'pr' }])
+    })
+
+    expect(asked).toEqual(['upstream'])
+    expect(found).toMatchObject({ repos: [fork], items: [{ number: 3 }] })
   })
 })

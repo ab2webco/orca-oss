@@ -33,7 +33,11 @@ type PullRequest = Pick<GitHubWorkItem, 'number' | 'title' | 'url' | 'headSha' |
 export type GameProjectWorkPort = {
   /** Null when the repo has no GitHub remote. */
   githubRepo: () => Promise<GitHubRepositoryIdentity | null>
-  githubPullRequests: () => Promise<readonly PullRequest[]>
+  /** My open PRs and the repos searched: a fork and its upstream when it has one. */
+  githubPullRequests: () => Promise<{
+    repos: readonly GitHubRepositoryIdentity[]
+    items: readonly PullRequest[]
+  }>
   githubChecks: (pr: PullRequest) => Promise<readonly PRCheckDetail[]>
   githubIssues: () => Promise<readonly Pick<GitHubWorkItem, 'number' | 'title' | 'url'>[]>
   /** Null when the repo is not a GitLab project. */
@@ -56,6 +60,33 @@ export type GameProjectWorkPort = {
 
 // Why: a tracker that is offline, unauthenticated or rate limited costs its own list, never the other.
 const settle = <T>(read: () => Promise<T>): Promise<T | null> => read().catch(() => null)
+
+const sameRepo = (left: GitHubRepositoryIdentity, right: GitHubRepositoryIdentity): boolean =>
+  left.owner.toLowerCase() === right.owner.toLowerCase() &&
+  left.repo.toLowerCase() === right.repo.toLowerCase()
+
+type MyOpenPrsSearch<T> = {
+  items: readonly T[]
+  sources: {
+    prs: GitHubRepositoryIdentity | null
+    originCandidate: GitHubRepositoryIdentity | null
+  }
+}
+
+/** My open PRs in a repo and, for a fork, its upstream: contributions live upstream, own work on the fork. */
+export async function myOpenPullRequestsOf<T extends { type: string }>(
+  search: (preference: 'upstream' | 'origin') => Promise<MyOpenPrsSearch<T>>
+): Promise<{ repos: GitHubRepositoryIdentity[]; items: T[] }> {
+  const upstream = await search('upstream')
+  const searched = upstream.sources.prs
+  const origin = upstream.sources.originCandidate
+  const fork = origin && searched && !sameRepo(origin, searched) ? await search('origin') : null
+  const results = fork ? [fork, upstream] : [upstream]
+  return {
+    repos: results.flatMap((one) => (one.sources.prs ? [one.sources.prs] : [])),
+    items: results.flatMap((one) => one.items.filter((item) => item.type === 'pr'))
+  }
+}
 
 /** A Plane workspace named by its slug, as a shared orca.yaml writes it, or by Orca's id for it. */
 export const planeWorkspaceIdOf = (
@@ -98,7 +129,10 @@ async function readGitHubReviews(
   port: GameProjectWorkPort,
   repo: GitHubRepositoryIdentity
 ): Promise<GameProjectList> {
-  const prs = await port.githubPullRequests()
+  const found = await port.githubPullRequests()
+  const prs = found.items.filter(
+    (pr, at) => found.items.findIndex((one) => one.url === pr.url) === at
+  )
   // Why only the shown ones: each check read is a GraphQL call against the user's quota.
   const shown = prs.slice(0, GAME_PROJECT_ITEMS_MAX)
   const items = await Promise.all(
@@ -116,7 +150,7 @@ async function readGitHubReviews(
   return gameProjectListOf(
     'github',
     items,
-    reviewsListUrlOf({ provider: 'github', repo }),
+    reviewsListUrlOf({ provider: 'github', repo, repos: found.repos }),
     prs.length
   )
 }

@@ -76,6 +76,21 @@ describe('list urls', () => {
     ).toBe('https://ghe.example.com/o/r/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me')
   })
 
+  it('opens my open PRs across a fork and its upstream in one search', () => {
+    expect(
+      reviewsListUrlOf({
+        provider: 'github',
+        repo: { owner: 'ab2webco', repo: 'orca-oss' },
+        repos: [
+          { owner: 'ab2webco', repo: 'orca-oss' },
+          { owner: 'stablyai', repo: 'orca' }
+        ]
+      })
+    ).toBe(
+      'https://github.com/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me%20repo%3Aab2webco%2Forca-oss%20repo%3Astablyai%2Forca'
+    )
+  })
+
   it('opens the open MRs of a GitLab project from any of its MR urls', () => {
     expect(
       reviewsListUrlOf({
