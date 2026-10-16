@@ -121,7 +121,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                   'Install the GitHub CLI to enable pull requests, issues, and checks.'
                 )}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -156,7 +156,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                   'gh auth login'
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -242,7 +242,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                   'Install the GitLab CLI to enable merge requests, issues, and pipelines.'
                 )}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -279,7 +279,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                   'glab auth login'
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"

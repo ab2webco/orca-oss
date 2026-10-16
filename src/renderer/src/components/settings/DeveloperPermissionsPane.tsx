@@ -350,9 +350,9 @@ export function DeveloperPermissionsPane({
               <div
                 data-settings-section={settingId}
                 data-highlighted={highlightedSettingId === settingId ? 'true' : undefined}
-                className="flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,box-shadow] duration-500 data-[highlighted=true]:bg-accent data-[highlighted=true]:ring-2 data-[highlighted=true]:ring-inset data-[highlighted=true]:ring-ring/50 motion-reduce:transition-none"
+                className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 transition-[background-color,box-shadow] duration-500 data-[highlighted=true]:bg-accent data-[highlighted=true]:ring-2 data-[highlighted=true]:ring-inset data-[highlighted=true]:ring-ring/50 motion-reduce:transition-none"
               >
-                <div className="flex min-w-0 items-start gap-3">
+                <div className="flex min-w-0 flex-1 basis-36 items-start gap-3">
                   <div className="mt-0.5 text-muted-foreground">{permission.icon}</div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">

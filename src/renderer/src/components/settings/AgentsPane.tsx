@@ -541,7 +541,8 @@ function AgentRow({
           </div>
         </div>
 
-        <div className="ml-auto grid shrink-0 grid-cols-[max-content_6.5rem_1.75rem_1.75rem] items-center gap-1.5">
+        {/* Why flex below sm: the fixed column grid is wider than a phone-width card. */}
+        <div className="ml-auto grid shrink-0 grid-cols-[max-content_6.5rem_1.75rem_1.75rem] items-center gap-1.5 max-sm:flex max-sm:max-w-full max-sm:flex-wrap">
           <AgentAvailabilityControl
             label={label}
             isEnabled={isEnabled}

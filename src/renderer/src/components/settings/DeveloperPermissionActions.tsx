@@ -36,7 +36,7 @@ export function DeveloperPermissionActions({
   }
 
   return (
-    <div className="flex shrink-0 gap-2">
+    <div className="flex max-w-full shrink-0 flex-wrap gap-2">
       <Button
         variant={id === 'local-network' ? 'default' : 'outline'}
         size="sm"

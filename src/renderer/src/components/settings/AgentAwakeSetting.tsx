@@ -1,12 +1,11 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import { Label } from '../ui/label'
 import {
   getAgentAwakeDescription,
   getAgentAwakeSearchKeywords,
   getAgentAwakeTitle
 } from './agent-awake-copy'
 import { SearchableSetting } from './SearchableSetting'
-import { SettingsSegmentedControl } from './SettingsFormControls'
+import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 import {
   computerAwakeSettingsForMode,
   normalizeComputerAwakeMode,
@@ -40,32 +39,34 @@ export function AgentAwakeSetting({
         description={description}
         keywords={getAgentAwakeSearchKeywords()}
       >
-        <div className="flex items-start justify-between gap-4 py-2">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <Label>{title}</Label>
-            <p className="text-xs text-muted-foreground">{description}</p>
-          </div>
-          <SettingsSegmentedControl
-            value={mode}
-            onChange={setMode}
-            ariaLabel={title}
-            size="sm"
-            options={[
-              {
-                value: 'on',
-                label: translate('auto.components.settings.AgentAwakeSetting.on', 'On')
-              },
-              {
-                value: 'auto',
-                label: translate('auto.components.settings.AgentAwakeSetting.auto', 'Agent')
-              },
-              {
-                value: 'off',
-                label: translate('auto.components.settings.AgentAwakeSetting.off', 'Off')
-              }
-            ]}
-          />
-        </div>
+        <SettingsRow
+          label={title}
+          description={description}
+          alignTop
+          className="py-2"
+          control={
+            <SettingsSegmentedControl
+              value={mode}
+              onChange={setMode}
+              ariaLabel={title}
+              size="sm"
+              options={[
+                {
+                  value: 'on',
+                  label: translate('auto.components.settings.AgentAwakeSetting.on', 'On')
+                },
+                {
+                  value: 'auto',
+                  label: translate('auto.components.settings.AgentAwakeSetting.auto', 'Agent')
+                },
+                {
+                  value: 'off',
+                  label: translate('auto.components.settings.AgentAwakeSetting.off', 'Off')
+                }
+              ]}
+            />
+          }
+        />
       </SearchableSetting>
     </section>
   )
