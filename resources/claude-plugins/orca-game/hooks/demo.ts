@@ -146,6 +146,8 @@ const stateOf = (step: Step): GameState => ({
   config: {},
   warnings: [],
   extensions: { scenes: [] },
+  links: [],
+  activity: null,
   worktree: { id: 'demo', path: '', branch: 'demo', displayName: 'demo' },
   agents: [
     {

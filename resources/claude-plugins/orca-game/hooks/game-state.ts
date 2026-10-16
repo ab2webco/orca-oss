@@ -1,7 +1,9 @@
 import type {
+  GameActivity,
   GameAgent,
   GameCi,
   GameConfig,
+  GameLink,
   GameReview,
   GameSceneExtension,
   GameState,
@@ -30,6 +32,11 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   (allowed as readonly unknown[]).includes(value) ? (value as T) : undefined
 
+const LINK_KINDS = ['review', 'ci', 'workItem', 'project', 'activity'] as const
+const LINK_TONES = ['neutral', 'pending', 'success', 'danger'] as const
+const MAX_LINKS = 32
+const MAX_LINK_TEXT = 64
+
 const AGENT_STATES = ['working', 'waiting', 'idle', 'done'] as const
 const PROVIDERS = ['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea'] as const
 const REVIEW_STATES = ['open', 'draft', 'merged', 'closed'] as const
@@ -44,6 +51,64 @@ const STATUS_GROUPS = [
   'cancelled',
   'unknown'
 ] as const
+
+// Only a web address is ever handed to a terminal link or to Orca's browser.
+const httpUrlOf = (value: unknown): string | undefined => {
+  const url = str(value)
+  if (url === undefined || url.length > 2048) {
+    return undefined
+  }
+  try {
+    const protocol = new URL(url).protocol
+    return protocol === 'https:' || protocol === 'http:' ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const textOf = (value: unknown): string | undefined => {
+  const text = str(value)?.trim().slice(0, MAX_LINK_TEXT)
+  return text === undefined || text === '' ? undefined : text
+}
+
+const activityOf = (value: unknown): GameActivity | undefined => {
+  if (!isShape(value) || typeof value.at !== 'number') {
+    return undefined
+  }
+  const name = textOf(value.name)
+  const id = textOf(value.id)
+  const url = httpUrlOf(value.url)
+  if (name === undefined || id === undefined || url === undefined) {
+    return undefined
+  }
+  return { name, id, url, at: value.at, running: value.running === true }
+}
+
+const linkOf = (value: unknown): GameLink[] => {
+  if (!isShape(value)) {
+    return []
+  }
+  const id = textOf(value.id)
+  const kind = oneOf(value.kind, LINK_KINDS)
+  const label = textOf(value.label)
+  const url = httpUrlOf(value.url)
+  if (id === undefined || kind === undefined || label === undefined || url === undefined) {
+    return []
+  }
+  const status = textOf(value.status)
+  const tone = oneOf(value.tone, LINK_TONES)
+  return [
+    {
+      id,
+      kind,
+      provider: textOf(value.provider) ?? '',
+      label,
+      url,
+      ...(status === undefined ? {} : { status }),
+      ...(tone === undefined ? {} : { tone })
+    }
+  ]
+}
 
 const configOf = (value: unknown): Partial<GameConfig> => {
   const raw = isShape(value) ? value : {}
@@ -80,6 +145,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const agentType = str(value.agentType) ?? ''
   // Orca sends null for a pane with no title or task yet; it is still on the team.
   const displayName = str(value.displayName) || agentType || paneKey
+  const activity = activityOf(value.activity)
   return [
     {
       paneKey,
@@ -88,7 +154,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       state,
       toolName: str(value.toolName) ?? null,
       isLeader: value.isLeader === true,
-      ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {})
+      ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {}),
+      ...(activity === undefined ? {} : { activity })
     }
   ]
 }
@@ -170,6 +237,8 @@ export const parseGameState = (stdout: string): GameState | undefined => {
     agents: Array.isArray(body.agents) ? body.agents.flatMap(agentOf) : [],
     review: reviewOf(body.review),
     workItem: workItemOf(body.workItem),
-    extensions: extensionsOf(body.extensions)
+    extensions: extensionsOf(body.extensions),
+    links: Array.isArray(body.links) ? body.links.slice(0, MAX_LINKS).flatMap(linkOf) : [],
+    activity: activityOf(body.activity) ?? null
   }
 }

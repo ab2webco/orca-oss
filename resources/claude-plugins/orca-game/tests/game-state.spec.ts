@@ -167,8 +167,52 @@ describe('parseGameState', () => {
     ).toEqual({ scenes: [] })
   })
 
-  // Why: hosts add optional fields (links, activity) that a mod built before them must read past.
-  it('reads the same state when a newer host adds links and agent activity', () => {
+  it('reads no links and no activity from a host older than them', () => {
+    const parsed = parseGameState(JSON.stringify(STATE))
+    expect(parsed?.links).toEqual([])
+    expect(parsed?.activity).toBeNull()
+    expect(parsed?.agents.every((agent) => !('activity' in agent))).toBe(true)
+  })
+
+  it('reads the links whole and http(s), dropping the malformed ones', () => {
+    const ci = {
+      id: 'ci',
+      kind: 'ci',
+      provider: 'github',
+      label: 'CI',
+      url: 'https://github.com/o/r/pull/42/checks',
+      status: 'failure',
+      tone: 'danger'
+    }
+    const plan = {
+      id: 'project:0',
+      kind: 'project',
+      provider: 'project',
+      label: 'Test plan',
+      url: 'http://tambora.example/projects/CIN'
+    }
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        links: [
+          ci,
+          { ...plan, tone: 'loud', status: 7 },
+          { ...ci, id: 'x1', url: 'javascript:alert(1)' },
+          { ...ci, id: 'x2', url: 'file:///etc/passwd' },
+          { ...ci, id: 'x3', url: 'not a url' },
+          { ...ci, id: 'x4', kind: 'chat' },
+          { ...ci, id: 'x5', label: 42 },
+          { ...ci, id: undefined },
+          'https://github.com',
+          null
+        ]
+      })
+    )
+    expect(parsed?.links).toEqual([ci, plan])
+    expect(parseGameState(JSON.stringify({ ...STATE, links: 'all' }))?.links).toEqual([])
+  })
+
+  it('reads the calling pane and each agent activity, dropping one that is not whole', () => {
     const activity = {
       name: 'Tambora',
       id: 'TR-CIN-12',
@@ -176,13 +220,22 @@ describe('parseGameState', () => {
       at: 1,
       running: true
     }
-    const newer = {
-      ...STATE,
-      agents: STATE.agents.map((agent) => ({ ...agent, activity })),
-      activity,
-      links: [{ id: 'ci', kind: 'ci', provider: 'github', label: 'CI', url: 'https://x/checks' }]
-    }
-    expect(parseGameState(JSON.stringify(newer))).toEqual(parseGameState(JSON.stringify(STATE)))
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        agents: [
+          { ...STATE.agents[0], activity },
+          { ...STATE.agents[1], activity: { ...activity, url: 'javascript:alert(1)' } }
+        ],
+        activity: { ...activity, running: 'yes' }
+      })
+    )
+    expect(parsed?.agents[0]?.activity).toEqual(activity)
+    expect(parsed?.agents[1]).not.toHaveProperty('activity')
+    expect(parsed?.activity).toEqual({ ...activity, running: false })
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, activity: { ...activity, id: '' } }))?.activity
+    ).toBeNull()
   })
 
   it('answers undefined for output that is not a JSON object', () => {

@@ -4,6 +4,9 @@ export type GameConfig = { mode: GameMode; scene: string; hud: boolean; rewards:
 
 export type GameAgentState = 'working' | 'waiting' | 'idle' | 'done'
 
+/** The newest id an agent's MCP calls mentioned that a rule turned into a link. */
+export type GameActivity = { name: string; id: string; url: string; at: number; running: boolean }
+
 export type GameAgent = {
   paneKey: string
   displayName: string
@@ -13,6 +16,8 @@ export type GameAgent = {
   isLeader: boolean
   /** Only a pane Orca maps to a live terminal has one; older hosts send none. */
   terminalHandle?: string
+  /** Only an agent a project or built-in activity rule matched has one. */
+  activity?: GameActivity
 }
 
 export type GameCi = 'pending' | 'success' | 'failure' | 'neutral' | 'none'
@@ -42,6 +47,21 @@ export type GameWorkItem = {
   url: string
   status: string
   statusGroup: GameStatusGroup
+}
+
+export type GameLinkKind = 'review' | 'ci' | 'workItem' | 'project' | 'activity'
+
+export type GameLinkTone = 'neutral' | 'pending' | 'success' | 'danger'
+
+/** A clickable integration of the worktree; `url` is always http(s). */
+export type GameLink = {
+  id: string
+  kind: GameLinkKind
+  provider: string
+  label: string
+  url: string
+  status?: string
+  tone?: GameLinkTone
 }
 
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
@@ -111,6 +131,10 @@ export type GameState = {
   review: GameReview | null
   workItem: GameWorkItem | null
   extensions: { scenes: GameSceneExtension[] }
+  /** Empty from a host older than game links. */
+  links: GameLink[]
+  /** The calling pane's own activity. */
+  activity: GameActivity | null
 }
 
 export type FleetState = {
