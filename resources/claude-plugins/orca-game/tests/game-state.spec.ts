@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { parseGameState } from '../hooks/game-state'
+import { QUEST_SCENE } from '../hooks/scenes/quest'
 
 const STATE = {
   config: { mode: 'zen', scene: 'quest', hud: true, rewards: false, tracker: true },
@@ -116,6 +117,38 @@ describe('parseGameState', () => {
     expect(parsed?.warnings).toEqual([])
     expect(parsed?.worktree).toBeNull()
     expect(parsed?.workItem).toBeNull()
+  })
+
+  it('keeps the plugin scenes that are whole and namespaced, and drops the rest', () => {
+    const definition = JSON.parse(JSON.stringify(QUEST_SCENE)) as Record<string, unknown>
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        extensions: {
+          scenes: [
+            { id: 'acme.space/orbit', pluginId: 'acme.space', definition },
+            { id: 'quest', pluginId: 'acme.space', definition },
+            {
+              id: 'acme.space/flat',
+              pluginId: 'acme.space',
+              definition: { ...definition, band: 1 }
+            },
+            { id: 'acme.space/bare', pluginId: 'acme.space' },
+            'scene'
+          ]
+        }
+      })
+    )
+    expect(
+      parsed?.extensions.scenes.map((one) => [one.id, one.pluginId, one.definition.id])
+    ).toEqual([['acme.space/orbit', 'acme.space', 'acme.space/orbit']])
+  })
+
+  it('reads no scenes from a host that sends no extensions or a broken list', () => {
+    expect(parseGameState(JSON.stringify(STATE))?.extensions).toEqual({ scenes: [] })
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, extensions: { scenes: 'all' } }))?.extensions
+    ).toEqual({ scenes: [] })
   })
 
   it('answers undefined for output that is not a JSON object', () => {

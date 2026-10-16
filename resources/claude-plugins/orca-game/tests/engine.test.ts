@@ -2,6 +2,8 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { QUEST_SCENE } from '../hooks/scenes/quest'
+
 const VIEWPORT = { columns: 170, rows: 40, isFullscreen: true } as const
 const BAND = {
   component: 'AbovePrompt',
@@ -205,6 +207,33 @@ describe('band', () => {
     const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
     expect(await ui.find({ type: 'Text', text: /orca game state unavailable/ })).toBeDefined()
     await ui.unmount()
+  })
+
+  test('a plugin scene Orca serves paints the band, and an unknown one falls back to quest', async ($, on) => {
+    const orbit = { ...QUEST_SCENE, band: { ...QUEST_SCENE.band, gold: '#123456' } }
+    const served = (scene: string) =>
+      JSON.stringify({
+        ...STATE,
+        config: { scene },
+        extensions: {
+          scenes: [{ id: 'acme.space/orbit', pluginId: 'acme.space', definition: orbit }]
+        }
+      })
+    const world = worldOf({ stdout: served('acme.space/orbit') })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const panelColor = async () => {
+      const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+      const panel = await ui.find({ type: 'Text', text: / ▤ Panel / })
+      await ui.unmount()
+      return panel?.props.backgroundColor
+    }
+    expect(await panelColor()).toBe('#123456')
+    world.stdout = served('acme.space/gone')
+    await clock.advance(30000)
+    expect(await panelColor()).toBe(QUEST_SCENE.band.gold)
   })
 
   test('ORCA_GAME_HUD=0 hides the band', async ($, on) => {

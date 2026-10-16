@@ -26,6 +26,7 @@ const workItem = (patch: Partial<GameWorkItem> = {}): GameWorkItem => ({
 const state = (patch: Partial<GameState> = {}): GameState => ({
   config: {},
   warnings: [],
+  extensions: { scenes: [] },
   worktree: { id: 'wt-1', path: '/w', branch: 'b', displayName: 'w' },
   agents: [],
   review: null,

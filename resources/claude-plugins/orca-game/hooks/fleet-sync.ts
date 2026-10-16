@@ -14,6 +14,7 @@ import {
   questLiveConfig
 } from './quest-runtime'
 import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
+import { setContributedScenes } from './scenes/index'
 
 export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
@@ -56,6 +57,9 @@ export async function refresh($: EngineInterface): Promise<void> {
   await update($, fleet, (s) => ({ ...s, isLoading: true, refreshedAt: startedAt }))
   const next = await readState($)
   if (next !== undefined) {
+    if (setContributedScenes(next.extensions.scenes.map((one) => one.definition))) {
+      $.ui.invalidate('ui.render')
+    }
     questLiveConfig($, next.config)
   }
   const config = gameConfig()

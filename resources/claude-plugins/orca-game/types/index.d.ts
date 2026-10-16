@@ -1,3 +1,5 @@
+import type { SceneDefinition } from '../hooks/scenes/scene-definition'
+
 export type GameMode = 'on' | 'zen' | 'off'
 
 export type GameConfig = { mode: GameMode; scene: string; hud: boolean; rewards: boolean }
@@ -44,6 +46,8 @@ export type GameWorkItem = {
 
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
 
+export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }
+
 export type GameState = {
   config: Partial<GameConfig>
   warnings: string[]
@@ -51,6 +55,7 @@ export type GameState = {
   agents: GameAgent[]
   review: GameReview | null
   workItem: GameWorkItem | null
+  extensions: { scenes: GameSceneExtension[] }
 }
 
 export type FleetState = {

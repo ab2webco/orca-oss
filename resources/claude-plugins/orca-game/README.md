@@ -72,7 +72,8 @@ entries.
             ci: 'pending' | 'success' | 'failure' | 'neutral' | 'none' } | null,
   workItem: { provider: 'plane' | 'jira' | 'linear' | 'github' | 'gitlab',
               identifier, title, url, status,
-              statusGroup: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled' | 'unknown' } | null
+              statusGroup: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled' | 'unknown' } | null,
+  extensions?: { scenes: [{ id: '<pluginKey>/<id>', pluginId, definition: SceneDefinition }] }
 }
 ```
 
@@ -98,6 +99,11 @@ re-awards: review merged 100, CI turning green 20, work item to review 50, to do
 3. Select it with `ORCA_GAME_SCENE=<id>` or the `scene` setting.
 
 The engine code reads only the definition, so nothing else changes.
+
+An Orca plugin can also ship a scene as JSON (`contributes.gameScenes`, see
+`docs/reference/plugin-development.md`). Orca serves it in `extensions.scenes` under the id
+`<pluginKey>/<id>`; `hooks/scenes/scene-shape.ts` re-validates it, and `sceneOf` resolves it until
+a poll stops serving it. Any id nothing serves draws `quest`.
 
 ## Development
 

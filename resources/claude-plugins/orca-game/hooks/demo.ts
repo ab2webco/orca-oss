@@ -144,6 +144,7 @@ export const DEMO_FRAMES = SCRIPT.length
 const stateOf = (step: Step): GameState => ({
   config: {},
   warnings: [],
+  extensions: { scenes: [] },
   worktree: { id: 'demo', path: '', branch: 'demo', displayName: 'demo' },
   agents: [
     {

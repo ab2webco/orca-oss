@@ -16,6 +16,7 @@ const agent = (patch: Partial<GameAgent>): GameAgent => ({
 const state = (patch: Partial<GameState> = {}): GameState => ({
   config: {},
   warnings: [],
+  extensions: { scenes: [] },
   worktree: null,
   agents: [],
   review: null,

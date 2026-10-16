@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ACTIONS } from '../hooks/quest-policy'
 import { actionPixel, PROP_WIDTH } from '../hooks/action-props'
-import { DEFAULT_SCENE_ID, SCENES, sceneOf } from '../hooks/scenes/index'
+import { DEFAULT_SCENE_ID, SCENES, sceneOf, setContributedScenes } from '../hooks/scenes/index'
 import {
   bubbleTextOf,
   restColumnOf,
@@ -28,6 +28,22 @@ describe('scene registry', () => {
     expect(sceneOf('nope')).toBe(QUEST)
     expect(sceneOf(undefined)).toBe(QUEST)
     expect(QUEST.id).toBe('quest')
+  })
+
+  it('never mistakes an Object prototype member for a scene', () => {
+    expect(sceneOf('constructor')).toBe(QUEST)
+    expect(sceneOf('__proto__')).toBe(QUEST)
+  })
+
+  it('resolves a contributed scene by its id until Orca stops serving it', () => {
+    const orbit = { ...QUEST, id: 'acme.space/orbit' }
+    expect(setContributedScenes([orbit])).toBe(true)
+    expect(sceneOf('acme.space/orbit')).toBe(orbit)
+    expect(setContributedScenes([{ ...orbit }])).toBe(false)
+    expect(setContributedScenes([{ ...orbit, id: 'quest' }])).toBe(true)
+    expect(sceneOf('quest')).toBe(QUEST)
+    expect(setContributedScenes([])).toBe(true)
+    expect(sceneOf('acme.space/orbit')).toBe(QUEST)
   })
 
   it('every phase has its own sky, costume, card name and card color', () => {

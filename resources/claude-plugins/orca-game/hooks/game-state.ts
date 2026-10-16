@@ -3,11 +3,13 @@ import type {
   GameCi,
   GameConfig,
   GameReview,
+  GameSceneExtension,
   GameState,
   GameWorkItem,
   GameWorktree
 } from '../types'
 import { isQuestMode } from './quest-policy'
+import { sceneDefinitionOf } from './scenes/scene-shape'
 
 type Shape = Record<string, unknown>
 
@@ -123,6 +125,31 @@ const workItemOf = (value: unknown): GameWorkItem | null => {
   }
 }
 
+const MAX_SCENES = 256
+// Orca namespaces a contributed id as `<pluginId>/<id>`, so it can never shadow a built-in scene.
+const SCENE_ID = /^[a-z0-9-]+\.[a-z0-9-]+\/[a-z0-9-]+$/
+
+const sceneOf = (value: unknown): GameSceneExtension[] => {
+  if (!isShape(value)) {
+    return []
+  }
+  const id = str(value.id)
+  const pluginId = str(value.pluginId)
+  if (id === undefined || pluginId === undefined || !SCENE_ID.test(id)) {
+    return []
+  }
+  if (!id.startsWith(`${pluginId}/`)) {
+    return []
+  }
+  const definition = sceneDefinitionOf(value.definition, id)
+  return definition === undefined ? [] : [{ id, pluginId, definition }]
+}
+
+const extensionsOf = (value: unknown): GameState['extensions'] => {
+  const scenes = isShape(value) && Array.isArray(value.scenes) ? value.scenes : []
+  return { scenes: scenes.slice(0, MAX_SCENES).flatMap(sceneOf) }
+}
+
 // Orca's CLI may answer the bare state or wrap it as { result }; anything else is no data.
 export const parseGameState = (stdout: string): GameState | undefined => {
   const parsed = parseJson(stdout)
@@ -140,6 +167,7 @@ export const parseGameState = (stdout: string): GameState | undefined => {
     worktree: worktreeOf(body.worktree),
     agents: Array.isArray(body.agents) ? body.agents.flatMap(agentOf) : [],
     review: reviewOf(body.review),
-    workItem: workItemOf(body.workItem)
+    workItem: workItemOf(body.workItem),
+    extensions: extensionsOf(body.extensions)
   }
 }
