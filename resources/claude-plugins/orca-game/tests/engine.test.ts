@@ -493,3 +493,116 @@ describe('lead autostart', () => {
     expect(ran).toEqual([])
   })
 })
+
+describe('lead name', () => {
+  const namedWorld = (label: string, role: 'lead' | 'member' = 'lead') =>
+    worldOf({
+      stdout: JSON.stringify({
+        id: 'x',
+        ok: true,
+        result: {
+          ...STATE,
+          agents: [agent('lead', 'working', 'Edit', true)],
+          lead: { autostart: true, cap: 4, agent: 'claude', label },
+          role
+        }
+      })
+    })
+
+  const startCounting = (on: On) => {
+    const renames: string[] = []
+    on('command.run', { command: 'orca-game:lead' }, () => ({ text: '' }))
+    on('command.run', { command: 'rename' }, ($s, e) => {
+      renames.push(e.args)
+      return { text: '' }
+    })
+    return renames
+  }
+
+  test('the Panel crowns the lead with the label from Settings', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Text', text: '♛ Orquestador' })).toBeDefined()
+    await pane.unmount()
+  })
+
+  test('names a started lead session after the label and follows a new label', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador'])
+
+    world.stdout = namedWorld('Capitán').stdout
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador', 'Capitán'])
+  })
+
+  test('names the session once the person runs the lead skill in a project without autostart', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    world.stdout = (world.stdout ?? '').replace('"autostart":true', '"autostart":false')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual([])
+    await $.command.run({
+      command: 'orca-game:lead',
+      args: '',
+      origin: { kind: 'composer' }
+    } as never)
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador'])
+  })
+
+  test('never renames a session the person named', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.command.run({
+      command: 'rename',
+      args: 'mine',
+      origin: { kind: 'composer' }
+    } as never)
+    world.stdout = namedWorld('Capitán').stdout
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador', 'mine'])
+  })
+
+  test('never renames a member, even one whose session ran the lead skill', async ($, on) => {
+    const world = namedWorld('Orquestador', 'member')
+    world.store = { 'lead-started-sessions': ['s1'] }
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual([])
+  })
+})

@@ -35,3 +35,26 @@ export const gameLeadOf = (body: Shape): { lead?: GameLead; role?: GameRole } =>
 /** Only the lead of a project that asks for it; a member reports to its lead and never leads. */
 export const isLeadAutostart = (state: Pick<GameState, 'lead' | 'role'>): boolean =>
   state.role === 'lead' && state.lead?.autostart === true
+
+/** The crown's name in the Panel: the project's label, else the plain word. */
+export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): string =>
+  state.lead?.label ?? fallback
+
+/** What the mod last did to this session's name, kept in the store per session. */
+export type LeadNameRecord = { applied?: string; isPersonNamed?: boolean }
+
+/** The name to give a started lead session now, or null: never a member or a name the person chose. */
+export const leadRenameOf = (args: {
+  state: Pick<GameState, 'lead' | 'role'>
+  isStarted: boolean
+  record: LeadNameRecord | undefined
+}): string | null => {
+  const label = args.state.lead?.label
+  if (args.state.role !== 'lead' || !args.isStarted || label === undefined) {
+    return null
+  }
+  if (args.record?.isPersonNamed === true || args.record?.applied === label) {
+    return null
+  }
+  return label
+}

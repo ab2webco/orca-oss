@@ -13,6 +13,7 @@ import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
 import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
+import { leadTitleOf } from './game-lead'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
@@ -170,7 +171,9 @@ export const registerFleetPane = (on: On): void => {
                 <Text color={AGENT_COLORS[agent.state]} bold>
                   {agent.displayName}
                 </Text>
-                {agent.isLeader && <Text color={palette.gold}>{`♛ ${text.lead}`}</Text>}
+                {agent.isLeader && (
+                  <Text color={palette.gold}>{`♛ ${leadTitleOf(state, text.lead)}`}</Text>
+                )}
                 <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
                 <Text dimColor>{agent.agentType}</Text>
                 {agent.worktree !== undefined && (

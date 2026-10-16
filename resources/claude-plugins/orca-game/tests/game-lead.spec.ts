@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { LEAD_SKILL, gameLeadOf, isLeadAutostart } from '../hooks/game-lead'
+import {
+  LEAD_SKILL,
+  gameLeadOf,
+  isLeadAutostart,
+  leadRenameOf,
+  leadTitleOf
+} from '../hooks/game-lead'
 import { parseGameState } from '../hooks/game-state'
 
 const BASE = { config: {}, warnings: [], worktree: null, agents: [], review: null, workItem: null }
@@ -47,5 +53,42 @@ describe('isLeadAutostart', () => {
 
   it('runs the plugin skill that loads the lead rules', () => {
     expect(LEAD_SKILL).toBe('orca-game:lead')
+  })
+})
+
+describe('leadTitleOf', () => {
+  it("names the lead with the project's label, or the plain word without one", () => {
+    expect(leadTitleOf({ lead: { autostart: false, cap: 4, label: 'Orquestador' } }, 'Lead')).toBe(
+      'Orquestador'
+    )
+    expect(leadTitleOf({ lead: { autostart: false, cap: 4 } }, 'Lead')).toBe('Lead')
+    expect(leadTitleOf({}, 'Líder')).toBe('Líder')
+  })
+})
+
+describe('leadRenameOf', () => {
+  const lead = { autostart: false, cap: 4, label: 'Orquestador' }
+  const base = { state: { lead, role: 'lead' as const }, isStarted: true }
+
+  it('names a started lead session after the label when the mod never named it', () => {
+    expect(leadRenameOf({ ...base, record: undefined })).toBe('Orquestador')
+  })
+
+  it('renames again when the label changes, and not while it stays', () => {
+    expect(leadRenameOf({ ...base, record: { applied: 'orquestador' } })).toBe('Orquestador')
+    expect(leadRenameOf({ ...base, record: { applied: 'Orquestador' } })).toBeNull()
+  })
+
+  it('never renames a session the person named, a member, a lead not started or one with no label', () => {
+    expect(leadRenameOf({ ...base, record: { isPersonNamed: true } })).toBeNull()
+    expect(leadRenameOf({ ...base, state: { lead, role: 'member' }, record: undefined })).toBeNull()
+    expect(leadRenameOf({ ...base, isStarted: false, record: undefined })).toBeNull()
+    expect(
+      leadRenameOf({
+        ...base,
+        state: { lead: { autostart: false, cap: 4 }, role: 'lead' },
+        record: undefined
+      })
+    ).toBeNull()
   })
 })
