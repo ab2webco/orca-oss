@@ -62,8 +62,8 @@ export const registerBand = (on: On): void => {
       draw: (chip: PlacedChip) => RenderElement,
       more?: (count: number) => string
     ) =>
-      chipRowsOf(chips, { columns, maxRows, more }).map((row, index) => (
-        <Box key={`${prefix}-${index}`} flexDirection="row" gap={1}>
+      chipRowsOf(chips, { columns, maxRows, more }).map((row) => (
+        <Box key={`${prefix}-${row[0]?.key ?? 'empty'}`} flexDirection="row" gap={1}>
           {row.map(draw)}
         </Box>
       ))

@@ -190,10 +190,10 @@ describe('band layout', () => {
       test(`every row fits ${columns} columns in ${locale}`, ALL, async ($, on) => {
         const ui = await mount($, on, columns, { ORCA_GAME_LOCALE: locale })
         const rows = (await ui.findAll({ type: 'Box' })).filter(
-          (one) => one.key !== undefined && /^band-(chips|menu)-\d+$/.test(one.key)
+          (one) => one.key !== undefined && /^band-(chips|menu)-/.test(one.key)
         )
-        expect(rows.some((one) => one.key === 'band-chips-0')).toBe(true)
-        expect(rows.some((one) => one.key === 'band-menu-0')).toBe(true)
+        expect(rows.some((one) => one.key === 'band-chips-band-team')).toBe(true)
+        expect(rows.some((one) => one.key === 'band-menu-band-panel')).toBe(true)
         expect(rows.filter((one) => one.key?.startsWith('band-chips-')).length).toBeLessThanOrEqual(
           2
         )
@@ -230,12 +230,17 @@ describe('band layout', () => {
       const ui = await mount($, on, 160)
       expect(await ui.find({ type: 'Raster', key: HUD_KEY })).toBeDefined()
       expect(await ui.find({ type: 'Box', key: 'band-hud-line' })).toBeUndefined()
-      expect(await ui.find({ type: 'Box', key: 'band-chips-1' })).toBeUndefined()
-      const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-0' }))
+      const chipRows = (await ui.findAll({ type: 'Box' })).filter((one) =>
+        one.key?.startsWith('band-chips-')
+      )
+      expect(chipRows).toHaveLength(1)
+      const chips = shownOf(chipRows[0])
       expect(chips).toContain('Team 3 teammates')
       expect(chips).toContain('#901 open · CI failing')
       expect(chips).toContain('ORCA-586 In Progress')
-      expect(shownOf(await ui.find({ type: 'Box', key: 'band-menu-0' }))).toContain('Pet Clawd')
+      expect(shownOf(await ui.find({ type: 'Box', key: 'band-menu-band-panel' }))).toContain(
+        'Pet Clawd'
+      )
       await ui.unmount()
     }
   )
@@ -245,8 +250,11 @@ describe('band layout', () => {
     ALL,
     async ($, on) => {
       const ui = await mount($, on, 40, { ORCA_GAME_LOCALE: 'es' })
-      expect(await ui.find({ type: 'Box', key: 'band-menu-1' })).toBeUndefined()
-      const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-0' }))
+      const menuRows = (await ui.findAll({ type: 'Box' })).filter((one) =>
+        one.key?.startsWith('band-menu-')
+      )
+      expect(menuRows).toHaveLength(1)
+      const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-band-team' }))
       expect(chips).toContain('⚑')
       await ui.unmount()
     }
