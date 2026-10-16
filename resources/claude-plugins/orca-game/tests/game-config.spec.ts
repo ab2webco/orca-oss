@@ -4,7 +4,8 @@ import {
   DEFAULT_GAME_CONFIG,
   effectiveConfigOf,
   gameConfigOfEnv,
-  gameStateArgvOf
+  gameStateArgvOf,
+  terminalFocusArgvOf
 } from '../hooks/game-config'
 
 describe('gameConfigOfEnv', () => {
@@ -69,5 +70,25 @@ describe('gameStateArgvOf', () => {
     expect(gameStateArgvOf('')).toBeUndefined()
     expect(gameStateArgvOf('orca')).toBeUndefined()
     expect(gameStateArgvOf('bin/orca')).toBeUndefined()
+  })
+})
+
+describe('terminalFocusArgvOf', () => {
+  it('focuses a teammate pane through the absolute CLI path', () => {
+    expect(terminalFocusArgvOf('/opt/orca/bin/orca', 'term_3f2a')).toEqual([
+      '/opt/orca/bin/orca',
+      'terminal',
+      'focus',
+      '--terminal',
+      'term_3f2a',
+      '--json'
+    ])
+  })
+
+  it('runs nothing for a bare CLI or a handle Orca would not issue', () => {
+    expect(terminalFocusArgvOf('orca', 'term_3f2a')).toBeUndefined()
+    expect(terminalFocusArgvOf(undefined, 'term_3f2a')).toBeUndefined()
+    expect(terminalFocusArgvOf('/opt/orca/bin/orca', '--help')).toBeUndefined()
+    expect(terminalFocusArgvOf('/opt/orca/bin/orca', '')).toBeUndefined()
   })
 })

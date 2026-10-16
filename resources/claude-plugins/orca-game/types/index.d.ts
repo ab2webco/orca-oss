@@ -13,6 +13,8 @@ export type GameAgent = {
   state: GameAgentState
   toolName: string | null
   isLeader: boolean
+  /** Only a pane Orca maps to a live terminal has one; older hosts send none. */
+  terminalHandle?: string
 }
 
 export type GameCi = 'pending' | 'success' | 'failure' | 'neutral' | 'none'

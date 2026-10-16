@@ -249,6 +249,36 @@ describe('band', () => {
   })
 })
 
+describe('fleet pane', () => {
+  test('View focuses a teammate pane through the Orca CLI; a tile with no valid handle has none', async ($, on) => {
+    const agents = [
+      { ...agent('lead', 'working', 'Edit', true), terminalHandle: 'term_lead' },
+      { ...agent('builder', 'working', 'Edit'), terminalHandle: 'term_builder' },
+      { ...agent('tester', 'waiting', null), terminalHandle: '--help' }
+    ]
+    const world = worldOf({ stdout: JSON.stringify({ ...STATE, agents }) })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Button', key: 'view-tab-1:lead' })).toBeDefined()
+    expect(await pane.find({ type: 'Button', key: 'view-tab-1:builder' })).toBeDefined()
+    expect(await pane.find({ key: 'view-tab-1:tester' })).toBeUndefined()
+    await pane.press({ key: 'view-tab-1:builder' })
+    await clock.settle()
+    expect(world.calls).toContainEqual([
+      ORCA_CLI,
+      'terminal',
+      'focus',
+      '--terminal',
+      'term_builder',
+      '--json'
+    ])
+    await pane.unmount()
+  })
+})
+
 describe('quest mode', () => {
   test('ORCA_GAME_MODE=off starts plain, and /quest overrides it for the session', async ($, on) => {
     const world = worldOf({ env: { ORCA_GAME_MODE: 'off' } })

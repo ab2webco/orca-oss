@@ -1,8 +1,9 @@
 import type { EngineInterface, On } from 'claude-code'
 
+import type { GameAgent } from '../types'
 import { AGENT_COLORS, CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { refreshSoon, viewOf } from './fleet-sync'
+import { focusTerminal, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
@@ -28,6 +29,25 @@ export const registerFleetPane = (on: On): void => {
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
       <Button key={key} plain hotkey={hotkey} onPress={onPress}>
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
+      </Button>
+    )
+    // Digits follow tile order; r, c and q stay the menu's.
+    const view = (agent: GameAgent, handle: string, index: number) => (
+      <Button
+        key={`view-${agent.paneKey}`}
+        plain
+        hotkey={index < 9 ? String(index + 1) : undefined}
+        onPress={() =>
+          void focusTerminal($, handle).then((isFocused) => {
+            if (!isFocused) {
+              $.ui.toast(`Could not open ${agent.displayName}'s pane`)
+            }
+          })
+        }
+      >
+        <Text backgroundColor={palette.panel} color={palette.parchment} bold>
+          {' View '}
+        </Text>
       </Button>
     )
     const menuRow = (
@@ -92,7 +112,7 @@ export const registerFleetPane = (on: On): void => {
             {` ! ${need.name}  ${need.text}`}
           </Text>
         ))}
-        {members.map(({ agent, member }) => (
+        {members.map(({ agent, member }, index) => (
           <Box
             key={`card-${agent.paneKey}`}
             flexDirection="row"
@@ -110,6 +130,7 @@ export const registerFleetPane = (on: On): void => {
                   {agent.state === 'waiting' ? '! waiting' : agent.state}
                 </Text>
                 <Text dimColor>{agent.agentType}</Text>
+                {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
               <Text wrap="truncate-end">{member.says}</Text>
             </Box>

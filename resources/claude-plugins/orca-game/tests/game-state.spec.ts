@@ -92,6 +92,22 @@ describe('parseGameState', () => {
     ])
   })
 
+  // Why: the handle goes into the CLI's argv, so only the `term_` shape Orca issues is kept.
+  it('keeps a terminal handle only in the shape Orca issues', () => {
+    const handles = ['term_3f2a-9c_b', '', '--json', 'term_a b', 'term_', 7, 'pty:1']
+    const agents = handles.map((terminalHandle, index) => ({
+      ...STATE.agents[1],
+      paneKey: `tab:${index}`,
+      terminalHandle
+    }))
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => agent.terminalHandle)).toEqual([
+      'term_3f2a-9c_b',
+      ...handles.slice(1).map(() => undefined)
+    ])
+    expect(parsed?.agents[1]).not.toHaveProperty('terminalHandle')
+  })
+
   it('turns an invalid review, work item or config field into null or nothing', () => {
     const parsed = parseGameState(
       JSON.stringify({

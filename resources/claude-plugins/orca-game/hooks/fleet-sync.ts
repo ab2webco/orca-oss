@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
-import { gameStateArgvOf } from './game-config'
+import { gameStateArgvOf, terminalFocusArgvOf } from './game-config'
 import { parseGameState } from './game-state'
 import { fleetPhaseOf, partyOf } from './party'
 import {
@@ -33,6 +33,17 @@ async function readState($: EngineInterface): Promise<GameState | undefined> {
   }
   const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
+}
+
+/** Brings a teammate's Orca pane forward; false when Orca could not. */
+export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const argv = terminalFocusArgvOf(cli, handle)
+  if (argv === undefined) {
+    return false
+  }
+  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  return out?.exitCode === 0
 }
 
 async function syncXp($: EngineInterface, before: GameState | null, next: GameState) {

@@ -8,6 +8,7 @@ import type {
   GameWorkItem,
   GameWorktree
 } from '../types'
+import { isTerminalHandle } from './game-config'
 import { isQuestMode } from './quest-policy'
 import { sceneDefinitionOf } from './scenes/scene-shape'
 
@@ -86,7 +87,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       agentType,
       state,
       toolName: str(value.toolName) ?? null,
-      isLeader: value.isLeader === true
+      isLeader: value.isLeader === true,
+      ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {})
     }
   ]
 }

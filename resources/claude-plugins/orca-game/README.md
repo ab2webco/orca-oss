@@ -13,6 +13,7 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   **Pet Clawd**.
 - **The Fleet pane** (Panel): the HUD at full width and one card per agent with its own animated
   tile, then the review and the work item as links. `r` refreshes, `c` pets Clawd, `q` or Esc closes.
+  **View** (`1`–`9` by tile order) focuses that teammate's Orca pane.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
 
 ## Origin
@@ -65,7 +66,8 @@ entries.
   worktree: { id, path, branch, displayName },
   agents: [{ paneKey, displayName, agentType,
              state: 'working' | 'waiting' | 'idle' | 'done',
-             toolName: string | null, isLeader: boolean }],
+             toolName: string | null, isLeader: boolean,
+             terminalHandle?: string /* term_…, kept only in that shape */ }],
   review: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure-devops' | 'gitea',
             number, title, url,
             state: 'open' | 'draft' | 'merged' | 'closed',
