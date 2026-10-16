@@ -95,7 +95,7 @@ function ActionRow({
   )
   return (
     <div data-slot="game-action-row" className="space-y-2 rounded-md border border-border p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         {field(
           'label',
           translate('auto.components.settings.OrchestratorGameActionsSetting.label', 'Label'),
@@ -106,15 +106,21 @@ function ActionRow({
         )}
         <div className="flex min-w-0 items-center gap-1">
           <span className="text-xs text-muted-foreground">/</span>
-          {field(
-            'command',
-            translate('auto.components.settings.OrchestratorGameActionsSetting.command', 'Command'),
-            translate(
-              'auto.components.settings.OrchestratorGameActionsSetting.commandPlaceholder',
-              'test-runs'
-            ),
-            true
-          )}
+          {/* Why a flex-1 wrapper: beside the fixed key box the input would shrink to nothing. */}
+          <div className="min-w-0 flex-1">
+            {field(
+              'command',
+              translate(
+                'auto.components.settings.OrchestratorGameActionsSetting.command',
+                'Command'
+              ),
+              translate(
+                'auto.components.settings.OrchestratorGameActionsSetting.commandPlaceholder',
+                'test-runs'
+              ),
+              true
+            )}
+          </div>
           <div className="w-12 shrink-0">
             {field(
               'key',
@@ -127,7 +133,7 @@ function ActionRow({
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 sm:col-span-2 xl:col-span-1">
           <SettingsSegmentedControl
             value={draft.kind}
             ariaLabel={`${translate('auto.components.settings.OrchestratorGameActionsSetting.kind', 'Kind')} ${n}`}

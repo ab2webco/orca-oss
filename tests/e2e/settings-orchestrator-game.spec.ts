@@ -474,3 +474,79 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
     }
   }
 })
+
+test("the project's Actions editor saves this machine's list and renders at every width", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? null)
+  expect(repoId, 'the harness seeds one repo').not.toBeNull()
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+
+  await expect(orcaPage.getByRole('radiogroup', { name: 'Lead buttons' })).toBeVisible({
+    timeout: 15_000
+  })
+  await expect(orcaPage.getByRole('radiogroup', { name: 'Open links in' }).first()).toBeVisible()
+  await orcaPage.getByRole('button', { name: 'Edit on this machine' }).click()
+  for (const [label, command, prompt] of [
+    ['Test runs', 'test-runs', 'Have members run the Tambora test runs of my QA tickets'],
+    ['Daily log', 'daily', 'Write the daily log of what the members did']
+  ] as const) {
+    await orcaPage.getByRole('button', { name: 'Add action' }).click()
+    const n = await orcaPage.locator('[data-slot="game-action-row"]').count()
+    await orcaPage.getByLabel(`Label ${n}`).fill(label)
+    await orcaPage.getByLabel(`Command ${n}`).fill(command)
+    await orcaPage.getByLabel(`Prompt ${n}`).fill(prompt)
+  }
+  await orcaPage.getByLabel('Key 2').fill('x')
+  await orcaPage.getByRole('button', { name: 'Save actions' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({
+      [repoId as string]: {
+        actions: [
+          {
+            label: 'Test runs',
+            command: 'test-runs',
+            prompt: 'Have members run the Tambora test runs of my QA tickets'
+          },
+          {
+            label: 'Daily log',
+            command: 'daily',
+            key: 'x',
+            prompt: 'Write the daily log of what the members did'
+          }
+        ]
+      }
+    })
+
+  // An MCP row with a refused command shows the inline error the screenshots should carry.
+  await orcaPage.getByRole('button', { name: 'Add action' }).click()
+  await orcaPage.getByLabel('Label 3').fill('Runs')
+  await orcaPage.getByLabel('Command 3').fill('wave')
+  await orcaPage
+    .getByRole('radiogroup', { name: 'Kind 3' })
+    .getByRole('radio', { name: 'MCP' })
+    .click()
+  await orcaPage.getByLabel('MCP server 3').fill('tambora')
+  await orcaPage.getByLabel('Tool 3').fill('list_test_runs')
+  await expect(orcaPage.getByRole('alert')).toHaveText(
+    'A lead button or another action already uses this command.'
+  )
+  await expect(orcaPage.getByRole('button', { name: 'Save actions' })).toBeDisabled()
+
+  const editor = orcaPage.locator('[data-slot="game-actions-settings"]')
+  await shootAll(electronApp, orcaPage, testInfo, 'actions', editor)
+  // Why a box check: at phone widths the editor is taller than the window, so no shot holds all of it.
+  for (const width of WIDTHS) {
+    await setWindowWidth(electronApp, orcaPage, width)
+    const box = await editor.boundingBox()
+    expect(box?.width ?? 0, `editor fits ${width}`).toBeLessThanOrEqual(width)
+  }
+})
