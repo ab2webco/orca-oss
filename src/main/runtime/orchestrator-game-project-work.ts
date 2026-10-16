@@ -57,6 +57,15 @@ export type GameProjectWorkPort = {
 // Why: a tracker that is offline, unauthenticated or rate limited costs its own list, never the other.
 const settle = <T>(read: () => Promise<T>): Promise<T | null> => read().catch(() => null)
 
+/** A Plane workspace named by its slug, as a shared orca.yaml writes it, or by Orca's id for it. */
+export const planeWorkspaceIdOf = (
+  workspaces: readonly { id: string; workspaceSlug: string }[],
+  value: string | undefined
+): string | undefined =>
+  value === undefined
+    ? undefined
+    : (workspaces.find((one) => one.id === value || one.workspaceSlug === value)?.id ?? value)
+
 const keyPrefixOf = (identifier: string): string | undefined =>
   /^([A-Za-z][A-Za-z0-9_]*)-\d+$/.exec(identifier)?.[1]
 

@@ -654,6 +654,7 @@ import {
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import {
   GameProjectWorkCache,
+  planeWorkspaceIdOf,
   readGameProjectWork,
   type GameProjectWorkPort
 } from './orchestrator-game-project-work'
@@ -890,6 +891,7 @@ import {
   updateIssue as updateJiraIssue
 } from '../jira/issues'
 import { connect as connectPlane } from '../plane/client'
+import { getWorkspaceFile as getPlaneWorkspaceFile } from '../plane/plane-workspace-store'
 import {
   disconnect as disconnectPlane,
   selectWorkspace as selectPlaneWorkspace,
@@ -30297,7 +30299,7 @@ export class OrcaRuntimeService {
         this.planeListWorkItems({
           projectId: project,
           filter: 'assigned',
-          workspaceId: workspace,
+          workspaceId: planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace),
           omitDescription: true
         }),
       jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 20, site),

@@ -3,6 +3,7 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import {
   autoTodoSourceOf,
   GameProjectWorkCache,
+  planeWorkspaceIdOf,
   readGameProjectWork,
   type GameProjectWorkPort
 } from './orchestrator-game-project-work'
@@ -257,6 +258,16 @@ describe('readGameProjectWork', () => {
 
     expect(work.reviews?.total).toBe(0)
     expect(work.todo).toBeNull()
+  })
+})
+
+describe('planeWorkspaceIdOf', () => {
+  it("takes a workspace's slug as written in orca.yaml or Orca's own id", () => {
+    const workspaces = [{ id: 'JC8r', workspaceSlug: 'ab2web' }]
+    expect(planeWorkspaceIdOf(workspaces, 'ab2web')).toBe('JC8r')
+    expect(planeWorkspaceIdOf(workspaces, 'JC8r')).toBe('JC8r')
+    expect(planeWorkspaceIdOf(workspaces, undefined)).toBeUndefined()
+    expect(planeWorkspaceIdOf(workspaces, 'unknown')).toBe('unknown')
   })
 })
 

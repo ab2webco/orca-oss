@@ -217,10 +217,11 @@ Where the To Do comes from, first match wins:
      todo:
        provider: plane # plane | jira | linear | github | gitlab
        project: e665c0d5-22e7-495e-9ecf-3effee3ae370 # optional: Plane project id, Jira key, Linear team key
-       workspace: orca-lab # optional: Plane workspace, Jira site or Linear workspace
+       workspace: ab2web # optional: Plane workspace slug, Jira site id or Linear workspace id
    ```
 
-   `todo: off` hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
+   Without `workspace` Orca uses the workspace or site selected on its Tasks page. `todo: off`
+   hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
    since it goes into the JQL.
 2. The Plane project this repo was last launched from on the Tasks page.
 3. The tracker of the worktree's linked item (a Jira or Linear item scopes to its key's prefix).
