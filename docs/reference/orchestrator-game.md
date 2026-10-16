@@ -234,6 +234,51 @@ The Fleet pane lists both, each item a link colored by its CI or status, with ho
 list) and `t` (To Do list). `/quest demo` shows them with fake data. A provider that fails costs
 only its own chip.
 
+## The project lead: `orchestratorGame.orchestrator`
+
+A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
+own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
+through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
+project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`.
+
+```yaml
+# orca.yaml
+orchestratorGame:
+  orchestrator:
+    autostart: true   # a plain session in this project starts as the lead
+    cap: 4            # members running at once, 1 to 12; launches past it are refused
+    agent: claude     # what a member runs, as `orca orchestration worker-start --agent` names it
+    model: opus       # optional
+    effort: high      # optional, used only with a model
+    label: Orquestador          # optional: the lead's name
+    launchPrompt: |             # optional: what a new member is told; {id} {title} {url} {status}
+      Implement {id}: {title}
+    pushPrompt: |               # optional: what `game push` sends a stopped member; same placeholders
+      Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
+    rules: Members report TERMINADO CIN-NNN.  # optional: appended to Orca's own rules
+```
+
+A placeholder with no value is left empty; an unknown one drops the key with a warning.
+
+The lead's verbs, run from the lead's terminal
+([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
+
+- `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game launch <ticket> [--repo <selector>]` — one member for one ticket; `--repo` starts it
+  in another repo of the project.
+- `orca game fleet` — each member's ticket, state, PR, CI, branch, phase (`needs-you`, `working`,
+  `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
+  merged and its ticket is in review or done (or it has none); every other member counts toward
+  the cap, even one whose turn ended.
+- `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
+  Do's items in list order, skipping tickets a member holds or that left the To Do, up to the free
+  slots. Only the first 5 To Do items are known to it.
+- `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
+  ticket not yet done). `--close` releases each one's dispatch, or closes its terminal when no
+  dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
+- `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
+  dialog is reported for the person or the lead, and working ones are left alone.
+
 ## Built-in scenes
 
 The mod ships four art sets ([`hooks/scenes/`](../../resources/claude-plugins/orca-game/hooks/scenes)),
