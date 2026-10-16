@@ -50,7 +50,12 @@ describe('orca game state', () => {
         result: {
           config: { mode: 'on' },
           agents: [],
-          worktree: { id: 'wt1', path: '/repo', branch: 'main', displayName: 'cineco' },
+          worktree: {
+            id: 'wt1',
+            path: '/Users/me/cineco-orchestrator',
+            branch: 'main',
+            displayName: 'main'
+          },
           lead: { autostart: true, cap: 3, agent: 'claude', rules: 'Use Jira CIN.' },
           role: 'lead'
         }
@@ -65,7 +70,7 @@ describe('orca game state', () => {
     })
 
     const text = output.join('\n')
-    expect(text).toContain('You are the lead of cineco')
+    expect(text).toContain('You are the lead of cineco-orchestrator')
     expect(text).toContain('At most 3 members run at once')
     expect(text).toContain('Use Jira CIN.')
   })

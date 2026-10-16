@@ -11,6 +11,10 @@ type GameLeadResult = {
   brief: string | null
 }
 
+// Why the folder: a primary worktree's display name is its branch, and an SSH path may use either separator.
+const projectNameOf = (worktree: OrchestratorGameState['worktree']): string =>
+  worktree?.path.split(/[\\/]/).findLast((part) => part !== '') ?? 'this project'
+
 // Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
 const callerParams = () => ({
   worktreeId: process.env.ORCA_WORKTREE_ID,
@@ -49,11 +53,7 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     const brief =
       role === 'member'
         ? null
-        : gameLeadBriefOf(
-            lead,
-            state.worktree?.displayName || 'this project',
-            process.env.ORCA_GAME_CLI || 'orca'
-          )
+        : gameLeadBriefOf(lead, projectNameOf(state.worktree), process.env.ORCA_GAME_CLI || 'orca')
     printResult<GameLeadResult>(
       { ...response, result: { role, lead, brief } },
       json,
