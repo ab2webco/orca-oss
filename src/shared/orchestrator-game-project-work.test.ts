@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   GAME_PROJECT_ITEMS_MAX,
+  GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
   parseGameTodoSource,
   reviewsListUrlOf,
@@ -56,6 +57,19 @@ describe('gameProjectListOf', () => {
     expect(list.items).toHaveLength(GAME_PROJECT_ITEMS_MAX)
     expect(list.items.map((one) => one.id)).toEqual(['#0', '#2', '#3', '#4', '#5'])
     expect(list.url).toBe('https://github.com/o/r/pulls')
+  })
+
+  it('keeps up to the given max, sorted by status group', () => {
+    const items = Array.from({ length: 40 }, (_, at) => ({
+      id: `CIN-${at}`,
+      title: 'x',
+      url: `https://jira/CIN-${at}`,
+      group: at % 2 === 0 ? ('todo' as const) : ('in_progress' as const)
+    }))
+    const list = gameProjectListOf('jira', items, null, 40, GAME_TODO_ITEMS_MAX)
+    expect(GAME_TODO_ITEMS_MAX).toBe(30)
+    expect(list.items).toHaveLength(30)
+    expect(list.items.slice(0, 20).every((one) => one.group === 'in_progress')).toBe(true)
   })
 
   it('drops a list url that is not http(s)', () => {

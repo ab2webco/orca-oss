@@ -17,6 +17,7 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  add `--repo <selector>` when the ticket belongs to another repo of the project.',
     `  At most ${lead.cap} members run at once; when they are all busy, say which ticket waits.`,
     '- "Work on <ticket>", from the person or from the game Panel, means launch a member for it.',
+    '- For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.',
     '- Wait for reports with',
     `  ${run('orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json')},`,
     '  in the background when your agent can (Claude Code: the Monitor tool), so the person can keep',
@@ -33,6 +34,8 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `- ${run('game sweep')} lists finished members (PR merged, ticket in review or done). Verify each,`,
     `  then ${run('game sweep --close')} frees their tabs; worktrees stay for the person.`,
     `- ${run('game push')} tells stopped members to continue; one waiting on a question is left to you.`,
+    `- When the person says stop/detener, run ${run('game stop --all')} at once, then confirm what stopped;`,
+    "  don't relaunch or re-arm watchers until asked.",
     `- ${run('game state --json')} lists every member (\`isMember\`) with its state, PR, CI and ticket.`,
     `- For anything else about members, load ${run('skills get orchestration')}.`
   ]

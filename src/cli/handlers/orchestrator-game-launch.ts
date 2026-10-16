@@ -4,6 +4,11 @@ import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
+import {
+  GAME_PROMPT_MAX,
+  GAME_WORK_PROMPT_PLACEHOLDERS,
+  unknownPlaceholderOf
+} from '../../shared/orchestrator-game-actions'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import type { RuntimeStatus } from '../../shared/runtime-types'
@@ -28,6 +33,29 @@ function requiredTicket(flags: Map<string, string | boolean>): string {
     throw new RuntimeClientError('invalid_argument', 'Name the ticket to launch, like CIN-12.')
   }
   return ticket
+}
+
+// Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
+function taskPromptOf(flags: Map<string, string | boolean>): string | null {
+  if (!flags.has('prompt')) {
+    return null
+  }
+  const raw = flags.get('prompt')
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  if (text.length === 0 || text.length > GAME_PROMPT_MAX) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt must be 1 to ${GAME_PROMPT_MAX} characters.`
+    )
+  }
+  const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
+  if (unknown !== null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt uses an unknown placeholder {${unknown}}; use {id}, {title}, {url} or {status}.`
+    )
+  }
+  return text
 }
 
 async function boundRunId(client: Client, from: string, objective: string): Promise<string> {
@@ -74,6 +102,8 @@ export async function launchGameMember(args: {
   repo: string | null
   flags: Map<string, string | boolean>
   cwd: string
+  /** Replaces the project's launchPrompt for this member. */
+  prompt?: string | null
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
@@ -90,7 +120,7 @@ export async function launchGameMember(args: {
     `${lead.label ?? 'Lead'} of ${project}: one member per ticket`
   )
   const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
-    spec: renderGameLaunchPrompt(lead.launchPrompt, {
+    spec: renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
       id: item?.id ?? ticket,
       title: item?.title ?? '',
       url: item?.url ?? '',
@@ -120,6 +150,7 @@ export const formatGameLaunch = (launched: GameLaunchResult): string =>
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {
     const ticket = requiredTicket(flags)
+    const prompt = taskPromptOf(flags)
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const response = await readCallerGameState(client)
@@ -136,7 +167,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       ticket,
       repo,
       flags,
-      cwd
+      cwd,
+      prompt
     })
     if (launched.state !== 'ready') {
       process.exitCode = 1

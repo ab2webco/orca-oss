@@ -72,15 +72,24 @@ describe('project work from Orca', () => {
 
     expect(state?.project?.reviews?.url).toBeNull()
     expect(state?.project?.reviews?.total).toBe(12)
-    expect(state?.project?.reviews?.items.map((one) => one.id)).toEqual([
-      '#1',
-      '#2',
-      '#3',
-      '#4',
-      '#5'
-    ])
+    expect(state?.project?.reviews?.items.map((one) => one.id)).toEqual(
+      Array.from({ length: 11 }, (_, at) => `#${at + 1}`)
+    )
     expect(state?.project?.reviews?.items[0]?.tone).toBeUndefined()
     expect(state?.project?.todo).toBeNull()
+  })
+
+  it('keeps a long To Do from the host, so the lead can wave past the first in-progress tickets', () => {
+    const items = Array.from({ length: 40 }, (_, at) => ({
+      id: `CIN-${at}`,
+      title: 'x',
+      url: `https://jira/CIN-${at}`
+    }))
+    const state = gameStateOf({
+      ...STATE,
+      project: { reviews: null, todo: { provider: 'jira', total: 40, url: null, items } }
+    })
+    expect(state?.project?.todo?.items).toHaveLength(30)
   })
 
   it('has no project work from a host older than it', () => {

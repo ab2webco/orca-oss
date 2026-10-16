@@ -4,7 +4,7 @@ import type { GameProjectItem, GameProjectList, GameState, GameStatusGroup } fro
 import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import { ACTION_HOTKEYS, actionErrorOf, actionResultOf } from '../hooks/action-results'
 import { gameStateOf } from '../hooks/game-state'
-import { todoSectionsOf } from '../hooks/todo-sections'
+import { todoDrawnCountOf, todoSectionsOf } from '../hooks/todo-sections'
 
 const STATE: GameState = {
   config: {},
@@ -163,6 +163,27 @@ describe('the To Do grouped by status', () => {
       ['backlog', undefined, ['E']],
       ['other', 2, ['F']]
     ])
+  })
+
+  it('draws at most a few tickets per section, the wire carrying more for the lead', () => {
+    const list: GameProjectList = {
+      provider: 'jira',
+      total: 20,
+      url: null,
+      items: [
+        ...['A', 'B', 'C', 'D', 'E'].map((id) => ticketOf(id, 'in_progress')),
+        ...['F', 'G', 'H', 'I'].map((id) => ticketOf(id, 'todo'))
+      ],
+      groups: { in_progress: 5, todo: 15 }
+    }
+    const sections = todoSectionsOf(list)
+    expect(
+      sections.map((one) => [one.heading, one.count, one.items.map((item) => item.id)])
+    ).toEqual([
+      ['in_progress', 5, ['A', 'B', 'C']],
+      ['todo', 15, ['F', 'G', 'H']]
+    ])
+    expect(todoDrawnCountOf(sections)).toBe(6)
   })
 
   it('draws an ungrouped list as one section with no heading', () => {

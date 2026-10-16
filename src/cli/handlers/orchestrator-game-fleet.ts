@@ -12,6 +12,7 @@ import {
   type SweepClose
 } from './orchestrator-game-fleet-format'
 import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { formatStop, stopGameMembers } from './orchestrator-game-stop'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
@@ -172,5 +173,15 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
       }
     }
     printResult({ ...response, result: push }, json, formatPush)
+  },
+  'game stop': async ({ flags, client, json }) => {
+    const tickets = ticketsOf(flags)
+    const all = flags.get('all') === true
+    if (tickets.length === 0 && !all) {
+      throw new RuntimeClientError('invalid_argument', 'Name the tickets to stop, or pass --all.')
+    }
+    const response = await readCallerGameState(client)
+    const stop = await stopGameMembers(client, response.result, all ? 'all' : tickets)
+    printResult({ ...response, result: stop }, json, formatStop)
   }
 }

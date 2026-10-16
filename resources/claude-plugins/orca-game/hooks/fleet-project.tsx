@@ -12,7 +12,7 @@ import { reviewKindOf } from './band-chips'
 import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
-import { todoSectionsOf } from './todo-sections'
+import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
 const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
   danger: 'red',
@@ -64,34 +64,37 @@ export async function projectRowsOf(
     </Box>
   )
   // A heading that opens the list, then the items, under a heading per status when they have one.
-  const listRows = (key: string, heading: string, list: GameProjectList) => (
-    <Box key={key} flexDirection="column">
-      <Box flexDirection="row" gap={1}>
-        {list.url === null ? (
-          <Text bold>{heading}</Text>
-        ) : (
-          <Link href={list.url}>
-            <Text bold underline>
-              {heading}
-            </Text>
-          </Link>
+  const listRows = (key: string, heading: string, list: GameProjectList) => {
+    const sections = todoSectionsOf(list)
+    return (
+      <Box key={key} flexDirection="column">
+        <Box flexDirection="row" gap={1}>
+          {list.url === null ? (
+            <Text bold>{heading}</Text>
+          ) : (
+            <Link href={list.url}>
+              <Text bold underline>
+                {heading}
+              </Text>
+            </Link>
+          )}
+        </Box>
+        {sections.flatMap((section, at) => [
+          ...(section.heading === null
+            ? []
+            : [
+                <Text key={`${key}-heading-${at}`} dimColor bold>
+                  {`${text.todoHeadings[section.heading]}${section.count === undefined ? '' : ` ${section.count}`}`}
+                </Text>
+              ]),
+          ...section.items.map((one) => itemRow(key, one))
+        ])}
+        {list.total > todoDrawnCountOf(sections) && (
+          <Text dimColor>{text.moreAllies(list.total - todoDrawnCountOf(sections))}</Text>
         )}
       </Box>
-      {todoSectionsOf(list).flatMap((section, at) => [
-        ...(section.heading === null
-          ? []
-          : [
-              <Text key={`${key}-heading-${at}`} dimColor bold>
-                {`${text.todoHeadings[section.heading]}${section.count === undefined ? '' : ` ${section.count}`}`}
-              </Text>
-            ]),
-        ...section.items.map((one) => itemRow(key, one))
-      ])}
-      {list.total > list.items.length && (
-        <Text dimColor>{text.moreAllies(list.total - list.items.length)}</Text>
-      )}
-    </Box>
-  )
+    )
+  }
   const actionButton = (action: GameAction, index: number) => {
     const hotkey = ACTION_HOTKEYS[index]
     return (

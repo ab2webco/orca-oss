@@ -10,6 +10,8 @@ import type { GameLinkTone, GameStatusGroup } from './orchestrator-game-state'
 /** Project-wide work the band shows next to the worktree's own: my open PRs and my open tickets. */
 
 export const GAME_PROJECT_ITEMS_MAX = 5
+/** Why more than the Panel draws: `orca game wave` picks its tickets from these. Older mods cut at 5. */
+export const GAME_TODO_ITEMS_MAX = 30
 const GAME_TODO_TEXT_MAX = 64
 
 export const GAME_TODO_PROVIDERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
@@ -119,7 +121,8 @@ export function gameProjectListOf(
   provider: string,
   items: readonly GameProjectItem[],
   url: string | null,
-  total: number = items.length
+  total: number = items.length,
+  max: number = GAME_PROJECT_ITEMS_MAX
 ): GameProjectList {
   const grouped = items.filter((one) => one.group !== undefined)
   const groups: Partial<Record<GameStatusGroup, number>> = {}
@@ -135,7 +138,7 @@ export function gameProjectListOf(
     items: items
       .filter((one) => isHttpUrl(one.url))
       .sort((left, right) => groupRankOf(left) - groupRankOf(right))
-      .slice(0, GAME_PROJECT_ITEMS_MAX),
+      .slice(0, max),
     ...(grouped.length > 0 ? { groups } : {})
   }
 }

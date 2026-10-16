@@ -30352,7 +30352,7 @@ export class OrcaRuntimeService {
           workspaceId: planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace),
           omitDescription: true
         }),
-      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 20, site),
+      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 50, site),
       linearAssigned: async (workspace) =>
         (await this.linearListIssues('assigned', 50, workspace)).items
     }

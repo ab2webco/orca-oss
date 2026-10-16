@@ -174,6 +174,29 @@ describe('orca game launch', () => {
     )
   })
 
+  it('gives the member the --prompt task instead of the project prompt, placeholders filled', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client, 'CIN-12', [
+      ['prompt', '  Run the Tambora test run of {id} ({title}) and report pass/fail  ']
+    ])
+
+    expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
+      expect.objectContaining({
+        spec: 'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
+      })
+    )
+  })
+
+  it('refuses an empty or unknown-placeholder --prompt before touching orchestration', async () => {
+    for (const prompt of ['   ', 'Check {ticket}']) {
+      const { client, calls } = fakeClient(stateWith())
+
+      await expect(launch(client, 'CIN-12', [['prompt', prompt]])).rejects.toThrow(/--prompt/)
+      expect(calls).toEqual([])
+    }
+  })
+
   it('starts the member in another repo of the project in its own top-level worktree', async () => {
     const { client, calls } = fakeClient(stateWith())
 

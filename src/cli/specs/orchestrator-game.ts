@@ -23,17 +23,19 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own child worktree, as this project's lead",
-    usage: 'orca game launch <ticket> [--repo <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo'],
+    usage: 'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo', 'prompt'],
     positionalArgs: ['ticket'],
     notes: [
       'Run it from the lead terminal: the member reports to it through Orca orchestration.',
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
-      "--repo starts the member in that repo's own new worktree instead of a child of the lead's."
+      "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
+      '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.'
     ],
     examples: [
       'orca game launch CIN-1232 --json',
+      'orca game launch CIN-1232 --prompt "Run the Tambora test run of {id} and report pass/fail"',
       'orca game launch CIN-1232 --repo name:cineco-frontend --json'
     ]
   },
@@ -82,6 +84,19 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'A member waiting on a question or dialog is reported, never sent anything; working ones are left.'
     ],
     examples: ['orca game push --dry-run', 'orca game push --json']
+  },
+  {
+    path: ['game', 'stop'],
+    summary: "Stop the lead's members so no member agent keeps running",
+    usage: 'orca game stop [<ticket>[,<ticket>...] | --all] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'all'],
+    positionalArgs: ['tickets'],
+    notes: [
+      "Stops each member's live dispatch, then closes its terminal when the agent is still there.",
+      'Never touches the lead. Worktrees are left in place.',
+      'Name tickets or pass --all; each member is reported stopped, already stopped or failed.'
+    ],
+    examples: ['orca game stop --all', 'orca game stop CIN-12,CIN-14 --json']
   },
   {
     path: ['game', 'scene', 'new'],

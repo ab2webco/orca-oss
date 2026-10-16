@@ -58,7 +58,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'orchestrator-game-fleet',
-    keys: ['game fleet', 'game wave', 'game sweep', 'game push'],
+    keys: ['game fleet', 'game wave', 'game sweep', 'game push', 'game stop'],
     load: async () =>
       (await import('./handlers/orchestrator-game-fleet.js')).ORCHESTRATOR_GAME_FLEET_HANDLERS
   },

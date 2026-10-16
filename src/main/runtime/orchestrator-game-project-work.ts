@@ -8,6 +8,7 @@ import type { PlaneWorkItem } from '../../shared/plane-types'
 import { derivePRCheckStatus } from '../../shared/pr-check-status'
 import {
   GAME_PROJECT_ITEMS_MAX,
+  GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
   reviewsListUrlOf,
   reviewToneOf,
@@ -198,7 +199,8 @@ async function readTodo(
           project: source.project,
           repo
         }),
-      items.length
+      items.length,
+      GAME_TODO_ITEMS_MAX
     )
   switch (source.provider) {
     case 'plane': {

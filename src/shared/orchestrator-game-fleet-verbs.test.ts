@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
+  gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf
@@ -269,5 +270,37 @@ describe('gamePushPlanOf', () => {
     expect(entry?.prompt).toBe(
       'Continue  to the end on your own. Report to your lead when it is done or when only the person can decide.'
     )
+  })
+})
+
+describe('gameStopTargetsOf', () => {
+  const agents = [
+    lead,
+    member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' }),
+    member({
+      paneKey: 'b',
+      displayName: 'CIN-2',
+      terminalHandle: 'term_2',
+      worktree: { id: 'wt2', branch: 'cin-2', displayName: 'cin-2' }
+    }),
+    member({ paneKey: 'c', displayName: 'CIN-3', review: review('merged') })
+  ]
+
+  it('takes every member, finished ones included, and never the lead', () => {
+    const { targets, missing } = gameStopTargetsOf({ agents, lead: DEFAULT_GAME_LEAD }, 'all')
+
+    expect(targets.map((target) => target.row.ticket)).toEqual(['CIN-1', 'CIN-2', 'CIN-3'])
+    expect(targets[1]?.worktreeId).toBe('wt2')
+    expect(missing).toEqual([])
+  })
+
+  it('takes only the named tickets and names the ones no member holds', () => {
+    const { targets, missing } = gameStopTargetsOf({ agents, lead: DEFAULT_GAME_LEAD }, [
+      'cin-2',
+      'CIN-7'
+    ])
+
+    expect(targets.map((target) => target.row.ticket)).toEqual(['CIN-2'])
+    expect(missing).toEqual(['CIN-7'])
   })
 })

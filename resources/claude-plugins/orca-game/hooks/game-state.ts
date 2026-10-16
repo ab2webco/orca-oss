@@ -79,7 +79,8 @@ const linkOf = (value: unknown): GameLink[] => {
   ]
 }
 
-const MAX_PROJECT_ITEMS = 5
+// Why 30: Orca sends the To Do the lead waves from; the Panel draws only a few per section.
+const MAX_PROJECT_ITEMS = 30
 
 const projectItemOf = (value: unknown): GameProjectItem[] => {
   if (!isShape(value)) {

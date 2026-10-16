@@ -18,6 +18,11 @@ const HEADING_OF: Readonly<Record<GameStatusGroup, TodoHeading>> = {
 
 const GROUPS = Object.keys(HEADING_OF) as GameStatusGroup[]
 
+/** Tickets drawn under one heading; the rest are counted in "+N more". */
+export const TODO_SECTION_ITEMS_MAX = 3
+// Why 5: a list with no status groups (PRs, GitHub issues) drew 5 before Orca sent more.
+const UNGROUPED_ITEMS_MAX = 5
+
 const countOf = (list: GameProjectList, heading: TodoHeading): { count?: number } => {
   const counts = GROUPS.filter((group) => HEADING_OF[group] === heading).flatMap((group) => {
     const count = list.groups?.[group]
@@ -29,17 +34,24 @@ const countOf = (list: GameProjectList, heading: TodoHeading): { count?: number 
 /** The To Do's items under one heading per status, in the order Orca sorted them. */
 export const todoSectionsOf = (list: GameProjectList): TodoSection[] => {
   if (list.items.every((one) => one.group === undefined)) {
-    return list.items.length === 0 ? [] : [{ heading: null, items: list.items }]
+    return list.items.length === 0
+      ? []
+      : [{ heading: null, items: list.items.slice(0, UNGROUPED_ITEMS_MAX) }]
   }
   const sections: TodoSection[] = []
   for (const item of list.items) {
     const heading = HEADING_OF[item.group ?? 'unknown']
     const last = sections.at(-1)
     if (last?.heading === heading) {
-      last.items.push(item)
+      if (last.items.length < TODO_SECTION_ITEMS_MAX) {
+        last.items.push(item)
+      }
     } else {
       sections.push({ heading, ...countOf(list, heading), items: [item] })
     }
   }
   return sections
 }
+
+export const todoDrawnCountOf = (sections: readonly TodoSection[]): number =>
+  sections.reduce((sum, one) => sum + one.items.length, 0)

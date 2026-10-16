@@ -25,6 +25,22 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('`orca game push`')
   })
 
+  it('stops every member at once when the person says stop, and never relaunches on its own', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('stop/detener')
+    expect(brief).toContain('`orca game stop --all` at once')
+    expect(brief).toContain("don't relaunch or re-arm watchers until asked")
+  })
+
+  it('hands a non-implementation task to a member with --prompt', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      'For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.'
+    )
+  })
+
   it('writes every command with the CLI this session runs', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
 

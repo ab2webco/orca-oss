@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PRCheckDetail } from '../../shared/github/check-types'
+import { GAME_TODO_ITEMS_MAX } from '../../shared/orchestrator-game-project-work'
 import {
   autoTodoSourceOf,
   GameProjectWorkCache,
@@ -314,10 +315,35 @@ describe('readGameProjectWork', () => {
       ['CIN-2', 'review'],
       ['CIN-5', 'review'],
       ['CIN-1', 'todo'],
-      ['CIN-4', 'todo']
+      ['CIN-4', 'todo'],
+      ['CIN-6', 'todo']
     ])
     expect(work.todo?.total).toBe(6)
     expect(work.todo?.groups).toEqual({ in_progress: 1, review: 2, todo: 3 })
+  })
+
+  it('sends the To Do past the first in-progress tickets, so a wave can fill the free slots', async () => {
+    const issue = (key: string, name: string, categoryKey: string) => ({
+      key,
+      title: key,
+      url: `https://koombea.atlassian.net/browse/${key}`,
+      status: { id: key, name, categoryKey, categoryName: '' }
+    })
+    const issues = Array.from({ length: 40 }, (_, at) =>
+      at < 5
+        ? issue(`CIN-${at}`, 'In Progress', 'indeterminate')
+        : issue(`CIN-${at}`, 'To Do', 'new')
+    )
+    const work = await readGameProjectWork(port({ jiraSearch: async () => issues }), {
+      todo: { provider: 'jira', project: 'CIN' },
+      workItem: null
+    })
+
+    expect(work.todo?.items).toHaveLength(GAME_TODO_ITEMS_MAX)
+    expect(work.todo?.items.filter((one) => one.group === 'todo')).toHaveLength(
+      GAME_TODO_ITEMS_MAX - 5
+    )
+    expect(work.todo?.total).toBe(40)
   })
 
   it('costs a failing tracker its list, never the other one', async () => {

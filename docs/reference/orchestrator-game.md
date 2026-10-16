@@ -264,8 +264,10 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
-- `orca game launch <ticket> [--repo <selector>]` — one member for one ticket; `--repo` starts it
-  in another repo of the project.
+- `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
+  `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
+  member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
+  investigation.
 - `orca game fleet` — each member's ticket, state, PR, CI, branch, phase (`needs-you`, `working`,
   `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
@@ -273,12 +275,19 @@ The lead's verbs, run from the lead's terminal
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
-  since a project may move it there first. Only the 5 To Do items `game state` carries are known to it.
+  since a project may move it there first. `game state` carries up to 30 To Do items, sorted
+  in progress, QA, to do, so the To Do past the in-progress ones is known to it; the Panel draws 3
+  per status heading and counts the rest in "+N more".
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` releases each one's dispatch, or closes its terminal when no
   dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
+- `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
+  agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
+  stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
+  reported stopped, already stopped or failed; the lead and the worktrees are never touched. The
+  lead's rules tell it to run `game stop --all` at once when the person says stop.
 
 ## Built-in scenes
 
