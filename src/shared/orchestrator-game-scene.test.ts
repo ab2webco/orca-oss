@@ -22,6 +22,17 @@ describe('parseOrchestratorGameScene', () => {
     }
   })
 
+  it('reads a pixel color written as #rrggbb and serves it as the number the mod draws', () => {
+    const parsed = parse(
+      scene({
+        looks: byPhase({ ...look, sun: '#FFE08A' }),
+        costumes: byPhase({ ...costume, colors: { ...costume.colors, H: '#3f6e46' } })
+      })
+    )
+    expect(parsed.ok && parsed.definition.looks.pr.sun).toBe(0xffe08a)
+    expect(parsed.ok && parsed.definition.costumes.pr.colors.H).toBe(0x3f6e46)
+  })
+
   it('ignores an id inside the file so a plugin cannot claim another namespace', () => {
     const parsed = parse(scene({ id: 'quest' }))
     expect(parsed.ok && parsed.definition.id).toBe('acme.pack/space')

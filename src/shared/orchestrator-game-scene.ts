@@ -16,8 +16,12 @@ export const ORCHESTRATOR_GAME_SCENE_MAX_BYTES = 64 * 1024
 // Why: the mod draws a costume as six rows plus a legs row inside an eight-pixel tile.
 export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
 
-const color = z.number().int().min(0).max(0xffffff)
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')
+// Why both: JSON has no hex literals, so authors write '#rrggbb'; the mod always receives a number.
+const color = z.union([
+  z.number().int().min(0).max(0xffffff),
+  hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
+])
 // Why: names reach the terminal verbatim, so control and bidi characters could rewrite the screen.
 const displayText = (max: number) =>
   z
