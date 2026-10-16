@@ -646,6 +646,8 @@ import {
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
+import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -1388,6 +1390,8 @@ type RuntimeStore = {
     mobileEmulatorDefaultDeviceUdid?: string | null
     voice?: VoiceSettings
     claudeAgentTeamsMode?: GlobalSettings['claudeAgentTeamsMode']
+    orchestratorGame?: GlobalSettings['orchestratorGame']
+    orchestratorGameProjects?: GlobalSettings['orchestratorGameProjects']
     // Why: Phase-5 query responder kill switches — read per chunk in
     // onPtyData to capture reply ownership at ingestion.
     terminalMainSideEffectAuthority?: GlobalSettings['terminalMainSideEffectAuthority']
@@ -30092,15 +30096,31 @@ export class OrcaRuntimeService {
   async prepareClaudeAgentTeamsLeader(args: {
     paneKey: string
     baseEnv?: Record<string, string>
-  }): Promise<{ env: Record<string, string> }> {
+  }): Promise<{ env: Record<string, string>; args: string[] }> {
     const handle = this.getTerminalHandleForPaneKey(args.paneKey)
     if (!handle) {
       throw new Error('claude_agent_teams_requires_orca_terminal')
     }
-    return await this.prepareClaudeAgentTeamsLeaderForHandle({
-      handle,
-      baseEnv: args.baseEnv
-    })
+    const [leader, game] = await Promise.all([
+      this.prepareClaudeAgentTeamsLeaderForHandle({ handle, baseEnv: args.baseEnv }),
+      this.prepareOrchestratorGameForHandle(handle)
+    ])
+    return { env: { ...leader.env, ...game.env }, args: game.args }
+  }
+
+  // Why: the game is optional decoration; any failure resolving it must still launch Claude.
+  private async prepareOrchestratorGameForHandle(handle: string): Promise<OrchestratorGameLaunch> {
+    try {
+      const terminal = await this.showTerminal(handle)
+      const worktree = (await this.getResolvedWorktreeMap()).get(terminal.worktreeId)
+      return await prepareOrchestratorGameLaunch({
+        settings: this.store?.getSettings?.(),
+        repoId: worktree?.repoId ?? null,
+        worktreePath: terminal.worktreePath || null
+      })
+    } catch {
+      return { args: [], env: {} }
+    }
   }
 
   async prepareClaudeAgentTeamsLeaderForHandle(args: {

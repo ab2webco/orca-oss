@@ -72,19 +72,19 @@ export const CORE_HANDLERS: Record<string, CommandHandler> = {
         'orca claude-teams must be run inside an Orca Lab terminal.'
       )
     }
-    const response = await client.call<{ launch: { env: Record<string, string> } }>(
-      'agentTeams.prepareLaunch',
-      {
-        paneKey,
-        env: envRecord()
-      }
-    )
+    const response = await client.call<{
+      launch: { env: Record<string, string>; args?: string[] }
+    }>('agentTeams.prepareLaunch', {
+      paneKey,
+      env: envRecord()
+    })
     process.exitCode = await runClaudeAgentTeams(
       {
         ...envRecord(),
         ...response.result.launch.env
       },
-      rawArgs ?? []
+      // Why: an older Orca answers without `args`; the game plugin is then simply not loaded.
+      [...(response.result.launch.args ?? []), ...(rawArgs ?? [])]
     )
   },
   open: async ({ client, json }) => {

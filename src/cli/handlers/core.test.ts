@@ -130,4 +130,35 @@ describe('orca claude-teams CLI handler', () => {
       expect(spawnEnv.PATH).toBe('/shim:/usr/bin')
     }
   )
+
+  it.skipIf(isWindows)('adds the args prepareLaunch returns before the user args', async () => {
+    callMock.mockResolvedValue({
+      result: { launch: { env: {}, args: ['--plugin-dir', '/plugins/orca-game'] } }
+    })
+    await CORE_HANDLERS['claude-teams']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp/repo',
+      json: false,
+      rawArgs: ['--model', 'opus']
+    })
+
+    expect(spawnMock.mock.calls.at(-1)?.[1]).toEqual([
+      '--teammate-mode',
+      'auto',
+      '--plugin-dir',
+      '/plugins/orca-game',
+      '--model',
+      'opus'
+    ])
+  })
+
+  it.skipIf(isWindows)(
+    'launches with only the user args when an older Orca sends no args',
+    async () => {
+      await runClaudeTeams()
+
+      expect(spawnMock.mock.calls.at(-1)?.[1]).toEqual(['--teammate-mode', 'auto'])
+    }
+  )
 })
