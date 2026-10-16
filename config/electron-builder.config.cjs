@@ -63,7 +63,18 @@ const bundledPluginResources = {
 // from package directories where pnpm's symlink farm is absent. Copy the exact
 // runtime dependency closure to Resources/node_modules so bare require() calls
 // do not fall through to a developer checkout's node_modules.
-const commonExtraResources = [relayExtraResource, bundledPluginResources, skillFreshnessResources]
+// Why: Claude Code loads these with --plugin-dir, which needs a real directory, not app.asar.
+const claudePluginResources = {
+  from: 'resources/claude-plugins',
+  to: 'claude-plugins',
+  filter: ['**/*', '!**/tests/**', '!**/.claude-plugin/types/**']
+}
+const commonExtraResources = [
+  relayExtraResource,
+  bundledPluginResources,
+  skillFreshnessResources,
+  claudePluginResources
+]
 const macSpeechNativeResource = {
   from: 'node_modules/sherpa-onnx-darwin-${arch}',
   to: 'node_modules/sherpa-onnx-darwin-${arch}'

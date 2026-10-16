@@ -88,6 +88,11 @@ describe('electron-builder config', () => {
       expect(electronBuilderConfig[platform].extraResources).toEqual(
         expect.arrayContaining([bundledPluginResources])
       )
+      expect(electronBuilderConfig[platform].extraResources).toContainEqual({
+        from: 'resources/claude-plugins',
+        to: 'claude-plugins',
+        filter: ['**/*', '!**/tests/**', '!**/.claude-plugin/types/**']
+      })
     }
     expect(electronBuilderConfig.mac.extraResources).toEqual(
       expect.arrayContaining([
