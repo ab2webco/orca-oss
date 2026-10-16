@@ -3,7 +3,7 @@ import {
   DEFAULT_GAME_PUSH_PROMPT,
   renderGameLaunchPrompt
 } from './orchestrator-game-lead'
-import type { GameAgent, OrchestratorGameState } from './orchestrator-game-state'
+import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -135,6 +135,9 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
   return { rows, counts, cap, running, free: Math.max(0, cap - running) }
 }
 
+// Why In Progress is allowed: a project may move a ticket there before its launch (cineco does).
+const PAST_WORK: ReadonlySet<GameStatusGroup> = new Set(['review', 'done', 'cancelled'])
+
 export type GameWaveSkipReason = 'cap' | 'already running' | 'not in To Do'
 
 export type GameWavePlan = {
@@ -165,7 +168,7 @@ export function gameWavePlanOf(
     const group = groupOf(ticket)
     const reason: GameWaveSkipReason | null = held.has(ticket)
       ? 'already running'
-      : group !== undefined && group !== 'todo'
+      : group !== undefined && PAST_WORK.has(group)
         ? 'not in To Do'
         : plan.launch.length >= fleet.free
           ? 'cap'

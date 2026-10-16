@@ -172,7 +172,8 @@ describe('gameWavePlanOf', () => {
       { id: 'CIN-2', group: 'in_progress' },
       { id: 'CIN-3', group: 'todo' },
       { id: 'CIN-4', group: 'todo' },
-      { id: 'CIN-5', group: 'todo' }
+      { id: 'CIN-5', group: 'todo' },
+      { id: 'CIN-6', group: 'review' }
     ])
   }
 
@@ -186,17 +187,21 @@ describe('gameWavePlanOf', () => {
     })
   })
 
-  it('launches the named tickets within the cap, refusing held or started ones', () => {
-    expect(gameWavePlanOf(state, ['cin-1', 'CIN-2', 'CIN-77', 'cin-77', 'CIN-3', 'CIN-4'])).toEqual(
+  it('launches the named tickets within the cap, refusing held ones and work already past In Progress', () => {
+    expect(gameWavePlanOf(state, ['cin-1', 'CIN-6', 'CIN-77', 'cin-77', 'CIN-3', 'CIN-4'])).toEqual(
       {
         launch: ['CIN-77', 'CIN-3'],
         skipped: [
           { ticket: 'CIN-1', reason: 'already running' },
-          { ticket: 'CIN-2', reason: 'not in To Do' },
+          { ticket: 'CIN-6', reason: 'not in To Do' },
           { ticket: 'CIN-4', reason: 'cap' }
         ]
       }
     )
+  })
+
+  it('launches a named ticket the lead already moved to In Progress', () => {
+    expect(gameWavePlanOf(state, ['CIN-2']).launch).toEqual(['CIN-2'])
   })
 
   it('launches nothing without a To Do', () => {

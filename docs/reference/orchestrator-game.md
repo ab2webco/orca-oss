@@ -271,8 +271,9 @@ The lead's verbs, run from the lead's terminal
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
-  Do's items in list order, skipping tickets a member holds or that left the To Do, up to the free
-  slots. Only the first 5 To Do items are known to it.
+  Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
+  and named tickets already in review, done or cancelled; one already In Progress is launched,
+  since a project may move it there first. Only the 5 To Do items `game state` carries are known to it.
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` releases each one's dispatch, or closes its terminal when no
   dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
