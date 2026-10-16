@@ -46,6 +46,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/dashboard-popout.js')).DASHBOARD_POPOUT_HANDLERS
   },
   {
+    name: 'orchestrator-game',
+    keys: ['game state'],
+    load: async () => (await import('./handlers/orchestrator-game.js')).ORCHESTRATOR_GAME_HANDLERS
+  },
+  {
     name: 'automations',
     keys: [
       'automations list',

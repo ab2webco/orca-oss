@@ -75,7 +75,8 @@ const preview: PluginMarketplaceHostInstallPreview = {
       automations: [],
       vmRecipes: [],
       agents: [],
-      skills: []
+      skills: [],
+      gameScenes: []
     },
     capabilities: [{ kind: 'workspace:read' }]
   }

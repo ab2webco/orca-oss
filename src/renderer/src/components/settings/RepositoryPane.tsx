@@ -26,6 +26,7 @@ import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
 import { RepositoryForkSyncSection } from './RepositoryForkSyncSection'
 import { translate } from '@/i18n/i18n'
 import { RepositoryWindowsRuntimeSection } from './RepositoryWindowsRuntimeSection'
+import { ProjectOrchestratorGameSetting } from './OrchestratorGameSetting'
 import { matchesRepositoryIdentitySearch } from './repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './RepositoryWorktreeDefaultsSection'
 import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
@@ -96,6 +97,7 @@ export function RepositoryPane({
   )
   const searchQuery = useAppStore((state) => state.settingsSearchQuery)
   const settings = useAppStore((state) => state.settings)
+  const updateSettings = useAppStore((state) => state.updateSettings)
   const worktreeVisibilityDefaultsByHost = useAppStore(
     (state) => state.worktreeVisibilityDefaultsByHost
   )
@@ -333,6 +335,15 @@ export function RepositoryPane({
         >
           <RepositoryIconPicker repo={repo} updateRepo={updateSelectedRepo} />
         </SearchableSetting>
+
+        {settings ? (
+          <ProjectOrchestratorGameSetting
+            repoId={repo.id}
+            settings={settings}
+            projectLayer={yamlHooks?.orchestratorGame}
+            updateSettings={updateSettings}
+          />
+        ) : null}
 
         {!isFolder ? (
           <>

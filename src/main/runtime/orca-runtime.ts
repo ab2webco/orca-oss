@@ -646,6 +646,14 @@ import {
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
+import {
+  withOrchestratorGameArgs,
+  type OrchestratorGameLaunch
+} from '../claude/orchestrator-game-launch'
+import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
+import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -1388,6 +1396,8 @@ type RuntimeStore = {
     mobileEmulatorDefaultDeviceUdid?: string | null
     voice?: VoiceSettings
     claudeAgentTeamsMode?: GlobalSettings['claudeAgentTeamsMode']
+    orchestratorGame?: GlobalSettings['orchestratorGame']
+    orchestratorGameProjects?: GlobalSettings['orchestratorGameProjects']
     // Why: Phase-5 query responder kill switches — read per chunk in
     // onPtyData to capture reply ownership at ingestion.
     terminalMainSideEffectAuthority?: GlobalSettings['terminalMainSideEffectAuthority']
@@ -27782,7 +27792,16 @@ export class OrcaRuntimeService {
                     },
                     shimDir,
                     shimBin
-                  }).env
+                  }).env,
+                // Why: the plugin dir is on this machine, so an SSH pane's remote Claude could not load it.
+                game:
+                  workspace.connectionId === null
+                    ? () =>
+                        this.prepareOrchestratorGameFor({
+                          repoId: workspace.repo?.id ?? null,
+                          worktreePath: workspace.path
+                        })
+                    : undefined
               })
         } catch (error) {
           releaseStablePaneCreate?.()
@@ -27800,9 +27819,12 @@ export class OrcaRuntimeService {
             ? {
                 ...launchOpts.launchConfig,
                 agentCommand: launchOpts.launchConfig.agentCommand
-                  ? effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
-                    ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
-                    : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand)
+                  ? withOrchestratorGameArgs(
+                      effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
+                        ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
+                        : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand),
+                      agentTeamsPlan.game ?? { args: [], env: {} }
+                    )
                   : agentTeamsPlan.command,
                 agentEnv: {
                   ...launchOpts.launchConfig.agentEnv,
@@ -30092,15 +30114,147 @@ export class OrcaRuntimeService {
   async prepareClaudeAgentTeamsLeader(args: {
     paneKey: string
     baseEnv?: Record<string, string>
-  }): Promise<{ env: Record<string, string> }> {
+  }): Promise<{ env: Record<string, string>; args: string[] }> {
     const handle = this.getTerminalHandleForPaneKey(args.paneKey)
     if (!handle) {
       throw new Error('claude_agent_teams_requires_orca_terminal')
     }
-    return await this.prepareClaudeAgentTeamsLeaderForHandle({
-      handle,
-      baseEnv: args.baseEnv
+    const [leader, game] = await Promise.all([
+      this.prepareClaudeAgentTeamsLeaderForHandle({ handle, baseEnv: args.baseEnv }),
+      this.prepareOrchestratorGameForHandle(handle)
+    ])
+    return { env: { ...leader.env, ...game.env }, args: game.args }
+  }
+
+  async getOrchestratorGameState(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    paneKey?: string
+  }): Promise<OrchestratorGameState> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    let worktreeId = args.worktreeId
+    if (!worktreeId && args.terminalHandle) {
+      worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+    }
+    const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
+    const summary = worktree
+      ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
+      : undefined
+    return await buildOrchestratorGameState({
+      settings: this.store?.getSettings?.(),
+      worktree: worktree
+        ? {
+            id: worktree.id,
+            repoId: worktree.repoId ?? null,
+            path: worktree.path,
+            branch: summary?.branch ?? worktree.branch ?? '',
+            displayName: summary?.displayName ?? worktree.displayName ?? '',
+            linkedWorkItem: worktree.linkedWorkItem
+          }
+        : null,
+      agents: summary?.agents ?? [],
+      leaderPaneKey: args.paneKey ?? null,
+      readScenes: () => readPluginGameSceneSources(),
+      readReview: async () =>
+        worktree?.repoId && summary?.branch
+          ? await this.getHostedReviewForBranch({
+              repoSelector: `id:${worktree.repoId}`,
+              branch: summary.branch,
+              linkedGitHubPR: summary.linkedPR?.number ?? null,
+              linkedGitLabMR: summary.linkedGitLabMR ?? null
+            })
+          : null,
+      readPlane: async () => {
+        const current = worktree
+          ? await this.planeResolveCurrentWorkItem({ worktreeId: worktree.id })
+          : null
+        return current?.workItem
+          ? {
+              identifier: current.identifier,
+              title: current.workItem.title,
+              url: current.url ?? '',
+              stateName: current.workItem.state.name,
+              stateGroup: current.workItem.state.group
+            }
+          : null
+      },
+      readLinear: async () => {
+        if (!worktree?.linkedLinearIssue) {
+          return null
+        }
+        const context = await this.linearIssueContext({
+          current: true,
+          include: {
+            comments: false,
+            children: false,
+            attachments: false,
+            relations: false,
+            activity: false
+          },
+          depth: 0,
+          context: { worktreeId: worktree.id }
+        })
+        return {
+          identifier: context.issue.identifier,
+          title: context.issue.title,
+          url: context.issue.url,
+          stateName: context.issue.state?.name ?? ''
+        }
+      },
+      readLinkedStatus: async (linked) => {
+        if (linked.provider === 'jira' && linked.jiraIdentifier) {
+          const status = (await this.jiraGetIssue(linked.jiraIdentifier))?.status
+          return status
+            ? { name: status.name, group: statusGroupOfJira(status.categoryKey, status.name) }
+            : null
+        }
+        const repoId = linked.repoId ?? worktree?.repoId
+        if (!repoId) {
+          return null
+        }
+        if (linked.provider === 'github') {
+          const issue = await this.getRepoIssue(`id:${repoId}`, linked.number)
+          return issue ? { name: issue.state } : null
+        }
+        if (linked.provider === 'gitlab') {
+          const details = await this.getGitLabRepoWorkItemDetails(
+            `id:${repoId}`,
+            linked.number,
+            'issue'
+          )
+          return details ? { name: details.item.state } : null
+        }
+        return null
+      }
     })
+  }
+
+  // Why: the game is optional decoration; any failure resolving it must still launch Claude.
+  private async prepareOrchestratorGameForHandle(handle: string): Promise<OrchestratorGameLaunch> {
+    try {
+      const terminal = await this.showTerminal(handle)
+      const worktree = (await this.getResolvedWorktreeMap()).get(terminal.worktreeId)
+      return await this.prepareOrchestratorGameFor({
+        repoId: worktree?.repoId ?? null,
+        worktreePath: terminal.worktreePath || null
+      })
+    } catch {
+      return { args: [], env: {} }
+    }
+  }
+
+  private async prepareOrchestratorGameFor(args: {
+    repoId: string | null
+    worktreePath: string | null
+  }): Promise<OrchestratorGameLaunch> {
+    try {
+      return await prepareOrchestratorGameLaunch({
+        settings: this.store?.getSettings?.(),
+        ...args
+      })
+    } catch {
+      return { args: [], env: {} }
+    }
   }
 
   async prepareClaudeAgentTeamsLeaderForHandle(args: {

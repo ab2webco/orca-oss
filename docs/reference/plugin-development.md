@@ -3,11 +3,11 @@
 Everything below is verified against this repository's source; each claim cites
 `file:line`. The whole plugin surface is **experimental** — no compatibility
 promises until `pluginApi` v1 freezes
-([`plugin-manifest.ts:49`](../../src/shared/plugins/plugin-manifest.ts),
+([`plugin-manifest.ts:51`](../../src/shared/plugins/plugin-manifest.ts),
 [`plugin-host-api.ts:16`](../../src/shared/plugins/plugin-host-api.ts)).
 
 A plugin is a folder with an `orca-plugin.json` at its root
-([`plugin-manifest.ts:183`](../../src/shared/plugins/plugin-manifest.ts)). It can
+([`plugin-manifest.ts:190`](../../src/shared/plugins/plugin-manifest.ts)). It can
 contain two kinds of code, and they are very different places to be:
 
 | | **Panel** | **Worker** |
@@ -42,22 +42,22 @@ Editing a panel's HTML reloads the frame without reinstalling.
 ## The manifest
 
 `orca-plugin.json` is parsed by `pluginManifestSchema`
-([`plugin-manifest.ts:105-170`](../../src/shared/plugins/plugin-manifest.ts)).
-`contributes` is `.strict()` (line 153): an undeclared key fails the whole
+([`plugin-manifest.ts:107-177`](../../src/shared/plugins/plugin-manifest.ts)).
+`contributes` is `.strict()` (line 160): an undeclared key fails the whole
 manifest, which is also why a field cannot be "added later" by a plugin.
 
 ### Identity and gating
 
 | Field | Rule |
 | --- | --- |
-| `manifestVersion` | literal `1` ([`:107`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `pluginApi` | literal `1` — the host-API major you target ([`:123`](../../src/shared/plugins/plugin-manifest.ts)) |
+| `manifestVersion` | literal `1` ([`:109`](../../src/shared/plugins/plugin-manifest.ts)) |
+| `pluginApi` | literal `1` — the host-API major you target ([`:125`](../../src/shared/plugins/plugin-manifest.ts)) |
 | `id`, `publisher` | kebab-case `[a-z0-9]+(-[a-z0-9]+)*`, ≤ 64 chars, not `__proto__`/`prototype`/`constructor` ([`plugin-manifest-fields.ts:4-20`](../../src/shared/plugins/plugin-manifest-fields.ts)) |
-| identity | `<publisher>.<id>` — also the install directory name ([`plugin-manifest.ts:186-188`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `version` | semver ([`:54`, `:112`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `engines.orca` | only the `>=x.y.z` form ([`:60-63`](../../src/shared/plugins/plugin-manifest.ts)); below it the host refuses to load the plugin at discovery ([`plugin-discovery.ts:110-117`](../../src/main/plugins/plugin-discovery.ts)) |
-| `main` | relative path to the worker entry; optional ([`:125`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `description`, `author`, `repository`, `icon` | optional ([`:114-119`](../../src/shared/plugins/plugin-manifest.ts)) |
+| identity | `<publisher>.<id>` — also the install directory name ([`plugin-manifest.ts:193-195`](../../src/shared/plugins/plugin-manifest.ts)) |
+| `version` | semver ([`:56`, `:114`](../../src/shared/plugins/plugin-manifest.ts)) |
+| `engines.orca` | only the `>=x.y.z` form ([`:62-65`](../../src/shared/plugins/plugin-manifest.ts)); below it the host refuses to load the plugin at discovery ([`plugin-discovery.ts:110-117`](../../src/main/plugins/plugin-discovery.ts)) |
+| `main` | relative path to the worker entry; optional ([`:127`](../../src/shared/plugins/plugin-manifest.ts)) |
+| `description`, `author`, `repository`, `icon` | optional ([`:116-121`](../../src/shared/plugins/plugin-manifest.ts)) |
 
 Every path in a manifest is a *portable relative path inside the plugin folder*
 ([`plugin-manifest-fields.ts:24-28`](../../src/shared/plugins/plugin-manifest-fields.ts)),
@@ -77,20 +77,21 @@ Pick something else.
 
 | Key | Limit | Notes |
 | --- | --- | --- |
-| `panels` | 64 ([`:55`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, `entry`, optional `icon`, `surface` |
-| `commands` | 256 ([`:56`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, optional `context` (`global`\|`worktree`) and `action` |
-| `events` | 4 — the whole closed set ([`:91-97`](../../src/shared/plugins/plugin-manifest.ts)) | `worktree.created`, `worktree.removed`, `agent.status.changed`, `notification.dispatched` |
+| `panels` | 64 ([`:57`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, `entry`, optional `icon`, `surface` |
+| `commands` | 256 ([`:58`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, optional `context` (`global`\|`worktree`) and `action` |
+| `events` | 4 — the whole closed set ([`:93-99`](../../src/shared/plugins/plugin-manifest.ts)) | `worktree.created`, `worktree.removed`, `agent.status.changed`, `notification.dispatched` |
 | `settings` | 32 ([`plugin-settings-contribution.ts:15`](../../src/shared/plugins/plugin-settings-contribution.ts)) | declarative form, rendered by Orca |
 | `automations` | 16 ([`plugin-automation-contribution.ts:32`](../../src/shared/plugins/plugin-automation-contribution.ts)) | scheduled work |
-| `keybindings` | 256 ([`plugin-content-pack-contributions.ts:10`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | must name a contributed command, and match its context ([`plugin-manifest-contribution-validation.ts:101-119`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts)) |
-| `languagePacks` | 16 ([`:9`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | one per locale |
-| `vmRecipes` | 64 ([`:11`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | |
-| `agents` | 64 ([`:12`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | agent profiles |
-| `skills` | 32 ([`:15`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | a directory holding a `SKILL.md`, served to **any** agent in **any** workspace |
-| `capabilities` | 32 ([`plugin-manifest.ts:167`](../../src/shared/plugins/plugin-manifest.ts)) | see below |
+| `keybindings` | 256 ([`plugin-content-pack-contributions.ts:11`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | must name a contributed command, and match its context ([`plugin-manifest-contribution-validation.ts:102-120`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts)) |
+| `languagePacks` | 16 ([`:10`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | one per locale |
+| `vmRecipes` | 64 ([`:12`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | |
+| `agents` | 64 ([`:13`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | agent profiles |
+| `skills` | 32 ([`:16`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | a directory holding a `SKILL.md`, served to **any** agent in **any** workspace |
+| `gameScenes` | 8 ([`:17`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | `id`, `path` to a JSON scene for the Agent Teams game — see [Game scenes](#game-scenes) |
+| `capabilities` | 32 ([`plugin-manifest.ts:174`](../../src/shared/plugins/plugin-manifest.ts)) | see below |
 
 Cross-field rules that reject a manifest outright
-([`plugin-manifest-contribution-validation.ts:121-181`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts),
+([`plugin-manifest-contribution-validation.ts:122-182`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts),
 [`plugin-settings-contribution.ts:116-142`](../../src/shared/plugins/plugin-settings-contribution.ts)):
 
 - `main` is required when any command has no built-in `action`, when
@@ -100,13 +101,13 @@ Cross-field rules that reject a manifest outright
 - `contributes.skills` requires `skills:contribute`.
 - `contributes.settings` requires `settings:own`; a `secret` setting also
   requires `secrets`.
-- Duplicate panel/command/automation ids, duplicate locales, duplicate
+- Duplicate panel/command/automation/gameScene ids, duplicate locales, duplicate
   vmRecipe/agent/skill paths, and duplicate keybindings are all rejected.
 
 Declared files are also size-capped at install and discovery
-([`plugin-artifact-validation.ts:15-24`](../../src/main/plugins/plugin-artifact-validation.ts)):
+([`plugin-artifact-validation.ts:16-25`](../../src/main/plugins/plugin-artifact-validation.ts)):
 panel entry 10 MB, worker entry 50 MB, plugin icon 2 MB, language pack 5 MB,
-VM recipe 256 KB, agent profile 1 MB, `SKILL.md` 256 KB.
+VM recipe 256 KB, agent profile 1 MB, `SKILL.md` 256 KB, game scene 64 KB.
 
 ## Capabilities and consent
 
@@ -146,7 +147,7 @@ one; otherwise it is `pending`. `needsReconsent` distinguishes "never approved"
 from "approved, then changed" ([`:31-38`](../../src/shared/plugins/plugin-consent-state.ts)).
 
 The fingerprint is a SHA-256 over three parts
-([`plugin-consent-fingerprint.ts:36-57`](../../src/shared/plugins/plugin-consent-fingerprint.ts)):
+([`plugin-consent-fingerprint.ts:37-58`](../../src/shared/plugins/plugin-consent-fingerprint.ts)):
 
 1. the canonicalised capability set — order- and duplicate-insensitive, so
    reformatting the manifest does not invalidate consent
@@ -156,7 +157,7 @@ The fingerprint is a SHA-256 over three parts
 3. **the installed tree's content hash**, but only when the manifest carries
    *instructional* contributions: `keybindings`, `vmRecipes`, `agents`,
    `automations`, or `skills`
-   ([`plugin-consent-fingerprint.ts:14-29`](../../src/shared/plugins/plugin-consent-fingerprint.ts)).
+   ([`plugin-consent-fingerprint.ts:14-30`](../../src/shared/plugins/plugin-consent-fingerprint.ts)).
 
 Part 3 is the one that surprises people. Those bytes are executed later under
 the user's (or an agent's) authority, so approval is bound to the exact tree.
@@ -165,7 +166,9 @@ new content hash, a new fingerprint, and a fresh consent prompt; the panel
 surface switches to `pending-update` until the user approves
 ([`plugin-panels.ts:30-37`](../../src/renderer/src/store/plugin-panels.ts)). A
 plugin with none of those five contributions keeps its consent across an update
-that does not change capabilities or add `main`.
+that does not change capabilities or add `main`. `languagePacks` and
+[`gameScenes`](#game-scenes) are deliberately not among them: both are inert data
+Orca renders, never executed and never handed to an agent.
 
 For a dev-path plugin the identity is a live hash of the folder
 ([`plugin-discovery.ts:135-143`](../../src/main/plugins/plugin-discovery.ts)), so
@@ -185,7 +188,7 @@ identity. Untrusted folders and installed plugins keep the tree hash.
 ## Panels
 
 A panel contributes `{ id, title, entry, icon?, surface? }`
-([`plugin-manifest.ts:65-79`](../../src/shared/plugins/plugin-manifest.ts)).
+([`plugin-manifest.ts:67-81`](../../src/shared/plugins/plugin-manifest.ts)).
 `surface` picks where it lands:
 
 - `worktree` (default) — the per-worktree right sidebar.
@@ -511,7 +514,7 @@ Two rules that reject the manifest ([`:82-97`](../../src/shared/plugins/plugin-s
 a `required` setting cannot declare a `default` (the "needs setup" state it
 exists to produce would be unreachable), and a `secret` cannot declare one
 either. A required setting with no value puts the plugin in `needsSetup`
-([`plugin-list-projection.ts:229-234`](../../src/main/plugins/plugin-list-projection.ts));
+([`plugin-list-projection.ts:227-232`](../../src/main/plugins/plugin-list-projection.ts));
 a blank string counts as unconfigured, not just an absent one
 ([`plugin-settings-contribution.ts:169-182`](../../src/shared/plugins/plugin-settings-contribution.ts)).
 
@@ -728,13 +731,78 @@ Because an automation is instructional content, declaring one binds consent to
 the content hash — see above. The consent dialog shows the trigger, the precheck
 and the command verbatim ([`plugin-automation-contribution.ts:110-131`](../../src/shared/plugins/plugin-automation-contribution.ts)).
 
+## Game scenes
+
+A plugin can add art sets to the Agent Teams game
+([`orchestrator-game.md`](./orchestrator-game.md)) as plain JSON. No worker and no capability is
+needed:
+
+```json
+"contributes": {
+  "gameScenes": [{ "id": "night-shift", "path": "scenes/night-shift.json" }]
+}
+```
+
+- `id` is kebab-case, unique within the plugin, and never `quest` (the built-in scene). At most 8
+  per plugin; each file at most 64 KB, inside the plugin folder (no absolute path, no `..`, no
+  symlink out — the same containment as every other declared file).
+- The game sees the scene as **`<publisher>.<id>/<scene id>`**, e.g.
+  `orca-samples.worklog/night-shift`, so two plugins, or a plugin and `quest`, never collide.
+  That is the id to put in `orchestratorGame.scene` in `orca.yaml`, or to pick under
+  Settings → Agents → **Agent Teams game** → **Scene**.
+- A scene is inert data the bundled mod draws; nothing executes it and no agent reads it, so it is
+  **not** part of the consent fingerprint — editing a scene never re-prompts.
+
+The file mirrors the mod's `SceneDefinition`
+([`scene-definition.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition.ts))
+and is validated by [`orchestrator-game-scene.ts`](../../src/shared/orchestrator-game-scene.ts).
+Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must be present in `looks`,
+`costumes` and `cards`:
+
+```jsonc
+{
+  "looks": {           // one per phase: the landscape
+    "working": {
+      "skyTop": "#0d1330", "skyBottom": "#2a3466", "sun": "#f2f0d8", "isNight": true,
+      "far": "#1f2748", "snow": "#8c97c4", "near": "#1b2b33", "ground": "#121c1e",
+      "plant": "#0d1714", "plantKind": "tree", "cloud": "#2e3a66"   // tree | cactus | none
+    }
+    // docs, build, verify, pr, handoff …
+  },
+  "costumes": {        // one per phase: Clawd's outfit
+    "working": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": { "O": "#d77757", "E": "#1a1a1a", "H": "#3a4a7a", "B": "#2a3a5a" }
+    }
+  },
+  "cards": { "working": { "icon": "☾", "name": "Night Owl", "color": "#8fa3d9" } },
+  "teller": { "icon": "❝", "name": "Night Log", "color": "#9aa6c8" },
+  "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" }
+}
+```
+
+- Pixel colors (`looks`, costume `colors`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
+  colors are `#rrggbb`.
+- A costume is exactly six `rows` plus two `legs` rows, each ten printable ASCII glyphs. `.` is
+  transparent and every other glyph must have a color.
+- `icon` is at most 4 characters and `name` at most 32, with no control or bidi characters: they
+  reach the terminal as-is.
+- Unknown keys are ignored, so a scene written for a newer Orca still loads.
+
+Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the
+valid ones in `extensions.scenes`. An invalid scene is dropped and named in `warnings`
+(`game scene <id> dropped: <reason>`); it never fails the call. A scene id nothing serves —
+uninstalled, disabled or invalid — draws `quest`. `examples/plugins/worklog` ships a complete
+one in `scenes/night-shift.json`.
+
 ## Lifecycle: which state shows what
 
 The wire status is one of `running`, `restarting`, `idle`, `pending`,
 `disabled`, `errored`, `invalid`
-([`plugin-list-projection.ts:36-66`](../../src/main/plugins/plugin-list-projection.ts)),
+([`plugin-list-projection.ts:38-68`](../../src/main/plugins/plugin-list-projection.ts)),
 derived in that precedence order: disabled → pending → errored → restarting →
-running/idle ([`:199-210`](../../src/main/plugins/plugin-list-projection.ts)).
+running/idle ([`:197-208`](../../src/main/plugins/plugin-list-projection.ts)).
 
 - `invalid` — the manifest is missing, unparseable, fails validation, declares a
   missing artifact, or requires a newer Orca.
@@ -797,7 +865,7 @@ committed `node_modules` will blow it.
 
 The "Official" badge is host-derived and cannot be self-awarded: it needs the
 reserved `ab2web.orca-*` identity, served from the `ab2webco` organisation, via
-the official index ([`plugin-list-projection.ts:260-266`](../../src/main/plugins/plugin-list-projection.ts),
+the official index ([`plugin-list-projection.ts:258-264`](../../src/main/plugins/plugin-list-projection.ts),
 [`plugin-marketplace.ts:16-26, 137-140`](../../src/shared/plugins/plugin-marketplace.ts)).
 
 ### Updating

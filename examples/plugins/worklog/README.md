@@ -11,6 +11,7 @@ this one exercises every surface a non-trivial plugin actually uses.
 | Declared settings, including a `secret`             | `orca-plugin.json` → `contributes.settings`  |
 | A worker with commands and an event subscription    | `main.mjs`                                   |
 | A contributed automation                            | `orca-plugin.json` → `contributes.automations` |
+| A scene for the Agent Teams game                    | `scenes/night-shift.json`, `contributes.gameScenes` |
 | Capabilities the user must consent to               | `orca-plugin.json` → `capabilities`          |
 
 The full reference — manifest fields, the design tokens a panel receives, the
@@ -27,6 +28,8 @@ the installed content hash — is in
    automation's command verbatim, because a contributed automation binds consent
    to the installed tree's hash.
 4. The panel appears as its own page under Settings → Plugins.
+5. Settings → Agents → **Agent Teams game** → **Scene** now offers
+   `night-shift · Worklog`; the game draws it as `orca-samples.worklog/night-shift`.
 
 The worker is lazy: it forks on the first command invocation or subscribed
 event, not at startup. Until then the panel's **Settings** card reads "not

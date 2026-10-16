@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'vitest'
+
+import type { GameAgent, GameState } from '../types'
+import { countsOf, fleetPhaseOf, needsOf, partyOf, worktreePhaseOf } from '../hooks/party'
+
+const agent = (patch: Partial<GameAgent>): GameAgent => ({
+  paneKey: 'p',
+  displayName: 'a',
+  agentType: 'claude',
+  state: 'working',
+  toolName: null,
+  isLeader: false,
+  ...patch
+})
+
+const state = (patch: Partial<GameState> = {}): GameState => ({
+  config: {},
+  warnings: [],
+  extensions: { scenes: [] },
+  worktree: null,
+  agents: [],
+  review: null,
+  workItem: null,
+  ...patch
+})
+
+const REVIEW = {
+  provider: 'gitlab',
+  number: 3,
+  title: 't',
+  url: 'https://gitlab.example/o/r/-/merge_requests/3',
+  state: 'open',
+  ci: 'failure'
+} as const
+
+describe('partyOf', () => {
+  it('seats every teammate but the lead, dressed for its tool and doing its action', () => {
+    const party = partyOf(
+      state({
+        agents: [
+          agent({ paneKey: 'lead', displayName: 'lead', isLeader: true }),
+          agent({ paneKey: 'p1', displayName: 'builder', toolName: 'Edit' }),
+          agent({ paneKey: 'p2', displayName: 'reader', toolName: 'Read', state: 'idle' })
+        ]
+      }),
+      true
+    )
+    expect(party.map((one) => one.name)).toEqual(['builder', 'reader'])
+    expect(party[0]).toMatchObject({
+      phase: 'build',
+      state: 'working',
+      action: 'edit',
+      mood: 'none'
+    })
+    expect(party[0]?.says).toBe('Editing')
+    expect(party[1]).toMatchObject({ phase: 'working', state: 'idle', action: undefined })
+  })
+
+  it('a red CI hurts the working party, and a finished teammate cheers when rewards are on', () => {
+    const agents = [agent({ displayName: 'w' }), agent({ displayName: 'd', state: 'done' })]
+    const hurt = partyOf(state({ agents, review: REVIEW }), true)
+    expect(hurt.map((one) => one.mood)).toEqual(['hurt', 'cheer'])
+    expect(hurt[1]).toMatchObject({ state: 'idle', phase: 'handoff', isDone: true })
+    expect(partyOf(state({ agents, review: REVIEW }), false).map((one) => one.mood)).toEqual([
+      'hurt',
+      'none'
+    ])
+  })
+
+  it('takes the worktree phase when the tool says nothing', () => {
+    const agents = [agent({ toolName: 'Bash' })]
+    expect(partyOf(state({ agents, review: { ...REVIEW, ci: 'success' } }), true)[0]?.phase).toBe(
+      'pr'
+    )
+  })
+})
+
+describe('worktreePhaseOf', () => {
+  it('is pr while a review is open and handoff once it merged or the work item is in review', () => {
+    expect(worktreePhaseOf(state())).toBeUndefined()
+    expect(worktreePhaseOf(state({ review: REVIEW }))).toBe('pr')
+    expect(worktreePhaseOf(state({ review: { ...REVIEW, state: 'merged' } }))).toBe('handoff')
+    const workItem = {
+      provider: 'linear',
+      identifier: 'ENG-1',
+      title: 't',
+      url: 'u',
+      status: 'In Review',
+      statusGroup: 'review'
+    } as const
+    expect(worktreePhaseOf(state({ workItem }))).toBe('handoff')
+  })
+})
+
+describe('counts and needs', () => {
+  it('counts teammates by state and lists who needs the person', () => {
+    const agents = [
+      agent({ displayName: 'lead', isLeader: true, state: 'waiting' }),
+      agent({ displayName: 'x', state: 'waiting' }),
+      agent({ displayName: 'y', state: 'done' }),
+      agent({ displayName: 'z' })
+    ]
+    expect(countsOf(agents)).toEqual({ working: 1, idle: 0, waiting: 1, done: 1 })
+    expect(needsOf(state({ agents, review: REVIEW }))).toEqual([
+      { name: 'x', text: 'waiting on you', url: null },
+      { name: '!3', text: 'CI failing', url: REVIEW.url }
+    ])
+  })
+})
+
+describe('fleetPhaseOf', () => {
+  it('is the common phase, handoff once all are done, nothing with no party', () => {
+    expect(fleetPhaseOf([])).toBeUndefined()
+    expect(
+      fleetPhaseOf([
+        { phase: 'build', isDone: false },
+        { phase: 'build', isDone: false },
+        { phase: 'pr', isDone: false }
+      ])
+    ).toBe('build')
+    expect(
+      fleetPhaseOf([
+        { phase: 'build', isDone: false },
+        { phase: 'pr', isDone: false }
+      ])
+    ).toBe('pr')
+    expect(
+      fleetPhaseOf([
+        { phase: 'pr', isDone: true },
+        { phase: 'verify', isDone: true }
+      ])
+    ).toBe('handoff')
+    expect(fleetPhaseOf([{ phase: 'working', isDone: false }])).toBeUndefined()
+  })
+})

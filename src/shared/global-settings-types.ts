@@ -7,6 +7,7 @@ import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
+import type { OrchestratorGameLayer } from './orchestrator-game-config'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { TerminalPaneActionsPosition } from './terminal-pane-actions-position'
 import type { UiLanguage } from './ui-language'
@@ -44,20 +45,9 @@ import type {
   TaskViewPresetId
 } from './ui-chrome-types'
 import type { SetupScriptLaunchMode } from './worktree/launch-types'
-import type {
-  CustomWorktreeVisibilitySource,
-  ExternalWorktreeVisibility,
-  WorktreeVisibilitySourcePreferences
-} from './repo-types'
+import type { WorktreeVisibilityDefaults } from './repo-types'
 
-export type WorktreeVisibilityDefaults = {
-  /** Default for worktrees outside a recognized source. */
-  external?: ExternalWorktreeVisibility
-  /** Host-owned roots applied to every repository on that host. */
-  customSources?: CustomWorktreeVisibilitySource[]
-  /** Defaults for built-in and host-owned custom sources. */
-  sourcePreferences?: WorktreeVisibilitySourcePreferences
-}
+export type { WorktreeVisibilityDefaults }
 
 export type GlobalSettings = {
   workspaceDir: string
@@ -193,6 +183,10 @@ export type GlobalSettings = {
   terminalAllowOsc52ClipboardDefaultedOnForAllUsers?: boolean
   /** Experimental Claude Agent Teams; native panes use a tmux-compatible shim so teammate output stays on the normal PTY path. */
   claudeAgentTeamsMode?: ClaudeAgentTeamsMode
+  /** Global layer of the Agent Teams orchestrator game; unset fields fall through to the defaults. */
+  orchestratorGame?: OrchestratorGameLayer
+  /** This machine's per-project override of the game, keyed by repo id; wins over the project's orca.yaml. */
+  orchestratorGameProjects?: Record<string, OrchestratorGameLayer>
   /** Where the repo setup script runs on workspace create; defaults to a background "Setup" tab to keep the main terminal usable. */
   setupScriptLaunchMode: SetupScriptLaunchMode
   terminalScrollbackRows: number

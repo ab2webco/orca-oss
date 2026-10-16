@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PLUGIN_GAME_SCENE_LIMIT } from './plugin-content-pack-contributions'
 import { parsePluginManifest, pluginManifestSchema } from './plugin-manifest'
 
 function manifest(contributes: Record<string, unknown>): Record<string, unknown> {
@@ -52,6 +53,7 @@ describe('content-pack manifest contributions', () => {
       vmRecipes: [],
       agents: [],
       skills: [],
+      gameScenes: [],
       settings: []
     })
   })
@@ -182,5 +184,42 @@ describe('content-pack manifest contributions', () => {
         ])
       )
     }
+  })
+})
+
+describe('game scene contributions', () => {
+  it('accepts kebab-case scene ids with relative JSON paths and no capability', () => {
+    const parsed = pluginManifestSchema.parse(
+      manifest({ gameScenes: [{ id: 'space-run', path: 'scenes/space.json' }] })
+    )
+    expect(parsed.contributes.gameScenes).toEqual([{ id: 'space-run', path: 'scenes/space.json' }])
+  })
+
+  it.each([
+    ['the built-in quest id', [{ id: 'quest', path: 'quest.json' }], 'built-in'],
+    ['a non kebab-case id', [{ id: 'Space Run', path: 'space.json' }], 'kebab-case'],
+    ['an absolute path', [{ id: 'space', path: '/etc/space.json' }], 'inside the plugin directory'],
+    ['a parent path', [{ id: 'space', path: '../space.json' }], 'inside the plugin directory'],
+    [
+      'two scenes with one id',
+      [
+        { id: 'space', path: 'a.json' },
+        { id: 'space', path: 'b.json' }
+      ],
+      'duplicate gameScenes id'
+    ],
+    [
+      'more scenes than the cap',
+      Array.from({ length: PLUGIN_GAME_SCENE_LIMIT + 1 }, (_, index) => ({
+        id: `scene-${index}`,
+        path: `scene-${index}.json`
+      })),
+      `gameScenes: Too big: expected array to have <=${PLUGIN_GAME_SCENE_LIMIT} items`
+    ]
+  ])('rejects %s', (_label, gameScenes, error) => {
+    expect(parsePluginManifest(manifest({ gameScenes }))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(error)
+    })
   })
 })

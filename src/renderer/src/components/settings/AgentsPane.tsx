@@ -20,6 +20,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { cn } from '@/lib/utils'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
+import { OrchestratorGameSetting } from './OrchestratorGameSetting'
 import { AgentCacheTimerSection } from './AgentCacheTimerSection'
 import { PreservedAgentSessionsSection } from './resume-vault/PreservedAgentSessionsSection'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
@@ -882,6 +883,8 @@ export function AgentsPane({
       {!isPairedWebClientWindow() ? (
         <AgentAwakeSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
+
+      <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
 
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
 

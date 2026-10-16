@@ -10690,6 +10690,30 @@
         "HostAccountLoginDialog": {
           "reauthTitle": "在 {{server}} 上重新验证",
           "reauthDescription": "这会刷新服务器上已有的账户，并保留其工作树绑定。请使用同一个账户登录；换成其他账户会被拒绝。"
+        },
+        "OrchestratorGameSetting": {
+          "title": "Agent Teams 游戏",
+          "description": "Claude Agent Teams 中的像素风场景、队友 HUD 和奖励。每个项目都可以在其 orca.yaml 中修改。",
+          "mode": "游戏模式",
+          "on": "开启",
+          "zen": "Zen",
+          "off": "关闭",
+          "hud": "队友 HUD",
+          "hudDescription": "在 Claude 提示符上方显示舰队栏。",
+          "rewards": "奖励",
+          "rewardsDescription": "评审合并或 CI 通过时显示经验值、升级和庆祝效果。",
+          "tracker": "工作项跟踪",
+          "trackerDescription": "在流程中跟踪关联的 Plane、Jira、Linear、GitHub 或 GitLab 工作项。",
+          "scene": "场景",
+          "sceneDescription": "游戏绘制的美术风格。已安装的插件可以添加场景。",
+          "sceneQuest": "Quest (内置)",
+          "sceneMissing": "{{value0}} (未安装)",
+          "inherit": "继承",
+          "projectDescription": "在此设备上覆盖此项目的游戏设置。项目的 orca.yaml 设置其默认值。",
+          "sourceDefault": "默认",
+          "sourceGlobal": "全局设置",
+          "sourceProject": "来自 orca.yaml",
+          "sourceLocal": "此设备"
         }
       },
       "right": {

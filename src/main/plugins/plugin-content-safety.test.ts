@@ -10,6 +10,7 @@ import {
   validateDeclaredPluginArtifacts,
   validatePluginInstallContent
 } from './plugin-artifact-validation'
+import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../shared/orchestrator-game-scene'
 import { hashPluginTree } from './plugin-content-hash'
 import { verifyHashAddressedPluginContent } from './plugin-content-integrity'
 import { PluginService } from './plugin-service'
@@ -149,6 +150,25 @@ describe('declared plugin artifacts', () => {
       }
     })
 
+    await expect(validateDeclaredPluginArtifacts(root, pluginManifest)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('artifact limit')
+    })
+  })
+
+  it('requires a declared game scene file and caps it at the scene limit', async () => {
+    const root = await tempRoot()
+    const pluginManifest = manifest({
+      contributes: { gameScenes: [{ id: 'space', path: 'scenes/space.json' }] }
+    })
+
+    await expect(validateDeclaredPluginArtifacts(root, pluginManifest)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('game scene "space" scenes/space.json')
+    })
+    await mkdir(join(root, 'scenes'))
+    await writeFile(join(root, 'scenes', 'space.json'), '')
+    await truncate(join(root, 'scenes', 'space.json'), ORCHESTRATOR_GAME_SCENE_MAX_BYTES + 1)
     await expect(validateDeclaredPluginArtifacts(root, pluginManifest)).resolves.toMatchObject({
       ok: false,
       error: expect.stringContaining('artifact limit')

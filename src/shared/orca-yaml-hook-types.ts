@@ -1,3 +1,5 @@
+import type { OrchestratorGameLayer } from './orchestrator-game-config'
+
 export type SetupRunPolicy = 'ask' | 'run-by-default' | 'skip-by-default'
 export type SetupAgentStartupPolicy = 'start-immediately' | 'wait-for-setup'
 export type HookCommandSourcePolicy = 'shared-only' | 'local-only' | 'run-both'
@@ -13,6 +15,8 @@ export type OrcaHooks = {
   environmentRecipes?: OrcaVmRecipe[] // Project-scoped per-workspace environment recipes
   environmentRecipeDiagnostics?: OrcaVmRecipeDiagnostic[] // Non-fatal validation issues from environmentRecipes
   worktree?: OrcaWorktreeDefaults // Project-scoped defaults applied when a worktree is created
+  orchestratorGame?: OrchestratorGameLayer // Repo owner's layer of the Agent Teams game config
+  orchestratorGameWarnings?: string[] // Non-fatal validation issues from orchestratorGame
 }
 
 export type OrcaWorktreeDefaults = {

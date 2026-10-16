@@ -68,6 +68,8 @@ export type PluginHostListEntry = {
   /** Manifest-declared skill directories. Optional so an older host that does
    *  not send them reads as "none" instead of breaking the consent dialog. */
   skills?: string[]
+  /** Game scene ids (`<pluginKey>/<id>`). Optional so an older host reads as "none". */
+  gameScenes?: string[]
   /** Manifest-declared settings the user can fill from Settings -> Plugins.
    *  A `secret` entry never carries `value`; only whether one is stored. */
   settings?: {

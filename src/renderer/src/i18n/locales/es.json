@@ -10681,6 +10681,30 @@
         "HostAccountLoginDialog": {
           "reauthTitle": "Volver a autenticar en {{server}}",
           "reauthDescription": "Esto actualiza la cuenta que ya existe en el servidor y conserva sus worktrees fijados. Inicia sesión con la misma cuenta: otra distinta se rechaza."
+        },
+        "OrchestratorGameSetting": {
+          "title": "Juego de Agent Teams",
+          "description": "Escenas en pixel art, un HUD del equipo y recompensas dentro de Claude Agent Teams. Cada proyecto puede cambiarlo en su orca.yaml.",
+          "mode": "Modo del juego",
+          "on": "Activado",
+          "zen": "Zen",
+          "off": "Desactivado",
+          "hud": "HUD del equipo",
+          "hudDescription": "Muestra la banda de la flota sobre el prompt de Claude.",
+          "rewards": "Recompensas",
+          "rewardsDescription": "XP, subidas de nivel y celebraciones cuando se integra una revisión o la CI pasa a verde.",
+          "tracker": "Seguimiento de tareas",
+          "trackerDescription": "Sigue en el flujo la tarea vinculada de Plane, Jira, Linear, GitHub o GitLab.",
+          "scene": "Escena",
+          "sceneDescription": "El arte que dibuja el juego. Los plugins instalados pueden añadir escenas.",
+          "sceneQuest": "Quest (integrada)",
+          "sceneMissing": "{{value0}} (no instalada)",
+          "inherit": "Heredar",
+          "projectDescription": "Cambia el juego para este proyecto en este equipo. El orca.yaml del proyecto define su valor por defecto.",
+          "sourceDefault": "por defecto",
+          "sourceGlobal": "ajuste global",
+          "sourceProject": "desde orca.yaml",
+          "sourceLocal": "este equipo"
         }
       },
       "right": {

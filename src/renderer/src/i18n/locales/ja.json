@@ -10670,6 +10670,30 @@
         "HostAccountLoginDialog": {
           "reauthTitle": "{{server}} で再認証",
           "reauthDescription": "サーバー上の既存アカウントを更新し、ワークツリーのピン留めはそのまま保持します。同じアカウントでサインインしてください。別のアカウントは拒否されます。"
+        },
+        "OrchestratorGameSetting": {
+          "title": "Agent Teams ゲーム",
+          "description": "Claude Agent Teams 内のピクセルアートのシーン、チームメイト HUD、報酬。各プロジェクトは orca.yaml で変更できます。",
+          "mode": "ゲームモード",
+          "on": "オン",
+          "zen": "Zen",
+          "off": "オフ",
+          "hud": "チームメイト HUD",
+          "hudDescription": "Claude のプロンプトの上にフリートの帯を表示します。",
+          "rewards": "報酬",
+          "rewardsDescription": "レビューのマージや CI の成功時に XP、レベルアップ、お祝いを表示します。",
+          "tracker": "作業項目の追跡",
+          "trackerDescription": "リンクされた Plane、Jira、Linear、GitHub、GitLab の項目をフローで追跡します。",
+          "scene": "シーン",
+          "sceneDescription": "ゲームが描くアートです。インストールしたプラグインでシーンを追加できます。",
+          "sceneQuest": "Quest (組み込み)",
+          "sceneMissing": "{{value0}} (未インストール)",
+          "inherit": "継承",
+          "projectDescription": "このマシンでこのプロジェクトのゲーム設定を上書きします。既定値はプロジェクトの orca.yaml で設定されます。",
+          "sourceDefault": "既定",
+          "sourceGlobal": "グローバル設定",
+          "sourceProject": "orca.yaml から",
+          "sourceLocal": "このマシン"
         }
       },
       "right": {

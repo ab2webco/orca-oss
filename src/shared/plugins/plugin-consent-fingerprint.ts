@@ -17,6 +17,7 @@ export const TRUSTED_DEV_FOLDER_CONTENT_IDENTITY = 'trusted-dev-folder'
 
 export function hasInstructionalPluginContributions(manifest: PluginConsentSubject): boolean {
   const contributions = manifest.contributes
+  // Why: gameScenes stay out; a scene is colors and labels the game mod draws, never executed or read by an agent.
   return Boolean(
     contributions &&
     ((contributions.keybindings?.length ?? 0) > 0 ||

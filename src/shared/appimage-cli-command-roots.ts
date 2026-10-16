@@ -44,6 +44,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   'focus',
   'forward',
   'full-screenshot',
+  'game',
   'geolocation',
   'get',
   'goto',

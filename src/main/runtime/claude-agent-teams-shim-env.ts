@@ -10,11 +10,16 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
 import { resolvePathEnvKey } from '../pty/windows-path-segment-merge'
+import {
+  withOrchestratorGameArgs,
+  type OrchestratorGameLaunch
+} from '../claude/orchestrator-game-launch'
 
 export type ClaudeAgentTeamsLaunchPlan = {
   command: string
   env: Record<string, string>
   envToDelete?: string[]
+  game?: OrchestratorGameLaunch
 }
 
 export async function ensureClaudeAgentTeamsShimDir(root = defaultShimRoot()): Promise<string> {
@@ -31,14 +36,38 @@ export async function buildClaudeAgentTeamsLaunchPlan(args: {
   mode: ClaudeAgentTeamsMode | undefined
   baseEnv: Record<string, string | undefined>
   createTeamEnv: (shimDir: string, shimBin: string) => Record<string, string>
+  /** Resolved only for a team launch; the caller limits it to local panes. */
+  game?: () => Promise<OrchestratorGameLaunch>
 }): Promise<ClaudeAgentTeamsLaunchPlan | null> {
   const mode = args.mode ?? 'off'
   if (!args.command || mode === 'off' || !isDirectClaudeCommand(args.command)) {
     return null
   }
+  const plan = await buildTeamPlan(args.command, mode, args)
+  // Why: Windows panes run through cmd/PowerShell, where the POSIX-quoted plugin dir would break.
+  const game = args.game && process.platform !== 'win32' ? await args.game() : undefined
+  if (!game || game.args.length === 0) {
+    return plan
+  }
+  return {
+    ...plan,
+    command: withOrchestratorGameArgs(plan.command, game),
+    env: { ...plan.env, ...game.env },
+    game
+  }
+}
+
+async function buildTeamPlan(
+  command: string,
+  mode: ClaudeAgentTeamsMode,
+  args: { baseEnv: Record<string, string | undefined> } & Pick<
+    Parameters<typeof buildClaudeAgentTeamsLaunchPlan>[0],
+    'createTeamEnv'
+  >
+): Promise<ClaudeAgentTeamsLaunchPlan> {
   if (mode === 'in-process' || process.platform === 'win32') {
     return {
-      command: addClaudeTeammateModeInProcess(args.command),
+      command: addClaudeTeammateModeInProcess(command),
       env: { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
     }
   }
@@ -46,15 +75,14 @@ export async function buildClaudeAgentTeamsLaunchPlan(args: {
   if (!shimBin) {
     // Why: without an absolute CLI path the shim would resolve a bare `orca` against the pane cwd, so degrade instead.
     return {
-      command: addClaudeTeammateModeInProcess(args.command),
+      command: addClaudeTeammateModeInProcess(command),
       env: { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' }
     }
   }
   const shimDir = await ensureClaudeAgentTeamsShimDir()
-  const env = args.createTeamEnv(shimDir, shimBin)
   return {
-    command: addClaudeTeammateModeAuto(args.command),
-    env,
+    command: addClaudeTeammateModeAuto(command),
+    env: args.createTeamEnv(shimDir, shimBin),
     envToDelete: ['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR']
   }
 }

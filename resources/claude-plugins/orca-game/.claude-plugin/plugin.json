@@ -1,0 +1,9 @@
+{
+  "name": "orca-game",
+  "version": "0.1.0",
+  "description": "A game layer over Claude Agent Teams in Orca: quest mode on the spinner, a party HUD above the prompt fed by `orca game state`, XP and level-ups from merged reviews, green CI and work items moving on.",
+  "author": {
+    "name": "Jucer Orozco and Orca Lab"
+  },
+  "types": "./types/index.d.ts"
+}

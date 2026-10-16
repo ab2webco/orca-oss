@@ -348,6 +348,10 @@ import {
 } from './skills/orca-plugin-skill-sources'
 import { clearSkillDiscoveryCaches } from './skills/skill-discovery-target'
 import {
+  collectPluginGameSceneContributions,
+  setPluginGameSceneContributionProvider
+} from './plugins/plugin-game-scene-sources'
+import {
   normalizePluginConsents,
   normalizePluginIdList
 } from '../shared/plugins/plugin-consent-state'
@@ -3020,6 +3024,9 @@ void app.whenReady().then(async () => {
   setOrcaPluginSkillContributionProvider(() =>
     pluginService ? collectOrcaPluginSkillContributions(pluginService) : []
   )
+  setPluginGameSceneContributionProvider(() =>
+    pluginService ? collectPluginGameSceneContributions(pluginService) : []
+  )
   // Lazy kernel: initialize() only discovers manifests — no worker forks, no
   // panel reads. Zero plugin code runs before an explicit trigger.
   void pluginService
@@ -3505,6 +3512,7 @@ app.on('will-quit', (e) => {
   // Electron exit first and orphan the hosts.
   setPluginServiceForRpc(null)
   setOrcaPluginSkillContributionProvider(null)
+  setPluginGameSceneContributionProvider(null)
   pluginKillListService = null
   pluginMarketplaceService = null
   pluginMarketplaceInstaller = null

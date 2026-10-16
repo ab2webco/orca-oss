@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   pluginCommandIdSchema,
+  pluginIdSchema,
   pluginRelativeDirectorySchema,
   pluginRelativePathSchema
 } from './plugin-manifest-fields'
@@ -13,6 +14,7 @@ export const PLUGIN_AGENT_PROFILE_LIMIT = 64
 // Why smaller than the rest: each entry is one more directory skill discovery
 // walks on every scan, in every workspace.
 export const PLUGIN_SKILL_LIMIT = 32
+export const PLUGIN_GAME_SCENE_LIMIT = 8
 
 // Why: locale ids become i18next bundle keys and filenames. This bounded BCP
 // 47 subset covers current community packs without accepting path syntax.
@@ -61,8 +63,17 @@ export const pluginSkillContributionSchema = z
   .object({ path: pluginRelativeDirectorySchema })
   .strict()
 
+/** A scene for the Agent Teams game: inert JSON, served as `<pluginKey>/<id>`. */
+export const pluginGameSceneContributionSchema = z
+  .object({
+    id: pluginIdSchema.refine((id) => id !== 'quest', 'quest is the built-in scene id'),
+    path: pluginRelativePathSchema
+  })
+  .strict()
+
 export type PluginLanguagePackContribution = z.infer<typeof pluginLanguagePackContributionSchema>
 export type PluginKeybindingContribution = z.infer<typeof pluginKeybindingContributionSchema>
 export type PluginVmRecipeContribution = z.infer<typeof pluginVmRecipeContributionSchema>
 export type PluginAgentProfileContribution = z.infer<typeof pluginAgentProfileContributionSchema>
 export type PluginSkillContribution = z.infer<typeof pluginSkillContributionSchema>
+export type PluginGameSceneContribution = z.infer<typeof pluginGameSceneContributionSchema>
