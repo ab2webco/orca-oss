@@ -95,17 +95,17 @@
       "name": "orca-game-scenes",
       "sourcePath": "skills/orca-game-scenes",
       "releaseRevision": 1,
-      "packageDigest": "cb5022f7c2917a5727d35fbe012598ac0c53a7063f6c86c7680aeeb99a6516a0",
-      "gitTreeSha": "d09f78091ab67684ba26c750c37a4c3562688f16",
+      "packageDigest": "6e397f9e6f992116b1c71feb5f6c697205c21783829bdac9867f4c97809436ab",
+      "gitTreeSha": "70c4dcd168e0593469f9031ddb01c14eeec22df8",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3701,
+          "size": 3707,
           "executable": false,
           "classification": "text",
-          "exactSha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8",
-          "textNormalizedSha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8",
-          "identitySha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8"
+          "exactSha256": "7f09ff425e79d8e0504c20ae59af7d600acca30e7704a869284ccd14b1d004ad",
+          "textNormalizedSha256": "7f09ff425e79d8e0504c20ae59af7d600acca30e7704a869284ccd14b1d004ad",
+          "identitySha256": "7f09ff425e79d8e0504c20ae59af7d600acca30e7704a869284ccd14b1d004ad"
         }
       ]
     },

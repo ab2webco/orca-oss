@@ -53,7 +53,7 @@ read-only bootstrap to orient. Do not dead-end and do not invent commands:
 
 ```text
 ORCA status --json
-ORCA game --help
+ORCA game state --json
 ```
 
 Then tell the user that updating Orca Lab restores the full, version-matched guide via
