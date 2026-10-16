@@ -5,6 +5,7 @@ import {
   effectiveConfigOf,
   gameConfigOfEnv,
   gameStateArgvOf,
+  tabCreateArgvOf,
   terminalFocusArgvOf
 } from '../hooks/game-config'
 
@@ -90,5 +91,35 @@ describe('terminalFocusArgvOf', () => {
     expect(terminalFocusArgvOf(undefined, 'term_3f2a')).toBeUndefined()
     expect(terminalFocusArgvOf('/opt/orca/bin/orca', '--help')).toBeUndefined()
     expect(terminalFocusArgvOf('/opt/orca/bin/orca', '')).toBeUndefined()
+  })
+})
+
+describe('tabCreateArgvOf', () => {
+  it("opens an http(s) URL in a browser tab of the game's worktree", () => {
+    expect(tabCreateArgvOf('/opt/orca/bin/orca', 'https://x.example/a?b=1', 'repo::/w')).toEqual([
+      '/opt/orca/bin/orca',
+      'tab',
+      'create',
+      '--url',
+      'https://x.example/a?b=1',
+      '--worktree',
+      'id:repo::/w',
+      '--json'
+    ])
+    expect(tabCreateArgvOf('/opt/orca/bin/orca', 'http://x.example', '')).toEqual([
+      '/opt/orca/bin/orca',
+      'tab',
+      'create',
+      '--url',
+      'http://x.example',
+      '--json'
+    ])
+  })
+
+  it('runs nothing for a bare CLI or a URL that is not http(s)', () => {
+    expect(tabCreateArgvOf('orca', 'https://x.example', 'w')).toBeUndefined()
+    expect(tabCreateArgvOf('/opt/orca/bin/orca', 'javascript:alert(1)', 'w')).toBeUndefined()
+    expect(tabCreateArgvOf('/opt/orca/bin/orca', '--help', 'w')).toBeUndefined()
+    expect(tabCreateArgvOf('/opt/orca/bin/orca', '', 'w')).toBeUndefined()
   })
 })

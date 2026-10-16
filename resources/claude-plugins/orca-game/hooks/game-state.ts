@@ -11,6 +11,7 @@ import type {
   GameWorktree
 } from '../types'
 import { isTerminalHandle } from './game-config'
+import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { sceneDefinitionOf } from './scenes/scene-shape'
 
@@ -51,20 +52,6 @@ const STATUS_GROUPS = [
   'cancelled',
   'unknown'
 ] as const
-
-// Only a web address is ever handed to a terminal link or to Orca's browser.
-const httpUrlOf = (value: unknown): string | undefined => {
-  const url = str(value)
-  if (url === undefined || url.length > 2048) {
-    return undefined
-  }
-  try {
-    const protocol = new URL(url).protocol
-    return protocol === 'https:' || protocol === 'http:' ? url : undefined
-  } catch {
-    return undefined
-  }
-}
 
 const textOf = (value: unknown): string | undefined => {
   const text = str(value)?.trim().slice(0, MAX_LINK_TEXT)

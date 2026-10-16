@@ -1,18 +1,28 @@
 import type { EngineInterface, On } from 'claude-code'
 
 import type { GameAgent } from '../types'
-import { AGENT_COLORS, CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { fitCells } from './cell-width'
+import {
+  activityTextOf,
+  AGENT_COLORS,
+  CI_COLORS,
+  reviewTextOf,
+  workItemTextOf
+} from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { focusTerminal, refreshSoon, viewOf } from './fleet-sync'
+import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
+import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
+// A card's text column: the pane less the tile, the round border and the padding.
+const CARD_CHROME = TILE_COLUMNS + 3
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -34,7 +44,7 @@ export const registerFleetPane = (on: On): void => {
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
-    // Digits follow tile order; r, c and q stay the menu's.
+    // Digits follow tile order; r, p and q are the menu's, i, o, c, w and a the links'.
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
         key={`view-${agent.paneKey}`}
@@ -61,7 +71,7 @@ export const registerFleetPane = (on: On): void => {
           `↻ ${text.refresh}`,
           () => void refreshSoon($).catch(() => undefined)
         )}
-        {menu('pet', 'c', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
+        {menu('pet', 'p', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
         {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
@@ -99,6 +109,31 @@ export const registerFleetPane = (on: On): void => {
     ])
     const counts = countsOf(state.agents)
     const needs = needsOf(state)
+    const cardRoom = Math.max(1, columns - CARD_CHROME)
+    const worktreeId = state.worktree?.id ?? ''
+    const linkButton = (one: PaneLink) => (
+      <Button
+        key={one.key}
+        plain
+        hotkey={one.hotkey}
+        onPress={() =>
+          void openInOrca($, one.url, worktreeId).then((isOpen) => {
+            if (!isOpen) {
+              $.ui.toast(text.couldNotOpenLink(one.label))
+            }
+          })
+        }
+      >
+        <Text backgroundColor={palette.panel} color={palette.parchment}>
+          {' '}
+          <Text color={palette.gold} bold>
+            {one.hotkey}
+          </Text>
+          {` ${one.label} `}
+        </Text>
+      </Button>
+    )
+    const links = paneLinksOf(state)
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
@@ -139,6 +174,23 @@ export const registerFleetPane = (on: On): void => {
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
               <Text wrap="truncate-end">{member.says}</Text>
+              {agent.activity !== undefined && (
+                <Link key={`activity-${agent.paneKey}`} href={agent.activity.url}>
+                  <Text
+                    color={agent.activity.running ? 'cyan' : palette.parchment}
+                    wrap="truncate-end"
+                  >
+                    {fitCells(
+                      activityTextOf({
+                        name: agent.activity.name,
+                        label: agent.activity.id,
+                        running: agent.activity.running
+                      }),
+                      cardRoom
+                    )}
+                  </Text>
+                </Link>
+              )}
             </Box>
           </Box>
         ))}
@@ -172,6 +224,12 @@ export const registerFleetPane = (on: On): void => {
             <Text dimColor wrap="truncate-end">
               {state.workItem.title}
             </Text>
+          </Box>
+        )}
+        {links.length > 0 && (
+          <Box key="pane-links" flexDirection="row" gap={1} flexWrap="wrap">
+            <Text dimColor>{text.openHeading}</Text>
+            {links.map(linkButton)}
           </Box>
         )}
         {menuRow}

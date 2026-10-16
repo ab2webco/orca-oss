@@ -34,6 +34,8 @@ export const KO: GameCatalog = {
       none: '없음'
     },
     couldNotOpen: (name) => `${name}의 패널을 열 수 없습니다`,
+    openHeading: '열기',
+    couldNotOpenLink: (label) => `${label}을(를) 열 수 없습니다`,
     merged: (review) => `${review} 병합됨`,
     ciGreen: (review) => `${review} CI 통과`,
     questDescription: 'Quest 모드: 움직이는 Claude, 흐름 단계별 캐릭터 카드, 조용한 도구 행',

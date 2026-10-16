@@ -35,6 +35,8 @@ export type TextStrings = {
   reviewStates: Readonly<Record<GameReview['state'], string>>
   ciWords: Readonly<Record<GameCi, string>>
   couldNotOpen: (name: string) => string
+  openHeading: string
+  couldNotOpenLink: (label: string) => string
   merged: (review: string) => string
   ciGreen: (review: string) => string
   questDescription: string
@@ -111,6 +113,8 @@ const EN: GameStrings = {
       none: 'none'
     },
     couldNotOpen: (name) => `Could not open ${name}'s pane`,
+    openHeading: 'Open',
+    couldNotOpenLink: (label) => `Could not open ${label}`,
     merged: (review) => `${review} merged`,
     ciGreen: (review) => `${review} CI is green`,
     questDescription:

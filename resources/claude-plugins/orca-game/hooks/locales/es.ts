@@ -41,6 +41,8 @@ export const ES: GameCatalog = {
       none: 'sin resultado'
     },
     couldNotOpen: (name) => `No se pudo abrir el panel de ${name}`,
+    openHeading: 'Abrir',
+    couldNotOpenLink: (label) => `No se pudo abrir ${label}`,
     merged: (review) => `${review} mergeado`,
     ciGreen: (review) => `${review}: CI en verde`,
     questDescription:
