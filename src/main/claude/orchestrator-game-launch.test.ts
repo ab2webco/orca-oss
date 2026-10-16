@@ -27,7 +27,8 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_SCENE: 'quest',
       ORCA_GAME_HUD: '1',
       ORCA_GAME_REWARDS: '0',
-      ORCA_GAME_LOCALE: 'ja'
+      ORCA_GAME_LOCALE: 'ja',
+      CLAUDE_CODE_NO_FLICKER: '1'
     })
   })
 

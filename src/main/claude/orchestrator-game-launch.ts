@@ -64,7 +64,10 @@ export function buildOrchestratorGameLaunch(args: {
       ORCA_GAME_SCENE: config.scene,
       ORCA_GAME_HUD: config.hud ? '1' : '0',
       ORCA_GAME_REWARDS: config.rewards ? '1' : '0',
-      ORCA_GAME_LOCALE: args.locale ?? DEFAULT_UI_LOCALE
+      ORCA_GAME_LOCALE: args.locale ?? DEFAULT_UI_LOCALE,
+      // Why: Team panes carry TMUX, which keeps Claude on the main screen, where the terminal
+      // reports no clicks; the fullscreen layout is the only one where the game's buttons click.
+      CLAUDE_CODE_NO_FLICKER: '1'
     }
   }
 }
