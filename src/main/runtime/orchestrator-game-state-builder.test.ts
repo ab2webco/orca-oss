@@ -3,6 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { sceneFile } from '../../shared/__fixtures__/orchestrator-game-scene'
+import {
+  registerSshFilesystemProvider,
+  unregisterSshFilesystemProvider
+} from '../providers/ssh-filesystem-dispatch'
+import type { IFilesystemProvider } from '../providers/types'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const dirs: string[] = []
@@ -10,7 +15,22 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
+  unregisterSshFilesystemProvider('ssh-1')
 })
+
+// Why: only readFile is reached; the rest of the contract stays unimplemented on purpose.
+function remoteHost(files: Record<string, string>, reads: string[]): IFilesystemProvider {
+  return {
+    readFile: async (filePath: string) => {
+      reads.push(filePath)
+      const content = files[filePath]
+      if (content === undefined) {
+        throw new Error('ENOENT')
+      }
+      return { content, isBinary: false }
+    }
+  } as IFilesystemProvider
+}
 
 function checkout(orcaYaml?: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-state-'))
@@ -260,5 +280,40 @@ describe('buildOrchestratorGameState', () => {
 
     expect(state.extensions).toEqual({ scenes: [] })
     expect(state.config.mode).toBe('on')
+  })
+
+  it('reads the project layer of an SSH worktree from its host, not the local disk', async () => {
+    const reads: string[] = []
+    registerSshFilesystemProvider(
+      'ssh-1',
+      remoteHost({ '/srv/repo/orca.yaml': 'orchestratorGame:\n  mode: zen\n' }, reads)
+    )
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: { ...worktree('/srv/repo'), connectionId: 'ssh-1' },
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(reads).toEqual(['/srv/repo/orca.yaml'])
+    expect(state.config.mode).toBe('zen')
+    expect(state.sources.mode).toBe('project')
+  })
+
+  it('falls back to the other layers while the SSH host is disconnected', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: { orchestratorGame: { hud: false } },
+      worktree: { ...worktree('/srv/repo'), connectionId: 'ssh-1' },
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.config).toMatchObject({ mode: 'on', hud: false })
   })
 })

@@ -27799,7 +27799,8 @@ export class OrcaRuntimeService {
                     ? () =>
                         this.prepareOrchestratorGameFor({
                           repoId: workspace.repo?.id ?? null,
-                          worktreePath: workspace.path
+                          worktreePath: workspace.path,
+                          connectionId: null
                         })
                     : undefined
               })
@@ -30146,6 +30147,7 @@ export class OrcaRuntimeService {
         ? {
             id: worktree.id,
             repoId: worktree.repoId ?? null,
+            connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null,
             path: worktree.path,
             branch: summary?.branch ?? worktree.branch ?? '',
             displayName: summary?.displayName ?? worktree.displayName ?? '',
@@ -30237,7 +30239,8 @@ export class OrcaRuntimeService {
       const worktree = (await this.getResolvedWorktreeMap()).get(terminal.worktreeId)
       return await this.prepareOrchestratorGameFor({
         repoId: worktree?.repoId ?? null,
-        worktreePath: terminal.worktreePath || null
+        worktreePath: terminal.worktreePath || null,
+        connectionId: worktree ? (this.store?.getRepo(worktree.repoId)?.connectionId ?? null) : null
       })
     } catch {
       return { args: [], env: {} }
@@ -30250,7 +30253,8 @@ export class OrcaRuntimeService {
       const worktree = (await this.getResolvedWorktreeMap()).get(worktreeId)
       return await this.prepareOrchestratorGameFor({
         repoId: worktree?.repoId ?? null,
-        worktreePath: worktree?.path ?? null
+        worktreePath: worktree?.path ?? null,
+        connectionId: worktree ? (this.store?.getRepo(worktree.repoId)?.connectionId ?? null) : null
       })
     } catch {
       return { args: [], env: {} }
@@ -30260,6 +30264,7 @@ export class OrcaRuntimeService {
   private async prepareOrchestratorGameFor(args: {
     repoId: string | null
     worktreePath: string | null
+    connectionId: string | null
   }): Promise<OrchestratorGameLaunch> {
     try {
       return await prepareOrchestratorGameLaunch({

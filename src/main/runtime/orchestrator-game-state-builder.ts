@@ -1,4 +1,4 @@
-import { loadHooks } from '../hooks'
+import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import {
   orchestratorGameScenesOf,
@@ -24,6 +24,8 @@ export type OrchestratorGameStateInput = {
   worktree: {
     id: string
     repoId: string | null
+    /** SSH connection of the worktree's repo; its orca.yaml is read from that host. */
+    connectionId?: string | null
     path: string
     branch: string
     displayName: string
@@ -69,7 +71,9 @@ function linkedItemOf(linked: WorkspaceLinkedItem | null | undefined): GameWorkI
 export async function buildOrchestratorGameState(
   input: OrchestratorGameStateInput
 ): Promise<OrchestratorGameState> {
-  const project = input.worktree ? loadHooks(input.worktree.path) : null
+  const project = input.worktree
+    ? await readWorktreeOrcaYaml(input.worktree.path, input.worktree.connectionId)
+    : null
   const resolved = resolveOrchestratorGameConfig({
     global: input.settings?.orchestratorGame,
     project: project?.orchestratorGame,
