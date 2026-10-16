@@ -92,6 +92,24 @@
       ]
     },
     {
+      "name": "orca-game-scenes",
+      "sourcePath": "skills/orca-game-scenes",
+      "releaseRevision": 1,
+      "packageDigest": "cb5022f7c2917a5727d35fbe012598ac0c53a7063f6c86c7680aeeb99a6516a0",
+      "gitTreeSha": "d09f78091ab67684ba26c750c37a4c3562688f16",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3701,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8",
+          "textNormalizedSha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8",
+          "identitySha256": "e7eff3a4f0d25cd26c251046e6be46bea4a0d496f3d89d5092d136b1c3095ec8"
+        }
+      ]
+    },
+    {
       "name": "orca-linear",
       "sourcePath": "skills/orca-linear",
       "releaseRevision": 9,
