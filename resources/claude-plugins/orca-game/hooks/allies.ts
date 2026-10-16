@@ -1,6 +1,7 @@
 import type { TextProps } from 'claude-code'
 
 import type { AllyStatus } from '../types'
+import { cellWidthOf, fitCells } from './cell-width'
 import type { BandPalette } from './scenes/scene-definition'
 
 // Jev's `advisor` value (orca-jev-mod-skills, AdvisorState version 1), only the fields the strip draws.
@@ -216,6 +217,29 @@ export const allyRowsOf = (
     text: layout.more(rows.length - kept.length)
   }
   return [...kept, more]
+}
+
+export type AllyParts = { label?: string; text: string; badge?: string }
+
+// A label takes at most a third of the row; a badge goes before the text is cut below this.
+const MIN_TEXT = 12
+
+/** A row's words cut to `columns` cells, padding included: label, then text, then badge. */
+export const allyPartsOf = (row: AllyRow, columns: number): AllyParts => {
+  const label =
+    row.label === undefined ? undefined : fitCells(row.label, Math.floor(columns / 3) - 2)
+  const labelWidth = label === undefined || label === '' ? 0 : cellWidthOf(label) + 2
+  const badgeWidth = row.badge === undefined ? 0 : cellWidthOf(row.badge) + 2
+  const textWidth = cellWidthOf(row.text) + 1
+  const isTight =
+    labelWidth + textWidth + badgeWidth > columns && columns - labelWidth - badgeWidth < MIN_TEXT
+  const badge = isTight ? undefined : row.badge
+  const room = columns - labelWidth - (badge === undefined ? 0 : badgeWidth) - 1
+  return {
+    ...(label === undefined || label === '' ? {} : { label }),
+    text: fitCells(row.text, room),
+    ...(badge === undefined ? {} : { badge })
+  }
 }
 
 // Colors that carry a state stay, so another plugin's error still reads as one.

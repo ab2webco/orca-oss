@@ -23,6 +23,18 @@ export const reviewTextOf = (review: GameReview): string => {
   return `${reviewLabelOf(review)} ${reviewStates[review.state]} · CI ${ciWords[review.ci]}`
 }
 
+const CI_MARKS: Readonly<Record<GameCi, string>> = {
+  success: '✓',
+  failure: '✗',
+  pending: '◷',
+  neutral: '·',
+  none: ''
+}
+
+/** The review as its number and a CI mark, for a narrow band. */
+export const reviewShortOf = (review: GameReview): string =>
+  `${reviewLabelOf(review)} ${CI_MARKS[review.ci]}`.trim()
+
 // The status is the tracker's own word, so it stays as Orca sent it.
 export const workItemTextOf = (item: GameWorkItem): string =>
   `${item.identifier} ${item.status || item.statusGroup}`

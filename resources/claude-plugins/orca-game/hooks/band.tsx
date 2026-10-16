@@ -1,8 +1,11 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import { alliesStrip } from './allies-strip'
-import { CI_COLORS, needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from './fleet-labels'
-import { HUD_KEY, HUD_ROWS, hudCellsOf } from './fleet-hud'
+import { CHIP_ROWS, MENU_ROWS, menuChipsOf, stateChipsOf } from './band-chips'
+import { fitCells } from './cell-width'
+import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-rows'
+import { CI_COLORS, needsLineOf } from './fleet-labels'
+import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
 import { gameStrings } from './game-strings'
 import { openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
@@ -52,43 +55,41 @@ export const registerBand = (on: On): void => {
     const text = gameStrings().text
     const showPet = isClawdReacting() && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
-    const menu = (
-      key: string,
-      icon: string,
-      label: string,
-      onPress: () => void,
-      isMain = false
-    ) => (
-      <Button key={key} plain onPress={onPress}>
+    const rowsOf = (
+      prefix: string,
+      chips: readonly Chip[],
+      maxRows: number,
+      draw: (chip: PlacedChip) => RenderElement,
+      more?: (count: number) => string
+    ) =>
+      chipRowsOf(chips, { columns, maxRows, more }).map((row, index) => (
+        <Box key={`${prefix}-${index}`} flexDirection="row" gap={1}>
+          {row.map(draw)}
+        </Box>
+      ))
+    const menuActions: Readonly<Record<string, () => void>> = {
+      'band-panel': () => openFleet($),
+      'band-refresh': () => void refreshSoon($).catch(() => undefined),
+      'band-pet': () => clawdReact($, 'pet')
+    }
+    const menuRows = rowsOf('band-menu', menuChipsOf(), MENU_ROWS, (chip) => (
+      <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
         <Text
-          backgroundColor={isMain ? palette.gold : palette.panel}
-          color={isMain ? palette.ink : palette.parchment}
+          backgroundColor={chip.key === 'band-panel' ? palette.gold : palette.panel}
+          color={chip.key === 'band-panel' ? palette.ink : palette.parchment}
           bold
-        >{` ${icon} ${label} `}</Text>
+        >{` ${chip.label} `}</Text>
       </Button>
-    )
-    const pill = (key: string, label: string, color: string, isBold = false) => (
-      <Text key={key} backgroundColor={palette.panel}>
-        {' '}
-        <Text color={color} bold={isBold}>
-          {label}
-        </Text>{' '}
-      </Text>
-    )
-    const menuRow = (
-      <Box flexDirection="row" gap={1} flexWrap="wrap">
-        {menu('band-panel', '▤', text.panel, () => openFleet($), true)}
-        {menu('band-refresh', '↻', text.refresh, () => void refreshSoon($).catch(() => undefined))}
-        {menu('band-pet', '♥', text.petClawd, () => clawdReact($, 'pet'))}
-      </Box>
-    )
+    ))
     if (v.state === null) {
       const art = await animate($, e, pet)
       return (
         <Box flexDirection="column">
           {art.get(PET_KEY)}
-          <Text dimColor>{`${text.team} · ${v.note === '' ? text.loading : v.note}`}</Text>
-          {menuRow}
+          <Text dimColor wrap="truncate-end">
+            {fitCells(`${text.team} · ${v.note === '' ? text.loading : v.note}`, columns)}
+          </Text>
+          {menuRows}
           {allies}
           {beneath}
         </Box>
@@ -110,7 +111,9 @@ export const registerBand = (on: On): void => {
           isDemo: v.isDemo
         })
     }
-    const art = await animate($, e, [...pet, hud])
+    const isFramed = columns >= HUD_MIN_COLUMNS
+    const isArtShown = config.mode !== 'off' && e.surface === 'terminal'
+    const art = await animate($, e, isFramed ? [...pet, hud] : pet)
     const linkOf = (key: string, url: string, child: RenderElement) =>
       url === '' ? (
         child
@@ -119,45 +122,71 @@ export const registerBand = (on: On): void => {
           {child}
         </Link>
       )
+    const pill = (key: string, label: string, color: string, isBold = false) => (
+      <Text key={key} backgroundColor={palette.panel}>
+        {' '}
+        <Text color={color} bold={isBold}>
+          {label}
+        </Text>{' '}
+      </Text>
+    )
+    const chipOf = (chip: PlacedChip): RenderElement => {
+      switch (chip.key) {
+        case 'band-team':
+          return (
+            <Button key={chip.key} plain onPress={() => openFleet($)}>
+              <Text backgroundColor={palette.gold} color={palette.ink} bold>
+                {' ⚑ '}
+                <Text bold>{chip.label.replace(/^⚑ /, '')}</Text>{' '}
+              </Text>
+            </Button>
+          )
+        case 'working':
+          return pill(chip.key, chip.label, 'cyan')
+        case 'done':
+          return pill(chip.key, chip.label, 'green')
+        case 'waiting':
+          return pill(chip.key, chip.label, counts.waiting > 0 ? 'red' : 'gray', counts.waiting > 0)
+        case 'band-review':
+          return linkOf(
+            chip.key,
+            state.review?.url ?? '',
+            <Text color={CI_COLORS[state.review?.ci ?? 'none']} backgroundColor={palette.panel}>
+              {` ${chip.label} `}
+            </Text>
+          )
+        case 'band-work-item':
+          return linkOf(
+            chip.key,
+            state.workItem?.url ?? '',
+            <Text color={palette.parchment} backgroundColor={palette.panel}>
+              {` ${chip.label} `}
+            </Text>
+          )
+        case 'note':
+          return <Text key={chip.key} color="yellow">{` ${chip.label} `}</Text>
+        case MORE_CHIP_KEY:
+          return <Text key={chip.key} dimColor>{` ${chip.label} `}</Text>
+        case 'loading':
+          return <Text key={chip.key} dimColor>{` ${chip.label} `}</Text>
+        default:
+          return pill(chip.key, chip.label, 'gray')
+      }
+    }
+    const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
-        {art.get(HUD_KEY)}
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          <Button key="band-team" plain onPress={() => openFleet($)}>
-            <Text backgroundColor={palette.gold} color={palette.ink} bold>
-              {' ⚑ '}
-              <Text bold>{teammatesOf(party.length)}</Text>{' '}
+        {isFramed || !isArtShown ? (
+          art.get(HUD_KEY)
+        ) : (
+          <Box key="band-hud-line" flexDirection="row" overflow="hidden">
+            <Text color={palette.parchment} backgroundColor={palette.panel} wrap="truncate-end">
+              {hudLineOf(party, columns, { level, isDemo: v.isDemo })}
             </Text>
-          </Button>
-          {pill('working', text.working(counts.working), 'cyan')}
-          {pill('idle', text.idle(counts.idle), 'gray')}
-          {counts.done > 0 && pill('done', text.done(counts.done), 'green')}
-          {pill(
-            'waiting',
-            text.waiting(counts.waiting),
-            counts.waiting > 0 ? 'red' : 'gray',
-            counts.waiting > 0
-          )}
-          {state.review !== null &&
-            linkOf(
-              'band-review',
-              state.review.url,
-              <Text color={CI_COLORS[state.review.ci]} backgroundColor={palette.panel}>
-                {` ${reviewTextOf(state.review)} `}
-              </Text>
-            )}
-          {state.workItem !== null &&
-            linkOf(
-              'band-work-item',
-              state.workItem.url,
-              <Text color={palette.parchment} backgroundColor={palette.panel}>
-                {` ${workItemTextOf(state.workItem)} `}
-              </Text>
-            )}
-          {v.note !== '' && <Text color="yellow">{v.note}</Text>}
-          {v.isLoading && <Text dimColor>↻</Text>}
-        </Box>
+          </Box>
+        )}
+        {rowsOf('band-chips', chips, CHIP_ROWS, chipOf, (count) => `+${count}`)}
         {needs.length > 0 && (
           <Box flexDirection="row" overflow="hidden">
             <Text color="red" bold wrap="truncate-end">
@@ -165,7 +194,7 @@ export const registerBand = (on: On): void => {
             </Text>
           </Box>
         )}
-        {menuRow}
+        {menuRows}
         {allies}
         {beneath}
       </Box>

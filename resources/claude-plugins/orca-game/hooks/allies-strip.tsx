@@ -3,6 +3,7 @@ import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-cod
 
 import {
   advisorOf,
+  allyPartsOf,
   allyRowsOf,
   restyledTextOf,
   withStatus,
@@ -55,28 +56,33 @@ export async function alliesStrip(
     return undefined
   }
   const { Box, Text } = $.ui.resolve(e)
-  // Why the slice: a status can be any length, and truncate-end alone still measures all of it.
-  const fit = (text: string) => text.slice(0, columns)
-  const rowOf = (row: AllyRow) => (
-    <Box key={row.key} flexDirection="row" overflow="hidden">
-      <Text wrap="truncate-end" backgroundColor={palette.panel}>
-        {row.label === undefined ? (
-          ''
-        ) : (
-          <Text
-            backgroundColor={palette.gold}
-            color={palette.ink}
-            bold
-          >{` ${fit(row.label)} `}</Text>
-        )}
-        <Text color={TONE_COLORS[row.tone] ?? palette.parchment} dimColor={row.tone === 'more'}>
-          {` ${fit(row.text)}`}
+  const rowOf = (row: AllyRow) => {
+    const parts = allyPartsOf(row, columns)
+    return (
+      <Box key={row.key} flexDirection="row" overflow="hidden">
+        <Text wrap="truncate-end" backgroundColor={palette.panel}>
+          {parts.label === undefined ? (
+            ''
+          ) : (
+            <Text
+              backgroundColor={palette.gold}
+              color={palette.ink}
+              bold
+            >{` ${parts.label} `}</Text>
+          )}
+          <Text color={TONE_COLORS[row.tone] ?? palette.parchment} dimColor={row.tone === 'more'}>
+            {` ${parts.text}`}
+          </Text>
+          {parts.badge === undefined ? '' : <Text color={palette.gold}>{` ${parts.badge} `}</Text>}
         </Text>
-        {row.badge === undefined ? '' : <Text color={palette.gold}>{` ${fit(row.badge)} `}</Text>}
-      </Text>
+      </Box>
+    )
+  }
+  return (
+    <Box key="allies-strip" flexDirection="column">
+      {rows.map(rowOf)}
     </Box>
   )
-  return <Box flexDirection="column">{rows.map(rowOf)}</Box>
 }
 
 export const registerAllies = (on: On): void => {

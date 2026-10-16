@@ -1,4 +1,5 @@
 import { actionPixel } from './action-props'
+import { fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
 import {
   IDLE,
@@ -29,6 +30,9 @@ const HUD_DIM = 0x8a90a8
 const PARTY_AT = 14
 const SLOT = 22
 const XP_CELLS = 5
+
+/** Below this the frame has no room for one teammate, so the band draws `hudLineOf` instead. */
+export const HUD_MIN_COLUMNS = PARTY_AT + SLOT + 1
 
 export type HudMember = {
   name: string
@@ -165,7 +169,7 @@ export const hudGridOf = (
     }
   }
   const room = columns - PARTY_AT - 2
-  if (shown.length === 0) {
+  if (members.length === 0) {
     const art = gameStrings().art
     hudWrite(grid, columns, 1, PARTY_AT, art.noParty, HUD_TEXT, room)
     hudWrite(grid, columns, 2, PARTY_AT, art.teammatesJoin, HUD_DIM, room)
@@ -192,7 +196,42 @@ export const hudGridOf = (
   if (extras.isDemo === true && columns > 10) {
     hudWrite(grid, columns, 0, 2, ' DEMO ', WAITING, 6)
   }
+  const hidden = members.length - shown.length
+  const xpEnd = extras.level === undefined ? PARTY_AT : PARTY_AT + xpTextOf(extras.level).length + 2
+  const plus = ` +${hidden} `
+  if (hidden > 0 && columns - 2 - plus.length > xpEnd) {
+    hudWrite(grid, columns, 0, columns - 2 - plus.length, plus, HUD_TEXT, plus.length)
+  }
   return grid
+}
+
+const markOf = (one: HudMember): string => {
+  if (one.state === 'waiting') {
+    return '!'
+  }
+  if (one.mood === 'hurt') {
+    return '×'
+  }
+  return one.state === 'working' ? '•' : 'z'
+}
+
+/** The HUD as one line of text, for a band too narrow for its frame. */
+export const hudLineOf = (
+  members: readonly HudMember[],
+  columns: number,
+  extras: HudExtras = {}
+): string => {
+  const art = gameStrings().art
+  const party =
+    members.length === 0
+      ? art.noParty
+      : members.map((one) => `${markOf(one)} ${one.name}`).join('  ')
+  const parts = [
+    ...(extras.isDemo === true ? ['DEMO'] : []),
+    ...(extras.level === undefined ? [] : [`${art.level} ${extras.level.level}`]),
+    party
+  ]
+  return fitCells(parts.join(' · '), columns)
 }
 
 export const hudCellsOf = (...args: Parameters<typeof hudGridOf>): string =>

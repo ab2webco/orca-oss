@@ -145,4 +145,15 @@ paint its own
   stay). A plugin loaded in the `prepend` tier draws outside the game and can hide it.
 
 The strip keeps at most six rows, the last saying how many it left out, and each row is cut to
-the band's width.
+the band's width (the label to a third of it, the text next, the badge dropped first).
+
+## Narrow panes
+
+The band lays itself out for the pane's width
+([`chip-rows.ts`](../../resources/claude-plugins/orca-game/hooks/chip-rows.ts)): the status chips
+fill at most two rows and the menu one, whole chips only. When they do not fit, the least important
+labels shorten first (`2 working` to `• 2`, the review to `#42 ✗`, Refresh and Pet Clawd to their
+icon), then chips drop and a `+N` counts them. Below 37 columns the HUD frame has no room for a
+teammate, so it becomes one line of text (`Lv 2 · • builder  ! scribe`); above that, teammates the
+frame cannot seat are counted as `+N` on its top edge. Widths are measured in terminal cells, so
+Japanese, Korean and Chinese labels count two per character.
