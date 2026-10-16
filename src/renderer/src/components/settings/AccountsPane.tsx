@@ -1505,8 +1505,8 @@ export function AccountsPane({
           keywords={['claude', 'account', 'rate limit', 'status bar', 'quota']}
           className="space-y-3 py-2"
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 basis-36 space-y-0.5">
               <Label>
                 {translate('auto.components.settings.AccountsPane.94d351af4a', 'Accounts')}
               </Label>
@@ -1524,7 +1524,7 @@ export function AccountsPane({
                     )}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1.5">
               <Button
                 variant="outline"
                 size="xs"
@@ -2037,8 +2037,8 @@ export function AccountsPane({
               </span>
             </div>
           ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 basis-36 space-y-0.5">
               <Label>
                 {translate('auto.components.settings.AccountsPane.94d351af4a', 'Accounts')}
               </Label>

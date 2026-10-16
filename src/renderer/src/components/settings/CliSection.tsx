@@ -250,13 +250,13 @@ export function CliSection({
       </div>
 
       <div className="space-y-3 rounded-xl border border-border/60 bg-card/50 p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0 flex-1 basis-36 space-y-0.5">
             <Label>
               {translate('auto.components.settings.CliSection.38edbb5721', 'Shell command')}
             </Label>
             <p
-              className={`text-xs ${pathStatusUnknown ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
+              className={`text-xs wrap-break-word ${pathStatusUnknown ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
             >
               {loading
                 ? translate(
@@ -266,7 +266,7 @@ export function CliSection({
                 : (status?.detail ?? getInstallDescription(currentPlatform))}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <TooltipProvider delayDuration={250}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -304,7 +304,7 @@ export function CliSection({
         </div>
 
         {status?.commandPath ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground wrap-break-word">
             {translate('auto.components.settings.CliSection.15eaad0d31', 'Command path:')}{' '}
             <code className="rounded bg-muted px-1 py-0.5 text-[11px]">{status.commandPath}</code>
           </p>

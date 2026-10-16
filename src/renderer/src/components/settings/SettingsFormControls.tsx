@@ -48,7 +48,7 @@ type SettingsRowProps = {
   alignTop?: boolean
 }
 
-/** Two-column row grammar: left min-w-0 label+description, right shrink-0 control. */
+/** Row grammar: min-w-0 label, shrink-0 control; the control wraps when both do not fit. */
 export function SettingsRow({
   label,
   description,
@@ -60,21 +60,22 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        'flex gap-4',
+        'flex flex-wrap gap-x-4 gap-y-2',
         description ? 'py-3' : 'py-2',
         alignTop ? 'items-start' : 'items-center justify-between',
         className
       )}
     >
-      <div className={cn('min-w-0 flex-1', description ? 'space-y-1' : 'space-y-0.5')}>
-        <Label id={labelId} className="select-text">
+      {/* Why basis-36: the label keeps 9rem before the control drops to its own line. */}
+      <div className={cn('min-w-0 flex-1 basis-36', description ? 'space-y-1' : 'space-y-0.5')}>
+        <Label id={labelId} className="select-text wrap-break-word">
           {label}
         </Label>
         {description ? (
-          <p className="select-text text-xs text-muted-foreground">{description}</p>
+          <p className="select-text text-xs text-muted-foreground wrap-break-word">{description}</p>
         ) : null}
       </div>
-      <div className="shrink-0">{control}</div>
+      <div className="max-w-full shrink-0">{control}</div>
     </div>
   )
 }
@@ -147,7 +148,7 @@ export function SettingsSegmentedControl<T extends string | number>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex items-center rounded-md border border-border bg-background/50 p-0.5',
+        'inline-flex max-w-full flex-wrap items-center rounded-md border border-border bg-background/50 p-0.5',
         equalWidth && 'w-full'
       )}
     >
@@ -241,12 +242,14 @@ export function SettingsSubsectionHeader({
   className
 }: SettingsSubsectionHeaderProps): React.JSX.Element {
   return (
-    <div className={cn('flex items-start justify-between gap-3', className)}>
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+    <div className={cn('flex flex-wrap items-start justify-between gap-3', className)}>
+      <div className="min-w-0 space-y-1">
+        <h3 className="text-sm font-semibold wrap-break-word">{title}</h3>
+        {description ? (
+          <p className="text-xs text-muted-foreground wrap-break-word">{description}</p>
+        ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="max-w-full">{action}</div> : null}
     </div>
   )
 }

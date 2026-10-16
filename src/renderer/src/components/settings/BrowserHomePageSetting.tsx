@@ -29,9 +29,9 @@ export function BrowserHomePageSetting({
         'URL opened when creating a new browser tab. Leave empty to open a blank tab.'
       )}
       keywords={['browser', 'home', 'homepage', 'default', 'url', 'new tab', 'blank']}
-      className="flex items-start justify-between gap-4 py-2"
+      className="flex flex-wrap items-start justify-between gap-4 py-2"
     >
-      <div className="min-w-0 shrink space-y-0.5">
+      <div className="min-w-0 flex-1 basis-36 space-y-0.5">
         <Label>
           {translate(
             'auto.components.settings.BrowserHomePageSetting.70224e37b1',
@@ -46,7 +46,7 @@ export function BrowserHomePageSetting({
         </p>
       </div>
       <form
-        className="flex shrink-0 items-center gap-2"
+        className="flex max-w-full shrink-0 items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault()
           const trimmed = value.trim()

@@ -239,8 +239,8 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
 
   return (
     <section className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 basis-36 space-y-1">
           <h3 className="text-sm font-semibold">
             {translate('auto.components.settings.McpConfigSection.55eea3ef47', 'MCP Configs')}
           </h3>
@@ -259,7 +259,7 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
           <Button
             variant="ghost"
             size="icon-sm"

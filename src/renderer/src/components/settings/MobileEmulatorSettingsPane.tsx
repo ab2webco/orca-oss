@@ -204,15 +204,17 @@ export function MobileEmulatorSettingsPane({
         />
 
         <div className="py-2">
-          <div className="flex items-start gap-4">
-            <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+            <div className="min-w-0 flex-1 basis-36 space-y-0.5">
               <Label>
                 {translate(
                   'auto.components.settings.MobileEmulatorSettingsPane.ae1612c58c',
                   'Availability'
                 )}
               </Label>
-              <p className="text-xs text-muted-foreground">{availabilityDetail(availability)}</p>
+              <p className="text-xs text-muted-foreground wrap-break-word">
+                {availabilityDetail(availability)}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Badge

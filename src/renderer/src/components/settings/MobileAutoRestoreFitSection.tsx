@@ -39,7 +39,7 @@ export function MobileAutoRestoreFitSection({
           onAutoRestoreFitChange(opt.ms)
         }}
       >
-        <SelectTrigger size="sm" className="min-w-[220px]">
+        <SelectTrigger size="sm" className="max-w-full min-w-[min(220px,100%)]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -175,7 +175,7 @@ export function BitbucketIntegrationCard(): React.JSX.Element {
             status={status}
             storedCredential={storedCredential}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!connected ? (
               <Button
                 variant="outline"
