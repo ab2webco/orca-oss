@@ -67,7 +67,7 @@ function templateProblem(
   if (template.length > GAME_URL_TEMPLATE_MAX || !LITERAL_ORIGIN.test(template)) {
     return 'must be an http(s) URL with a literal host'
   }
-  for (const [, name] of template.matchAll(PLACEHOLDER)) {
+  for (const [, name = ''] of template.matchAll(PLACEHOLDER)) {
     if (!isPlaceholder(name)) {
       return `uses an unknown placeholder {${name}}`
     }
