@@ -33,6 +33,17 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain("don't relaunch or re-arm watchers until asked")
   })
 
+  it('reads and relays its orchestration messages when Orca says it has some, never echoing the line', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
+
+    expect(brief).toContain('"You have N orchestration messages"')
+    expect(brief).toContain('run `/opt/orca-dev orchestration check --json` at once')
+    expect(brief).toContain('answer a member question, verify a worker_done, escalate')
+    expect(brief).toContain('one short line who wrote and what it means')
+    expect(brief).toContain('quote the member')
+    expect(brief).toContain('Never just repeat that line')
+  })
+
   it('hands a non-implementation task to a member with --prompt', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
