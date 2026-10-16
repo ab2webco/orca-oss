@@ -1,0 +1,187 @@
+{
+  "looks": {
+    "working": {
+      "skyTop": "#0d1330",
+      "skyBottom": "#2a3466",
+      "sun": "#f2f0d8",
+      "isNight": true,
+      "far": "#1f2748",
+      "snow": "#8c97c4",
+      "near": "#1b2b33",
+      "ground": "#121c1e",
+      "plant": "#0d1714",
+      "plantKind": "tree",
+      "cloud": "#2e3a66"
+    },
+    "docs": {
+      "skyTop": "#111a3d",
+      "skyBottom": "#3b3f7a",
+      "sun": "#e8e4ff",
+      "isNight": true,
+      "far": "#262c55",
+      "snow": "#9ea6d8",
+      "near": "#1e2d3a",
+      "ground": "#15202a",
+      "plant": "#0f1a1c",
+      "plantKind": "tree",
+      "cloud": "#3a4478"
+    },
+    "build": {
+      "skyTop": "#150f2b",
+      "skyBottom": "#4a2a55",
+      "sun": "#ffb86b",
+      "isNight": true,
+      "far": "#2a1d40",
+      "snow": "#7a5a8c",
+      "near": "#23202f",
+      "ground": "#1a1622",
+      "plant": "#120e18",
+      "plantKind": "none",
+      "cloud": "#4a3360"
+    },
+    "verify": {
+      "skyTop": "#0b1a2a",
+      "skyBottom": "#1f4a5a",
+      "sun": "#c8fff0",
+      "isNight": true,
+      "far": "#173040",
+      "snow": "#6fa3b0",
+      "near": "#123038",
+      "ground": "#0c2026",
+      "plant": "#081a1e",
+      "plantKind": "cactus",
+      "cloud": "#24506a"
+    },
+    "pr": {
+      "skyTop": "#1a0f2e",
+      "skyBottom": "#5a2a4a",
+      "sun": "#ff7a8a",
+      "isNight": true,
+      "far": "#2d1a3a",
+      "snow": "#8a4a6a",
+      "near": "#2a1830",
+      "ground": "#1c1020",
+      "plant": "#140a18",
+      "plantKind": "tree",
+      "cloud": "#6a3358"
+    },
+    "handoff": {
+      "skyTop": "#05081a",
+      "skyBottom": "#18204a",
+      "sun": "#fff6c8",
+      "isNight": true,
+      "far": "#10163a",
+      "snow": "#5a6aa0",
+      "near": "#0e1a24",
+      "ground": "#080f16",
+      "plant": "#050a10",
+      "plantKind": "tree",
+      "cloud": "#202a55"
+    }
+  },
+  "costumes": {
+    "working": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#3a4a7a",
+        "B": "#2a3a5a"
+      }
+    },
+    "docs": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#6a5acd",
+        "B": "#3b3070"
+      }
+    },
+    "build": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#f2c14e",
+        "B": "#8a5a2b"
+      }
+    },
+    "verify": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#5fd3c0",
+        "B": "#1f6a72"
+      }
+    },
+    "pr": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#ff8fa3",
+        "B": "#7a2a4a"
+      }
+    },
+    "handoff": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#f5e6a0",
+        "B": "#2a2a5a"
+      }
+    }
+  },
+  "cards": {
+    "working": {
+      "icon": "☾",
+      "name": "Night Owl",
+      "color": "#8fa3d9"
+    },
+    "docs": {
+      "icon": "✎",
+      "name": "Archivist",
+      "color": "#a99bf0"
+    },
+    "build": {
+      "icon": "⚙",
+      "name": "Mechanic",
+      "color": "#f2c14e"
+    },
+    "verify": {
+      "icon": "✓",
+      "name": "Inspector",
+      "color": "#5fd3c0"
+    },
+    "pr": {
+      "icon": "✉",
+      "name": "Courier",
+      "color": "#ff8fa3"
+    },
+    "handoff": {
+      "icon": "★",
+      "name": "Dawn Keeper",
+      "color": "#f5e6a0"
+    }
+  },
+  "teller": {
+    "icon": "❝",
+    "name": "Night Log",
+    "color": "#9aa6c8"
+  },
+  "band": {
+    "gold": "#f2c14e",
+    "ink": "#0d1330",
+    "panel": "#1f2748",
+    "parchment": "#e8e4ff"
+  }
+}

@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest'
 import { hasInstructionalPluginContributions } from './plugin-consent-fingerprint'
 import { pluginManifestSchema } from './plugin-manifest'
 import { isSecretPluginSetting } from './plugin-settings-contribution'
+import {
+  ORCHESTRATOR_GAME_SCENE_MAX_BYTES,
+  parseOrchestratorGameScene
+} from '../orchestrator-game-scene'
 
 describe.each(['hello-orca', 'worklog'])('%s plugin fixture', (name) => {
   it('uses an ESM entry that remains loadable outside a type-module package', async () => {
@@ -36,6 +40,22 @@ describe('worklog plugin fixture', () => {
     expect(manifest.contributes.events).not.toHaveLength(0)
     // An automation is instructional content, so consent binds to the tree hash.
     expect(hasInstructionalPluginContributions(manifest)).toBe(true)
+  })
+
+  it('ships a game scene the Agent Teams game accepts', async () => {
+    const root = join(process.cwd(), 'examples', 'plugins', 'worklog')
+    const manifest = pluginManifestSchema.parse(
+      JSON.parse(await readFile(join(root, 'orca-plugin.json'), 'utf8'))
+    )
+
+    expect(manifest.contributes.gameScenes).toHaveLength(1)
+    for (const scene of manifest.contributes.gameScenes) {
+      const text = await readFile(join(root, scene.path), 'utf8')
+      expect(Buffer.byteLength(text)).toBeLessThanOrEqual(ORCHESTRATOR_GAME_SCENE_MAX_BYTES)
+      expect(parseOrchestratorGameScene(text, `orca-samples.worklog/${scene.id}`)).toMatchObject({
+        ok: true
+      })
+    }
   })
 
   it('ships every panel control disabled until the script wires it', async () => {

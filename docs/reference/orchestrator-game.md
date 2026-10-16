@@ -46,7 +46,7 @@ Each field resolves on its own; a later layer wins
 # orca.yaml
 orchestratorGame:
   mode: zen        # on | zen | off
-  scene: quest     # scene id from the plugin's registry
+  scene: quest     # quest, or a plugin scene: <publisher>.<id>/<scene id>
   hud: true        # teammate band above the prompt
   rewards: false   # XP, level-ups, celebrations
   tracker: true    # follow the linked work item in the flow
@@ -71,3 +71,12 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   so the game never needs to know the tracker. `tracker: false` leaves it out.
 
 A provider that is offline or unauthenticated only drops its own field.
+
+## Scenes from plugins
+
+`quest` is built in. An Orca plugin can add more as JSON (`contributes.gameScenes`); `game.state`
+sends the valid ones in an optional `extensions.scenes`, each as `{ id, pluginId, definition }`
+with `id` namespaced `<publisher>.<id>/<scene id>`, and lists dropped ones in `warnings`. Settings
+→ **Scene** offers quest plus the scenes of running plugins, and keeps showing an id from
+`orca.yaml` that nothing installed serves; the mod draws `quest` for it. The file format, limits
+and consent rules are in [Game scenes](./plugin-development.md#game-scenes).
