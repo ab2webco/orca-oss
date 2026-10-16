@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_GAME_CONFIG, effectiveConfigOf, gameConfigOfEnv } from '../hooks/game-config'
+import {
+  DEFAULT_GAME_CONFIG,
+  effectiveConfigOf,
+  gameConfigOfEnv,
+  gameStateArgvOf
+} from '../hooks/game-config'
 
 describe('gameConfigOfEnv', () => {
   it('defaults to quest mode on with the HUD and rewards', () => {
@@ -44,5 +49,25 @@ describe('effectiveConfigOf', () => {
     })
     expect(effectiveConfigOf(env, { mode: 'off' }, undefined).mode).toBe('off')
     expect(effectiveConfigOf(env, { mode: 'off' }, 'on').mode).toBe('on')
+  })
+})
+
+describe('gameStateArgvOf', () => {
+  it('runs the absolute CLI path Orca hands the session', () => {
+    expect(gameStateArgvOf('/Applications/Orca.app/Contents/Resources/bin/orca')).toEqual([
+      '/Applications/Orca.app/Contents/Resources/bin/orca',
+      'game',
+      'state',
+      '--json'
+    ])
+    expect(gameStateArgvOf('C:\\Orca\\bin\\orca.exe')?.[0]).toBe('C:\\Orca\\bin\\orca.exe')
+  })
+
+  // Why: on Linux a bare `orca` is the GNOME screen reader, and a relative name resolves against the cwd.
+  it('never falls back to a bare or relative command', () => {
+    expect(gameStateArgvOf(undefined)).toBeUndefined()
+    expect(gameStateArgvOf('')).toBeUndefined()
+    expect(gameStateArgvOf('orca')).toBeUndefined()
+    expect(gameStateArgvOf('bin/orca')).toBeUndefined()
   })
 })

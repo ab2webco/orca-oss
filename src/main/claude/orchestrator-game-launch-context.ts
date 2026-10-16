@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 import { app } from 'electron'
 import { resolveClaudeCommand } from '../codex-cli/command'
 import { loadHooks } from '../hooks'
+import { resolveClaudeAgentTeamsShimBin } from '../runtime/claude-agent-teams-shim-env'
 import { parseClaudeCodeVersion } from './hook-event-versions'
 import {
   buildOrchestratorGameLaunch,
@@ -51,6 +52,7 @@ export async function prepareOrchestratorGameLaunch(args: {
   repoId: string | null
   worktreePath: string | null
   pluginDir?: string | null
+  orcaCli?: string | null
   detectClaudeVersion?: () => Promise<string | null>
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
@@ -63,6 +65,8 @@ export async function prepareOrchestratorGameLaunch(args: {
   return buildOrchestratorGameLaunch({
     resolved,
     claudeVersion,
-    pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir
+    pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir,
+    // Why: the same absolute CLI the Agent Teams tmux shim runs, so Linux never hits the screen reader.
+    orcaCli: args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli
   })
 }

@@ -22,6 +22,7 @@ function worktreeWith(orcaYaml: string | null): string {
 
 const base = {
   pluginDir: '/plugins/orca-game',
+  orcaCli: '/app/bin/orca',
   detectClaudeVersion: async () => '2.1.301'
 }
 
@@ -39,6 +40,7 @@ describe('prepareOrchestratorGameLaunch', () => {
 
     expect(launch.args).toEqual(['--plugin-dir', '/plugins/orca-game'])
     expect(launch.env).toMatchObject({
+      ORCA_GAME_CLI: '/app/bin/orca',
       ORCA_GAME_MODE: 'zen',
       ORCA_GAME_HUD: '0',
       ORCA_GAME_REWARDS: '0'

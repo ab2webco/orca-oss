@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
+import { gameStateArgvOf } from './game-config'
 import { parseGameState } from './game-state'
 import { fleetPhaseOf, partyOf } from './party'
 import {
@@ -18,7 +19,6 @@ export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
 const CLI_TIMEOUT_MS = 15000
 const XP_KEY = 'xp-ledger'
-export const GAME_STATE_ARGV = ['orca', 'game', 'state', '--json'] as const
 export const UNAVAILABLE = 'orca game state unavailable'
 
 const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note: '', xp: 0 }
@@ -26,9 +26,11 @@ const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note:
 export const fleet = atom({ plugin: 'orca-game', key: 'fleet' } as const, EMPTY)
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
-  const out = await $.process
-    .run(GAME_STATE_ARGV, { timeoutMs: CLI_TIMEOUT_MS })
-    .catch(() => undefined)
+  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+  if (argv === undefined) {
+    return undefined
+  }
+  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 

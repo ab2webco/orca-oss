@@ -40,7 +40,8 @@ const TURN = {
   isAborted: false,
   turnId: 't1'
 } as const
-const GAME_STATE = ['orca', 'game', 'state', '--json']
+const ORCA_CLI = '/opt/orca/bin/orca'
+const GAME_STATE = [ORCA_CLI, 'game', 'state', '--json']
 
 const agent = (displayName: string, state: string, toolName: string | null, isLeader = false) => ({
   paneKey: `tab-1:${displayName}`,
@@ -98,7 +99,7 @@ const worldOf = (patch: Partial<World> = {}): World => ({
 })
 
 const engine = (on: On, world: World) => {
-  mock.env(on, world.env ?? {})
+  mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ...world.env })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
@@ -192,6 +193,18 @@ describe('band', () => {
     const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
     expect(await spinner.find({ type: 'Raster' })).toBeDefined()
     await spinner.unmount()
+  })
+
+  test('without an absolute ORCA_GAME_CLI it runs nothing, not even a bare orca', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_CLI: 'orca' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(world.calls).toEqual([])
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Text', text: /orca game state unavailable/ })).toBeDefined()
+    await ui.unmount()
   })
 
   test('ORCA_GAME_HUD=0 hides the band', async ($, on) => {

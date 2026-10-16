@@ -70,16 +70,18 @@ const agentOf = (value: unknown): GameAgent[] => {
     return []
   }
   const paneKey = str(value.paneKey)
-  const displayName = str(value.displayName)
   const state = oneOf(value.state, AGENT_STATES)
-  if (paneKey === undefined || displayName === undefined || state === undefined) {
+  if (paneKey === undefined || state === undefined) {
     return []
   }
+  const agentType = str(value.agentType) ?? ''
+  // Orca sends null for a pane with no title or task yet; it is still on the team.
+  const displayName = str(value.displayName) || agentType || paneKey
   return [
     {
       paneKey,
       displayName,
-      agentType: str(value.agentType) ?? '',
+      agentType,
       state,
       toolName: str(value.toolName) ?? null,
       isLeader: value.isLeader === true

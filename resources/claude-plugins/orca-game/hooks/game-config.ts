@@ -47,3 +47,11 @@ export const effectiveConfigOf = (
   ...live,
   ...(modeOverride === undefined ? {} : { mode: modeOverride })
 })
+
+const ABSOLUTE_PATH = /^(?:\/|[A-Za-z]:[\\/])/
+
+// Why: on Linux a bare `orca` is the GNOME screen reader; only the absolute path Orca hands over is run.
+export const gameStateArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
+  const path = cli?.trim() ?? ''
+  return ABSOLUTE_PATH.test(path) ? [path, 'game', 'state', '--json'] : undefined
+}

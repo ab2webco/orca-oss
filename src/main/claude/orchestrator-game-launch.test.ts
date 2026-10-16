@@ -13,11 +13,13 @@ describe('buildOrchestratorGameLaunch', () => {
     const launch = buildOrchestratorGameLaunch({
       resolved: resolveOrchestratorGameConfig({ project: { mode: 'zen', rewards: false } }),
       claudeVersion: '2.1.301',
-      pluginDir: PLUGIN_DIR
+      pluginDir: PLUGIN_DIR,
+      orcaCli: '/app/bin/orca'
     })
 
     expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
     expect(launch.env).toEqual({
+      ORCA_GAME_CLI: '/app/bin/orca',
       ORCA_GAME_MODE: 'zen',
       ORCA_GAME_SCENE: 'quest',
       ORCA_GAME_HUD: '1',
@@ -33,6 +35,19 @@ describe('buildOrchestratorGameLaunch', () => {
     })
 
     expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
+  })
+
+  // Why: the mod never runs a bare `orca`; without a path it still draws, just with no fleet data.
+  it('loads the plugin without ORCA_GAME_CLI when no Orca CLI path resolves', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({}),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR,
+      orcaCli: null
+    })
+
+    expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
+    expect(launch.env).not.toHaveProperty('ORCA_GAME_CLI')
   })
 
   it.each([

@@ -73,6 +73,24 @@ describe('parseGameState', () => {
     expect(parsed?.agents[2]?.toolName).toBeNull()
   })
 
+  it('keeps an agent Orca sends with a null name or type, named after its type or pane', () => {
+    const agents = [
+      {
+        paneKey: 'tab:a',
+        displayName: null,
+        agentType: 'codex',
+        state: 'working',
+        isLeader: false
+      },
+      { paneKey: 'tab:b', displayName: null, agentType: null, state: 'idle', isLeader: false }
+    ]
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => [agent.displayName, agent.agentType])).toEqual([
+      ['codex', 'codex'],
+      ['tab:b', '']
+    ])
+  })
+
   it('turns an invalid review, work item or config field into null or nothing', () => {
     const parsed = parseGameState(
       JSON.stringify({

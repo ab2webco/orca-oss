@@ -21,6 +21,8 @@ export function buildOrchestratorGameLaunch(args: {
   resolved: ResolvedOrchestratorGameConfig
   claudeVersion: string | null
   pluginDir: string | null
+  /** Absolute Orca CLI the mod polls for `game state`. */
+  orcaCli?: string | null
 }): OrchestratorGameLaunch {
   const { config } = args.resolved
   // Why: an unknown or older Claude Code would reject or ignore the mod; plain Claude is the safe launch.
@@ -35,6 +37,7 @@ export function buildOrchestratorGameLaunch(args: {
   return {
     args: ['--plugin-dir', args.pluginDir],
     env: {
+      ...(args.orcaCli ? { ORCA_GAME_CLI: args.orcaCli } : {}),
       ORCA_GAME_MODE: config.mode,
       ORCA_GAME_SCENE: config.scene,
       ORCA_GAME_HUD: config.hud ? '1' : '0',
