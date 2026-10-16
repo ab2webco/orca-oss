@@ -30244,6 +30244,19 @@ export class OrcaRuntimeService {
     }
   }
 
+  // Why: the pty spawn path has only a pre-allocated handle, which is not a terminal yet; the worktree id is what it knows.
+  async prepareOrchestratorGameForWorktree(worktreeId: string): Promise<OrchestratorGameLaunch> {
+    try {
+      const worktree = (await this.getResolvedWorktreeMap()).get(worktreeId)
+      return await this.prepareOrchestratorGameFor({
+        repoId: worktree?.repoId ?? null,
+        worktreePath: worktree?.path ?? null
+      })
+    } catch {
+      return { args: [], env: {} }
+    }
+  }
+
   private async prepareOrchestratorGameFor(args: {
     repoId: string | null
     worktreePath: string | null
