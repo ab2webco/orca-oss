@@ -9831,6 +9831,62 @@ describe('registerPtyHandlers', () => {
     )
   })
 
+  it('loads the Agent Teams game for a renderer PTY spawn from the tab menu (ORCA-580)', async () => {
+    const leafId = '22222222-2222-4222-8222-222222222222'
+    const pluginDir = '/Applications/Orca Lab.app/Contents/Resources/claude-plugins/orca-game'
+    const runtime = {
+      setPtyController: vi.fn(),
+      createPreAllocatedTerminalHandle: vi.fn(() => 'term_agent_teams'),
+      prepareClaudeAgentTeamsLeaderForHandle: vi.fn(async () => ({
+        env: { ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh', ORCA_AGENT_TEAMS_TOKEN: 'fresh-token' }
+      })),
+      prepareOrchestratorGameForWorktree: vi.fn(async () => ({
+        args: ['--plugin-dir', pluginDir],
+        env: { ORCA_GAME_MODE: 'full', ORCA_GAME_SCENE: 'office' }
+      })),
+      registerPreAllocatedHandleForPty: vi.fn(),
+      registerPty: vi.fn(),
+      noteTerminalSpawnCommand: vi.fn(),
+      getDriver: vi.fn(() => ({ kind: 'host' })),
+      onPtySpawned: vi.fn(),
+      onPtyExit: vi.fn(),
+      onPtyData: vi.fn()
+    }
+
+    registerPtyHandlers(mainWindow as never, runtime as never)
+    const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+      cols: 80,
+      rows: 24,
+      cwd: '/repo',
+      command: 'claude --teammate-mode auto',
+      tabId: 'tab-1',
+      leafId,
+      worktreeId: 'wt-1',
+      env: {
+        ORCA_PANE_KEY: `tab-1:${leafId}`,
+        ORCA_TAB_ID: 'tab-1',
+        ORCA_WORKTREE_ID: 'wt-1'
+      },
+      launchConfig: {
+        agentCommand: 'claude --teammate-mode auto',
+        agentArgs: '',
+        agentEnv: {}
+      },
+      launchAgent: 'claude'
+    })) as { launchConfig?: { agentCommand?: string; agentEnv: Record<string, string> } }
+
+    const spawnOptions = spawnMock.mock.calls.at(-1)?.[2] as { env: Record<string, string> }
+    const expectedCommand = `claude '--plugin-dir' '${pluginDir}' --teammate-mode auto`
+    expect(runtime.prepareOrchestratorGameForWorktree).toHaveBeenCalledWith('wt-1')
+    expect(runtime.noteTerminalSpawnCommand).toHaveBeenCalledWith(
+      expect.any(String),
+      expectedCommand
+    )
+    expect(spawnOptions.env).toMatchObject({ ORCA_GAME_MODE: 'full', ORCA_GAME_SCENE: 'office' })
+    expect(result.launchConfig?.agentCommand).toBe(expectedCommand)
+    expect(result.launchConfig?.agentEnv).toMatchObject({ ORCA_GAME_MODE: 'full' })
+  })
+
   it('threads the validated pane identity into registerPty for a renderer PTY spawn (#7587)', async () => {
     const leafId = '88888888-8888-4888-8888-888888888888'
     const runtime = {
