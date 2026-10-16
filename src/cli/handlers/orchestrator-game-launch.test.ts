@@ -154,13 +154,13 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })
 
-  it('launches a ticket that is not in the To Do with its id alone', async () => {
+  it('keeps the project prompt for a ticket outside the To Do, its unknown values left empty', async () => {
     const { client, calls } = fakeClient(stateWith())
 
     await launch(client, 'CIN-99')
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
-      expect.objectContaining({ spec: 'Work on CIN-99', taskTitle: 'CIN-99' })
+      expect.objectContaining({ spec: 'Implement CIN-99:', taskTitle: 'CIN-99' })
     )
   })
 

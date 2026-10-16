@@ -4,6 +4,7 @@ import {
   DEFAULT_GAME_LEAD,
   GAME_LEAD_CAP_MAX,
   parseGameLead,
+  renderGameLaunchPrompt,
   resolveGameLead
 } from './orchestrator-game-lead'
 
@@ -81,5 +82,27 @@ describe('resolveGameLead', () => {
 
   it('drops an effort that has no model, as worker-start would refuse it', () => {
     expect(resolveGameLead([{ effort: 'high' }])).toEqual(DEFAULT_GAME_LEAD)
+  })
+})
+
+describe('renderGameLaunchPrompt', () => {
+  const item = { id: 'CIN-12', title: 'Cartelera page', url: 'https://jira/CIN-12' }
+
+  it('fills the project template', () => {
+    expect(renderGameLaunchPrompt('/implement {id}\n{title} {url}', item)).toBe(
+      '/implement CIN-12\nCartelera page https://jira/CIN-12'
+    )
+  })
+
+  it('keeps the template when a value is unknown, leaving it empty', () => {
+    expect(
+      renderGameLaunchPrompt('/implement {id}\nNow: {status}\n{title}', { ...item, title: '' })
+    ).toBe('/implement CIN-12\nNow:\n')
+  })
+
+  it('is the default work prompt without a template', () => {
+    expect(renderGameLaunchPrompt(undefined, item)).toBe(
+      'Work on CIN-12: Cartelera page\nhttps://jira/CIN-12'
+    )
   })
 })

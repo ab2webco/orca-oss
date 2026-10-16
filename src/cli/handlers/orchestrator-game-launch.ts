@@ -2,8 +2,7 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
-import { renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
-import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
+import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import type { RuntimeStatus } from '../../shared/runtime-types'
@@ -89,7 +88,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       `${lead.label ?? 'Lead'} of ${project}: one member per ticket`
     )
     const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
-      spec: renderGameWorkPrompt(lead.launchPrompt, {
+      spec: renderGameLaunchPrompt(lead.launchPrompt, {
         id: item?.id ?? ticket,
         title: item?.title ?? '',
         url: item?.url ?? '',

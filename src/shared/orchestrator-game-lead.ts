@@ -1,6 +1,7 @@
 import {
   GAME_PROMPT_MAX,
   GAME_WORK_PROMPT_PLACEHOLDERS,
+  renderGameWorkPrompt,
   unknownPlaceholderOf
 } from './orchestrator-game-actions'
 
@@ -119,4 +120,20 @@ export function resolveGameLead(
     delete lead.effort
   }
   return lead
+}
+
+/** What a new member is told about its ticket; unlike a button prompt, a missing value never drops the template. */
+export function renderGameLaunchPrompt(
+  template: string | undefined,
+  item: { id: string; title: string; url: string; status?: string }
+): string {
+  if (template === undefined) {
+    return renderGameWorkPrompt(undefined, item)
+  }
+  const values: Record<string, string | undefined> = { ...item }
+  return template
+    .replace(/\{([^{}]*)\}/g, (_, name: string) => values[name] ?? '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
 }
