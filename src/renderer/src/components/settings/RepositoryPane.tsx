@@ -338,7 +338,7 @@ export function RepositoryPane({
 
         {settings ? (
           <ProjectOrchestratorGameSetting
-            repoId={repo.id}
+            repo={repo}
             settings={settings}
             projectLayer={yamlHooks?.orchestratorGame}
             updateSettings={updateSettings}

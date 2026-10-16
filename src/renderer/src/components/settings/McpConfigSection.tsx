@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
-import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import {
   canInspectLocalMcpConfigRoot,
   inspectMcpConfigContent,
@@ -19,6 +18,7 @@ import { isWindowsUserAgent } from '../terminal-pane/pane-helpers'
 import { McpConfigFileRow, type LoadedMcpConfigInspection } from './McpConfigFileRow'
 import { McpMissingConfigList } from './McpMissingConfigList'
 import { loadMcpConfigInspections } from './mcp-config-inspection'
+import { repositoryTargetWorktreeOf } from './repository-target-worktree'
 import { translate } from '@/i18n/i18n'
 import { captureDirectSshMutationExpectation } from '@/lib/ssh-mutation-expectation'
 
@@ -53,21 +53,10 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
 
   const connectionId = repo.connectionId ?? undefined
   const isWindows = isWindowsUserAgent()
-  const targetWorktree = useMemo(() => {
-    if (activeWorktreeId && getRepoIdFromWorktreeId(activeWorktreeId) === repo.id) {
-      return (
-        worktreesForRepo.find((worktree) => worktree.id === activeWorktreeId) ?? {
-          id: activeWorktreeId,
-          path: repo.path
-        }
-      )
-    }
-    return (
-      worktreesForRepo.find((worktree) => worktree.isMainWorktree) ??
-      worktreesForRepo.find((worktree) => worktree.path === repo.path) ??
-      worktreesForRepo[0] ?? { id: `${repo.id}::${repo.path}`, path: repo.path }
-    )
-  }, [activeWorktreeId, repo.id, repo.path, worktreesForRepo])
+  const targetWorktree = useMemo(
+    () => repositoryTargetWorktreeOf(activeWorktreeId, repo, worktreesForRepo),
+    [activeWorktreeId, repo, worktreesForRepo]
+  )
   const targetWorktreeId = targetWorktree.id
   const targetRootPath = targetWorktree.path
   const detectedCount = useMemo(() => configs.filter((config) => config.exists).length, [configs])

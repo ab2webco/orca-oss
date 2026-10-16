@@ -12,6 +12,9 @@ import {
   type ScenePreviewFrame
 } from './orchestrator-game-scene-preview-frame'
 import { sceneLabel } from './OrchestratorGameSceneSelect'
+import type { SceneFileState } from './use-orchestrator-game-scene-file'
+import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
+import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 
 const QUEST_OPTION = { value: 'quest', kind: 'built-in', scene: 'quest' } as const
@@ -64,16 +67,32 @@ const notes = {
     translate(
       'auto.components.settings.OrchestratorGameSetting.previewMissing',
       'Not installed, so the game draws Quest.'
+    ),
+  file: (): string =>
+    translate(
+      'auto.components.settings.OrchestratorGameSetting.previewFileFallback',
+      'Until the scene file is valid, the game draws Quest.'
     )
+}
+
+// Why Quest on a bad file: it is what the game falls back to, so the preview never shows more than the pane.
+function fileSceneOf(read: SceneFileState | null | undefined): SceneDefinition | null {
+  if (!read || read.status === 'loading') {
+    return null
+  }
+  return read.status === 'ok' ? read.definition : QUEST_SCENE
 }
 
 /** The scene an Agent Teams pane draws on its spinner, painted by the mod's own code. */
 export function OrchestratorGameScenePreview({
   scene,
-  mode
+  mode,
+  fileScene
 }: {
   scene: string
   mode: OrchestratorGameMode
+  /** The read of a project's scene file, when `scene` is a `file:` id. */
+  fileScene?: SceneFileState | null
 }): React.JSX.Element {
   const plugins = usePluginPanelsStore((state) => state.plugins)
   const option = useMemo(
@@ -85,7 +104,9 @@ export function OrchestratorGameScenePreview({
       },
     [plugins, scene]
   )
-  const definition = mode === 'off' ? null : previewSceneOf(option)
+  const definition =
+    mode === 'off' ? null : option.kind === 'file' ? fileSceneOf(fileScene) : previewSceneOf(option)
+  const isFileFallback = option.kind === 'file' && definition !== null && fileScene?.status !== 'ok'
   const isReduced = usePrefersReducedMotion()
   const isAnimated = definition !== null && !isReduced
   const [tick, setTick] = useState(0)
@@ -112,11 +133,13 @@ export function OrchestratorGameScenePreview({
       ? notes.off()
       : option.kind === 'plugin'
         ? notes.plugin()
-        : option.kind === 'missing'
-          ? notes.missing()
-          : mode === 'zen'
-            ? notes.zen()
-            : null
+        : isFileFallback
+          ? notes.file()
+          : option.kind === 'missing'
+            ? notes.missing()
+            : mode === 'zen'
+              ? notes.zen()
+              : null
 
   return (
     <figure
@@ -139,7 +162,11 @@ export function OrchestratorGameScenePreview({
           aria-label={translate(
             'auto.components.settings.OrchestratorGameSetting.previewImage',
             'Preview of {{value0}}',
-            { value0: sceneLabel(option.kind === 'missing' ? QUEST_OPTION : option) }
+            {
+              value0: sceneLabel(
+                option.kind === 'missing' || isFileFallback ? QUEST_OPTION : option
+              )
+            }
           )}
           width={frame.columns * PIXEL}
           height={frame.rows * 2 * PIXEL}

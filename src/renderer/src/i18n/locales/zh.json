@@ -10723,7 +10723,25 @@
           "previewOff": "游戏已关闭，因此 Agent Teams 窗格以普通 Claude 启动。",
           "previewZen": "Zen 绘制相同的场景，并且还会隐藏简短的工作笔记。",
           "previewPlugin": "此插件的美术只会在 Agent Teams 窗格中绘制。",
-          "previewMissing": "未安装，因此游戏会绘制 Quest。"
+          "previewMissing": "未安装，因此游戏会绘制 Quest。",
+          "sceneCustomFile": "自定义文件…",
+          "sceneFile": "场景文件",
+          "sceneFileDescription": "此项目中的场景 JSON，路径相对于项目根目录。每个 worktree 读取自己的副本，因此修改会在下次刷新时显示。",
+          "sceneFileEmpty": "请输入此项目中 JSON 文件的路径。",
+          "sceneFileAbsolute": "请使用相对于项目根目录的路径。",
+          "sceneFileEscapes": "路径必须位于项目内（不能使用 ..）。",
+          "sceneFileInvalid": "无法绘制此文件，因此游戏会绘制 Quest：{{value0}}",
+          "sceneFileUnreadable": "无法读取此文件，因此游戏会绘制 Quest：{{value0}}",
+          "sceneFileOutside": "请选择此项目中的文件（{{value0}}）。",
+          "sceneFileCreated": "已创建场景文件",
+          "sceneFileCreateFailed": "无法创建场景文件。",
+          "sceneFileChoose": "选择文件…",
+          "sceneFileCreate": "基于 {{value0}} 创建",
+          "sceneFileOpen": "在编辑器中打开",
+          "sceneFileSsh": "此项目位于 SSH 主机上，请直接输入路径；文件选择器只能浏览这台电脑。",
+          "sceneFileSshOffline": "请连接此 SSH 项目以读取其场景文件。",
+          "previewFileFallback": "在场景文件有效之前，游戏会绘制 Quest。",
+          "sceneFileNotText": "不是文本文件"
         }
       },
       "right": {

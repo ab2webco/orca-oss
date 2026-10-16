@@ -3,11 +3,13 @@ import {
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   type OrchestratorGameBuiltInScene
 } from '../../../../shared/orchestrator-game-config'
+import { orchestratorGameSceneFileOfId } from '../../../../shared/orchestrator-game-scene-file'
 
 export type OrchestratorGameSceneOption =
   | { value: string; kind: 'built-in'; scene: OrchestratorGameBuiltInScene }
   | { value: string; kind: 'plugin'; scene: string; pluginName: string }
   | { value: string; kind: 'missing'; scene: string }
+  | { value: string; kind: 'file'; scene: string; path: string }
 
 const SERVING_STATUSES: readonly PluginHostListEntry['status'][] = ['running', 'restarting', 'idle']
 
@@ -36,7 +38,10 @@ export function orchestratorGameSceneOptions(
     })),
     ...contributed
   ]
-  if (current && !options.some((option) => option.value === current)) {
+  const path = current ? orchestratorGameSceneFileOfId(current) : null
+  if (current && path !== null) {
+    options.push({ value: current, kind: 'file', scene: current, path })
+  } else if (current && !options.some((option) => option.value === current)) {
     options.push({ value: current, kind: 'missing', scene: current })
   }
   return options

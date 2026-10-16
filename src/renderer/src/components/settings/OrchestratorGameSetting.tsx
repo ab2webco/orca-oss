@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { Repo } from '../../../../shared/repo-types'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
+  ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   resolveOrchestratorGameConfig,
+  type OrchestratorGameBuiltInScene,
   type OrchestratorGameConfig,
   type OrchestratorGameLayer,
   type OrchestratorGameMode,
@@ -9,11 +13,23 @@ import {
 } from '../../../../shared/orchestrator-game-config'
 import {
   withOrchestratorGameField,
-  withOrchestratorGameProjectField
+  withOrchestratorGameProjectField,
+  withOrchestratorGameProjectScene
 } from '../../../../shared/orchestrator-game-settings-updates'
+import { useAppStore } from '../../store'
 import { SearchableSetting } from './SearchableSetting'
-import { INHERIT_SCENE, OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
+import {
+  CUSTOM_SCENE_FILE,
+  INHERIT_SCENE,
+  OrchestratorGameSceneSelect
+} from './OrchestratorGameSceneSelect'
 import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
+import {
+  OrchestratorGameSceneFileField,
+  OrchestratorGameSceneFileStatus
+} from './OrchestratorGameSceneFileField'
+import { repositoryTargetWorktreeOf } from './repository-target-worktree'
+import { useOrchestratorGameSceneFile } from './use-orchestrator-game-scene-file'
 import {
   SettingsRow,
   SettingsSegmentedControl,
@@ -173,23 +189,54 @@ const sourceLabel = (source: OrchestratorGameSource): string =>
 
 type FieldValue = OrchestratorGameMode | 'true' | 'false'
 
+const EMPTY_WORKTREES: never[] = []
+
+const builtInOf = (scene: string): OrchestratorGameBuiltInScene =>
+  ORCHESTRATOR_GAME_BUILT_IN_SCENES.find((one) => one === scene) ?? 'quest'
+
 export function ProjectOrchestratorGameSetting({
-  repoId,
+  repo,
   settings,
   projectLayer,
   updateSettings
 }: {
-  repoId: string
+  repo: Pick<Repo, 'id' | 'path' | 'connectionId'>
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
+  const repoId = repo.id
   const local = settings.orchestratorGameProjects?.[repoId]
-  const { config, sources } = resolveOrchestratorGameConfig({
+  const { config, sources, sceneFile } = resolveOrchestratorGameConfig({
     global: settings.orchestratorGame,
     project: projectLayer,
     local
   })
+  const connectionId = repo.connectionId ?? undefined
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const worktrees = useAppStore((state) => state.worktreesByRepo[repoId] ?? EMPTY_WORKTREES)
+  const sshStatus = useAppStore((state) =>
+    connectionId ? state.sshConnectionStates.get(connectionId)?.status : undefined
+  )
+  const target = repositoryTargetWorktreeOf(activeWorktreeId, repo, worktrees)
+  const file = useOrchestratorGameSceneFile({
+    rootPath: target.path,
+    connectionId,
+    isReachable: !connectionId || sshStatus === 'connected',
+    path: sceneFile
+  })
+  const [isCustomPicked, setIsCustomPicked] = useState(false)
+  const isCustom = local?.sceneFile !== undefined || isCustomPicked
+  const setScene = (choice: { scene: string } | { sceneFile: string } | null): void => {
+    setIsCustomPicked(false)
+    updateSettings({
+      orchestratorGameProjects: withOrchestratorGameProjectScene(
+        settings.orchestratorGameProjects,
+        repoId,
+        choice
+      )
+    })
+  }
   const set = <K extends keyof OrchestratorGameConfig>(
     key: K,
     value: OrchestratorGameConfig[K] | undefined
@@ -275,17 +322,37 @@ export function ProjectOrchestratorGameSetting({
         ))}
         <SettingsRow
           label={sceneTitle()}
-          description={effective('scene', config.scene)}
+          description={effective('scene', sceneFile ?? config.scene)}
           control={
             <OrchestratorGameSceneSelect
-              value={local?.scene ?? INHERIT_SCENE}
+              value={isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE)}
               ariaLabel={sceneTitle()}
               inheritLabel={inherit}
-              onChange={(scene) => set('scene', scene ?? undefined)}
+              onChange={(scene) => setScene(scene === null ? null : { scene })}
+              onCustomFile={() => setIsCustomPicked(true)}
             />
           }
         />
-        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
+        {isCustom ? (
+          <OrchestratorGameSceneFileField
+            key={local?.sceneFile ?? ''}
+            path={local?.sceneFile}
+            rootPath={target.path}
+            worktreeId={target.id}
+            connectionId={connectionId}
+            baseScene={builtInOf(config.scene)}
+            read={local?.sceneFile === undefined ? null : file.state}
+            onPath={(path) => setScene({ sceneFile: path })}
+            onFileWritten={file.reload}
+          />
+        ) : (
+          <OrchestratorGameSceneFileStatus read={file.state} />
+        )}
+        <OrchestratorGameScenePreview
+          scene={config.scene}
+          mode={config.mode}
+          fileScene={file.state}
+        />
       </div>
     </SearchableSetting>
   )

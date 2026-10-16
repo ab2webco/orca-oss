@@ -24,6 +24,7 @@ vi.mock('../ui/select', () => ({
   ),
   SelectTrigger: () => null,
   SelectValue: () => null,
+  SelectSeparator: () => null,
   SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => (
     <option value={value}>{children}</option>
@@ -141,7 +142,7 @@ describe('game settings section', () => {
   it('previews the project scene this machine resolves', () => {
     const view = render(
       <ProjectOrchestratorGameSetting
-        repoId="repo1"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{ orchestratorGame: { scene: 'tamer' } }}
         projectLayer={{ scene: 'jrpg', mode: 'off' }}
         updateSettings={() => undefined}
@@ -161,7 +162,7 @@ describe('ProjectOrchestratorGameSetting', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
-        repoId="repo1"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{ orchestratorGameProjects: { repo1: { hud: false } } }}
         projectLayer={{ mode: 'off' }}
         updateSettings={(update) => updates.push(update)}
@@ -220,7 +221,7 @@ describe('game scene picker', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
-        repoId="repo1"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{}}
         projectLayer={{ scene: 'acme.gone/orbit' }}
         updateSettings={(update) => updates.push(update)}

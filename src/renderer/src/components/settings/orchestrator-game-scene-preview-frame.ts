@@ -43,7 +43,8 @@ export type ScenePreviewPixels = {
 
 /** Plugin scene definitions live in the main process, so the renderer has none to draw. */
 export function previewSceneOf(option: OrchestratorGameSceneOption): SceneDefinition | null {
-  if (option.kind === 'plugin') {
+  // Why file too: the renderer reads a project's file itself and hands its definition over.
+  if (option.kind === 'plugin' || option.kind === 'file') {
     return null
   }
   const id = option.kind === 'built-in' ? option.scene : DEFAULT_SCENE_ID

@@ -10714,7 +10714,25 @@
           "previewOff": "El juego está desactivado, así que los paneles de Agent Teams arrancan como Claude normal.",
           "previewZen": "Zen dibuja la misma escena y además oculta las notas breves de trabajo.",
           "previewPlugin": "El arte de este plugin solo se dibuja dentro de un panel de Agent Teams.",
-          "previewMissing": "No está instalada, así que el juego dibuja Quest."
+          "previewMissing": "No está instalada, así que el juego dibuja Quest.",
+          "sceneCustomFile": "Archivo propio…",
+          "sceneFile": "Archivo de escena",
+          "sceneFileDescription": "Un JSON de escena dentro de este proyecto, relativo a su raíz. Cada worktree lee su propia copia, así que los cambios se ven en la siguiente actualización.",
+          "sceneFileEmpty": "Escribe la ruta de un archivo JSON de este proyecto.",
+          "sceneFileAbsolute": "Usa una ruta relativa a la raíz del proyecto.",
+          "sceneFileEscapes": "La ruta debe quedarse dentro del proyecto (sin ..).",
+          "sceneFileInvalid": "Este archivo no se puede dibujar, así que el juego dibuja Quest: {{value0}}",
+          "sceneFileUnreadable": "No se pudo leer este archivo, así que el juego dibuja Quest: {{value0}}",
+          "sceneFileOutside": "Elige un archivo dentro de este proyecto ({{value0}}).",
+          "sceneFileCreated": "Archivo de escena creado",
+          "sceneFileCreateFailed": "No se pudo crear el archivo de escena.",
+          "sceneFileChoose": "Elegir archivo…",
+          "sceneFileCreate": "Crear a partir de {{value0}}",
+          "sceneFileOpen": "Abrir en el editor",
+          "sceneFileSsh": "Este proyecto está en un host SSH, así que escribe la ruta; el selector de archivos solo explora este equipo.",
+          "sceneFileSshOffline": "Conecta este proyecto SSH para leer su archivo de escena.",
+          "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
+          "sceneFileNotText": "no es un archivo de texto"
         }
       },
       "right": {

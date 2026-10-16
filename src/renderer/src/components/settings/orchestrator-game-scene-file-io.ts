@@ -1,0 +1,139 @@
+import type { SshMutationExpectation } from '../../../../shared/ssh-types'
+import {
+  ORCHESTRATOR_GAME_SCENE_PHASES,
+  parseOrchestratorGameScene
+} from '../../../../shared/orchestrator-game-scene'
+import {
+  orchestratorGameSceneFileCandidates,
+  orchestratorGameSceneFileId
+} from '../../../../shared/orchestrator-game-scene-file'
+import type {
+  Costume,
+  Look,
+  SceneDefinition
+} from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
+import { joinPath } from '../../lib/path'
+import { translate } from '@/i18n/i18n'
+
+/** The part of `window.api.fs` a project's scene file needs; SSH goes through `connectionId`. */
+export type SceneFileFs = {
+  readFile: (args: {
+    filePath: string
+    connectionId?: string
+  }) => Promise<{ content: string; isBinary: boolean }>
+  pathExists: (args: { filePath: string; connectionId?: string }) => Promise<boolean>
+  createFile: (
+    args: { filePath: string; connectionId?: string } & SshMutationExpectation
+  ) => Promise<void>
+  writeFile: (
+    args: { filePath: string; content: string; connectionId?: string } & SshMutationExpectation
+  ) => Promise<void>
+}
+
+export type SceneFileRead =
+  | { status: 'ok'; definition: SceneDefinition }
+  | { status: 'invalid' | 'unreadable'; message: string }
+
+const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`
+
+const lookText = (look: Look): Record<string, unknown> => ({
+  ...look,
+  skyTop: hex(look.skyTop),
+  skyBottom: hex(look.skyBottom),
+  sun: hex(look.sun),
+  far: hex(look.far),
+  snow: hex(look.snow),
+  near: hex(look.near),
+  ground: hex(look.ground),
+  plant: hex(look.plant),
+  cloud: hex(look.cloud)
+})
+
+const costumeText = (costume: Costume): Record<string, unknown> => ({
+  rows: costume.rows,
+  legs: costume.legs,
+  colors: Object.fromEntries(
+    Object.entries(costume.colors).map(([glyph, color]) => [glyph, hex(color)])
+  )
+})
+
+const byPhase = <T>(
+  values: Record<string, T>,
+  of: (value: T) => unknown
+): Record<string, unknown> =>
+  Object.fromEntries(ORCHESTRATOR_GAME_SCENE_PHASES.map((phase) => [phase, of(values[phase] as T)]))
+
+/** A scene as a hand-editable file: colors as `#rrggbb`, no id (the file's path is its id). */
+export function sceneFileTextOf(scene: SceneDefinition): string {
+  const file = {
+    looks: byPhase(scene.looks, lookText),
+    costumes: byPhase(scene.costumes, costumeText),
+    cards: scene.cards,
+    teller: scene.teller,
+    band: scene.band,
+    ...(scene.foe ? { foe: costumeText(scene.foe) } : {}),
+    ...(scene.finale ? { finale: scene.finale } : {})
+  }
+  return `${JSON.stringify(file, null, 2)}\n`
+}
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+/** Writes `text` to the first free `.orca/scenes/<sceneId>[-n].json` and returns that path. */
+export async function createOrchestratorGameSceneFile(args: {
+  fs: SceneFileFs
+  rootPath: string
+  connectionId?: string
+  expectation?: SshMutationExpectation
+  sceneId: string
+  text: string
+}): Promise<string> {
+  const target = { connectionId: args.connectionId, ...args.expectation }
+  for (const path of orchestratorGameSceneFileCandidates(args.sceneId)) {
+    const filePath = joinPath(args.rootPath, path)
+    try {
+      // Why createFile first: it fails on an existing file, so a user's scene is never overwritten.
+      await args.fs.createFile({ filePath, ...target })
+    } catch (error) {
+      if (await args.fs.pathExists({ filePath, connectionId: args.connectionId })) {
+        continue
+      }
+      throw error
+    }
+    await args.fs.writeFile({ filePath, content: args.text, ...target })
+    return path
+  }
+  throw new Error('Every scene file name is taken')
+}
+
+export async function readOrchestratorGameSceneFile(args: {
+  fs: SceneFileFs
+  rootPath: string
+  connectionId?: string
+  path: string
+}): Promise<SceneFileRead> {
+  let text: string
+  try {
+    const read = await args.fs.readFile({
+      filePath: joinPath(args.rootPath, args.path),
+      connectionId: args.connectionId
+    })
+    if (read.isBinary) {
+      return {
+        status: 'unreadable',
+        message: translate(
+          'auto.components.settings.OrchestratorGameSetting.sceneFileNotText',
+          'not a text file'
+        )
+      }
+    }
+    text = read.content
+  } catch (error) {
+    return { status: 'unreadable', message: messageOf(error) }
+  }
+  const parsed = parseOrchestratorGameScene(text, orchestratorGameSceneFileId(args.path))
+  return parsed.ok
+    ? { status: 'ok', definition: parsed.definition }
+    : { status: 'invalid', message: parsed.error }
+}
