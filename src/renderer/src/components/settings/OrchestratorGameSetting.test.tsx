@@ -141,7 +141,7 @@ describe('ProjectOrchestratorGameSetting', () => {
 })
 
 describe('game scene picker', () => {
-  it('offers quest and the scenes of running plugins, and writes the pick globally', () => {
+  it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
@@ -151,6 +151,9 @@ describe('game scene picker', () => {
     expect(select.value).toBe('quest')
     expect(optionsOf(select)).toEqual([
       ['quest', 'Quest (built-in)'],
+      ['vigilante', 'Night Watch (built-in)'],
+      ['jrpg', 'Crystal Saga (built-in)'],
+      ['tamer', 'Beast Tamer (built-in)'],
       ['acme.space/orbit', 'orbit · Space Pack']
     ])
     choose(select, 'acme.space/orbit')

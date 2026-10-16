@@ -21,8 +21,14 @@ const plugin = (patch: Partial<PluginHostListEntry>): PluginHostListEntry => ({
   ...patch
 })
 
+const BUILT_IN = ['quest', 'vigilante', 'jrpg', 'tamer'].map((scene) => ({
+  value: scene,
+  kind: 'built-in',
+  scene
+}))
+
 describe('orchestratorGameSceneOptions', () => {
-  it('lists quest first, then the scenes of plugins the host runs', () => {
+  it('lists the built-in scenes first, then the scenes of plugins the host runs', () => {
     const options = orchestratorGameSceneOptions(
       [
         plugin({ gameScenes: ['acme.space/orbit', 'acme.space/moon'] }),
@@ -50,7 +56,7 @@ describe('orchestratorGameSceneOptions', () => {
     )
 
     expect(options).toEqual([
-      { value: 'quest', kind: 'built-in', scene: 'quest' },
+      ...BUILT_IN,
       { value: 'acme.space/moon', kind: 'plugin', scene: 'moon', pluginName: 'Space Pack' },
       { value: 'acme.space/orbit', kind: 'plugin', scene: 'orbit', pluginName: 'Space Pack' }
     ])
@@ -58,8 +64,13 @@ describe('orchestratorGameSceneOptions', () => {
 
   it('keeps a scene id nothing installed serves, so orca.yaml values still show as-is', () => {
     expect(orchestratorGameSceneOptions([], 'acme.gone/orbit')).toEqual([
-      { value: 'quest', kind: 'built-in', scene: 'quest' },
+      ...BUILT_IN,
       { value: 'acme.gone/orbit', kind: 'missing', scene: 'acme.gone/orbit' }
     ])
+  })
+
+  it('never marks a built-in scene as not installed', () => {
+    const options = orchestratorGameSceneOptions([], 'tamer')
+    expect(options).toEqual(BUILT_IN)
   })
 })

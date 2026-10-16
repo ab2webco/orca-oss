@@ -5,16 +5,33 @@ import {
   orchestratorGameSceneOptions,
   type OrchestratorGameSceneOption
 } from './orchestrator-game-scene-options'
+import type { OrchestratorGameBuiltInScene } from '../../../../shared/orchestrator-game-config'
 import { translate } from '@/i18n/i18n'
 
 export const INHERIT_SCENE = 'inherit'
 
+const builtInLabels = (): Record<OrchestratorGameBuiltInScene, string> => ({
+  quest: translate(
+    'auto.components.settings.OrchestratorGameSetting.sceneQuest',
+    'Quest (built-in)'
+  ),
+  vigilante: translate(
+    'auto.components.settings.OrchestratorGameSetting.sceneVigilante',
+    'Night Watch (built-in)'
+  ),
+  jrpg: translate(
+    'auto.components.settings.OrchestratorGameSetting.sceneJrpg',
+    'Crystal Saga (built-in)'
+  ),
+  tamer: translate(
+    'auto.components.settings.OrchestratorGameSetting.sceneTamer',
+    'Beast Tamer (built-in)'
+  )
+})
+
 export const sceneLabel = (option: OrchestratorGameSceneOption): string => {
   if (option.kind === 'built-in') {
-    return translate(
-      'auto.components.settings.OrchestratorGameSetting.sceneQuest',
-      'Quest (built-in)'
-    )
+    return builtInLabels()[option.scene]
   }
   if (option.kind === 'missing') {
     return translate(
