@@ -79,6 +79,55 @@ describe('claude agent teams shim env', () => {
     ).resolves.toBeNull()
   })
 
+  // Why: Windows panes run Claude through cmd/PowerShell, where the POSIX-quoted plugin dir is wrong.
+  it.skipIf(process.platform === 'win32')(
+    'adds the orchestrator game to a team launch and resolves it only for one',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'orca-agent-teams-cli-'))
+      roots.push(root)
+      const cliPath = join(root, 'orca-dev')
+      await writeFile(cliPath, '#!/usr/bin/env sh\n', 'utf8')
+      await chmod(cliPath, 0o755)
+      let gameCalls = 0
+      const game = async () => {
+        gameCalls += 1
+        return { args: ['--plugin-dir', '/r/orca-game'], env: { ORCA_GAME_MODE: 'on' } }
+      }
+
+      const native = await buildClaudeAgentTeamsLaunchPlan({
+        command: 'claude',
+        mode: 'native-panes-shim',
+        baseEnv: { PATH: root },
+        createTeamEnv: () => ({ TMUX_PANE: '%1' }),
+        game
+      })
+      const inProcess = await buildClaudeAgentTeamsLaunchPlan({
+        command: 'claude',
+        mode: 'in-process',
+        baseEnv: {},
+        createTeamEnv: () => ({}),
+        game
+      })
+      const plain = await buildClaudeAgentTeamsLaunchPlan({
+        command: 'echo ok',
+        mode: 'native-panes-shim',
+        baseEnv: { PATH: root },
+        createTeamEnv: () => ({}),
+        game
+      })
+
+      expect(native?.command).toBe("claude '--plugin-dir' '/r/orca-game' --teammate-mode auto")
+      expect(native?.env).toMatchObject({ TMUX_PANE: '%1', ORCA_GAME_MODE: 'on' })
+      expect(native?.game?.args).toEqual(['--plugin-dir', '/r/orca-game'])
+      expect(inProcess?.command).toBe(
+        "claude '--plugin-dir' '/r/orca-game' --teammate-mode in-process"
+      )
+      expect(inProcess?.env).toMatchObject({ ORCA_GAME_MODE: 'on' })
+      expect(plain).toBeNull()
+      expect(gameCalls).toBe(2)
+    }
+  )
+
   it('resolves the dev CLI wrapper for the tmux callback binary', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-agent-teams-cli-'))
     roots.push(root)

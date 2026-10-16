@@ -470,6 +470,17 @@ vi.mock('../hooks', () => ({
   parseOrcaYaml: vi.fn().mockReturnValue(null)
 }))
 
+// Why: the real one runs `claude --version`, so launches would depend on the machine running the suite.
+const prepareOrchestratorGameLaunchMock = vi.hoisted(() =>
+  vi.fn(async (_args: { repoId: string | null; worktreePath: string | null }) => ({
+    args: [] as string[],
+    env: {} as Record<string, string>
+  }))
+)
+vi.mock('../claude/orchestrator-game-launch-context', () => ({
+  prepareOrchestratorGameLaunch: prepareOrchestratorGameLaunchMock
+}))
+
 vi.mock('../setup-runner-script-text', () => ({
   buildPosixRunnerScript: (script: string) => `#!/usr/bin/env bash\nset -e\n${script}\n`,
   buildWindowsRunnerScript: (script: string) => `@echo off\r\n${script}\r\n`
@@ -14518,6 +14529,41 @@ describe('OrcaRuntimeService', () => {
     expect(normalAgent.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBeUndefined()
     expect(normalAgent.env?.TMUX).toBeUndefined()
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'loads the orchestrator game into a local Claude Agent Teams launch only',
+    async () => {
+      prepareOrchestratorGameLaunchMock.mockClear()
+      prepareOrchestratorGameLaunchMock.mockResolvedValueOnce({
+        args: ['--plugin-dir', '/r/orca-game'],
+        env: { ORCA_GAME_MODE: 'zen' }
+      })
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+      const runtime = new OrcaRuntimeService({
+        ...store,
+        getSettings: () => ({ ...store.getSettings(), claudeAgentTeamsMode: 'in-process' as const })
+      })
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+
+      await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { command: "claude 'hello'" })
+      await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { command: 'codex' })
+
+      const team = spawn.mock.calls[0]?.[0] as { command?: string; env?: Record<string, string> }
+      expect(team.command).toBe(
+        "claude '--plugin-dir' '/r/orca-game' --teammate-mode in-process 'hello'"
+      )
+      expect(team.env?.ORCA_GAME_MODE).toBe('zen')
+      expect(prepareOrchestratorGameLaunchMock).toHaveBeenCalledTimes(1)
+      expect(prepareOrchestratorGameLaunchMock).toHaveBeenCalledWith(
+        expect.objectContaining({ repoId: TEST_REPO_ID, worktreePath: TEST_WORKTREE_PATH })
+      )
+    }
+  )
 
   it('reveals Claude Agent Teams launches with the rewritten launch config', async () => {
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })

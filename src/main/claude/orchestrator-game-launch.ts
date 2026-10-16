@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { compareAppVersions } from '../../shared/app-version'
 import type { ResolvedOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
+import { quotePosixShell } from '../../shared/wsl-login-shell-command'
 
 // Why: Claude Code loads plugin hook modules ("mods") from this version on.
 export const ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION = '2.1.287'
@@ -44,4 +45,13 @@ export function buildOrchestratorGameLaunch(args: {
       ORCA_GAME_REWARDS: config.rewards ? '1' : '0'
     }
   }
+}
+
+/** Inserts the game's Claude args after the executable of a POSIX shell command line. */
+export function withOrchestratorGameArgs(command: string, launch: OrchestratorGameLaunch): string {
+  if (launch.args.length === 0) {
+    return command
+  }
+  const quoted = launch.args.map(quotePosixShell).join(' ')
+  return command.replace(/^(\S+)/, (executable) => `${executable} ${quoted}`)
 }

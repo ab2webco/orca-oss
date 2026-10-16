@@ -647,7 +647,10 @@ import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
-import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
+import {
+  withOrchestratorGameArgs,
+  type OrchestratorGameLaunch
+} from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
@@ -27788,7 +27791,16 @@ export class OrcaRuntimeService {
                     },
                     shimDir,
                     shimBin
-                  }).env
+                  }).env,
+                // Why: the plugin dir is on this machine, so an SSH pane's remote Claude could not load it.
+                game:
+                  workspace.connectionId === null
+                    ? () =>
+                        this.prepareOrchestratorGameFor({
+                          repoId: workspace.repo?.id ?? null,
+                          worktreePath: workspace.path
+                        })
+                    : undefined
               })
         } catch (error) {
           releaseStablePaneCreate?.()
@@ -27806,9 +27818,12 @@ export class OrcaRuntimeService {
             ? {
                 ...launchOpts.launchConfig,
                 agentCommand: launchOpts.launchConfig.agentCommand
-                  ? effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
-                    ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
-                    : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand)
+                  ? withOrchestratorGameArgs(
+                      effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
+                        ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
+                        : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand),
+                      agentTeamsPlan.game ?? { args: [], env: {} }
+                    )
                   : agentTeamsPlan.command,
                 agentEnv: {
                   ...launchOpts.launchConfig.agentEnv,
@@ -30217,10 +30232,23 @@ export class OrcaRuntimeService {
     try {
       const terminal = await this.showTerminal(handle)
       const worktree = (await this.getResolvedWorktreeMap()).get(terminal.worktreeId)
-      return await prepareOrchestratorGameLaunch({
-        settings: this.store?.getSettings?.(),
+      return await this.prepareOrchestratorGameFor({
         repoId: worktree?.repoId ?? null,
         worktreePath: terminal.worktreePath || null
+      })
+    } catch {
+      return { args: [], env: {} }
+    }
+  }
+
+  private async prepareOrchestratorGameFor(args: {
+    repoId: string | null
+    worktreePath: string | null
+  }): Promise<OrchestratorGameLaunch> {
+    try {
+      return await prepareOrchestratorGameLaunch({
+        settings: this.store?.getSettings?.(),
+        ...args
       })
     } catch {
       return { args: [], env: {} }
