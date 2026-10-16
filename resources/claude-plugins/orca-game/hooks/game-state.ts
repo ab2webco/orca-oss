@@ -1,13 +1,20 @@
 import type {
+  GameActivity,
   GameAgent,
   GameCi,
   GameConfig,
+  GameLink,
+  GameProjectItem,
+  GameProjectList,
+  GameProjectWork,
   GameReview,
   GameSceneExtension,
   GameState,
   GameWorkItem,
   GameWorktree
 } from '../types'
+import { isTerminalHandle } from './game-config'
+import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { sceneDefinitionOf } from './scenes/scene-shape'
 
@@ -29,6 +36,11 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   (allowed as readonly unknown[]).includes(value) ? (value as T) : undefined
 
+const LINK_KINDS = ['review', 'ci', 'workItem', 'project', 'activity'] as const
+const LINK_TONES = ['neutral', 'pending', 'success', 'danger'] as const
+const MAX_LINKS = 32
+const MAX_LINK_TEXT = 64
+
 const AGENT_STATES = ['working', 'waiting', 'idle', 'done'] as const
 const PROVIDERS = ['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea'] as const
 const REVIEW_STATES = ['open', 'draft', 'merged', 'closed'] as const
@@ -43,6 +55,92 @@ const STATUS_GROUPS = [
   'cancelled',
   'unknown'
 ] as const
+
+const textOf = (value: unknown): string | undefined => {
+  const text = str(value)?.trim().slice(0, MAX_LINK_TEXT)
+  return text === undefined || text === '' ? undefined : text
+}
+
+const activityOf = (value: unknown): GameActivity | undefined => {
+  if (!isShape(value) || typeof value.at !== 'number') {
+    return undefined
+  }
+  const name = textOf(value.name)
+  const id = textOf(value.id)
+  const url = httpUrlOf(value.url)
+  if (name === undefined || id === undefined || url === undefined) {
+    return undefined
+  }
+  return { name, id, url, at: value.at, running: value.running === true }
+}
+
+const linkOf = (value: unknown): GameLink[] => {
+  if (!isShape(value)) {
+    return []
+  }
+  const id = textOf(value.id)
+  const kind = oneOf(value.kind, LINK_KINDS)
+  const label = textOf(value.label)
+  const url = httpUrlOf(value.url)
+  if (id === undefined || kind === undefined || label === undefined || url === undefined) {
+    return []
+  }
+  const status = textOf(value.status)
+  const tone = oneOf(value.tone, LINK_TONES)
+  return [
+    {
+      id,
+      kind,
+      provider: textOf(value.provider) ?? '',
+      label,
+      url,
+      ...(status === undefined ? {} : { status }),
+      ...(tone === undefined ? {} : { tone })
+    }
+  ]
+}
+
+const MAX_PROJECT_ITEMS = 5
+
+const projectItemOf = (value: unknown): GameProjectItem[] => {
+  if (!isShape(value)) {
+    return []
+  }
+  const id = textOf(value.id)
+  const url = httpUrlOf(value.url)
+  if (id === undefined || url === undefined) {
+    return []
+  }
+  const status = textOf(value.status)
+  const tone = oneOf(value.tone, LINK_TONES)
+  return [
+    {
+      id,
+      title: textOf(value.title) ?? '',
+      url,
+      ...(status === undefined ? {} : { status }),
+      ...(tone === undefined ? {} : { tone })
+    }
+  ]
+}
+
+const projectListOf = (value: unknown): GameProjectList | null => {
+  if (!isShape(value) || typeof value.total !== 'number' || !Number.isFinite(value.total)) {
+    return null
+  }
+  const items = Array.isArray(value.items) ? value.items : []
+  return {
+    provider: textOf(value.provider) ?? '',
+    total: Math.max(0, Math.floor(value.total)),
+    url: httpUrlOf(value.url) ?? null,
+    items: items.flatMap(projectItemOf).slice(0, MAX_PROJECT_ITEMS)
+  }
+}
+
+const projectWorkOf = (value: unknown): { project?: GameProjectWork } =>
+  isShape(value)
+    ? { project: { reviews: projectListOf(value.reviews), todo: projectListOf(value.todo) } }
+    : {}
 
 const configOf = (value: unknown): Partial<GameConfig> => {
   const raw = isShape(value) ? value : {}
@@ -79,6 +177,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const agentType = str(value.agentType) ?? ''
   // Orca sends null for a pane with no title or task yet; it is still on the team.
   const displayName = str(value.displayName) || agentType || paneKey
+  const activity = activityOf(value.activity)
   return [
     {
       paneKey,
@@ -86,7 +185,9 @@ const agentOf = (value: unknown): GameAgent[] => {
       agentType,
       state,
       toolName: str(value.toolName) ?? null,
-      isLeader: value.isLeader === true
+      isLeader: value.isLeader === true,
+      ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {}),
+      ...(activity === undefined ? {} : { activity })
     }
   ]
 }
@@ -128,6 +229,17 @@ const workItemOf = (value: unknown): GameWorkItem | null => {
 const MAX_SCENES = 256
 // Orca namespaces a contributed id as `<pluginId>/<id>`, so it can never shadow a built-in scene.
 const SCENE_ID = /^[a-z0-9-]+\.[a-z0-9-]+\/[a-z0-9-]+$/
+// A project's own scene file arrives as `file:<path in the worktree>` from the `file` source.
+const FILE_SCENE_SOURCE = 'file'
+const MAX_FILE_SCENE_PATH = 512
+const isFileSceneId = (id: string): boolean => {
+  const path = id.startsWith('file:') ? id.slice('file:'.length) : ''
+  return (
+    path.length > 0 &&
+    path.length <= MAX_FILE_SCENE_PATH &&
+    [...path].every((one) => (one.codePointAt(0) ?? 0) > 0x1f && one !== '\u007f')
+  )
+}
 
 const sceneOf = (value: unknown): GameSceneExtension[] => {
   if (!isShape(value)) {
@@ -135,10 +247,11 @@ const sceneOf = (value: unknown): GameSceneExtension[] => {
   }
   const id = str(value.id)
   const pluginId = str(value.pluginId)
-  if (id === undefined || pluginId === undefined || !SCENE_ID.test(id)) {
+  if (id === undefined || pluginId === undefined) {
     return []
   }
-  if (!id.startsWith(`${pluginId}/`)) {
+  const isFile = pluginId === FILE_SCENE_SOURCE && isFileSceneId(id)
+  if (!isFile && !(SCENE_ID.test(id) && id.startsWith(`${pluginId}/`))) {
     return []
   }
   const definition = sceneDefinitionOf(value.definition, id)
@@ -156,7 +269,11 @@ export const parseGameState = (stdout: string): GameState | undefined => {
   if (!isShape(parsed)) {
     return undefined
   }
-  const body = 'result' in parsed ? parsed.result : parsed
+  return gameStateOf('result' in parsed ? parsed.result : parsed)
+}
+
+/** A game state from any value, such as one an older version of the mod stored. */
+export const gameStateOf = (body: unknown): GameState | undefined => {
   if (!isShape(body)) {
     return undefined
   }
@@ -168,6 +285,9 @@ export const parseGameState = (stdout: string): GameState | undefined => {
     agents: Array.isArray(body.agents) ? body.agents.flatMap(agentOf) : [],
     review: reviewOf(body.review),
     workItem: workItemOf(body.workItem),
-    extensions: extensionsOf(body.extensions)
+    extensions: extensionsOf(body.extensions),
+    links: Array.isArray(body.links) ? body.links.slice(0, MAX_LINKS).flatMap(linkOf) : [],
+    activity: activityOf(body.activity) ?? null,
+    ...projectWorkOf(body.project)
   }
 }

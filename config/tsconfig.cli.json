@@ -3,6 +3,8 @@
   "include": [
     "../src/cli/**/*",
     "../src/shared/**/*",
+    // Why: `orca game scene new` writes this template; JSON is only in a project when listed.
+    "../src/shared/orchestrator-game-scene-template.json",
     "../src/main/agent-state-file-reader.ts",
     "../src/main/agent-hooks/hook-config-types.ts",
     "../src/main/agent-hooks/hook-stdin-contract.ts",

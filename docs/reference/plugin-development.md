@@ -765,7 +765,8 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
     "working": {
       "skyTop": "#0d1330", "skyBottom": "#2a3466", "sun": "#f2f0d8", "isNight": true,
       "far": "#1f2748", "snow": "#8c97c4", "near": "#1b2b33", "ground": "#121c1e",
-      "plant": "#0d1714", "plantKind": "tree", "cloud": "#2e3a66"   // tree | cactus | none
+      "plant": "#0d1714", "plantKind": "tree", "cloud": "#2e3a66",
+      "scenery": "skyline", "isSignal": true                         // both optional
     }
     // docs, build, verify, pr, handoff …
   },
@@ -776,18 +777,41 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
       "colors": { "O": "#d77757", "E": "#1a1a1a", "H": "#3a4a7a", "B": "#2a3a5a" }
     }
   },
-  "cards": { "working": { "icon": "☾", "name": "Night Owl", "color": "#8fa3d9" } },
+  "cards": {
+    "working": { "icon": "☾", "name": { "en": "Night Owl", "es": "Búho nocturno" }, "color": "#8fa3d9" }
+  },
   "teller": { "icon": "❝", "name": "Night Log", "color": "#9aa6c8" },
-  "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" }
+  "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" },
+  "foe": { "rows": ["…six rows…"], "legs": ["…", "…"], "colors": { } },   // optional
+  "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" },          // optional
+  "hud": { "skyTop": "#0d1330", "skyBottom": "#1f2748", "frame": "#f2c14e",
+           "text": "#e8e4ff", "dim": "#9aa6c8", "star": "#ffffff" }        // optional, team band
 }
 ```
 
-- Pixel colors (`looks`, costume `colors`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
+- Pixel colors (`looks`, costume `colors`, `hud`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
   colors are `#rrggbb`.
 - A costume is exactly six `rows` plus two `legs` rows, each ten printable ASCII glyphs. `.` is
   transparent and every other glyph must have a color.
 - `icon` is at most 4 characters and `name` at most 32, with no control or bidi characters: they
   reach the terminal as-is.
+- A card or teller `name` is a string, or one per language as `{ "en", "es", "ja", "ko", "zh" }`
+  with `en` required; the game shows the one for Orca's UI language and falls back to `en`. Other
+  language keys are dropped. A mod older than this drops a scene that uses the object form and
+  draws `quest`.
+- `plantKind` is the roadside plant: `tree`, `cactus`, `none`, `antenna`, `crystal` or `flower`.
+  Optional `scenery` is the far layer: `peaks` (the default), `skyline` (buildings with lit
+  windows, on rooftops instead of hills), `crystals` or `meadow`. Optional `isSignal: true` draws a
+  searchlight sign with its beam in place of the sun.
+- Optional `foe` is a costume, same rules as above, that faces a teammate whose CI is red: on its
+  Fleet tile in place of the phase prop, and in turns with it on the HUD.
+- Optional `finale` is a caption painted bottom-right while a merge runs: a string or one per
+  language, at most 24 characters. It is drawn inside the pixel art, so it takes only width-1
+  characters (Latin with accents, punctuation, box drawing and blocks, `★`, card suits); write
+  Japanese, Korean and Chinese scenes' finale in a Latin script or leave those languages out.
+- An Orca or mod older than these fields ignores `scenery`, `isSignal`, `foe` and `finale`; one
+  that predates the `antenna`, `crystal` and `flower` plants drops a scene that uses them and draws
+  `quest`.
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the

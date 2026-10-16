@@ -1,5 +1,7 @@
 import type { GameAgent, GameState } from '../types'
 import type { HudMember } from './fleet-hud'
+import { linkOfKind } from './fleet-labels'
+import { gameStrings } from './game-strings'
 import type { MemberState, Mood } from './party-sprites'
 import { actionOf, activityOf, phaseOf, type FlowPhase } from './quest-policy'
 import { isCiRed, reviewLabelOf } from './rewards'
@@ -34,11 +36,12 @@ const moodOf = (agent: GameAgent, state: GameState, hasRewards: boolean): Mood =
 }
 
 const saysOf = (agent: GameAgent): string => {
+  const says = gameStrings().art.says
   if (agent.state === 'done' || agent.state === 'idle') {
-    return agent.state
+    return says[agent.state]
   }
   const tool = agent.toolName ?? ''
-  return tool === '' ? agent.state : (activityOf(tool, {}).split(' ')[0] ?? tool)
+  return tool === '' ? says[agent.state] : (activityOf(tool, {}).split(' ')[0] ?? tool)
 }
 
 export const memberOf = (agent: GameAgent, state: GameState, hasRewards: boolean): PartyMember => {
@@ -72,14 +75,23 @@ export const countsOf = (agents: readonly GameAgent[]) => {
   }
 }
 
-export const needsOf = (state: GameState): Need[] => [
-  ...state.agents
-    .filter((agent) => !agent.isLeader && agent.state === 'waiting')
-    .map((agent) => ({ name: agent.displayName, text: 'waiting on you', url: null })),
-  ...(state.review !== null && isCiRed(state.review)
-    ? [{ name: reviewLabelOf(state.review), text: 'CI failing', url: state.review.url }]
-    : [])
-]
+export const needsOf = (state: GameState): Need[] => {
+  const { waitingNeed, ciFailingNeed } = gameStrings().text
+  return [
+    ...state.agents
+      .filter((agent) => !agent.isLeader && agent.state === 'waiting')
+      .map((agent) => ({ name: agent.displayName, text: waitingNeed, url: null })),
+    ...(state.review !== null && isCiRed(state.review)
+      ? [
+          {
+            name: reviewLabelOf(state.review),
+            text: ciFailingNeed,
+            url: linkOfKind(state.links, 'ci')?.url ?? state.review.url
+          }
+        ]
+      : [])
+  ]
+}
 
 // The lead wears the costume most of its party wears, and the King once all of it is done.
 export const fleetPhaseOf = (

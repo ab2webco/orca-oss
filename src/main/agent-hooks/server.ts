@@ -84,6 +84,11 @@ import {
   type AgentProviderSessionMetadata
 } from '../../shared/agent-session-resume'
 import { isCommandCodeNewTurnWhileWorking } from '../../shared/command-code-turn-boundary'
+import {
+  GameMcpCallLog,
+  mcpToolCallOfHookBody,
+  type GameMcpCall
+} from './orchestrator-game-mcp-calls'
 
 export type { AgentHookSource }
 
@@ -629,6 +634,8 @@ export class AgentHookServer {
   // plugin event bus (and future consumers) need an additive subscription
   // that also works in headless serve, where no window listener exists.
   private enrichedStatusListeners = new Set<(payload: EnrichedAgentHookEventPayload) => void>()
+  // Why: raw MCP input stays here in memory; game.state only ever gets the id and URL a rule builds.
+  private readonly gameMcpCalls = new GameMcpCallLog()
   // Why: set via start()'s userDataPath so the class has no direct Electron dependency (mockable in vitest node env).
   private endpointDir: string | null = null
   private endpointFilePathCache: string | null = null
@@ -717,7 +724,29 @@ export class AgentHookServer {
     }
   }
 
+  gameMcpCallsOf(paneKey: string): readonly GameMcpCall[] {
+    return this.gameMcpCalls.callsOf(paneKey)
+  }
+
+  // Why: the local body is read for the exact call; a relayed event only has its status payload.
+  private recordGameMcpCall(event: AgentHookEventPayload, body?: unknown): void {
+    const toolName = event.payload.toolName
+    const raw =
+      body !== undefined && toolName?.startsWith('mcp__') ? mcpToolCallOfHookBody(body) : null
+    this.gameMcpCalls.record(event.paneKey, {
+      hookEventName: event.hookEventName,
+      toolUseId: event.toolUseId,
+      toolName,
+      input: raw?.input ?? '',
+      result: raw ? raw.result : event.payload.lastAssistantMessage,
+      at: Date.now()
+    })
+  }
+
   private emitPaneStatusCleared(clear: AgentStatusClearIpcPayload): void {
+    if ('paneKey' in clear) {
+      this.gameMcpCalls.forget(clear.paneKey)
+    }
     this.onPaneStatusCleared?.(clear)
     for (const listener of this.paneStatusClearListeners) {
       // Why: callers are pane/connection teardown paths; one throwing subscriber must
@@ -2114,6 +2143,8 @@ export class AgentHookServer {
       payload: normalizedPayload
     }
     this.recordCurrentAuthorityObservation(event)
+    // Why: the relay forwards no raw tool input, so a remote call is matched on its result alone.
+    this.recordGameMcpCall(event)
     this.applyNormalizedStatus(
       event,
       applyClaudeBackgroundWork
@@ -2209,6 +2240,7 @@ export class AgentHookServer {
               : normalized.event
           this.recordCurrentAuthorityObservation(event)
           const enriched = this.applyNormalizedStatus(event, normalized.onAccepted)
+          this.recordGameMcpCall(event, aliasedBody)
           this.scheduleAssistantMessageRetry(source, aliasedBody, enriched)
           this.scheduleCodexSubagentPoll(source, aliasedBody, enriched)
         }

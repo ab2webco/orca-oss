@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { GameConfig } from '../types'
 import { DEMO_STEP_TICKS, demoFrameOf, type DemoFrame } from './demo'
 import { DEFAULT_GAME_CONFIG, effectiveConfigOf, gameConfigOfEnv } from './game-config'
+import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
 import {
   actionOf,
   activityOf,
@@ -158,7 +159,7 @@ export function questFleet(
   aggregate: FlowPhase | undefined,
   waiting: string
 ): void {
-  const alert = waiting === '' ? '' : `${waiting} needs you!`
+  const alert = waiting === '' ? '' : gameStrings().art.alert(waiting)
   if (aggregate === quest.fleetPhase && alert === quest.alert) {
     return
   }
@@ -219,12 +220,14 @@ async function repaint($: EngineInterface): Promise<void> {
 
 async function load($: EngineInterface): Promise<void> {
   // The engine lists what a mod reads only from literal names.
-  const [mode, scene, hud, rewards] = await Promise.all([
+  const [mode, scene, hud, rewards, locale] = await Promise.all([
     $.env.get('ORCA_GAME_MODE').catch(() => undefined),
     $.env.get('ORCA_GAME_SCENE').catch(() => undefined),
     $.env.get('ORCA_GAME_HUD').catch(() => undefined),
-    $.env.get('ORCA_GAME_REWARDS').catch(() => undefined)
+    $.env.get('ORCA_GAME_REWARDS').catch(() => undefined),
+    $.env.get('ORCA_GAME_LOCALE').catch(() => undefined)
   ])
+  setGameLocale(gameLocaleOf(locale))
   quest.envConfig = gameConfigOfEnv({
     ORCA_GAME_MODE: mode,
     ORCA_GAME_SCENE: scene,

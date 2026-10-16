@@ -1,19 +1,39 @@
 import type { EngineInterface, On } from 'claude-code'
 
-import { AGENT_COLORS, CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
+import type { GameAgent, GameLinkTone, GameProjectList } from '../types'
+import { reviewKindOf } from './band-chips'
+import { fitCells } from './cell-width'
+import {
+  activityTextOf,
+  AGENT_COLORS,
+  CI_COLORS,
+  reviewTextOf,
+  workItemTextOf
+} from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { refreshSoon, viewOf } from './fleet-sync'
+import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
+import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
+import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
+// A card's text column: the pane less the tile, the round border and the padding.
+const CARD_CHROME = TILE_COLUMNS + 3
+const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
+  danger: 'red',
+  pending: 'yellow',
+  success: 'green',
+  neutral: 'white'
+}
 
 export async function openPane($: EngineInterface): Promise<void> {
-  await $.ui.open({ id: PANE_ID, title: 'Fleet', closeOnEscape: true, focus: true })
+  const title = gameStrings().text.fleet
+  await $.ui.open({ id: PANE_ID, title, closeOnEscape: true, focus: true })
 }
 
 export const registerFleetPane = (on: On): void => {
@@ -24,23 +44,48 @@ export const registerFleetPane = (on: On): void => {
     const scene = currentScene()
     const palette = scene.band
     const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const text = gameStrings().text
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
       <Button key={key} plain hotkey={hotkey} onPress={onPress}>
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
+    // Digits follow tile order; r, p and q are the menu's, i, o, c, w, a, g and t the links'.
+    const view = (agent: GameAgent, handle: string, index: number) => (
+      <Button
+        key={`view-${agent.paneKey}`}
+        plain
+        hotkey={index < 9 ? String(index + 1) : undefined}
+        onPress={() =>
+          void focusTerminal($, handle).then((isFocused) => {
+            if (!isFocused) {
+              $.ui.toast(text.couldNotOpen(agent.displayName))
+            }
+          })
+        }
+      >
+        <Text backgroundColor={palette.panel} color={palette.parchment} bold>
+          {` ${text.view} `}
+        </Text>
+      </Button>
+    )
     const menuRow = (
       <Box flexDirection="row" gap={1} flexWrap="wrap" marginTop={1}>
-        {menu('refresh', 'r', '↻ Refresh', () => void refreshSoon($).catch(() => undefined))}
-        {menu('pet', 'c', '♥ Pet Clawd', () => clawdReact($, 'pet'))}
-        {menu('quit', 'q', '✕ Close', close)}
+        {menu(
+          'refresh',
+          'r',
+          `↻ ${text.refresh}`,
+          () => void refreshSoon($).catch(() => undefined)
+        )}
+        {menu('pet', 'p', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
+        {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
     if (v.state === null) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>{`Fleet · ${v.note === '' ? 'loading…' : v.note}`}</Text>
+          <Text dimColor>{`${text.fleet} · ${v.note === '' ? text.loading : v.note}`}</Text>
           {menuRow}
         </Box>
       )
@@ -71,28 +116,95 @@ export const registerFleetPane = (on: On): void => {
     ])
     const counts = countsOf(state.agents)
     const needs = needsOf(state)
+    const cardRoom = Math.max(1, columns - CARD_CHROME)
+    const worktreeId = state.worktree?.id ?? ''
+    const linkButton = (one: PaneLink) => (
+      <Button
+        key={one.key}
+        plain
+        hotkey={one.hotkey}
+        onPress={() =>
+          void openInOrca($, one.url, worktreeId).then((isOpen) => {
+            if (!isOpen) {
+              $.ui.toast(text.couldNotOpenLink(one.label))
+            }
+          })
+        }
+      >
+        <Text backgroundColor={palette.panel} color={palette.parchment}>
+          {' '}
+          <Text color={palette.gold} bold>
+            {one.hotkey}
+          </Text>
+          {` ${one.label} `}
+        </Text>
+      </Button>
+    )
+    const links = paneLinksOf(state)
+    // My PRs and To Do: a heading that opens the list, then one link per item.
+    const projectRows = (key: string, heading: string, list: GameProjectList | null) =>
+      list !== null && (
+        <Box key={key} flexDirection="column">
+          <Box flexDirection="row" gap={1}>
+            {list.url === null ? (
+              <Text bold>{heading}</Text>
+            ) : (
+              <Link href={list.url}>
+                <Text bold underline>
+                  {heading}
+                </Text>
+              </Link>
+            )}
+          </Box>
+          {list.items.map((one) => (
+            <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
+              {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
+              <Box flexShrink={0}>
+                <Link href={one.url}>
+                  <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
+                    {one.id}
+                  </Text>
+                </Link>
+              </Box>
+              {one.status !== undefined && (
+                <Box flexShrink={0}>
+                  <Text dimColor>{one.status}</Text>
+                </Box>
+              )}
+              <Box flexShrink={1} minWidth={0}>
+                <Text wrap="truncate-end">{one.title}</Text>
+              </Box>
+            </Box>
+          ))}
+          {list.total > list.items.length && (
+            <Text dimColor>{text.moreAllies(list.total - list.items.length)}</Text>
+          )}
+        </Box>
+      )
+    const reviews = state.project?.reviews ?? null
+    const todo = state.project?.todo ?? null
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Text backgroundColor={palette.gold} color={palette.ink} bold>
-            {' ⚑ Fleet '}
+            {` ⚑ ${text.fleet} `}
           </Text>
-          <Text color="cyan">{`${counts.working} working`}</Text>
-          <Text color="gray">{`${counts.idle} idle`}</Text>
-          <Text color="green">{`${counts.done} done`}</Text>
+          <Text color="cyan">{text.working(counts.working)}</Text>
+          <Text color="gray">{text.idle(counts.idle)}</Text>
+          <Text color="green">{text.done(counts.done)}</Text>
           <Text color={counts.waiting > 0 ? 'red' : 'gray'} bold={counts.waiting > 0}>
-            {`${counts.waiting} waiting on you`}
+            {text.waiting(counts.waiting)}
           </Text>
           {v.note !== '' && <Text color="yellow">{v.note}</Text>}
-          {v.isLoading && <Text dimColor>(refreshing)</Text>}
+          {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
         </Box>
         {needs.map((need) => (
           <Text key={`need-${need.name}`} color="red" wrap="truncate-end">
             {` ! ${need.name}  ${need.text}`}
           </Text>
         ))}
-        {members.map(({ agent, member }) => (
+        {members.map(({ agent, member }, index) => (
           <Box
             key={`card-${agent.paneKey}`}
             flexDirection="row"
@@ -105,20 +217,36 @@ export const registerFleetPane = (on: On): void => {
                 <Text color={AGENT_COLORS[agent.state]} bold>
                   {agent.displayName}
                 </Text>
-                {agent.isLeader && <Text color={palette.gold}>♛ lead</Text>}
-                <Text color={AGENT_COLORS[agent.state]}>
-                  {agent.state === 'waiting' ? '! waiting' : agent.state}
-                </Text>
+                {agent.isLeader && <Text color={palette.gold}>{`♛ ${text.lead}`}</Text>}
+                <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
                 <Text dimColor>{agent.agentType}</Text>
+                {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
               <Text wrap="truncate-end">{member.says}</Text>
+              {agent.activity !== undefined && (
+                <Link key={`activity-${agent.paneKey}`} href={agent.activity.url}>
+                  <Text
+                    color={agent.activity.running ? 'cyan' : palette.parchment}
+                    wrap="truncate-end"
+                  >
+                    {fitCells(
+                      activityTextOf({
+                        name: agent.activity.name,
+                        label: agent.activity.id,
+                        running: agent.activity.running
+                      }),
+                      cardRoom
+                    )}
+                  </Text>
+                </Link>
+              )}
             </Box>
           </Box>
         ))}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
-              <Text dimColor>Review</Text>
+              <Text dimColor>{text.reviewHeading}</Text>
             </Box>
             <Link href={state.review.url}>
               <Text color={CI_COLORS[state.review.ci]} underline>
@@ -133,7 +261,7 @@ export const registerFleetPane = (on: On): void => {
         {state.workItem !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
-              <Text dimColor>Work item</Text>
+              <Text dimColor>{text.workItemHeading}</Text>
             </Box>
             {state.workItem.url === '' ? (
               <Text>{workItemTextOf(state.workItem)}</Text>
@@ -145,6 +273,18 @@ export const registerFleetPane = (on: On): void => {
             <Text dimColor wrap="truncate-end">
               {state.workItem.title}
             </Text>
+          </Box>
+        )}
+        {projectRows(
+          'project-reviews',
+          reviews === null ? '' : text.myReviews(reviewKindOf(reviews), reviews.total),
+          reviews
+        )}
+        {projectRows('project-todo', todo === null ? '' : text.todo(todo.total), todo)}
+        {links.length > 0 && (
+          <Box key="pane-links" flexDirection="row" gap={1} flexWrap="wrap">
+            <Text dimColor>{text.openHeading}</Text>
+            {links.map(linkButton)}
           </Box>
         )}
         {menuRow}

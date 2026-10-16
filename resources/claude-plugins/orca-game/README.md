@@ -9,11 +9,17 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   rows are hidden unless they fail. `on` (default), `zen` (also hides short working notes) or `off`.
 - **The band** above the prompt: a HUD with the lead as the hero and every teammate in the party
   (walking while it works, hopping with `needs you!` while it waits, hurt while CI is red), counts,
-  the review with its CI, the work item, a `Needs you:` line, and **Panel**, **Refresh** and
-  **Pet Clawd**.
+  the review, its CI, the work item, agent activity and project links as clickable chips, a
+  `Needs you:` line, and **Panel**, **Refresh** and **Pet Clawd**.
 - **The Fleet pane** (Panel): the HUD at full width and one card per agent with its own animated
-  tile, then the review and the work item as links. `r` refreshes, `c` pets Clawd, `q` or Esc closes.
+  tile and activity link, then the review and the work item as links. **Open** takes `i` (work
+  item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
+  tab. `r` refreshes, `p` pets Clawd, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
+  that teammate's Orca pane.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
+- **Allies.** Other plugins keep running: their `$.ui.status` lines, and Jev's advisor state when
+  Jev is installed, become rows of a strip under the band, and their band elements take the scene
+  palette. See `docs/reference/orchestrator-game.md` (Other plugins in a game pane).
 
 ## Origin
 
@@ -21,6 +27,10 @@ Ported from the `o` plugin of `koombea/cineco-orchestrator` by **Jucer Orozco** 
 pixel art, the band and the Fleet pane). Everything specific to that project (Jira, Tambora, cmux,
 the coordination dir, wave/push/sweep actions, autostart) was removed; the fleet now comes only from
 Orca's CLI.
+
+The **Night Watch** (`vigilante`), **Crystal Saga** (`jrpg`) and **Beast Tamer** (`tamer`) scenes
+are also his, from PR #32 of that repo: worlds, costumes, foes, cards and finales, with the
+far-layer drawing (skyline, crystal spires, meadow, the signal) in `hooks/scenery.ts`.
 
 ## How Orca loads it
 
@@ -38,12 +48,17 @@ claude --plugin-dir "$(pwd)/resources/claude-plugins/orca-game"
 
 Read once when the mod loads:
 
-| Variable            | Values                  | Default | Effect                                             |
-| ------------------- | ----------------------- | ------- | -------------------------------------------------- |
-| `ORCA_GAME_MODE`    | `on`, `zen`, `off`      | `on`    | Quest mode                                         |
-| `ORCA_GAME_SCENE`   | a scene id              | `quest` | Art set; an unknown id falls back to `quest`       |
-| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false` | `1`     | `0` hides the band                                 |
-| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false` | `1`     | `0` turns off XP, level-ups and the cheer confetti |
+| Variable            | Values                       | Default | Effect                                                 |
+| ------------------- | ---------------------------- | ------- | ------------------------------------------------------ |
+| `ORCA_GAME_MODE`    | `on`, `zen`, `off`           | `on`    | Quest mode                                             |
+| `ORCA_GAME_SCENE`   | a scene id or `file:<path>`  | `quest` | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false`      | `1`     | `0` hides the band                                     |
+| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false`      | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
+| `ORCA_GAME_LOCALE`  | `en`, `es`, `ja`, `ko`, `zh` | `en`    | Language of the game's words; anything else is English |
+
+The words live in `hooks/game-strings.ts` (English) and `hooks/locales/`. Text drawn inside the
+pixel art (the HUD, the thought bubble) must be width-1 characters, so Japanese, Korean and Chinese
+keep English there and translate everything else.
 
 The `config` that `orca game state` reports overrides the variables while the session runs, and
 `/quest on|zen|off` overrides the mode for the session. `/quest demo` plays a scripted fake party
@@ -65,7 +80,8 @@ entries.
   worktree: { id, path, branch, displayName },
   agents: [{ paneKey, displayName, agentType,
              state: 'working' | 'waiting' | 'idle' | 'done',
-             toolName: string | null, isLeader: boolean }],
+             toolName: string | null, isLeader: boolean,
+             terminalHandle?: string /* term_…, kept only in that shape */ }],
   review: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure-devops' | 'gitea',
             number, title, url,
             state: 'open' | 'draft' | 'merged' | 'closed',
@@ -73,7 +89,7 @@ entries.
   workItem: { provider: 'plane' | 'jira' | 'linear' | 'github' | 'gitlab',
               identifier, title, url, status,
               statusGroup: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled' | 'unknown' } | null,
-  extensions?: { scenes: [{ id: '<pluginKey>/<id>', pluginId, definition: SceneDefinition }] }
+  extensions?: { scenes: [{ id: '<pluginKey>/<id>' | 'file:<path>', pluginId, definition: SceneDefinition }] }
 }
 ```
 
@@ -93,9 +109,10 @@ re-awards: review merged 100, CI turning green 20, work item to review 50, to do
 ## Adding a scene
 
 1. Add `hooks/scenes/<id>.ts` exporting a `SceneDefinition` (`hooks/scenes/scene-definition.ts`):
-   a `Look` (sky, mountains, plants), a ten-column `Costume` and a message `Card` for each phase,
-   the Storyteller card and the band palette.
-2. Add it to `SCENES` in `hooks/scenes/index.ts`.
+   a `Look` (sky, far layer, plants), a ten-column `Costume` and a message `Card` for each phase,
+   the Storyteller card and the band palette; optionally a `foe` for red CI and a merge `finale`.
+2. Add it to `SCENES` in `hooks/scenes/index.ts`, and its id to Orca's
+   `ORCHESTRATOR_GAME_BUILT_IN_SCENES` (with a Settings label) so the picker offers it.
 3. Select it with `ORCA_GAME_SCENE=<id>` or the `scene` setting.
 
 The engine code reads only the definition, so nothing else changes.
@@ -104,6 +121,10 @@ An Orca plugin can also ship a scene as JSON (`contributes.gameScenes`, see
 `docs/reference/plugin-development.md`). Orca serves it in `extensions.scenes` under the id
 `<pluginKey>/<id>`; `hooks/scenes/scene-shape.ts` re-validates it, and `sceneOf` resolves it until
 a poll stops serving it. Any id nothing serves draws `quest`.
+
+A project's own scene file (`orchestratorGame.sceneFile`, see `docs/reference/orchestrator-game.md`)
+arrives the same way under `file:<path in the worktree>` with `pluginId: 'file'`. Colors may be
+integers or `#rrggbb` strings, as Orca's parser takes them.
 
 ## Development
 

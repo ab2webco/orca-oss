@@ -1,4 +1,5 @@
 import type { GameConfig, GameMode } from '../types'
+import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { DEFAULT_SCENE_ID } from './scenes/index'
 
@@ -51,7 +52,42 @@ export const effectiveConfigOf = (
 const ABSOLUTE_PATH = /^(?:\/|[A-Za-z]:[\\/])/
 
 // Why: on Linux a bare `orca` is the GNOME screen reader; only the absolute path Orca hands over is run.
-export const gameStateArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
+const cliOf = (cli: string | null | undefined): string | undefined => {
   const path = cli?.trim() ?? ''
-  return ABSOLUTE_PATH.test(path) ? [path, 'game', 'state', '--json'] : undefined
+  return ABSOLUTE_PATH.test(path) ? path : undefined
+}
+
+export const gameStateArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined ? undefined : [path, 'game', 'state', '--json']
+}
+
+// Orca issues `term_<uuid>`; the shape also keeps a handle from ever reading as a CLI flag.
+const TERMINAL_HANDLE = /^term_[A-Za-z0-9_-]{1,128}$/
+
+export const isTerminalHandle = (value: unknown): value is string =>
+  typeof value === 'string' && TERMINAL_HANDLE.test(value)
+
+export const terminalFocusArgvOf = (
+  cli: string | null | undefined,
+  handle: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined || !isTerminalHandle(handle)
+    ? undefined
+    : [path, 'terminal', 'focus', '--terminal', handle, '--json']
+}
+
+/** Opens a link in a browser tab of the game's worktree, the same on every platform Orca runs on. */
+export const tabCreateArgvOf = (
+  cli: string | null | undefined,
+  url: string,
+  worktreeId: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  if (path === undefined || httpUrlOf(url) === undefined) {
+    return undefined
+  }
+  const worktree = worktreeId === '' ? [] : ['--worktree', `id:${worktreeId}`]
+  return [path, 'tab', 'create', '--url', url, ...worktree, '--json']
 }

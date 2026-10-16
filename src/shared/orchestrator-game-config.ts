@@ -1,3 +1,19 @@
+import {
+  parseGameActivityRules,
+  parseGameLinkTemplates,
+  type OrchestratorGameActivityRule,
+  type OrchestratorGameLinkTemplate
+} from './orchestrator-game-integrations'
+import {
+  parseGameTodoSource,
+  type OrchestratorGameTodoSource
+} from './orchestrator-game-project-work'
+import {
+  orchestratorGameSceneFileErrorText,
+  orchestratorGameSceneFileId,
+  parseOrchestratorGameSceneFile
+} from './orchestrator-game-scene-file'
+
 export type OrchestratorGameMode = 'on' | 'zen' | 'off'
 
 export const ORCHESTRATOR_GAME_MODES: readonly OrchestratorGameMode[] = ['on', 'zen', 'off']
@@ -10,14 +26,35 @@ export type OrchestratorGameConfig = {
   tracker: boolean
 }
 
-export type OrchestratorGameLayer = Partial<OrchestratorGameConfig>
+/** Lists that a later layer replaces whole; kept out of the config so Settings and the env stay scalar. */
+export type OrchestratorGameIntegrations = {
+  links: OrchestratorGameLinkTemplate[]
+  activity: OrchestratorGameActivityRule[]
+  /** Where the band's To Do comes from; null picks it from the repo and its linked work item. */
+  todo: OrchestratorGameTodoSource | null
+}
+
+export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
+  Partial<Omit<OrchestratorGameIntegrations, 'todo'>> & {
+    todo?: OrchestratorGameTodoSource
+    /** A scene JSON relative to the worktree root; read only from the project layers. */
+    sceneFile?: string
+  }
 
 export type OrchestratorGameSource = 'default' | 'global' | 'project' | 'local'
 
 export type ResolvedOrchestratorGameConfig = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
+  /** The worktree path the effective scene is read from, when a scene file won over `scene`. */
+  sceneFile: string | null
+  warnings: string[]
 }
+
+// Why listed here: the bundled mod ships these art sets, so Settings offers them without a plugin.
+export const ORCHESTRATOR_GAME_BUILT_IN_SCENES = ['quest', 'vigilante', 'jrpg', 'tamer'] as const
+
+export type OrchestratorGameBuiltInScene = (typeof ORCHESTRATOR_GAME_BUILT_IN_SCENES)[number]
 
 export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   mode: 'on',
@@ -44,6 +81,8 @@ export function resolveOrchestratorGameConfig(
     keyof OrchestratorGameConfig,
     OrchestratorGameSource
   >
+  let sceneFile: string | null = null
+  const warnings: string[] = []
   for (const source of LAYER_ORDER) {
     const layer = layers[source]
     if (!layer) {
@@ -55,8 +94,52 @@ export function resolveOrchestratorGameConfig(
         sources[key] = source
       }
     }
+    if (layer.scene !== undefined) {
+      sceneFile = null
+    }
+    if (layer.sceneFile === undefined) {
+      continue
+    }
+    // Why: a path means a worktree, which only a project has; a global one would follow every repo.
+    if (source === 'global') {
+      warnings.push(
+        'orchestratorGame.sceneFile is read only from orca.yaml or the project Settings'
+      )
+      continue
+    }
+    const parsed = parseOrchestratorGameSceneFile(layer.sceneFile)
+    if (!parsed.ok) {
+      warnings.push(
+        `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
+      )
+      continue
+    }
+    sceneFile = parsed.path
+    config.scene = orchestratorGameSceneFileId(parsed.path)
+    sources.scene = source
   }
-  return { config, sources }
+  return { config, sources, sceneFile, warnings }
+}
+
+// Why: Settings layers are plain JSON a user can hand-edit, so every layer is re-validated, not only orca.yaml.
+export function resolveOrchestratorGameIntegrations(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
+): OrchestratorGameIntegrations {
+  const resolved: OrchestratorGameIntegrations = { links: [], activity: [], todo: null }
+  for (const source of LAYER_ORDER) {
+    const layer = layers[source]
+    if (layer?.links !== undefined) {
+      resolved.links = parseGameLinkTemplates(layer.links).value ?? []
+    }
+    if (layer?.activity !== undefined) {
+      resolved.activity = parseGameActivityRules(layer.activity).value ?? []
+    }
+    const todo = layer?.todo === undefined ? undefined : parseGameTodoSource(layer.todo).value
+    if (todo !== undefined) {
+      resolved.todo = todo
+    }
+  }
+  return resolved
 }
 
 const isMode = (value: unknown): value is OrchestratorGameMode =>
@@ -87,11 +170,32 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       } else {
         warnings.push('orchestratorGame.scene must be a non-empty scene id')
       }
+    } else if (key === 'sceneFile') {
+      const parsed = parseOrchestratorGameSceneFile(value)
+      if (parsed.ok) {
+        layer.sceneFile = parsed.path
+      } else {
+        warnings.push(
+          `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
+        )
+      }
     } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {
         layer[key] = value
       } else {
         warnings.push(`orchestratorGame.${key} must be true or false`)
+      }
+    } else if (key === 'links' || key === 'activity') {
+      const parsed = key === 'links' ? parseGameLinkTemplates(value) : parseGameActivityRules(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        Object.assign(layer, { [key]: parsed.value })
+      }
+    } else if (key === 'todo') {
+      const parsed = parseGameTodoSource(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value !== undefined) {
+        layer.todo = parsed.value
       }
     } else {
       warnings.push(`orchestratorGame.${key} is not a known setting`)

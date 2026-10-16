@@ -1,4 +1,5 @@
-import type { GameMode } from '../types'
+import type { FlowPhase, GameMode } from '../types'
+import { gameStrings } from './game-strings'
 
 export const QUEST_MODES: readonly GameMode[] = ['off', 'on', 'zen']
 
@@ -17,9 +18,7 @@ export const questCommandOf = (args: string): QuestCommand => {
   if (asked === 'demo') {
     return { demo: true }
   }
-  return isQuestMode(asked)
-    ? { mode: asked }
-    : { error: `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.` }
+  return isQuestMode(asked) ? { mode: asked } : { error: gameStrings().text.unknownMode(asked) }
 }
 
 const field = (input: unknown, key: string): string | undefined => {
@@ -43,33 +42,32 @@ const isEditTool = (tool: string): boolean =>
 export const activityOf = (tool: string, input: unknown): string => {
   const path = field(input, 'file_path') ?? field(input, 'notebook_path')
   const target = path === undefined ? '' : ` ${basename(path)}`
+  const art = gameStrings().art
   switch (tool) {
     case 'Read':
-      return `Reading${target}`
+      return `${art.reading}${target}`
     case 'Edit':
     case 'MultiEdit':
     case 'NotebookEdit':
-      return `Editing${target}`
+      return `${art.editing}${target}`
     case 'Write':
-      return `Writing${target}`
+      return `${art.writing}${target}`
     case 'Bash':
-      return firstLine(
-        field(input, 'description') ?? field(input, 'command') ?? 'Running a command'
-      )
+      return firstLine(field(input, 'description') ?? field(input, 'command') ?? art.runningCommand)
     case 'Grep':
     case 'Glob':
-      return 'Searching the code'
+      return art.searchingCode
     case 'Agent':
     case 'Task':
-      return `Delegating: ${firstLine(field(input, 'description') ?? 'an agent')}`
+      return art.delegating(firstLine(field(input, 'description') ?? art.anAgent))
     case 'WebFetch':
     case 'WebSearch':
-      return 'Researching the web'
+      return art.researchingWeb
     case 'Skill':
-      return `Running ${field(input, 'skill') ?? 'a skill'}`
+      return art.running(field(input, 'skill') ?? art.aSkill)
     default: {
       const mcp = /^mcp__([^_]+(?:_[^_]+)*)__(.+)$/.exec(tool)
-      return mcp === null ? `Using ${tool}` : `Using ${mcp[1]} ${mcp[2]}`
+      return art.using(mcp === null ? tool : `${mcp[1]} ${mcp[2]}`)
     }
   }
 }
@@ -128,7 +126,7 @@ export const restoredNotesOf = (
   return { notes: [...notes], replies: [...replies] }
 }
 
-export type FlowPhase = 'docs' | 'build' | 'verify' | 'pr' | 'handoff'
+export type { FlowPhase }
 
 const DOCS_PATH = /(^|\/)docs\/|\.mdx?$/
 const VERIFY_COMMAND =

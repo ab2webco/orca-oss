@@ -1,5 +1,6 @@
 import type { Register } from 'claude-code'
 
+import { registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
@@ -10,6 +11,7 @@ import { clawdReact, questToolCall, questTurnComplete } from './quest-runtime'
 export const register: Register = (on) => {
   registerQuest(on)
   registerBand(on)
+  registerAllies(on)
   registerFleetPane(on)
 
   on('session.start', async ($, e, next) => {

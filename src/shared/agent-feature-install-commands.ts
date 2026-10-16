@@ -16,13 +16,15 @@ export const ORCA_PLANE_SKILL_NAME = 'orca-plane'
 export const PLANE_AGENT_SKILL_NAMES = [ORCA_PLANE_SKILL_NAME] as const
 export const SWITCH_ACCOUNT_SKILL_NAME = 'switch-account'
 export const SWITCH_ACCOUNT_AGENT_SKILL_NAMES = [SWITCH_ACCOUNT_SKILL_NAME] as const
+export const ORCA_GAME_SCENES_SKILL_NAME = 'orca-game-scenes'
 
 // Why: `skills add` resolves names against the repo it is given, so a fork-only
 // skill asked for from upstream comes back "No matching skills found" — every
 // caller that builds a command from a bare name has to route by name to get here.
 const FORK_ONLY_SKILL_NAMES: ReadonlySet<string> = new Set<string>([
   ORCA_PLANE_SKILL_NAME,
-  SWITCH_ACCOUNT_SKILL_NAME
+  SWITCH_ACCOUNT_SKILL_NAME,
+  ORCA_GAME_SCENES_SKILL_NAME
 ])
 
 export function resolveAgentFeatureSkillRepositoryUrl(skillName: string): string {

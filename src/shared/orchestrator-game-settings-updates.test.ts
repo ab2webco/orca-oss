@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
-  withOrchestratorGameProjectField
+  withOrchestratorGameProjectField,
+  withOrchestratorGameProjectScene
 } from './orchestrator-game-settings-updates'
 
 describe('withOrchestratorGameField', () => {
@@ -25,5 +26,29 @@ describe('withOrchestratorGameProjectField', () => {
     expect(
       withOrchestratorGameProjectField({ repo1: { hud: true } }, 'repo1', 'hud', undefined)
     ).toEqual({})
+  })
+})
+
+describe('withOrchestratorGameProjectScene', () => {
+  it('keeps one scene choice per project: a built-in scene clears the file and back', () => {
+    const withFile = withOrchestratorGameProjectScene(
+      { repo1: { scene: 'jrpg', hud: false } },
+      'repo1',
+      { sceneFile: '.orca/scenes/mario.json' }
+    )
+    expect(withFile).toEqual({ repo1: { sceneFile: '.orca/scenes/mario.json', hud: false } })
+    expect(withOrchestratorGameProjectScene(withFile, 'repo1', { scene: 'tamer' })).toEqual({
+      repo1: { scene: 'tamer', hud: false }
+    })
+  })
+
+  it('inherits by clearing both, and drops a project left with no overrides', () => {
+    expect(
+      withOrchestratorGameProjectScene(
+        { repo1: { sceneFile: 'a.json' }, other: { mode: 'off' } },
+        'repo1',
+        null
+      )
+    ).toEqual({ other: { mode: 'off' } })
   })
 })

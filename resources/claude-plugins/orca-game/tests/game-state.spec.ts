@@ -92,6 +92,22 @@ describe('parseGameState', () => {
     ])
   })
 
+  // Why: the handle goes into the CLI's argv, so only the `term_` shape Orca issues is kept.
+  it('keeps a terminal handle only in the shape Orca issues', () => {
+    const handles = ['term_3f2a-9c_b', '', '--json', 'term_a b', 'term_', 7, 'pty:1']
+    const agents = handles.map((terminalHandle, index) => ({
+      ...STATE.agents[1],
+      paneKey: `tab:${index}`,
+      terminalHandle
+    }))
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => agent.terminalHandle)).toEqual([
+      'term_3f2a-9c_b',
+      ...handles.slice(1).map(() => undefined)
+    ])
+    expect(parsed?.agents[1]).not.toHaveProperty('terminalHandle')
+  })
+
   it('turns an invalid review, work item or config field into null or nothing', () => {
     const parsed = parseGameState(
       JSON.stringify({
@@ -144,11 +160,103 @@ describe('parseGameState', () => {
     ).toEqual([['acme.space/orbit', 'acme.space', 'acme.space/orbit']])
   })
 
+  it("keeps a project's scene file under its file: id, and drops one that claims a plugin", () => {
+    const definition = JSON.parse(JSON.stringify(QUEST_SCENE)) as Record<string, unknown>
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        extensions: {
+          scenes: [
+            { id: 'file:.orca/scenes/my scene.json', pluginId: 'file', definition },
+            { id: 'file:.orca/scenes/a.json', pluginId: 'acme.space', definition },
+            { id: 'file:', pluginId: 'file', definition },
+            { id: 'file:x\u001b.json', pluginId: 'file', definition },
+            { id: `file:${'a'.repeat(513)}`, pluginId: 'file', definition }
+          ]
+        }
+      })
+    )
+    expect(
+      parsed?.extensions.scenes.map((one) => [one.id, one.pluginId, one.definition.id])
+    ).toEqual([['file:.orca/scenes/my scene.json', 'file', 'file:.orca/scenes/my scene.json']])
+  })
+
   it('reads no scenes from a host that sends no extensions or a broken list', () => {
     expect(parseGameState(JSON.stringify(STATE))?.extensions).toEqual({ scenes: [] })
     expect(
       parseGameState(JSON.stringify({ ...STATE, extensions: { scenes: 'all' } }))?.extensions
     ).toEqual({ scenes: [] })
+  })
+
+  it('reads no links and no activity from a host older than them', () => {
+    const parsed = parseGameState(JSON.stringify(STATE))
+    expect(parsed?.links).toEqual([])
+    expect(parsed?.activity).toBeNull()
+    expect(parsed?.agents.every((agent) => !('activity' in agent))).toBe(true)
+  })
+
+  it('reads the links whole and http(s), dropping the malformed ones', () => {
+    const ci = {
+      id: 'ci',
+      kind: 'ci',
+      provider: 'github',
+      label: 'CI',
+      url: 'https://github.com/o/r/pull/42/checks',
+      status: 'failure',
+      tone: 'danger'
+    }
+    const plan = {
+      id: 'project:0',
+      kind: 'project',
+      provider: 'project',
+      label: 'Test plan',
+      url: 'http://tambora.example/projects/CIN'
+    }
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        links: [
+          ci,
+          { ...plan, tone: 'loud', status: 7 },
+          { ...ci, id: 'x1', url: 'javascript:alert(1)' },
+          { ...ci, id: 'x2', url: 'file:///etc/passwd' },
+          { ...ci, id: 'x3', url: 'not a url' },
+          { ...ci, id: 'x4', kind: 'chat' },
+          { ...ci, id: 'x5', label: 42 },
+          { ...ci, id: undefined },
+          'https://github.com',
+          null
+        ]
+      })
+    )
+    expect(parsed?.links).toEqual([ci, plan])
+    expect(parseGameState(JSON.stringify({ ...STATE, links: 'all' }))?.links).toEqual([])
+  })
+
+  it('reads the calling pane and each agent activity, dropping one that is not whole', () => {
+    const activity = {
+      name: 'Tambora',
+      id: 'TR-CIN-12',
+      url: 'https://tambora.example/projects/CIN/testruns/TR-CIN-12',
+      at: 1,
+      running: true
+    }
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        agents: [
+          { ...STATE.agents[0], activity },
+          { ...STATE.agents[1], activity: { ...activity, url: 'javascript:alert(1)' } }
+        ],
+        activity: { ...activity, running: 'yes' }
+      })
+    )
+    expect(parsed?.agents[0]?.activity).toEqual(activity)
+    expect(parsed?.agents[1]).not.toHaveProperty('activity')
+    expect(parsed?.activity).toEqual({ ...activity, running: false })
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, activity: { ...activity, id: '' } }))?.activity
+    ).toBeNull()
   })
 
   it('answers undefined for output that is not a JSON object', () => {

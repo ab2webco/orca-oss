@@ -248,6 +248,22 @@ describe('ClaudeAgentTeamsService', () => {
     expect(next).toMatchObject({ exitCode: 0 })
   })
 
+  it('names the terminals of the team a pane belongs to, following a respawned teammate', async () => {
+    const { service, teamId, token, leaderPane, api } = createServiceWithLeader()
+    const request = (argv: string[]) =>
+      service.handleTmuxCompat({ teamId, token, envPane: leaderPane, argv }, api)
+
+    expect(service.teamHandlesOf('leader-handle')).toEqual(new Set(['leader-handle']))
+    await request(['split-window', '-t', leaderPane, '-h', '-P', '-F', '#{pane_id}', '--', 'cat'])
+    await request(['respawn-pane', '-k', '-t', '%2', '--', 'claude --agent-id a'])
+
+    const team = new Set(['leader-handle', 'teammate-2'])
+    expect(service.teamHandlesOf('leader-handle')).toEqual(team)
+    // Why: a teammate's own band asks with its handle and must see the same team.
+    expect(service.teamHandlesOf('teammate-2')).toEqual(team)
+    expect(service.teamHandlesOf('teammate-1')).toBeNull()
+  })
+
   it('keeps the placeholder handle when the respawn split fails', async () => {
     const { service, teamId, token, leaderPane, api } = createServiceWithLeader()
     const request = (argv: string[], envPane = leaderPane) =>

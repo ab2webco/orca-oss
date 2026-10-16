@@ -27,6 +27,8 @@ const state = (patch: Partial<GameState> = {}): GameState => ({
   config: {},
   warnings: [],
   extensions: { scenes: [] },
+  links: [],
+  activity: null,
   worktree: { id: 'wt-1', path: '/w', branch: 'b', displayName: 'w' },
   agents: [],
   review: null,

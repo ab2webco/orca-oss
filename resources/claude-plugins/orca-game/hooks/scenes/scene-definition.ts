@@ -1,37 +1,32 @@
-import type { FlowPhase } from '../quest-policy'
+import type { PlantKind, Scenery } from '../../types'
 
-export type ScenePhase = FlowPhase | 'working'
+export type {
+  BandPalette,
+  Card,
+  Costume,
+  HudPalette,
+  Look,
+  PlantKind,
+  SceneDefinition,
+  ScenePhase,
+  Scenery
+} from '../../types'
 
-export type Look = {
-  skyTop: number
-  skyBottom: number
-  sun: number
-  isNight: boolean
-  far: number
-  snow: number
-  near: number
-  ground: number
-  plant: number
-  plantKind: 'tree' | 'cactus' | 'none'
-  cloud: number
+// Records, so the type check fails when the contract's unions and these lists drift.
+const PLANT_KIND_SET: Readonly<Record<PlantKind, true>> = {
+  tree: true,
+  cactus: true,
+  none: true,
+  antenna: true,
+  crystal: true,
+  flower: true
 }
+export const PLANT_KINDS = Object.keys(PLANT_KIND_SET) as readonly PlantKind[]
 
-// Ten columns wide; each glyph names a key of `colors`, '.' is transparent.
-export type Costume = {
-  rows: readonly string[]
-  legs: readonly [string, string]
-  colors: Readonly<Record<string, number>>
+const SCENERY_SET: Readonly<Record<Scenery, true>> = {
+  peaks: true,
+  skyline: true,
+  crystals: true,
+  meadow: true
 }
-
-export type Card = { icon: string; name: string; color: string }
-
-export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
-
-export type SceneDefinition = {
-  id: string
-  looks: Readonly<Record<ScenePhase, Look>>
-  costumes: Readonly<Record<ScenePhase, Costume>>
-  cards: Readonly<Record<ScenePhase, Card>>
-  teller: Card
-  band: BandPalette
-}
+export const SCENERIES = Object.keys(SCENERY_SET) as readonly Scenery[]

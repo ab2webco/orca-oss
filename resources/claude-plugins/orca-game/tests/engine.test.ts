@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { VIGILANTE_SCENE } from '../hooks/scenes/vigilante'
 
 const VIEWPORT = { columns: 170, rows: 40, isFullscreen: true } as const
 const BAND = {
@@ -153,8 +154,11 @@ describe('band', () => {
     expect(await ui.find({ type: 'Text', text: /^1 waiting on you$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /#42 open · CI failing/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /ORCA-580 In Progress/ })).toBeDefined()
-    const needs = /Needs you: tester waiting on you · #42 CI failing/
-    expect(await ui.find({ type: 'Text', text: needs })).toBeDefined()
+    const needs = await ui.find({ type: 'Box', key: 'band-needs' })
+    expect(await ui.find({ type: 'Text', text: /^Needs you:$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^tester waiting on you$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^#42 CI failing$/ })).toBeDefined()
+    expect(needs).toBeDefined()
     await ui.press({ key: 'band-refresh' })
     await clock.settle()
     expect(polls(world)).toBe(2)
@@ -249,6 +253,36 @@ describe('band', () => {
   })
 })
 
+describe('fleet pane', () => {
+  test('View focuses a teammate pane through the Orca CLI; a tile with no valid handle has none', async ($, on) => {
+    const agents = [
+      { ...agent('lead', 'working', 'Edit', true), terminalHandle: 'term_lead' },
+      { ...agent('builder', 'working', 'Edit'), terminalHandle: 'term_builder' },
+      { ...agent('tester', 'waiting', null), terminalHandle: '--help' }
+    ]
+    const world = worldOf({ stdout: JSON.stringify({ ...STATE, agents }) })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Button', key: 'view-tab-1:lead' })).toBeDefined()
+    expect(await pane.find({ type: 'Button', key: 'view-tab-1:builder' })).toBeDefined()
+    expect(await pane.find({ key: 'view-tab-1:tester' })).toBeUndefined()
+    await pane.press({ key: 'view-tab-1:builder' })
+    await clock.settle()
+    expect(world.calls).toContainEqual([
+      ORCA_CLI,
+      'terminal',
+      'focus',
+      '--terminal',
+      'term_builder',
+      '--json'
+    ])
+    await pane.unmount()
+  })
+})
+
 describe('quest mode', () => {
   test('ORCA_GAME_MODE=off starts plain, and /quest overrides it for the session', async ($, on) => {
     const world = worldOf({ env: { ORCA_GAME_MODE: 'off' } })
@@ -291,6 +325,100 @@ describe('quest mode', () => {
     const real = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
     expect(await real.find({ type: 'Text', text: /^Team 2 teammates$/ })).toBeDefined()
     await real.unmount()
+  })
+})
+
+describe('language', () => {
+  test('ORCA_GAME_LOCALE=es speaks Spanish in the band, the pane and /quest', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Raster' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Equipo: 2 compañeros$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^1 trabajando$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^1 te espera$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /#42 abierto · CI fallando/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ORCA-580 In Progress/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: / ↻ Actualizar / })).toBeDefined()
+    await ui.unmount()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Text', text: /^ ✕ Cerrar $/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /^builder$/ })).toBeDefined()
+    await pane.unmount()
+    const loud = await $.command.run({ command: 'quest', args: 'loud' } as never)
+    expect(loud).toMatchObject({ text: expect.stringMatching(/^Modo desconocido/) })
+  })
+
+  // Why: a Raster refuses characters drawn two columns wide, so CJK keeps English pixel art.
+  test('ORCA_GAME_LOCALE=ja translates the text and still draws the art', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'ja' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Raster' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^チーム 2 人$/ })).toBeDefined()
+    await ui.unmount()
+    const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
+    expect(await spinner.find({ type: 'Raster' })).toBeDefined()
+    await spinner.unmount()
+  })
+
+  test('a reply card names its character in the launch language', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const reply = await $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AssistantMessage',
+      viewport: VIEWPORT,
+      props: { text: 'Listo.', isFirstOfReply: true }
+    })
+    // The open review puts the fleet in the pr phase, whose character is the Herald.
+    expect(await reply.find({ type: 'Text', text: /^✉ Heraldo$/ })).toBeDefined()
+    await reply.unmount()
+  })
+
+  test('ORCA_GAME_SCENE=vigilante paints its band and signs replies as its characters', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_SCENE: 'vigilante', ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    const panel = await ui.find({ type: 'Text', text: / ▤ Panel / })
+    expect(panel?.props.backgroundColor).toBe(VIGILANTE_SCENE.band.gold)
+    await ui.unmount()
+    const reply = await $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AssistantMessage',
+      viewport: VIEWPORT,
+      props: { text: 'Listo.', isFirstOfReply: true }
+    })
+    expect(await reply.find({ type: 'Text', text: /^↗ Carrera en azoteas$/ })).toBeDefined()
+    await reply.unmount()
+    const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
+    expect(await spinner.find({ type: 'Raster' })).toBeDefined()
+    await spinner.unmount()
+  })
+
+  test('an unknown ORCA_GAME_LOCALE falls back to English', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'fr' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Text', text: /^Team 2 teammates$/ })).toBeDefined()
+    await ui.unmount()
   })
 })
 

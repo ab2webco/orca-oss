@@ -1,0 +1,249 @@
+{
+  "looks": {
+    "working": {
+      "skyTop": "#4a7fc1",
+      "skyBottom": "#a9d4f5",
+      "sun": "#ffe08a",
+      "isNight": false,
+      "far": "#6d7f99",
+      "snow": "#f2f5fa",
+      "near": "#4f8a55",
+      "ground": "#6b4f35",
+      "plant": "#2f6b3a",
+      "plantKind": "tree",
+      "cloud": "#f4f7fb"
+    },
+    "docs": {
+      "skyTop": "#2b3a67",
+      "skyBottom": "#f6a77a",
+      "sun": "#ffc977",
+      "isNight": false,
+      "far": "#5b4a7a",
+      "snow": "#e9dcf2",
+      "near": "#3f5f4a",
+      "ground": "#4a3a2c",
+      "plant": "#2c4a36",
+      "plantKind": "tree",
+      "cloud": "#f7c9b0"
+    },
+    "build": {
+      "skyTop": "#3b8fd6",
+      "skyBottom": "#bfe6ff",
+      "sun": "#fff1a8",
+      "isNight": false,
+      "far": "#6b7f99",
+      "snow": "#ffffff",
+      "near": "#3f8f4a",
+      "ground": "#7a5a3a",
+      "plant": "#1f5e2c",
+      "plantKind": "tree",
+      "cloud": "#ffffff"
+    },
+    "verify": {
+      "skyTop": "#6fb3f2",
+      "skyBottom": "#ffe0a3",
+      "sun": "#fff3c4",
+      "isNight": false,
+      "far": "#c46a3a",
+      "snow": "#e8955e",
+      "near": "#d9a35f",
+      "ground": "#e0b36a",
+      "plant": "#3d7a3a",
+      "plantKind": "cactus",
+      "cloud": "#fff7e6"
+    },
+    "pr": {
+      "skyTop": "#3b1e5f",
+      "skyBottom": "#ff7a59",
+      "sun": "#ff4f3a",
+      "isNight": false,
+      "far": "#2d1f3d",
+      "snow": "#7a4a6a",
+      "near": "#4a2f3f",
+      "ground": "#2a1c26",
+      "plant": "#1c1420",
+      "plantKind": "tree",
+      "cloud": "#ff9f86"
+    },
+    "handoff": {
+      "skyTop": "#0b1030",
+      "skyBottom": "#253a6b",
+      "sun": "#e8ecff",
+      "isNight": true,
+      "far": "#1c2540",
+      "snow": "#9aa8d0",
+      "near": "#182a2a",
+      "ground": "#10201c",
+      "plant": "#0c1814",
+      "plantKind": "tree",
+      "cloud": "#34406b"
+    }
+  },
+  "costumes": {
+    "working": {
+      "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "H": "#3f6e46",
+        "B": "#5f7f3a"
+      }
+    },
+    "docs": {
+      "rows": ["....P.....", "...PYP...T", ".PPPPPPP.Y", ".OEOOOEO.T", "ORWWWWWROT", ".RRWWWRR.T"],
+      "legs": [".RRRRRRR.T", "RRRRRRRRRT"],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "P": "#5b3fa8",
+        "Y": "#ffd84a",
+        "R": "#3e2a78",
+        "W": "#f2f2f2",
+        "T": "#7a5230"
+      }
+    },
+    "build": {
+      "rows": ["..........", "..DDDDD...", ".DDDDDDD..", ".OEOOOEO.G", "OAAAAAAAOT", ".AAAAAAA.T"],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "D": "#4a2f1c",
+        "A": "#8a5a2b",
+        "G": "#9aa3ab",
+        "T": "#6b4a2b"
+      }
+    },
+    "verify": {
+      "rows": ["....M.....", "..SSSSS...", ".SSSSSSS..", ".SKSSSKS..", "OTTTXTTTO.", ".TTTXTTT.."],
+      "legs": [".S.S.S.S..", "S.S.S.S.S."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "M": "#d83a2e",
+        "S": "#c3ccd6",
+        "K": "#1a1a1a",
+        "T": "#2c5aa0",
+        "X": "#f4f4f4"
+      }
+    },
+    "pr": {
+      "rows": ["......F...", "..CCCCC...", ".CCCCCCC..", ".OEOOOEO.P", "OGGGGGGGOP", ".GGGGGGG.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "F": "#ffffff",
+        "C": "#2e7d4f",
+        "G": "#d4a017",
+        "P": "#f1e2b8"
+      }
+    },
+    "handoff": {
+      "rows": [".Y.Y.Y.Y..", ".YYYYYYY..", ".YJYYYJY..", ".OEOOOEO..", "RNNNNNNNR.", ".RRRRRRR.."],
+      "legs": [".O.O.O.O..", "O.O.O.O.O."],
+      "colors": {
+        "O": "#d77757",
+        "E": "#1a1a1a",
+        "Y": "#f5c518",
+        "J": "#d8283a",
+        "R": "#a3202a",
+        "N": "#f4f1ea"
+      }
+    }
+  },
+  "cards": {
+    "working": {
+      "icon": "◆",
+      "name": {
+        "en": "Squire",
+        "es": "Escudero",
+        "ja": "従者",
+        "ko": "종자",
+        "zh": "侍从"
+      },
+      "color": "#7fa86a"
+    },
+    "docs": {
+      "icon": "✦",
+      "name": {
+        "en": "Sage",
+        "es": "Sabio",
+        "ja": "賢者",
+        "ko": "현자",
+        "zh": "贤者"
+      },
+      "color": "#9a7fe0"
+    },
+    "build": {
+      "icon": "⚒",
+      "name": {
+        "en": "Blacksmith",
+        "es": "Herrero",
+        "ja": "鍛冶屋",
+        "ko": "대장장이",
+        "zh": "铁匠"
+      },
+      "color": "#d98a3d"
+    },
+    "verify": {
+      "icon": "⚔",
+      "name": {
+        "en": "Knight",
+        "es": "Caballero",
+        "ja": "騎士",
+        "ko": "기사",
+        "zh": "骑士"
+      },
+      "color": "#5b8fd6"
+    },
+    "pr": {
+      "icon": "✉",
+      "name": {
+        "en": "Herald",
+        "es": "Heraldo",
+        "ja": "伝令",
+        "ko": "전령",
+        "zh": "传令官"
+      },
+      "color": "#3fae6f"
+    },
+    "handoff": {
+      "icon": "♛",
+      "name": {
+        "en": "King",
+        "es": "Rey",
+        "ja": "王",
+        "ko": "왕",
+        "zh": "国王"
+      },
+      "color": "#e0b020"
+    }
+  },
+  "teller": {
+    "icon": "❝",
+    "name": {
+      "en": "Storyteller",
+      "es": "Narrador",
+      "ja": "語り部",
+      "ko": "이야기꾼",
+      "zh": "说书人"
+    },
+    "color": "#8f9bb3"
+  },
+  "band": {
+    "gold": "#c9a24a",
+    "ink": "#1a1f33",
+    "panel": "#2b3150",
+    "parchment": "#f1e2b8"
+  },
+  "hud": {
+    "skyTop": "#1a1f33",
+    "skyBottom": "#2b3150",
+    "frame": "#c9a24a",
+    "text": "#f1e2b8",
+    "dim": "#8a90a8",
+    "star": "#f5f3c8"
+  }
+}

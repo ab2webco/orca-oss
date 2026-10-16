@@ -2,6 +2,7 @@ import type { AgentStatusState } from './agent-status-types'
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
+import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 
@@ -14,6 +15,16 @@ export type GameStatusGroup =
   | 'cancelled'
   | 'unknown'
 
+/** The latest id an agent's MCP calls mentioned that a rule turned into a link. */
+export type GameActivity = {
+  name: string
+  id: string
+  url: string
+  at: number
+  /** True between the tool's PreToolUse and PostToolUse. */
+  running: boolean
+}
+
 export type GameAgent = {
   paneKey: string
   displayName: string | null
@@ -21,6 +32,10 @@ export type GameAgent = {
   state: 'working' | 'waiting' | 'idle' | 'done'
   toolName: string | null
   isLeader: boolean
+  /** Optional on the wire: older hosts send none, and a pane with no terminal gets none. */
+  terminalHandle?: string
+  /** Optional on the wire: older hosts send none, and an agent no rule matched gets none. */
+  activity?: GameActivity
 }
 
 export type GameReview = {
@@ -41,6 +56,21 @@ export type GameWorkItem = {
   statusGroup: GameStatusGroup
 }
 
+export type GameLinkKind = 'review' | 'ci' | 'workItem' | 'project' | 'activity'
+
+export type GameLinkTone = 'neutral' | 'pending' | 'success' | 'danger'
+
+/** A clickable integration of the worktree; `url` is always http(s). */
+export type GameLink = {
+  id: string
+  kind: GameLinkKind
+  provider: string
+  label: string
+  url: string
+  status?: string
+  tone?: GameLinkTone
+}
+
 export type OrchestratorGameState = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
@@ -51,6 +81,12 @@ export type OrchestratorGameState = {
   workItem: GameWorkItem | null
   /** Optional on the wire: a host older than plugin scenes sends none. */
   extensions?: { scenes: OrchestratorGameSceneExtension[] }
+  /** Optional on the wire: a host older than game links sends none. */
+  links?: GameLink[]
+  /** The calling pane's own activity; optional on the wire like `links`. */
+  activity?: GameActivity
+  /** My open PRs and tickets across the project; absent with the tracker off or from an older host. */
+  project?: GameProjectWork
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i
@@ -113,7 +149,8 @@ export function gameAgentOf(
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
   >,
-  leaderPaneKey: string | null
+  leaderPaneKey: string | null,
+  terminalHandle: string | null = null
 ): GameAgent {
   return {
     paneKey: row.paneKey,
@@ -121,7 +158,8 @@ export function gameAgentOf(
     agentType: row.agentType,
     state: AGENT_STATES[row.state] ?? 'idle',
     toolName: row.toolName,
-    isLeader: row.paneKey === leaderPaneKey
+    isLeader: row.paneKey === leaderPaneKey,
+    ...(terminalHandle ? { terminalHandle } : {})
   }
 }
 

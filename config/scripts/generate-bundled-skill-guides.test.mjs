@@ -83,6 +83,7 @@ describe('bundled skill guide generator', () => {
       'orca-cli': ['ORCA status --json', 'ORCA terminal list --json'],
       'orca-emulator': ['ORCA emulator list --json'],
       'orca-emulator-android': ['ORCA emulator devices --json'],
+      'orca-game-scenes': ['ORCA game state --json'],
       'orca-linear': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
       'orca-per-workspace-env': ['ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json'],
       'orca-plane': ['ORCA plane --help'],

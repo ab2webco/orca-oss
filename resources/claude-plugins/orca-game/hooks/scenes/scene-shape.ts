@@ -1,10 +1,14 @@
-import type {
-  BandPalette,
-  Card,
-  Costume,
-  Look,
-  SceneDefinition,
-  ScenePhase
+import { GAME_LOCALES, isRasterText, type GameLocale, type LocalizedName } from '../game-strings'
+import {
+  PLANT_KINDS,
+  SCENERIES,
+  type BandPalette,
+  type Card,
+  type Costume,
+  type HudPalette,
+  type Look,
+  type SceneDefinition,
+  type ScenePhase
 } from './scene-definition'
 
 // Re-validates a scene Orca served, so bad data drops the scene instead of crashing the mod.
@@ -13,6 +17,8 @@ type Shape = Record<string, unknown>
 
 const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 const COSTUME_ROWS = 6
+const NAME_MAX = 32
+const FINALE_MAX = 24
 const SPRITE_ROW = /^[!-~]{10}$/
 const GLYPH = /^[!-~]$/
 const HEX = /^#[0-9a-fA-F]{6}$/
@@ -27,13 +33,19 @@ const LOOK_COLORS = [
   'plant',
   'cloud'
 ] as const
-const PLANTS: readonly Look['plantKind'][] = ['tree', 'cactus', 'none']
 
 const isShape = (value: unknown): value is Shape =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const isColor = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffff
+// Why both, as Orca's parser: JSON has no hex literals, so a hand-written scene says '#rrggbb'.
+const colorOf = (value: unknown): number | undefined => {
+  if (typeof value === 'string') {
+    return HEX.test(value) ? Number.parseInt(value.slice(1), 16) : undefined
+  }
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffff
+    ? value
+    : undefined
+}
 
 // Why: card names reach the terminal verbatim; control, C1 and bidi characters could rewrite it.
 const isSafeCode = (code: number): boolean =>
@@ -57,15 +69,24 @@ const lookOf = (value: unknown): Look | undefined => {
   if (!isShape(value) || typeof value.isNight !== 'boolean') {
     return undefined
   }
-  const plantKind = PLANTS.find((one) => one === value.plantKind)
-  if (plantKind === undefined || !LOOK_COLORS.every((key) => isColor(value[key]))) {
+  const plantKind = PLANT_KINDS.find((one) => one === value.plantKind)
+  const colors = Object.fromEntries(LOOK_COLORS.map((key) => [key, colorOf(value[key])]))
+  if (plantKind === undefined || !LOOK_COLORS.every((key) => colors[key] !== undefined)) {
     return undefined
   }
-  const colors = Object.fromEntries(LOOK_COLORS.map((key) => [key, value[key]])) as Record<
-    (typeof LOOK_COLORS)[number],
-    number
-  >
-  return { ...colors, isNight: value.isNight, plantKind }
+  const scenery = SCENERIES.find((one) => one === value.scenery)
+  const hasScenery = value.scenery !== undefined
+  const hasSignal = value.isSignal !== undefined
+  if ((hasScenery && scenery === undefined) || (hasSignal && typeof value.isSignal !== 'boolean')) {
+    return undefined
+  }
+  return {
+    ...(colors as Record<(typeof LOOK_COLORS)[number], number>),
+    isNight: value.isNight,
+    plantKind,
+    ...(scenery === undefined ? {} : { scenery }),
+    ...(typeof value.isSignal === 'boolean' ? { isSignal: value.isSignal } : {})
+  }
 }
 
 const rowsOf = (value: unknown, count: number): string[] | undefined =>
@@ -81,11 +102,15 @@ const costumeOf = (value: unknown): Costume | undefined => {
   }
   const rows = rowsOf(value.rows, COSTUME_ROWS)
   const legs = rowsOf(value.legs, 2)
-  const entries = Object.entries(value.colors)
+  const entries = Object.entries(value.colors).map(
+    ([glyph, color]) => [glyph, colorOf(color)] as const
+  )
   if (rows === undefined || legs === undefined || legs[0] === undefined || legs[1] === undefined) {
     return undefined
   }
-  if (!entries.every(([glyph, color]) => GLYPH.test(glyph) && glyph !== '.' && isColor(color))) {
+  if (
+    !entries.every(([glyph, color]) => GLYPH.test(glyph) && glyph !== '.' && color !== undefined)
+  ) {
     return undefined
   }
   const colors = Object.fromEntries(entries) as Record<string, number>
@@ -99,12 +124,47 @@ const costumeOf = (value: unknown): Costume | undefined => {
 const hexOf = (value: unknown): string | undefined =>
   typeof value === 'string' && HEX.test(value) ? value : undefined
 
+// Why: Orca strips languages it does not ship, so an unknown key is ignored, not a failure.
+const nameOf = (value: unknown, max = NAME_MAX): LocalizedName | undefined => {
+  if (!isShape(value)) {
+    return textOf(value, max)
+  }
+  const en = textOf(value.en, max)
+  if (en === undefined) {
+    return undefined
+  }
+  const name: { en: string } & Partial<Record<GameLocale, string>> = { en }
+  for (const locale of GAME_LOCALES) {
+    const said = value[locale]
+    if (locale === 'en' || said === undefined) {
+      continue
+    }
+    const text = textOf(said, max)
+    if (text === undefined) {
+      return undefined
+    }
+    name[locale] = text
+  }
+  return name
+}
+
+// Why width-1: a Raster refuses the whole frame over one wide character.
+const finaleOf = (value: unknown): LocalizedName | undefined => {
+  const finale = nameOf(value, FINALE_MAX)
+  const texts = typeof finale === 'object' ? Object.values(finale) : [finale]
+  return texts.every((one) => one !== undefined && isRasterText(one)) ? finale : undefined
+}
+
+// Absent stays absent; present but invalid drops the scene, as Orca's schema does.
+const optionalOf = <T>(value: unknown, of: (one: unknown) => T | undefined): T | null | undefined =>
+  value === undefined ? undefined : (of(value) ?? null)
+
 const cardOf = (value: unknown): Card | undefined => {
   if (!isShape(value)) {
     return undefined
   }
   const icon = textOf(value.icon, 4)
-  const name = textOf(value.name, 32)
+  const name = nameOf(value.name)
   const color = hexOf(value.color)
   return icon && name && color ? { icon, name, color } : undefined
 }
@@ -118,6 +178,18 @@ const bandOf = (value: unknown): BandPalette | undefined => {
   const panel = hexOf(value.panel)
   const parchment = hexOf(value.parchment)
   return gold && ink && panel && parchment ? { gold, ink, panel, parchment } : undefined
+}
+
+const HUD_COLORS = ['skyTop', 'skyBottom', 'frame', 'text', 'dim', 'star'] as const
+
+const hudOf = (value: unknown): HudPalette | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const colors = HUD_COLORS.map((key) => [key, colorOf(value[key])] as const)
+  return colors.every(([, one]) => one !== undefined)
+    ? (Object.fromEntries(colors) as HudPalette)
+    : undefined
 }
 
 const byPhaseOf = <T>(
@@ -143,10 +215,32 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const cards = byPhaseOf(value.cards, cardOf)
     const teller = cardOf(value.teller)
     const band = bandOf(value.band)
-    if (!looks || !costumes || !cards || !teller || !band) {
+    const foe = optionalOf(value.foe, costumeOf)
+    const finale = optionalOf(value.finale, finaleOf)
+    const hud = optionalOf(value.hud, hudOf)
+    if (
+      !looks ||
+      !costumes ||
+      !cards ||
+      !teller ||
+      !band ||
+      foe === null ||
+      finale === null ||
+      hud === null
+    ) {
       return undefined
     }
-    return { id, looks, costumes, cards, teller, band }
+    return {
+      id,
+      looks,
+      costumes,
+      cards,
+      teller,
+      band,
+      ...(foe === undefined ? {} : { foe }),
+      ...(finale === undefined ? {} : { finale }),
+      ...(hud === undefined ? {} : { hud })
+    }
   } catch {
     return undefined
   }

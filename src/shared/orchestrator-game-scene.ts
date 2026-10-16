@@ -18,10 +18,13 @@ export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')
 // Why both: JSON has no hex literals, so authors write '#rrggbb'; the mod always receives a number.
-const color = z.union([
-  z.number().int().min(0).max(0xffffff),
-  hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
-])
+const color = z.union(
+  [
+    z.number().int().min(0).max(0xffffff),
+    hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
+  ],
+  { error: 'must be a #rrggbb color or an integer from 0 to 16777215' }
+)
 // Why: names reach the terminal verbatim, so control and bidi characters could rewrite the screen.
 const displayText = (max: number) =>
   z
@@ -51,8 +54,10 @@ const lookSchema = z.object({
   near: color,
   ground: color,
   plant: color,
-  plantKind: z.enum(['tree', 'cactus', 'none']),
-  cloud: color
+  plantKind: z.enum(['tree', 'cactus', 'none', 'antenna', 'crystal', 'flower']),
+  cloud: color,
+  scenery: z.enum(['peaks', 'skyline', 'crystals', 'meadow']).optional(),
+  isSignal: z.boolean().optional()
 })
 
 const costumeSchema = z
@@ -72,7 +77,48 @@ const costumeSchema = z
     }
   })
 
-const cardSchema = z.object({ icon: displayText(4), name: displayText(32), color: hexColor })
+const sceneName = displayText(32)
+// Why: the mod shows the name in Orca's UI language; unknown languages are stripped, not rejected.
+const localizedSceneName = z.union([
+  sceneName,
+  z.object({
+    en: sceneName,
+    es: sceneName.optional(),
+    ja: sceneName.optional(),
+    ko: sceneName.optional(),
+    zh: sceneName.optional()
+  })
+])
+
+const cardSchema = z.object({ icon: displayText(4), name: localizedSceneName, color: hexColor })
+
+// Mirrors the mod's isRasterText: Latin, punctuation, box drawing and blocks, ★ and card suits.
+const isPixelArtCode = (code: number): boolean =>
+  (code >= 0x20 && code < 0x7f) ||
+  (code >= 0xa0 && code < 0x300) ||
+  (code >= 0x2010 && code <= 0x2027) ||
+  (code >= 0x2500 && code <= 0x25ff) ||
+  code === 0x2605 ||
+  (code >= 0x2660 && code <= 0x2667)
+// Why: the finale is painted into the pixel art, which refuses a frame with a wide character.
+const pixelArtText = z
+  .string()
+  .min(1)
+  .max(24)
+  .refine(
+    (value) => [...value].every((one) => isPixelArtCode(one.codePointAt(0) ?? 0)),
+    'must be width-1 characters (Latin, punctuation, box drawing, ★ or card suits)'
+  )
+const finaleSchema = z.union([
+  pixelArtText,
+  z.object({
+    en: pixelArtText,
+    es: pixelArtText.optional(),
+    ja: pixelArtText.optional(),
+    ko: pixelArtText.optional(),
+    zh: pixelArtText.optional()
+  })
+])
 
 const byPhase = <T extends z.ZodType>(schema: T) =>
   z.object({
@@ -90,7 +136,19 @@ const sceneFileSchema = z.object({
   costumes: byPhase(costumeSchema),
   cards: byPhase(cardSchema),
   teller: cardSchema,
-  band: z.object({ gold: hexColor, ink: hexColor, panel: hexColor, parchment: hexColor })
+  band: z.object({ gold: hexColor, ink: hexColor, panel: hexColor, parchment: hexColor }),
+  foe: costumeSchema.optional(),
+  finale: finaleSchema.optional(),
+  hud: z
+    .object({
+      skyTop: color,
+      skyBottom: color,
+      frame: color,
+      text: color,
+      dim: color,
+      star: color
+    })
+    .optional()
 })
 
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & { id: string }
@@ -105,6 +163,20 @@ export type OrchestratorGameSceneSource = { pluginId: string; id: string } & (
   | { text: string }
   | { error: string }
 )
+
+/** Every reason Orca would refuse `text` as a scene, each as `path: message`; empty when valid. */
+export function orchestratorGameSceneIssues(text: string): string[] {
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return ['not valid JSON']
+  }
+  const parsed = sceneFileSchema.safeParse(raw)
+  return parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+}
 
 export function parseOrchestratorGameScene(
   text: string,

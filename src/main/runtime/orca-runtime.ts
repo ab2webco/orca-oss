@@ -652,8 +652,17 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import {
+  GameProjectWorkCache,
+  myOpenPullRequestsOf,
+  planeWorkspaceIdOf,
+  readGameProjectWork,
+  type GameProjectWorkPort
+} from './orchestrator-game-project-work'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
+import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -883,6 +892,7 @@ import {
   updateIssue as updateJiraIssue
 } from '../jira/issues'
 import { connect as connectPlane } from '../plane/client'
+import { getWorkspaceFile as getPlaneWorkspaceFile } from '../plane/plane-workspace-store'
 import {
   disconnect as disconnectPlane,
   selectWorkspace as selectPlaneWorkspace,
@@ -3571,6 +3581,10 @@ export class OrcaRuntimeService {
   private readonly subscribeAgentStatusEventsFn:
     | ((listener: (event: AgentStatusEventSource) => void) => () => void)
     | null
+  private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
+  private readonly gameActivityMemory = new GameActivityMemory()
+  // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
+  private readonly gameProjectWork = new GameProjectWorkCache(90_000)
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -3650,6 +3664,8 @@ export class OrcaRuntimeService {
       onTerminalAgentStatus?: (event: RuntimeTerminalAgentStatusEvent) => void
       // Why: `orca events` reads the hook pipeline, which lives outside the runtime.
       subscribeAgentStatusEvents?: (listener: (event: AgentStatusEventSource) => void) => () => void
+      // Why: the game's activity rules read recent MCP calls the hook server keeps in memory.
+      readGameMcpCalls?: (paneKey: string) => readonly GameActivityCall[]
       onTerminalSideEffects?: (batch: TerminalSideEffectBatch) => void
       // Why: agent status mostly arrives via hooks (agent-hooks/server), not OSC
       // terminal output. worktree.ps reads this at query time so mobile shows the
@@ -3734,6 +3750,7 @@ export class OrcaRuntimeService {
     this.onPtyStopped = deps?.onPtyStopped ?? null
     this.onTerminalAgentStatus = deps?.onTerminalAgentStatus ?? null
     this.subscribeAgentStatusEventsFn = deps?.subscribeAgentStatusEvents ?? null
+    this.readGameMcpCallsFn = deps?.readGameMcpCalls ?? null
     this.buildAgentHookPtyEnv = deps?.buildAgentHookPtyEnv ?? null
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
@@ -27799,7 +27816,8 @@ export class OrcaRuntimeService {
                     ? () =>
                         this.prepareOrchestratorGameFor({
                           repoId: workspace.repo?.id ?? null,
-                          worktreePath: workspace.path
+                          worktreePath: workspace.path,
+                          connectionId: null
                         })
                     : undefined
               })
@@ -30140,12 +30158,15 @@ export class OrcaRuntimeService {
     const summary = worktree
       ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
       : undefined
+    const callerHandle =
+      args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
     return await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       worktree: worktree
         ? {
             id: worktree.id,
             repoId: worktree.repoId ?? null,
+            connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null,
             path: worktree.path,
             branch: summary?.branch ?? worktree.branch ?? '',
             displayName: summary?.displayName ?? worktree.displayName ?? '',
@@ -30154,7 +30175,28 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       leaderPaneKey: args.paneKey ?? null,
+      terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+      teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
+      mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
+      activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readProjectWork: async ({ todo, workItem }) => {
+        const repoId = worktree?.repoId
+        if (!repoId) {
+          return { reviews: null, todo: null }
+        }
+        const planeProject =
+          Object.entries(this.store?.getSettings?.()?.planeProjectRepoLinks ?? {}).find(
+            ([, linkedRepoId]) => linkedRepoId === repoId
+          )?.[0] ?? null
+        const trackerKey = workItem
+          ? `${workItem.provider}:${workItem.identifier.split('-')[0]}`
+          : ''
+        const key = JSON.stringify([repoId, todo, planeProject, trackerKey])
+        return await this.gameProjectWork.read(key, () =>
+          readGameProjectWork(this.gameProjectWorkPortFor(repoId), { todo, workItem, planeProject })
+        )
+      },
       readReview: async () =>
         worktree?.repoId && summary?.branch
           ? await this.getHostedReviewForBranch({
@@ -30229,6 +30271,55 @@ export class OrcaRuntimeService {
     })
   }
 
+  private gameProjectWorkPortFor(repoId: string): GameProjectWorkPort {
+    const selector = `id:${repoId}`
+    // Why: a folder workspace has no remote, so it has no PRs or repo issues, only tracker items.
+    const isFolder = this.store?.getRepo(repoId)?.kind === 'folder'
+    return {
+      githubRepo: async () => (isFolder ? null : await this.getRepoSlug(selector)),
+      githubPullRequests: async () => {
+        const repo = await this.resolveRepoSelector(selector)
+        return myOpenPullRequestsOf((preference) =>
+          listWorkItems(
+            repo.path,
+            20,
+            'author:@me is:pr is:open',
+            undefined,
+            preference,
+            repo.connectionId ?? null,
+            undefined,
+            ...this.getLocalGitExecutionOptionArgs(repo)
+          )
+        )
+      },
+      githubChecks: (pr) =>
+        this.getRepoPRChecks(selector, pr.number, pr.headSha, pr.prRepo ?? null),
+      githubIssues: async () =>
+        (await this.listRepoWorkItems(selector, 20, 'assignee:@me is:issue is:open')).items.filter(
+          (item) => item.type === 'issue'
+        ),
+      gitlabMergeRequests: async () => {
+        if (isFolder) {
+          return null
+        }
+        const result = await this.listGitLabRepoMRs(selector, 'opened', 1, 20)
+        return result.error ? null : result.items
+      },
+      gitlabIssues: async () =>
+        (await this.listGitLabRepoIssues(selector, 'opened', '@me', 20)).items,
+      planeAssigned: ({ project, workspace }) =>
+        this.planeListWorkItems({
+          projectId: project,
+          filter: 'assigned',
+          workspaceId: planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace),
+          omitDescription: true
+        }),
+      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 20, site),
+      linearAssigned: async (workspace) =>
+        (await this.linearListIssues('assigned', 50, workspace)).items
+    }
+  }
+
   // Why: the game is optional decoration; any failure resolving it must still launch Claude.
   private async prepareOrchestratorGameForHandle(handle: string): Promise<OrchestratorGameLaunch> {
     try {
@@ -30236,7 +30327,8 @@ export class OrcaRuntimeService {
       const worktree = (await this.getResolvedWorktreeMap()).get(terminal.worktreeId)
       return await this.prepareOrchestratorGameFor({
         repoId: worktree?.repoId ?? null,
-        worktreePath: terminal.worktreePath || null
+        worktreePath: terminal.worktreePath || null,
+        connectionId: worktree ? (this.store?.getRepo(worktree.repoId)?.connectionId ?? null) : null
       })
     } catch {
       return { args: [], env: {} }
@@ -30249,7 +30341,8 @@ export class OrcaRuntimeService {
       const worktree = (await this.getResolvedWorktreeMap()).get(worktreeId)
       return await this.prepareOrchestratorGameFor({
         repoId: worktree?.repoId ?? null,
-        worktreePath: worktree?.path ?? null
+        worktreePath: worktree?.path ?? null,
+        connectionId: worktree ? (this.store?.getRepo(worktree.repoId)?.connectionId ?? null) : null
       })
     } catch {
       return { args: [], env: {} }
@@ -30259,6 +30352,7 @@ export class OrcaRuntimeService {
   private async prepareOrchestratorGameFor(args: {
     repoId: string | null
     worktreePath: string | null
+    connectionId: string | null
   }): Promise<OrchestratorGameLaunch> {
     try {
       return await prepareOrchestratorGameLaunch({

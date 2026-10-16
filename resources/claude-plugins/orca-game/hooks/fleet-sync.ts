@@ -2,8 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
-import { gameStateArgvOf } from './game-config'
-import { parseGameState } from './game-state'
+import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
+import { gameStateOf, parseGameState } from './game-state'
+import { gameStrings } from './game-strings'
 import { fleetPhaseOf, partyOf } from './party'
 import {
   clawdReact,
@@ -20,11 +21,16 @@ export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
 const CLI_TIMEOUT_MS = 15000
 const XP_KEY = 'xp-ledger'
-export const UNAVAILABLE = 'orca game state unavailable'
 
 const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note: '', xp: 0 }
 
 export const fleet = atom({ plugin: 'orca-game', key: 'fleet' } as const, EMPTY)
+
+// Why: a hot reload keeps the atom, so its state may have the shape an older mod stored.
+async function readFleet($: EngineInterface): Promise<FleetState> {
+  const v = await read($, fleet)
+  return { ...v, state: v.state === null ? null : (gameStateOf(v.state) ?? null) }
+}
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
   const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
@@ -33,6 +39,32 @@ async function readState($: EngineInterface): Promise<GameState | undefined> {
   }
   const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
+}
+
+/** Brings a teammate's Orca pane forward; false when Orca could not. */
+export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const argv = terminalFocusArgvOf(cli, handle)
+  if (argv === undefined) {
+    return false
+  }
+  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  return out?.exitCode === 0
+}
+
+/** Opens a link in an Orca browser tab of the game's worktree; false when Orca could not. */
+export async function openInOrca(
+  $: EngineInterface,
+  url: string,
+  worktreeId: string
+): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const argv = tabCreateArgvOf(cli, url, worktreeId)
+  if (argv === undefined) {
+    return false
+  }
+  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  return out?.exitCode === 0
 }
 
 async function syncXp($: EngineInterface, before: GameState | null, next: GameState) {
@@ -52,7 +84,7 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
 }
 
 export async function refresh($: EngineInterface): Promise<void> {
-  const before = await read($, fleet)
+  const before = await readFleet($)
   const startedAt = await $.clock.now()
   await update($, fleet, (s) => ({ ...s, isLoading: true, refreshedAt: startedAt }))
   const next = await readState($)
@@ -67,7 +99,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     next !== undefined && config.rewards
       ? await syncXp($, before.state, next).catch(() => before.xp)
       : before.xp
-  const note = next === undefined ? UNAVAILABLE : (next.warnings[0] ?? '')
+  const note = next === undefined ? gameStrings().text.unavailable : (next.warnings[0] ?? '')
   const doneAt = await $.clock.now()
   await update($, fleet, (s) => ({
     ...s,
@@ -97,7 +129,7 @@ export async function refreshSoon($: EngineInterface): Promise<void> {
 export type FleetView = FleetState & { isDemo: boolean }
 
 export async function viewOf($: EngineInterface): Promise<FleetView> {
-  const v = await read($, fleet)
+  const v = await readFleet($)
   if (!quest.isDemo) {
     return { ...v, isDemo: false }
   }

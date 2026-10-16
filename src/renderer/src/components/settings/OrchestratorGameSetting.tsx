@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { Repo } from '../../../../shared/repo-types'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
+  ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   resolveOrchestratorGameConfig,
+  type OrchestratorGameBuiltInScene,
   type OrchestratorGameConfig,
   type OrchestratorGameLayer,
   type OrchestratorGameMode,
@@ -9,11 +13,36 @@ import {
 } from '../../../../shared/orchestrator-game-config'
 import {
   withOrchestratorGameField,
-  withOrchestratorGameProjectField
+  withOrchestratorGameProjectField,
+  withOrchestratorGameProjectScene
 } from '../../../../shared/orchestrator-game-settings-updates'
+import { useAppStore } from '../../store'
 import { SearchableSetting } from './SearchableSetting'
-import { INHERIT_SCENE, OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
-import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './SettingsFormControls'
+import {
+  CUSTOM_SCENE_FILE,
+  INHERIT_SCENE,
+  OrchestratorGameSceneSelect
+} from './OrchestratorGameSceneSelect'
+import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
+import {
+  OrchestratorGameSceneFileField,
+  OrchestratorGameSceneFileStatus
+} from './OrchestratorGameSceneFileField'
+import { repositoryTargetWorktreeOf } from './repository-target-worktree'
+import {
+  useOrchestratorGameProjectSceneFiles,
+  useOrchestratorGameSceneFile
+} from './use-orchestrator-game-scene-file'
+import {
+  orchestratorGameSceneFileId,
+  orchestratorGameSceneFileOfId
+} from '../../../../shared/orchestrator-game-scene-file'
+import {
+  SettingsRow,
+  SettingsSegmentedControl,
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
+} from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
@@ -58,6 +87,19 @@ const toggles = (): { key: ToggleKey; label: string; description: string }[] => 
 const title = (): string =>
   translate('auto.components.settings.OrchestratorGameSetting.title', 'Agent Teams game')
 
+const sectionHeader = (): React.JSX.Element => (
+  <SettingsSubsectionHeader
+    title={title()}
+    description={translate(
+      'auto.components.settings.OrchestratorGameSetting.scope',
+      'Applies only to Claude Agent Teams panes. Plain Claude, Codex and other agents never load it.'
+    )}
+  />
+)
+
+const modeTitle = (): string =>
+  translate('auto.components.settings.OrchestratorGameSetting.mode', 'Game mode')
+
 const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen', 'scene']
 
 const sceneTitle = (): string =>
@@ -83,19 +125,22 @@ export function OrchestratorGameSetting({
   )
 
   return (
-    <section className="space-y-1">
-      <SearchableSetting title={title()} description={description} keywords={keywords}>
+    <section>
+      <SearchableSetting
+        title={title()}
+        description={description}
+        keywords={keywords}
+        className="space-y-1"
+      >
+        {sectionHeader()}
         <SettingsRow
-          label={title()}
+          label={modeTitle()}
           description={description}
           control={
             <SettingsSegmentedControl
               value={config.mode}
               onChange={(mode) => set('mode', mode)}
-              ariaLabel={translate(
-                'auto.components.settings.OrchestratorGameSetting.mode',
-                'Game mode'
-              )}
+              ariaLabel={modeTitle()}
               size="sm"
               options={(['on', 'zen', 'off'] as const).map((mode) => ({
                 value: mode,
@@ -119,6 +164,7 @@ export function OrchestratorGameSetting({
             />
           }
         />
+        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
         {toggles().map((toggle) => (
           <SettingsSwitchRow
             key={toggle.key}
@@ -150,23 +196,64 @@ const sourceLabel = (source: OrchestratorGameSource): string =>
 
 type FieldValue = OrchestratorGameMode | 'true' | 'false'
 
+const EMPTY_WORKTREES: never[] = []
+
+const builtInOf = (scene: string): OrchestratorGameBuiltInScene =>
+  ORCHESTRATOR_GAME_BUILT_IN_SCENES.find((one) => one === scene) ?? 'quest'
+
 export function ProjectOrchestratorGameSetting({
-  repoId,
+  repo,
   settings,
   projectLayer,
   updateSettings
 }: {
-  repoId: string
+  repo: Pick<Repo, 'id' | 'path' | 'connectionId'>
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
+  const repoId = repo.id
   const local = settings.orchestratorGameProjects?.[repoId]
-  const { config, sources } = resolveOrchestratorGameConfig({
+  const { config, sources, sceneFile } = resolveOrchestratorGameConfig({
     global: settings.orchestratorGame,
     project: projectLayer,
     local
   })
+  const connectionId = repo.connectionId ?? undefined
+  const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const worktrees = useAppStore((state) => state.worktreesByRepo[repoId] ?? EMPTY_WORKTREES)
+  const sshStatus = useAppStore((state) =>
+    connectionId ? state.sshConnectionStates.get(connectionId)?.status : undefined
+  )
+  const target = repositoryTargetWorktreeOf(activeWorktreeId, repo, worktrees)
+  const file = useOrchestratorGameSceneFile({
+    rootPath: target.path,
+    connectionId,
+    isReachable: !connectionId || sshStatus === 'connected',
+    path: sceneFile
+  })
+  const projectFiles = useOrchestratorGameProjectSceneFiles({
+    rootPath: target.path,
+    connectionId,
+    isReachable: !connectionId || sshStatus === 'connected'
+  })
+  const [isCustomPicked, setIsCustomPicked] = useState(false)
+  const isCustom = local?.sceneFile !== undefined || isCustomPicked
+  // Why: a file from the scenes folder shows as itself in the picker, not as "Custom file…".
+  const listedFile =
+    !isCustomPicked && local?.sceneFile !== undefined && projectFiles.includes(local.sceneFile)
+      ? orchestratorGameSceneFileId(local.sceneFile)
+      : null
+  const setScene = (choice: { scene: string } | { sceneFile: string } | null): void => {
+    setIsCustomPicked(false)
+    updateSettings({
+      orchestratorGameProjects: withOrchestratorGameProjectScene(
+        settings.orchestratorGameProjects,
+        repoId,
+        choice
+      )
+    })
+  }
   const set = <K extends keyof OrchestratorGameConfig>(
     key: K,
     value: OrchestratorGameConfig[K] | undefined
@@ -197,7 +284,7 @@ export function ProjectOrchestratorGameSetting({
   }[] = [
     {
       key: 'mode',
-      label: translate('auto.components.settings.OrchestratorGameSetting.mode', 'Game mode'),
+      label: modeTitle(),
       text: labels[config.mode],
       value: local?.mode ?? 'inherit',
       options: [
@@ -224,10 +311,8 @@ export function ProjectOrchestratorGameSetting({
   return (
     <SearchableSetting title={title()} description={description} keywords={keywords}>
       <div className="space-y-1">
-        <div className="space-y-0.5 py-2">
-          <h3 className="text-sm font-medium">{title()}</h3>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
+        {sectionHeader()}
+        <p className="text-xs text-muted-foreground">{description}</p>
         {rows.map((row) => (
           <SettingsRow
             key={row.key}
@@ -254,15 +339,40 @@ export function ProjectOrchestratorGameSetting({
         ))}
         <SettingsRow
           label={sceneTitle()}
-          description={effective('scene', config.scene)}
+          description={effective('scene', sceneFile ?? config.scene)}
           control={
             <OrchestratorGameSceneSelect
-              value={local?.scene ?? INHERIT_SCENE}
+              value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
               ariaLabel={sceneTitle()}
               inheritLabel={inherit}
-              onChange={(scene) => set('scene', scene ?? undefined)}
+              projectFiles={projectFiles}
+              onChange={(scene) => {
+                const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
+                setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
+              }}
+              onCustomFile={() => setIsCustomPicked(true)}
             />
           }
+        />
+        {isCustom ? (
+          <OrchestratorGameSceneFileField
+            key={local?.sceneFile ?? ''}
+            path={local?.sceneFile}
+            rootPath={target.path}
+            worktreeId={target.id}
+            connectionId={connectionId}
+            baseScene={builtInOf(config.scene)}
+            read={local?.sceneFile === undefined ? null : file.state}
+            onPath={(path) => setScene({ sceneFile: path })}
+            onFileWritten={file.reload}
+          />
+        ) : (
+          <OrchestratorGameSceneFileStatus read={file.state} />
+        )}
+        <OrchestratorGameScenePreview
+          scene={config.scene}
+          mode={config.mode}
+          fileScene={file.state}
         />
       </div>
     </SearchableSetting>

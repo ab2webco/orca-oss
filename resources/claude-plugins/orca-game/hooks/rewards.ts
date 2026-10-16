@@ -1,5 +1,6 @@
 import type { GameReview, GameState } from '../types'
 import type { Level } from './fleet-hud'
+import { gameStrings } from './game-strings'
 
 export type RewardKind = 'review-merged' | 'ci-green' | 'work-item-review' | 'work-item-done'
 
@@ -44,11 +45,12 @@ export const rewardsOf = (previous: GameState | null, next: GameState): Reward[]
     before.number === after.number
   if (isSameReview) {
     const key = `${after.provider}${reviewLabelOf(after)}@${next.worktree?.id ?? ''}`
+    const text = gameStrings().text
     if (before.state !== 'merged' && after.state === 'merged') {
-      out.push(reward(`review-merged:${key}`, 'review-merged', `${reviewLabelOf(after)} merged`))
+      out.push(reward(`review-merged:${key}`, 'review-merged', text.merged(reviewLabelOf(after))))
     }
     if (before.ci !== 'success' && after.ci === 'success') {
-      out.push(reward(`ci-green:${key}`, 'ci-green', `${reviewLabelOf(after)} CI is green`))
+      out.push(reward(`ci-green:${key}`, 'ci-green', text.ciGreen(reviewLabelOf(after))))
     }
   }
   const was = previous.workItem

@@ -1,7 +1,12 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
-import { CI_COLORS, needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from './fleet-labels'
-import { HUD_KEY, HUD_ROWS, hudCellsOf } from './fleet-hud'
+import { alliesStrip } from './allies-strip'
+import { CHIP_ROWS, MENU_ROWS, menuChipsOf, stateChipsOf } from './band-chips'
+import { fitCells } from './cell-width'
+import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-rows'
+import { needPartsOf } from './fleet-labels'
+import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
+import { gameStrings } from './game-strings'
 import { openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
 import { countsOf, needsOf, partyOf } from './party'
@@ -18,6 +23,10 @@ import {
 import { levelOf } from './rewards'
 
 const PET_KEY = 'band-pet-scene'
+
+// Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
+const beneathOf = (drawn: RenderElement): RenderElement[] =>
+  drawn.type === 'engine' ? [] : [drawn]
 
 function openFleet($: EngineInterface): void {
   void openPane($)
@@ -38,46 +47,51 @@ export const registerBand = (on: On): void => {
     const v = await viewOf($)
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
+    const [beneath, allies] = await Promise.all([
+      next(e).then(beneathOf),
+      alliesStrip($, e, palette, columns)
+    ])
     const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const text = gameStrings().text
     const showPet = isClawdReacting() && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
-    const menu = (
-      key: string,
-      icon: string,
-      label: string,
-      onPress: () => void,
-      isMain = false
-    ) => (
-      <Button key={key} plain onPress={onPress}>
+    const rowsOf = (
+      prefix: string,
+      chips: readonly Chip[],
+      maxRows: number,
+      draw: (chip: PlacedChip) => RenderElement,
+      more?: (count: number) => string
+    ) =>
+      chipRowsOf(chips, { columns, maxRows, more }).map((row) => (
+        <Box key={`${prefix}-${row[0]?.key ?? 'empty'}`} flexDirection="row" gap={1}>
+          {row.map(draw)}
+        </Box>
+      ))
+    const menuActions: Readonly<Record<string, () => void>> = {
+      'band-panel': () => openFleet($),
+      'band-refresh': () => void refreshSoon($).catch(() => undefined),
+      'band-pet': () => clawdReact($, 'pet')
+    }
+    const menuRows = rowsOf('band-menu', menuChipsOf(), MENU_ROWS, (chip) => (
+      <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
         <Text
-          backgroundColor={isMain ? palette.gold : palette.panel}
-          color={isMain ? palette.ink : palette.parchment}
+          backgroundColor={chip.key === 'band-panel' ? palette.gold : palette.panel}
+          color={chip.key === 'band-panel' ? palette.ink : palette.parchment}
           bold
-        >{` ${icon} ${label} `}</Text>
+        >{` ${chip.label} `}</Text>
       </Button>
-    )
-    const pill = (key: string, label: string, color: string, isBold = false) => (
-      <Text key={key} backgroundColor={palette.panel}>
-        {' '}
-        <Text color={color} bold={isBold}>
-          {label}
-        </Text>{' '}
-      </Text>
-    )
-    const menuRow = (
-      <Box flexDirection="row" gap={1} flexWrap="wrap">
-        {menu('band-panel', '▤', 'Panel', () => openFleet($), true)}
-        {menu('band-refresh', '↻', 'Refresh', () => void refreshSoon($).catch(() => undefined))}
-        {menu('band-pet', '♥', 'Pet Clawd', () => clawdReact($, 'pet'))}
-      </Box>
-    )
+    ))
     if (v.state === null) {
       const art = await animate($, e, pet)
       return (
         <Box flexDirection="column">
           {art.get(PET_KEY)}
-          <Text dimColor>{`Team · ${v.note === '' ? 'loading…' : v.note}`}</Text>
-          {menuRow}
+          <Text dimColor wrap="truncate-end">
+            {fitCells(`${text.team} · ${v.note === '' ? text.loading : v.note}`, columns)}
+          </Text>
+          {menuRows}
+          {allies}
+          {beneath}
         </Box>
       )
     }
@@ -97,7 +111,9 @@ export const registerBand = (on: On): void => {
           isDemo: v.isDemo
         })
     }
-    const art = await animate($, e, [...pet, hud])
+    const isFramed = columns >= HUD_MIN_COLUMNS
+    const isArtShown = config.mode !== 'off' && e.surface === 'terminal'
+    const art = await animate($, e, isFramed ? [...pet, hud] : pet)
     const linkOf = (key: string, url: string, child: RenderElement) =>
       url === '' ? (
         child
@@ -106,53 +122,82 @@ export const registerBand = (on: On): void => {
           {child}
         </Link>
       )
+    const pill = (key: string, label: string, color: string, isBold = false) => (
+      <Text key={key} backgroundColor={palette.panel}>
+        {' '}
+        <Text color={color} bold={isBold}>
+          {label}
+        </Text>{' '}
+      </Text>
+    )
+    const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
+    const linked = new Map(chips.filter((one) => one.isLink).map((one) => [one.key, one]))
+    const chipOf = (chip: PlacedChip): RenderElement => {
+      const link = linked.get(chip.key)
+      if (link !== undefined) {
+        return linkOf(
+          chip.key,
+          link.href ?? '',
+          <Text
+            key={chip.key}
+            color={link.color ?? palette.parchment}
+            backgroundColor={palette.panel}
+          >
+            {` ${chip.label} `}
+          </Text>
+        )
+      }
+      switch (chip.key) {
+        case 'band-team':
+          return (
+            <Button key={chip.key} plain onPress={() => openFleet($)}>
+              <Text backgroundColor={palette.gold} color={palette.ink} bold>
+                {' ⚑ '}
+                <Text bold>{chip.label.replace(/^⚑ /, '')}</Text>{' '}
+              </Text>
+            </Button>
+          )
+        case 'working':
+          return pill(chip.key, chip.label, 'cyan')
+        case 'done':
+          return pill(chip.key, chip.label, 'green')
+        case 'waiting':
+          return pill(chip.key, chip.label, counts.waiting > 0 ? 'red' : 'gray', counts.waiting > 0)
+        case 'note':
+          return <Text key={chip.key} color="yellow">{` ${chip.label} `}</Text>
+        case MORE_CHIP_KEY:
+          return <Text key={chip.key} dimColor>{` ${chip.label} `}</Text>
+        case 'loading':
+          return <Text key={chip.key} dimColor>{` ${chip.label} `}</Text>
+        default:
+          return pill(chip.key, chip.label, 'gray')
+      }
+    }
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
-        {art.get(HUD_KEY)}
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          <Button key="band-team" plain onPress={() => openFleet($)}>
-            <Text backgroundColor={palette.gold} color={palette.ink} bold>
-              {' ⚑ '}
-              <Text bold>{teammatesOf(party.length)}</Text>{' '}
-            </Text>
-          </Button>
-          {pill('working', `${counts.working} working`, 'cyan')}
-          {pill('idle', `${counts.idle} idle`, 'gray')}
-          {counts.done > 0 && pill('done', `${counts.done} done`, 'green')}
-          {pill(
-            'waiting',
-            `${counts.waiting} waiting on you`,
-            counts.waiting > 0 ? 'red' : 'gray',
-            counts.waiting > 0
-          )}
-          {state.review !== null &&
-            linkOf(
-              'band-review',
-              state.review.url,
-              <Text color={CI_COLORS[state.review.ci]} backgroundColor={palette.panel}>
-                {` ${reviewTextOf(state.review)} `}
-              </Text>
-            )}
-          {state.workItem !== null &&
-            linkOf(
-              'band-work-item',
-              state.workItem.url,
-              <Text color={palette.parchment} backgroundColor={palette.panel}>
-                {` ${workItemTextOf(state.workItem)} `}
-              </Text>
-            )}
-          {v.note !== '' && <Text color="yellow">{v.note}</Text>}
-          {v.isLoading && <Text dimColor>↻</Text>}
-        </Box>
-        {needs.length > 0 && (
-          <Box flexDirection="row" overflow="hidden">
-            <Text color="red" bold wrap="truncate-end">
-              {needsLineOf(needs)}
+        {isFramed || !isArtShown ? (
+          art.get(HUD_KEY)
+        ) : (
+          <Box key="band-hud-line" flexDirection="row" overflow="hidden">
+            <Text color={palette.parchment} backgroundColor={palette.panel} wrap="truncate-end">
+              {hudLineOf(party, columns, { level, isDemo: v.isDemo })}
             </Text>
           </Box>
         )}
-        {menuRow}
+        {rowsOf('band-chips', chips, CHIP_ROWS, chipOf, (count) => `+${count}`)}
+        {needs.length > 0 && (
+          <Box key="band-needs" flexDirection="row" overflow="hidden">
+            <Text color="red" bold wrap="truncate-end">
+              {needPartsOf(needs, columns).map((part) =>
+                linkOf(part.key, part.url ?? '', <Text key={part.key}>{part.text}</Text>)
+              )}
+            </Text>
+          </Box>
+        )}
+        {menuRows}
+        {allies}
+        {beneath}
       </Box>
     )
   })

@@ -6,7 +6,16 @@
     "../src/renderer/src/**/*.tsx",
     "../src/preload/api-types.ts",
     "../src/preload/api/**/*",
-    "../src/shared/**/*"
+    "../src/shared/**/*",
+    "../resources/claude-plugins/orca-game/types/index.d.ts",
+    "../resources/claude-plugins/orca-game/hooks/action-props.ts",
+    "../resources/claude-plugins/orca-game/hooks/game-strings.ts",
+    "../resources/claude-plugins/orca-game/hooks/locales/*.ts",
+    "../resources/claude-plugins/orca-game/hooks/pixel-canvas.ts",
+    "../resources/claude-plugins/orca-game/hooks/quest-policy.ts",
+    "../resources/claude-plugins/orca-game/hooks/scene.ts",
+    "../resources/claude-plugins/orca-game/hooks/scenery.ts",
+    "../resources/claude-plugins/orca-game/hooks/scenes/*.ts"
   ],
   "compilerOptions": {
     "composite": true,

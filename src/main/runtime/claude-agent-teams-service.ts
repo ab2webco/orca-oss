@@ -88,6 +88,17 @@ export class ClaudeAgentTeamsService {
     }
   }
 
+  /** The live terminals of the team `handle` belongs to, as leader or teammate; null for none. */
+  teamHandlesOf(handle: string): Set<string> | null {
+    for (const team of this.teams.values()) {
+      const handles = new Set([...team.panes.values()].map((pane) => pane.handle))
+      if (handles.has(handle)) {
+        return handles
+      }
+    }
+    return null
+  }
+
   getActiveTeamCount(): number {
     return this.teams.size
   }

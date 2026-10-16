@@ -269,7 +269,7 @@ import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtim
 import { isPtyIncarnationId } from '../../shared/pty-incarnation'
 import type { PtyListedSession } from '../../shared/pty-listed-session'
 import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
-import { withAgentTeamsGameCommand } from './pty-agent-teams-game-launch'
+import { withAgentTeamsGameCommand, withDevOrcaCli } from './pty-agent-teams-game-launch'
 
 // ─── Provider Registry ──────────────────────────────────────────────
 // Routes PTY operations by connectionId (null = local provider).
@@ -7051,9 +7051,13 @@ export function registerPtyHandlers(
           ? await resolveCodexResumeLaunch(args.command, codexResumePreparation)
           : noCodexResumeLaunch(preAdoptedStablePane ? undefined : args.command)
         const codexResumeHome = codexResumeLaunch.codexResumeHome
-        const launchCommand = withAgentTeamsGameCommand(
-          codexResumeLaunch.command,
-          agentTeamsGameLaunch
+        const devOrcaCli =
+          !app.isPackaged && process.platform !== 'win32' && !args.connectionId
+            ? join(app.getPath('userData'), 'cli', 'bin', 'orca')
+            : null
+        const launchCommand = withDevOrcaCli(
+          withAgentTeamsGameCommand(codexResumeLaunch.command, agentTeamsGameLaunch),
+          devOrcaCli
         )
         baseEnv = stripSequencedStartupResumeArgv(baseEnv, codexResumeLaunch)
         // Why: declared after the strip so a local-provider spawn cannot capture the

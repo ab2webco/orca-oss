@@ -3403,6 +3403,7 @@ function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     pickRepoIconImage: () => Promise.resolve(null),
     pickAudio: () => Promise.resolve(null),
     pickDirectory: () => Promise.resolve(null),
+    pickJsonFile: () => Promise.resolve(null),
     copyFile: () => Promise.resolve()
   }
 }

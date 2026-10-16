@@ -154,6 +154,30 @@ describe('registerShellHandlers', () => {
     await expect(handler({})).resolves.toBeNull()
   })
 
+  it('picks one JSON file, starting where the caller asks', async () => {
+    showOpenDialogMock.mockResolvedValue({
+      canceled: false,
+      filePaths: ['/Users/kaylee/repo/.orca/scenes/space.json']
+    })
+
+    const handler = getHandler('shell:pickJsonFile')
+    await expect(handler({}, { defaultPath: '/Users/kaylee/repo' })).resolves.toBe(
+      '/Users/kaylee/repo/.orca/scenes/space.json'
+    )
+    expect(showOpenDialogMock).toHaveBeenCalledWith({
+      defaultPath: '/Users/kaylee/repo',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+  })
+
+  it('returns null when JSON file picking is canceled', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] })
+
+    const handler = getHandler('shell:pickJsonFile')
+    await expect(handler({}, {})).resolves.toBeNull()
+  })
+
   it('picks an existing directory without enabling native directory creation', async () => {
     showOpenDialogMock.mockResolvedValue({
       canceled: false,

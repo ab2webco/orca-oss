@@ -103,5 +103,12 @@
     "text": "ghostty",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/settings/OrchestratorGameSceneFileField.tsx",
+    "kind": "jsx-attribute:placeholder",
+    "text": ".orca/scenes/my-scene.json",
+    "dynamic": false,
+    "count": 1
   }
 ]

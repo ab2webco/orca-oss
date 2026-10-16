@@ -3,11 +3,13 @@ import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { resolveClaudeCommand } from '../codex-cli/command'
-import { loadHooks } from '../hooks'
+import { getMainSystemLocale } from '../i18n/main-i18n'
 import { resolveClaudeAgentTeamsShimBin } from '../runtime/claude-agent-teams-shim-env'
+import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { parseClaudeCodeVersion } from './hook-event-versions'
 import {
   buildOrchestratorGameLaunch,
+  orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
   type OrchestratorGameLaunch
 } from './orchestrator-game-launch'
@@ -48,18 +50,27 @@ export function bundledOrchestratorGamePluginDir(): string | null {
 }
 
 export async function prepareOrchestratorGameLaunch(args: {
-  settings: Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'> | undefined
+  settings:
+    | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects' | 'uiLanguage'>>
+    | undefined
   repoId: string | null
   worktreePath: string | null
+  /** SSH connection of the worktree's repo; its orca.yaml is read from that host. */
+  connectionId?: string | null
   pluginDir?: string | null
   orcaCli?: string | null
+  /** The OS locale behind a `system` UI language; defaults to Electron's. */
+  systemLocale?: string
   detectClaudeVersion?: () => Promise<string | null>
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
-  const claudeVersion = await detect().catch(() => null)
+  const [claudeVersion, project] = await Promise.all([
+    detect().catch(() => null),
+    args.worktreePath ? readWorktreeOrcaYaml(args.worktreePath, args.connectionId) : null
+  ])
   const resolved = resolveOrchestratorGameConfig({
     global: args.settings?.orchestratorGame,
-    project: args.worktreePath ? loadHooks(args.worktreePath)?.orchestratorGame : undefined,
+    project: project?.orchestratorGame,
     local: args.repoId ? args.settings?.orchestratorGameProjects?.[args.repoId] : undefined
   })
   return buildOrchestratorGameLaunch({
@@ -67,6 +78,11 @@ export async function prepareOrchestratorGameLaunch(args: {
     claudeVersion,
     pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir,
     // Why: the same absolute CLI the Agent Teams tmux shim runs, so Linux never hits the screen reader.
-    orcaCli: args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli
+    orcaCli:
+      args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli,
+    locale: orchestratorGameLocaleOf(
+      args.settings?.uiLanguage,
+      args.systemLocale ?? getMainSystemLocale()
+    )
   })
 }

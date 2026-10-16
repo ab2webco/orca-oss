@@ -120,13 +120,41 @@ export const QUEST_SCENE: SceneDefinition = {
     }
   },
   cards: {
-    working: { icon: '◆', name: 'Squire', color: '#7fa86a' },
-    docs: { icon: '✦', name: 'Sage', color: '#9a7fe0' },
-    build: { icon: '⚒', name: 'Blacksmith', color: '#d98a3d' },
-    verify: { icon: '⚔', name: 'Knight', color: '#5b8fd6' },
-    pr: { icon: '✉', name: 'Herald', color: '#3fae6f' },
-    handoff: { icon: '♛', name: 'King', color: '#e0b020' }
+    working: {
+      icon: '◆',
+      name: { en: 'Squire', es: 'Escudero', ja: '従者', ko: '종자', zh: '侍从' },
+      color: '#7fa86a'
+    },
+    docs: {
+      icon: '✦',
+      name: { en: 'Sage', es: 'Sabio', ja: '賢者', ko: '현자', zh: '贤者' },
+      color: '#9a7fe0'
+    },
+    build: {
+      icon: '⚒',
+      name: { en: 'Blacksmith', es: 'Herrero', ja: '鍛冶屋', ko: '대장장이', zh: '铁匠' },
+      color: '#d98a3d'
+    },
+    verify: {
+      icon: '⚔',
+      name: { en: 'Knight', es: 'Caballero', ja: '騎士', ko: '기사', zh: '骑士' },
+      color: '#5b8fd6'
+    },
+    pr: {
+      icon: '✉',
+      name: { en: 'Herald', es: 'Heraldo', ja: '伝令', ko: '전령', zh: '传令官' },
+      color: '#3fae6f'
+    },
+    handoff: {
+      icon: '♛',
+      name: { en: 'King', es: 'Rey', ja: '王', ko: '왕', zh: '国王' },
+      color: '#e0b020'
+    }
   },
-  teller: { icon: '❝', name: 'Storyteller', color: '#8f9bb3' },
+  teller: {
+    icon: '❝',
+    name: { en: 'Storyteller', es: 'Narrador', ja: '語り部', ko: '이야기꾼', zh: '说书人' },
+    color: '#8f9bb3'
+  },
   band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' }
 }

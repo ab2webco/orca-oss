@@ -1,6 +1,8 @@
 import { actionPixel } from './action-props'
+import { gameStrings, localizedNameOf } from './game-strings'
 import { cellsOf, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
+import { farPixel, GROUND, nearTopOf, plantPixel, sunPixel } from './scenery'
 import type { Costume, Look, SceneDefinition } from './scenes/index'
 
 export const SCENE_ROWS = 5
@@ -10,33 +12,12 @@ export const CLAWD_TOP = 2
 export const SPRITE_WIDTH = 10
 const MAX_COLUMNS = 512
 const MARGIN = 2
-const PIXEL_ROWS = SCENE_ROWS * 2
 const STAR = 0xf5f3c8
 const BUBBLE = 0xf4f4f0
 const BUBBLE_TEXT = 0x23232b
-const GROUND = PIXEL_ROWS - 1
-const PEAK_EVERY = 23
 const HEART = 0xff5a8a
-
-const peakOf = (x: number): { top: number; height: number } => {
-  let best = { top: GROUND, height: 0 }
-  const index = Math.floor(x / PEAK_EVERY)
-  for (let i = index - 1; i <= index + 1; i += 1) {
-    const centre = i * PEAK_EVERY + (hash(i, 3) % 10)
-    const height = 4 + (hash(i, 5) % 4)
-    const top = Math.round(GROUND - 1 - Math.max(0, height - Math.abs(x - centre) * 0.7))
-    if (top < best.top) {
-      best = { top, height }
-    }
-  }
-  return best
-}
-
-const hillTop = (x: number): number =>
-  Math.max(
-    6,
-    Math.min(GROUND, Math.round(7.7 - 0.9 * Math.sin(x * 0.17 + 2) - 0.6 * Math.sin(x * 0.37)))
-  )
+const FINALE_TEXT = 0xffffff
+const FINALE_PANEL = 0x1a1a24
 
 export const sceneColumnsOf = (viewport: number | undefined): number =>
   Math.max(1, Math.min(MAX_COLUMNS, (viewport ?? 80) - MARGIN))
@@ -67,28 +48,10 @@ const clawdPixel = (
   return costume.colors[row?.[column] ?? '.']
 }
 
-const plantPixel = (look: Look, x: number, y: number, top: number): number | undefined => {
-  const slot = mod(x, 13)
-  if (look.plantKind === 'none' || hash(Math.floor(x / 13), 9) % 3 === 0) {
-    return undefined
-  }
-  if (look.plantKind === 'tree') {
-    if (y === top - 3 && slot === 6) {
-      return look.plant
-    }
-    return (y === top - 2 || y === top - 1) && slot >= 5 && slot <= 7 ? look.plant : undefined
-  }
-  if (slot === 6 && y >= top - 3 && y < top) {
-    return look.plant
-  }
-  return slot === 7 && y === top - 2 ? look.plant : undefined
-}
-
 const skyPixel = (look: Look, width: number, x: number, y: number, tick: number): number => {
-  const dx = x - (width - 14)
-  const dy = y - 2.5
-  if (dx * dx + dy * dy * 1.4 <= 5) {
-    return look.sun
+  const sun = sunPixel(look, width, x, y)
+  if (sun !== undefined) {
+    return sun
   }
   const blob = mod(x + Math.floor(tick / 10), 37)
   if ((y === 2 && blob >= 3 && blob <= 9) || (y === 1 && blob >= 5 && blob <= 7)) {
@@ -121,21 +84,15 @@ export const pixelOf = (
     return hash(x + scroll, 7) % 9 === 0 ? mix(look.ground, 0x000000, 0.25) : look.ground
   }
   const nx = x + Math.floor(scroll / 2)
-  const hill = hillTop(nx)
+  const hill = nearTopOf(look, nx)
   if (y >= hill) {
     return mix(look.near, 0x000000, (y - hill) * 0.08)
   }
-  const plant = plantPixel(look, nx, y, hill)
-  if (plant !== undefined) {
-    return plant
-  }
-  const peak = peakOf(x + Math.floor(scroll / 6))
-  if (y >= peak.top) {
-    return y <= peak.top + 1 && peak.top <= 3
-      ? look.snow
-      : mix(look.far, look.near, (y - peak.top) * 0.06)
-  }
-  return skyPixel(look, width, x, y, tick)
+  return (
+    plantPixel(look, nx, y, hill) ??
+    farPixel(look, x + Math.floor(scroll / 6), y, tick) ??
+    skyPixel(look, width, x, y, tick)
+  )
 }
 
 const DOTS = ['.  ', '.. ', '...'] as const
@@ -144,7 +101,10 @@ export const REACTION_TICKS = 24
 
 export type Reaction = { kind: 'pet' | 'hello' | 'level'; age: number }
 
-const REACTION_SAYS = { pet: '♥ thanks!', hello: 'on it!', level: '★ level up!' } as const
+const reactionSaysOf = (kind: Reaction['kind']): string => {
+  const art = gameStrings().art
+  return kind === 'pet' ? art.thanks : kind === 'hello' ? art.onIt : art.levelUp
+}
 
 const SNORES = ['z  ', 'zz ', 'zzz'] as const
 
@@ -159,7 +119,8 @@ export const bubbleTextOf = (
   since: number,
   room: number
 ): string => {
-  const said = caption === '' ? `thinking${DOTS[Math.floor(tick / 4) % DOTS.length]}` : caption
+  const thinking = `${gameStrings().art.thinking}${DOTS[Math.floor(tick / 4) % DOTS.length]}`
+  const said = caption === '' ? thinking : caption
   const fitted = said.length <= room ? said : `${said.slice(0, Math.max(0, room - 1))}…`
   // A caption types itself in, three letters a tick.
   const shown = caption === '' ? fitted.length : Math.max(1, (tick - since) * 3)
@@ -210,7 +171,7 @@ export const sceneGridOf = (
       grid.push([UPPER_HALF, at(x, row * 2), at(x, row * 2 + 1)])
     }
   }
-  const said = reacting ? REACTION_SAYS[reaction.kind] : resting ? snoreOf(tick) : caption
+  const said = reacting ? reactionSaysOf(reaction.kind) : resting ? snoreOf(tick) : caption
   const typedSince = reacting ? tick - reaction.age : resting ? -Infinity : since
   const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, columns - 8))} `
   const width = text.length + 2
@@ -248,7 +209,22 @@ export const sceneGridOf = (
       bubble
     )
   }
+  if (shown === 'merge' && scene.finale !== undefined) {
+    paintFinale(grid, columns, localizedNameOf(scene.finale))
+  }
   return grid
+}
+
+// Bottom-right of the ground row, as PR #32 draws it, while a merge runs.
+const paintFinale = (grid: number[][], columns: number, finale: string): void => {
+  const glyphs = Array.from(` ${finale} `)
+  if (glyphs.length >= columns) {
+    return
+  }
+  const from = (SCENE_ROWS - 1) * columns + columns - glyphs.length - 1
+  glyphs.forEach((glyph, index) => {
+    grid[from + index] = [glyph.codePointAt(0) ?? 0x20, FINALE_TEXT, FINALE_PANEL]
+  })
 }
 
 export const sceneCellsOf = (

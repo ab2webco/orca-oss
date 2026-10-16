@@ -24,6 +24,7 @@ vi.mock('../ui/select', () => ({
   ),
   SelectTrigger: () => null,
   SelectValue: () => null,
+  SelectSeparator: () => null,
   SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => (
     <option value={value}>{children}</option>
@@ -49,8 +50,23 @@ const spacePack: PluginHostListEntry = {
   gameScenes: ['acme.space/orbit']
 }
 
+let sceneFiles: string[] = []
+
 beforeEach(() => {
   usePluginPanelsStore.setState({ plugins: [spacePack], fetchStatus: 'ready' })
+  sceneFiles = []
+  // Why: the project picker lists `.orca/scenes`; each test names the files that folder holds.
+  Object.assign(window, {
+    api: {
+      fs: {
+        readDir: async () =>
+          sceneFiles.map((name) => ({ name, isDirectory: false, isSymlink: false })),
+        readFile: async () => {
+          throw new Error('ENOENT')
+        }
+      }
+    }
+  })
 })
 
 function sceneSelect(container: HTMLElement): HTMLSelectElement {
@@ -115,12 +131,53 @@ describe('OrchestratorGameSetting', () => {
   })
 })
 
+describe('game settings section', () => {
+  it('titles the section and says it only applies to Claude Agent Teams panes', () => {
+    const view = render(<OrchestratorGameSetting settings={{}} updateSettings={() => undefined} />)
+
+    const heading = view.container.querySelector('h3')
+    expect(heading?.textContent).toBe('Agent Teams game')
+    expect(view.container.textContent).toContain('Applies only to Claude Agent Teams panes')
+    view.unmount()
+  })
+
+  it('previews the effective scene and mode', () => {
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { scene: 'tamer', mode: 'zen' } }}
+        updateSettings={() => undefined}
+      />
+    )
+    const preview = view.container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview?.dataset.scene).toBe('tamer')
+    expect(preview?.dataset.mode).toBe('zen')
+    view.unmount()
+  })
+
+  it('previews the project scene this machine resolves', () => {
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{ orchestratorGame: { scene: 'tamer' } }}
+        projectLayer={{ scene: 'jrpg', mode: 'off' }}
+        updateSettings={() => undefined}
+      />
+    )
+    expect(view.container.querySelector('h3')?.textContent).toBe('Agent Teams game')
+    expect(view.container.textContent).toContain('Applies only to Claude Agent Teams panes')
+    const preview = view.container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview?.dataset.scene).toBe('jrpg')
+    expect(preview?.dataset.mode).toBe('off')
+    view.unmount()
+  })
+})
+
 describe('ProjectOrchestratorGameSetting', () => {
   it('shows where the effective value comes from and overrides it for this machine', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
-        repoId="repo1"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{ orchestratorGameProjects: { repo1: { hud: false } } }}
         projectLayer={{ mode: 'off' }}
         updateSettings={(update) => updates.push(update)}
@@ -141,7 +198,7 @@ describe('ProjectOrchestratorGameSetting', () => {
 })
 
 describe('game scene picker', () => {
-  it('offers quest and the scenes of running plugins, and writes the pick globally', () => {
+  it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
@@ -151,6 +208,9 @@ describe('game scene picker', () => {
     expect(select.value).toBe('quest')
     expect(optionsOf(select)).toEqual([
       ['quest', 'Quest (built-in)'],
+      ['vigilante', 'Night Watch (built-in)'],
+      ['jrpg', 'Crystal Saga (built-in)'],
+      ['tamer', 'Beast Tamer (built-in)'],
       ['acme.space/orbit', 'orbit · Space Pack']
     ])
     choose(select, 'acme.space/orbit')
@@ -176,7 +236,7 @@ describe('game scene picker', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
-        repoId="repo1"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{}}
         projectLayer={{ scene: 'acme.gone/orbit' }}
         updateSettings={(update) => updates.push(update)}
@@ -190,6 +250,53 @@ describe('game scene picker', () => {
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { scene: 'acme.space/orbit' } } }
     ])
+    view.unmount()
+  })
+
+  it("lists the project's scene files as custom scenes and picks one for this machine", async () => {
+    sceneFiles = ['deep-space.json']
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={undefined}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const select = sceneSelect(view.container)
+    expect(optionsOf(select)).toContainEqual([
+      'file:.orca/scenes/deep-space.json',
+      'deep-space (custom)'
+    ])
+    choose(select, 'file:.orca/scenes/deep-space.json')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { sceneFile: '.orca/scenes/deep-space.json' } } }
+    ])
+    view.unmount()
+  })
+
+  it('shows a listed scene file this machine picked as selected', async () => {
+    sceneFiles = ['deep-space.json']
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{
+          orchestratorGameProjects: { repo1: { sceneFile: '.orca/scenes/deep-space.json' } }
+        }}
+        projectLayer={undefined}
+        updateSettings={() => undefined}
+      />
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(sceneSelect(view.container).value).toBe('file:.orca/scenes/deep-space.json')
     view.unmount()
   })
 })

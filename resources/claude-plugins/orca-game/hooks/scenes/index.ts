@@ -1,13 +1,27 @@
+import { JRPG_SCENE } from './jrpg'
 import { QUEST_SCENE } from './quest'
 import type { SceneDefinition } from './scene-definition'
+import { TAMER_SCENE } from './tamer'
+import { VIGILANTE_SCENE } from './vigilante'
 
-export type { Card, Costume, Look, SceneDefinition, ScenePhase } from './scene-definition'
+export type {
+  Card,
+  Costume,
+  HudPalette,
+  Look,
+  SceneDefinition,
+  ScenePhase
+} from './scene-definition'
 
 export const DEFAULT_SCENE_ID = 'quest'
 
-// A new scene is one file in this folder plus its entry here.
+// A new scene is one file in this folder plus its entry here and in Orca's
+// ORCHESTRATOR_GAME_BUILT_IN_SCENES, so Settings offers it.
 export const SCENES: Readonly<Record<string, SceneDefinition>> = {
-  [QUEST_SCENE.id]: QUEST_SCENE
+  [QUEST_SCENE.id]: QUEST_SCENE,
+  [VIGILANTE_SCENE.id]: VIGILANTE_SCENE,
+  [JRPG_SCENE.id]: JRPG_SCENE,
+  [TAMER_SCENE.id]: TAMER_SCENE
 }
 
 // Scenes Orca's plugins contribute, replaced on every poll of `orca game state`.

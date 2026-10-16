@@ -33,6 +33,54 @@ describe('parseOrchestratorGameScene', () => {
     expect(parsed.ok && parsed.definition.costumes.pr.colors.H).toBe(0x3f6e46)
   })
 
+  it('takes a card or teller name per language, with English required', () => {
+    const parsed = parse(
+      scene({
+        cards: byPhase({ ...card, name: { en: 'Pilot', es: 'Piloto', ja: 'パイロット' } }),
+        teller: { icon: '❝', name: { en: 'Narrator', zh: '旁白' }, color: '#8f9bb3' }
+      })
+    )
+    expect(parsed.ok && parsed.definition.cards.pr.name).toEqual({
+      en: 'Pilot',
+      es: 'Piloto',
+      ja: 'パイロット'
+    })
+    expect(parsed.ok && parsed.definition.teller.name).toEqual({ en: 'Narrator', zh: '旁白' })
+    const plain = parse(scene())
+    expect(plain.ok && plain.definition.teller.name).toBe('Narrator')
+  })
+
+  // Why: a scene that also names a language Orca does not ship yet still loads.
+  it('drops a name in a language Orca does not ship', () => {
+    const parsed = parse(
+      scene({ cards: byPhase({ ...card, name: { en: 'Pilot', fr: 'Pilote' } }) })
+    )
+    expect(parsed.ok && parsed.definition.cards.pr.name).toEqual({ en: 'Pilot' })
+  })
+
+  it('takes an optional world, foe and merge finale, and leaves them out when absent', () => {
+    const parsed = parse(
+      scene({
+        looks: byPhase({ ...look, plantKind: 'antenna', scenery: 'skyline', isSignal: true }),
+        foe: { ...costume, colors: { ...costume.colors, H: '#8a2a3a' } },
+        finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' }
+      })
+    )
+    expect(parsed.ok && parsed.definition.looks.pr).toMatchObject({
+      plantKind: 'antenna',
+      scenery: 'skyline',
+      isSignal: true
+    })
+    expect(parsed.ok && parsed.definition.foe?.colors.H).toBe(0x8a2a3a)
+    expect(parsed.ok && parsed.definition.finale).toEqual({
+      en: '◆ CASE CLOSED',
+      es: '◆ CASO CERRADO'
+    })
+    const plain = parse(scene())
+    expect(plain.ok && ('foe' in plain.definition || 'finale' in plain.definition)).toBe(false)
+    expect(plain.ok && 'scenery' in plain.definition.looks.pr).toBe(false)
+  })
+
   it('ignores an id inside the file so a plugin cannot claim another namespace', () => {
     const parsed = parse(scene({ id: 'quest' }))
     expect(parsed.ok && parsed.definition.id).toBe('acme.pack/space')
@@ -91,6 +139,39 @@ describe('parseOrchestratorGameScene', () => {
       JSON.stringify(scene({ cards: byPhase({ ...card, name: 'x'.repeat(33) }) })),
       'cards'
     ],
+    [
+      'per-language card names without English',
+      JSON.stringify(scene({ cards: byPhase({ ...card, name: { es: 'Piloto' } }) })),
+      'cards.working.name'
+    ],
+    [
+      'a translated teller name with a terminal escape',
+      JSON.stringify(
+        scene({ teller: { icon: '❝', name: { en: 'N', ko: 'x\u001b[2J' }, color: '#8f9bb3' } })
+      ),
+      'teller.name'
+    ],
+    [
+      'an overlong translated card name',
+      JSON.stringify(scene({ cards: byPhase({ ...card, name: { en: 'P', es: 'x'.repeat(33) } }) })),
+      'cards.working.name'
+    ],
+    [
+      'an unknown world',
+      JSON.stringify(scene({ looks: byPhase({ ...look, scenery: 'ocean' }) })),
+      'looks'
+    ],
+    [
+      'a foe glyph with no color',
+      JSON.stringify(scene({ foe: { ...costume, legs: ['.Z.O.O.O..', 'O.O.O.O.O.'] } })),
+      'foe'
+    ],
+    [
+      'a finale the pixel art cannot draw',
+      JSON.stringify(scene({ finale: { en: 'WIN', zh: '胜利' } })),
+      'finale'
+    ],
+    ['an overlong finale', JSON.stringify(scene({ finale: 'x'.repeat(25) })), 'finale'],
     [
       'a band color that is not hex',
       JSON.stringify(

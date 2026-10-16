@@ -30,3 +30,22 @@ export function withOrchestratorGameProjectField<K extends keyof OrchestratorGam
   }
   return next
 }
+
+/** Sets a project's scene from the picker: one built-in or plugin scene, one file, or `null` to inherit. */
+export function withOrchestratorGameProjectScene(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  choice: { scene: string } | { sceneFile: string } | null
+): Record<string, OrchestratorGameLayer> {
+  const next = { ...projects }
+  const layer: OrchestratorGameLayer = { ...next[repoId] }
+  delete layer.scene
+  delete layer.sceneFile
+  Object.assign(layer, choice)
+  if (Object.keys(layer).length === 0) {
+    delete next[repoId]
+  } else {
+    next[repoId] = layer
+  }
+  return next
+}
