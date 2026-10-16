@@ -127,6 +127,36 @@ describe('buildOrchestratorGameState', () => {
     })
   })
 
+  it('reads the live status of a linked Jira issue', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: {
+        ...worktree(checkout()),
+        linkedWorkItem: {
+          provider: 'jira',
+          type: 'issue',
+          number: 0,
+          title: 'Checkout flow',
+          url: 'https://jira.example/browse/CIN-9',
+          jiraIdentifier: 'CIN-9'
+        }
+      },
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readLinkedStatus: async (linked) =>
+        linked.jiraIdentifier === 'CIN-9' ? { name: 'QA', group: 'review' } : null
+    })
+
+    expect(state.workItem).toMatchObject({
+      identifier: 'CIN-9',
+      status: 'QA',
+      statusGroup: 'review'
+    })
+  })
+
   it('leaves the work item out when the project turns the tracker off', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

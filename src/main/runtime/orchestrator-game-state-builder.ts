@@ -5,6 +5,7 @@ import {
   gameReviewOf,
   statusGroupOfName,
   statusGroupOfPlane,
+  type GameStatusGroup,
   type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
@@ -32,6 +33,9 @@ export type OrchestratorGameStateInput = {
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
+  readLinkedStatus?: (
+    linked: WorkspaceLinkedItem
+  ) => Promise<{ name: string; group?: GameStatusGroup } | null>
 }
 
 // Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
@@ -93,7 +97,18 @@ export async function buildOrchestratorGameState(
       statusGroup: statusGroupOfName(linear.stateName)
     }
   } else if (tracker) {
-    workItem = linkedItemOf(input.worktree?.linkedWorkItem)
+    const linked = input.worktree?.linkedWorkItem
+    const readLinkedStatus = input.readLinkedStatus
+    workItem = linkedItemOf(linked)
+    const live =
+      workItem && linked && readLinkedStatus ? await settle(() => readLinkedStatus(linked)) : null
+    if (workItem && live) {
+      workItem = {
+        ...workItem,
+        status: live.name,
+        statusGroup: live.group ?? statusGroupOfName(live.name)
+      }
+    }
   }
   return {
     config: resolved.config,

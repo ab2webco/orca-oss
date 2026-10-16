@@ -83,6 +83,21 @@ export function statusGroupOfName(name: string): GameStatusGroup {
   return NAME_GROUPS.find(([pattern]) => pattern.test(name))?.[1] ?? 'unknown'
 }
 
+// Why: Jira's category is reliable for todo/doing/done; the name is still needed for review and cancelled.
+export function statusGroupOfJira(categoryKey: string, name: string): GameStatusGroup {
+  const named = statusGroupOfName(name)
+  switch (categoryKey) {
+    case 'new':
+      return named === 'backlog' ? 'backlog' : 'todo'
+    case 'indeterminate':
+      return named === 'review' ? 'review' : 'in_progress'
+    case 'done':
+      return named === 'cancelled' ? 'cancelled' : 'done'
+    default:
+      return named
+  }
+}
+
 const AGENT_STATES: Record<AgentStatusState, GameAgent['state']> = {
   working: 'working',
   blocked: 'waiting',

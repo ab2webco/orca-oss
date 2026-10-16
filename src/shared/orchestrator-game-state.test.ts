@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   gameAgentOf,
   gameReviewOf,
+  statusGroupOfJira,
   statusGroupOfName,
   statusGroupOfPlane
 } from './orchestrator-game-state'
@@ -28,6 +29,17 @@ describe('statusGroupOfName', () => {
     expect(statusGroupOfName('Done')).toBe('done')
     expect(statusGroupOfName('Canceled')).toBe('cancelled')
     expect(statusGroupOfName('Blocked by vendor')).toBe('unknown')
+  })
+})
+
+describe('statusGroupOfJira', () => {
+  it('maps the Jira status category, with review read from the status name', () => {
+    expect(statusGroupOfJira('new', 'To Do')).toBe('todo')
+    expect(statusGroupOfJira('indeterminate', 'In Progress')).toBe('in_progress')
+    expect(statusGroupOfJira('indeterminate', 'QA')).toBe('review')
+    expect(statusGroupOfJira('done', "Won't Do")).toBe('cancelled')
+    expect(statusGroupOfJira('done', 'Done')).toBe('done')
+    expect(statusGroupOfJira('undefined', 'Backlog')).toBe('backlog')
   })
 })
 

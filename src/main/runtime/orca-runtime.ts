@@ -649,7 +649,7 @@ import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
-import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -30183,6 +30183,31 @@ export class OrcaRuntimeService {
           url: context.issue.url,
           stateName: context.issue.state?.name ?? ''
         }
+      },
+      readLinkedStatus: async (linked) => {
+        if (linked.provider === 'jira' && linked.jiraIdentifier) {
+          const status = (await this.jiraGetIssue(linked.jiraIdentifier))?.status
+          return status
+            ? { name: status.name, group: statusGroupOfJira(status.categoryKey, status.name) }
+            : null
+        }
+        const repoId = linked.repoId ?? worktree?.repoId
+        if (!repoId) {
+          return null
+        }
+        if (linked.provider === 'github') {
+          const issue = await this.getRepoIssue(`id:${repoId}`, linked.number)
+          return issue ? { name: issue.state } : null
+        }
+        if (linked.provider === 'gitlab') {
+          const details = await this.getGitLabRepoWorkItemDetails(
+            `id:${repoId}`,
+            linked.number,
+            'issue'
+          )
+          return details ? { name: details.item.state } : null
+        }
+        return null
       }
     })
   }
