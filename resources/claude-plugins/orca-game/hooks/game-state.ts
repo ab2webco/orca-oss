@@ -2,29 +2,22 @@ import type {
   GameActivity,
   GameAgent,
   GameMemberWorktree,
-  GameCi,
   GameConfig,
   GameLink,
   GameProjectItem,
   GameProjectList,
   GameProjectWork,
-  GameReview,
   GameSceneExtension,
   GameState,
   GameStatusGroup,
-  GameWorkItem,
   GameWorktree
 } from '../types'
 import { gameActionsOf, gamePromptOf } from './game-action-shape'
 import { isTerminalHandle } from './game-config'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
+import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
-
-type Shape = Record<string, unknown>
-
-const isShape = (value: unknown): value is Shape =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const parseJson = (text: string): unknown => {
   try {
@@ -34,30 +27,12 @@ const parseJson = (text: string): unknown => {
   }
 }
 
-const str = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
-
-const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
-  (allowed as readonly unknown[]).includes(value) ? (value as T) : undefined
-
 const LINK_KINDS = ['review', 'ci', 'workItem', 'project', 'activity'] as const
 const LINK_TONES = ['neutral', 'pending', 'success', 'danger'] as const
 const MAX_LINKS = 32
 const MAX_LINK_TEXT = 64
 
 const AGENT_STATES = ['working', 'waiting', 'idle', 'done'] as const
-const PROVIDERS = ['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea'] as const
-const REVIEW_STATES = ['open', 'draft', 'merged', 'closed'] as const
-const CI_STATES: readonly GameCi[] = ['pending', 'success', 'failure', 'neutral', 'none']
-const TRACKERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
-const STATUS_GROUPS = [
-  'backlog',
-  'todo',
-  'in_progress',
-  'review',
-  'done',
-  'cancelled',
-  'unknown'
-] as const
 
 const textOf = (value: unknown): string | undefined => {
   const text = str(value)?.trim().slice(0, MAX_LINK_TEXT)
@@ -212,6 +187,8 @@ const agentOf = (value: unknown): GameAgent[] => {
   const displayName = str(value.displayName) || agentType || paneKey
   const activity = activityOf(value.activity)
   const worktree = memberWorktreeOf(value.worktree)
+  const review = worktree ? reviewOf(value.review) : null
+  const workItem = worktree ? workItemOf(value.workItem) : null
   return [
     {
       paneKey,
@@ -223,43 +200,11 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {}),
       ...(activity === undefined ? {} : { activity }),
       ...(value.isMember === true ? { isMember: true } : {}),
-      ...(worktree === undefined ? {} : { worktree })
+      ...(worktree === undefined ? {} : { worktree }),
+      ...(review === null ? {} : { review }),
+      ...(workItem === null ? {} : { workItem })
     }
   ]
-}
-
-const reviewOf = (value: unknown): GameReview | null => {
-  if (!isShape(value) || typeof value.number !== 'number') {
-    return null
-  }
-  const provider = oneOf(value.provider, PROVIDERS)
-  const state = oneOf(value.state, REVIEW_STATES)
-  const url = str(value.url)
-  if (provider === undefined || state === undefined || url === undefined) {
-    return null
-  }
-  const ci = oneOf(value.ci, CI_STATES) ?? 'none'
-  return { provider, number: value.number, title: str(value.title) ?? '', url, state, ci }
-}
-
-const workItemOf = (value: unknown): GameWorkItem | null => {
-  if (!isShape(value)) {
-    return null
-  }
-  const provider = oneOf(value.provider, TRACKERS)
-  const statusGroup = oneOf(value.statusGroup, STATUS_GROUPS)
-  const identifier = str(value.identifier)
-  if (provider === undefined || statusGroup === undefined || identifier === undefined) {
-    return null
-  }
-  return {
-    provider,
-    identifier,
-    title: str(value.title) ?? '',
-    url: str(value.url) ?? '',
-    status: str(value.status) ?? '',
-    statusGroup
-  }
 }
 
 const MAX_SCENES = 256

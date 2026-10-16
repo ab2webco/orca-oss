@@ -232,6 +232,68 @@ describe('buildOrchestratorGameState', () => {
     })
   })
 
+  it("gives each member in its own worktree that worktree's PR, CI and ticket", async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: 'CIN-8 Seats',
+      toolName: null
+    }
+    const asked: string[] = []
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      members: [
+        {
+          row: { ...row, paneKey: 'tab-6:away' },
+          worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+        },
+        {
+          row: { ...row, paneKey: 'tab-7:quiet' },
+          worktree: { id: 'wt-cin-9', branch: 'feat/cin-9', displayName: 'cin-9' }
+        }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readLinkedStatus: async () => ({ name: 'QA', group: 'review' }),
+      readMemberWork: async (worktreeId) => {
+        asked.push(worktreeId)
+        return worktreeId === 'wt-cin-8'
+          ? {
+              review: {
+                provider: 'github',
+                number: 12,
+                title: 'Seats',
+                url: 'https://github.com/o/r/pull/12',
+                state: 'open',
+                status: 'failure'
+              },
+              linkedWorkItem: {
+                provider: 'jira',
+                type: 'issue',
+                number: 0,
+                title: 'Seats',
+                url: 'https://jira.example/browse/CIN-8',
+                jiraIdentifier: 'CIN-8'
+              }
+            }
+          : null
+      }
+    })
+
+    expect(asked).toEqual(['wt-cin-8', 'wt-cin-9'])
+    expect(state.agents[0]).toMatchObject({
+      review: { number: 12, ci: 'failure', url: 'https://github.com/o/r/pull/12' },
+      workItem: { identifier: 'CIN-8', status: 'QA', statusGroup: 'review' }
+    })
+    expect(state.agents[1]).not.toHaveProperty('review')
+    expect(state.agents[1]).not.toHaveProperty('workItem')
+  })
+
   it('falls back to a linked item without status when no tracker answers', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

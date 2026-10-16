@@ -1,0 +1,112 @@
+import {
+  gameAgentOf,
+  gameReviewOf,
+  statusGroupOfName,
+  type GameActivity,
+  type GameAgent,
+  type GameMemberWorktree,
+  type GameStatusGroup,
+  type GameWorkItem
+} from '../../shared/orchestrator-game-state'
+import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
+import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
+
+export type GameAgentRow = Pick<
+  RuntimeWorktreeAgentRow,
+  'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
+> & { parentPaneKey?: string | null }
+
+export type ReadLinkedStatus = (
+  linked: WorkspaceLinkedItem
+) => Promise<{ name: string; group?: GameStatusGroup } | null>
+
+/** A member worktree's own review and linked ticket, as the lead's are read. */
+export type GameMemberWork = {
+  review: Parameters<typeof gameReviewOf>[0]
+  linkedWorkItem: WorkspaceLinkedItem | null | undefined
+}
+
+// Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
+export const settle = <T>(read: () => Promise<T | null>): Promise<T | null> =>
+  read().catch(() => null)
+
+export function linkedItemOf(linked: WorkspaceLinkedItem | null | undefined): GameWorkItem | null {
+  if (!linked || linked.type !== 'issue') {
+    return null
+  }
+  const identifier =
+    linked.jiraIdentifier ??
+    linked.linearIdentifier ??
+    linked.planeIdentifier ??
+    `#${linked.number}`
+  return {
+    provider: linked.provider,
+    identifier,
+    title: linked.title,
+    url: linked.url,
+    status: '',
+    statusGroup: 'unknown'
+  }
+}
+
+/** The linked ticket with its live status, or without one when its tracker does not answer. */
+export async function liveLinkedItemOf(
+  linked: WorkspaceLinkedItem | null | undefined,
+  readLinkedStatus: ReadLinkedStatus | undefined
+): Promise<GameWorkItem | null> {
+  const item = linkedItemOf(linked)
+  const live =
+    item && linked && readLinkedStatus ? await settle(() => readLinkedStatus(linked)) : null
+  return item && live
+    ? { ...item, status: live.name, statusGroup: live.group ?? statusGroupOfName(live.name) }
+    : item
+}
+
+/** The calling Team plus every session the lead launched, with each member's own PR and ticket. */
+export async function gameFleetOf(args: {
+  agents: readonly GameAgentRow[]
+  members: readonly { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  leaderPaneKey: string | null
+  teamHandles: ReadonlySet<string> | null | undefined
+  terminalHandleOf: ((paneKey: string) => string | null) | undefined
+  activityOf: (paneKey: string) => GameActivity | null
+  readMemberWork: ((worktreeId: string) => Promise<GameMemberWork | null>) | undefined
+  readLinkedStatus: ReadLinkedStatus | undefined
+}): Promise<GameAgent[]> {
+  const { leaderPaneKey, teamHandles } = args
+  const isMemberRow = (row: GameAgentRow): boolean =>
+    leaderPaneKey !== null && row.parentPaneKey === leaderPaneKey
+  // Why: a member reports to this lead wherever it runs; another lead's member is never ours.
+  const rows = teamHandles
+    ? args.agents.filter((row) => {
+        const handle = args.terminalHandleOf?.(row.paneKey)
+        return (
+          isMemberRow(row) || (handle !== null && handle !== undefined && teamHandles.has(handle))
+        )
+      })
+    : args.agents.filter((row) => !row.parentPaneKey || isMemberRow(row))
+  const sourced = [
+    ...rows.map((row) => ({ row, worktree: undefined })),
+    ...args.members.filter((one) => !rows.some((row) => row.paneKey === one.row.paneKey))
+  ]
+  const readMemberWork = args.readMemberWork
+  return await Promise.all(
+    sourced.map(async ({ row, worktree }) => {
+      const work =
+        worktree && readMemberWork ? await settle(() => readMemberWork(worktree.id)) : null
+      const review = work ? gameReviewOf(work.review) : null
+      const workItem = work
+        ? await liveLinkedItemOf(work.linkedWorkItem, args.readLinkedStatus)
+        : null
+      const activity = args.activityOf(row.paneKey)
+      return {
+        ...gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null),
+        ...(isMemberRow(row) || worktree ? { isMember: true } : {}),
+        ...(worktree ? { worktree } : {}),
+        ...(review ? { review } : {}),
+        ...(workItem ? { workItem } : {}),
+        ...(activity ? { activity } : {})
+      }
+    })
+  )
+}

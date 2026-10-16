@@ -1,4 +1,12 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
+import {
+  gameFleetOf,
+  liveLinkedItemOf,
+  settle,
+  type GameAgentRow,
+  type GameMemberWork,
+  type ReadLinkedStatus
+} from './orchestrator-game-fleet'
 import { readWorktreeGameSceneFile } from '../worktree-game-scene-file'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
@@ -27,14 +35,11 @@ import {
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import {
-  gameAgentOf,
   gameReviewOf,
   statusGroupOfName,
   statusGroupOfPlane,
   type GameActivity,
-  type GameAgent,
   type GameMemberWorktree,
-  type GameStatusGroup,
   type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
@@ -43,7 +48,6 @@ import type {
   OrchestratorGameTodoSource
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
-import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
@@ -74,42 +78,15 @@ export type OrchestratorGameStateInput = {
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
-  readLinkedStatus?: (
-    linked: WorkspaceLinkedItem
-  ) => Promise<{ name: string; group?: GameStatusGroup } | null>
+  readLinkedStatus?: ReadLinkedStatus
+  /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
+  readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
     workItem: GameWorkItem | null
   }) => Promise<GameProjectWork>
-}
-
-type GameAgentRow = Pick<
-  RuntimeWorktreeAgentRow,
-  'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
-> & { parentPaneKey?: string | null }
-
-// Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
-const settle = <T>(read: () => Promise<T | null>): Promise<T | null> => read().catch(() => null)
-
-function linkedItemOf(linked: WorkspaceLinkedItem | null | undefined): GameWorkItem | null {
-  if (!linked || linked.type !== 'issue') {
-    return null
-  }
-  const identifier =
-    linked.jiraIdentifier ??
-    linked.linearIdentifier ??
-    linked.planeIdentifier ??
-    `#${linked.number}`
-  return {
-    provider: linked.provider,
-    identifier,
-    title: linked.title,
-    url: linked.url,
-    status: '',
-    statusGroup: 'unknown'
-  }
 }
 
 type SceneFileOutcome =
@@ -195,18 +172,7 @@ export async function buildOrchestratorGameState(
       statusGroup: statusGroupOfName(linear.stateName)
     }
   } else if (tracker) {
-    const linked = input.worktree?.linkedWorkItem
-    const readLinkedStatus = input.readLinkedStatus
-    workItem = linkedItemOf(linked)
-    const live =
-      workItem && linked && readLinkedStatus ? await settle(() => readLinkedStatus(linked)) : null
-    if (workItem && live) {
-      workItem = {
-        ...workItem,
-        status: live.name,
-        statusGroup: live.group ?? statusGroupOfName(live.name)
-      }
-    }
+    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
   }
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
@@ -246,31 +212,15 @@ export async function buildOrchestratorGameState(
     const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
-  const teamHandles = input.teamHandles
-  const leaderPaneKey = input.leaderPaneKey
-  const isMemberRow = (row: GameAgentRow): boolean =>
-    leaderPaneKey !== null && row.parentPaneKey === leaderPaneKey
-  // Why: a member reports to this lead wherever it runs; another lead's member is never ours.
-  const rows = teamHandles
-    ? input.agents.filter((row) => {
-        const handle = input.terminalHandleOf?.(row.paneKey)
-        return (
-          isMemberRow(row) || (handle !== null && handle !== undefined && teamHandles.has(handle))
-        )
-      })
-    : input.agents.filter((row) => !row.parentPaneKey || isMemberRow(row))
-  const sourced = [
-    ...rows.map((row) => ({ row, worktree: undefined })),
-    ...(input.members ?? []).filter((one) => !rows.some((row) => row.paneKey === one.row.paneKey))
-  ]
-  const agents = sourced.map(({ row, worktree }) => {
-    const agent: GameAgent = {
-      ...gameAgentOf(row, leaderPaneKey, input.terminalHandleOf?.(row.paneKey) ?? null),
-      ...(isMemberRow(row) || worktree ? { isMember: true } : {}),
-      ...(worktree ? { worktree } : {})
-    }
-    const activity = activityOf(row.paneKey)
-    return activity ? { ...agent, activity } : agent
+  const agents = await gameFleetOf({
+    agents: input.agents,
+    members: input.members ?? [],
+    leaderPaneKey: input.leaderPaneKey,
+    teamHandles: input.teamHandles,
+    terminalHandleOf: input.terminalHandleOf,
+    activityOf,
+    readMemberWork: input.readMemberWork,
+    readLinkedStatus: input.readLinkedStatus
   })
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {

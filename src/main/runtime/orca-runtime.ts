@@ -652,6 +652,8 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import type { GameMemberWork } from './orchestrator-game-fleet'
+import { GameReadCache } from './orchestrator-game-read-cache'
 import {
   GameProjectWorkCache,
   myOpenPullRequestsOf,
@@ -3585,6 +3587,7 @@ export class OrcaRuntimeService {
   private readonly gameActivityMemory = new GameActivityMemory()
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(90_000)
+  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -30187,6 +30190,24 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       members,
+      readMemberWork: (memberWorktreeId) =>
+        this.gameMemberWork.read(memberWorktreeId, async () => {
+          const member = worktreesById.get(memberWorktreeId)
+          const memberSummary = summaries.find((row) => row.worktreeId === memberWorktreeId)
+          if (!member) {
+            return null
+          }
+          const review =
+            member.repoId && memberSummary?.branch
+              ? await this.getHostedReviewForBranch({
+                  repoSelector: `id:${member.repoId}`,
+                  branch: memberSummary.branch,
+                  linkedGitHubPR: memberSummary.linkedPR?.number ?? null,
+                  linkedGitLabMR: memberSummary.linkedGitLabMR ?? null
+                })
+              : null
+          return { review, linkedWorkItem: member.linkedWorkItem }
+        }),
       leaderPaneKey: args.paneKey ?? null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,

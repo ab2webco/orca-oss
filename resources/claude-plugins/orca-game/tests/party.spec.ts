@@ -110,6 +110,31 @@ describe('counts and needs', () => {
     ])
   })
 
+  it("reads a member in its own worktree by that worktree's PR and ticket, not the lead's", () => {
+    const worktree = { id: 'wt-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+    const merged = { ...REVIEW, number: 8, state: 'merged', ci: 'success' } as const
+    const red = { ...REVIEW, number: 9, url: 'https://gitlab.example/o/r/-/merge_requests/9' }
+    const agents = [
+      agent({
+        paneKey: 'm8',
+        displayName: 'CIN-8',
+        isMember: true,
+        worktree,
+        review: merged,
+        state: 'idle'
+      }),
+      agent({ paneKey: 'm9', displayName: 'CIN-9', isMember: true, worktree, review: red })
+    ]
+    const party = partyOf(state({ agents, review: null }), true)
+    expect(party.map((member) => [member.name, member.phase, member.mood])).toEqual([
+      ['CIN-8', 'handoff', 'cheer'],
+      ['CIN-9', 'pr', 'hurt']
+    ])
+    expect(needsOf(state({ agents, review: null }))).toEqual([
+      { name: 'CIN-9', text: 'CI failing', url: red.url }
+    ])
+  })
+
   it('says what is needed, and what a teammate does, in the launch language', () => {
     setGameLocale('es')
     try {

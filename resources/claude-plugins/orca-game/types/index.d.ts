@@ -22,6 +22,9 @@ export type GameAgent = {
   isMember?: boolean
   /** The member's own worktree, when it is not the lead's. */
   worktree?: GameMemberWorktree
+  /** The member worktree's own review and ticket. */
+  review?: GameReview
+  workItem?: GameWorkItem
 }
 
 export type GameMemberWorktree = { id: string; branch: string; displayName: string }

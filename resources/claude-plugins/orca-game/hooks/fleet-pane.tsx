@@ -182,6 +182,27 @@ export const registerFleetPane = (on: On): void => {
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
               <Text wrap="truncate-end">{member.says}</Text>
+              {(agent.review !== undefined || agent.workItem !== undefined) && (
+                <Box flexDirection="row" gap={1}>
+                  {agent.review !== undefined && (
+                    <Link href={agent.review.url}>
+                      <Text color={CI_COLORS[agent.review.ci]} underline>
+                        {reviewTextOf(agent.review)}
+                      </Text>
+                    </Link>
+                  )}
+                  {agent.workItem !== undefined &&
+                    (agent.workItem.url === '' ? (
+                      <Text>{workItemTextOf(agent.workItem)}</Text>
+                    ) : (
+                      <Link href={agent.workItem.url}>
+                        <Text underline wrap="truncate-end">
+                          {workItemTextOf(agent.workItem)}
+                        </Text>
+                      </Link>
+                    ))}
+                </Box>
+              )}
               {agent.activity !== undefined && (
                 <Link key={`activity-${agent.paneKey}`} href={agent.activity.url}>
                   <Text
