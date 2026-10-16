@@ -314,7 +314,7 @@ test("a project's scene file previews when valid, says why when not, and renders
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({ [repoId]: { sceneFile: '.orca/scenes/space.json' } })
 
-  const preview = orcaPage.getByRole('img', { name: 'Preview of .orca/scenes/space.json' })
+  const preview = orcaPage.getByRole('img', { name: 'Preview of space (custom)' })
   await expect(preview).toBeVisible()
   await expect
     .poll(async () =>
@@ -379,9 +379,7 @@ test("the project's scene files are listed in the Scene picker and picking one s
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({ [repoId]: { sceneFile: '.orca/scenes/deep-space.json' } })
   await expect(scene).toHaveText('deep-space (custom)')
-  await expect(
-    orcaPage.getByRole('img', { name: 'Preview of .orca/scenes/deep-space.json' })
-  ).toBeVisible()
+  await expect(orcaPage.getByRole('img', { name: 'Preview of deep-space (custom)' })).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-listed', scene)
 
   for (const theme of THEMES) {
