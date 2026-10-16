@@ -52,18 +52,31 @@ vi.mock('react-native-svg', () => ({
 }))
 
 describe('PluginPanelIcon', () => {
-  let renderer: ReactTestRenderer | null = null
+  // Why: a `| null` union over this type trips no-redundant-type-constituents in the root lint.
+  let mounted: ReactTestRenderer[] = []
+  const latest = () => mounted.at(-1)!
 
   afterEach(() => {
-    act(() => renderer?.unmount())
-    renderer = null
+    act(() => mounted.forEach((view) => view.unmount()))
+    mounted = []
   })
 
   function render(props: { icon?: string; iconSvg?: PluginPanelIconSvgNode }) {
     act(() => {
-      renderer = create(createElement(PluginPanelIcon, { ...props, size: 20, color: '#abcdef' }))
+      mounted.push(
+        create(
+          createElement(PluginPanelIcon, {
+            ...props,
+            size: 20,
+            color: '#abcdef'
+          })
+        )
+      )
     })
-    return renderer!.toJSON() as { type: string; props: Record<string, unknown> }
+    return latest().toJSON() as {
+      type: string
+      props: Record<string, unknown>
+    }
   }
 
   it('resolves a curated icon name with the given size and color', () => {
@@ -93,13 +106,25 @@ describe('PluginPanelIcon', () => {
       children: [
         {
           tag: 'g',
-          attributes: { stroke: 'currentColor', 'stroke-width': '2', 'fill-rule': 'evenodd' },
+          attributes: {
+            stroke: 'currentColor',
+            'stroke-width': '2',
+            'fill-rule': 'evenodd'
+          },
           children: [
             { tag: 'path', attributes: { d: 'M0 0h24' }, children: [] },
-            { tag: 'circle', attributes: { cx: '12', cy: '12', r: '4' }, children: [] }
+            {
+              tag: 'circle',
+              attributes: { cx: '12', cy: '12', r: '4' },
+              children: []
+            }
           ]
         },
-        { tag: 'rect', attributes: { width: '4', height: '4', fill: 'none' }, children: [] }
+        {
+          tag: 'rect',
+          attributes: { width: '4', height: '4', fill: 'none' },
+          children: []
+        }
       ]
     }
     const icon = render({ icon: 'inbox', iconSvg }) as unknown as SvgJson
@@ -123,8 +148,16 @@ describe('PluginPanelIcon', () => {
     expect(group?.children.map((child) => child.type)).toEqual(['Path', 'Circle'])
     expect(group?.children[0]?.props).toMatchObject({ d: 'M0 0h24' })
     expect(rect?.type).toBe('Rect')
-    expect(rect?.props).toMatchObject({ width: '4', height: '4', fill: 'none' })
+    expect(rect?.props).toMatchObject({
+      width: '4',
+      height: '4',
+      fill: 'none'
+    })
   })
 })
 
-type SvgJson = { type: string; props: Record<string, unknown>; children: SvgJson[] }
+type SvgJson = {
+  type: string
+  props: Record<string, unknown>
+  children: SvgJson[]
+}

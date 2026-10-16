@@ -44,24 +44,37 @@ vi.mock('../transport/client-context', () => ({
 vi.mock('../transport/host-store', () => ({ loadHosts: async () => [] }))
 
 vi.mock('../components/HostProtocolGate', () => ({
-  useHostProtocolGates: () => ({ hostCapabilities: ['mobile.plugin-panels.v1'] })
+  useHostProtocolGates: () => ({
+    hostCapabilities: ['mobile.plugin-panels.v1']
+  })
 }))
 
 const panels = vi.hoisted((): HostablePluginPanel[] => [])
 vi.mock('./use-host-plugin-panels', () => ({
-  useHostPluginPanels: () => ({ panels, error: null, refreshing: false, refresh: () => {} })
+  useHostPluginPanels: () => ({
+    panels,
+    error: null,
+    refreshing: false,
+    refresh: () => {}
+  })
 }))
 
 describe('Host plugin panels screen', () => {
-  let renderer: ReactTestRenderer | null = null
+  // Why: a `| null` union over this type trips no-redundant-type-constituents in the root lint.
+  let mounted: ReactTestRenderer[] = []
+  const latest = () => mounted.at(-1)!
 
   afterEach(() => {
-    act(() => renderer?.unmount())
-    renderer = null
+    act(() => mounted.forEach((view) => view.unmount()))
+    mounted = []
   })
 
   it('shows each panel with its plugin icon', async () => {
-    const iconSvg = { tag: 'svg' as const, attributes: { viewBox: '0 0 24 24' }, children: [] }
+    const iconSvg = {
+      tag: 'svg' as const,
+      attributes: { viewBox: '0 0 24 24' },
+      children: []
+    }
     panels.splice(
       0,
       panels.length,
@@ -83,14 +96,18 @@ describe('Host plugin panels screen', () => {
       }
     )
     await act(async () => {
-      renderer = create(createElement(HostPluginPanelsScreen))
+      mounted.push(create(createElement(HostPluginPanelsScreen)))
     })
 
-    const rows = renderer!.root
-      .findAllByType('Pressable')
+    const rows = latest()
+      .root.findAllByType('Pressable')
       .filter((node) => String(node.props.accessibilityLabel).startsWith('Open '))
     expect(rows).toHaveLength(2)
-    expect(rows[0]!.findByType('PluginPanelIcon').props).toMatchObject({ icon: 'inbox' })
-    expect(rows[1]!.findByType('PluginPanelIcon').props).toMatchObject({ iconSvg })
+    expect(rows[0]!.findByType('PluginPanelIcon').props).toMatchObject({
+      icon: 'inbox'
+    })
+    expect(rows[1]!.findByType('PluginPanelIcon').props).toMatchObject({
+      iconSvg
+    })
   })
 })

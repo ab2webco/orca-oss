@@ -25,7 +25,9 @@ vi.mock('./PluginPanelIcon', async () => {
   }
 })
 
-const gates = vi.hoisted(() => ({ hostCapabilities: ['mobile.plugin-panels.v1'] as string[] }))
+const gates = vi.hoisted(() => ({
+  hostCapabilities: ['mobile.plugin-panels.v1'] as string[]
+}))
 vi.mock('../components/HostProtocolGate', () => ({
   useHostProtocolGates: () => gates
 }))
@@ -37,7 +39,12 @@ const hook = vi.hoisted(() => ({
 vi.mock('./use-host-plugin-panels', () => ({
   useHostPluginPanels: (args: { supported: boolean; connState: string }) => {
     hook.args = args
-    return { panels: hook.panels, error: null, refreshing: false, refresh: () => {} }
+    return {
+      panels: hook.panels,
+      error: null,
+      refreshing: false,
+      refresh: () => {}
+    }
   }
 }))
 
@@ -55,7 +62,9 @@ function panel(overrides: Partial<HostablePluginPanel>): HostablePluginPanel {
 }
 
 describe('HostPluginPanelsRow', () => {
-  let renderer: ReactTestRenderer | null = null
+  // Why: a `| null` union over this type trips no-redundant-type-constituents in the root lint.
+  let mounted: ReactTestRenderer[] = []
+  const latest = () => mounted.at(-1)!
 
   beforeEach(() => {
     gates.hostCapabilities = ['mobile.plugin-panels.v1']
@@ -64,29 +73,47 @@ describe('HostPluginPanelsRow', () => {
   })
 
   afterEach(() => {
-    act(() => renderer?.unmount())
-    renderer = null
+    act(() => mounted.forEach((view) => view.unmount()))
+    mounted = []
   })
 
   function render(connState: ConnectionState = 'connected', hostId: string | undefined = 'desk') {
     const open = vi.fn()
     act(() => {
-      renderer = create(createElement(HostPluginPanelsRow, { hostId, client, connState, open }))
+      mounted.push(
+        create(
+          createElement(HostPluginPanelsRow, {
+            hostId,
+            client,
+            connState,
+            open
+          })
+        )
+      )
     })
     return open
   }
 
   function cards() {
-    return renderer!.root
-      .findAllByType('Pressable')
+    return latest()
+      .root.findAllByType('Pressable')
       .filter((node) => String(node.props.accessibilityLabel).startsWith('Open '))
   }
 
   it('shows one card per nav panel with the plugin icon, title and plugin name', () => {
     hook.panels = [
       panel({ icon: 'inbox' }),
-      panel({ pluginKey: 'acme.crm', pluginName: 'CRM', panelId: 'a', title: 'Deals' }),
-      panel({ panelId: 'config', title: 'Inbox settings', surface: 'settings' })
+      panel({
+        pluginKey: 'acme.crm',
+        pluginName: 'CRM',
+        panelId: 'a',
+        title: 'Deals'
+      }),
+      panel({
+        panelId: 'config',
+        title: 'Inbox settings',
+        surface: 'settings'
+      })
     ]
     render()
 
@@ -96,7 +123,9 @@ describe('HostPluginPanelsRow', () => {
     ])
     const first = cards()[0]!
     expect(first.props.accessibilityRole).toBe('button')
-    expect(first.findByType('PluginPanelIcon').props).toMatchObject({ icon: 'inbox' })
+    expect(first.findByType('PluginPanelIcon').props).toMatchObject({
+      icon: 'inbox'
+    })
     const texts = first.findAllByType('Text').map((node) => node.props.children)
     expect(texts).toEqual(['Inbox board', 'Inbox'])
     expect(first.findAllByType('Text')[0]!.props.numberOfLines).toBe(1)
@@ -114,7 +143,13 @@ describe('HostPluginPanelsRow', () => {
   })
 
   it('opens the panel route and the full plugins list', () => {
-    hook.panels = [panel({ pluginKey: 'demo.inbox', panelId: 'board', title: 'Inbox & more' })]
+    hook.panels = [
+      panel({
+        pluginKey: 'demo.inbox',
+        panelId: 'board',
+        title: 'Inbox & more'
+      })
+    ]
     const open = render()
 
     act(() => cards()[0]!.props.onPress())
@@ -122,8 +157,8 @@ describe('HostPluginPanelsRow', () => {
       '/h/desk/plugins/demo.inbox/board?title=Inbox%20%26%20more'
     )
 
-    const all = renderer!.root
-      .findAllByType('Pressable')
+    const all = latest()
+      .root.findAllByType('Pressable')
       .find((node) => node.props.accessibilityLabel === 'All plugins')!
     act(() => all.props.onPress())
     expect(open).toHaveBeenLastCalledWith('/h/desk/plugins')
@@ -134,17 +169,17 @@ describe('HostPluginPanelsRow', () => {
     hook.panels = [panel({})]
     render()
 
-    expect(renderer!.toJSON()).toBeNull()
+    expect(latest().toJSON()).toBeNull()
     expect(hook.args?.supported).toBe(false)
   })
 
   it('renders nothing before the first list arrives or without any panel', () => {
     render('disconnected')
-    expect(renderer!.toJSON()).toBeNull()
+    expect(latest().toJSON()).toBeNull()
 
     hook.panels = []
     render()
-    expect(renderer!.toJSON()).toBeNull()
+    expect(latest().toJSON()).toBeNull()
   })
 
   it('keeps the All entry when only settings panels exist', () => {
@@ -152,9 +187,9 @@ describe('HostPluginPanelsRow', () => {
     const open = render()
 
     expect(cards()).toHaveLength(0)
-    expect(renderer!.root.findAllByType('ScrollView')).toHaveLength(0)
-    const all = renderer!.root
-      .findAllByType('Pressable')
+    expect(latest().root.findAllByType('ScrollView')).toHaveLength(0)
+    const all = latest()
+      .root.findAllByType('Pressable')
       .find((node) => node.props.accessibilityLabel === 'All plugins')!
     act(() => all.props.onPress())
     expect(open).toHaveBeenLastCalledWith('/h/desk/plugins')
