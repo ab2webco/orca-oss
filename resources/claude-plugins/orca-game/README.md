@@ -9,11 +9,13 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   rows are hidden unless they fail. `on` (default), `zen` (also hides short working notes) or `off`.
 - **The band** above the prompt: a HUD with the lead as the hero and every teammate in the party
   (walking while it works, hopping with `needs you!` while it waits, hurt while CI is red), counts,
-  the review with its CI, the work item, a `Needs you:` line, and **Panel**, **Refresh** and
-  **Pet Clawd**.
+  the review, its CI, the work item, agent activity and project links as clickable chips, a
+  `Needs you:` line, and **Panel**, **Refresh** and **Pet Clawd**.
 - **The Fleet pane** (Panel): the HUD at full width and one card per agent with its own animated
-  tile, then the review and the work item as links. `r` refreshes, `c` pets Clawd, `q` or Esc closes.
-  **View** (`1`–`9` by tile order) focuses that teammate's Orca pane.
+  tile and activity link, then the review and the work item as links. **Open** takes `i` (work
+  item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
+  tab. `r` refreshes, `p` pets Clawd, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
+  that teammate's Orca pane.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
 - **Allies.** Other plugins keep running: their `$.ui.status` lines, and Jev's advisor state when
   Jev is installed, become rows of a strip under the band, and their band elements take the scene
