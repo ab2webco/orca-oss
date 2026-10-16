@@ -282,6 +282,21 @@ export function registerShellHandlers(store: Store): void {
     }
   )
 
+  ipcMain.handle(
+    'shell:pickJsonFile',
+    async (_event, args: { defaultPath?: string }): Promise<string | null> => {
+      const result = await dialog.showOpenDialog({
+        defaultPath: args.defaultPath,
+        properties: ['openFile'],
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      })
+      if (result.canceled || result.filePaths.length === 0) {
+        return null
+      }
+      return result.filePaths[0]
+    }
+  )
+
   ipcMain.handle('shell:pickAudio', async (): Promise<string | null> => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],

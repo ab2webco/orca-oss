@@ -2808,6 +2808,9 @@ const api = {
     pickDirectory: (args: { defaultPath?: string }): Promise<string | null> =>
       ipcRenderer.invoke('shell:pickDirectory', args),
 
+    pickJsonFile: (args: { defaultPath?: string }): Promise<string | null> =>
+      ipcRenderer.invoke('shell:pickJsonFile', args),
+
     copyFile: (args: { srcPath: string; destPath: string }): Promise<void> =>
       ipcRenderer.invoke('shell:copyFile', args)
   },
