@@ -4,6 +4,7 @@ import { sceneFile } from '../../../../shared/__fixtures__/orchestrator-game-sce
 import { SCENES } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import {
   createOrchestratorGameSceneFile,
+  listOrchestratorGameSceneFiles,
   readOrchestratorGameSceneFile,
   sceneFileTextOf,
   type SceneFileFs
@@ -149,5 +150,41 @@ describe('readOrchestratorGameSceneFile', () => {
     expect(
       await readOrchestratorGameSceneFile({ fs, rootPath: '/repo', path: 'gone.json' })
     ).toEqual({ status: 'unreadable', message: expect.stringContaining('ENOENT') })
+  })
+})
+
+describe('listOrchestratorGameSceneFiles', () => {
+  it("lists the JSON files in the project's .orca/scenes, over SSH too", async () => {
+    const asked: unknown[] = []
+    const files = await listOrchestratorGameSceneFiles({
+      fs: {
+        readDir: async (args) => {
+          asked.push(args)
+          return [
+            { name: 'old', isDirectory: true, isSymlink: false },
+            { name: 'notes.md', isDirectory: false, isSymlink: false },
+            { name: 'mario.json', isDirectory: false, isSymlink: false },
+            { name: 'deep-space.json', isDirectory: false, isSymlink: false }
+          ]
+        }
+      },
+      rootPath: '/repo',
+      connectionId: 'ssh-1'
+    })
+
+    expect(asked).toEqual([{ dirPath: '/repo/.orca/scenes', connectionId: 'ssh-1' }])
+    expect(files).toEqual(['.orca/scenes/deep-space.json', '.orca/scenes/mario.json'])
+  })
+
+  it('lists nothing when the folder is missing', async () => {
+    const files = await listOrchestratorGameSceneFiles({
+      fs: {
+        readDir: async () => {
+          throw new Error('ENOENT')
+        }
+      },
+      rootPath: '/repo'
+    })
+    expect(files).toEqual([])
   })
 })

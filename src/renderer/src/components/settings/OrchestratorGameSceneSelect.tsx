@@ -42,7 +42,15 @@ export const sceneLabel = (option: OrchestratorGameSceneOption): string => {
     return builtInLabels()[option.scene]
   }
   if (option.kind === 'file') {
-    return option.path
+    // Why: a file in the scenes folder reads by its name; one elsewhere keeps its whole path.
+    const listed = /^\.orca\/scenes\/([^/]+)\.json$/i.exec(option.path)?.[1]
+    return listed
+      ? translate(
+          'auto.components.settings.OrchestratorGameSetting.sceneProjectFile',
+          '{{value0}} (custom)',
+          { value0: listed }
+        )
+      : option.path
   }
   if (option.kind === 'missing') {
     return translate(
@@ -62,7 +70,8 @@ export function OrchestratorGameSceneSelect({
   inheritLabel,
   disabled,
   onChange,
-  onCustomFile
+  onCustomFile,
+  projectFiles
 }: {
   value: string
   ariaLabel: string
@@ -70,6 +79,8 @@ export function OrchestratorGameSceneSelect({
   disabled?: boolean
   onChange: (scene: string | null) => void
   onCustomFile?: () => void
+  /** The project's `.orca/scenes` files, offered as `file:<path>` scene ids. */
+  projectFiles?: readonly string[]
 }): React.JSX.Element {
   const customLabel = translate(
     'auto.components.settings.OrchestratorGameSetting.sceneCustomFile',
@@ -85,9 +96,10 @@ export function OrchestratorGameSceneSelect({
         plugins,
         (value === INHERIT_SCENE && inheritLabel) || (value === CUSTOM_SCENE_FILE && onCustomFile)
           ? undefined
-          : value
+          : value,
+        projectFiles
       ),
-    [plugins, value, inheritLabel, onCustomFile]
+    [plugins, value, inheritLabel, onCustomFile, projectFiles]
   )
   const selected = options.find((option) => option.value === value)
   const title = selected

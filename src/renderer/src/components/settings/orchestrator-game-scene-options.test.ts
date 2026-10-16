@@ -73,4 +73,26 @@ describe('orchestratorGameSceneOptions', () => {
     const options = orchestratorGameSceneOptions([], 'tamer')
     expect(options).toEqual(BUILT_IN)
   })
+
+  it("adds the project's scene files after the plugins, each once even when it is the current one", () => {
+    const options = orchestratorGameSceneOptions([], 'file:.orca/scenes/mario.json', [
+      '.orca/scenes/deep-space.json',
+      '.orca/scenes/mario.json'
+    ])
+    expect(options).toEqual([
+      ...BUILT_IN,
+      {
+        value: 'file:.orca/scenes/deep-space.json',
+        kind: 'file',
+        scene: 'file:.orca/scenes/deep-space.json',
+        path: '.orca/scenes/deep-space.json'
+      },
+      {
+        value: 'file:.orca/scenes/mario.json',
+        kind: 'file',
+        scene: 'file:.orca/scenes/mario.json',
+        path: '.orca/scenes/mario.json'
+      }
+    ])
+  })
 })

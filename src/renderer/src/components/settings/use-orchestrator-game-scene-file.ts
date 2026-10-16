@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  listOrchestratorGameSceneFiles,
   readOrchestratorGameSceneFile,
   type SceneFileRead
 } from './orchestrator-game-scene-file-io'
@@ -53,4 +54,41 @@ export function useOrchestratorGameSceneFile(args: {
   }, [reload])
 
   return { state, reload }
+}
+
+const NO_FILES: readonly string[] = []
+
+/** The project's `.orca/scenes` files for the Scene picker, re-listed when the window regains focus. */
+export function useOrchestratorGameProjectSceneFiles(args: {
+  rootPath: string
+  connectionId: string | undefined
+  isReachable: boolean
+}): readonly string[] {
+  const { rootPath, connectionId, isReachable } = args
+  const [files, setFiles] = useState<readonly string[]>(NO_FILES)
+
+  useEffect(() => {
+    let isCurrent = true
+    const reload = (): void => {
+      if (!isReachable || rootPath === '') {
+        setFiles(NO_FILES)
+        return
+      }
+      void listOrchestratorGameSceneFiles({ fs: window.api.fs, rootPath, connectionId }).then(
+        (next) => {
+          if (isCurrent) {
+            setFiles((current) => (current.join('\n') === next.join('\n') ? current : next))
+          }
+        }
+      )
+    }
+    reload()
+    window.addEventListener('focus', reload)
+    return () => {
+      isCurrent = false
+      window.removeEventListener('focus', reload)
+    }
+  }, [connectionId, isReachable, rootPath])
+
+  return files
 }

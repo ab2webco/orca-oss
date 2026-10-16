@@ -10702,6 +10702,7 @@
           "sceneJrpg": "Crystal Saga (integrada)",
           "sceneTamer": "Beast Tamer (integrada)",
           "sceneMissing": "{{value0}} (no instalada)",
+          "sceneProjectFile": "{{value0}} (propia)",
           "inherit": "Heredar",
           "projectDescription": "Cambia el juego para este proyecto en este equipo. El orca.yaml del proyecto define su valor por defecto.",
           "sourceDefault": "por defecto",

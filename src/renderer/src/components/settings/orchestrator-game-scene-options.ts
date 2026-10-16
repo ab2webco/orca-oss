@@ -3,7 +3,10 @@ import {
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   type OrchestratorGameBuiltInScene
 } from '../../../../shared/orchestrator-game-config'
-import { orchestratorGameSceneFileOfId } from '../../../../shared/orchestrator-game-scene-file'
+import {
+  orchestratorGameSceneFileId,
+  orchestratorGameSceneFileOfId
+} from '../../../../shared/orchestrator-game-scene-file'
 
 export type OrchestratorGameSceneOption =
   | { value: string; kind: 'built-in'; scene: OrchestratorGameBuiltInScene }
@@ -13,11 +16,13 @@ export type OrchestratorGameSceneOption =
 
 const SERVING_STATUSES: readonly PluginHostListEntry['status'][] = ['running', 'restarting', 'idle']
 
-/** Scene choices for Settings: the built-in scenes, then scenes of plugins the host runs, then the
- *  current id if nothing serves it (an orca.yaml value stays visible; the game falls back to quest). */
+/** Scene choices for Settings: the built-in scenes, scenes of plugins the host runs, the project's
+ *  scene files, then the current id if nothing serves it (an orca.yaml value stays visible; the
+ *  game falls back to quest). */
 export function orchestratorGameSceneOptions(
   plugins: readonly PluginHostListEntry[],
-  current: string | undefined
+  current: string | undefined,
+  projectFiles: readonly string[] = []
 ): OrchestratorGameSceneOption[] {
   const contributed = plugins
     .filter((plugin) => SERVING_STATUSES.includes(plugin.status) && !plugin.blockedByKillList)
@@ -36,9 +41,16 @@ export function orchestratorGameSceneOptions(
       kind: 'built-in' as const,
       scene
     })),
-    ...contributed
+    ...contributed,
+    ...projectFiles.map((file) => {
+      const value = orchestratorGameSceneFileId(file)
+      return { value, kind: 'file' as const, scene: value, path: file }
+    })
   ]
   const path = current ? orchestratorGameSceneFileOfId(current) : null
+  if (options.some((option) => option.value === current)) {
+    return options
+  }
   if (current && path !== null) {
     options.push({ value: current, kind: 'file', scene: current, path })
   } else if (current && !options.some((option) => option.value === current)) {

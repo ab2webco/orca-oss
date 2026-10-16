@@ -29,7 +29,14 @@ import {
   OrchestratorGameSceneFileStatus
 } from './OrchestratorGameSceneFileField'
 import { repositoryTargetWorktreeOf } from './repository-target-worktree'
-import { useOrchestratorGameSceneFile } from './use-orchestrator-game-scene-file'
+import {
+  useOrchestratorGameProjectSceneFiles,
+  useOrchestratorGameSceneFile
+} from './use-orchestrator-game-scene-file'
+import {
+  orchestratorGameSceneFileId,
+  orchestratorGameSceneFileOfId
+} from '../../../../shared/orchestrator-game-scene-file'
 import {
   SettingsRow,
   SettingsSegmentedControl,
@@ -225,8 +232,18 @@ export function ProjectOrchestratorGameSetting({
     isReachable: !connectionId || sshStatus === 'connected',
     path: sceneFile
   })
+  const projectFiles = useOrchestratorGameProjectSceneFiles({
+    rootPath: target.path,
+    connectionId,
+    isReachable: !connectionId || sshStatus === 'connected'
+  })
   const [isCustomPicked, setIsCustomPicked] = useState(false)
   const isCustom = local?.sceneFile !== undefined || isCustomPicked
+  // Why: a file from the scenes folder shows as itself in the picker, not as "Custom file…".
+  const listedFile =
+    !isCustomPicked && local?.sceneFile !== undefined && projectFiles.includes(local.sceneFile)
+      ? orchestratorGameSceneFileId(local.sceneFile)
+      : null
   const setScene = (choice: { scene: string } | { sceneFile: string } | null): void => {
     setIsCustomPicked(false)
     updateSettings({
@@ -325,10 +342,14 @@ export function ProjectOrchestratorGameSetting({
           description={effective('scene', sceneFile ?? config.scene)}
           control={
             <OrchestratorGameSceneSelect
-              value={isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE)}
+              value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
               ariaLabel={sceneTitle()}
               inheritLabel={inherit}
-              onChange={(scene) => setScene(scene === null ? null : { scene })}
+              projectFiles={projectFiles}
+              onChange={(scene) => {
+                const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
+                setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
+              }}
               onCustomFile={() => setIsCustomPicked(true)}
             />
           }

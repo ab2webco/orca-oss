@@ -10691,6 +10691,7 @@
           "sceneJrpg": "Crystal Saga (組み込み)",
           "sceneTamer": "Beast Tamer (組み込み)",
           "sceneMissing": "{{value0}} (未インストール)",
+          "sceneProjectFile": "{{value0}} (カスタム)",
           "inherit": "継承",
           "projectDescription": "このマシンでこのプロジェクトのゲーム設定を上書きします。既定値はプロジェクトの orca.yaml で設定されます。",
           "sourceDefault": "既定",

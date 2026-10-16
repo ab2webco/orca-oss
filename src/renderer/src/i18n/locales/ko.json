@@ -10702,6 +10702,7 @@
           "sceneJrpg": "Crystal Saga (기본 제공)",
           "sceneTamer": "Beast Tamer (기본 제공)",
           "sceneMissing": "{{value0}} (설치되지 않음)",
+          "sceneProjectFile": "{{value0}} (사용자 지정)",
           "inherit": "상속",
           "projectDescription": "이 기기에서 이 프로젝트의 게임 설정을 재정의합니다. 기본값은 프로젝트의 orca.yaml에서 정합니다.",
           "sourceDefault": "기본값",

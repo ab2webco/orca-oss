@@ -11330,6 +11330,7 @@
           "sceneJrpg": "Crystal Saga (built-in)",
           "sceneTamer": "Beast Tamer (built-in)",
           "sceneMissing": "{{value0}} (not installed)",
+          "sceneProjectFile": "{{value0}} (custom)",
           "inherit": "Inherit",
           "projectDescription": "Override the game for this project on this machine. The project's orca.yaml sets its default.",
           "sourceDefault": "default",

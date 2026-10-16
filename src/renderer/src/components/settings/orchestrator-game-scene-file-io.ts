@@ -4,6 +4,7 @@ import {
   parseOrchestratorGameScene
 } from '../../../../shared/orchestrator-game-scene'
 import {
+  ORCHESTRATOR_GAME_SCENE_FILE_DIR,
   orchestratorGameSceneFileCandidates,
   orchestratorGameSceneFileId
 } from '../../../../shared/orchestrator-game-scene-file'
@@ -112,6 +113,34 @@ export async function createOrchestratorGameSceneFile(args: {
     return path
   }
   throw new Error('Every scene file name is taken')
+}
+
+/** The part of `window.api.fs` that lists a project's scene folder. */
+export type SceneDirFs = {
+  readDir: (args: {
+    dirPath: string
+    connectionId?: string
+  }) => Promise<{ name: string; isDirectory: boolean; isSymlink: boolean }[]>
+}
+
+/** The `.orca/scenes/*.json` files of a project as worktree paths; none when the folder is missing. */
+export async function listOrchestratorGameSceneFiles(args: {
+  fs: SceneDirFs
+  rootPath: string
+  connectionId?: string
+}): Promise<string[]> {
+  try {
+    const entries = await args.fs.readDir({
+      dirPath: joinPath(args.rootPath, ORCHESTRATOR_GAME_SCENE_FILE_DIR),
+      connectionId: args.connectionId
+    })
+    return entries
+      .filter((entry) => !entry.isDirectory && entry.name.toLowerCase().endsWith('.json'))
+      .map((entry) => `${ORCHESTRATOR_GAME_SCENE_FILE_DIR}/${entry.name}`)
+      .sort()
+  } catch {
+    return []
+  }
 }
 
 export async function readOrchestratorGameSceneFile(args: {

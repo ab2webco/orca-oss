@@ -50,8 +50,23 @@ const spacePack: PluginHostListEntry = {
   gameScenes: ['acme.space/orbit']
 }
 
+let sceneFiles: string[] = []
+
 beforeEach(() => {
   usePluginPanelsStore.setState({ plugins: [spacePack], fetchStatus: 'ready' })
+  sceneFiles = []
+  // Why: the project picker lists `.orca/scenes`; each test names the files that folder holds.
+  Object.assign(window, {
+    api: {
+      fs: {
+        readDir: async () =>
+          sceneFiles.map((name) => ({ name, isDirectory: false, isSymlink: false })),
+        readFile: async () => {
+          throw new Error('ENOENT')
+        }
+      }
+    }
+  })
 })
 
 function sceneSelect(container: HTMLElement): HTMLSelectElement {
@@ -235,6 +250,53 @@ describe('game scene picker', () => {
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { scene: 'acme.space/orbit' } } }
     ])
+    view.unmount()
+  })
+
+  it("lists the project's scene files as custom scenes and picks one for this machine", async () => {
+    sceneFiles = ['deep-space.json']
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={undefined}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const select = sceneSelect(view.container)
+    expect(optionsOf(select)).toContainEqual([
+      'file:.orca/scenes/deep-space.json',
+      'deep-space (custom)'
+    ])
+    choose(select, 'file:.orca/scenes/deep-space.json')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { sceneFile: '.orca/scenes/deep-space.json' } } }
+    ])
+    view.unmount()
+  })
+
+  it('shows a listed scene file this machine picked as selected', async () => {
+    sceneFiles = ['deep-space.json']
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{
+          orchestratorGameProjects: { repo1: { sceneFile: '.orca/scenes/deep-space.json' } }
+        }}
+        projectLayer={undefined}
+        updateSettings={() => undefined}
+      />
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(sceneSelect(view.container).value).toBe('file:.orca/scenes/deep-space.json')
     view.unmount()
   })
 })

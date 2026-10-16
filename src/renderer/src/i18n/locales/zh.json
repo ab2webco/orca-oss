@@ -10711,6 +10711,7 @@
           "sceneJrpg": "Crystal Saga (内置)",
           "sceneTamer": "Beast Tamer (内置)",
           "sceneMissing": "{{value0}} (未安装)",
+          "sceneProjectFile": "{{value0}} (自定义)",
           "inherit": "继承",
           "projectDescription": "在此设备上覆盖此项目的游戏设置。项目的 orca.yaml 设置其默认值。",
           "sourceDefault": "默认",
