@@ -8,6 +8,9 @@ const GENERAL_PANES = ['general', 'agents', 'appearance', 'terminal', 'git'] as 
 
 type PaneTarget = { pane: string; repoId: string | null }
 
+// Why: a developer's ANDROID_HOME shows the SDK as found, hiding the wider not-found row CI renders.
+test.use({ orcaAppExtraEnv: { ANDROID_HOME: '', ANDROID_SDK_ROOT: '' } })
+
 type OverflowReport = {
   scrollWidth: number
   clientWidth: number
@@ -169,6 +172,30 @@ test('settings panes fit the window without horizontal overflow at every width',
     await openPane(orcaPage, { pane, repoId: null })
     await checkPane(electronApp, orcaPage, testInfo, pane, null, failures)
   }
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await openPane(orcaPage, { pane: 'general', repoId: null })
+  await checkPane(
+    electronApp,
+    orcaPage,
+    testInfo,
+    'general-cli',
+    'button[role="switch"][aria-label="Shell command"]',
+    failures
+  )
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await openPane(orcaPage, { pane: 'mobile-emulator', repoId: null })
+  // Why: the toolchain rows render after an async availability probe; measuring earlier misses them.
+  await expect(orcaPage.getByText('Android SDK', { exact: true })).toBeVisible({ timeout: 15_000 })
+  await checkPane(
+    electronApp,
+    orcaPage,
+    testInfo,
+    'mobile-emulator',
+    '[aria-label="Refresh emulator availability"]',
+    failures
+  )
 
   await setWindowWidth(electronApp, orcaPage, 1440)
   await openPane(orcaPage, { pane: 'agents', repoId: null })
