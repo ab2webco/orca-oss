@@ -82,6 +82,11 @@ import {
 import { shouldHideNonOpenReviewOnDefaultBranch } from '../source-control/repo-default-branch'
 import { readLocalGitConfigSignature } from './local-git-config-signature'
 import {
+  FULL_PULL_REQUEST_HEAD_MATCH,
+  rankPullRequestHeadMatch,
+  type PullRequestHeadExpectation
+} from './pr-number-head-match'
+import {
   getGitHubApiRepositoryForRemote,
   getOriginGitHubApiRepository,
   githubHostExecOptions,
@@ -2213,6 +2218,7 @@ type PullRequestLookupData = {
   headRefName?: string
   baseRefOid?: string
   headRefOid?: string
+  headRepositoryOwner?: { login?: string } | null
   stack?: GitHubPRStack
   stackMetadataChecked?: boolean
 }
@@ -2229,7 +2235,7 @@ type RestPullRequest = {
   mergeable?: boolean | null
   mergeable_state?: string | null
   base?: { ref?: string; sha?: string }
-  head?: { ref?: string; sha?: string }
+  head?: { ref?: string; sha?: string; repo?: { owner?: { login?: string } } | null }
   stack?: {
     number?: number
     position?: number
@@ -2239,7 +2245,7 @@ type RestPullRequest = {
 }
 
 const PR_LOOKUP_JSON_FIELDS =
-  'number,title,state,url,statusCheckRollup,updatedAt,isDraft,mergeable,reviewDecision,mergeStateStatus,autoMergeRequest,baseRefName,headRefName,baseRefOid,headRefOid'
+  'number,title,state,url,statusCheckRollup,updatedAt,isDraft,mergeable,reviewDecision,mergeStateStatus,autoMergeRequest,baseRefName,headRefName,baseRefOid,headRefOid,headRepositoryOwner'
 const PR_BRANCH_LIST_JSON_FIELDS =
   'number,title,state,url,statusCheckRollup,updatedAt,isDraft,mergeable,baseRefName,headRefName,baseRefOid,headRefOid'
 const PR_AUTO_MERGE_IDENTITY_JSON_FIELDS = 'id,headRefOid,baseRefName'
@@ -2301,6 +2307,9 @@ function mapRestPullRequest(pr: RestPullRequest): PullRequestLookupData {
     headRefName: pr.head?.ref,
     baseRefOid: pr.base?.sha,
     headRefOid: pr.head?.sha,
+    ...(pr.head?.repo?.owner?.login
+      ? { headRepositoryOwner: { login: pr.head.repo.owner.login } }
+      : {}),
     stackMetadataChecked: true,
     ...(stack ? { stack } : {})
   }
@@ -3134,7 +3143,10 @@ async function lookupPRByNumber(args: {
   number: number
   ghOptions: ReturnType<typeof ghRepoExecOptions>
   executionScope: string
+  /** Null when the branch is unknown (detached HEAD): the first PR found wins. */
+  expectedHead: PullRequestHeadExpectation | null
 }): Promise<{ data: PullRequestLookupData | null; dataRepo: OwnerRepo | null }> {
+  let best: { data: PullRequestLookupData; dataRepo: OwnerRepo; rank: number } | null = null
   for (const candidate of args.candidates) {
     try {
       const linkedData = await getPRByNumber(
@@ -3146,13 +3158,26 @@ async function lookupPRByNumber(args: {
       if (!linkedData) {
         continue
       }
-      return { data: linkedData, dataRepo: candidate }
+      const rank = args.expectedHead
+        ? rankPullRequestHeadMatch(linkedData, args.expectedHead)
+        : FULL_PULL_REQUEST_HEAD_MATCH
+      if (rank === FULL_PULL_REQUEST_HEAD_MATCH) {
+        return { data: linkedData, dataRepo: candidate }
+      }
+      // Why: upstream and a fork hosting its own PRs reuse numbers; keep probing for the worktree's head, else keep the first hit (create-from-PR local names).
+      if (!best || rank > best.rank) {
+        best = { data: linkedData, dataRepo: candidate, rank }
+      }
     } catch (err) {
-      if (shouldStopAfterExactLookupError(err)) {
+      // Why: a later probe failing must not discard a PR the upstream-first lookup already found.
+      if (shouldStopAfterExactLookupError(err) && !best) {
         throw err
       }
       // Candidate probing is best-effort; another repo may own the PR.
     }
+  }
+  if (best) {
+    return { data: best.data, dataRepo: best.dataRepo }
   }
 
   if (args.candidates.length > 0) {
@@ -3340,13 +3365,17 @@ export async function getPRForBranchOutcome(
       )
     }
 
+    const expectedHead: PullRequestHeadExpectation | null = branchName
+      ? { branchName, headOwner: headRepo?.owner ?? null }
+      : null
     if (typeof linkedPRNumber === 'number') {
       usedExactNumberLookup = true
       const exactLookup = await lookupPRByNumber({
         candidates,
         number: linkedPRNumber,
         ghOptions,
-        executionScope
+        executionScope,
+        expectedHead
       })
       data = exactLookup.data
       dataRepo = exactLookup.dataRepo
@@ -3418,7 +3447,8 @@ export async function getPRForBranchOutcome(
         candidates,
         number: fallbackPRNumber,
         ghOptions,
-        executionScope
+        executionScope,
+        expectedHead
       })
       data = fallbackLookup.data
       dataRepo = fallbackLookup.dataRepo
