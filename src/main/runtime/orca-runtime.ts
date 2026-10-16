@@ -30148,6 +30148,8 @@ export class OrcaRuntimeService {
     const summary = worktree
       ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
       : undefined
+    const callerHandle =
+      args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
     return await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       worktree: worktree
@@ -30164,6 +30166,7 @@ export class OrcaRuntimeService {
       agents: summary?.agents ?? [],
       leaderPaneKey: args.paneKey ?? null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+      teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),

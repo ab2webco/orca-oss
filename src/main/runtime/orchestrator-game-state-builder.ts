@@ -59,6 +59,8 @@ export type OrchestratorGameStateInput = {
   >[]
   leaderPaneKey: string | null
   terminalHandleOf?: (paneKey: string) => string | null
+  /** The calling Team's terminals; when known, agents outside it are left out. */
+  teamHandles?: ReadonlySet<string> | null
   /** A pane's recent MCP calls, newest first, held by the hook server in memory. */
   mcpCallsOf?: (paneKey: string) => readonly GameActivityCall[]
   /** Keeps each pane's last match once its call leaves `mcpCallsOf`'s bounded window. */
@@ -206,7 +208,14 @@ export async function buildOrchestratorGameState(
     const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
-  const agents = input.agents.map((row) => {
+  const teamHandles = input.teamHandles
+  const rows = teamHandles
+    ? input.agents.filter((row) => {
+        const handle = input.terminalHandleOf?.(row.paneKey)
+        return handle !== null && handle !== undefined && teamHandles.has(handle)
+      })
+    : input.agents
+  const agents = rows.map((row) => {
     const agent = gameAgentOf(
       row,
       input.leaderPaneKey,

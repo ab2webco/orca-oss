@@ -145,6 +145,40 @@ describe('buildOrchestratorGameState', () => {
     expect(state.agents[1]).not.toHaveProperty('terminalHandle')
   })
 
+  // Why: one worktree can host several Teams; a band counting another Team's agents misleads.
+  it("keeps only the calling team's panes when the team is known", async () => {
+    const row = {
+      state: 'done' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: null,
+      toolName: null
+    }
+    const handles: Record<string, string> = {
+      'tab-1:lead': 'term_lead',
+      'tab-1:mate': 'term_mate',
+      'tab-2:other-lead': 'term_other',
+      'tab-3:moved-mate': 'term_moved'
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: Object.keys(handles).map((paneKey) => ({ ...row, paneKey })),
+      leaderPaneKey: 'tab-1:lead',
+      terminalHandleOf: (paneKey) => handles[paneKey] ?? null,
+      teamHandles: new Set(['term_lead', 'term_mate', 'term_moved']),
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual([
+      'tab-1:lead',
+      'tab-1:mate',
+      'tab-3:moved-mate'
+    ])
+  })
+
   it('falls back to a linked item without status when no tracker answers', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,
