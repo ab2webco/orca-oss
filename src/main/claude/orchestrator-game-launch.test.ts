@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import {
   buildOrchestratorGameLaunch,
+  orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
   withOrchestratorGameArgs
 } from './orchestrator-game-launch'
@@ -15,7 +16,8 @@ describe('buildOrchestratorGameLaunch', () => {
       resolved: resolveOrchestratorGameConfig({ project: { mode: 'zen', rewards: false } }),
       claudeVersion: '2.1.301',
       pluginDir: PLUGIN_DIR,
-      orcaCli: '/app/bin/orca'
+      orcaCli: '/app/bin/orca',
+      locale: 'ja'
     })
 
     expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
@@ -24,8 +26,19 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_MODE: 'zen',
       ORCA_GAME_SCENE: 'quest',
       ORCA_GAME_HUD: '1',
-      ORCA_GAME_REWARDS: '0'
+      ORCA_GAME_REWARDS: '0',
+      ORCA_GAME_LOCALE: 'ja'
     })
+  })
+
+  it('tells the game English when no language is given', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({}),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR
+    })
+
+    expect(launch.env.ORCA_GAME_LOCALE).toBe('en')
   })
 
   it('accepts the first Claude Code version with mods', () => {
@@ -64,6 +77,23 @@ describe('buildOrchestratorGameLaunch', () => {
         pluginDir
       })
     ).toEqual({ args: [], env: {} })
+  })
+})
+
+describe('orchestratorGameLocaleOf', () => {
+  it.each([
+    ['es', 'ja-JP', 'es'],
+    ['zh', 'en-US', 'zh'],
+    ['system', 'ko-KR', 'ko'],
+    ['system', 'es_CO', 'es'],
+    // Why: Orca has no Traditional Chinese catalog, so the renderer shows English too.
+    ['system', 'zh-TW', 'en'],
+    ['system', 'fr-FR', 'en'],
+    ['plugin:acme.lang/es-MX', 'en-US', 'es'],
+    ['plugin:acme.lang/fr', 'ja-JP', 'en'],
+    [undefined, 'ja-JP', 'ja']
+  ] as const)('maps the UI language %s (system %s) to %s', (language, system, expected) => {
+    expect(orchestratorGameLocaleOf(language, system)).toBe(expected)
   })
 })
 

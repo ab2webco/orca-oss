@@ -4,10 +4,12 @@ import { promisify } from 'node:util'
 import { app } from 'electron'
 import { resolveClaudeCommand } from '../codex-cli/command'
 import { loadHooks } from '../hooks'
+import { getMainSystemLocale } from '../i18n/main-i18n'
 import { resolveClaudeAgentTeamsShimBin } from '../runtime/claude-agent-teams-shim-env'
 import { parseClaudeCodeVersion } from './hook-event-versions'
 import {
   buildOrchestratorGameLaunch,
+  orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
   type OrchestratorGameLaunch
 } from './orchestrator-game-launch'
@@ -48,11 +50,15 @@ export function bundledOrchestratorGamePluginDir(): string | null {
 }
 
 export async function prepareOrchestratorGameLaunch(args: {
-  settings: Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'> | undefined
+  settings:
+    | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects' | 'uiLanguage'>>
+    | undefined
   repoId: string | null
   worktreePath: string | null
   pluginDir?: string | null
   orcaCli?: string | null
+  /** The OS locale behind a `system` UI language; defaults to Electron's. */
+  systemLocale?: string
   detectClaudeVersion?: () => Promise<string | null>
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
@@ -67,6 +73,11 @@ export async function prepareOrchestratorGameLaunch(args: {
     claudeVersion,
     pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir,
     // Why: the same absolute CLI the Agent Teams tmux shim runs, so Linux never hits the screen reader.
-    orcaCli: args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli
+    orcaCli:
+      args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli,
+    locale: orchestratorGameLocaleOf(
+      args.settings?.uiLanguage,
+      args.systemLocale ?? getMainSystemLocale()
+    )
   })
 }
