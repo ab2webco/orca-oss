@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest'
+import { gameActionsOf, parseGameActions, renderGameWorkPrompt } from './orchestrator-game-actions'
+
+describe('parseGameActions', () => {
+  it('takes prompt and MCP actions, trimming labels and keeping MCP arguments', () => {
+    expect(
+      parseGameActions([
+        { label: ' QA board ', prompt: 'List my CIN tickets in QA' },
+        {
+          label: 'Test runs',
+          mcp: { server: 'tambora', tool: 'list_test_run_cases', args: { run: 'TR-CIN-1' } }
+        }
+      ])
+    ).toEqual({
+      value: [
+        { label: 'QA board', prompt: 'List my CIN tickets in QA' },
+        {
+          label: 'Test runs',
+          mcp: { server: 'tambora', tool: 'list_test_run_cases', args: { run: 'TR-CIN-1' } }
+        }
+      ],
+      warnings: []
+    })
+  })
+
+  it('drops an action that is neither or both kinds, or names an unknown placeholder', () => {
+    const parsed = parseGameActions([
+      { label: 'Nothing' },
+      { label: 'Both', prompt: 'x', mcp: { server: 's', tool: 't' } },
+      { label: 'Bad tool', mcp: { server: 'tambora', tool: 'list runs' } },
+      { label: 'Bad args', mcp: { server: 'tambora', tool: 'x', args: ['a'] } },
+      { label: 'Unknown', prompt: 'Work on {ticket}' },
+      { label: 'A label that is far too long to fit', prompt: 'x' }
+    ])
+    expect(parsed.value).toEqual([])
+    expect(parsed.warnings).toEqual([
+      'orchestratorGame.actions[0] must have either prompt or mcp',
+      'orchestratorGame.actions[1] must have either prompt or mcp',
+      'orchestratorGame.actions[2].mcp must name a server and a tool like list_test_runs',
+      'orchestratorGame.actions[3].mcp.args must be a mapping',
+      'orchestratorGame.actions[4].prompt uses an unknown placeholder {ticket}',
+      'orchestratorGame.actions[5].label must be 1 to 24 characters'
+    ])
+  })
+
+  it('keeps the first six and refuses a non-list', () => {
+    const many = Array.from({ length: 8 }, (_, at) => ({ label: `A${at}`, prompt: 'x' }))
+    expect(parseGameActions(many).value).toHaveLength(6)
+    expect(parseGameActions('nope').warnings).toEqual(['orchestratorGame.actions must be a list'])
+  })
+})
+
+describe('gameActionsOf', () => {
+  it("fills a prompt from the worktree and leaves out one whose value it doesn't have", () => {
+    expect(
+      gameActionsOf(
+        [
+          { label: 'Ship', prompt: 'Open the PR for {workItem.identifier} on {branch}' },
+          { label: 'Review', prompt: 'Review #{review.number}' },
+          { label: 'Runs', mcp: { server: 'tambora', tool: 'list' } }
+        ],
+        { 'workItem.identifier': 'CIN-12', branch: 'feat/cin-12' }
+      )
+    ).toEqual([
+      { id: 'action-0', label: 'Ship', prompt: 'Open the PR for CIN-12 on feat/cin-12' },
+      { id: 'action-2', label: 'Runs', mcp: { server: 'tambora', tool: 'list' } }
+    ])
+  })
+})
+
+describe('renderGameWorkPrompt', () => {
+  it('fills the ticket into the template, or into the default one', () => {
+    const item = { id: 'CIN-7', title: 'Login', url: 'https://jira/CIN-7', status: 'QA' }
+    expect(renderGameWorkPrompt(undefined, item)).toBe('Work on CIN-7: Login\nhttps://jira/CIN-7')
+    expect(renderGameWorkPrompt('/o:launch {id} ({status})', item)).toBe('/o:launch CIN-7 (QA)')
+  })
+})

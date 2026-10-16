@@ -1,3 +1,4 @@
+import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
 import {
   parseGameActivityRules,
   parseGameLinkTemplates,
@@ -30,6 +31,8 @@ export type OrchestratorGameConfig = {
 export type OrchestratorGameIntegrations = {
   links: OrchestratorGameLinkTemplate[]
   activity: OrchestratorGameActivityRule[]
+  /** Project buttons that send the lead a prompt or run an MCP tool. */
+  actions: OrchestratorGameAction[]
   /** Where the band's To Do comes from; null picks it from the repo and its linked work item. */
   todo: OrchestratorGameTodoSource | null
 }
@@ -125,7 +128,12 @@ export function resolveOrchestratorGameConfig(
 export function resolveOrchestratorGameIntegrations(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
 ): OrchestratorGameIntegrations {
-  const resolved: OrchestratorGameIntegrations = { links: [], activity: [], todo: null }
+  const resolved: OrchestratorGameIntegrations = {
+    links: [],
+    activity: [],
+    actions: [],
+    todo: null
+  }
   for (const source of LAYER_ORDER) {
     const layer = layers[source]
     if (layer?.links !== undefined) {
@@ -133,6 +141,9 @@ export function resolveOrchestratorGameIntegrations(
     }
     if (layer?.activity !== undefined) {
       resolved.activity = parseGameActivityRules(layer.activity).value ?? []
+    }
+    if (layer?.actions !== undefined) {
+      resolved.actions = parseGameActions(layer.actions).value ?? []
     }
     const todo = layer?.todo === undefined ? undefined : parseGameTodoSource(layer.todo).value
     if (todo !== undefined) {
@@ -190,6 +201,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         Object.assign(layer, { [key]: parsed.value })
+      }
+    } else if (key === 'actions') {
+      const parsed = parseGameActions(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.actions = parsed.value
       }
     } else if (key === 'todo') {
       const parsed = parseGameTodoSource(value)

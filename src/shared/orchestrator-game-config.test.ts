@@ -3,7 +3,8 @@ import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   parseOrchestratorGameLayer,
-  resolveOrchestratorGameConfig
+  resolveOrchestratorGameConfig,
+  resolveOrchestratorGameIntegrations
 } from './orchestrator-game-config'
 
 describe('resolveOrchestratorGameConfig', () => {
@@ -163,5 +164,40 @@ describe('parseOrchestratorGameLayer', () => {
       layer: {},
       warnings: ['orchestratorGame must be a mapping']
     })
+  })
+})
+
+describe('orchestratorGame.actions', () => {
+  it('reads actions from orca.yaml, reporting the ones it drops', () => {
+    expect(
+      parseOrchestratorGameLayer({
+        actions: [{ label: 'QA', prompt: 'List my tickets in QA' }, { label: 'Broken' }]
+      })
+    ).toEqual({
+      layer: { actions: [{ label: 'QA', prompt: 'List my tickets in QA' }] },
+      warnings: ['orchestratorGame.actions[1] must have either prompt or mcp']
+    })
+  })
+
+  it("lets this machine's actions replace the project's whole list", () => {
+    const project = { actions: [{ label: 'A', prompt: 'a' }] }
+    expect(resolveOrchestratorGameIntegrations({ project }).actions).toEqual(project.actions)
+    expect(
+      resolveOrchestratorGameIntegrations({
+        project,
+        local: { actions: [{ label: 'B', mcp: { server: 'tambora', tool: 'list' } }] }
+      }).actions
+    ).toEqual([{ label: 'B', mcp: { server: 'tambora', tool: 'list' } }])
+  })
+
+  it("keeps the To Do's work prompt", () => {
+    expect(
+      parseOrchestratorGameLayer({
+        todo: { provider: 'jira', project: 'CIN', workPrompt: '/o:launch {id}' }
+      }).layer.todo
+    ).toEqual({ provider: 'jira', project: 'CIN', workPrompt: '/o:launch {id}' })
+    expect(
+      parseOrchestratorGameLayer({ todo: { provider: 'jira', workPrompt: 'Go {ticket}' } }).warnings
+    ).toEqual(['orchestratorGame.todo.workPrompt uses an unknown placeholder {ticket}'])
   })
 })

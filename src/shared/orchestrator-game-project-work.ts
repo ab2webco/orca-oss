@@ -1,4 +1,9 @@
 import type { CheckStatus, GitHubRepositoryIdentity } from './github/pull-request-types'
+import {
+  GAME_PROMPT_MAX,
+  GAME_WORK_PROMPT_PLACEHOLDERS,
+  unknownPlaceholderOf
+} from './orchestrator-game-actions'
 import { isHttpUrl } from './orchestrator-game-integrations'
 import type { GameLinkTone, GameStatusGroup } from './orchestrator-game-state'
 
@@ -13,7 +18,13 @@ export type GameTodoProvider = (typeof GAME_TODO_PROVIDERS)[number]
 /** Where the To Do comes from; `project` is a Plane project id, Jira key or Linear team key. */
 export type OrchestratorGameTodoSource =
   | 'off'
-  | { provider: GameTodoProvider; project?: string; workspace?: string }
+  | {
+      provider: GameTodoProvider
+      project?: string
+      workspace?: string
+      /** What "work on" sends the lead: `{id}`, `{title}`, `{url}`, `{status}`. */
+      workPrompt?: string
+    }
 
 export type GameProjectItem = {
   id: string
@@ -55,9 +66,7 @@ export function parseGameTodoSource(raw: unknown): {
   if (!isTodoProvider(raw.provider)) {
     return refuse(`orchestratorGame.todo.provider must be one of ${GAME_TODO_PROVIDERS.join(', ')}`)
   }
-  const source: { provider: GameTodoProvider; project?: string; workspace?: string } = {
-    provider: raw.provider
-  }
+  const source: Exclude<OrchestratorGameTodoSource, 'off'> = { provider: raw.provider }
   for (const key of ['project', 'workspace'] as const) {
     if (raw[key] === undefined) {
       continue
@@ -71,6 +80,17 @@ export function parseGameTodoSource(raw: unknown): {
   // Why: the key is spliced into JQL, so anything but a project key could widen the query.
   if (source.provider === 'jira' && source.project && !JIRA_PROJECT_KEY.test(source.project)) {
     return refuse('orchestratorGame.todo.project must be a Jira project key like CIN')
+  }
+  if (raw.workPrompt !== undefined) {
+    const workPrompt = typeof raw.workPrompt === 'string' ? raw.workPrompt.trim() : ''
+    if (workPrompt.length === 0 || workPrompt.length > GAME_PROMPT_MAX) {
+      return refuse(`orchestratorGame.todo.workPrompt must be 1 to ${GAME_PROMPT_MAX} characters`)
+    }
+    const unknown = unknownPlaceholderOf(workPrompt, GAME_WORK_PROMPT_PLACEHOLDERS)
+    if (unknown !== null) {
+      return refuse(`orchestratorGame.todo.workPrompt uses an unknown placeholder {${unknown}}`)
+    }
+    source.workPrompt = workPrompt
   }
   return { value: source, warnings: [] }
 }

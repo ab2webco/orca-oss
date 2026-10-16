@@ -76,7 +76,7 @@ function templateProblem(
   return /[{}]/.test(bare) || !isHttpUrl(bare) ? 'must be an http(s) URL with a literal host' : null
 }
 
-function parseList<T>(
+export function parseGameList<T>(
   raw: unknown,
   key: string,
   max: number,
@@ -162,11 +162,11 @@ function parseActivityRule(entry: unknown, at: string): OrchestratorGameActivity
 }
 
 export function parseGameLinkTemplates(raw: unknown): Parsed<OrchestratorGameLinkTemplate> {
-  return parseList(raw, 'links', GAME_LINKS_MAX, parseLink)
+  return parseGameList(raw, 'links', GAME_LINKS_MAX, parseLink)
 }
 
 export function parseGameActivityRules(raw: unknown): Parsed<OrchestratorGameActivityRule> {
-  return parseList(raw, 'activity', GAME_ACTIVITY_RULES_MAX, parseActivityRule)
+  return parseGameList(raw, 'activity', GAME_ACTIVITY_RULES_MAX, parseActivityRule)
 }
 
 export const toolGlobPattern = (glob: string): RegExp =>
