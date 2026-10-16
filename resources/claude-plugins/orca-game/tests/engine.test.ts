@@ -449,3 +449,47 @@ describe('rewards', () => {
     expect(world.store['xp-ledger']).toBeUndefined()
   })
 })
+
+describe('lead autostart', () => {
+  const leadWorld = (role: 'lead' | 'member', autostart: boolean) =>
+    worldOf({
+      stdout: JSON.stringify({
+        id: 'x',
+        ok: true,
+        result: { ...STATE, lead: { autostart, cap: 4, agent: 'claude' }, role }
+      })
+    })
+
+  const startCounting = (on: On) => {
+    const ran: string[] = []
+    on('command.run', { command: 'orca-game:lead' }, ($s, e) => {
+      ran.push(e.command)
+      return { text: '' }
+    })
+    return ran
+  }
+
+  test('loads the lead rules once in a project that asks for it', async ($, on) => {
+    const world = leadWorld('lead', true)
+    const clock = mock.clock(on)
+    engine(on, world)
+    const ran = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual(['orca-game:lead'])
+    expect(world.store['lead-started-sessions']).toEqual(['s1'])
+
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual(['orca-game:lead'])
+  })
+
+  test('never makes a member or a project without autostart the lead', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, leadWorld('member', true))
+    const ran = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual([])
+  })
+})

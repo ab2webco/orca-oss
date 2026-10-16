@@ -47,8 +47,14 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'orchestrator-game',
-    keys: ['game state'],
+    keys: ['game state', 'game lead'],
     load: async () => (await import('./handlers/orchestrator-game.js')).ORCHESTRATOR_GAME_HANDLERS
+  },
+  {
+    name: 'orchestrator-game-launch',
+    keys: ['game launch'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-launch.js')).ORCHESTRATOR_GAME_LAUNCH_HANDLERS
   },
   {
     name: 'orchestrator-game-scenes',

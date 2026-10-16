@@ -430,6 +430,38 @@ describe('buildOrchestratorGameState', () => {
     expect(state.actions).toBeUndefined()
   })
 
+  it("sends the project's lead, this machine's Settings over orca.yaml", async () => {
+    const yaml = 'orchestratorGame:\n  orchestrator:\n    cap: 2\n    rules: CIN flow\n'
+    const state = await buildOrchestratorGameState({
+      settings: { orchestratorGameProjects: { repo1: { orchestrator: { autostart: true } } } },
+      worktree: worktree(checkout(yaml)),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.lead).toEqual({ autostart: true, cap: 2, agent: 'claude', rules: 'CIN flow' })
+  })
+
+  it('names the calling pane a member when a lead launched it, else the lead', async () => {
+    const base = {
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: 'tab:m',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+
+    expect((await buildOrchestratorGameState(base)).role).toBe('lead')
+    expect(
+      (await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })).role
+    ).toBe('member')
+  })
+
   it("sends the project's actions filled for this worktree and each ticket's work prompt", async () => {
     const yaml = [
       'orchestratorGame:',

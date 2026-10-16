@@ -195,7 +195,15 @@ export type GameState = {
   project?: GameProjectWork
   /** Absent from a host older than project actions or with none configured. */
   actions?: GameAction[]
+  /** How the project's lead orchestrates; absent from an older host. */
+  lead?: GameLead
+  /** Whether this pane leads or a lead launched it; absent from an older host. */
+  role?: GameRole
 }
+
+export type GameLead = { autostart: boolean; cap: number; label?: string }
+
+export type GameRole = 'lead' | 'member'
 
 export type FleetState = {
   isLoading: boolean

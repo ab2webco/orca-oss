@@ -5,6 +5,7 @@ import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { questSessionStart, registerQuest } from './quest'
+import { leadAutostart } from './lead-autostart'
 import { isHumanOrigin } from './quest-policy'
 import { clawdReact, questToolCall, questTurnComplete } from './quest-runtime'
 
@@ -18,7 +19,8 @@ export const register: Register = (on) => {
     const started = await next(e)
     await questSessionStart($).catch(() => undefined)
     $.clock.every(POLL_EVERY_MS, () => void refreshSoon($).catch(() => undefined))
-    void refreshSoon($).catch(() => undefined)
+    // Why not awaited: the skill runs once the session is idle, and session.start must not wait on it.
+    void leadAutostart($).catch(() => undefined)
     return started
   })
 

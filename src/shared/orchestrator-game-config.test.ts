@@ -4,8 +4,10 @@ import {
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   parseOrchestratorGameLayer,
   resolveOrchestratorGameConfig,
-  resolveOrchestratorGameIntegrations
+  resolveOrchestratorGameIntegrations,
+  resolveOrchestratorGameLead
 } from './orchestrator-game-config'
+import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 
 describe('resolveOrchestratorGameConfig', () => {
   it('uses the defaults when no layer sets anything', () => {
@@ -199,5 +201,34 @@ describe('orchestratorGame.actions', () => {
     expect(
       parseOrchestratorGameLayer({ todo: { provider: 'jira', workPrompt: 'Go {ticket}' } }).warnings
     ).toEqual(['orchestratorGame.todo.workPrompt uses an unknown placeholder {ticket}'])
+  })
+})
+
+describe('orchestratorGame.orchestrator', () => {
+  it('reads the lead block from orca.yaml, reporting the keys it drops', () => {
+    expect(
+      parseOrchestratorGameLayer({ orchestrator: { cap: 2, rules: 'Report to me', cap2: 1 } })
+    ).toEqual({
+      layer: { orchestrator: { cap: 2, rules: 'Report to me' } },
+      warnings: ['orchestratorGame.orchestrator.cap2 is not a known setting']
+    })
+  })
+
+  it("merges the lead key by key, this machine's Settings over orca.yaml over global", () => {
+    expect(resolveOrchestratorGameLead({})).toEqual(DEFAULT_GAME_LEAD)
+    expect(
+      resolveOrchestratorGameLead({
+        global: { orchestrator: { agent: 'codex' } },
+        project: { orchestrator: { cap: 3, rules: 'CIN flow', label: 'orquestador' } },
+        local: { orchestrator: { label: 'Jefe', model: 'opus' } }
+      })
+    ).toEqual({
+      ...DEFAULT_GAME_LEAD,
+      agent: 'codex',
+      cap: 3,
+      rules: 'CIN flow',
+      label: 'Jefe',
+      model: 'opus'
+    })
   })
 })

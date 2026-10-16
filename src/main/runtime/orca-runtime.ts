@@ -30209,6 +30209,10 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       leaderPaneKey: args.paneKey ?? null,
+      callerParentPaneKey: args.paneKey
+        ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
+            ?.parentPaneKey
+        : null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],

@@ -13,6 +13,7 @@ import type {
   GameWorktree
 } from '../types'
 import { gameActionsOf, gamePromptOf } from './game-action-shape'
+import { gameLeadOf } from './game-lead'
 import { isTerminalHandle } from './game-config'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
@@ -270,6 +271,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     links: Array.isArray(body.links) ? body.links.slice(0, MAX_LINKS).flatMap(linkOf) : [],
     activity: activityOf(body.activity) ?? null,
     ...projectWorkOf(body.project),
-    ...gameActionsOf(body.actions)
+    ...gameActionsOf(body.actions),
+    ...gameLeadOf(body)
   }
 }

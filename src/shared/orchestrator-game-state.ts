@@ -3,6 +3,7 @@ import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
 import type { GameAction } from './orchestrator-game-actions'
+import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
@@ -99,6 +100,10 @@ export type OrchestratorGameState = {
   project?: GameProjectWork
   /** The project's buttons, filled for this worktree; absent when it declares none. */
   actions?: GameAction[]
+  /** How this project's lead orchestrates; absent from an older host. */
+  lead?: OrchestratorGameLead
+  /** Whether the calling pane leads or was launched by a lead; absent from an older host. */
+  role?: 'lead' | 'member'
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

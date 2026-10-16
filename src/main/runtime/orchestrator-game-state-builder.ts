@@ -12,6 +12,7 @@ import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
+  resolveOrchestratorGameLead,
   type ResolvedOrchestratorGameConfig
 } from '../../shared/orchestrator-game-config'
 import {
@@ -68,6 +69,8 @@ export type OrchestratorGameStateInput = {
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
   members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
+  /** The calling pane's own launcher; set when a lead started it through orchestration. */
+  callerParentPaneKey?: string | null
   terminalHandleOf?: (paneKey: string) => string | null
   /** The calling Team's terminals; when known, agents outside it are left out. */
   teamHandles?: ReadonlySet<string> | null
@@ -242,6 +245,8 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
+    lead: resolveOrchestratorGameLead(layers),
+    role: input.callerParentPaneKey ? 'member' : 'lead',
     review: gameReview,
     workItem,
     extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },

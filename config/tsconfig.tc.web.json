@@ -16,6 +16,7 @@
     "../resources/claude-plugins/orca-game/hooks/scene.ts",
     "../resources/claude-plugins/orca-game/hooks/scenery.ts",
     "../resources/claude-plugins/orca-game/hooks/scenes/*.ts",
+    "../resources/claude-plugins/orca-game/hooks/todo-sections.ts",
     "../src/main/gitlab/mappers.ts",
     "../src/main/ipc/worktree-branch-name.ts",
     "../src/main/ipc/worktree-logic.ts",

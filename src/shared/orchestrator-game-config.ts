@@ -1,5 +1,11 @@
 import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
 import {
+  parseGameLead,
+  resolveGameLead,
+  type OrchestratorGameLead,
+  type OrchestratorGameLeadLayer
+} from './orchestrator-game-lead'
+import {
   parseGameActivityRules,
   parseGameLinkTemplates,
   type OrchestratorGameActivityRule,
@@ -40,6 +46,8 @@ export type OrchestratorGameIntegrations = {
 export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
   Partial<Omit<OrchestratorGameIntegrations, 'todo'>> & {
     todo?: OrchestratorGameTodoSource
+    /** How the lead orchestrates; merged key by key across layers. */
+    orchestrator?: OrchestratorGameLeadLayer
     /** A scene JSON relative to the worktree root; read only from the project layers. */
     sceneFile?: string
   }
@@ -153,6 +161,12 @@ export function resolveOrchestratorGameIntegrations(
   return resolved
 }
 
+export function resolveOrchestratorGameLead(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
+): OrchestratorGameLead {
+  return resolveGameLead(LAYER_ORDER.map((source) => layers[source]?.orchestrator))
+}
+
 const isMode = (value: unknown): value is OrchestratorGameMode =>
   typeof value === 'string' && (ORCHESTRATOR_GAME_MODES as readonly string[]).includes(value)
 
@@ -207,6 +221,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         layer.actions = parsed.value
+      }
+    } else if (key === 'orchestrator') {
+      const parsed = parseGameLead(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.orchestrator = parsed.value
       }
     } else if (key === 'todo') {
       const parsed = parseGameTodoSource(value)

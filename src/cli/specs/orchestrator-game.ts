@@ -10,6 +10,30 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game state --json']
   },
   {
+    path: ['game', 'lead'],
+    summary: "Print the standing rules that make this session the project's lead",
+    usage: 'orca game lead [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      "Orca's rules plus the project's own from orchestratorGame.orchestrator.rules in orca.yaml.",
+      'A session a lead launched gets no rules: it reports to its lead.'
+    ],
+    examples: ['orca game lead']
+  },
+  {
+    path: ['game', 'launch'],
+    summary: "Start one member for a ticket in its own child worktree, as this project's lead",
+    usage: 'orca game launch <ticket> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket'],
+    positionalArgs: ['ticket'],
+    notes: [
+      'Run it from the lead terminal: the member reports to it through Orca orchestration.',
+      'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
+      'Refused when the project cap of running members is reached.'
+    ],
+    examples: ['orca game launch CIN-1232 --json']
+  },
+  {
     path: ['game', 'scene', 'new'],
     summary: 'Start a project scene file from the built-in Quest scene',
     usage: 'orca game scene new <path> [--json]',
