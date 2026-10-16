@@ -187,16 +187,19 @@ describe('readGameProjectWork', () => {
           title: 'ORCA-1',
           url: 'https://app.plane.so/orca-lab/browse/ORCA-1/',
           status: 'In Progress',
-          tone: 'pending'
+          tone: 'pending',
+          group: 'in_progress'
         },
         {
           id: 'ORCA-3',
           title: 'ORCA-3',
           url: 'https://app.plane.so/orca-lab/browse/ORCA-3/',
           status: 'Todo',
-          tone: 'neutral'
+          tone: 'neutral',
+          group: 'todo'
         }
-      ]
+      ],
+      groups: { in_progress: 1, todo: 1 }
     })
   })
 
@@ -232,7 +235,8 @@ describe('readGameProjectWork', () => {
         title: 'Checkout',
         url: 'https://koombea.atlassian.net/browse/CIN-12',
         status: 'In Progress',
-        tone: 'pending'
+        tone: 'pending',
+        group: 'in_progress'
       }
     ])
 
@@ -282,6 +286,38 @@ describe('readGameProjectWork', () => {
       url: 'https://gitlab.com/g/p/-/merge_requests?state=opened',
       items: [{ id: '!3', title: 'MR', url: 'https://gitlab.com/g/p/-/merge_requests/3' }]
     })
+  })
+
+  it('lists in-progress tickets first, then QA, then to do, counting each group', async () => {
+    const issue = (key: string, name: string, categoryKey: string) => ({
+      key,
+      title: key,
+      url: `https://koombea.atlassian.net/browse/${key}`,
+      status: { id: key, name, categoryKey, categoryName: '' }
+    })
+    const work = await readGameProjectWork(
+      port({
+        jiraSearch: async () => [
+          issue('CIN-1', 'To Do', 'new'),
+          issue('CIN-2', 'QA', 'indeterminate'),
+          issue('CIN-3', 'In Progress', 'indeterminate'),
+          issue('CIN-4', 'To Do', 'new'),
+          issue('CIN-5', 'QA', 'indeterminate'),
+          issue('CIN-6', 'To Do', 'new')
+        ]
+      }),
+      { todo: { provider: 'jira', project: 'CIN' }, workItem: null }
+    )
+
+    expect(work.todo?.items.map((one) => [one.id, one.group])).toEqual([
+      ['CIN-3', 'in_progress'],
+      ['CIN-2', 'review'],
+      ['CIN-5', 'review'],
+      ['CIN-1', 'todo'],
+      ['CIN-4', 'todo']
+    ])
+    expect(work.todo?.total).toBe(6)
+    expect(work.todo?.groups).toEqual({ in_progress: 1, review: 2, todo: 3 })
   })
 
   it('costs a failing tracker its list, never the other one', async () => {

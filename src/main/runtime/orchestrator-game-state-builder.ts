@@ -13,6 +13,7 @@ import {
 } from '../../shared/orchestrator-game-activity'
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
+import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
 import {
   activityGameLinksOf,
   gameLinksOf,
@@ -207,12 +208,29 @@ export async function buildOrchestratorGameState(
     tracker && readProjectWork
       ? await settle(() => readProjectWork({ todo: integrations.todo, workItem }))
       : null
-  const projectLinks = projectGameLinksOf(integrations.links, {
+  const placeholders = {
     'workItem.identifier': workItem?.identifier,
     'workItem.provider': workItem?.provider,
     branch: input.worktree?.branch,
     'review.number': gameReview ? String(gameReview.number) : undefined
-  })
+  }
+  const projectLinks = projectGameLinksOf(integrations.links, placeholders)
+  const actions = gameActionsOf(integrations.actions, placeholders)
+  const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
+  const todo = projectWork?.todo
+  const projectState =
+    projectWork && todo
+      ? {
+          ...projectWork,
+          todo: {
+            ...todo,
+            items: todo.items.map((one) => ({
+              ...one,
+              prompt: renderGameWorkPrompt(workPrompt, one)
+            }))
+          }
+        }
+      : projectWork
   // Why: project rules first, so a repo can override what Orca's own integrations would link.
   const rules = [
     ...integrations.activity.flatMap((rule) => compileGameActivityRule(rule) ?? []),
@@ -267,6 +285,7 @@ export async function buildOrchestratorGameState(
       extra: [...projectLinks, ...activityGameLinksOf(agents)]
     }),
     ...(leaderActivity ? { activity: leaderActivity } : {}),
-    ...(projectWork ? { project: projectWork } : {})
+    ...(projectState ? { project: projectState } : {}),
+    ...(actions.length > 0 ? { actions } : {})
   }
 }

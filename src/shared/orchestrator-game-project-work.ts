@@ -32,6 +32,10 @@ export type GameProjectItem = {
   url: string
   status?: string
   tone?: GameLinkTone
+  /** A ticket's status group, so the Panel can head in-progress, QA and to-do apart. */
+  group?: GameStatusGroup
+  /** What "work on" sends the lead for this ticket. */
+  prompt?: string
 }
 
 /** `total` counts every open item; `items` keeps the first few, `url` opens the full list. */
@@ -40,6 +44,8 @@ export type GameProjectList = {
   total: number
   url: string | null
   items: GameProjectItem[]
+  /** Open tickets per status group, all of them and not only the items kept. */
+  groups?: Partial<Record<GameStatusGroup, number>>
 }
 
 export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
@@ -95,17 +101,42 @@ export function parseGameTodoSource(raw: unknown): {
   return { value: source, warnings: [] }
 }
 
+// Why this order: what is being worked on first, then what waits on QA, then what is next.
+const GROUP_ORDER: readonly GameStatusGroup[] = [
+  'in_progress',
+  'review',
+  'todo',
+  'backlog',
+  'unknown',
+  'done',
+  'cancelled'
+]
+
+const groupRankOf = (item: GameProjectItem): number =>
+  item.group === undefined ? GROUP_ORDER.length : GROUP_ORDER.indexOf(item.group)
+
 export function gameProjectListOf(
   provider: string,
   items: readonly GameProjectItem[],
   url: string | null,
   total: number = items.length
 ): GameProjectList {
+  const grouped = items.filter((one) => one.group !== undefined)
+  const groups: Partial<Record<GameStatusGroup, number>> = {}
+  for (const one of grouped) {
+    if (one.group !== undefined) {
+      groups[one.group] = (groups[one.group] ?? 0) + 1
+    }
+  }
   return {
     provider,
     total,
     url: url !== null && isHttpUrl(url) ? url : null,
-    items: items.filter((one) => isHttpUrl(one.url)).slice(0, GAME_PROJECT_ITEMS_MAX)
+    items: items
+      .filter((one) => isHttpUrl(one.url))
+      .sort((left, right) => groupRankOf(left) - groupRankOf(right))
+      .slice(0, GAME_PROJECT_ITEMS_MAX),
+    ...(grouped.length > 0 ? { groups } : {})
   }
 }
 

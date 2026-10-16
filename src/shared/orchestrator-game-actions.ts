@@ -113,7 +113,7 @@ export function gameActionsOf(
   actions: readonly OrchestratorGameAction[],
   values: Readonly<Record<string, string | undefined>>
 ): GameAction[] {
-  return actions.flatMap((action, index) => {
+  return actions.flatMap((action, index): GameAction[] => {
     const id = `action-${index}`
     if (!('prompt' in action)) {
       return [{ ...action, id }]

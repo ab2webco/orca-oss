@@ -304,7 +304,57 @@ describe('buildOrchestratorGameState', () => {
         workItem: expect.objectContaining({ provider: 'plane', identifier: 'ORCA-1' })
       }
     ])
-    expect(state.project).toEqual(project)
+    expect(state.project?.todo?.items).toEqual([
+      {
+        id: 'ORCA-9',
+        title: 'Mine',
+        url: 'https://app.plane.so/w/browse/ORCA-9/',
+        prompt: 'Work on ORCA-9: Mine\nhttps://app.plane.so/w/browse/ORCA-9/'
+      }
+    ])
+    expect(state.actions).toBeUndefined()
+  })
+
+  it("sends the project's actions filled for this worktree and each ticket's work prompt", async () => {
+    const yaml = [
+      'orchestratorGame:',
+      '  todo:',
+      '    provider: jira',
+      '    project: CIN',
+      "    workPrompt: '/o:launch {id}'",
+      '  actions:',
+      '    - label: Ship',
+      "      prompt: 'Open the PR for {branch}'",
+      '    - label: Runs',
+      '      mcp:',
+      '        server: tambora',
+      '        tool: list_test_run_cases',
+      ''
+    ].join('\n')
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout(yaml)),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readProjectWork: async () => ({
+        reviews: null,
+        todo: {
+          provider: 'jira',
+          total: 1,
+          url: null,
+          items: [{ id: 'CIN-7', title: 'Login', url: 'https://jira.example/browse/CIN-7' }]
+        }
+      })
+    })
+
+    expect(state.actions).toEqual([
+      { id: 'action-0', label: 'Ship', prompt: `Open the PR for ${state.worktree?.branch}` },
+      { id: 'action-1', label: 'Runs', mcp: { server: 'tambora', tool: 'list_test_run_cases' } }
+    ])
+    expect(state.project?.todo?.items[0]?.prompt).toBe('/o:launch CIN-7')
   })
 
   it('reads no project work when the tracker is off or there is no worktree', async () => {
