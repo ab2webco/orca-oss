@@ -108,3 +108,28 @@ with `id` namespaced `<publisher>.<id>/<scene id>`, and lists dropped ones in `w
 `orca.yaml` that nothing installed serves; the mod draws `quest` for it. Card and teller names may
 be per language (`{ "en": …, "es": … }`); the mod shows the `ORCA_GAME_LOCALE` one. The file
 format, limits and consent rules are in [Game scenes](./plugin-development.md#game-scenes).
+
+## Other plugins in a game pane
+
+Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on` or `zen`
+with the band on) the mod draws what they show in the scene's style instead of letting each one
+paint its own
+([`allies-strip.tsx`](../../resources/claude-plugins/orca-game/hooks/allies-strip.tsx)):
+
+- **Status lines.** A `ui.status` hook takes another plugin's `$.ui.status(text)` before Claude Code
+  sees it and keeps it as a row of the **allies strip** under the band, labeled with the plugin's
+  name; `undefined` removes the row. With the game `off` the call passes through untouched. The
+  user's own `statusLine` is not a plugin call and is never touched.
+- **Jev.** The strip reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
+  `AdvisorState`, `version: 1`) without depending on Jev: its line with model·effort, one row per
+  running subagent (title, model, verdict), its CI rows and its latest notice. Any other version or
+  shape is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
+  value is written; nothing polls it.
+- **Zen** keeps one row: Jev's line, or else the latest status.
+- **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, drawn under
+  the strip, and a `ui.resolve` hook paints every other plugin's `Text` in the scene palette (a
+  highlighted run as the gold pill; red, green, yellow and the theme's error, warning and success
+  stay). A plugin loaded in the `prepend` tier draws outside the game and can hide it.
+
+The strip keeps at most six rows, the last saying how many it left out, and each row is cut to
+the band's width.
