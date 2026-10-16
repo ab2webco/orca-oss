@@ -347,3 +347,62 @@ test("a project's scene file previews when valid, says why when not, and renders
   await expect(orcaPage.getByRole('img', { name: 'Preview of Quest (built-in)' })).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-invalid', path)
 })
+
+test("the project's scene files are listed in the Scene picker and picking one selects it", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repo = await orcaPage.evaluate(() => {
+    const first = window.__store!.getState().repos[0]
+    return first ? { id: first.id, path: first.path } : null
+  })
+  expect(repo, 'the harness seeds one repo').not.toBeNull()
+  const { id: repoId, path: repoPath } = repo as { id: string; path: string }
+  mkdirSync(join(repoPath, '.orca', 'scenes'), { recursive: true })
+  writeFileSync(
+    join(repoPath, '.orca', 'scenes', 'deep-space.json'),
+    JSON.stringify(sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }) }), null, 2)
+  )
+
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+  const scene = orcaPage.getByRole('combobox', { name: 'Scene' }).first()
+  await expect(scene).toBeVisible({ timeout: 15_000 })
+  await scene.click()
+  await orcaPage.getByRole('option', { name: 'deep-space (custom)' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId]: { sceneFile: '.orca/scenes/deep-space.json' } })
+  await expect(scene).toHaveText('deep-space (custom)')
+  await expect(
+    orcaPage.getByRole('img', { name: 'Preview of .orca/scenes/deep-space.json' })
+  ).toBeVisible()
+  await shootAll(electronApp, orcaPage, testInfo, 'scene-file-listed', scene)
+
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await scene.click()
+      await expect(orcaPage.getByRole('listbox')).toBeVisible()
+      await orcaPage.waitForFunction(() =>
+        (
+          document
+            .querySelector('[role="listbox"]')
+            ?.parentElement?.getAnimations({ subtree: true }) ?? []
+        ).every((animation) => animation.playState !== 'running')
+      )
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`scene-files-open-${theme}-${width}.png`)
+      })
+      await orcaPage.keyboard.press('Escape')
+      await expect(orcaPage.getByRole('listbox')).toBeHidden()
+    }
+  }
+})
