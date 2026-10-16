@@ -1,7 +1,10 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
+import { readWorktreeGameSceneFile } from '../worktree-game-scene-file'
 import {
+  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
-  resolveOrchestratorGameIntegrations
+  resolveOrchestratorGameIntegrations,
+  type ResolvedOrchestratorGameConfig
 } from '../../shared/orchestrator-game-config'
 import {
   builtInGameActivityRules,
@@ -17,8 +20,11 @@ import {
 } from '../../shared/orchestrator-game-links'
 import {
   orchestratorGameScenesOf,
+  parseOrchestratorGameScene,
+  type OrchestratorGameSceneExtension,
   type OrchestratorGameSceneSource
 } from '../../shared/orchestrator-game-scene'
+import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import {
   gameAgentOf,
   gameReviewOf,
@@ -88,6 +94,40 @@ function linkedItemOf(linked: WorkspaceLinkedItem | null | undefined): GameWorkI
   }
 }
 
+type SceneFileOutcome =
+  | { scene: OrchestratorGameSceneExtension; warning?: undefined }
+  | { scene?: undefined; warning: string }
+
+// Why re-read every build: a scene being authored should redraw on the next poll, not after a restart.
+async function readSceneFile(
+  resolved: ResolvedOrchestratorGameConfig,
+  worktree: NonNullable<OrchestratorGameStateInput['worktree']> | null
+): Promise<SceneFileOutcome | null> {
+  const path = resolved.sceneFile
+  if (path === null) {
+    return null
+  }
+  const id = resolved.config.scene
+  const failed = (reason: string): SceneFileOutcome => ({
+    warning: `Scene file ${path}: ${reason}; drawing Quest`
+  })
+  if (!worktree) {
+    return failed('no worktree to read it from')
+  }
+  let text: string
+  try {
+    text = await readWorktreeGameSceneFile(worktree.path, worktree.connectionId, path)
+  } catch (error) {
+    return failed(error instanceof Error ? error.message : String(error))
+  }
+  const parsed = parseOrchestratorGameScene(text, id)
+  return parsed.ok
+    ? {
+        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition }
+      }
+    : failed(parsed.error)
+}
+
 export async function buildOrchestratorGameState(
   input: OrchestratorGameStateInput
 ): Promise<OrchestratorGameState> {
@@ -105,13 +145,18 @@ export async function buildOrchestratorGameState(
   const integrations = resolveOrchestratorGameIntegrations(layers)
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
-  const [review, plane, linear, sceneSources] = await Promise.all([
+  const [review, plane, linear, sceneSources, sceneFile] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
     tracker ? settle(input.readLinear) : Promise.resolve(null),
-    readScenes ? settle(readScenes) : Promise.resolve(null)
+    readScenes ? settle(readScenes) : Promise.resolve(null),
+    readSceneFile(resolved, input.worktree)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
+  const config =
+    sceneFile?.warning === undefined
+      ? resolved.config
+      : { ...resolved.config, scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }
   let workItem: GameWorkItem | null = null
   if (plane) {
     workItem = {
@@ -172,9 +217,15 @@ export async function buildOrchestratorGameState(
   })
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {
-    config: resolved.config,
+    config,
     sources: resolved.sources,
-    warnings: [...(project?.orchestratorGameWarnings ?? []), ...scenes.warnings],
+    // Why the scene file first: the mod's note shows only the first warning, and this one changes the art.
+    warnings: [
+      ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),
+      ...(project?.orchestratorGameWarnings ?? []),
+      ...resolved.warnings,
+      ...scenes.warnings
+    ],
     worktree: input.worktree
       ? {
           id: input.worktree.id,
@@ -186,7 +237,7 @@ export async function buildOrchestratorGameState(
     agents,
     review: gameReview,
     workItem,
-    extensions: { scenes: scenes.scenes },
+    extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },
     links: gameLinksOf({
       review: gameReview,
       workItem,
