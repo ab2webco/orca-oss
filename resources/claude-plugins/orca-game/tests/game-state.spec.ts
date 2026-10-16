@@ -160,6 +160,27 @@ describe('parseGameState', () => {
     ).toEqual([['acme.space/orbit', 'acme.space', 'acme.space/orbit']])
   })
 
+  it("keeps a project's scene file under its file: id, and drops one that claims a plugin", () => {
+    const definition = JSON.parse(JSON.stringify(QUEST_SCENE)) as Record<string, unknown>
+    const parsed = parseGameState(
+      JSON.stringify({
+        ...STATE,
+        extensions: {
+          scenes: [
+            { id: 'file:.orca/scenes/my scene.json', pluginId: 'file', definition },
+            { id: 'file:.orca/scenes/a.json', pluginId: 'acme.space', definition },
+            { id: 'file:', pluginId: 'file', definition },
+            { id: 'file:x\u001b.json', pluginId: 'file', definition },
+            { id: `file:${'a'.repeat(513)}`, pluginId: 'file', definition }
+          ]
+        }
+      })
+    )
+    expect(
+      parsed?.extensions.scenes.map((one) => [one.id, one.pluginId, one.definition.id])
+    ).toEqual([['file:.orca/scenes/my scene.json', 'file', 'file:.orca/scenes/my scene.json']])
+  })
+
   it('reads no scenes from a host that sends no extensions or a broken list', () => {
     expect(parseGameState(JSON.stringify(STATE))?.extensions).toEqual({ scenes: [] })
     expect(
