@@ -13,6 +13,7 @@ import {
   type HostablePluginPanel
 } from '../../../../src/plugin-panels/plugin-panel-list'
 import { useHostPluginPanels } from '../../../../src/plugin-panels/use-host-plugin-panels'
+import { PluginPanelIcon } from '../../../../src/plugin-panels/PluginPanelIcon'
 
 const SECTIONS = [
   { surface: 'nav', heading: 'Panels' },
@@ -104,6 +105,14 @@ export default function HostPluginPanelsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${panel.title}`}
               >
+                <View style={styles.rowIcon}>
+                  <PluginPanelIcon
+                    icon={panel.icon}
+                    iconSvg={panel.iconSvg}
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                </View>
                 <View style={styles.rowMain}>
                   <Text style={styles.rowTitle} numberOfLines={1}>
                     {panel.title}
