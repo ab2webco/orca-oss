@@ -35,6 +35,10 @@ import {
   type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
+import type {
+  GameProjectWork,
+  OrchestratorGameTodoSource
+} from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
@@ -72,6 +76,11 @@ export type OrchestratorGameStateInput = {
     linked: WorkspaceLinkedItem
   ) => Promise<{ name: string; group?: GameStatusGroup } | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
+  /** My open PRs and tickets across the repo, not only this worktree's. */
+  readProjectWork?: (args: {
+    todo: OrchestratorGameTodoSource | null
+    workItem: GameWorkItem | null
+  }) => Promise<GameProjectWork>
 }
 
 // Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
@@ -193,6 +202,11 @@ export async function buildOrchestratorGameState(
     }
   }
   const gameReview = gameReviewOf(review)
+  const readProjectWork = input.readProjectWork
+  const projectWork =
+    tracker && readProjectWork
+      ? await settle(() => readProjectWork({ todo: integrations.todo, workItem }))
+      : null
   const projectLinks = projectGameLinksOf(integrations.links, {
     'workItem.identifier': workItem?.identifier,
     'workItem.provider': workItem?.provider,
@@ -252,6 +266,7 @@ export async function buildOrchestratorGameState(
       workItem,
       extra: [...projectLinks, ...activityGameLinksOf(agents)]
     }),
-    ...(leaderActivity ? { activity: leaderActivity } : {})
+    ...(leaderActivity ? { activity: leaderActivity } : {}),
+    ...(projectWork ? { project: projectWork } : {})
   }
 }

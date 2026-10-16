@@ -1,4 +1,11 @@
-import type { GameAgent, GameCi, GameState, GameStatusGroup } from '../types'
+import type {
+  GameAgent,
+  GameCi,
+  GameLinkTone,
+  GameProjectWork,
+  GameState,
+  GameStatusGroup
+} from '../types'
 import { gameStrings, type ArtStrings } from './game-strings'
 import type { Action, FlowPhase } from './quest-policy'
 import { levelOf } from './rewards'
@@ -142,6 +149,49 @@ const SCRIPT: readonly Step[] = [
 
 export const DEMO_FRAMES = SCRIPT.length
 
+const DEMO_URL = 'https://example.invalid/demo'
+const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
+  failure: 'danger',
+  success: 'success',
+  pending: 'pending',
+  neutral: 'neutral',
+  none: 'neutral'
+}
+
+// The project lists follow the scripted PR's CI so the PRs chip changes color with it.
+const projectOf = (step: Step): GameProjectWork => ({
+  reviews: {
+    provider: 'github',
+    total: 2,
+    url: `${DEMO_URL}/pulls`,
+    items: [
+      {
+        id: '#901',
+        title: 'demo: scripted pull request',
+        url: `${DEMO_URL}/901`,
+        status: step.ci,
+        tone: DEMO_TONES[step.ci]
+      },
+      { id: '#902', title: 'demo: second pull request', url: `${DEMO_URL}/902`, tone: 'success' }
+    ]
+  },
+  todo: {
+    provider: 'plane',
+    total: 3,
+    url: `${DEMO_URL}/todo`,
+    items: [
+      { id: 'ORCA-2', title: 'Demo ticket', url: `${DEMO_URL}/ORCA-2`, status: 'Todo' },
+      {
+        id: 'ORCA-3',
+        title: 'Another demo ticket',
+        url: `${DEMO_URL}/ORCA-3`,
+        status: 'In Progress',
+        tone: 'pending'
+      }
+    ]
+  }
+})
+
 const stateOf = (step: Step): GameState => ({
   config: {},
   warnings: [],
@@ -182,7 +232,8 @@ const stateOf = (step: Step): GameState => ({
     url: 'https://example.invalid/demo/ORCA-1',
     status: step.group === 'done' ? 'Done' : step.group === 'review' ? 'In Review' : 'In Progress',
     statusGroup: step.group
-  }
+  },
+  project: projectOf(step)
 })
 
 export const demoFrameOf = (step: number): DemoFrame => {

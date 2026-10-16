@@ -4,6 +4,9 @@ import type {
   GameCi,
   GameConfig,
   GameLink,
+  GameProjectItem,
+  GameProjectList,
+  GameProjectWork,
   GameReview,
   GameSceneExtension,
   GameState,
@@ -96,6 +99,48 @@ const linkOf = (value: unknown): GameLink[] => {
     }
   ]
 }
+
+const MAX_PROJECT_ITEMS = 5
+
+const projectItemOf = (value: unknown): GameProjectItem[] => {
+  if (!isShape(value)) {
+    return []
+  }
+  const id = textOf(value.id)
+  const url = httpUrlOf(value.url)
+  if (id === undefined || url === undefined) {
+    return []
+  }
+  const status = textOf(value.status)
+  const tone = oneOf(value.tone, LINK_TONES)
+  return [
+    {
+      id,
+      title: textOf(value.title) ?? '',
+      url,
+      ...(status === undefined ? {} : { status }),
+      ...(tone === undefined ? {} : { tone })
+    }
+  ]
+}
+
+const projectListOf = (value: unknown): GameProjectList | null => {
+  if (!isShape(value) || typeof value.total !== 'number' || !Number.isFinite(value.total)) {
+    return null
+  }
+  const items = Array.isArray(value.items) ? value.items : []
+  return {
+    provider: textOf(value.provider) ?? '',
+    total: Math.max(0, Math.floor(value.total)),
+    url: httpUrlOf(value.url) ?? null,
+    items: items.flatMap(projectItemOf).slice(0, MAX_PROJECT_ITEMS)
+  }
+}
+
+const projectWorkOf = (value: unknown): { project?: GameProjectWork } =>
+  isShape(value)
+    ? { project: { reviews: projectListOf(value.reviews), todo: projectListOf(value.todo) } }
+    : {}
 
 const configOf = (value: unknown): Partial<GameConfig> => {
   const raw = isShape(value) ? value : {}
@@ -242,6 +287,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     workItem: workItemOf(body.workItem),
     extensions: extensionsOf(body.extensions),
     links: Array.isArray(body.links) ? body.links.slice(0, MAX_LINKS).flatMap(linkOf) : [],
-    activity: activityOf(body.activity) ?? null
+    activity: activityOf(body.activity) ?? null,
+    ...projectWorkOf(body.project)
   }
 }

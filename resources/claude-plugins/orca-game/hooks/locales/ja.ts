@@ -41,6 +41,8 @@ export const JA: GameCatalog = {
       'Quest: demo。台本どおりの架空のパーティーがすべてのリアクションを再生します。何も読み書きしません。/quest on で実際のデータに戻ります。',
     unknownMode: (asked) =>
       `不明なモード「${asked}」です。/quest off、/quest on、/quest zen、/quest demo のいずれかを使用してください。`,
-    moreAllies: (count) => `ほか ${count} 件`
+    moreAllies: (count) => `ほか ${count} 件`,
+    myReviews: (kind, count) => `自分の${kind} ${count}`,
+    todo: (count) => `ToDo ${count}`
   }
 }

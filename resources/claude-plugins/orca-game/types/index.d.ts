@@ -64,6 +64,25 @@ export type GameLink = {
   tone?: GameLinkTone
 }
 
+export type GameProjectItem = {
+  id: string
+  title: string
+  url: string
+  status?: string
+  tone?: GameLinkTone
+}
+
+/** `total` counts every open item; `items` holds the first few and `url` opens the full list. */
+export type GameProjectList = {
+  provider: string
+  total: number
+  url: string | null
+  items: GameProjectItem[]
+}
+
+/** My open PRs and tickets across the project, not only this worktree's. */
+export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
+
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
 
 export type GameLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
@@ -146,6 +165,8 @@ export type GameState = {
   links: GameLink[]
   /** The calling pane's own activity. */
   activity: GameActivity | null
+  /** Absent from a host older than project work or with the tracker off. */
+  project?: GameProjectWork
 }
 
 export type FleetState = {

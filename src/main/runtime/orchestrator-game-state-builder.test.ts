@@ -265,6 +265,80 @@ describe('buildOrchestratorGameState', () => {
     expect(state.workItem).toBeNull()
   })
 
+  it("hands the project's To Do source and the worktree's item to the project work reader", async () => {
+    const asked: unknown[] = []
+    const project = {
+      reviews: null,
+      todo: {
+        provider: 'plane',
+        total: 1,
+        url: null,
+        items: [{ id: 'ORCA-9', title: 'Mine', url: 'https://app.plane.so/w/browse/ORCA-9/' }]
+      }
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(
+        checkout('orchestratorGame:\n  todo:\n    provider: plane\n    project: p1\n')
+      ),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: async () => ({
+        identifier: 'ORCA-1',
+        title: 'x',
+        url: '',
+        stateName: 'Todo',
+        stateGroup: 'unstarted'
+      }),
+      readLinear: none,
+      readProjectWork: async (args) => {
+        asked.push(args)
+        return project
+      }
+    })
+
+    expect(asked).toEqual([
+      {
+        todo: { provider: 'plane', project: 'p1' },
+        workItem: expect.objectContaining({ provider: 'plane', identifier: 'ORCA-1' })
+      }
+    ])
+    expect(state.project).toEqual(project)
+  })
+
+  it('reads no project work when the tracker is off or there is no worktree', async () => {
+    let reads = 0
+    const readProjectWork = async () => {
+      reads += 1
+      return { reviews: null, todo: null }
+    }
+    const off = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout('orchestratorGame:\n  tracker: false\n')),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readProjectWork
+    })
+    const outside = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readProjectWork
+    })
+
+    expect(reads).toBe(0)
+    expect(off.project).toBeUndefined()
+    expect(outside.project).toBeUndefined()
+  })
+
   it('answers with defaults outside a worktree', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

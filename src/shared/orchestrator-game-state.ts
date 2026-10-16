@@ -2,6 +2,7 @@ import type { AgentStatusState } from './agent-status-types'
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
+import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 
@@ -84,6 +85,8 @@ export type OrchestratorGameState = {
   links?: GameLink[]
   /** The calling pane's own activity; optional on the wire like `links`. */
   activity?: GameActivity
+  /** My open PRs and tickets across the project; absent with the tracker off or from an older host. */
+  project?: GameProjectWork
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

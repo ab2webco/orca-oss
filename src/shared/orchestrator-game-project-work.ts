@@ -1,0 +1,166 @@
+import type { CheckStatus, GitHubRepositoryIdentity } from './github/pull-request-types'
+import { isHttpUrl } from './orchestrator-game-integrations'
+import type { GameLinkTone, GameStatusGroup } from './orchestrator-game-state'
+
+/** Project-wide work the band shows next to the worktree's own: my open PRs and my open tickets. */
+
+export const GAME_PROJECT_ITEMS_MAX = 5
+const GAME_TODO_TEXT_MAX = 64
+
+export const GAME_TODO_PROVIDERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
+export type GameTodoProvider = (typeof GAME_TODO_PROVIDERS)[number]
+
+/** Where the To Do comes from; `project` is a Plane project id, Jira key or Linear team key. */
+export type OrchestratorGameTodoSource =
+  | 'off'
+  | { provider: GameTodoProvider; project?: string; workspace?: string }
+
+export type GameProjectItem = {
+  id: string
+  title: string
+  url: string
+  status?: string
+  tone?: GameLinkTone
+}
+
+/** `total` counts every open item; `items` keeps the first few, `url` opens the full list. */
+export type GameProjectList = {
+  provider: string
+  total: number
+  url: string | null
+  items: GameProjectItem[]
+}
+
+export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
+
+const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,31}$/
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isTodoProvider = (value: unknown): value is GameTodoProvider =>
+  typeof value === 'string' && (GAME_TODO_PROVIDERS as readonly string[]).includes(value)
+
+export function parseGameTodoSource(raw: unknown): {
+  value: OrchestratorGameTodoSource | undefined
+  warnings: string[]
+} {
+  const refuse = (warning: string) => ({ value: undefined, warnings: [warning] })
+  if (raw === 'off') {
+    return { value: 'off', warnings: [] }
+  }
+  if (!isRecord(raw)) {
+    return refuse('orchestratorGame.todo must be off or a mapping with provider')
+  }
+  if (!isTodoProvider(raw.provider)) {
+    return refuse(`orchestratorGame.todo.provider must be one of ${GAME_TODO_PROVIDERS.join(', ')}`)
+  }
+  const source: { provider: GameTodoProvider; project?: string; workspace?: string } = {
+    provider: raw.provider
+  }
+  for (const key of ['project', 'workspace'] as const) {
+    if (raw[key] === undefined) {
+      continue
+    }
+    const text = typeof raw[key] === 'string' ? raw[key].trim() : ''
+    if (text.length === 0 || text.length > GAME_TODO_TEXT_MAX) {
+      return refuse(`orchestratorGame.todo.${key} must be 1 to ${GAME_TODO_TEXT_MAX} characters`)
+    }
+    source[key] = text
+  }
+  // Why: the key is spliced into JQL, so anything but a project key could widen the query.
+  if (source.provider === 'jira' && source.project && !JIRA_PROJECT_KEY.test(source.project)) {
+    return refuse('orchestratorGame.todo.project must be a Jira project key like CIN')
+  }
+  return { value: source, warnings: [] }
+}
+
+export function gameProjectListOf(
+  provider: string,
+  items: readonly GameProjectItem[],
+  url: string | null,
+  total: number = items.length
+): GameProjectList {
+  return {
+    provider,
+    total,
+    url: url !== null && isHttpUrl(url) ? url : null,
+    items: items.filter((one) => isHttpUrl(one.url)).slice(0, GAME_PROJECT_ITEMS_MAX)
+  }
+}
+
+export const reviewToneOf = (ci: CheckStatus | 'none'): GameLinkTone =>
+  ci === 'failure'
+    ? 'danger'
+    : ci === 'pending'
+      ? 'pending'
+      : ci === 'success'
+        ? 'success'
+        : 'neutral'
+
+export const todoToneOf = (group: GameStatusGroup): GameLinkTone =>
+  group === 'in_progress' ? 'pending' : group === 'review' ? 'success' : 'neutral'
+
+type ListUrlSource = {
+  provider: string
+  repo?: GitHubRepositoryIdentity | null
+  sampleUrl?: string | null
+  project?: string
+}
+
+const githubBase = (repo: GitHubRepositoryIdentity): string =>
+  `https://${repo.host ?? 'github.com'}/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`
+
+const parsedUrl = (value: string | null | undefined): URL | null => {
+  if (!value || !isHttpUrl(value)) {
+    return null
+  }
+  return new URL(value)
+}
+
+// Why cut at `/-/`: a GitLab project path can nest groups, and `/-/` always ends it.
+const gitlabProjectOf = (sampleUrl: string | null | undefined): string | null => {
+  const url = parsedUrl(sampleUrl)
+  const at = url?.pathname.indexOf('/-/') ?? -1
+  return url && at > 0 ? `${url.origin}${url.pathname.slice(0, at)}` : null
+}
+
+export function reviewsListUrlOf(source: ListUrlSource): string | null {
+  if (source.provider === 'github' && source.repo) {
+    return `${githubBase(source.repo)}/pulls?q=${encodeURIComponent('is:pr is:open author:@me')}`
+  }
+  if (source.provider === 'gitlab') {
+    const project = gitlabProjectOf(source.sampleUrl)
+    return project ? `${project}/-/merge_requests?state=opened` : null
+  }
+  return null
+}
+
+export function todoListUrlOf(source: ListUrlSource): string | null {
+  if (source.provider === 'github') {
+    return source.repo
+      ? `${githubBase(source.repo)}/issues?q=${encodeURIComponent('is:issue is:open assignee:@me')}`
+      : null
+  }
+  if (source.provider === 'gitlab') {
+    const project = gitlabProjectOf(source.sampleUrl)
+    return project ? `${project}/-/issues?state=opened` : null
+  }
+  const url = parsedUrl(source.sampleUrl)
+  const first = url?.pathname.split('/').find((part) => part !== '')
+  if (!url) {
+    return null
+  }
+  if (source.provider === 'plane') {
+    return first ? `${url.origin}/${first}/workspace-views/assigned/` : null
+  }
+  if (source.provider === 'linear') {
+    return first ? `${url.origin}/${first}/my-issues/assigned` : null
+  }
+  if (source.provider === 'jira') {
+    const scope = source.project ? `project = ${source.project} AND ` : ''
+    const jql = `${scope}assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC`
+    return `${url.origin}/issues/?jql=${encodeURIComponent(jql)}`
+  }
+  return null
+}

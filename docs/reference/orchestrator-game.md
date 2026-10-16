@@ -162,6 +162,11 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 - `activity` (optional, on an agent row and at the top for the calling pane) —
   `{ name, id, url, at, running }`, the newest MCP call a rule matched (see
   [Project links and activity](#project-links-and-activity)).
+- `project` (optional) — `{ reviews, todo }`, my open work across the whole repo, not only this
+  worktree's (see [My PRs and To Do](#my-prs-and-to-do)). Each list is
+  `{ provider, total, url, items }` or `null`; `items` holds the first 5 as
+  `{ id, title, url, status?, tone? }` and `url` opens the full list. `tracker: false` leaves
+  it out.
 
 A provider that is offline or unauthenticated only drops its own field. `links` and `activity`
 are new optional fields: a mod built before them reads the state exactly as before, and this mod
@@ -182,10 +187,48 @@ popover.
   link); the line is cut to the band's width.
 - **Fleet pane.** Each teammate card shows its activity as a link under its status, cut to the
   card. An **Open** row takes hotkeys: `i` the work item, `o` the review, `c` CI, `w` the first
-  project link and `a` the calling pane's activity (else the first one linked). Each runs
+  project link, `a` the calling pane's activity (else the first one linked), `g` my PRs and `t`
+  my To Do. Each runs
   `orca tab create --url <url> --worktree id:<worktree> --json`, so it opens in an Orca browser
   tab of the worktree on every platform, and a toast says when Orca could not. The menu keeps `r`
   (Refresh) and `q` (Close); Pet Clawd is `p`.
+
+## My PRs and To Do
+
+The band also shows two project-wide chips, so a lead on `main` with no PR of its own still sees
+the team's open work. Both are read in the main process and cached for 90 seconds per repo and
+source, so polling never multiplies GitHub or tracker calls
+([reader](../../src/main/runtime/orchestrator-game-project-work.ts)).
+
+- **`⇄ My PRs N`** — my open PRs on GitHub (`author:@me is:pr is:open`). The first 5 get their CI
+  (one checks call each, cached 60 seconds by `gh`), and the chip takes the worst color: red when
+  any fails, yellow while one runs, green when they pass. On GitLab it is **My MRs**, the
+  project's open merge requests. Opens the host's list.
+- **`☐ To Do N`** — my open tickets. Done and cancelled items are left out. Opens the tracker's
+  "assigned to me" view.
+
+Where the To Do comes from, first match wins:
+
+1. `orchestratorGame.todo` in project Settings or `orca.yaml`:
+
+   ```yaml
+   # orca.yaml
+   orchestratorGame:
+     todo:
+       provider: plane # plane | jira | linear | github | gitlab
+       project: e665c0d5-22e7-495e-9ecf-3effee3ae370 # optional: Plane project id, Jira key, Linear team key
+       workspace: orca-lab # optional: Plane workspace, Jira site or Linear workspace
+   ```
+
+   `todo: off` hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
+   since it goes into the JQL.
+2. The Plane project this repo was last launched from on the Tasks page.
+3. The tracker of the worktree's linked item (a Jira or Linear item scopes to its key's prefix).
+4. Issues assigned to me on the repo's GitHub or GitLab.
+
+The Fleet pane lists both, each item a link colored by its CI or status, with hotkeys `g` (my PRs
+list) and `t` (To Do list). `/quest demo` shows them with fake data. A provider that fails costs
+only its own chip.
 
 ## Built-in scenes
 

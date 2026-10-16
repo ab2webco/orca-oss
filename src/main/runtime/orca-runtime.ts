@@ -652,6 +652,11 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import {
+  GameProjectWorkCache,
+  readGameProjectWork,
+  type GameProjectWorkPort
+} from './orchestrator-game-project-work'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
@@ -3575,6 +3580,8 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
+  private readonly gameProjectWork = new GameProjectWorkCache(90_000)
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -30170,6 +30177,23 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readProjectWork: async ({ todo, workItem }) => {
+        const repoId = worktree?.repoId
+        if (!repoId) {
+          return { reviews: null, todo: null }
+        }
+        const planeProject =
+          Object.entries(this.store?.getSettings?.()?.planeProjectRepoLinks ?? {}).find(
+            ([, linkedRepoId]) => linkedRepoId === repoId
+          )?.[0] ?? null
+        const trackerKey = workItem
+          ? `${workItem.provider}:${workItem.identifier.split('-')[0]}`
+          : ''
+        const key = JSON.stringify([repoId, todo, planeProject, trackerKey])
+        return await this.gameProjectWork.read(key, () =>
+          readGameProjectWork(this.gameProjectWorkPortFor(repoId), { todo, workItem, planeProject })
+        )
+      },
       readReview: async () =>
         worktree?.repoId && summary?.branch
           ? await this.getHostedReviewForBranch({
@@ -30242,6 +30266,44 @@ export class OrcaRuntimeService {
         return null
       }
     })
+  }
+
+  private gameProjectWorkPortFor(repoId: string): GameProjectWorkPort {
+    const selector = `id:${repoId}`
+    // Why: a folder workspace has no remote, so it has no PRs or repo issues, only tracker items.
+    const isFolder = this.store?.getRepo(repoId)?.kind === 'folder'
+    return {
+      githubRepo: async () => (isFolder ? null : await this.getRepoSlug(selector)),
+      githubPullRequests: async () =>
+        (await this.listRepoWorkItems(selector, 20, 'author:@me is:pr is:open')).items.filter(
+          (item) => item.type === 'pr'
+        ),
+      githubChecks: (pr) =>
+        this.getRepoPRChecks(selector, pr.number, pr.headSha, pr.prRepo ?? null),
+      githubIssues: async () =>
+        (await this.listRepoWorkItems(selector, 20, 'assignee:@me is:issue is:open')).items.filter(
+          (item) => item.type === 'issue'
+        ),
+      gitlabMergeRequests: async () => {
+        if (isFolder) {
+          return null
+        }
+        const result = await this.listGitLabRepoMRs(selector, 'opened', 1, 20)
+        return result.error ? null : result.items
+      },
+      gitlabIssues: async () =>
+        (await this.listGitLabRepoIssues(selector, 'opened', '@me', 20)).items,
+      planeAssigned: ({ project, workspace }) =>
+        this.planeListWorkItems({
+          projectId: project,
+          filter: 'assigned',
+          workspaceId: workspace,
+          omitDescription: true
+        }),
+      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 20, site),
+      linearAssigned: async (workspace) =>
+        (await this.linearListIssues('assigned', 50, workspace)).items
+    }
   }
 
   // Why: the game is optional decoration; any failure resolving it must still launch Claude.

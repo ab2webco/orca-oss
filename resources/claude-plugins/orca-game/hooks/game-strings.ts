@@ -45,6 +45,9 @@ export type TextStrings = {
   questDemo: string
   unknownMode: (asked: string) => string
   moreAllies: (count: number) => string
+  /** `kind` is PR or MR, after the project's host. */
+  myReviews: (kind: string, count: number) => string
+  todo: (count: number) => string
 }
 
 /** Words painted into a Raster, which only takes width-1 characters. */
@@ -126,7 +129,9 @@ const EN: GameStrings = {
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.',
     unknownMode: (asked) =>
       `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
-    moreAllies: (count) => `+${count} more`
+    moreAllies: (count) => `+${count} more`,
+    myReviews: (kind, count) => `My ${kind}s ${count}`,
+    todo: (count) => `To Do ${count}`
   },
   art: {
     needsYou: 'needs you!',

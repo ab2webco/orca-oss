@@ -1,6 +1,8 @@
 import type { GameState } from '../types'
 import { fitCells } from './cell-width'
+import { reviewKindOf } from './band-chips'
 import { activityLinksOf, activityTextOf, linkOfKind } from './fleet-labels'
+import { gameStrings } from './game-strings'
 import { httpUrlOf } from './http-url'
 import { reviewLabelOf } from './rewards'
 
@@ -11,11 +13,13 @@ const MAX_LABEL_CELLS = 32
 
 type Candidate = { key: string; hotkey: string; label: string | undefined; url: unknown }
 
-/** The work item, review, CI, first project link and own activity; a host with no links still has the first two. */
+/** The work item, review, CI, first project link, own activity, then my PRs and To Do lists. */
 export const paneLinksOf = (state: GameState): PaneLink[] => {
   const linked = (kind: Parameters<typeof linkOfKind>[1]) => linkOfKind(state.links, kind)
   const own = state.activity
   const activity = own === null ? activityLinksOf(state)[0] : undefined
+  const reviews = state.project?.reviews ?? undefined
+  const todo = state.project?.todo ?? undefined
   const candidates: Candidate[] = [
     {
       key: 'open-work-item',
@@ -46,6 +50,18 @@ export const paneLinksOf = (state: GameState): PaneLink[] => {
           ? activity && activityTextOf(activity)
           : activityTextOf({ name: own.name, label: own.id, running: own.running }),
       url: own?.url ?? activity?.url
+    },
+    {
+      key: 'open-reviews',
+      hotkey: 'g',
+      label: reviews && gameStrings().text.myReviews(reviewKindOf(reviews), reviews.total),
+      url: reviews?.url
+    },
+    {
+      key: 'open-todo',
+      hotkey: 't',
+      label: todo && gameStrings().text.todo(todo.total),
+      url: todo?.url
     }
   ]
   return candidates.flatMap(({ key, hotkey, label, url }) => {

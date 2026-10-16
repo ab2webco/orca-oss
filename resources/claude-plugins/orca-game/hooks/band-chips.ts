@@ -1,4 +1,4 @@
-import type { GameState } from '../types'
+import type { GameLinkTone, GameProjectList, GameState } from '../types'
 import type { Chip } from './chip-rows'
 import {
   activityLinksOf,
@@ -26,6 +26,58 @@ export const MENU_ROWS = 1
 export const CHIP_ROWS = 2
 
 const hrefOf = (url: string): { href?: string } => (url === '' ? {} : { href: url })
+
+const TONE_COLORS: Readonly<Record<GameLinkTone, string | undefined>> = {
+  danger: 'red',
+  pending: 'yellow',
+  success: 'green',
+  neutral: undefined
+}
+const TONE_RANK: readonly GameLinkTone[] = ['danger', 'pending', 'success']
+
+const worstToneOf = (list: GameProjectList): GameLinkTone | undefined =>
+  TONE_RANK.find((tone) => list.items.some((one) => one.tone === tone))
+
+/** The review noun after the host: GitLab calls them merge requests. */
+export const reviewKindOf = (list: GameProjectList): string =>
+  list.provider === 'gitlab' ? 'MR' : 'PR'
+
+// An empty list still says there is nothing pending, after every other link.
+const projectChipOf = (
+  key: string,
+  mark: string,
+  text: string,
+  list: GameProjectList,
+  color?: string
+): BandChip => ({
+  key,
+  priority: list.total > 0 ? 3 : 6,
+  labels: [`${mark} ${text}`, `${mark} ${list.total}`],
+  ...(list.url === null ? {} : { href: list.url }),
+  ...(color === undefined ? {} : { color })
+})
+
+// My open PRs and tickets across the project, beside the worktree's own review and item.
+const projectChipsOf = (state: GameState): BandChip[] => {
+  const text = gameStrings().text
+  const reviews = state.project?.reviews ?? null
+  const todo = state.project?.todo ?? null
+  const tone = reviews === null ? undefined : worstToneOf(reviews)
+  return [
+    ...(reviews === null
+      ? []
+      : [
+          projectChipOf(
+            'band-reviews',
+            '⇄',
+            text.myReviews(reviewKindOf(reviews), reviews.total),
+            reviews,
+            tone === undefined ? undefined : TONE_COLORS[tone]
+          )
+        ]),
+    ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)])
+  ]
+}
 
 // The work item and review lead, then CI, then activity, then the project's own links.
 const linkChipsOf = (state: GameState): BandChip[] => {
@@ -61,6 +113,7 @@ const linkChipsOf = (state: GameState): BandChip[] => {
       color: CI_COLORS[status]
     })
   }
+  chips.push(...projectChipsOf(state))
   for (const one of activityLinksOf(state)) {
     chips.push({
       key: `band-activity-${one.id}`,

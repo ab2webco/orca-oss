@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveOrchestratorGameIntegrations } from './orchestrator-game-config'
+import {
+  parseOrchestratorGameLayer,
+  resolveOrchestratorGameIntegrations
+} from './orchestrator-game-config'
 import {
   compileGameActivityRule,
   matchGameActivity,
@@ -168,8 +171,24 @@ describe('resolveOrchestratorGameIntegrations', () => {
 
     expect(resolved).toEqual({
       links: [{ label: 'Project', url: 'https://p.example' }],
-      activity: []
+      activity: [],
+      todo: null
     })
+  })
+
+  it('takes the To Do source from the latest layer that names a valid one', () => {
+    expect(
+      resolveOrchestratorGameIntegrations({
+        project: { todo: { provider: 'plane', project: 'p1' } },
+        local: { todo: { provider: 'trello' } as never }
+      }).todo
+    ).toEqual({ provider: 'plane', project: 'p1' })
+    expect(
+      resolveOrchestratorGameIntegrations({
+        project: { todo: { provider: 'plane' } },
+        local: { todo: 'off' }
+      }).todo
+    ).toBe('off')
   })
 
   it('drops invalid entries a hand-edited Settings layer carries', () => {
@@ -178,5 +197,20 @@ describe('resolveOrchestratorGameIntegrations', () => {
     })
 
     expect(resolved.links).toEqual([])
+  })
+})
+
+describe('orchestratorGame.todo in orca.yaml', () => {
+  it('reads a valid source and warns about an invalid one', () => {
+    expect(parseOrchestratorGameLayer({ todo: { provider: 'jira', project: 'CIN' } })).toEqual({
+      layer: { todo: { provider: 'jira', project: 'CIN' } },
+      warnings: []
+    })
+    expect(parseOrchestratorGameLayer({ todo: { provider: 'trello' } })).toEqual({
+      layer: {},
+      warnings: [
+        'orchestratorGame.todo.provider must be one of plane, jira, linear, github, gitlab'
+      ]
+    })
   })
 })

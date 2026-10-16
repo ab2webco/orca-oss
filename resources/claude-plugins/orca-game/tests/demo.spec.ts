@@ -17,10 +17,20 @@ describe('demo', () => {
     )
     expect(frames.some((one) => one.isResting)).toBe(true)
     expect(frames.filter((one) => one.isLevelUp)).toHaveLength(1)
-    const urls = frames.flatMap((one) => [
-      one.state.review?.url ?? '',
-      one.state.workItem?.url ?? ''
+    expect(frames.every((one) => (one.state.project?.reviews?.items.length ?? 0) > 0)).toBe(true)
+    expect(frames.every((one) => (one.state.project?.todo?.items.length ?? 0) > 0)).toBe(true)
+    const project = frames.flatMap((one) => [
+      one.state.project?.reviews?.url ?? '',
+      one.state.project?.todo?.url ?? '',
+      ...[
+        ...(one.state.project?.reviews?.items ?? []),
+        ...(one.state.project?.todo?.items ?? [])
+      ].map((item) => item.url)
     ])
+    const urls = [
+      ...frames.flatMap((one) => [one.state.review?.url ?? '', one.state.workItem?.url ?? '']),
+      ...project
+    ]
     expect(
       urls.filter((url) => url !== '').every((url) => url.startsWith('https://example.invalid/'))
     ).toBe(true)
