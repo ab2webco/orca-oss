@@ -92,6 +92,33 @@ describe('buildOrchestratorGameState', () => {
     })
   })
 
+  it('hands out the terminal handle of each agent pane that maps to one', async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: 'dev',
+      taskTitle: null,
+      toolName: null
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab:a' },
+        { ...row, paneKey: 'tab:gone' }
+      ],
+      leaderPaneKey: null,
+      terminalHandleOf: (paneKey) => (paneKey === 'tab:a' ? 'term_a' : null),
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents[0]?.terminalHandle).toBe('term_a')
+    // Why: an absent key, not null, keeps the row identical to what older hosts send.
+    expect(state.agents[1]).not.toHaveProperty('terminalHandle')
+  })
+
   it('falls back to a linked item without status when no tracker answers', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

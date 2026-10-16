@@ -30154,6 +30154,7 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       leaderPaneKey: args.paneKey ?? null,
+      terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       readScenes: () => readPluginGameSceneSources(),
       readReview: async () =>
         worktree?.repoId && summary?.branch

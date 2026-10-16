@@ -34,6 +34,7 @@ export type OrchestratorGameStateInput = {
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
   >[]
   leaderPaneKey: string | null
+  terminalHandleOf?: (paneKey: string) => string | null
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
@@ -130,7 +131,9 @@ export async function buildOrchestratorGameState(
           displayName: input.worktree.displayName
         }
       : null,
-    agents: input.agents.map((row) => gameAgentOf(row, input.leaderPaneKey)),
+    agents: input.agents.map((row) =>
+      gameAgentOf(row, input.leaderPaneKey, input.terminalHandleOf?.(row.paneKey) ?? null)
+    ),
     review: gameReviewOf(review),
     workItem,
     extensions: { scenes: scenes.scenes }

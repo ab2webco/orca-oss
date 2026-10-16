@@ -21,6 +21,8 @@ export type GameAgent = {
   state: 'working' | 'waiting' | 'idle' | 'done'
   toolName: string | null
   isLeader: boolean
+  /** Optional on the wire: older hosts send none, and a pane with no terminal gets none. */
+  terminalHandle?: string
 }
 
 export type GameReview = {
@@ -113,7 +115,8 @@ export function gameAgentOf(
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
   >,
-  leaderPaneKey: string | null
+  leaderPaneKey: string | null,
+  terminalHandle: string | null = null
 ): GameAgent {
   return {
     paneKey: row.paneKey,
@@ -121,7 +124,8 @@ export function gameAgentOf(
     agentType: row.agentType,
     state: AGENT_STATES[row.state] ?? 'idle',
     toolName: row.toolName,
-    isLeader: row.paneKey === leaderPaneKey
+    isLeader: row.paneKey === leaderPaneKey,
+    ...(terminalHandle ? { terminalHandle } : {})
   }
 }
 
