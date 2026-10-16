@@ -15,7 +15,10 @@ const roundTrip = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
 const quest = roundTrip(QUEST_SCENE) as Record<string, unknown>
 const withCostume = (patch: Record<string, unknown>) => ({
   ...quest,
-  costumes: { ...(quest.costumes as object), pr: { ...QUEST_SCENE.costumes.pr, ...patch } }
+  costumes: {
+    ...(quest.costumes as object),
+    pr: { ...QUEST_SCENE.costumes.pr, ...patch }
+  }
 })
 
 describe('sceneDefinitionOf', () => {
@@ -39,8 +42,15 @@ describe('sceneDefinitionOf', () => {
   it('takes a name per language like Orca does, keeping only the languages it ships', () => {
     const text = JSON.stringify(
       sceneFile({
-        cards: byScenePhase({ ...sceneCard, name: { en: 'Pilot', es: 'Piloto', fr: 'Pilote' } }),
-        teller: { icon: '❝', name: { en: 'Narrator', ja: '語り手' }, color: '#8f9bb3' }
+        cards: byScenePhase({
+          ...sceneCard,
+          name: { en: 'Pilot', es: 'Piloto', fr: 'Pilote' }
+        }),
+        teller: {
+          icon: '❝',
+          name: { en: 'Narrator', ja: '語り手' },
+          color: '#8f9bb3'
+        }
       })
     )
     const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
@@ -79,6 +89,46 @@ describe('sceneDefinitionOf', () => {
     )
   })
 
+  it('takes #rrggbb colors like Orca does, as the integers the renderer draws', () => {
+    const text = JSON.stringify(
+      sceneFile({
+        looks: byScenePhase({
+          ...sceneLook,
+          skyTop: '#4A7FC1',
+          sun: '#ffe08a'
+        }),
+        foe: {
+          ...sceneCostume,
+          colors: { ...sceneCostume.colors, O: '#d77757' }
+        }
+      })
+    )
+    const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
+    const scene = sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')
+    expect(scene?.looks.pr.skyTop).toBe(0x4a7fc1)
+    expect(scene?.looks.pr.sun).toBe(0xffe08a)
+    expect(scene?.foe?.colors.O).toBe(0xd77757)
+    expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+  })
+
+  it.each([
+    ['a short #rgb color', { looks: byScenePhase({ ...sceneLook, sun: '#fe8' }) }],
+    ['a color name', { looks: byScenePhase({ ...sceneLook, sun: 'gold' }) }],
+    [
+      'a hex costume color with alpha',
+      {
+        foe: {
+          ...sceneCostume,
+          colors: { ...sceneCostume.colors, O: '#d77757ff' }
+        }
+      }
+    ]
+  ])('drops a scene with %s, as Orca does', (_label, patch) => {
+    const text = JSON.stringify(sceneFile(patch))
+    expect(parseOrchestratorGameScene(text, 'acme.space/orbit').ok).toBe(false)
+    expect(sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')).toBeUndefined()
+  })
+
   it.each([
     ['an unknown world', { looks: byScenePhase({ ...sceneLook, scenery: 'ocean' }) }],
     ['a signal that is not a boolean', { looks: byScenePhase({ ...sceneLook, isSignal: 'yes' }) }],
@@ -102,7 +152,13 @@ describe('sceneDefinitionOf', () => {
     ],
     [
       'a look with a fractional color',
-      { ...quest, looks: { ...(quest.looks as object), pr: { ...QUEST_SCENE.looks.pr, sun: 0.5 } } }
+      {
+        ...quest,
+        looks: {
+          ...(quest.looks as object),
+          pr: { ...QUEST_SCENE.looks.pr, sun: 0.5 }
+        }
+      }
     ],
     [
       'a row that is not ten columns',
@@ -111,7 +167,10 @@ describe('sceneDefinitionOf', () => {
     ['a glyph with no color', withCostume({ legs: ['.Q.O.O.O..', 'O.O.O.O.O.'] })],
     [
       'a name with a terminal escape',
-      { ...quest, teller: { ...QUEST_SCENE.teller, name: 'x\u001b]0;pwned\u0007' } }
+      {
+        ...quest,
+        teller: { ...QUEST_SCENE.teller, name: 'x\u001b]0;pwned\u0007' }
+      }
     ],
     [
       'per-language names without English',
@@ -121,7 +180,10 @@ describe('sceneDefinitionOf', () => {
       'a translated name with a terminal escape',
       {
         ...quest,
-        teller: { ...QUEST_SCENE.teller, name: { en: 'N', ko: 'x\u001b]0;pwned\u0007' } }
+        teller: {
+          ...QUEST_SCENE.teller,
+          name: { en: 'N', ko: 'x\u001b]0;pwned\u0007' }
+        }
       }
     ],
     [

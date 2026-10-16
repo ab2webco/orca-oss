@@ -36,8 +36,15 @@ const LOOK_COLORS = [
 const isShape = (value: unknown): value is Shape =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const isColor = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffff
+// Why both, as Orca's parser: JSON has no hex literals, so a hand-written scene says '#rrggbb'.
+const colorOf = (value: unknown): number | undefined => {
+  if (typeof value === 'string') {
+    return HEX.test(value) ? Number.parseInt(value.slice(1), 16) : undefined
+  }
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffff
+    ? value
+    : undefined
+}
 
 // Why: card names reach the terminal verbatim; control, C1 and bidi characters could rewrite it.
 const isSafeCode = (code: number): boolean =>
@@ -62,7 +69,8 @@ const lookOf = (value: unknown): Look | undefined => {
     return undefined
   }
   const plantKind = PLANT_KINDS.find((one) => one === value.plantKind)
-  if (plantKind === undefined || !LOOK_COLORS.every((key) => isColor(value[key]))) {
+  const colors = Object.fromEntries(LOOK_COLORS.map((key) => [key, colorOf(value[key])]))
+  if (plantKind === undefined || !LOOK_COLORS.every((key) => colors[key] !== undefined)) {
     return undefined
   }
   const scenery = SCENERIES.find((one) => one === value.scenery)
@@ -71,12 +79,8 @@ const lookOf = (value: unknown): Look | undefined => {
   if ((hasScenery && scenery === undefined) || (hasSignal && typeof value.isSignal !== 'boolean')) {
     return undefined
   }
-  const colors = Object.fromEntries(LOOK_COLORS.map((key) => [key, value[key]])) as Record<
-    (typeof LOOK_COLORS)[number],
-    number
-  >
   return {
-    ...colors,
+    ...(colors as Record<(typeof LOOK_COLORS)[number], number>),
     isNight: value.isNight,
     plantKind,
     ...(scenery === undefined ? {} : { scenery }),
@@ -97,11 +101,15 @@ const costumeOf = (value: unknown): Costume | undefined => {
   }
   const rows = rowsOf(value.rows, COSTUME_ROWS)
   const legs = rowsOf(value.legs, 2)
-  const entries = Object.entries(value.colors)
+  const entries = Object.entries(value.colors).map(
+    ([glyph, color]) => [glyph, colorOf(color)] as const
+  )
   if (rows === undefined || legs === undefined || legs[0] === undefined || legs[1] === undefined) {
     return undefined
   }
-  if (!entries.every(([glyph, color]) => GLYPH.test(glyph) && glyph !== '.' && isColor(color))) {
+  if (
+    !entries.every(([glyph, color]) => GLYPH.test(glyph) && glyph !== '.' && color !== undefined)
+  ) {
     return undefined
   }
   const colors = Object.fromEntries(entries) as Record<string, number>
