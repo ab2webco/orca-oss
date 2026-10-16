@@ -188,15 +188,11 @@ export const registerBand = (on: On): void => {
         {rowsOf('band-chips', chips, CHIP_ROWS, chipOf, (count) => `+${count}`)}
         {needs.length > 0 && (
           <Box key="band-needs" flexDirection="row" overflow="hidden">
-            {needPartsOf(needs, columns).map((part) =>
-              linkOf(
-                part.key,
-                part.url ?? '',
-                <Text key={part.key} color="red" bold>
-                  {part.text}
-                </Text>
-              )
-            )}
+            <Text color="red" bold wrap="truncate-end">
+              {needPartsOf(needs, columns).map((part) =>
+                linkOf(part.key, part.url ?? '', <Text key={part.key}>{part.text}</Text>)
+              )}
+            </Text>
           </Box>
         )}
         {menuRows}

@@ -222,6 +222,8 @@ describe('band links', () => {
     const needs = await ui.find({ type: 'Box', key: 'band-needs' })
     expect(shownOf(needs)).toBe('Needs you: tester waiting on you · #42 CI failing')
     expect(linksIn(needs).map((one) => one.props?.href)).toEqual([CHECKS])
+    // One truncating line, so a terminal cuts it rather than wrapping its parts.
+    expect(elementsOf(needs).map((one) => one.type)).toEqual(['Text'])
     await ui.unmount()
 
     const narrow = await band($, 32)
