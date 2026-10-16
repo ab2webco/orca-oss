@@ -167,6 +167,24 @@ describe('parseGameState', () => {
     ).toEqual({ scenes: [] })
   })
 
+  // Why: hosts add optional fields (links, activity) that a mod built before them must read past.
+  it('reads the same state when a newer host adds links and agent activity', () => {
+    const activity = {
+      name: 'Tambora',
+      id: 'TR-CIN-12',
+      url: 'https://tambora.example/projects/CIN/testruns/TR-CIN-12',
+      at: 1,
+      running: true
+    }
+    const newer = {
+      ...STATE,
+      agents: STATE.agents.map((agent) => ({ ...agent, activity })),
+      activity,
+      links: [{ id: 'ci', kind: 'ci', provider: 'github', label: 'CI', url: 'https://x/checks' }]
+    }
+    expect(parseGameState(JSON.stringify(newer))).toEqual(parseGameState(JSON.stringify(STATE)))
+  })
+
   it('answers undefined for output that is not a JSON object', () => {
     expect(parseGameState('')).toBeUndefined()
     expect(parseGameState('not json')).toBeUndefined()

@@ -43,6 +43,21 @@ export type GameWorkItem = {
   statusGroup: GameStatusGroup
 }
 
+export type GameLinkKind = 'review' | 'ci' | 'workItem' | 'project' | 'activity'
+
+export type GameLinkTone = 'neutral' | 'pending' | 'success' | 'danger'
+
+/** A clickable integration of the worktree; `url` is always http(s). */
+export type GameLink = {
+  id: string
+  kind: GameLinkKind
+  provider: string
+  label: string
+  url: string
+  status?: string
+  tone?: GameLinkTone
+}
+
 export type OrchestratorGameState = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
@@ -53,6 +68,8 @@ export type OrchestratorGameState = {
   workItem: GameWorkItem | null
   /** Optional on the wire: a host older than plugin scenes sends none. */
   extensions?: { scenes: OrchestratorGameSceneExtension[] }
+  /** Optional on the wire: a host older than game links sends none. */
+  links?: GameLink[]
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

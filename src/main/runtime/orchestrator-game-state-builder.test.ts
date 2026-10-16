@@ -110,6 +110,11 @@ describe('buildOrchestratorGameState', () => {
       status: 'In Review',
       statusGroup: 'review'
     })
+    expect(state.links?.map((link) => [link.kind, link.url])).toEqual([
+      ['review', 'https://github.com/o/r/pull/12'],
+      ['ci', 'https://github.com/o/r/pull/12/checks'],
+      ['workItem', 'https://plane.example/ORCA-580']
+    ])
   })
 
   it('hands out the terminal handle of each agent pane that maps to one', async () => {

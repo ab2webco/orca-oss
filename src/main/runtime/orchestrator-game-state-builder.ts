@@ -1,5 +1,6 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
+import { gameLinksOf } from '../../shared/orchestrator-game-links'
 import {
   orchestratorGameScenesOf,
   type OrchestratorGameSceneSource
@@ -123,6 +124,7 @@ export async function buildOrchestratorGameState(
       }
     }
   }
+  const gameReview = gameReviewOf(review)
   return {
     config: resolved.config,
     sources: resolved.sources,
@@ -138,8 +140,9 @@ export async function buildOrchestratorGameState(
     agents: input.agents.map((row) =>
       gameAgentOf(row, input.leaderPaneKey, input.terminalHandleOf?.(row.paneKey) ?? null)
     ),
-    review: gameReviewOf(review),
+    review: gameReview,
     workItem,
-    extensions: { scenes: scenes.scenes }
+    extensions: { scenes: scenes.scenes },
+    links: gameLinksOf({ review: gameReview, workItem })
   }
 }
