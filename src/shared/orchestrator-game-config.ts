@@ -12,7 +12,9 @@ import {
   type OrchestratorGameLinkTemplate
 } from './orchestrator-game-integrations'
 import {
+  parseGameReviewsSource,
   parseGameTodoSource,
+  type OrchestratorGameReviewsSource,
   type OrchestratorGameTodoSource
 } from './orchestrator-game-project-work'
 import {
@@ -47,10 +49,13 @@ export type OrchestratorGameIntegrations = {
   actions: OrchestratorGameAction[]
   /** Where the band's To Do comes from; null picks it from the repo and its linked work item. */
   todo: OrchestratorGameTodoSource | null
+  /** What the PR list's link does; a later layer replaces it whole. */
+  reviews: OrchestratorGameReviewsSource
 }
 
 export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
-  Partial<Omit<OrchestratorGameIntegrations, 'todo'>> & {
+  Partial<Omit<OrchestratorGameIntegrations, 'todo' | 'reviews'>> & {
+    reviews?: OrchestratorGameReviewsSource
     todo?: OrchestratorGameTodoSource
     /** How the lead orchestrates; merged key by key across layers. */
     orchestrator?: OrchestratorGameLeadLayer
@@ -147,7 +152,8 @@ export function resolveOrchestratorGameIntegrations(
     links: [],
     activity: [],
     actions: [],
-    todo: null
+    todo: null,
+    reviews: {}
   }
   for (const source of LAYER_ORDER) {
     const layer = layers[source]
@@ -159,6 +165,9 @@ export function resolveOrchestratorGameIntegrations(
     }
     if (layer?.actions !== undefined) {
       resolved.actions = parseGameActions(layer.actions).value ?? []
+    }
+    if (layer?.reviews !== undefined) {
+      resolved.reviews = parseGameReviewsSource(layer.reviews).value ?? {}
     }
     const todo = layer?.todo === undefined ? undefined : parseGameTodoSource(layer.todo).value
     if (todo !== undefined) {
@@ -258,6 +267,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         layer.orchestrator = parsed.value
+      }
+    } else if (key === 'reviews') {
+      const parsed = parseGameReviewsSource(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value !== undefined) {
+        layer.reviews = parsed.value
       }
     } else if (key === 'todo') {
       const parsed = parseGameTodoSource(value)

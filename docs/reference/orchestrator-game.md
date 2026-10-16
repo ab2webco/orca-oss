@@ -244,6 +244,9 @@ Where the To Do comes from, first match wins:
    instead of opening the tracker's list, so the lead shows the To Do with whatever the project
    uses (a CLI, an MCP server). An action that does not exist is reported in `orca game state`
    and the link opens the list as before.
+   The PR list takes the same key, `orchestratorGame.reviews.action` (for example
+   `reviews: { action: prs }`): the **My PRs** chip, the Panel's My PRs heading and its `g` link
+   then run that action instead of opening GitHub's or GitLab's list.
    Without `workspace` Orca uses the workspace or site selected on its Tasks page. `todo: off`
    hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
    since it goes into the JQL.

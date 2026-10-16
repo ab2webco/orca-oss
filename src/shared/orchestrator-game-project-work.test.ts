@@ -3,6 +3,7 @@ import {
   GAME_PROJECT_ITEMS_MAX,
   GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
+  parseGameReviewsSource,
   parseGameTodoSource,
   reviewsListUrlOf,
   reviewToneOf,
@@ -56,6 +57,27 @@ describe('parseGameTodoSource', () => {
   it('refuses a Jira project that is not a project key, since it reaches a JQL query', () => {
     expect(parseGameTodoSource({ provider: 'jira', project: 'CIN" OR 1=1' }).warnings).toEqual([
       'orchestratorGame.todo.project must be a Jira project key like CIN'
+    ])
+  })
+})
+
+describe('parseGameReviewsSource', () => {
+  it('takes the action the PR list runs instead of opening it, warning on a bad name', () => {
+    expect(parseGameReviewsSource({ action: ' prs ' })).toEqual({
+      value: { action: 'prs' },
+      warnings: []
+    })
+    expect(parseGameReviewsSource({ action: 'My PRs' })).toEqual({
+      value: {},
+      warnings: [
+        'orchestratorGame.reviews.action must name an action by its command or id, like prs'
+      ]
+    })
+    expect(parseGameReviewsSource({ list: 'x' }).warnings).toEqual([
+      'orchestratorGame.reviews.list is not a known setting'
+    ])
+    expect(parseGameReviewsSource('prs').warnings).toEqual([
+      'orchestratorGame.reviews must be a mapping'
     ])
   })
 })

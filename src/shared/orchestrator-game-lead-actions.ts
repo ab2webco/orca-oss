@@ -56,6 +56,23 @@ export function gameStateActionsOf(args: {
   return [...builtIn, ...project]
 }
 
+/** The PR and To Do lists' actions as `game.state` carries them, and a warning per unknown name. */
+export function gameListActionsOf(
+  actions: readonly GameAction[],
+  names: { todo?: string; reviews?: string }
+): { todo: { actionId?: string }; reviews: { actionId?: string }; warnings: string[] } {
+  const warnings: string[] = []
+  const idOf = (list: 'todo' | 'reviews'): { actionId?: string } => {
+    const name = names[list]
+    const id = name === undefined ? undefined : gameActionIdOf(actions, name)
+    if (name !== undefined && id === undefined) {
+      warnings.push(`orchestratorGame.${list}.action names no action: ${name}`)
+    }
+    return id === undefined ? {} : { actionId: id }
+  }
+  return { todo: idOf('todo'), reviews: idOf('reviews'), warnings }
+}
+
 /** The id of the action a setting names by its command or its id, as `todo.action` does. */
 export const gameActionIdOf = (actions: readonly GameAction[], name: string): string | undefined =>
   (actions.find((one) => one.command === name) ?? actions.find((one) => one.id === name))?.id

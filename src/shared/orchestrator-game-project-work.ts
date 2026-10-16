@@ -65,6 +65,33 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isTodoProvider = (value: unknown): value is GameTodoProvider =>
   typeof value === 'string' && (GAME_TODO_PROVIDERS as readonly string[]).includes(value)
 
+/** How the band's PR list behaves; `action` names one it runs instead of opening the list. */
+export type OrchestratorGameReviewsSource = { action?: string }
+
+export function parseGameReviewsSource(raw: unknown): {
+  value: OrchestratorGameReviewsSource | undefined
+  warnings: string[]
+} {
+  if (!isRecord(raw)) {
+    return { value: undefined, warnings: ['orchestratorGame.reviews must be a mapping'] }
+  }
+  const value: OrchestratorGameReviewsSource = {}
+  const warnings: string[] = []
+  for (const [key, entry] of Object.entries(raw)) {
+    const action = typeof entry === 'string' ? entry.trim() : ''
+    if (key !== 'action') {
+      warnings.push(`orchestratorGame.reviews.${key} is not a known setting`)
+    } else if (TODO_ACTION.test(action)) {
+      value.action = action
+    } else {
+      warnings.push(
+        'orchestratorGame.reviews.action must name an action by its command or id, like prs'
+      )
+    }
+  }
+  return { value, warnings }
+}
+
 export function parseGameTodoSource(raw: unknown): {
   value: OrchestratorGameTodoSource | undefined
   warnings: string[]

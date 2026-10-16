@@ -27,10 +27,14 @@ export const commandPromptOf = (prompt: string, args: string): string => {
   return extra === '' ? prompt : `${prompt}\n\n${extra}`
 }
 
-/** The action Orca says the To Do link runs, when the state still has it. */
-export const todoActionOf = (
-  state: Pick<GameState, 'actions' | 'project'>
+/** The action Orca says a list's link runs (the To Do or my PRs), when the state still has it. */
+export const listActionOf = (
+  state: Pick<GameState, 'actions' | 'project'>,
+  list: 'todo' | 'reviews'
 ): GameAction | undefined => {
-  const id = state.project?.todo?.actionId
+  const id = state.project?.[list]?.actionId
   return id === undefined ? undefined : state.actions?.find((one) => one.id === id)
 }
+
+export const todoActionOf = (state: Pick<GameState, 'actions' | 'project'>) =>
+  listActionOf(state, 'todo')

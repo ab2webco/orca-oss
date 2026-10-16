@@ -397,3 +397,31 @@ describe('a To Do that runs an action', () => {
     await strip.unmount()
   })
 })
+
+describe('a PR list that runs an action', () => {
+  const PRS_STATE = {
+    ...STATE,
+    project: {
+      ...STATE.project,
+      reviews: {
+        provider: 'github',
+        total: 0,
+        url: 'https://github.com/o/r/pulls',
+        items: [],
+        actionId: 'action-0'
+      }
+    }
+  }
+
+  test('the g link and the Panel heading send its prompt instead of opening the list', async ($, on) => {
+    const world = worldOf({ state: PRS_STATE })
+    const clock = await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'open-reviews' })
+    await clock.advance(3001)
+    await ui.press({ key: 'project-reviews-action' })
+    await clock.settle()
+    expect(world.prompts).toEqual(['Open a PR for ORCA-1', 'Open a PR for ORCA-1'])
+    await ui.unmount()
+  })
+})

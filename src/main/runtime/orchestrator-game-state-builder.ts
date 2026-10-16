@@ -23,7 +23,7 @@ import {
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
-import { gameActionIdOf, gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
+import { gameListActionsOf, gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
 import {
   activityGameLinksOf,
   gameLinksOf,
@@ -199,23 +199,19 @@ export async function buildOrchestratorGameState(
     project: gameActionsOf(integrations.actions, placeholders)
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
-  const todoAction = integrations.todo === 'off' ? undefined : integrations.todo?.action
-  const todoActionId = todoAction === undefined ? undefined : gameActionIdOf(actions, todoAction)
-  const todo = projectWork?.todo
-  const projectState =
-    projectWork && todo
-      ? {
-          ...projectWork,
-          todo: {
-            ...todo,
-            ...(todoActionId === undefined ? {} : { actionId: todoActionId }),
-            items: todo.items.map((one) => ({
-              ...one,
-              prompt: renderGameWorkPrompt(workPrompt, one)
-            }))
-          }
-        }
-      : projectWork
+  const listActions = gameListActionsOf(actions, {
+    todo: integrations.todo === 'off' ? undefined : integrations.todo?.action,
+    reviews: integrations.reviews.action
+  })
+  const todo = projectWork?.todo ?? null
+  const projectState = projectWork && {
+    reviews: projectWork.reviews && { ...projectWork.reviews, ...listActions.reviews },
+    todo: todo && {
+      ...todo,
+      ...listActions.todo,
+      items: todo.items.map((one) => ({ ...one, prompt: renderGameWorkPrompt(workPrompt, one) }))
+    }
+  }
   // Why: project rules first, so a repo can override what Orca's own integrations would link.
   const rules = [
     ...integrations.activity.flatMap((rule) => compileGameActivityRule(rule) ?? []),
@@ -245,9 +241,7 @@ export async function buildOrchestratorGameState(
       ...(project?.orchestratorGameWarnings ?? []),
       ...resolved.warnings,
       ...scenes.warnings,
-      ...(todoAction !== undefined && todoActionId === undefined
-        ? [`orchestratorGame.todo.action names no action: ${todoAction}`]
-        : [])
+      ...listActions.warnings
     ],
     worktree: input.worktree
       ? {

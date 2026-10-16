@@ -4,7 +4,7 @@ import type { GameProjectWork, GameState } from '../types'
 import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import { gameStateOf } from '../hooks/game-state'
 import { paneLinksOf } from '../hooks/pane-links'
-import { todoActionOf } from '../hooks/lead-actions'
+import { listActionOf, todoActionOf } from '../hooks/lead-actions'
 
 const PROJECT: GameProjectWork = {
   reviews: {
@@ -244,5 +244,28 @@ describe('a To Do that runs an action', () => {
       expect(byKey(chipsOf(state), 'band-todo')?.href).toBe(PROJECT.todo?.url)
       expect(paneLinksOf(state).find((one) => one.key === 'open-todo')?.url).toBe(PROJECT.todo?.url)
     }
+  })
+})
+
+describe('a PR list that runs an action', () => {
+  const PRS = { id: 'action-0', label: 'PRs', command: 'prs', prompt: 'Show my PRs' }
+  const reviews = { ...(PROJECT.reviews as NonNullable<GameProjectWork['reviews']>), total: 0 }
+  const state: GameState = {
+    ...STATE,
+    actions: [PRS],
+    project: { reviews: { ...reviews, actionId: 'action-0' }, todo: null }
+  }
+
+  it('makes the band count and the g link run it instead of opening the list', () => {
+    const parsed = gameStateOf(state) as GameState
+    expect(listActionOf(parsed, 'reviews')).toEqual(PRS)
+    const chip = byKey(chipsOf(parsed), 'band-reviews')
+    expect(chip?.href).toBeUndefined()
+    expect(chip?.actionId).toBe('action-0')
+    expect(paneLinksOf(parsed).find((one) => one.key === 'open-reviews')).toMatchObject({
+      hotkey: 'g',
+      url: '',
+      action: PRS
+    })
   })
 })

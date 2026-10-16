@@ -64,6 +64,20 @@ describe('openLinks', () => {
   })
 })
 
+describe('reviews', () => {
+  it("reads the PR list's action from orca.yaml, this machine's layer replacing it", () => {
+    const { layer, warnings } = parseOrchestratorGameLayer({ reviews: { action: 'prs' } })
+    expect(layer).toEqual({ reviews: { action: 'prs' } })
+    expect(warnings).toEqual([])
+    expect(
+      resolveOrchestratorGameIntegrations({ project: layer, local: { reviews: {} } }).reviews
+    ).toEqual({})
+    expect(resolveOrchestratorGameIntegrations({ project: layer }).reviews).toEqual({
+      action: 'prs'
+    })
+  })
+})
+
 describe('resolveOrchestratorGameConfig sceneFile', () => {
   it('draws a project layer scene file over a scene at the same or a lower layer', () => {
     const resolved = resolveOrchestratorGameConfig({

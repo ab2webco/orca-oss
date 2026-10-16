@@ -4,7 +4,7 @@ import { reviewKindOf } from './band-chips'
 import { activityLinksOf, activityTextOf, linkOfKind } from './fleet-labels'
 import { gameStrings } from './game-strings'
 import { httpUrlOf } from './http-url'
-import { todoActionOf } from './lead-actions'
+import { listActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
 
 /** A link the fleet pane opens on a hotkey. */
@@ -69,14 +69,15 @@ export const paneLinksOf = (state: GameState): PaneLink[] => {
       key: 'open-reviews',
       hotkey: 'g',
       label: reviews && gameStrings().text.myReviews(reviewKindOf(reviews), reviews.total),
-      url: reviews?.url
+      url: reviews?.url,
+      action: listActionOf(state, 'reviews')
     },
     {
       key: 'open-todo',
       hotkey: 't',
       label: todo && gameStrings().text.todo(todo.total),
       url: todo?.url,
-      action: todoActionOf(state)
+      action: listActionOf(state, 'todo')
     }
   ]
   return candidates.flatMap(({ key, hotkey, label, url, action }) => {

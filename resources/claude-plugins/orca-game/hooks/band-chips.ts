@@ -15,7 +15,7 @@ import {
   workItemTextOf
 } from './fleet-labels'
 import { gameStrings } from './game-strings'
-import { todoActionOf } from './lead-actions'
+import { listActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
 
 /** A link chip opens `href` when it has one and is drawn in `color`, else the scene's parchment. */
@@ -64,10 +64,9 @@ const projectChipOf = (
   ...(color === undefined ? {} : { color })
 })
 
-// Why no href with an action: the project asked for its To Do through the lead, not a URL.
-const todoChipOf = (state: GameState, label: string, todo: GameProjectList): BandChip => {
-  const chip = projectChipOf('band-todo', '☐', label, todo)
-  const action = todoActionOf(state)
+// Why no href with an action: the project asked for the list through the lead, not a URL.
+const withListAction = (state: GameState, list: 'todo' | 'reviews', chip: BandChip): BandChip => {
+  const action = listActionOf(state, list)
   if (action === undefined) {
     return chip
   }
@@ -116,16 +115,28 @@ const projectChipsOf = (state: GameState): BandChip[] => {
     ...prChips,
     ...(needsCount
       ? [
-          projectChipOf(
-            'band-reviews',
-            '⇄',
-            text.myReviews(reviewKindOf(reviews), reviews.total),
-            reviews,
-            tone === undefined ? undefined : TONE_COLORS[tone]
+          withListAction(
+            state,
+            'reviews',
+            projectChipOf(
+              'band-reviews',
+              '⇄',
+              text.myReviews(reviewKindOf(reviews), reviews.total),
+              reviews,
+              tone === undefined ? undefined : TONE_COLORS[tone]
+            )
           )
         ]
       : []),
-    ...(todo === null ? [] : [todoChipOf(state, text.todo(todo.total), todo)]),
+    ...(todo === null
+      ? []
+      : [
+          withListAction(
+            state,
+            'todo',
+            projectChipOf('band-todo', '☐', text.todo(todo.total), todo)
+          )
+        ]),
     ...qaChips
   ]
 }

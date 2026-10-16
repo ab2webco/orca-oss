@@ -13,7 +13,7 @@ import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
-import { actionLabelOf, todoActionOf } from './lead-actions'
+import { actionLabelOf, listActionOf } from './lead-actions'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
 const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
@@ -158,11 +158,16 @@ export async function projectRowsOf(
     ...(reviews === null
       ? []
       : [
-          listRows('project-reviews', text.myReviews(reviewKindOf(reviews), reviews.total), reviews)
+          listRows(
+            'project-reviews',
+            text.myReviews(reviewKindOf(reviews), reviews.total),
+            reviews,
+            listActionOf(state, 'reviews')
+          )
         ]),
     ...(todo === null
       ? []
-      : [listRows('project-todo', text.todo(todo.total), todo, todoActionOf(state))]),
+      : [listRows('project-todo', text.todo(todo.total), todo, listActionOf(state, 'todo'))]),
     ...(actions.length === 0
       ? []
       : [
