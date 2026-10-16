@@ -10,9 +10,11 @@ import type {
   GameReview,
   GameSceneExtension,
   GameState,
+  GameStatusGroup,
   GameWorkItem,
   GameWorktree
 } from '../types'
+import { gameActionsOf, gamePromptOf } from './game-action-shape'
 import { isTerminalHandle } from './game-config'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
@@ -113,15 +115,32 @@ const projectItemOf = (value: unknown): GameProjectItem[] => {
   }
   const status = textOf(value.status)
   const tone = oneOf(value.tone, LINK_TONES)
+  const group = oneOf(value.group, STATUS_GROUPS)
+  const prompt = gamePromptOf(value.prompt)
   return [
     {
       id,
       title: textOf(value.title) ?? '',
       url,
       ...(status === undefined ? {} : { status }),
-      ...(tone === undefined ? {} : { tone })
+      ...(tone === undefined ? {} : { tone }),
+      ...(group === undefined ? {} : { group }),
+      ...(prompt === undefined ? {} : { prompt })
     }
   ]
+}
+
+const groupCountsOf = (value: unknown): { groups?: Partial<Record<GameStatusGroup, number>> } => {
+  if (!isShape(value)) {
+    return {}
+  }
+  const counts = STATUS_GROUPS.flatMap((group) => {
+    const count = value[group]
+    return typeof count === 'number' && Number.isInteger(count) && count >= 0
+      ? [[group, count] as const]
+      : []
+  })
+  return counts.length === 0 ? {} : { groups: Object.fromEntries(counts) }
 }
 
 const projectListOf = (value: unknown): GameProjectList | null => {
@@ -133,7 +152,8 @@ const projectListOf = (value: unknown): GameProjectList | null => {
     provider: textOf(value.provider) ?? '',
     total: Math.max(0, Math.floor(value.total)),
     url: httpUrlOf(value.url) ?? null,
-    items: items.flatMap(projectItemOf).slice(0, MAX_PROJECT_ITEMS)
+    items: items.flatMap(projectItemOf).slice(0, MAX_PROJECT_ITEMS),
+    ...groupCountsOf(value.groups)
   }
 }
 
@@ -288,6 +308,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     extensions: extensionsOf(body.extensions),
     links: Array.isArray(body.links) ? body.links.slice(0, MAX_LINKS).flatMap(linkOf) : [],
     activity: activityOf(body.activity) ?? null,
-    ...projectWorkOf(body.project)
+    ...projectWorkOf(body.project),
+    ...gameActionsOf(body.actions)
   }
 }

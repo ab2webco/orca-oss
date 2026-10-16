@@ -48,6 +48,20 @@ export const KO: GameCatalog = {
       `알 수 없는 모드 "${asked}"입니다. /quest off, /quest on, /quest zen 또는 /quest demo를 사용하세요.`,
     moreAllies: (count) => `외 ${count}개`,
     myReviews: (kind, count) => `내 ${kind} ${count}`,
-    todo: (count) => `할 일 ${count}`
+    todo: (count) => `할 일 ${count}`,
+    actionsHeading: '액션',
+    sentToLead: (label) => `리드에게 보냈습니다: ${label}`,
+    couldNotSend: (label) => `${label}을(를) 보낼 수 없습니다`,
+    actionRunning: '실행 중…',
+    demoAction: (label) => `데모: ${label}은(는) 실행되지 않습니다`,
+    todoHeadings: {
+      in_progress: '진행 중',
+      review: 'QA / 리뷰',
+      todo: '할 일',
+      backlog: '백로그',
+      other: '기타'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `${id} 작업하기`
   }
 }

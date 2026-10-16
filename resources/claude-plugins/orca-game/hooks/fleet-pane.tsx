@@ -1,7 +1,6 @@
 import type { EngineInterface, On } from 'claude-code'
 
-import type { GameAgent, GameLinkTone, GameProjectList } from '../types'
-import { reviewKindOf } from './band-chips'
+import type { GameAgent } from '../types'
 import { fitCells } from './cell-width'
 import {
   activityTextOf,
@@ -11,6 +10,7 @@ import {
   workItemTextOf
 } from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
+import { projectRowsOf } from './fleet-project'
 import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { gameStrings } from './game-strings'
@@ -24,12 +24,6 @@ export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
 // A card's text column: the pane less the tile, the round border and the padding.
 const CARD_CHROME = TILE_COLUMNS + 3
-const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
-  danger: 'red',
-  pending: 'yellow',
-  success: 'green',
-  neutral: 'white'
-}
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -51,7 +45,7 @@ export const registerFleetPane = (on: On): void => {
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
-    // Digits follow tile order; r, p and q are the menu's, i, o, c, w, a, g and t the links'.
+    // Digits follow tile order; r p q are the menu's, i o c w a g t the links', e f h j k l the actions'.
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
         key={`view-${agent.paneKey}`}
@@ -141,48 +135,7 @@ export const registerFleetPane = (on: On): void => {
       </Button>
     )
     const links = paneLinksOf(state)
-    // My PRs and To Do: a heading that opens the list, then one link per item.
-    const projectRows = (key: string, heading: string, list: GameProjectList | null) =>
-      list !== null && (
-        <Box key={key} flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            {list.url === null ? (
-              <Text bold>{heading}</Text>
-            ) : (
-              <Link href={list.url}>
-                <Text bold underline>
-                  {heading}
-                </Text>
-              </Link>
-            )}
-          </Box>
-          {list.items.map((one) => (
-            <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
-              {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
-              <Box flexShrink={0}>
-                <Link href={one.url}>
-                  <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
-                    {one.id}
-                  </Text>
-                </Link>
-              </Box>
-              {one.status !== undefined && (
-                <Box flexShrink={0}>
-                  <Text dimColor>{one.status}</Text>
-                </Box>
-              )}
-              <Box flexShrink={1} minWidth={0}>
-                <Text wrap="truncate-end">{one.title}</Text>
-              </Box>
-            </Box>
-          ))}
-          {list.total > list.items.length && (
-            <Text dimColor>{text.moreAllies(list.total - list.items.length)}</Text>
-          )}
-        </Box>
-      )
-    const reviews = state.project?.reviews ?? null
-    const todo = state.project?.todo ?? null
+    const projectRows = await projectRowsOf($, e, state, palette, v.isDemo)
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
@@ -275,12 +228,7 @@ export const registerFleetPane = (on: On): void => {
             </Text>
           </Box>
         )}
-        {projectRows(
-          'project-reviews',
-          reviews === null ? '' : text.myReviews(reviewKindOf(reviews), reviews.total),
-          reviews
-        )}
-        {projectRows('project-todo', todo === null ? '' : text.todo(todo.total), todo)}
+        {projectRows}
         {links.length > 0 && (
           <Box key="pane-links" flexDirection="row" gap={1} flexWrap="wrap">
             <Text dimColor>{text.openHeading}</Text>

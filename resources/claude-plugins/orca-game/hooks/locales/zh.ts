@@ -42,6 +42,20 @@ export const ZH: GameCatalog = {
       `未知模式“${asked}”。请使用 /quest off、/quest on、/quest zen 或 /quest demo。`,
     moreAllies: (count) => `另有 ${count} 项`,
     myReviews: (kind, count) => `我的${kind} ${count}`,
-    todo: (count) => `待办 ${count}`
+    todo: (count) => `待办 ${count}`,
+    actionsHeading: '操作',
+    sentToLead: (label) => `已发送给负责人：${label}`,
+    couldNotSend: (label) => `无法发送 ${label}`,
+    actionRunning: '运行中…',
+    demoAction: (label) => `演示：不会运行 ${label}`,
+    todoHeadings: {
+      in_progress: '进行中',
+      review: 'QA / 评审',
+      todo: '待办',
+      backlog: '待规划',
+      other: '其他'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `处理 ${id}`
   }
 }

@@ -43,6 +43,20 @@ export const JA: GameCatalog = {
       `不明なモード「${asked}」です。/quest off、/quest on、/quest zen、/quest demo のいずれかを使用してください。`,
     moreAllies: (count) => `ほか ${count} 件`,
     myReviews: (kind, count) => `自分の${kind} ${count}`,
-    todo: (count) => `ToDo ${count}`
+    todo: (count) => `ToDo ${count}`,
+    actionsHeading: 'アクション',
+    sentToLead: (label) => `リードに送信しました: ${label}`,
+    couldNotSend: (label) => `${label} を送信できませんでした`,
+    actionRunning: '実行中…',
+    demoAction: (label) => `デモ: ${label} は実行されません`,
+    todoHeadings: {
+      in_progress: '進行中',
+      review: 'QA / レビュー',
+      todo: 'ToDo',
+      backlog: 'バックログ',
+      other: 'その他'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `${id} に取り組む`
   }
 }

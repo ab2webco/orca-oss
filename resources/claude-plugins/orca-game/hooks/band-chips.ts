@@ -81,6 +81,19 @@ const projectChipsOf = (state: GameState): BandChip[] => {
     })
   )
   const needsCount = reviews !== null && (reviews.total === 0 || reviews.total > shown)
+  const inQa = todo?.groups?.review ?? 0
+  const qaChips: BandChip[] =
+    todo === null || inQa === 0
+      ? []
+      : [
+          {
+            key: 'band-qa',
+            priority: 4,
+            labels: [`✓ ${text.qa(inQa)}`, `✓ ${inQa}`],
+            ...(todo.url === null ? {} : { href: todo.url }),
+            color: 'green'
+          }
+        ]
   return [
     ...prChips,
     ...(needsCount
@@ -94,7 +107,8 @@ const projectChipsOf = (state: GameState): BandChip[] => {
           )
         ]
       : []),
-    ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)])
+    ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)]),
+    ...qaChips
   ]
 }
 

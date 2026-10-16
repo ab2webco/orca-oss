@@ -1,4 +1,5 @@
 import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
+import type { TodoHeading } from './todo-sections'
 import { ES } from './locales/es'
 import { JA } from './locales/ja'
 import { KO } from './locales/ko'
@@ -48,6 +49,16 @@ export type TextStrings = {
   /** `kind` is PR or MR, after the project's host. */
   myReviews: (kind: string, count: number) => string
   todo: (count: number) => string
+  actionsHeading: string
+  /** Toast once a prompt is queued for the lead's next turn. */
+  sentToLead: (label: string) => string
+  couldNotSend: (label: string) => string
+  actionRunning: string
+  /** Toast for an action pressed during /quest demo, which runs nothing. */
+  demoAction: (label: string) => string
+  todoHeadings: Readonly<Record<TodoHeading, string>>
+  qa: (count: number) => string
+  workOn: (id: string) => string
 }
 
 /** Words painted into a Raster, which only takes width-1 characters. */
@@ -131,7 +142,21 @@ const EN: GameStrings = {
       `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
-    todo: (count) => `To Do ${count}`
+    todo: (count) => `To Do ${count}`,
+    actionsHeading: 'Actions',
+    sentToLead: (label) => `Sent to the lead: ${label}`,
+    couldNotSend: (label) => `Could not send ${label}`,
+    actionRunning: 'running…',
+    demoAction: (label) => `Demo: ${label} is not run`,
+    todoHeadings: {
+      in_progress: 'In progress',
+      review: 'QA / review',
+      todo: 'To do',
+      backlog: 'Backlog',
+      other: 'Other'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `Work on ${id}`
   },
   art: {
     needsYou: 'needs you!',

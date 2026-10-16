@@ -56,7 +56,21 @@ export const ES: GameCatalog = {
       `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
     moreAllies: (count) => `+${count} más`,
     myReviews: (kind, count) => `Mis ${kind}s ${count}`,
-    todo: (count) => `Por hacer ${count}`
+    todo: (count) => `Por hacer ${count}`,
+    actionsHeading: 'Acciones',
+    sentToLead: (label) => `Enviado al líder: ${label}`,
+    couldNotSend: (label) => `No se pudo enviar ${label}`,
+    actionRunning: 'ejecutando…',
+    demoAction: (label) => `Demo: ${label} no se ejecuta`,
+    todoHeadings: {
+      in_progress: 'En curso',
+      review: 'QA / revisión',
+      todo: 'Por hacer',
+      backlog: 'Backlog',
+      other: 'Otros'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `Trabajar en ${id}`
   },
   art: {
     needsYou: '¡te necesita!',

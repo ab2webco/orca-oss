@@ -1,7 +1,9 @@
 import type {
+  GameAction,
   GameAgent,
   GameCi,
   GameLinkTone,
+  GameProjectItem,
   GameProjectWork,
   GameState,
   GameStatusGroup
@@ -158,6 +160,27 @@ const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
   none: 'neutral'
 }
 
+const todoOf = (
+  id: string,
+  title: string,
+  group: GameStatusGroup,
+  status: string
+): GameProjectItem => ({
+  id,
+  title,
+  url: `${DEMO_URL}/${id}`,
+  status,
+  group,
+  prompt: `Work on ${id}: ${title}`,
+  ...(group === 'in_progress' ? { tone: 'pending' } : group === 'review' ? { tone: 'success' } : {})
+})
+
+// Pressing either during /quest demo only toasts; the MCP server named here is never called.
+const DEMO_ACTIONS: GameAction[] = [
+  { id: 'action-0', label: 'Open a PR', prompt: 'Open a PR for the demo work item' },
+  { id: 'action-1', label: 'Test runs', mcp: { server: 'demo', tool: 'list_test_runs' } }
+]
+
 // The project lists follow the scripted PR's CI so the PRs chip changes color with it.
 const projectOf = (step: Step): GameProjectWork => ({
   reviews: {
@@ -177,18 +200,15 @@ const projectOf = (step: Step): GameProjectWork => ({
   },
   todo: {
     provider: 'plane',
-    total: 3,
+    total: 7,
     url: `${DEMO_URL}/todo`,
     items: [
-      { id: 'ORCA-2', title: 'Demo ticket', url: `${DEMO_URL}/ORCA-2`, status: 'Todo' },
-      {
-        id: 'ORCA-3',
-        title: 'Another demo ticket',
-        url: `${DEMO_URL}/ORCA-3`,
-        status: 'In Progress',
-        tone: 'pending'
-      }
-    ]
+      todoOf('ORCA-3', 'Another demo ticket', 'in_progress', 'In Progress'),
+      todoOf('ORCA-4', 'Demo ticket in QA', 'review', 'QA'),
+      todoOf('ORCA-5', 'Second ticket in QA', 'review', 'QA'),
+      todoOf('ORCA-2', 'Demo ticket', 'todo', 'Todo')
+    ],
+    groups: { in_progress: 1, review: 2, todo: 3, backlog: 1 }
   }
 })
 
@@ -233,7 +253,8 @@ const stateOf = (step: Step): GameState => ({
     status: step.group === 'done' ? 'Done' : step.group === 'review' ? 'In Review' : 'In Progress',
     statusGroup: step.group
   },
-  project: projectOf(step)
+  project: projectOf(step),
+  actions: DEMO_ACTIONS
 })
 
 export const demoFrameOf = (step: number): DemoFrame => {

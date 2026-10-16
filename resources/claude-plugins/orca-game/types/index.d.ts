@@ -70,6 +70,10 @@ export type GameProjectItem = {
   url: string
   status?: string
   tone?: GameLinkTone
+  /** A ticket's status group; an issue list from GitHub or GitLab has none. */
+  group?: GameStatusGroup
+  /** What "work on" sends the lead for this ticket. */
+  prompt?: string
 }
 
 /** `total` counts every open item; `items` holds the first few and `url` opens the full list. */
@@ -78,10 +82,23 @@ export type GameProjectList = {
   total: number
   url: string | null
   items: GameProjectItem[]
+  /** Open tickets per status group, all of them and not only `items`. */
+  groups?: Partial<Record<GameStatusGroup, number>>
 }
 
 /** My open PRs and tickets across the project, not only this worktree's. */
 export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
+
+export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
+
+/** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
+export type GameAction = { id: string; label: string } & ({ prompt: string } | { mcp: GameMcpCall })
+
+/** The last run of an MCP action: its text lines, or the error. */
+export type ActionRun = { status: 'running' | 'done' | 'error'; lines: string[] }
+
+/** Keyed by action id; `call` names the tool that ran, so a renumbered action drops a stale run. */
+export type ActionRuns = Record<string, ActionRun & { call: string; run: number }>
 
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
 
@@ -167,6 +184,8 @@ export type GameState = {
   activity: GameActivity | null
   /** Absent from a host older than project work or with the tracker off. */
   project?: GameProjectWork
+  /** Absent from a host older than project actions or with none configured. */
+  actions?: GameAction[]
 }
 
 export type FleetState = {
@@ -185,7 +204,7 @@ export type AlliesState = { statuses: AllyStatus[] }
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
-    'orca-game': { fleet: FleetState; allies: AlliesState }
+    'orca-game': { fleet: FleetState; allies: AlliesState; actions: ActionRuns }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
     'orca-jev-mod-skills': { advisor: unknown }
   }
