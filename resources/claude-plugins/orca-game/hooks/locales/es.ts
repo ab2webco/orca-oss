@@ -70,7 +70,18 @@ export const ES: GameCatalog = {
       other: 'Otros'
     },
     qa: (count) => `QA ${count}`,
-    workOn: (id) => `Trabajar en ${id}`
+    workOn: (id) => `Trabajar en ${id}`,
+    leadActions: {
+      wave: 'Ola',
+      status: 'Estado',
+      push: 'Reactivar',
+      sweep: 'Barrer',
+      stop: 'Detener'
+    },
+    actionCommandDescription: (label) => `Acción de Orca: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command} ya lo usa otro comando; usa su botón en la banda o en el Panel`,
+    actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`
   },
   art: {
     needsYou: '¡te necesita!',

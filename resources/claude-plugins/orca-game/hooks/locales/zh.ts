@@ -56,6 +56,16 @@ export const ZH: GameCatalog = {
       other: '其他'
     },
     qa: (count) => `QA ${count}`,
-    workOn: (id) => `处理 ${id}`
+    workOn: (id) => `处理 ${id}`,
+    leadActions: {
+      wave: '一波',
+      status: '状态',
+      push: '继续',
+      sweep: '清理',
+      stop: '停止'
+    },
+    actionCommandDescription: (label) => `Orca 操作: ${label}`,
+    actionCommandRefused: (command) => `/${command} 已被其他命令占用;请使用横栏或面板中的按钮`,
+    actionCommandGone: (command) => `/${command} 已不再是此项目的操作`
   }
 }

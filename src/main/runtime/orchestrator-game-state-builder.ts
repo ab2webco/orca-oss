@@ -23,6 +23,7 @@ import {
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
+import { gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
 import {
   activityGameLinksOf,
   gameLinksOf,
@@ -190,7 +191,13 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const actions = gameActionsOf(integrations.actions, placeholders)
+  const lead = resolveOrchestratorGameLead(layers)
+  const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const actions = gameStateActionsOf({
+    role,
+    lead,
+    project: gameActionsOf(integrations.actions, placeholders)
+  })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
   const todo = projectWork?.todo
   const projectState =
@@ -245,8 +252,8 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
-    lead: resolveOrchestratorGameLead(layers),
-    role: input.callerParentPaneKey ? 'member' : 'lead',
+    lead,
+    role,
     review: gameReview,
     workItem,
     extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },

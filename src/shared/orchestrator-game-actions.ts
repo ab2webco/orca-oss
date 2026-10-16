@@ -5,9 +5,10 @@ import {
 } from './orchestrator-game-integrations'
 
 /** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
-export type OrchestratorGameAction =
-  | { label: string; prompt: string }
-  | { label: string; mcp: GameMcpCall }
+export type OrchestratorGameAction = { label: string; command?: string } & (
+  | { prompt: string }
+  | { mcp: GameMcpCall }
+)
 
 export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
 
@@ -21,6 +22,8 @@ const GAME_MCP_ARGS_MAX = 4096
 const MCP_SERVER = /^[A-Za-z0-9 _.-]{1,64}$/
 const MCP_TOOL = /^[A-Za-z0-9_.-]{1,64}$/
 const PLACEHOLDER = /\{([^{}]*)\}/g
+/** A slash command the mod registers for the action, as `/<command>`. */
+export const GAME_ACTION_COMMAND = /^[a-z][a-z0-9-]{0,23}$/
 
 export const GAME_WORK_PROMPT_PLACEHOLDERS: ReadonlySet<string> = new Set([
   'id',
@@ -87,9 +90,17 @@ function parseAction(entry: unknown, at: string): OrchestratorGameAction | strin
   if (label.length === 0 || label.length > GAME_LINK_LABEL_MAX) {
     return `${at}.label must be 1 to ${GAME_LINK_LABEL_MAX} characters`
   }
+  const command = typeof entry.command === 'string' ? entry.command.trim() : entry.command
+  if (
+    command !== undefined &&
+    (typeof command !== 'string' || !GAME_ACTION_COMMAND.test(command))
+  ) {
+    return `${at}.command must be a lowercase name like test-runs, up to 24 characters`
+  }
+  const head = command === undefined ? { label } : { label, command }
   if (entry.mcp !== undefined) {
     const mcp = parseMcp(entry.mcp, at)
-    return typeof mcp === 'string' ? mcp : { label, mcp }
+    return typeof mcp === 'string' ? mcp : { ...head, mcp }
   }
   const prompt = typeof entry.prompt === 'string' ? entry.prompt.trim() : ''
   if (prompt.length === 0 || prompt.length > GAME_PROMPT_MAX) {
@@ -97,7 +108,7 @@ function parseAction(entry: unknown, at: string): OrchestratorGameAction | strin
   }
   const unknown = unknownPlaceholderOf(prompt, GAME_LINK_PLACEHOLDERS)
   return unknown === null
-    ? { label, prompt }
+    ? { ...head, prompt }
     : `${at}.prompt uses an unknown placeholder {${unknown}}`
 }
 
@@ -119,7 +130,7 @@ export function gameActionsOf(
       return [{ ...action, id }]
     }
     const prompt = fillTemplate(action.prompt, values)
-    return prompt === null ? [] : [{ id, label: action.label, prompt }]
+    return prompt === null ? [] : [{ ...action, id, prompt }]
   })
 }
 

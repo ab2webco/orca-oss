@@ -57,6 +57,17 @@ export const JA: GameCatalog = {
       other: 'その他'
     },
     qa: (count) => `QA ${count}`,
-    workOn: (id) => `${id} に取り組む`
+    workOn: (id) => `${id} に取り組む`,
+    leadActions: {
+      wave: 'ウェーブ',
+      status: '状況',
+      push: '再開',
+      sweep: '片付け',
+      stop: '停止'
+    },
+    actionCommandDescription: (label) => `Orca アクション: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command} は別のコマンドが使っています。バンドかパネルのボタンを使ってください`,
+    actionCommandGone: (command) => `/${command} はこのプロジェクトのアクションではなくなりました`
   }
 }

@@ -1,5 +1,6 @@
 import type { Register } from 'claude-code'
 
+import { registerActionCommands } from './action-commands'
 import { registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
@@ -16,6 +17,7 @@ export const register: Register = (on) => {
   registerAllies(on)
   registerFleetPane(on)
   registerLeadName(on)
+  registerActionCommands(on)
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)

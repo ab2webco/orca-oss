@@ -62,6 +62,14 @@ describe('parseGameLead', () => {
     ])
   })
 
+  it("takes actions as the switch for Orca's built-in lead buttons", () => {
+    expect(parseGameLead({ actions: false })).toEqual({ value: { actions: false }, warnings: [] })
+    expect(parseGameLead({ actions: 'no' })).toEqual({
+      value: {},
+      warnings: ['orchestratorGame.orchestrator.actions must be true or false']
+    })
+  })
+
   it('refuses a non-mapping', () => {
     expect(parseGameLead(['claude'])).toEqual({
       value: undefined,

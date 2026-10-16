@@ -96,7 +96,17 @@ const STATE = {
     url: 'https://plane.example/ORCA-586',
     status: 'In Progress',
     statusGroup: 'in_progress'
-  }
+  },
+  role: 'lead',
+  actions: [
+    ...['wave', 'status', 'push', 'sweep', 'stop'].map((command) => ({
+      id: `lead:${command}`,
+      label: command,
+      command,
+      prompt: `Run ${command}`
+    })),
+    { id: 'action-0', label: 'Test runs', command: 'runs', prompt: 'Run the QA test runs' }
+  ]
 }
 
 const JEV: Plugin = {
@@ -190,9 +200,10 @@ describe('band layout', () => {
       test(`every row fits ${columns} columns in ${locale}`, ALL, async ($, on) => {
         const ui = await mount($, on, columns, { ORCA_GAME_LOCALE: locale })
         const rows = (await ui.findAll({ type: 'Box' })).filter(
-          (one) => one.key !== undefined && /^band-(chips|menu)-/.test(one.key)
+          (one) => one.key !== undefined && /^band-(chips|menu|actions)-/.test(one.key)
         )
         expect(rows.some((one) => one.key === 'band-chips-band-team')).toBe(true)
+        expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toHaveLength(1)
         expect(rows.some((one) => one.key === 'band-menu-band-panel')).toBe(true)
         expect(rows.filter((one) => one.key?.startsWith('band-chips-')).length).toBeLessThanOrEqual(
           2

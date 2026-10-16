@@ -49,6 +49,7 @@ import {
   orchestratorGameSourceLabel as sourceLabel
 } from './orchestrator-game-setting-labels'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
+import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -360,6 +361,13 @@ export function ProjectOrchestratorGameSetting({
           fileScene={file.state}
         />
         <ProjectOrchestratorGameLeadSetting
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
+        />
+        <ProjectOrchestratorGameActionsSetting
+          key={repoId}
           repoId={repoId}
           settings={settings}
           projectLayer={projectLayer}

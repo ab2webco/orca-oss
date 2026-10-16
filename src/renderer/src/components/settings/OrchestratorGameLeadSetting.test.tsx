@@ -100,6 +100,22 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     overridden.unmount()
   })
 
+  it("turns Orca's lead buttons off on this machine, shown on by default", () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+    expect(view.container.textContent).toContain('Lead buttons')
+    expect(view.container.textContent).toContain('On · default')
+    click(view.container, '[aria-label="Lead buttons"] button', 'Off')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { orchestrator: { actions: false } } } }
+    ])
+    view.unmount()
+
+    const fromYaml = render({}, { orchestrator: { actions: false } })
+    expect(fromYaml.container.textContent).toContain('Off · from orca.yaml')
+    fromYaml.unmount()
+  })
+
   it('saves a typed value on blur and inherits when the field is cleared', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(

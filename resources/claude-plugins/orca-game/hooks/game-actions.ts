@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { ActionRuns, GameAction, GameMcpCall, GameProjectItem } from '../types'
+import type { ActionRun, ActionRuns, GameAction, GameMcpCall, GameProjectItem } from '../types'
 import { actionErrorOf, actionResultOf } from './action-results'
 import { gameStrings } from './game-strings'
+import { actionLabelOf, commandPromptOf } from './lead-actions'
 
 const actionRuns = atom({ plugin: 'orca-game', key: 'actions' } as const, {} as ActionRuns)
 
@@ -25,7 +26,7 @@ async function submitToLead($: EngineInterface, text: string, label: string): Pr
   }
 }
 
-async function runMcp($: EngineInterface, id: string, mcp: GameMcpCall): Promise<void> {
+async function runMcp($: EngineInterface, id: string, mcp: GameMcpCall): Promise<ActionRun> {
   const call = mcpCallTextOf(mcp)
   let run = 0
   await update($, actionRuns, (runs): ActionRuns => {
@@ -42,21 +43,26 @@ async function runMcp($: EngineInterface, id: string, mcp: GameMcpCall): Promise
     (runs): ActionRuns =>
       runs[id]?.run === run ? { ...runs, [id]: { ...outcome, call, run } } : runs
   )
+  return outcome
 }
 
-/** Runs a project action; during /quest demo it only says so. */
+/** Runs an action, `typed` appended to its prompt; during /quest demo it only says so. */
 export async function runAction(
   $: EngineInterface,
   action: GameAction,
-  isDemo: boolean
-): Promise<void> {
+  isDemo: boolean,
+  typed = ''
+): Promise<ActionRun | undefined> {
+  const label = actionLabelOf(action)
   if (isDemo) {
-    $.ui.toast(gameStrings().text.demoAction(action.label))
-    return
+    $.ui.toast(gameStrings().text.demoAction(label))
+    return undefined
   }
-  await ('prompt' in action
-    ? submitToLead($, action.prompt, action.label)
-    : runMcp($, action.id, action.mcp))
+  if ('prompt' in action) {
+    await submitToLead($, commandPromptOf(action.prompt, typed), label)
+    return undefined
+  }
+  return runMcp($, action.id, action.mcp)
 }
 
 /** Sends the lead a To Do ticket's work prompt; during /quest demo it only says so. */

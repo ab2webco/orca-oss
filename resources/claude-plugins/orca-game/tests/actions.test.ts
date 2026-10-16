@@ -65,10 +65,21 @@ type World = {
   mcp: { server: string; tool: string; args: Record<string, unknown> }[]
   toasts: string[]
   mcpFails: boolean
+  state?: unknown
+  env?: Record<string, string>
+  registered: string[]
 }
 
 const engine = (on: On, world: World) => {
-  mock.env(on, { ORCA_GAME_CLI: ORCA_CLI })
+  mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ...world.env })
+  on('command.register', ($s, e) => {
+    // Why: Claude Code refuses a plugin the name of one of its own commands, like /status.
+    if (e.name === 'status') {
+      throw new Error('status is a built-in command')
+    }
+    world.registered.push(e.name)
+    return { value: { command: e.name } }
+  })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
@@ -80,6 +91,7 @@ const engine = (on: On, world: World) => {
     return { value: undefined }
   })
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
+  on('turn.complete', () => ({ text: 'ok' }))
   on('ui.status', () => ({ value: undefined }))
   on('prompt.submit', ($s, e) => {
     world.prompts.push(e.text)
@@ -94,7 +106,7 @@ const engine = (on: On, world: World) => {
   on('process.run', () => ({
     value: {
       exitCode: 0,
-      stdout: JSON.stringify(STATE),
+      stdout: JSON.stringify(world.state ?? STATE),
       stderr: '',
       isStdoutTruncated: false,
       isStderrTruncated: false
@@ -141,6 +153,7 @@ const worldOf = (patch: Partial<World> = {}): World => ({
   mcp: [],
   toasts: [],
   mcpFails: false,
+  registered: [],
   ...patch
 })
 
@@ -221,6 +234,102 @@ describe('the To Do in the Panel', () => {
     await ui.press({ key: 'work-ORCA-2' })
     expect(world.prompts).toEqual(['Work on ORCA-2: Check'])
     expect(world.toasts).toEqual(['Sent to the lead: Work on ORCA-2'])
+    await ui.unmount()
+  })
+})
+
+const LEAD_ACTIONS = [
+  { id: 'lead:wave', label: 'Wave', command: 'wave', prompt: 'Run a wave now' },
+  { id: 'lead:status', label: 'Status', command: 'status', prompt: 'How are the members?' },
+  { id: 'lead:push', label: 'Push', command: 'push', prompt: 'Push the stopped ones' },
+  { id: 'lead:sweep', label: 'Sweep', command: 'sweep', prompt: 'Sweep the finished ones' },
+  { id: 'lead:stop', label: 'Stop', command: 'stop', prompt: 'Stop every member' }
+]
+const LEAD_STATE = {
+  ...STATE,
+  role: 'lead',
+  actions: [
+    ...LEAD_ACTIONS,
+    {
+      id: 'action-0',
+      label: 'Test runs',
+      command: 'runs',
+      mcp: { server: 'Tambora', tool: 'list_test_runs', args: { project: 'CIN' } }
+    }
+  ]
+}
+
+describe('actions as slash commands', () => {
+  test('registers each command once, skipping and noting one the engine refuses', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE })
+    const clock = await start($, on, world)
+    await $.turn.complete({
+      reason: 'answer',
+      answer: 'ok',
+      durationMs: 1,
+      isAborted: false,
+      turnId: 't1'
+    } as never)
+    await clock.settle()
+    expect(world.registered.filter((one) => one !== 'quest')).toEqual([
+      'wave',
+      'push',
+      'sweep',
+      'stop',
+      'runs'
+    ])
+    expect(world.toasts.filter((one) => one.startsWith('/status'))).toHaveLength(1)
+  })
+
+  test('/wave sends its prompt to the lead with what the person typed after it', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE })
+    const clock = await start($, on, world)
+    await $.command.run({ command: 'wave', args: 'CIN-1,CIN-2' } as never)
+    await clock.settle()
+    expect(world.prompts).toEqual(['Run a wave now\n\nCIN-1,CIN-2'])
+    expect(world.toasts).toContain('Sent to the lead: Wave')
+  })
+
+  test('an MCP action run as a command answers with what the tool said', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE })
+    const clock = await start($, on, world)
+    const ran = await $.command.run({ command: 'runs', args: '' } as never)
+    await clock.settle()
+    expect(world.mcp).toEqual([
+      { server: 'Tambora', tool: 'list_test_runs', args: { project: 'CIN' } }
+    ])
+    expect(ran.text).toContain('TR-1 passed')
+  })
+})
+
+describe("the lead's buttons in the band", () => {
+  const band = ($: Engine) =>
+    $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      viewport: { columns: 124, rows: 40, isFullscreen: true },
+      props: {
+        hasSurvey: false,
+        isWorking: false,
+        maxRows: 8,
+        bodyColumns: 120,
+        scroll: { offset: 0, bodyRows: 7 },
+        view: {}
+      }
+    })
+
+  test('draws them in the session language and sends a pressed one to the lead', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE, env: { ORCA_GAME_LOCALE: 'es' } })
+    await start($, on, world)
+    const ui = await band($)
+    const row = await ui.find({ type: 'Box', key: 'band-actions-band-action-lead:wave' })
+    expect(shownOf(row)).toContain('Ola')
+    expect(shownOf(row)).toContain('Detener')
+    expect(shownOf(row)).toContain('Test runs')
+    await ui.press({ key: 'band-action-lead:wave' })
+    expect(world.prompts).toEqual(['Run a wave now'])
+    expect(world.toasts).toContain('Enviado al líder: Ola')
     await ui.unmount()
   })
 })

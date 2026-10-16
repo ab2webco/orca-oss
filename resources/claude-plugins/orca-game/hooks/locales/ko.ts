@@ -62,6 +62,17 @@ export const KO: GameCatalog = {
       other: '기타'
     },
     qa: (count) => `QA ${count}`,
-    workOn: (id) => `${id} 작업하기`
+    workOn: (id) => `${id} 작업하기`,
+    leadActions: {
+      wave: '웨이브',
+      status: '상태',
+      push: '재개',
+      sweep: '정리',
+      stop: '중지'
+    },
+    actionCommandDescription: (label) => `Orca 작업: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command}은(는) 다른 명령이 사용 중입니다. 밴드나 패널의 버튼을 사용하세요`,
+    actionCommandGone: (command) => `/${command}은(는) 더 이상 이 프로젝트의 작업이 아닙니다`
   }
 }

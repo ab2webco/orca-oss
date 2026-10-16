@@ -1,5 +1,6 @@
 import type { OrchestratorGameConfig, OrchestratorGameLayer } from './orchestrator-game-config'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { OrchestratorGameAction } from './orchestrator-game-actions'
 
 // Why: `undefined` means "inherit", so the key is removed instead of stored, letting lower layers show through.
 export function withOrchestratorGameField<K extends keyof OrchestratorGameConfig>(
@@ -70,6 +71,27 @@ export function withOrchestratorGameProjectLead<K extends keyof OrchestratorGame
     delete layer.orchestrator
   } else {
     layer.orchestrator = lead
+  }
+  if (Object.keys(layer).length === 0) {
+    delete next[repoId]
+  } else {
+    next[repoId] = layer
+  }
+  return next
+}
+
+/** Replaces a project's action list on this machine; `undefined` inherits orca.yaml's again. */
+export function withOrchestratorGameProjectActions(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  actions: OrchestratorGameAction[] | undefined
+): Record<string, OrchestratorGameLayer> {
+  const next = { ...projects }
+  const layer: OrchestratorGameLayer = { ...next[repoId] }
+  if (actions === undefined) {
+    delete layer.actions
+  } else {
+    layer.actions = actions
   }
   if (Object.keys(layer).length === 0) {
     delete next[repoId]

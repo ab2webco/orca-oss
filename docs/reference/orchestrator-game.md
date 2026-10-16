@@ -234,12 +234,48 @@ The Fleet pane lists both, each item a link colored by its CI or status, with ho
 list) and `t` (To Do list). `/quest demo` shows them with fake data. A provider that fails costs
 only its own chip.
 
+## Actions: buttons and slash commands
+
+A project gives its lead up to 6 buttons ([`orchestrator-game-actions.ts`](../../src/shared/orchestrator-game-actions.ts)).
+Each one either sends the lead a prompt as a turn or runs an MCP tool from the mod itself, and
+`command` also serves it as `/<command>`:
+
+```yaml
+# orca.yaml
+orchestratorGame:
+  actions: # at most 6; a later layer replaces the whole list
+    - label: Test runs # at most 24 characters
+      command: test-runs # optional: /test-runs; lowercase, digits and -, up to 24 characters
+      prompt: Have members run the Tambora test runs of my QA tickets and report pass/fail.
+    - label: Runs
+      mcp: { server: tambora, tool: list_test_runs, args: { project: CIN } }
+```
+
+- **Prompts** may use the link placeholders; one with no value in this worktree is left out.
+- **Lead buttons.** The lead also gets Orca's own five first: Wave, Status, Push, Sweep and Stop
+  (`/wave`, `/status`, `/push`, `/sweep`, `/stop`), each a prompt asking it to run the matching
+  `orca game` verb ([`orchestrator-game-lead-actions.ts`](../../src/shared/orchestrator-game-lead-actions.ts)).
+  A member gets none. `orchestratorGame.orchestrator.actions: false` turns them off; a project
+  action whose command a lead button already uses keeps its button without the command.
+- **Where they show.** The band draws one chip row (`▸ Ola`, `▸ Estado`… in the session language;
+  the rest behind `+N`), the Panel an Actions row with hotkeys `e f h j k l`. Typing to the lead
+  keeps working as before.
+- **Slash commands.** The mod registers each command after a refresh and again when the list
+  changes. A name Claude Code refuses (its own `/status`, say) is skipped and noted once; the
+  button still works. Text after the command is appended to the prompt: `/wave CIN-1,CIN-2`. An
+  MCP command answers with the tool's lines.
+- **Settings.** The project's **Actions** section shows the `orca.yaml` list read only; **Edit on
+  this machine** starts this machine's list (label, command, prompt or MCP server, tool and JSON
+  arguments, checked by the same parser), which replaces the `orca.yaml` one whole. **Inherit from
+  orca.yaml** drops it.
+
 ## The project lead: `orchestratorGame.orchestrator`
 
 A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
 own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
 through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
-project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`.
+project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`
+(**Lead buttons** is `actions`).
 
 ```yaml
 # orca.yaml
@@ -256,6 +292,7 @@ orchestratorGame:
     pushPrompt: |               # optional: what `game push` sends a stopped member; same placeholders
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN.  # optional: appended to Orca's own rules
+    actions: false    # optional: hide Orca's lead buttons and their slash commands (on by default)
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.

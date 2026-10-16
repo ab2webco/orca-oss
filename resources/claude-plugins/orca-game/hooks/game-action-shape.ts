@@ -2,6 +2,9 @@ import type { GameAction, GameMcpCall } from '../types'
 
 // Mirrors Orca's own limits in src/shared/orchestrator-game-actions.ts.
 export const GAME_ACTIONS_MAX = 6
+// Why 5 more: Orca puts its lead buttons (wave, status, push, sweep, stop) before the project's.
+const GAME_STATE_ACTIONS_MAX = GAME_ACTIONS_MAX + 5
+const COMMAND = /^[a-z][a-z0-9-]{0,23}$/
 const LABEL_MAX = 24
 const ID_MAX = 64
 export const GAME_PROMPT_MAX = 2000
@@ -47,12 +50,14 @@ const actionOf = (value: unknown): GameAction[] => {
   if (id === undefined || label === undefined) {
     return []
   }
+  const command = typeof value.command === 'string' ? value.command.trim() : ''
+  const head = COMMAND.test(command) ? { id, label, command } : { id, label }
   if (value.mcp !== undefined) {
     const mcp = mcpCallOf(value.mcp)
-    return mcp === undefined ? [] : [{ id, label, mcp }]
+    return mcp === undefined ? [] : [{ ...head, mcp }]
   }
   const prompt = gamePromptOf(value.prompt)
-  return prompt === undefined ? [] : [{ id, label, prompt }]
+  return prompt === undefined ? [] : [{ ...head, prompt }]
 }
 
 /** The project's buttons; left out when there are none, as from a host older than them. */
@@ -62,7 +67,7 @@ export const gameActionsOf = (value: unknown): { actions?: GameAction[] } => {
   }
   const seen = new Set<string>()
   const actions = value
-    .slice(0, GAME_ACTIONS_MAX)
+    .slice(0, GAME_STATE_ACTIONS_MAX)
     .flatMap(actionOf)
     .filter((one) => !seen.has(one.id) && seen.add(one.id))
   return actions.length === 0 ? {} : { actions }

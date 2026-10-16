@@ -12,6 +12,7 @@ import { reviewKindOf } from './band-chips'
 import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
+import { actionLabelOf } from './lead-actions'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
 const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
@@ -111,7 +112,7 @@ export async function projectRowsOf(
               {`${hotkey} `}
             </Text>
           )}
-          {`${action.label} `}
+          {`${actionLabelOf(action)} `}
           {'mcp' in action && <Text dimColor>{`${mcpCallTextOf(action.mcp)} `}</Text>}
         </Text>
       </Button>
@@ -126,7 +127,9 @@ export async function projectRowsOf(
     return [
       <Box key={`action-result-${action.id}`} flexDirection="column" paddingLeft={2}>
         <Text dimColor wrap="truncate-end">
-          {run.status === 'running' ? `${action.label} · ${text.actionRunning}` : action.label}
+          {run.status === 'running'
+            ? `${actionLabelOf(action)} · ${text.actionRunning}`
+            : actionLabelOf(action)}
         </Text>
         {run.lines.map((line, at) => (
           <Text key={`line-${at}`} color={color} wrap="truncate-end">

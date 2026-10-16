@@ -24,6 +24,8 @@ export type OrchestratorGameLead = {
   pushPrompt?: string
   /** The project's own standing rules, appended to Orca's. */
   rules?: string
+  /** Orca's built-in lead buttons and slash commands (wave, status, push, sweep, stop); on unless false. */
+  actions?: boolean
 }
 
 export type OrchestratorGameLeadLayer = Partial<OrchestratorGameLead>
@@ -79,9 +81,14 @@ const promptKey =
       : `${at(key)} uses an unknown placeholder {${unknown}}`
   }
 
+const switchKey =
+  (key: 'autostart' | 'actions'): KeyParser =>
+  (value) =>
+    typeof value === 'boolean' ? { [key]: value } : `${at(key)} must be true or false`
+
 const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
-  autostart: (value) =>
-    typeof value === 'boolean' ? { autostart: value } : `${at('autostart')} must be true or false`,
+  autostart: switchKey('autostart'),
+  actions: switchKey('actions'),
   cap: (value) =>
     typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= GAME_LEAD_CAP_MAX
       ? { cap: value }

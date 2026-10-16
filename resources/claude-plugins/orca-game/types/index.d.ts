@@ -101,7 +101,11 @@ export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProje
 export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
 
 /** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
-export type GameAction = { id: string; label: string } & ({ prompt: string } | { mcp: GameMcpCall })
+/** `command` names the slash command that runs it, as `/<command>`. */
+export type GameAction = { id: string; label: string; command?: string } & (
+  | { prompt: string }
+  | { mcp: GameMcpCall }
+)
 
 /** The last run of an MCP action: its text lines, or the error. */
 export type ActionRun = { status: 'running' | 'done' | 'error'; lines: string[] }

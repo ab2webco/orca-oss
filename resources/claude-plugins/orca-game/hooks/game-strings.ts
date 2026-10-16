@@ -59,7 +59,15 @@ export type TextStrings = {
   todoHeadings: Readonly<Record<TodoHeading, string>>
   qa: (count: number) => string
   workOn: (id: string) => string
+  /** Orca's own lead buttons, by the id after `lead:`. */
+  leadActions: Readonly<Record<LeadActionKey, string>>
+  /** What the typeahead shows for an action's slash command. */
+  actionCommandDescription: (label: string) => string
+  actionCommandRefused: (command: string) => string
+  actionCommandGone: (command: string) => string
 }
+
+export type LeadActionKey = 'wave' | 'status' | 'push' | 'sweep' | 'stop'
 
 /** Words painted into a Raster, which only takes width-1 characters. */
 export type ArtStrings = {
@@ -156,7 +164,12 @@ const EN: GameStrings = {
       other: 'Other'
     },
     qa: (count) => `QA ${count}`,
-    workOn: (id) => `Work on ${id}`
+    workOn: (id) => `Work on ${id}`,
+    leadActions: { wave: 'Wave', status: 'Status', push: 'Push', sweep: 'Sweep', stop: 'Stop' },
+    actionCommandDescription: (label) => `Orca action: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command} is taken by another command; use its button in the band or the Panel`,
+    actionCommandGone: (command) => `/${command} is no longer one of this project's actions`
   },
   art: {
     needsYou: 'needs you!',

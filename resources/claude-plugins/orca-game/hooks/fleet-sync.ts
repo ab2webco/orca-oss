@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
+import { syncActionCommands } from './action-commands'
 import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
@@ -110,6 +111,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     xp
   }))
   if (next !== undefined) {
+    await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
   }

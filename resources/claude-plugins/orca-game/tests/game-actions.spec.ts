@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { GameProjectItem, GameProjectList, GameState, GameStatusGroup } from '../types'
 import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import { ACTION_HOTKEYS, actionErrorOf, actionResultOf } from '../hooks/action-results'
 import { gameStateOf } from '../hooks/game-state'
 import { todoDrawnCountOf, todoSectionsOf } from '../hooks/todo-sections'
+import { setGameLocale } from '../hooks/game-strings'
+import { actionChipsOf, actionLabelOf, commandPromptOf } from '../hooks/lead-actions'
 
 const STATE: GameState = {
   config: {},
@@ -40,7 +42,23 @@ describe('project actions from Orca', () => {
     expect(state?.actions).toEqual([PROMPT_ACTION, MCP_ACTION])
   })
 
-  it('drops malformed actions and keeps at most six', () => {
+  it("keeps each action's slash command and drops one that is not a short lowercase name", () => {
+    const state = gameStateOf({
+      ...STATE,
+      actions: [
+        { id: 'lead:wave', label: 'Wave', command: 'wave', prompt: 'Run a wave' },
+        { ...MCP_ACTION, command: ' test-runs ' },
+        { id: 'action-2', label: 'Bad', command: '/Bad', prompt: 'x' }
+      ]
+    })
+    expect(state?.actions).toEqual([
+      { id: 'lead:wave', label: 'Wave', command: 'wave', prompt: 'Run a wave' },
+      { ...MCP_ACTION, command: 'test-runs' },
+      { id: 'action-2', label: 'Bad', prompt: 'x' }
+    ])
+  })
+
+  it('drops malformed actions and keeps at most eleven: the lead five and six of the project', () => {
     const malformed = [
       { id: 'action-0', prompt: 'no label' },
       { id: 'action-1', label: 'x'.repeat(25), prompt: 'too long a label' },
@@ -55,19 +73,14 @@ describe('project actions from Orca', () => {
       'not an action'
     ]
     expect(gameStateOf({ ...STATE, actions: malformed })?.actions).toBeUndefined()
-    const many = Array.from({ length: 9 }, (_, at) => ({
+    const many = Array.from({ length: 13 }, (_, at) => ({
       id: `action-${at}`,
       label: `Action ${at}`,
       prompt: `Do ${at}`
     }))
-    expect(gameStateOf({ ...STATE, actions: many })?.actions?.map((one) => one.id)).toEqual([
-      'action-0',
-      'action-1',
-      'action-2',
-      'action-3',
-      'action-4',
-      'action-5'
-    ])
+    expect(gameStateOf({ ...STATE, actions: many })?.actions?.map((one) => one.id)).toEqual(
+      Array.from({ length: 11 }, (_, at) => `action-${at}`)
+    )
   })
 
   it('trims a label and the MCP names and keeps a 24-character label', () => {
@@ -273,5 +286,49 @@ describe('an MCP action result', () => {
 
   it('uses hotkeys no other pane button takes', () => {
     expect(ACTION_HOTKEYS).toEqual(['e', 'f', 'h', 'j', 'k', 'l'])
+  })
+})
+
+describe("the lead's buttons", () => {
+  const LEAD = [
+    { id: 'lead:wave', label: 'Wave', command: 'wave', prompt: 'Run a wave' },
+    { id: 'lead:status', label: 'Status', command: 'status', prompt: 'How are they?' },
+    { id: 'lead:push', label: 'Push', command: 'push', prompt: 'Push them' },
+    { id: 'lead:sweep', label: 'Sweep', command: 'sweep', prompt: 'Sweep them' },
+    { id: 'lead:stop', label: 'Stop', command: 'stop', prompt: 'Stop them' }
+  ]
+
+  afterEach(() => setGameLocale('en'))
+
+  it("names Orca's own buttons in the session language and a project's by its label", () => {
+    setGameLocale('es')
+    expect([...LEAD, PROMPT_ACTION].map(actionLabelOf)).toEqual([
+      'Ola',
+      'Estado',
+      'Reactivar',
+      'Barrer',
+      'Detener',
+      'Ship it'
+    ])
+    expect(actionLabelOf({ id: 'lead:dance', label: 'Dance', prompt: 'x' })).toBe('Dance')
+  })
+
+  it('draws one chip per action, in order, the later ones dropped first', () => {
+    const chips = actionChipsOf([...LEAD, PROMPT_ACTION])
+    expect(chips.map((one) => [one.key, one.labels[0]])).toEqual([
+      ['band-action-lead:wave', '▸ Wave'],
+      ['band-action-lead:status', '▸ Status'],
+      ['band-action-lead:push', '▸ Push'],
+      ['band-action-lead:sweep', '▸ Sweep'],
+      ['band-action-lead:stop', '▸ Stop'],
+      ['band-action-action-0', '▸ Ship it']
+    ])
+    expect(chips.map((one) => one.priority)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(chips[0]?.labels.at(-1)).toBe('Wave')
+  })
+
+  it('appends what the person typed after the command to the prompt', () => {
+    expect(commandPromptOf('Run a wave', '  CIN-1,CIN-2 ')).toBe('Run a wave\n\nCIN-1,CIN-2')
+    expect(commandPromptOf('Run a wave', '   ')).toBe('Run a wave')
   })
 })

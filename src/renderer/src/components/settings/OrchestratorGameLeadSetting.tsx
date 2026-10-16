@@ -179,10 +179,25 @@ export function ProjectOrchestratorGameLeadSetting({
   const effective = (key: keyof OrchestratorGameLead, text: string): string =>
     `${text} · ${orchestratorGameSourceLabel(gameLeadSourceOf(layers, key))}`
   const onOff = orchestratorGameModeLabels()
-  const autostartLabel = translate(
-    'auto.components.settings.OrchestratorGameLeadSetting.autostart',
-    'Start as lead'
-  )
+  const switches: { key: 'autostart' | 'actions'; label: string; isOn: boolean }[] = [
+    {
+      key: 'autostart',
+      label: translate(
+        'auto.components.settings.OrchestratorGameLeadSetting.autostart',
+        'Start as lead'
+      ),
+      isOn: lead.autostart
+    },
+    {
+      key: 'actions',
+      label: translate(
+        'auto.components.settings.OrchestratorGameLeadSetting.actions',
+        'Lead buttons'
+      ),
+      // Why: unset means on; Orca's buttons show unless a layer turns them off.
+      isOn: lead.actions !== false
+    }
+  ]
   const textOf = (key: LeadTextKey): string => {
     const value = lead[key]
     if (value !== undefined) {
@@ -205,23 +220,26 @@ export function ProjectOrchestratorGameLeadSetting({
           'The session that talks to you and launches one member per ticket. orca.yaml sets the project default; these override it on this machine.'
         )}
       />
-      <SettingsRow
-        label={autostartLabel}
-        description={effective('autostart', lead.autostart ? onOff.on : onOff.off)}
-        control={
-          <SettingsSegmentedControl
-            value={stored?.autostart === undefined ? 'inherit' : String(stored.autostart)}
-            ariaLabel={autostartLabel}
-            size="sm"
-            options={[
-              { value: 'inherit', label: orchestratorGameInheritLabel() },
-              { value: 'true', label: onOff.on },
-              { value: 'false', label: onOff.off }
-            ]}
-            onChange={(next) => set('autostart', next === 'inherit' ? undefined : next === 'true')}
-          />
-        }
-      />
+      {switches.map((row) => (
+        <SettingsRow
+          key={row.key}
+          label={row.label}
+          description={effective(row.key, row.isOn ? onOff.on : onOff.off)}
+          control={
+            <SettingsSegmentedControl
+              value={stored?.[row.key] === undefined ? 'inherit' : String(stored[row.key])}
+              ariaLabel={row.label}
+              size="sm"
+              options={[
+                { value: 'inherit', label: orchestratorGameInheritLabel() },
+                { value: 'true', label: onOff.on },
+                { value: 'false', label: onOff.off }
+              ]}
+              onChange={(next) => set(row.key, next === 'inherit' ? undefined : next === 'true')}
+            />
+          }
+        />
+      ))}
       {fields().map((field) => {
         const value = stored?.[field.key]
         const text = value === undefined ? '' : String(value)

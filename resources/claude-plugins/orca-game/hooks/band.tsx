@@ -6,7 +6,9 @@ import { fitCells } from './cell-width'
 import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-rows'
 import { needPartsOf } from './fleet-labels'
 import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
+import { runAction } from './game-actions'
 import { gameStrings } from './game-strings'
+import { ACTION_CHIP_PREFIX, actionChipsOf } from './lead-actions'
 import { openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
 import { countsOf, needsOf, partyOf } from './party'
@@ -23,6 +25,7 @@ import {
 import { levelOf } from './rewards'
 
 const PET_KEY = 'band-pet-scene'
+const ACTION_ROWS = 1
 
 // Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
 const beneathOf = (drawn: RenderElement): RenderElement[] =>
@@ -173,6 +176,34 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'gray')
       }
     }
+    const actions = new Map(
+      (state.actions ?? []).map((one) => [`${ACTION_CHIP_PREFIX}${one.id}`, one])
+    )
+    // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
+    const actionRows = rowsOf(
+      'band-actions',
+      actionChipsOf([...actions.values()]),
+      ACTION_ROWS,
+      (chip) => {
+        const action = actions.get(chip.key)
+        return (
+          <Button
+            key={chip.key}
+            plain
+            onPress={() =>
+              action === undefined
+                ? openFleet($)
+                : void runAction($, action, v.isDemo).catch(() => undefined)
+            }
+          >
+            <Text backgroundColor={palette.panel} color={palette.parchment}>
+              {` ${chip.label} `}
+            </Text>
+          </Button>
+        )
+      },
+      (count) => `+${count}`
+    )
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
@@ -195,6 +226,7 @@ export const registerBand = (on: On): void => {
             </Text>
           </Box>
         )}
+        {actionRows}
         {menuRows}
         {allies}
         {beneath}

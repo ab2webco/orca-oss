@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
+  withOrchestratorGameProjectActions,
   withOrchestratorGameProjectField,
   withOrchestratorGameProjectLead,
   withOrchestratorGameProjectScene
@@ -86,5 +87,26 @@ describe('withOrchestratorGameProjectLead', () => {
         undefined
       )
     ).toEqual({})
+  })
+})
+
+describe('withOrchestratorGameProjectActions', () => {
+  const actions = [{ label: 'Test runs', command: 'test-runs', prompt: 'Run the QA test runs' }]
+
+  it("replaces a project's whole action list on this machine, an empty one included", () => {
+    expect(withOrchestratorGameProjectActions({ repo1: { hud: false } }, 'repo1', actions)).toEqual(
+      {
+        repo1: { hud: false, actions }
+      }
+    )
+    expect(withOrchestratorGameProjectActions(undefined, 'repo1', [])).toEqual({
+      repo1: { actions: [] }
+    })
+  })
+
+  it('inherits orca.yaml again, dropping an entry left empty', () => {
+    expect(withOrchestratorGameProjectActions({ repo1: { actions } }, 'repo1', undefined)).toEqual(
+      {}
+    )
   })
 })

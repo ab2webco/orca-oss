@@ -43,6 +43,7 @@ function checkout(orcaYaml?: string): string {
 }
 
 const none = async () => null
+const LEAD_ACTION_IDS = ['lead:wave', 'lead:status', 'lead:push', 'lead:sweep', 'lead:stop']
 
 function worktree(path: string) {
   return {
@@ -427,7 +428,7 @@ describe('buildOrchestratorGameState', () => {
         prompt: 'Work on ORCA-9: Mine\nhttps://app.plane.so/w/browse/ORCA-9/'
       }
     ])
-    expect(state.actions).toBeUndefined()
+    expect(state.actions?.map((one) => one.id)).toEqual(LEAD_ACTION_IDS)
   })
 
   it("sends the project's lead, this machine's Settings over orca.yaml", async () => {
@@ -460,6 +461,32 @@ describe('buildOrchestratorGameState', () => {
     expect(
       (await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })).role
     ).toBe('member')
+  })
+
+  it("sends Orca's lead buttons only to the lead, unless the project turns them off", async () => {
+    const base = {
+      settings: undefined,
+      worktree: worktree(checkout('orchestratorGame:\n  tracker: false\n')),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+    const lead = await buildOrchestratorGameState(base)
+    const member = await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })
+    const off = await buildOrchestratorGameState({
+      ...base,
+      worktree: worktree(
+        checkout('orchestratorGame:\n  tracker: false\n  orchestrator:\n    actions: false\n')
+      )
+    })
+
+    expect(lead.actions?.map((one) => [one.id, one.command])).toEqual(
+      LEAD_ACTION_IDS.map((id) => [id, id.slice('lead:'.length)])
+    )
+    expect(member.actions).toBeUndefined()
+    expect(off.actions).toBeUndefined()
   })
 
   it("sends the project's actions filled for this worktree and each ticket's work prompt", async () => {
@@ -497,7 +524,7 @@ describe('buildOrchestratorGameState', () => {
       })
     })
 
-    expect(state.actions).toEqual([
+    expect(state.actions?.slice(5)).toEqual([
       { id: 'action-0', label: 'Ship', prompt: `Open the PR for ${state.worktree?.branch}` },
       { id: 'action-1', label: 'Runs', mcp: { server: 'tambora', tool: 'list_test_run_cases' } }
     ])

@@ -43,6 +43,25 @@ describe('parseGameActions', () => {
     ])
   })
 
+  it('takes an optional slash command name, refusing one that is not a short lowercase word', () => {
+    const parsed = parseGameActions([
+      { label: 'Test runs', command: ' test-runs ', prompt: 'Run the QA test runs' },
+      { label: 'Runs', command: 'runs', mcp: { server: 'tambora', tool: 'list' } },
+      { label: 'Bad', command: '/Wave', prompt: 'x' },
+      { label: 'Long', command: 'a-command-name-far-too-long', prompt: 'x' },
+      { label: 'Number', command: 3, prompt: 'x' }
+    ])
+    expect(parsed.value).toEqual([
+      { label: 'Test runs', command: 'test-runs', prompt: 'Run the QA test runs' },
+      { label: 'Runs', command: 'runs', mcp: { server: 'tambora', tool: 'list' } }
+    ])
+    expect(parsed.warnings).toEqual([
+      'orchestratorGame.actions[2].command must be a lowercase name like test-runs, up to 24 characters',
+      'orchestratorGame.actions[3].command must be a lowercase name like test-runs, up to 24 characters',
+      'orchestratorGame.actions[4].command must be a lowercase name like test-runs, up to 24 characters'
+    ])
+  })
+
   it('keeps the first six and refuses a non-list', () => {
     const many = Array.from({ length: 8 }, (_, at) => ({ label: `A${at}`, prompt: 'x' }))
     expect(parseGameActions(many).value).toHaveLength(6)
@@ -57,13 +76,13 @@ describe('gameActionsOf', () => {
         [
           { label: 'Ship', prompt: 'Open the PR for {workItem.identifier} on {branch}' },
           { label: 'Review', prompt: 'Review #{review.number}' },
-          { label: 'Runs', mcp: { server: 'tambora', tool: 'list' } }
+          { label: 'Runs', command: 'runs', mcp: { server: 'tambora', tool: 'list' } }
         ],
         { 'workItem.identifier': 'CIN-12', branch: 'feat/cin-12' }
       )
     ).toEqual([
       { id: 'action-0', label: 'Ship', prompt: 'Open the PR for CIN-12 on feat/cin-12' },
-      { id: 'action-2', label: 'Runs', mcp: { server: 'tambora', tool: 'list' } }
+      { id: 'action-2', label: 'Runs', command: 'runs', mcp: { server: 'tambora', tool: 'list' } }
     ])
   })
 })
