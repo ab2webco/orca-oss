@@ -1,12 +1,12 @@
-import type { GameAgentState, GameCi, GameReview } from '../types'
+import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
 import { ES } from './locales/es'
 import { JA } from './locales/ja'
 import { KO } from './locales/ko'
 import { ZH } from './locales/zh'
 
 // Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same five.
-export const GAME_LOCALES = ['en', 'es', 'ja', 'ko', 'zh'] as const
-export type GameLocale = (typeof GAME_LOCALES)[number]
+export const GAME_LOCALES = ['en', 'es', 'ja', 'ko', 'zh'] as const satisfies readonly GameLocale[]
+export type { GameLocale, LocalizedName }
 
 /** Words drawn as terminal text, where any character renders. */
 export type TextStrings = {
@@ -192,9 +192,6 @@ export const setGameLocale = (locale: GameLocale): void => {
 }
 
 export const gameStrings = (): GameStrings => active
-
-/** A scene's card or teller name: one string, or one per language with English required. */
-export type LocalizedName = string | ({ en: string } & Partial<Record<GameLocale, string>>)
 
 export const localizedNameOf = (name: LocalizedName, locale = activeLocale): string =>
   typeof name === 'string' ? name : (name[locale] ?? name.en)

@@ -1,5 +1,3 @@
-import type { SceneDefinition } from '../hooks/scenes/scene-definition'
-
 export type GameMode = 'on' | 'zen' | 'off'
 
 export type GameConfig = { mode: GameMode; scene: string; hud: boolean; rewards: boolean }
@@ -47,6 +45,61 @@ export type GameWorkItem = {
 }
 
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
+
+export type GameLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
+
+/** A scene's card or teller name: one string, or one per language with English required. */
+export type LocalizedName = string | ({ en: string } & Partial<Record<GameLocale, string>>)
+
+export type FlowPhase = 'docs' | 'build' | 'verify' | 'pr' | 'handoff'
+
+export type ScenePhase = FlowPhase | 'working'
+
+export type PlantKind = 'tree' | 'cactus' | 'none' | 'antenna' | 'crystal' | 'flower'
+
+// The far layer behind the hills; `peaks` when a look leaves it out.
+export type Scenery = 'peaks' | 'skyline' | 'crystals' | 'meadow'
+
+export type Look = {
+  skyTop: number
+  skyBottom: number
+  sun: number
+  isNight: boolean
+  far: number
+  snow: number
+  near: number
+  ground: number
+  plant: number
+  plantKind: PlantKind
+  cloud: number
+  scenery?: Scenery
+  /** A searchlight sign in place of the sun, its beam slanting down. */
+  isSignal?: boolean
+}
+
+// Ten columns wide; each glyph names a key of `colors`, '.' is transparent.
+export type Costume = {
+  rows: readonly string[]
+  legs: readonly [string, string]
+  colors: Readonly<Record<string, number>>
+}
+
+export type Card = { icon: string; name: LocalizedName; color: string }
+
+export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
+
+export type SceneDefinition = {
+  id: string
+  looks: Readonly<Record<ScenePhase, Look>>
+  costumes: Readonly<Record<ScenePhase, Costume>>
+  cards: Readonly<Record<ScenePhase, Card>>
+  teller: Card
+  band: BandPalette
+  /** Faces a teammate whose CI is red, on its tile and in turns with it on the HUD. */
+  foe?: Costume
+  /** Caption painted while a merge runs; pixel art, so width-1 characters only. */
+  finale?: LocalizedName
+}
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }
 

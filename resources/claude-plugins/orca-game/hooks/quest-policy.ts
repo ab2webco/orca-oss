@@ -1,4 +1,4 @@
-import type { GameMode } from '../types'
+import type { FlowPhase, GameMode } from '../types'
 import { gameStrings } from './game-strings'
 
 export const QUEST_MODES: readonly GameMode[] = ['off', 'on', 'zen']
@@ -126,7 +126,7 @@ export const restoredNotesOf = (
   return { notes: [...notes], replies: [...replies] }
 }
 
-export type FlowPhase = 'docs' | 'build' | 'verify' | 'pr' | 'handoff'
+export type { FlowPhase }
 
 const DOCS_PATH = /(^|\/)docs\/|\.mdx?$/
 const VERIFY_COMMAND =
