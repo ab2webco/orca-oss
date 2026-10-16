@@ -5,6 +5,7 @@ import {
   parseOrchestratorGameLayer,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
+  gameLeadSourceOf,
   resolveOrchestratorGameLead
 } from './orchestrator-game-config'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
@@ -230,5 +231,34 @@ describe('orchestratorGame.orchestrator', () => {
       label: 'Jefe',
       model: 'opus'
     })
+  })
+})
+
+describe('gameLeadSourceOf', () => {
+  it('names the highest layer that sets a valid value for the key', () => {
+    const layers = {
+      global: { orchestrator: { cap: 2, agent: 'codex' } },
+      project: { orchestrator: { cap: 6 } },
+      local: { orchestrator: { cap: 99, label: 'Boss' } }
+    }
+    expect(gameLeadSourceOf(layers, 'cap')).toBe('project')
+    expect(gameLeadSourceOf(layers, 'agent')).toBe('global')
+    expect(gameLeadSourceOf(layers, 'label')).toBe('local')
+    expect(gameLeadSourceOf(layers, 'autostart')).toBe('default')
+  })
+
+  it('reports an effort with no model as the default, since the lead drops it', () => {
+    expect(gameLeadSourceOf({ project: { orchestrator: { effort: 'high' } } }, 'effort')).toBe(
+      'default'
+    )
+    expect(
+      gameLeadSourceOf(
+        {
+          project: { orchestrator: { model: 'opus' } },
+          local: { orchestrator: { effort: 'high' } }
+        },
+        'effort'
+      )
+    ).toBe('local')
   })
 })

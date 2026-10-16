@@ -10734,6 +10734,24 @@
           "sceneFileSshOffline": "Conecta este proyecto SSH para leer su archivo de escena.",
           "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
           "sceneFileNotText": "no es un archivo de texto"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "Límite de miembros",
+          "capInvalid": "Escribe un número entero del 1 al {{value0}}.",
+          "label": "Nombre del líder",
+          "labelInvalid": "Usa de 1 a 32 caracteres.",
+          "agent": "Agente",
+          "agentInvalid": "Usa un id de agente como claude o codex.",
+          "model": "Modelo",
+          "modelInvalid": "Usa un id de modelo como opus.",
+          "effort": "Esfuerzo",
+          "effortInvalid": "Usa un nivel de esfuerzo como high.",
+          "notSet": "Sin definir",
+          "autostart": "Iniciar como líder",
+          "effortNeedsModel": "Solo se usa con un modelo",
+          "title": "Líder",
+          "description": "La sesión que habla contigo y lanza un miembro por ticket. orca.yaml define el valor del proyecto; estos ajustes lo cambian en este equipo.",
+          "yamlOnly": "El prompt de lanzamiento y las reglas del proyecto se definen en orca.yaml, en orchestratorGame.orchestrator."
         }
       },
       "right": {

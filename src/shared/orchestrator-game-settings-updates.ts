@@ -1,4 +1,5 @@
 import type { OrchestratorGameConfig, OrchestratorGameLayer } from './orchestrator-game-config'
+import type { OrchestratorGameLead } from './orchestrator-game-lead'
 
 // Why: `undefined` means "inherit", so the key is removed instead of stored, letting lower layers show through.
 export function withOrchestratorGameField<K extends keyof OrchestratorGameConfig>(
@@ -42,6 +43,34 @@ export function withOrchestratorGameProjectScene(
   delete layer.scene
   delete layer.sceneFile
   Object.assign(layer, choice)
+  if (Object.keys(layer).length === 0) {
+    delete next[repoId]
+  } else {
+    next[repoId] = layer
+  }
+  return next
+}
+
+/** Overrides one lead key for one project on this machine; `undefined` inherits it again. */
+export function withOrchestratorGameProjectLead<K extends keyof OrchestratorGameLead>(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  key: K,
+  value: OrchestratorGameLead[K] | undefined
+): Record<string, OrchestratorGameLayer> {
+  const next = { ...projects }
+  const layer: OrchestratorGameLayer = { ...next[repoId] }
+  const lead = { ...layer.orchestrator }
+  if (value === undefined) {
+    delete lead[key]
+  } else {
+    lead[key] = value
+  }
+  if (Object.keys(lead).length === 0) {
+    delete layer.orchestrator
+  } else {
+    layer.orchestrator = lead
+  }
   if (Object.keys(layer).length === 0) {
     delete next[repoId]
   } else {

@@ -11362,6 +11362,24 @@
           "sceneFileSshOffline": "Connect this SSH project to read its scene file.",
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
           "sceneFileNotText": "not a text file"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "Member cap",
+          "capInvalid": "Enter a whole number from 1 to {{value0}}.",
+          "label": "Lead name",
+          "labelInvalid": "Use 1 to 32 characters.",
+          "agent": "Agent",
+          "agentInvalid": "Use an agent id like claude or codex.",
+          "model": "Model",
+          "modelInvalid": "Use a model id like opus.",
+          "effort": "Effort",
+          "effortInvalid": "Use an effort level like high.",
+          "notSet": "Not set",
+          "autostart": "Start as lead",
+          "effortNeedsModel": "Used only with a model",
+          "title": "Lead",
+          "description": "The session that talks to you and launches one member per ticket. orca.yaml sets the project default; these override it on this machine.",
+          "yamlOnly": "The launch prompt and the project's rules live in orca.yaml under orchestratorGame.orchestrator."
         }
       },
       "right": {

@@ -10723,6 +10723,24 @@
           "sceneFileSshOffline": "シーンファイルを読むには、この SSH プロジェクトに接続してください。",
           "previewFileFallback": "シーンファイルが有効になるまで、ゲームは Quest を描きます。",
           "sceneFileNotText": "テキストファイルではありません"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "メンバー上限",
+          "capInvalid": "1 から {{value0}} までの整数を入力してください。",
+          "label": "リーダー名",
+          "labelInvalid": "1〜32 文字で入力してください。",
+          "agent": "Agent",
+          "agentInvalid": "claude や codex のような Agent ID を使ってください。",
+          "model": "モデル",
+          "modelInvalid": "opus のようなモデル ID を使ってください。",
+          "effort": "エフォート",
+          "effortInvalid": "high のようなエフォートレベルを使ってください。",
+          "notSet": "未設定",
+          "autostart": "リーダーとして開始",
+          "effortNeedsModel": "モデル指定時のみ使用",
+          "title": "リーダー",
+          "description": "あなたと対話し、チケットごとにメンバーを 1 人起動するセッションです。プロジェクトの既定値は orca.yaml で設定され、ここではこのマシンでそれを上書きします。",
+          "yamlOnly": "起動プロンプトとプロジェクトのルールは orca.yaml の orchestratorGame.orchestrator で設定します。"
         }
       },
       "right": {

@@ -8,8 +8,7 @@ import {
   type OrchestratorGameBuiltInScene,
   type OrchestratorGameConfig,
   type OrchestratorGameLayer,
-  type OrchestratorGameMode,
-  type OrchestratorGameSource
+  type OrchestratorGameMode
 } from '../../../../shared/orchestrator-game-config'
 import {
   withOrchestratorGameField,
@@ -44,15 +43,15 @@ import {
   SettingsSwitchRow
 } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
+import {
+  orchestratorGameInheritLabel,
+  orchestratorGameModeLabels as modeLabels,
+  orchestratorGameSourceLabel as sourceLabel
+} from './orchestrator-game-setting-labels'
+import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
-
-const modeLabels = (): Record<OrchestratorGameMode, string> => ({
-  on: translate('auto.components.settings.OrchestratorGameSetting.on', 'On'),
-  zen: translate('auto.components.settings.OrchestratorGameSetting.zen', 'Zen'),
-  off: translate('auto.components.settings.OrchestratorGameSetting.off', 'Off')
-})
 
 const toggles = (): { key: ToggleKey; label: string; description: string }[] => [
   {
@@ -180,20 +179,6 @@ export function OrchestratorGameSetting({
   )
 }
 
-const sourceLabel = (source: OrchestratorGameSource): string =>
-  ({
-    default: translate('auto.components.settings.OrchestratorGameSetting.sourceDefault', 'default'),
-    global: translate(
-      'auto.components.settings.OrchestratorGameSetting.sourceGlobal',
-      'global setting'
-    ),
-    project: translate(
-      'auto.components.settings.OrchestratorGameSetting.sourceProject',
-      'from orca.yaml'
-    ),
-    local: translate('auto.components.settings.OrchestratorGameSetting.sourceLocal', 'this machine')
-  })[source]
-
 type FieldValue = OrchestratorGameMode | 'true' | 'false'
 
 const EMPTY_WORKTREES: never[] = []
@@ -267,7 +252,7 @@ export function ProjectOrchestratorGameSetting({
       )
     })
   const labels = modeLabels()
-  const inherit = translate('auto.components.settings.OrchestratorGameSetting.inherit', 'Inherit')
+  const inherit = orchestratorGameInheritLabel()
   const onOff = (value: boolean): string => (value ? labels.on : labels.off)
   const effective = (key: keyof OrchestratorGameConfig, text: string): string =>
     `${text} · ${sourceLabel(sources[key])}`
@@ -373,6 +358,12 @@ export function ProjectOrchestratorGameSetting({
           scene={config.scene}
           mode={config.mode}
           fileScene={file.state}
+        />
+        <ProjectOrchestratorGameLeadSetting
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
         />
       </div>
     </SearchableSetting>

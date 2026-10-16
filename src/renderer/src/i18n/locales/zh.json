@@ -10743,6 +10743,24 @@
           "sceneFileSshOffline": "请连接此 SSH 项目以读取其场景文件。",
           "previewFileFallback": "在场景文件有效之前，游戏会绘制 Quest。",
           "sceneFileNotText": "不是文本文件"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "成员上限",
+          "capInvalid": "请输入 1 到 {{value0}} 之间的整数。",
+          "label": "负责人名称",
+          "labelInvalid": "请使用 1 到 32 个字符。",
+          "agent": "智能体",
+          "agentInvalid": "请使用 claude 或 codex 这样的智能体 ID。",
+          "model": "模型",
+          "modelInvalid": "请使用 opus 这样的模型 ID。",
+          "effort": "推理强度",
+          "effortInvalid": "请使用 high 这样的强度级别。",
+          "notSet": "未设置",
+          "autostart": "作为负责人启动",
+          "effortNeedsModel": "仅在指定模型时使用",
+          "title": "负责人",
+          "description": "与你对话并为每个工单启动一个成员的会话。项目默认值由 orca.yaml 设置；这里的设置会在此设备上覆盖它。",
+          "yamlOnly": "启动提示词和项目规则位于 orca.yaml 的 orchestratorGame.orchestrator 下。"
         }
       },
       "right": {

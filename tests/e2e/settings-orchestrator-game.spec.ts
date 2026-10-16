@@ -404,3 +404,73 @@ test("the project's scene files are listed in the Scene picker and picking one s
     }
   }
 })
+
+test("the project lead shows orca.yaml's values, overrides them on this machine and renders at every width", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repo = await orcaPage.evaluate(() => {
+    const first = window.__store!.getState().repos[0]
+    return first ? { id: first.id, path: first.path } : null
+  })
+  expect(repo, 'the harness seeds one repo').not.toBeNull()
+  const { id: repoId, path: repoPath } = repo as { id: string; path: string }
+  writeFileSync(
+    join(repoPath, 'orca.yaml'),
+    'orchestratorGame:\n  orchestrator:\n    autostart: true\n    cap: 6\n'
+  )
+
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+  const lead = orcaPage.locator('[data-slot="game-lead-settings"]')
+  await expect(lead).toBeVisible({ timeout: 15_000 })
+  await expect(lead.getByText('On · from orca.yaml')).toBeVisible()
+  await expect(lead.getByText('6 · from orca.yaml')).toBeVisible()
+  await expect(lead.getByText('claude · default')).toBeVisible()
+
+  await lead
+    .getByRole('radiogroup', { name: 'Start as lead' })
+    .getByRole('radio', { name: 'Off' })
+    .click()
+  const model = lead.getByRole('textbox', { name: 'Model' })
+  await model.fill('opus')
+  await model.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId]: { orchestrator: { autostart: false, model: 'opus' } } })
+  await expect(lead.getByText('Off · this machine')).toBeVisible()
+  await expect(lead.getByText('opus · this machine')).toBeVisible()
+
+  const cap = lead.getByRole('textbox', { name: 'Member cap' })
+  await cap.fill('40')
+  await cap.press('Enter')
+  await expect(lead.getByRole('alert')).toHaveText('Enter a whole number from 1 to 12.')
+  expect((await savedGameSettings(orcaPage)).orchestratorGameProjects).toEqual({
+    [repoId]: { orchestrator: { autostart: false, model: 'opus' } }
+  })
+
+  const yamlOnly = lead.getByText('The launch prompt and the project', { exact: false })
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      // Why: a lead field must never be wider than the section it sits in.
+      const overflow = await lead.evaluate((section) => {
+        const right = section.getBoundingClientRect().right
+        return Array.from(section.querySelectorAll('input, [role="radiogroup"]'))
+          .map((element) => element.getBoundingClientRect().right - right)
+          .filter((excess) => excess > 0.5)
+      })
+      expect(overflow, `a lead control overflows its section at ${width}px`).toEqual([])
+      await lead.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-top-${theme}-${width}.png`) })
+      await yamlOnly.evaluate((element) => element.scrollIntoView({ block: 'end' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-end-${theme}-${width}.png`) })
+    }
+  }
+})

@@ -167,6 +167,24 @@ export function resolveOrchestratorGameLead(
   return resolveGameLead(LAYER_ORDER.map((source) => layers[source]?.orchestrator))
 }
 
+/** The layer a lead key's effective value comes from; 'default' when no layer sets a usable one. */
+export function gameLeadSourceOf(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>,
+  key: keyof OrchestratorGameLead
+): OrchestratorGameSource {
+  if (resolveOrchestratorGameLead(layers)[key] === undefined) {
+    return 'default'
+  }
+  let source: OrchestratorGameSource = 'default'
+  for (const name of LAYER_ORDER) {
+    const raw = layers[name]?.orchestrator
+    if (raw !== undefined && parseGameLead(raw).value?.[key] !== undefined) {
+      source = name
+    }
+  }
+  return source
+}
+
 const isMode = (value: unknown): value is OrchestratorGameMode =>
   typeof value === 'string' && (ORCHESTRATOR_GAME_MODES as readonly string[]).includes(value)
 
