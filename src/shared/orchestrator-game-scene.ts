@@ -124,6 +124,8 @@ export function parseOrchestratorGameScene(
 }
 
 // Why `<pluginId>/<id>`: two plugins, or a plugin and the built-in quest, can never share an id.
+export const orchestratorGameSceneId = (pluginId: string, id: string): string => `${pluginId}/${id}`
+
 export function orchestratorGameScenesOf(sources: readonly OrchestratorGameSceneSource[]): {
   scenes: OrchestratorGameSceneExtension[]
   warnings: string[]
@@ -132,7 +134,7 @@ export function orchestratorGameScenesOf(sources: readonly OrchestratorGameScene
   const warnings: string[] = []
   const seen = new Set<string>()
   for (const source of sources) {
-    const id = `${source.pluginId}/${source.id}`
+    const id = orchestratorGameSceneId(source.pluginId, source.id)
     const parsed:
       | { ok: true; definition: OrchestratorGameSceneDefinition }
       | { ok: false; error: string } = seen.has(id)

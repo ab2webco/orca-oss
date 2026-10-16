@@ -30,6 +30,8 @@ import {
   type PluginPanelIconSvgNode
 } from '../../shared/plugins/plugin-panel-icon-svg'
 import { readContainedPluginArtifactText } from './plugin-artifact-validation'
+import { orchestratorGameSceneId } from '../../shared/orchestrator-game-scene'
+import { projectPluginListSource, type PluginListSource } from './plugin-list-source-projection'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -92,6 +94,8 @@ export type PluginListEntry = {
   /** Directories the manifest declares as skills; instructional bytes an agent
    *  is served, so the consent dialog must not read as panel-only content. */
   skills: string[]
+  /** Game scene ids (`<pluginKey>/<id>`) for the Settings scene picker; absent when none. */
+  gameScenes?: string[]
   /** Scheduled work the manifest declares; consent must show what it runs.
    *  Optional like the wire type: an older host simply sends none. */
   automations?: PluginAutomationPreview[]
@@ -107,13 +111,7 @@ export type PluginListEntry = {
   /** A required setting has no value, so the plugin runs unconfigured. */
   needsSetup?: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
-  source?: {
-    kind: 'local-path' | 'git' | 'marketplace' | 'bundled'
-    reference: string
-    resolvedCommit: string | null
-    contentHash: string
-    marketplace?: { reference: string; resolvedCommit: string }
-  }
+  source?: PluginListSource
 }
 
 /** Fail-soft read of the plugin's reserved badge key. A corrupt store, an
@@ -293,6 +291,13 @@ export async function buildPluginList(
         })),
         hasWorker: Boolean(plugin.manifest.main),
         skills: plugin.manifest.contributes.skills.map((skill) => skill.path),
+        ...(plugin.manifest.contributes.gameScenes.length > 0
+          ? {
+              gameScenes: plugin.manifest.contributes.gameScenes.map((scene) =>
+                orchestratorGameSceneId(plugin.pluginKey, scene.id)
+              )
+            }
+          : {}),
         automations: previewPluginAutomations(plugin.manifest.contributes.automations),
         vmRecipes: service.contentPacks.vmRecipes.preview(plugin.pluginKey).map(({ recipe }) => ({
           id: recipe.id,
@@ -311,31 +316,7 @@ export async function buildPluginList(
               }
             }
           : {}),
-        ...(lockEntry
-          ? {
-              source: {
-                kind: lockEntry.source.kind,
-                reference:
-                  lockEntry.source.kind === 'local-path'
-                    ? lockEntry.source.path
-                    : lockEntry.source.kind === 'git'
-                      ? lockEntry.source.url
-                      : lockEntry.source.kind === 'marketplace'
-                        ? lockEntry.source.plugin.url
-                        : `bundled:${lockEntry.source.bundleId}`,
-                resolvedCommit: lockEntry.resolvedCommit,
-                contentHash: lockEntry.contentHash,
-                ...(lockEntry.source.kind === 'marketplace'
-                  ? {
-                      marketplace: {
-                        reference: lockEntry.source.marketplace.url,
-                        resolvedCommit: lockEntry.source.marketplace.resolvedCommit
-                      }
-                    }
-                  : {})
-              }
-            }
-          : {})
+        ...(lockEntry ? { source: projectPluginListSource(lockEntry) } : {})
       }
     }
   )

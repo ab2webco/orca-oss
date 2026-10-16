@@ -51,7 +51,7 @@ async function shootAll(
     await setTheme(page, theme)
     for (const width of WIDTHS) {
       await setWindowWidth(app, page, width)
-      await section.scrollIntoViewIfNeeded()
+      await section.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       await page.screenshot({ path: testInfo.outputPath(`${name}-${theme}-${width}.png`) })
     }
   }
@@ -100,4 +100,85 @@ test('global and per-project Agent Teams game settings persist and render at eve
   await expect(orcaPage.getByText('Off · this machine')).toBeVisible()
 
   await shootAll(electronApp, orcaPage, testInfo, 'project', projectMode)
+})
+
+const SPACE_PACK = {
+  pluginKey: 'acme.space',
+  consentFingerprint: 'sha256-e2e',
+  name: 'Space Pack',
+  version: '1.0.0',
+  publisher: 'acme',
+  status: 'idle',
+  needsReconsent: false,
+  isDev: false,
+  official: false,
+  bundled: false,
+  capabilities: [],
+  panels: [],
+  commands: [],
+  hasWorker: false,
+  restarts: 0,
+  gameScenes: ['acme.space/orbit']
+}
+
+test('the scene picker lists plugin scenes, keeps an uninstalled id and renders at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  // Why: a real install needs the plugin system and consent; the picker only reads plugins:list.
+  await electronApp.evaluate(({ ipcMain, BrowserWindow }, plugin) => {
+    ipcMain.removeHandler('plugins:list')
+    ipcMain.handle('plugins:list', async () => [plugin])
+    BrowserWindow.getAllWindows()[0]?.webContents.send('plugins:changed', {})
+  }, SPACE_PACK)
+
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const scene = orcaPage.getByRole('combobox', { name: 'Scene' }).first()
+  await expect(scene).toBeVisible({ timeout: 15_000 })
+  await expect(scene).toHaveText('Quest (built-in)')
+
+  await scene.click()
+  await orcaPage.getByRole('option', { name: 'orbit · Space Pack' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ scene: 'acme.space/orbit' })
+  await expect(scene).toHaveText('orbit · Space Pack')
+  await shootAll(electronApp, orcaPage, testInfo, 'scene-picked', scene)
+
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await scene.click()
+      await expect(orcaPage.getByRole('listbox')).toBeVisible()
+      // Why: Radix fades the list in; a mid-animation capture reads as a washed-out control.
+      await orcaPage.waitForFunction(() =>
+        (
+          document
+            .querySelector('[role="listbox"]')
+            ?.parentElement?.getAnimations({ subtree: true }) ?? []
+        ).every((animation) => animation.playState !== 'running')
+      )
+      await orcaPage.screenshot({ path: testInfo.outputPath(`scene-open-${theme}-${width}.png`) })
+      await orcaPage.keyboard.press('Escape')
+      await expect(orcaPage.getByRole('listbox')).toBeHidden()
+    }
+  }
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await orcaPage.evaluate(async () => {
+    const settings = await window.api.settings.set({
+      orchestratorGame: { scene: 'acme.gone/orbit' }
+    })
+    window.__store?.setState({ settings })
+  })
+  await expect(scene).toHaveText('acme.gone/orbit (not installed)')
+  await shootAll(electronApp, orcaPage, testInfo, 'scene-missing', scene)
 })

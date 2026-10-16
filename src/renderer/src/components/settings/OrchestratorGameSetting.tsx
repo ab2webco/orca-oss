@@ -1,5 +1,6 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
+  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   type OrchestratorGameConfig,
   type OrchestratorGameLayer,
@@ -11,6 +12,7 @@ import {
   withOrchestratorGameProjectField
 } from '../../../../shared/orchestrator-game-settings-updates'
 import { SearchableSetting } from './SearchableSetting'
+import { INHERIT_SCENE, OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
 import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
@@ -56,7 +58,10 @@ const toggles = (): { key: ToggleKey; label: string; description: string }[] => 
 const title = (): string =>
   translate('auto.components.settings.OrchestratorGameSetting.title', 'Agent Teams game')
 
-const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen']
+const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen', 'scene']
+
+const sceneTitle = (): string =>
+  translate('auto.components.settings.OrchestratorGameSetting.scene', 'Scene')
 
 export function OrchestratorGameSetting({
   settings,
@@ -96,6 +101,21 @@ export function OrchestratorGameSetting({
                 value: mode,
                 label: labels[mode]
               }))}
+            />
+          }
+        />
+        <SettingsRow
+          label={sceneTitle()}
+          description={translate(
+            'auto.components.settings.OrchestratorGameSetting.sceneDescription',
+            'The art the game draws. Installed plugins can add scenes.'
+          )}
+          control={
+            <OrchestratorGameSceneSelect
+              value={config.scene}
+              ariaLabel={sceneTitle()}
+              disabled={config.mode === 'off'}
+              onChange={(scene) => set('scene', scene ?? DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene)}
             />
           }
         />
@@ -232,6 +252,18 @@ export function ProjectOrchestratorGameSetting({
             }
           />
         ))}
+        <SettingsRow
+          label={sceneTitle()}
+          description={effective('scene', config.scene)}
+          control={
+            <OrchestratorGameSceneSelect
+              value={local?.scene ?? INHERIT_SCENE}
+              ariaLabel={sceneTitle()}
+              inheritLabel={inherit}
+              onChange={(scene) => set('scene', scene ?? undefined)}
+            />
+          }
+        />
       </div>
     </SearchableSetting>
   )

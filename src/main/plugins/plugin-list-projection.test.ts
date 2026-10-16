@@ -618,3 +618,37 @@ describe('buildPluginList contributed automations', () => {
     ])
   })
 })
+
+describe('buildPluginList game scenes', () => {
+  const pluginWithScenes = (gameScenes: { id: string; path: string }[]): ValidDiscoveredPlugin => ({
+    pluginKey: 'orca-samples.demo',
+    rootDir: join(tmpdir(), 'plugins', 'demo'),
+    manifest: pluginManifestSchema.parse({
+      manifestVersion: 1,
+      id: 'demo',
+      publisher: 'orca-samples',
+      name: 'Demo',
+      version: '1.0.0',
+      engines: { orca: '>=1.0.0' },
+      pluginApi: 1,
+      contributes: { gameScenes },
+      capabilities: []
+    }),
+    consentFingerprint: 'sha256-current',
+    contentHash: null,
+    isDev: true
+  })
+
+  it('projects each declared scene under the id the game resolves it by', async () => {
+    const [entry] = await buildPluginList(
+      serviceWith(pluginWithScenes([{ id: 'orbit', path: 'scenes/orbit.json' }])),
+      emptyPluginLockfile()
+    )
+    expect(entry?.gameScenes).toEqual(['orca-samples.demo/orbit'])
+  })
+
+  it('leaves the field out for a plugin with no scenes, as an older host would', async () => {
+    const [entry] = await buildPluginList(serviceWith(pluginWithScenes([])), emptyPluginLockfile())
+    expect(entry).not.toHaveProperty('gameScenes')
+  })
+})
