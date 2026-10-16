@@ -4,7 +4,14 @@ import type { SceneDefinition } from './scene-definition'
 import { TAMER_SCENE } from './tamer'
 import { VIGILANTE_SCENE } from './vigilante'
 
-export type { Card, Costume, Look, SceneDefinition, ScenePhase } from './scene-definition'
+export type {
+  Card,
+  Costume,
+  HudPalette,
+  Look,
+  SceneDefinition,
+  ScenePhase
+} from './scene-definition'
 
 export const DEFAULT_SCENE_ID = 'quest'
 

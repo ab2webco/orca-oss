@@ -245,6 +245,10 @@ orchestratorGame:
   strings or integers; the mod's own validator
   ([`scene-shape.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-shape.ts)) takes
   both, as Orca's does.
+- **Team band colors.** The optional `hud` object paints the team band's pixel-art frame and sky:
+  `skyTop`, `skyBottom`, `frame`, `text`, `dim` (the second line of each teammate) and `star`, all
+  six required when `hud` is present. Without it the band keeps Quest's night sky, so only the
+  characters and the chips (`band`) take the scene's colors.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
 relative to the project root; a path leaving the project is refused inline) and three actions:

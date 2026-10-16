@@ -111,6 +111,30 @@ describe('sceneDefinitionOf', () => {
     expect(scene).toEqual(orca.ok ? orca.definition : undefined)
   })
 
+  it('takes an optional hud palette like Orca does, as the integers the renderer draws', () => {
+    const hud = {
+      skyTop: '#5c94fc',
+      skyBottom: '#a4c8fc',
+      frame: '#fcd800',
+      text: '#fcfcfc',
+      dim: '#2038ec',
+      star: 0xffffff
+    }
+    const text = JSON.stringify(sceneFile({ hud }))
+    const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
+    const scene = sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')
+    expect(scene?.hud).toEqual({
+      skyTop: 0x5c94fc,
+      skyBottom: 0xa4c8fc,
+      frame: 0xfcd800,
+      text: 0xfcfcfc,
+      dim: 0x2038ec,
+      star: 0xffffff
+    })
+    expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+    expect(sceneDefinitionOf(quest, 'quest')).not.toHaveProperty('hud')
+  })
+
   it.each([
     ['a short #rgb color', { looks: byScenePhase({ ...sceneLook, sun: '#fe8' }) }],
     ['a color name', { looks: byScenePhase({ ...sceneLook, sun: 'gold' }) }],
@@ -135,7 +159,8 @@ describe('sceneDefinitionOf', () => {
     ['an unknown plant', { looks: byScenePhase({ ...sceneLook, plantKind: 'fern' }) }],
     ['a foe glyph with no color', { foe: { ...sceneCostume, legs: ['.Q.O.O.O..', 'O.O.O.O.O.'] } }],
     ['a finale a Raster cannot draw', { finale: { en: 'WIN', ja: '勝利' } }],
-    ['a finale too long for the scene', { finale: 'x'.repeat(25) }]
+    ['a finale too long for the scene', { finale: 'x'.repeat(25) }],
+    ['a hud missing its frame', { hud: { skyTop: 1, skyBottom: 2, text: 3, dim: 4, star: 5 } }]
   ])('drops a scene with %s, as Orca does', (_label, patch) => {
     const text = JSON.stringify(sceneFile(patch))
     expect(parseOrchestratorGameScene(text, 'acme.space/orbit').ok).toBe(false)

@@ -5,6 +5,7 @@ import {
   type BandPalette,
   type Card,
   type Costume,
+  type HudPalette,
   type Look,
   type SceneDefinition,
   type ScenePhase
@@ -179,6 +180,18 @@ const bandOf = (value: unknown): BandPalette | undefined => {
   return gold && ink && panel && parchment ? { gold, ink, panel, parchment } : undefined
 }
 
+const HUD_COLORS = ['skyTop', 'skyBottom', 'frame', 'text', 'dim', 'star'] as const
+
+const hudOf = (value: unknown): HudPalette | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const colors = HUD_COLORS.map((key) => [key, colorOf(value[key])] as const)
+  return colors.every(([, one]) => one !== undefined)
+    ? (Object.fromEntries(colors) as HudPalette)
+    : undefined
+}
+
 const byPhaseOf = <T>(
   value: unknown,
   of: (one: unknown) => T | undefined
@@ -204,7 +217,17 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const band = bandOf(value.band)
     const foe = optionalOf(value.foe, costumeOf)
     const finale = optionalOf(value.finale, finaleOf)
-    if (!looks || !costumes || !cards || !teller || !band || foe === null || finale === null) {
+    const hud = optionalOf(value.hud, hudOf)
+    if (
+      !looks ||
+      !costumes ||
+      !cards ||
+      !teller ||
+      !band ||
+      foe === null ||
+      finale === null ||
+      hud === null
+    ) {
       return undefined
     }
     return {
@@ -215,7 +238,8 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       teller,
       band,
       ...(foe === undefined ? {} : { foe }),
-      ...(finale === undefined ? {} : { finale })
+      ...(finale === undefined ? {} : { finale }),
+      ...(hud === undefined ? {} : { hud })
     }
   } catch {
     return undefined

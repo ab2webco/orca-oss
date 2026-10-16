@@ -4,6 +4,7 @@ export type {
   BandPalette,
   Card,
   Costume,
+  HudPalette,
   Look,
   PlantKind,
   SceneDefinition,

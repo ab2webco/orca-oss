@@ -135,7 +135,17 @@ const sceneFileSchema = z.object({
   teller: cardSchema,
   band: z.object({ gold: hexColor, ink: hexColor, panel: hexColor, parchment: hexColor }),
   foe: costumeSchema.optional(),
-  finale: finaleSchema.optional()
+  finale: finaleSchema.optional(),
+  hud: z
+    .object({
+      skyTop: color,
+      skyBottom: color,
+      frame: color,
+      text: color,
+      dim: color,
+      star: color
+    })
+    .optional()
 })
 
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & { id: string }

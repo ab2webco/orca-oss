@@ -16,17 +16,21 @@ import {
 import { cellsOf, glyphCell, hash, mix, UPPER_HALF } from './pixel-canvas'
 import type { Action } from './quest-policy'
 import { SPRITE_WIDTH } from './scene'
-import type { SceneDefinition, ScenePhase } from './scenes/index'
+import type { HudPalette, SceneDefinition, ScenePhase } from './scenes/index'
 
 export const HUD_ROWS = 5
 export const HUD_KEY = 'orca-game-hud'
 
 const HUD_PIXELS = HUD_ROWS * 2
-const HUD_TOP = 0x1a1f33
-const HUD_BOTTOM = 0x2b3150
-const HUD_FRAME = 0xc9a24a
-const HUD_TEXT = 0xf1e2b8
-const HUD_DIM = 0x8a90a8
+// Quest's night sky, for every scene that brings no hud palette of its own.
+const QUEST_HUD: HudPalette = {
+  skyTop: 0x1a1f33,
+  skyBottom: 0x2b3150,
+  frame: 0xc9a24a,
+  text: 0xf1e2b8,
+  dim: 0x8a90a8,
+  star: 0xf5f3c8
+}
 const PARTY_AT = 14
 const SLOT = 22
 const XP_CELLS = 5
@@ -47,13 +51,13 @@ export type Level = { level: number; into: number; need: number }
 
 export type HudExtras = { isHeroWorking?: boolean; level?: Level; isDemo?: boolean }
 
-const hudSky = (x: number, y: number, tick: number): number => {
+const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => {
   if (y === 0 || y === HUD_PIXELS - 1) {
-    return HUD_FRAME
+    return hud.frame
   }
   const isStar =
     (y === 1 || y >= 7) && hash(x, y) % 23 === 0 && (hash(x, y) + Math.floor(tick / 5)) % 5 !== 0
-  return isStar ? 0xf5f3c8 : mix(HUD_TOP, HUD_BOTTOM, y / (HUD_PIXELS - 1))
+  return isStar ? hud.star : mix(hud.skyTop, hud.skyBottom, y / (HUD_PIXELS - 1))
 }
 
 type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number }
@@ -134,9 +138,10 @@ export const hudGridOf = (
   const heroState = heroStateOf(members, extras)
   const heroAt = heroState === 'idle' ? 2 : 2 + (Math.floor(tick / 8) % 2)
   const hero: Sprite = { phase: 'working', state: heroState, at: heroAt }
+  const hud = scene.hud ?? QUEST_HUD
   const pixel = (x: number, y: number): number => {
     if (x === 0 || x === columns - 1) {
-      return HUD_FRAME
+      return hud.frame
     }
     const heroPixel = hudSprite(scene, hero, x, y, tick)
     if (heroPixel !== undefined) {
@@ -145,13 +150,13 @@ export const hudGridOf = (
     const slot = Math.floor((x - PARTY_AT) / SLOT)
     const one = x >= PARTY_AT ? shown[slot] : undefined
     if (one === undefined) {
-      return hudSky(x, y, tick)
+      return hudSky(hud, x, y, tick)
     }
     const at = PARTY_AT + slot * SLOT
     const member = hudSprite(scene, { ...one, at }, x, y, tick)
     const hasProp = !isRestingOf(one.state, one.mood) && y >= 6
     const prop = hasProp ? actionPixel(one.action, x - (at + SPRITE_WIDTH + 1), y, tick) : undefined
-    return member ?? prop ?? hudSky(x, y, tick)
+    return member ?? prop ?? hudSky(hud, x, y, tick)
   }
   const grid: number[][] = []
   for (let row = 0; row < HUD_ROWS; row += 1) {
@@ -164,21 +169,21 @@ export const hudGridOf = (
     for (let x = PARTY_AT; x < columns; x += 1) {
       const cell = grid[row * columns + x]
       if (cell !== undefined && cell[0] === UPPER_HALF && cell[1] === cell[2]) {
-        grid[row * columns + x] = [0x20, HUD_TEXT, cell[1] ?? 0]
+        grid[row * columns + x] = [0x20, hud.text, cell[1] ?? 0]
       }
     }
   }
   const room = columns - PARTY_AT - 2
   if (members.length === 0) {
     const art = gameStrings().art
-    hudWrite(grid, columns, 1, PARTY_AT, art.noParty, HUD_TEXT, room)
-    hudWrite(grid, columns, 2, PARTY_AT, art.teammatesJoin, HUD_DIM, room)
+    hudWrite(grid, columns, 1, PARTY_AT, art.noParty, hud.text, room)
+    hudWrite(grid, columns, 2, PARTY_AT, art.teammatesJoin, hud.dim, room)
   }
   shown.forEach((one, slot) => {
     const left = PARTY_AT + slot * SLOT + SPRITE_WIDTH + 1
     const color = one.state === 'waiting' ? WAITING : one.state === 'idle' ? IDLE : WORKING
     hudWrite(grid, columns, 1, left, one.name, color, SLOT - SPRITE_WIDTH - 2)
-    hudWrite(grid, columns, 2, left, memberLine(one), HUD_DIM, SLOT - SPRITE_WIDTH - 2)
+    hudWrite(grid, columns, 2, left, memberLine(one), hud.dim, SLOT - SPRITE_WIDTH - 2)
     const mark = moodMarkOf(one.state, one.mood, tick)
     if (mark !== undefined) {
       hudWrite(grid, columns, 1, left - 1, mark.glyph, mark.color, 1)
@@ -191,7 +196,7 @@ export const hudGridOf = (
     hudWrite(grid, columns, 1, heroAt + SPRITE_WIDTH, snoreGlyph(tick), IDLE, 1)
   }
   if (extras.level !== undefined && columns > PARTY_AT + 4) {
-    hudWrite(grid, columns, 0, PARTY_AT, ` ${xpTextOf(extras.level)} `, HUD_FRAME, room)
+    hudWrite(grid, columns, 0, PARTY_AT, ` ${xpTextOf(extras.level)} `, hud.frame, room)
   }
   if (extras.isDemo === true && columns > 10) {
     hudWrite(grid, columns, 0, 2, ' DEMO ', WAITING, 6)
@@ -200,7 +205,7 @@ export const hudGridOf = (
   const xpEnd = extras.level === undefined ? PARTY_AT : PARTY_AT + xpTextOf(extras.level).length + 2
   const plus = ` +${hidden} `
   if (hidden > 0 && columns - 2 - plus.length > xpEnd) {
-    hudWrite(grid, columns, 0, columns - 2 - plus.length, plus, HUD_TEXT, plus.length)
+    hudWrite(grid, columns, 0, columns - 2 - plus.length, plus, hud.text, plus.length)
   }
   return grid
 }

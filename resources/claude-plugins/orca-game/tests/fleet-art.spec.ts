@@ -44,6 +44,23 @@ describe('hud', () => {
     expect(glyphs(hudGridOf(QUEST, party, 90, 4))).toContain('×')
   })
 
+  it("paints the frame and sky from a scene's own hud palette", () => {
+    const hud = {
+      skyTop: 0x5c94fc,
+      skyBottom: 0x5c94fc,
+      frame: 0xfcd800,
+      text: 0xfcfcfc,
+      dim: 0x2038ec,
+      star: 0x5c94fc
+    }
+    const grid = hudGridOf({ ...QUEST, hud }, [], 90, 4)
+    expect(grid[0]).toEqual([0x2580, 0xfcd800, 0xfcd800])
+    expect(grid[90 * 2]).toEqual([0x2580, 0xfcd800, 0xfcd800])
+    // Why row 3, column 85: below the "no party" lines and past the hero, so only sky shows.
+    expect(grid[85 + 90 * 3]).toEqual([0x2580, 0x5c94fc, 0x5c94fc])
+    expect(hudGridOf(QUEST, [], 90, 4)[0]?.[1]).toBe(0xc9a24a)
+  })
+
   it('shows the level bar only when rewards give it one', () => {
     expect(glyphs(hudGridOf(QUEST, party, 90, 4, { level: levelOf(250) }))).toContain(
       'Lv 2 ■■■□□ 150/200 XP'

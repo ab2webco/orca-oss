@@ -108,6 +108,16 @@ export type Card = { icon: string; name: LocalizedName; color: string }
 
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
 
+/** The team band's pixel-art frame and night sky; built-in scenes leave it out and keep Quest's. */
+export type HudPalette = {
+  skyTop: number
+  skyBottom: number
+  frame: number
+  text: number
+  dim: number
+  star: number
+}
+
 export type SceneDefinition = {
   id: string
   looks: Readonly<Record<ScenePhase, Look>>
@@ -119,6 +129,7 @@ export type SceneDefinition = {
   foe?: Costume
   /** Caption painted while a merge runs; pixel art, so width-1 characters only. */
   finale?: LocalizedName
+  hud?: HudPalette
 }
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }

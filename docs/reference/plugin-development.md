@@ -783,11 +783,13 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   "teller": { "icon": "❝", "name": "Night Log", "color": "#9aa6c8" },
   "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" },
   "foe": { "rows": ["…six rows…"], "legs": ["…", "…"], "colors": { } },   // optional
-  "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" }           // optional
+  "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" },          // optional
+  "hud": { "skyTop": "#0d1330", "skyBottom": "#1f2748", "frame": "#f2c14e",
+           "text": "#e8e4ff", "dim": "#9aa6c8", "star": "#ffffff" }        // optional, team band
 }
 ```
 
-- Pixel colors (`looks`, costume `colors`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
+- Pixel colors (`looks`, costume `colors`, `hud`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
   colors are `#rrggbb`.
 - A costume is exactly six `rows` plus two `legs` rows, each ten printable ASCII glyphs. `.` is
   transparent and every other glyph must have a color.
