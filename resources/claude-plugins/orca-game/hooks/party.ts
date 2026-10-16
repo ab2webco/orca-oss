@@ -1,5 +1,6 @@
 import type { GameAgent, GameState } from '../types'
 import type { HudMember } from './fleet-hud'
+import { linkOfKind } from './fleet-labels'
 import { gameStrings } from './game-strings'
 import type { MemberState, Mood } from './party-sprites'
 import { actionOf, activityOf, phaseOf, type FlowPhase } from './quest-policy'
@@ -81,7 +82,13 @@ export const needsOf = (state: GameState): Need[] => {
       .filter((agent) => !agent.isLeader && agent.state === 'waiting')
       .map((agent) => ({ name: agent.displayName, text: waitingNeed, url: null })),
     ...(state.review !== null && isCiRed(state.review)
-      ? [{ name: reviewLabelOf(state.review), text: ciFailingNeed, url: state.review.url }]
+      ? [
+          {
+            name: reviewLabelOf(state.review),
+            text: ciFailingNeed,
+            url: linkOfKind(state.links, 'ci')?.url ?? state.review.url
+          }
+        ]
       : [])
   ]
 }

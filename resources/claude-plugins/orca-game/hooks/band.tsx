@@ -4,7 +4,7 @@ import { alliesStrip } from './allies-strip'
 import { CHIP_ROWS, MENU_ROWS, menuChipsOf, stateChipsOf } from './band-chips'
 import { fitCells } from './cell-width'
 import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-rows'
-import { CI_COLORS, needsLineOf } from './fleet-labels'
+import { needPartsOf } from './fleet-labels'
 import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
 import { gameStrings } from './game-strings'
 import { openPane } from './fleet-pane'
@@ -130,7 +130,23 @@ export const registerBand = (on: On): void => {
         </Text>{' '}
       </Text>
     )
+    const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
+    const linked = new Map(chips.filter((one) => one.isLink).map((one) => [one.key, one]))
     const chipOf = (chip: PlacedChip): RenderElement => {
+      const link = linked.get(chip.key)
+      if (link !== undefined) {
+        return linkOf(
+          chip.key,
+          link.href ?? '',
+          <Text
+            key={chip.key}
+            color={link.color ?? palette.parchment}
+            backgroundColor={palette.panel}
+          >
+            {` ${chip.label} `}
+          </Text>
+        )
+      }
       switch (chip.key) {
         case 'band-team':
           return (
@@ -147,22 +163,6 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'green')
         case 'waiting':
           return pill(chip.key, chip.label, counts.waiting > 0 ? 'red' : 'gray', counts.waiting > 0)
-        case 'band-review':
-          return linkOf(
-            chip.key,
-            state.review?.url ?? '',
-            <Text color={CI_COLORS[state.review?.ci ?? 'none']} backgroundColor={palette.panel}>
-              {` ${chip.label} `}
-            </Text>
-          )
-        case 'band-work-item':
-          return linkOf(
-            chip.key,
-            state.workItem?.url ?? '',
-            <Text color={palette.parchment} backgroundColor={palette.panel}>
-              {` ${chip.label} `}
-            </Text>
-          )
         case 'note':
           return <Text key={chip.key} color="yellow">{` ${chip.label} `}</Text>
         case MORE_CHIP_KEY:
@@ -173,7 +173,6 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'gray')
       }
     }
-    const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
@@ -188,10 +187,16 @@ export const registerBand = (on: On): void => {
         )}
         {rowsOf('band-chips', chips, CHIP_ROWS, chipOf, (count) => `+${count}`)}
         {needs.length > 0 && (
-          <Box flexDirection="row" overflow="hidden">
-            <Text color="red" bold wrap="truncate-end">
-              {needsLineOf(needs)}
-            </Text>
+          <Box key="band-needs" flexDirection="row" overflow="hidden">
+            {needPartsOf(needs, columns).map((part) =>
+              linkOf(
+                part.key,
+                part.url ?? '',
+                <Text key={part.key} color="red" bold>
+                  {part.text}
+                </Text>
+              )
+            )}
           </Box>
         )}
         {menuRows}

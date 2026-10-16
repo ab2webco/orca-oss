@@ -154,8 +154,11 @@ describe('band', () => {
     expect(await ui.find({ type: 'Text', text: /^1 waiting on you$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /#42 open · CI failing/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /ORCA-580 In Progress/ })).toBeDefined()
-    const needs = /Needs you: tester waiting on you · #42 CI failing/
-    expect(await ui.find({ type: 'Text', text: needs })).toBeDefined()
+    const needs = await ui.find({ type: 'Box', key: 'band-needs' })
+    expect(await ui.find({ type: 'Text', text: /^Needs you:$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^tester waiting on you$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^#42 CI failing$/ })).toBeDefined()
+    expect(needs).toBeDefined()
     await ui.press({ key: 'band-refresh' })
     await clock.settle()
     expect(polls(world)).toBe(2)
