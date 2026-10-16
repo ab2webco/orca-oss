@@ -38,6 +38,12 @@ because a Raster only takes width-1 characters.
 
 ## Configuration layers
 
+To start a project's `orca.yaml` from nothing, run `/orca-game:setup` in a Claude pane of the
+repo: it reads what the project uses (tracker keys, MCP servers, `CLAUDE.md` rules, `bin/`
+scripts), asks what to integrate one question at a time, shows the YAML, writes it once confirmed
+and clears every `orca game state` warning. Its key summary is
+[`skills/setup/reference.md`](../../resources/claude-plugins/orca-game/skills/setup/reference.md).
+
 Each field resolves on its own; a later layer wins
 ([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)):
 
