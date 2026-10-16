@@ -61,7 +61,9 @@ const hudSprite = (
   y: number,
   tick: number
 ): number | undefined => {
-  const costume = scene.costumes[sprite.phase]
+  // A member on red CI trades turns with the scene's foe.
+  const isFoeTurn = sprite.mood === 'hurt' && Math.floor(tick / 6) % 2 === 1
+  const costume = (isFoeTurn ? scene.foe : undefined) ?? scene.costumes[sprite.phase]
   const isResting = isRestingOf(sprite.state, sprite.mood)
   const top = 2 - (sprite.state === 'waiting' && isBlink(tick) ? 1 : 0) + (isResting ? 1 : 0)
   const column = x - sprite.at

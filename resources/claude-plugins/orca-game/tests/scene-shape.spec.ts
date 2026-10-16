@@ -6,7 +6,9 @@ import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-
 import {
   byScenePhase,
   sceneCard,
-  sceneFile
+  sceneCostume,
+  sceneFile,
+  sceneLook
 } from '../../../../src/shared/__fixtures__/orchestrator-game-scene'
 
 const roundTrip = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
@@ -46,6 +48,48 @@ describe('sceneDefinitionOf', () => {
     expect(scene?.cards.pr.name).toEqual({ en: 'Pilot', es: 'Piloto' })
     expect(scene?.teller.name).toEqual({ en: 'Narrator', ja: '語り手' })
     expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+  })
+
+  it('takes the optional foe, finale and world like Orca does, and leaves them out when absent', () => {
+    const text = JSON.stringify(
+      sceneFile({
+        looks: byScenePhase({
+          ...sceneLook,
+          plantKind: 'flower',
+          scenery: 'meadow',
+          isSignal: true
+        }),
+        foe: sceneCostume,
+        finale: { en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!', fr: 'ATTRAPÉ' }
+      })
+    )
+    const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
+    const scene = sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')
+    expect(scene?.foe).toEqual(sceneCostume)
+    expect(scene?.finale).toEqual({ en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!' })
+    expect(scene?.looks.pr).toMatchObject({
+      plantKind: 'flower',
+      scenery: 'meadow',
+      isSignal: true
+    })
+    expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+    const plain = sceneDefinitionOf(quest, 'quest')
+    expect(plain && ('foe' in plain || 'finale' in plain || 'scenery' in plain.looks.pr)).toBe(
+      false
+    )
+  })
+
+  it.each([
+    ['an unknown world', { looks: byScenePhase({ ...sceneLook, scenery: 'ocean' }) }],
+    ['a signal that is not a boolean', { looks: byScenePhase({ ...sceneLook, isSignal: 'yes' }) }],
+    ['an unknown plant', { looks: byScenePhase({ ...sceneLook, plantKind: 'fern' }) }],
+    ['a foe glyph with no color', { foe: { ...sceneCostume, legs: ['.Q.O.O.O..', 'O.O.O.O.O.'] } }],
+    ['a finale a Raster cannot draw', { finale: { en: 'WIN', ja: '勝利' } }],
+    ['a finale too long for the scene', { finale: 'x'.repeat(25) }]
+  ])('drops a scene with %s, as Orca does', (_label, patch) => {
+    const text = JSON.stringify(sceneFile(patch))
+    expect(parseOrchestratorGameScene(text, 'acme.space/orbit').ok).toBe(false)
+    expect(sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')).toBeUndefined()
   })
 
   it.each([

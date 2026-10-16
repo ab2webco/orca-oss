@@ -51,8 +51,10 @@ const lookSchema = z.object({
   near: color,
   ground: color,
   plant: color,
-  plantKind: z.enum(['tree', 'cactus', 'none']),
-  cloud: color
+  plantKind: z.enum(['tree', 'cactus', 'none', 'antenna', 'crystal', 'flower']),
+  cloud: color,
+  scenery: z.enum(['peaks', 'skyline', 'crystals', 'meadow']).optional(),
+  isSignal: z.boolean().optional()
 })
 
 const costumeSchema = z
@@ -87,6 +89,34 @@ const localizedSceneName = z.union([
 
 const cardSchema = z.object({ icon: displayText(4), name: localizedSceneName, color: hexColor })
 
+// Mirrors the mod's isRasterText: Latin, punctuation, box drawing and blocks, ★ and card suits.
+const isPixelArtCode = (code: number): boolean =>
+  (code >= 0x20 && code < 0x7f) ||
+  (code >= 0xa0 && code < 0x300) ||
+  (code >= 0x2010 && code <= 0x2027) ||
+  (code >= 0x2500 && code <= 0x25ff) ||
+  code === 0x2605 ||
+  (code >= 0x2660 && code <= 0x2667)
+// Why: the finale is painted into the pixel art, which refuses a frame with a wide character.
+const pixelArtText = z
+  .string()
+  .min(1)
+  .max(24)
+  .refine(
+    (value) => [...value].every((one) => isPixelArtCode(one.codePointAt(0) ?? 0)),
+    'must be width-1 characters (Latin, punctuation, box drawing, ★ or card suits)'
+  )
+const finaleSchema = z.union([
+  pixelArtText,
+  z.object({
+    en: pixelArtText,
+    es: pixelArtText.optional(),
+    ja: pixelArtText.optional(),
+    ko: pixelArtText.optional(),
+    zh: pixelArtText.optional()
+  })
+])
+
 const byPhase = <T extends z.ZodType>(schema: T) =>
   z.object({
     working: schema,
@@ -103,7 +133,9 @@ const sceneFileSchema = z.object({
   costumes: byPhase(costumeSchema),
   cards: byPhase(cardSchema),
   teller: cardSchema,
-  band: z.object({ gold: hexColor, ink: hexColor, panel: hexColor, parchment: hexColor })
+  band: z.object({ gold: hexColor, ink: hexColor, panel: hexColor, parchment: hexColor }),
+  foe: costumeSchema.optional(),
+  finale: finaleSchema.optional()
 })
 
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & { id: string }

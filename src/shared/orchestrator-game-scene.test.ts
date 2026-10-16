@@ -58,6 +58,29 @@ describe('parseOrchestratorGameScene', () => {
     expect(parsed.ok && parsed.definition.cards.pr.name).toEqual({ en: 'Pilot' })
   })
 
+  it('takes an optional world, foe and merge finale, and leaves them out when absent', () => {
+    const parsed = parse(
+      scene({
+        looks: byPhase({ ...look, plantKind: 'antenna', scenery: 'skyline', isSignal: true }),
+        foe: { ...costume, colors: { ...costume.colors, H: '#8a2a3a' } },
+        finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' }
+      })
+    )
+    expect(parsed.ok && parsed.definition.looks.pr).toMatchObject({
+      plantKind: 'antenna',
+      scenery: 'skyline',
+      isSignal: true
+    })
+    expect(parsed.ok && parsed.definition.foe?.colors.H).toBe(0x8a2a3a)
+    expect(parsed.ok && parsed.definition.finale).toEqual({
+      en: '◆ CASE CLOSED',
+      es: '◆ CASO CERRADO'
+    })
+    const plain = parse(scene())
+    expect(plain.ok && ('foe' in plain.definition || 'finale' in plain.definition)).toBe(false)
+    expect(plain.ok && 'scenery' in plain.definition.looks.pr).toBe(false)
+  })
+
   it('ignores an id inside the file so a plugin cannot claim another namespace', () => {
     const parsed = parse(scene({ id: 'quest' }))
     expect(parsed.ok && parsed.definition.id).toBe('acme.pack/space')
@@ -133,6 +156,22 @@ describe('parseOrchestratorGameScene', () => {
       JSON.stringify(scene({ cards: byPhase({ ...card, name: { en: 'P', es: 'x'.repeat(33) } }) })),
       'cards.working.name'
     ],
+    [
+      'an unknown world',
+      JSON.stringify(scene({ looks: byPhase({ ...look, scenery: 'ocean' }) })),
+      'looks'
+    ],
+    [
+      'a foe glyph with no color',
+      JSON.stringify(scene({ foe: { ...costume, legs: ['.Z.O.O.O..', 'O.O.O.O.O.'] } })),
+      'foe'
+    ],
+    [
+      'a finale the pixel art cannot draw',
+      JSON.stringify(scene({ finale: { en: 'WIN', zh: '胜利' } })),
+      'finale'
+    ],
+    ['an overlong finale', JSON.stringify(scene({ finale: 'x'.repeat(25) })), 'finale'],
     [
       'a band color that is not hex',
       JSON.stringify(

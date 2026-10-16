@@ -8,7 +8,7 @@ import {
 } from './party-sprites'
 import { cellsOf, glyphCell, hash, UPPER_HALF } from './pixel-canvas'
 import { SPRITE_WIDTH } from './scene'
-import type { SceneDefinition, ScenePhase } from './scenes/index'
+import type { Costume, SceneDefinition, ScenePhase } from './scenes/index'
 
 export const TILE_COLUMNS = 22
 export const TILE_ROWS = 4
@@ -138,6 +138,19 @@ const tileClawd = (
   return moodPixel(mood, costume.colors[row?.[column] ?? '.'], tick)
 }
 
+// The scene's foe faces the member, mirrored and swaying, where its prop would be.
+const foeProp =
+  (foe: Costume) =>
+  (x: number, y: number, tick: number): number | undefined => {
+    const column = x - (11 + (Math.floor(tick / 3) % 2))
+    const last = foe.rows.length
+    if (column < 0 || column >= SPRITE_WIDTH || y < 0 || y > last) {
+      return undefined
+    }
+    const row = y === last ? foe.legs[Math.floor(tick / 2) % 2] : foe.rows[y]
+    return foe.colors[row?.[SPRITE_WIDTH - 1 - column] ?? '.']
+  }
+
 export const tileGridOf = (
   scene: SceneDefinition,
   kind: TileKind,
@@ -146,7 +159,10 @@ export const tileGridOf = (
   mood: Mood = 'none'
 ): number[][] => {
   const moving = state === 'idle' && mood === 'none' ? 0 : tick
-  const prop = PROPS[mood === 'cheer' ? 'handed' : kind]
+  const prop =
+    mood === 'hurt' && scene.foe !== undefined
+      ? foeProp(scene.foe)
+      : PROPS[mood === 'cheer' ? 'handed' : kind]
   const grid: number[][] = []
   for (let row = 0; row < TILE_ROWS; row += 1) {
     for (let x = 0; x < TILE_COLUMNS; x += 1) {
