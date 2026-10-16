@@ -10716,7 +10716,14 @@
           "sourceDefault": "默认",
           "sourceGlobal": "全局设置",
           "sourceProject": "来自 orca.yaml",
-          "sourceLocal": "此设备"
+          "sourceLocal": "此设备",
+          "scope": "仅适用于 Claude Agent Teams 窗格。普通 Claude、Codex 和其他智能体不会加载它。",
+          "previewLabel": "场景预览",
+          "previewImage": "{{value0}} 的预览",
+          "previewOff": "游戏已关闭，因此 Agent Teams 窗格以普通 Claude 启动。",
+          "previewZen": "Zen 绘制相同的场景，并且还会隐藏简短的工作笔记。",
+          "previewPlugin": "此插件的美术只会在 Agent Teams 窗格中绘制。",
+          "previewMissing": "未安装，因此游戏会绘制 Quest。"
         }
       },
       "right": {

@@ -10707,7 +10707,14 @@
           "sourceDefault": "por defecto",
           "sourceGlobal": "ajuste global",
           "sourceProject": "desde orca.yaml",
-          "sourceLocal": "este equipo"
+          "sourceLocal": "este equipo",
+          "scope": "Solo se aplica a los paneles de Claude Agent Teams. Claude normal, Codex y los demás agentes nunca lo cargan.",
+          "previewLabel": "Vista previa de la escena",
+          "previewImage": "Vista previa de {{value0}}",
+          "previewOff": "El juego está desactivado, así que los paneles de Agent Teams arrancan como Claude normal.",
+          "previewZen": "Zen dibuja la misma escena y además oculta las notas breves de trabajo.",
+          "previewPlugin": "El arte de este plugin solo se dibuja dentro de un panel de Agent Teams.",
+          "previewMissing": "No está instalada, así que el juego dibuja Quest."
         }
       },
       "right": {

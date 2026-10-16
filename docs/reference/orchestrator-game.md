@@ -47,6 +47,19 @@ Each field resolves on its own; a later layer wins
 4. Settings → the project → **Agent Teams game**, this machine only
    (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
 
+Both Settings pages group the game's controls (mode, scene, teammate HUD, rewards, work item
+tracking) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
+panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
+([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
+imports `hooks/scene.ts`, `scenery.ts` and `scenes/`), so it cannot drift from what a pane draws:
+the spinner scene walking through the six phases with the phase's character under it, or one still
+frame when the system asks for reduced motion. `zen` notes what it hides, `off` says the pane starts
+as plain Claude, an uninstalled id shows `quest` (what the mod falls back to), and a plugin scene
+shows a note instead, because its definition only reaches the mod through `game.state`, never the
+renderer. The renderer build strips the mod's TypeScript with its own plugin
+([`orca-game-mod-transform.ts`](../../config/build-plugins/orca-game-mod-transform.ts)): the mod's
+`tsconfig.json` sets an `h` JSX factory that React's automatic runtime refuses.
+
 ```yaml
 # orca.yaml
 orchestratorGame:

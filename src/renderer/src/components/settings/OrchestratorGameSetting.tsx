@@ -13,7 +13,13 @@ import {
 } from '../../../../shared/orchestrator-game-settings-updates'
 import { SearchableSetting } from './SearchableSetting'
 import { INHERIT_SCENE, OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
-import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './SettingsFormControls'
+import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
+import {
+  SettingsRow,
+  SettingsSegmentedControl,
+  SettingsSubsectionHeader,
+  SettingsSwitchRow
+} from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
@@ -58,6 +64,19 @@ const toggles = (): { key: ToggleKey; label: string; description: string }[] => 
 const title = (): string =>
   translate('auto.components.settings.OrchestratorGameSetting.title', 'Agent Teams game')
 
+const sectionHeader = (): React.JSX.Element => (
+  <SettingsSubsectionHeader
+    title={title()}
+    description={translate(
+      'auto.components.settings.OrchestratorGameSetting.scope',
+      'Applies only to Claude Agent Teams panes. Plain Claude, Codex and other agents never load it.'
+    )}
+  />
+)
+
+const modeTitle = (): string =>
+  translate('auto.components.settings.OrchestratorGameSetting.mode', 'Game mode')
+
 const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen', 'scene']
 
 const sceneTitle = (): string =>
@@ -83,19 +102,22 @@ export function OrchestratorGameSetting({
   )
 
   return (
-    <section className="space-y-1">
-      <SearchableSetting title={title()} description={description} keywords={keywords}>
+    <section>
+      <SearchableSetting
+        title={title()}
+        description={description}
+        keywords={keywords}
+        className="space-y-1"
+      >
+        {sectionHeader()}
         <SettingsRow
-          label={title()}
+          label={modeTitle()}
           description={description}
           control={
             <SettingsSegmentedControl
               value={config.mode}
               onChange={(mode) => set('mode', mode)}
-              ariaLabel={translate(
-                'auto.components.settings.OrchestratorGameSetting.mode',
-                'Game mode'
-              )}
+              ariaLabel={modeTitle()}
               size="sm"
               options={(['on', 'zen', 'off'] as const).map((mode) => ({
                 value: mode,
@@ -119,6 +141,7 @@ export function OrchestratorGameSetting({
             />
           }
         />
+        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
         {toggles().map((toggle) => (
           <SettingsSwitchRow
             key={toggle.key}
@@ -197,7 +220,7 @@ export function ProjectOrchestratorGameSetting({
   }[] = [
     {
       key: 'mode',
-      label: translate('auto.components.settings.OrchestratorGameSetting.mode', 'Game mode'),
+      label: modeTitle(),
       text: labels[config.mode],
       value: local?.mode ?? 'inherit',
       options: [
@@ -224,10 +247,8 @@ export function ProjectOrchestratorGameSetting({
   return (
     <SearchableSetting title={title()} description={description} keywords={keywords}>
       <div className="space-y-1">
-        <div className="space-y-0.5 py-2">
-          <h3 className="text-sm font-medium">{title()}</h3>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
+        {sectionHeader()}
+        <p className="text-xs text-muted-foreground">{description}</p>
         {rows.map((row) => (
           <SettingsRow
             key={row.key}
@@ -264,6 +285,7 @@ export function ProjectOrchestratorGameSetting({
             />
           }
         />
+        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
       </div>
     </SearchableSetting>
   )

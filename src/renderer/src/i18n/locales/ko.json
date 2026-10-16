@@ -10707,7 +10707,14 @@
           "sourceDefault": "기본값",
           "sourceGlobal": "전역 설정",
           "sourceProject": "orca.yaml에서",
-          "sourceLocal": "이 기기"
+          "sourceLocal": "이 기기",
+          "scope": "Claude Agent Teams 창에만 적용됩니다. 일반 Claude, Codex 및 다른 에이전트는 이를 불러오지 않습니다.",
+          "previewLabel": "장면 미리보기",
+          "previewImage": "{{value0}} 미리보기",
+          "previewOff": "게임이 꺼져 있으므로 Agent Teams 창은 일반 Claude로 시작합니다.",
+          "previewZen": "Zen은 같은 장면을 그리고 짧은 작업 메모도 숨깁니다.",
+          "previewPlugin": "이 플러그인의 아트는 Agent Teams 창 안에서만 그려집니다.",
+          "previewMissing": "설치되어 있지 않아 게임이 Quest를 그립니다."
         }
       },
       "right": {

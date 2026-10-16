@@ -11335,7 +11335,14 @@
           "sourceDefault": "default",
           "sourceGlobal": "global setting",
           "sourceProject": "from orca.yaml",
-          "sourceLocal": "this machine"
+          "sourceLocal": "this machine",
+          "scope": "Applies only to Claude Agent Teams panes. Plain Claude, Codex and other agents never load it.",
+          "previewLabel": "Scene preview",
+          "previewImage": "Preview of {{value0}}",
+          "previewOff": "The game is off, so Agent Teams panes start as plain Claude.",
+          "previewZen": "Zen draws the same scene and also hides short working notes.",
+          "previewPlugin": "This plugin's art is only drawn inside an Agent Teams pane.",
+          "previewMissing": "Not installed, so the game draws Quest."
         }
       },
       "right": {

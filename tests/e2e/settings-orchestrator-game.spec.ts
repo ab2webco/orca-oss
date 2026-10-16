@@ -182,3 +182,75 @@ test('the scene picker lists plugin scenes, keeps an uninstalled id and renders 
   await expect(scene).toHaveText('acme.gone/orbit (not installed)')
   await shootAll(electronApp, orcaPage, testInfo, 'scene-missing', scene)
 })
+
+/** Distinct colors on the preview canvas; a blank or one-color canvas means nothing was painted. */
+async function previewColors(preview: ReturnType<Page['locator']>): Promise<number> {
+  return preview.evaluate((canvas) => {
+    const context = (canvas as HTMLCanvasElement).getContext('2d')
+    const data = context?.getImageData(0, 0, (canvas as HTMLCanvasElement).width, 40).data
+    const colors = new Set<number>()
+    for (let index = 0; data && index < data.length; index += 4) {
+      colors.add(
+        ((data[index] ?? 0) << 16) | ((data[index + 1] ?? 0) << 8) | (data[index + 2] ?? 0)
+      )
+    }
+    return colors.size
+  })
+}
+
+test('the game section says it is for Claude Agent Teams only and previews the picked scene', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const heading = orcaPage.getByRole('heading', { name: 'Agent Teams game' }).first()
+  await expect(heading).toBeVisible({ timeout: 15_000 })
+  await expect(
+    orcaPage.getByText('Applies only to Claude Agent Teams panes.', { exact: false }).first()
+  ).toBeVisible()
+
+  const quest = orcaPage.getByRole('img', { name: 'Preview of Quest (built-in)' })
+  await expect(quest).toBeVisible()
+  await expect.poll(async () => previewColors(quest)).toBeGreaterThan(8)
+
+  const scene = orcaPage.getByRole('combobox', { name: 'Scene' }).first()
+  await scene.click()
+  await orcaPage.getByRole('option', { name: 'Night Watch (built-in)' }).click()
+  const nightWatch = orcaPage.getByRole('img', { name: 'Preview of Night Watch (built-in)' })
+  await expect(nightWatch).toBeVisible()
+  await expect.poll(async () => previewColors(nightWatch)).toBeGreaterThan(8)
+
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await heading.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+      // Why: the canvas has a 512px drawing buffer; it must scale down, not widen its column.
+      const fits = await nightWatch.evaluate((canvas) => {
+        const column = canvas.closest('section')?.getBoundingClientRect().width ?? 0
+        return canvas.getBoundingClientRect().width <= column
+      })
+      expect(fits, `preview wider than its column at ${width}px`).toBe(true)
+      await orcaPage.screenshot({ path: testInfo.outputPath(`preview-${theme}-${width}.png`) })
+    }
+  }
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await orcaPage
+    .getByRole('radiogroup', { name: 'Game mode' })
+    .first()
+    .getByRole('radio', { name: 'Off' })
+    .click()
+  await expect(nightWatch).toBeHidden()
+  await expect(
+    orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')
+  ).toBeVisible()
+  await heading.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+  await orcaPage.screenshot({ path: testInfo.outputPath('preview-off-1440.png') })
+})

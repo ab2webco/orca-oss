@@ -10696,7 +10696,14 @@
           "sourceDefault": "既定",
           "sourceGlobal": "グローバル設定",
           "sourceProject": "orca.yaml から",
-          "sourceLocal": "このマシン"
+          "sourceLocal": "このマシン",
+          "scope": "Claude Agent Teams のペインにのみ適用されます。通常の Claude や Codex などは読み込みません。",
+          "previewLabel": "シーンのプレビュー",
+          "previewImage": "{{value0}} のプレビュー",
+          "previewOff": "ゲームはオフのため、Agent Teams のペインは通常の Claude として起動します。",
+          "previewZen": "Zen は同じシーンを描き、短い作業メモも非表示にします。",
+          "previewPlugin": "このプラグインのアートは Agent Teams のペイン内でのみ描画されます。",
+          "previewMissing": "インストールされていないため、ゲームは Quest を描きます。"
         }
       },
       "right": {

@@ -115,6 +115,47 @@ describe('OrchestratorGameSetting', () => {
   })
 })
 
+describe('game settings section', () => {
+  it('titles the section and says it only applies to Claude Agent Teams panes', () => {
+    const view = render(<OrchestratorGameSetting settings={{}} updateSettings={() => undefined} />)
+
+    const heading = view.container.querySelector('h3')
+    expect(heading?.textContent).toBe('Agent Teams game')
+    expect(view.container.textContent).toContain('Applies only to Claude Agent Teams panes')
+    view.unmount()
+  })
+
+  it('previews the effective scene and mode', () => {
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { scene: 'tamer', mode: 'zen' } }}
+        updateSettings={() => undefined}
+      />
+    )
+    const preview = view.container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview?.dataset.scene).toBe('tamer')
+    expect(preview?.dataset.mode).toBe('zen')
+    view.unmount()
+  })
+
+  it('previews the project scene this machine resolves', () => {
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repoId="repo1"
+        settings={{ orchestratorGame: { scene: 'tamer' } }}
+        projectLayer={{ scene: 'jrpg', mode: 'off' }}
+        updateSettings={() => undefined}
+      />
+    )
+    expect(view.container.querySelector('h3')?.textContent).toBe('Agent Teams game')
+    expect(view.container.textContent).toContain('Applies only to Claude Agent Teams panes')
+    const preview = view.container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview?.dataset.scene).toBe('jrpg')
+    expect(preview?.dataset.mode).toBe('off')
+    view.unmount()
+  })
+})
+
 describe('ProjectOrchestratorGameSetting', () => {
   it('shows where the effective value comes from and overrides it for this machine', () => {
     const updates: Partial<GlobalSettings>[] = []
