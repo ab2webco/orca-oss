@@ -33,15 +33,15 @@ const TONE_COLORS: Readonly<Partial<Record<AllyTone, string>>> = {
   warn: 'yellow'
 }
 
-/** Jev and every intercepted status, as rows under the band; reading both state values redraws on their writes. */
+/** Jev and every intercepted status as the strip under the band, or nothing; reading both state values redraws on their writes. */
 export async function alliesStrip(
   $: EngineInterface,
   e: RenderInput,
   palette: BandPalette,
   columns: number
-): Promise<RenderElement | undefined> {
+): Promise<RenderElement[]> {
   if (!isAbsorbing()) {
-    return undefined
+    return []
   }
   const [jev, held] = await Promise.all([
     $.state.get(JEV_ADVISOR).catch(() => ({ value: undefined })),
@@ -53,7 +53,7 @@ export async function alliesStrip(
     more: gameStrings().text.moreAllies
   })
   if (rows.length === 0) {
-    return undefined
+    return []
   }
   const { Box, Text } = $.ui.resolve(e)
   const rowOf = (row: AllyRow) => {
@@ -78,11 +78,11 @@ export async function alliesStrip(
       </Box>
     )
   }
-  return (
+  return [
     <Box key="allies-strip" flexDirection="column">
       {rows.map(rowOf)}
     </Box>
-  )
+  ]
 }
 
 export const registerAllies = (on: On): void => {

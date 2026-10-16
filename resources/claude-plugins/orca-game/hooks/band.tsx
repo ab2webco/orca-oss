@@ -25,8 +25,8 @@ import { levelOf } from './rewards'
 const PET_KEY = 'band-pet-scene'
 
 // Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
-const beneathOf = (drawn: RenderElement): RenderElement | undefined =>
-  drawn.type === 'engine' ? undefined : drawn
+const beneathOf = (drawn: RenderElement): RenderElement[] =>
+  drawn.type === 'engine' ? [] : [drawn]
 
 function openFleet($: EngineInterface): void {
   void openPane($)
