@@ -64,6 +64,16 @@ const ALLOWED_ATTRIBUTES: ReadonlySet<string> = new Set([
 /** Attributes only meaningful on the root element. */
 const ROOT_ONLY_ATTRIBUTES: ReadonlySet<string> = new Set(['viewBox'])
 
+/** Lets a client that receives an already-sanitized tree over the wire re-check
+ *  it against the same allow-lists instead of a copy that could drift. */
+export function isPluginPanelIconSvgTag(tag: string): tag is PluginPanelIconSvgTag {
+  return ALLOWED_TAG_SET.has(tag)
+}
+
+export function isPluginPanelIconSvgAttribute(name: string, isRoot: boolean): boolean {
+  return ALLOWED_ATTRIBUTES.has(name) || (isRoot && ROOT_ONLY_ATTRIBUTES.has(name))
+}
+
 /** A 32 KB icon can still encode a tree bomb, so the shape is bounded too. */
 export const PLUGIN_PANEL_ICON_SVG_MAX_BYTES = 32 * 1024
 const MAX_NODES = 512

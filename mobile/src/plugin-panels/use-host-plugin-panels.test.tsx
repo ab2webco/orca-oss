@@ -6,7 +6,9 @@ import type { ConnectionState } from '../transport/types'
 import { useHostPluginPanels } from './use-host-plugin-panels'
 
 function mountPanels(connState: ConnectionState) {
-  const client = { sendRequest: () => new Promise<never>(() => {}) } as unknown as RpcClient
+  const client = {
+    sendRequest: () => new Promise<never>(() => {})
+  } as unknown as RpcClient
   let latest: ReturnType<typeof useHostPluginPanels> | null = null
 
   function Probe({ state }: { state: ConnectionState }) {

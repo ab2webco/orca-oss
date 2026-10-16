@@ -76,6 +76,14 @@ export const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: colors.bgRaised
   },
+  rowIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgRaised
+  },
   rowMain: {
     flex: 1,
     minWidth: 0,

@@ -78,4 +78,64 @@ describe('listHostablePluginPanels', () => {
     ).toEqual(['ok'])
     expect(listHostablePluginPanels({ not: 'a list' })).toEqual([])
   })
+
+  it('carries the panel icon name and a well-formed custom svg tree', () => {
+    const iconSvg = {
+      tag: 'svg',
+      attributes: { viewBox: '0 0 24 24', fill: 'currentColor' },
+      children: [
+        { tag: 'path', attributes: { d: 'M0 0h24v24H0z', 'stroke-width': '2' }, children: [] }
+      ]
+    }
+    const [panel] = listHostablePluginPanels([
+      plugin({ panels: [{ id: 'board', title: 'Inbox', surface: 'nav', icon: 'inbox', iconSvg }] })
+    ])
+
+    expect(panel?.icon).toBe('inbox')
+    expect(panel?.iconSvg).toEqual(iconSvg)
+  })
+
+  it('drops attributes outside the shared allow-list but keeps the tree', () => {
+    const [panel] = listHostablePluginPanels([
+      plugin({
+        panels: [
+          {
+            id: 'board',
+            title: 'Inbox',
+            surface: 'nav',
+            iconSvg: {
+              tag: 'svg',
+              attributes: { viewBox: '0 0 24 24', onPress: 'x' },
+              children: [{ tag: 'circle', attributes: { r: '4', href: 'x' }, children: [] }]
+            }
+          }
+        ]
+      })
+    ])
+
+    expect(panel?.iconSvg).toEqual({
+      tag: 'svg',
+      attributes: { viewBox: '0 0 24 24' },
+      children: [{ tag: 'circle', attributes: { r: '4' }, children: [] }]
+    })
+  })
+
+  it('drops only a malformed custom svg and keeps the panel', () => {
+    const malformed: unknown[] = [
+      'not a tree',
+      { tag: 'g', attributes: {}, children: [] },
+      { tag: 'svg', attributes: {}, children: [{ tag: 'script', attributes: {}, children: [] }] },
+      { tag: 'svg', attributes: { viewBox: 7 }, children: [] },
+      { tag: 'svg', attributes: {}, children: 'nope' },
+      { tag: 'svg', attributes: null, children: [] }
+    ]
+    for (const iconSvg of malformed) {
+      const panels = listHostablePluginPanels([
+        plugin({ panels: [{ id: 'board', title: 'Inbox', surface: 'nav', icon: '', iconSvg }] })
+      ])
+      expect(panels).toHaveLength(1)
+      expect(panels[0]).not.toHaveProperty('iconSvg')
+      expect(panels[0]).not.toHaveProperty('icon')
+    }
+  })
 })
