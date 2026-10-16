@@ -57,16 +57,34 @@ const projectChipOf = (
   ...(color === undefined ? {} : { color })
 })
 
-// My open PRs and tickets across the project, beside the worktree's own review and item.
+// Open PRs drawn one by one before the band falls back to a count.
+const BAND_PRS_MAX = 3
+
+// My open PRs, each opening itself, and my tickets, beside the worktree's own review and item.
 const projectChipsOf = (state: GameState): BandChip[] => {
   const text = gameStrings().text
   const reviews = state.project?.reviews ?? null
   const todo = state.project?.todo ?? null
+  const own = state.review?.url
+  const prs = (reviews?.items ?? []).filter((one) => one.url !== own).slice(0, BAND_PRS_MAX)
+  const shown = prs.length + ((reviews?.items ?? []).some((one) => one.url === own) ? 1 : 0)
   const tone = reviews === null ? undefined : worstToneOf(reviews)
+  const prChips = prs.map(
+    (one): BandChip => ({
+      key: `band-pr-${one.id}`,
+      priority: 3,
+      labels: [`⇄ ${one.id}`, one.id],
+      href: one.url,
+      ...(one.tone === undefined || TONE_COLORS[one.tone] === undefined
+        ? {}
+        : { color: TONE_COLORS[one.tone] })
+    })
+  )
+  const needsCount = reviews !== null && (reviews.total === 0 || reviews.total > shown)
   return [
-    ...(reviews === null
-      ? []
-      : [
+    ...prChips,
+    ...(needsCount
+      ? [
           projectChipOf(
             'band-reviews',
             '⇄',
@@ -74,12 +92,12 @@ const projectChipsOf = (state: GameState): BandChip[] => {
             reviews,
             tone === undefined ? undefined : TONE_COLORS[tone]
           )
-        ]),
+        ]
+      : []),
     ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)])
   ]
 }
 
-// The work item and review lead, then CI, then activity, then the project's own links.
 const linkChipsOf = (state: GameState): BandChip[] => {
   const chips: BandChip[] = []
   const ci = linkOfKind(state.links, 'ci')

@@ -90,19 +90,62 @@ describe('project work from Orca', () => {
 })
 
 describe('project chips', () => {
-  it('draws my PRs colored by the worst CI and my To Do, each opening its list', () => {
+  it('draws each open PR as a chip that opens it, colored by its CI, and my To Do opening its list', () => {
     const chips = chipsOf(STATE)
-    expect(byKey(chips, 'band-reviews')).toMatchObject({
-      labels: ['⇄ My PRs 2', '⇄ 2'],
-      href: 'https://github.com/o/r/pulls?q=is%3Apr',
+    expect(byKey(chips, 'band-pr-#469')).toMatchObject({
+      labels: ['⇄ #469', '#469'],
+      href: 'https://github.com/o/r/pull/469',
       color: 'red',
       isLink: true
     })
+    expect(byKey(chips, 'band-pr-#470')).toMatchObject({
+      labels: ['⇄ #470', '#470'],
+      href: 'https://github.com/o/r/pull/470',
+      color: 'green'
+    })
+    expect(byKey(chips, 'band-reviews')).toBeUndefined()
     expect(byKey(chips, 'band-todo')).toMatchObject({
       labels: ['☐ To Do 3', '☐ 3'],
       href: 'https://app.plane.so/w/workspace-views/assigned/',
       isLink: true
     })
+  })
+
+  it('adds the count that opens the list when more PRs are open than the band shows', () => {
+    const items = Array.from({ length: 5 }, (_, at) => ({
+      id: `#${at + 1}`,
+      title: `PR ${at + 1}`,
+      url: `https://github.com/o/r/pull/${at + 1}`
+    }))
+    const chips = chipsOf({
+      ...STATE,
+      project: { reviews: { ...PROJECT.reviews!, total: 7, items }, todo: null }
+    })
+    expect(chips.filter((one) => one.key.startsWith('band-pr-')).map((one) => one.key)).toEqual([
+      'band-pr-#1',
+      'band-pr-#2',
+      'band-pr-#3'
+    ])
+    expect(byKey(chips, 'band-reviews')).toMatchObject({
+      labels: ['⇄ My PRs 7', '⇄ 7'],
+      href: 'https://github.com/o/r/pulls?q=is%3Apr'
+    })
+  })
+
+  it("leaves out the PR the worktree's own review chip already shows", () => {
+    const chips = chipsOf({
+      ...STATE,
+      review: {
+        provider: 'github',
+        number: 469,
+        title: 'Spawn race',
+        url: 'https://github.com/o/r/pull/469',
+        state: 'open',
+        ci: 'failure'
+      }
+    })
+    expect(byKey(chips, 'band-pr-#469')).toBeUndefined()
+    expect(byKey(chips, 'band-pr-#470')).toBeDefined()
   })
 
   it('names GitLab reviews MRs and draws a list with no url as plain text', () => {
