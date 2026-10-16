@@ -4,6 +4,10 @@ import { defineConfig, type UserConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createBootstrapFatalExitBanner } from './config/build-plugins/bootstrap-fatal-exit-banner'
+import {
+  createOrcaGameModTransformPlugin,
+  ORCA_GAME_MOD_TS
+} from './config/build-plugins/orca-game-mod-transform'
 import { createPlainNodeEntryGuardPlugin } from './config/build-plugins/plain-node-entry-guard'
 import packageJson from './package.json' with { type: 'json' }
 
@@ -294,7 +298,13 @@ export const electronViteConfig: UserConfig = {
         '@': resolve('src/renderer/src')
       }
     },
-    plugins: [react(), tailwindcss()],
+    // Why: the mod's .ts goes through its own plugin; both excludes keep their defaults alongside it.
+    plugins: [
+      createOrcaGameModTransformPlugin(),
+      react({ exclude: [/\/node_modules\//, ORCA_GAME_MOD_TS] }),
+      tailwindcss()
+    ],
+    oxc: { exclude: [/\.js$/, ORCA_GAME_MOD_TS] },
     worker: {
       format: 'es'
     },
