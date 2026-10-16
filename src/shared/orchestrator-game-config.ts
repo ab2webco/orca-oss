@@ -4,6 +4,11 @@ import {
   type OrchestratorGameActivityRule,
   type OrchestratorGameLinkTemplate
 } from './orchestrator-game-integrations'
+import {
+  orchestratorGameSceneFileErrorText,
+  orchestratorGameSceneFileId,
+  parseOrchestratorGameSceneFile
+} from './orchestrator-game-scene-file'
 
 export type OrchestratorGameMode = 'on' | 'zen' | 'off'
 
@@ -24,13 +29,19 @@ export type OrchestratorGameIntegrations = {
 }
 
 export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
-  Partial<OrchestratorGameIntegrations>
+  Partial<OrchestratorGameIntegrations> & {
+    /** A scene JSON relative to the worktree root; read only from the project layers. */
+    sceneFile?: string
+  }
 
 export type OrchestratorGameSource = 'default' | 'global' | 'project' | 'local'
 
 export type ResolvedOrchestratorGameConfig = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
+  /** The worktree path the effective scene is read from, when a scene file won over `scene`. */
+  sceneFile: string | null
+  warnings: string[]
 }
 
 // Why listed here: the bundled mod ships these art sets, so Settings offers them without a plugin.
@@ -63,6 +74,8 @@ export function resolveOrchestratorGameConfig(
     keyof OrchestratorGameConfig,
     OrchestratorGameSource
   >
+  let sceneFile: string | null = null
+  const warnings: string[] = []
   for (const source of LAYER_ORDER) {
     const layer = layers[source]
     if (!layer) {
@@ -74,8 +87,31 @@ export function resolveOrchestratorGameConfig(
         sources[key] = source
       }
     }
+    if (layer.scene !== undefined) {
+      sceneFile = null
+    }
+    if (layer.sceneFile === undefined) {
+      continue
+    }
+    // Why: a path means a worktree, which only a project has; a global one would follow every repo.
+    if (source === 'global') {
+      warnings.push(
+        'orchestratorGame.sceneFile is read only from orca.yaml or the project Settings'
+      )
+      continue
+    }
+    const parsed = parseOrchestratorGameSceneFile(layer.sceneFile)
+    if (!parsed.ok) {
+      warnings.push(
+        `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
+      )
+      continue
+    }
+    sceneFile = parsed.path
+    config.scene = orchestratorGameSceneFileId(parsed.path)
+    sources.scene = source
   }
-  return { config, sources }
+  return { config, sources, sceneFile, warnings }
 }
 
 // Why: Settings layers are plain JSON a user can hand-edit, so every layer is re-validated, not only orca.yaml.
@@ -122,6 +158,15 @@ export function parseOrchestratorGameLayer(raw: unknown): {
         layer.scene = value.trim()
       } else {
         warnings.push('orchestratorGame.scene must be a non-empty scene id')
+      }
+    } else if (key === 'sceneFile') {
+      const parsed = parseOrchestratorGameSceneFile(value)
+      if (parsed.ok) {
+        layer.sceneFile = parsed.path
+      } else {
+        warnings.push(
+          `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
+        )
       }
     } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {
