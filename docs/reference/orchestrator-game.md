@@ -65,6 +65,7 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 orchestratorGame:
   mode: zen        # on | zen | off
   scene: quest     # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
+  sceneFile: .orca/scenes/mario.json  # optional: the project's own scene; wins over scene (below)
   hud: true        # teammate band above the prompt
   rewards: false   # XP, level-ups, celebrations
   tracker: true    # follow the linked work item in the flow
@@ -205,6 +206,62 @@ koombea/cineco-orchestrator PR #32. Names are translated to Spanish, Japanese, K
 the finale is pixel art, so it is English or Spanish. PR #32's per-game HUD words and colors, the
 Crystal Saga ATB bar, Beast Tamer evolution, the wild encounter while waiting, and each game's
 handed-off tile animation are not ported: they need logic beyond what a scene's data can describe.
+
+## A project's own scene file
+
+A project can draw its own scene without writing a plugin: `orchestratorGame.sceneFile` is a scene
+JSON path **relative to the worktree root**
+([`orchestrator-game-scene-file.ts`](../../src/shared/orchestrator-game-scene-file.ts)).
+
+```yaml
+# orca.yaml
+orchestratorGame:
+  sceneFile: .orca/scenes/mario.json
+```
+
+- **Where it is read from.** Only the project layers: `orca.yaml` and Settings → the project →
+  **Agent Teams game**. Global Settings never offers it, and a hand-written global value is ignored
+  with a warning, since a path only means something inside one project.
+- **Precedence.** A `sceneFile` wins over a `scene` at the same or a lower layer; a `scene` at a
+  higher layer wins over it (a project Settings scene beats an `orca.yaml` file). Picking a scene in
+  the project picker clears that layer's `sceneFile` and back, so the picker is the one source of
+  truth for the layer.
+- **Validation.** An absolute path, a Windows drive or UNC path, or a path with a `..` part is
+  dropped with a warning, in the shared resolver for every layer. Backslashes become `/`, and `.`
+  and empty parts are dropped, so `./.orca//scenes/a.json` is stored as `.orca/scenes/a.json`.
+- **Reading.** `game.state` reads the file on every build, so an edit shows on the mod's next poll
+  with no restart ([`worktree-game-scene-file.ts`](../../src/main/worktree-game-scene-file.ts)). An
+  SSH worktree's file is read from its host through the SSH filesystem provider, like its
+  `orca.yaml`; each worktree reads its own copy. A link that resolves outside the worktree, a file
+  over 64 KB, or a disconnected SSH host counts as unreadable.
+- **What the game gets.** A valid file is validated by the same parser as a plugin scene and sent in
+  `extensions.scenes` as `{ id: "file:<path>", pluginId: "file", definition }`, and `config.scene`
+  is that `file:<path>` id, so the mod draws it like a contributed scene. A missing or invalid file
+  sets `config.scene` to `quest` and puts `Scene file <path>: <reason>; drawing Quest` first in
+  `warnings`, which the mod shows as its note. A mod older than this drops the `file:` scene and
+  draws `quest`.
+- **Format.** The same JSON as a plugin scene ([Game scenes](./plugin-development.md#game-scenes)):
+  every phase in `looks`, `costumes` and `cards`, plus `teller` and `band`. Colors are `#rrggbb`
+  strings or integers; the mod's own validator
+  ([`scene-shape.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-shape.ts)) takes
+  both, as Orca's does.
+
+**Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
+relative to the project root; a path leaving the project is refused inline) and three actions:
+
+- **Choose file…** opens a native dialog for `.json` files starting in the project, and refuses a
+  file outside it. It is hidden for SSH projects, where the dialog could only browse this computer.
+- **Create from <scene>** writes the current built-in scene (Quest when the effective scene is not
+  built in) as pretty JSON with `#rrggbb` colors to `.orca/scenes/<scene id>.json`, or `-2`, `-3`…
+  when that exists — it never overwrites a file — through the project's filesystem (SSH included),
+  then selects it.
+- **Open in editor** opens the file in Orca's editor, in the project's active worktree or else its
+  main one.
+
+The preview under the picker paints the file with the mod's drawing code and reads it again when the
+window regains focus; an unreadable or invalid file shows the parser's reason and the preview draws
+Quest, as the pane would. A `sceneFile` inherited from `orca.yaml` shows the same reason under the
+row.
 
 ## Scenes from plugins
 

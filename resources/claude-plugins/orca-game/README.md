@@ -51,7 +51,7 @@ Read once when the mod loads:
 | Variable            | Values                       | Default | Effect                                                 |
 | ------------------- | ---------------------------- | ------- | ------------------------------------------------------ |
 | `ORCA_GAME_MODE`    | `on`, `zen`, `off`           | `on`    | Quest mode                                             |
-| `ORCA_GAME_SCENE`   | a scene id                   | `quest` | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_SCENE`   | a scene id or `file:<path>`  | `quest` | Art set; an unknown id falls back to `quest`           |
 | `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false`      | `1`     | `0` hides the band                                     |
 | `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false`      | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
 | `ORCA_GAME_LOCALE`  | `en`, `es`, `ja`, `ko`, `zh` | `en`    | Language of the game's words; anything else is English |
@@ -89,7 +89,7 @@ entries.
   workItem: { provider: 'plane' | 'jira' | 'linear' | 'github' | 'gitlab',
               identifier, title, url, status,
               statusGroup: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled' | 'unknown' } | null,
-  extensions?: { scenes: [{ id: '<pluginKey>/<id>', pluginId, definition: SceneDefinition }] }
+  extensions?: { scenes: [{ id: '<pluginKey>/<id>' | 'file:<path>', pluginId, definition: SceneDefinition }] }
 }
 ```
 
@@ -121,6 +121,10 @@ An Orca plugin can also ship a scene as JSON (`contributes.gameScenes`, see
 `docs/reference/plugin-development.md`). Orca serves it in `extensions.scenes` under the id
 `<pluginKey>/<id>`; `hooks/scenes/scene-shape.ts` re-validates it, and `sceneOf` resolves it until
 a poll stops serving it. Any id nothing serves draws `quest`.
+
+A project's own scene file (`orchestratorGame.sceneFile`, see `docs/reference/orchestrator-game.md`)
+arrives the same way under `file:<path in the worktree>` with `pluginId: 'file'`. Colors may be
+integers or `#rrggbb` strings, as Orca's parser takes them.
 
 ## Development
 
