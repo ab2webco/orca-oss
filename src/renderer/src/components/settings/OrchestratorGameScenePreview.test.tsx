@@ -110,6 +110,15 @@ describe('OrchestratorGameScenePreview', () => {
     expect(figure().textContent).toContain('only drawn inside an Agent Teams pane')
   })
 
+  // Why a class check: happy-dom lays nothing out; the e2e spec measures the canvas at 320 and 390px.
+  it('scales the canvas to its column and never past the window', () => {
+    show('quest', 'on')
+    const canvas = container.querySelector('canvas')
+    expect(canvas?.classList.contains('w-full')).toBe(true)
+    expect(canvas?.classList.contains('h-auto')).toBe(true)
+    expect(canvas?.classList.contains('max-w-[min(512px,calc(100vw-2rem))]')).toBe(true)
+  })
+
   it('animates at the mod tick', async () => {
     show('quest', 'on')
     expect(figure().dataset.animated).toBe('true')

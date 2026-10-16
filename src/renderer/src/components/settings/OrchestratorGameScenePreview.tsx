@@ -143,7 +143,7 @@ export function OrchestratorGameScenePreview({
           )}
           width={frame.columns * PIXEL}
           height={frame.rows * 2 * PIXEL}
-          className="block h-auto w-full max-w-[512px] rounded-md border border-border [image-rendering:pixelated]"
+          className="block h-auto w-full max-w-[min(512px,calc(100vw-2rem))] rounded-md border border-border [image-rendering:pixelated]"
         />
       ) : null}
       <figcaption className="text-[11px] text-muted-foreground">

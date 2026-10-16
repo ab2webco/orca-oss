@@ -237,6 +237,15 @@ test('the game section says it is for Claude Agent Teams only and previews the p
         return canvas.getBoundingClientRect().width <= column
       })
       expect(fits, `preview wider than its column at ${width}px`).toBe(true)
+      // Why: at phone widths the settings column itself overflows (ORCA-588); the art stays on screen.
+      const box = await nightWatch.evaluate((canvas) => {
+        const rect = canvas.getBoundingClientRect()
+        return { left: rect.left, right: rect.right, viewport: window.innerWidth }
+      })
+      expect(
+        box.right - box.left,
+        `preview wider than the window at ${width}px`
+      ).toBeLessThanOrEqual(box.viewport)
       await orcaPage.screenshot({ path: testInfo.outputPath(`preview-${theme}-${width}.png`) })
     }
   }
