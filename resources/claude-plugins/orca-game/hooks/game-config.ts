@@ -1,4 +1,5 @@
 import type { GameConfig, GameMode } from '../types'
+import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { DEFAULT_SCENE_ID } from './scenes/index'
 
@@ -75,4 +76,18 @@ export const terminalFocusArgvOf = (
   return path === undefined || !isTerminalHandle(handle)
     ? undefined
     : [path, 'terminal', 'focus', '--terminal', handle, '--json']
+}
+
+/** Opens a link in a browser tab of the game's worktree, the same on every platform Orca runs on. */
+export const tabCreateArgvOf = (
+  cli: string | null | undefined,
+  url: string,
+  worktreeId: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  if (path === undefined || httpUrlOf(url) === undefined) {
+    return undefined
+  }
+  const worktree = worktreeId === '' ? [] : ['--worktree', `id:${worktreeId}`]
+  return [path, 'tab', 'create', '--url', url, ...worktree, '--json']
 }

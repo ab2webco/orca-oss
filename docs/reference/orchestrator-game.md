@@ -122,6 +122,10 @@ orchestratorGame:
   newest call first; the first rule that matches wins. Only the matched id and the URL it built
   leave memory. A call is `running` from its `PreToolUse` until its `PostToolUse`, a failure or the
   turn's `Stop`.
+- **Memory.** The newest match per pane is remembered once its call leaves those eight
+  ([`orchestrator-game-activity-memory.ts`](../../src/main/runtime/orchestrator-game-activity-memory.ts)),
+  so the link stays until a newer call matches; a remembered one is never `running`. At most 64
+  panes are kept, the least recently matched dropped first.
 - **SSH agents.** The relay forwards no raw tool input, so a remote call is matched on its result
   text alone.
 - **Built-in rules** follow the project's rules and exist only for a host this worktree already
@@ -159,7 +163,28 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   [Project links and activity](#project-links-and-activity)).
 
 A provider that is offline or unauthenticated only drops its own field. `links` and `activity`
-are new optional fields: a mod built before them reads the state exactly as before.
+are new optional fields: a mod built before them reads the state exactly as before, and this mod
+keeps only whole entries with an `http(s)` URL (at most 32 links).
+
+## Links in the band and the Fleet pane
+
+Every link is a terminal hyperlink (OSC 8); Orca opens it on Cmd/Ctrl-click or from its link
+popover.
+
+- **Band chips**, after the team counts: the review (`#901 open`), its CI as a chip of its own
+  (`CI failing`, red, yellow or green), the work item (`CIN-123 In Progress`), each distinct
+  agent activity (`▶ Tambora TR-CIN-12` while its call runs, `Tambora TR-CIN-12` after) and the
+  project's links (`↗ Test plan`). When the band is narrow the project links shorten and drop
+  first, then activity, then CI; the review and work item are kept longest. A host that sends no
+  links draws the review with its CI words (`#901 open · CI failing`) as before.
+- **Needs you.** A failing CI need links to the checks page (the review when there is no CI
+  link); the line is cut to the band's width.
+- **Fleet pane.** Each teammate card shows its activity as a link under its status, cut to the
+  card. An **Open** row takes hotkeys: `i` the work item, `o` the review, `c` CI, `w` the first
+  project link and `a` the calling pane's activity (else the first one linked). Each runs
+  `orca tab create --url <url> --worktree id:<worktree> --json`, so it opens in an Orca browser
+  tab of the worktree on every platform, and a toast says when Orca could not. The menu keeps `r`
+  (Refresh) and `q` (Close); Pet Clawd is `p`.
 
 ## Built-in scenes
 

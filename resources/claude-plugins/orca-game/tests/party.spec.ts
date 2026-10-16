@@ -18,6 +18,8 @@ const state = (patch: Partial<GameState> = {}): GameState => ({
   config: {},
   warnings: [],
   extensions: { scenes: [] },
+  links: [],
+  activity: null,
   worktree: null,
   agents: [],
   review: null,

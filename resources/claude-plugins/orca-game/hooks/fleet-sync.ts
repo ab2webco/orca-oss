@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
-import { gameStateArgvOf, terminalFocusArgvOf } from './game-config'
+import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
 import { parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
 import { fleetPhaseOf, partyOf } from './party'
@@ -39,6 +39,21 @@ async function readState($: EngineInterface): Promise<GameState | undefined> {
 export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
   const argv = terminalFocusArgvOf(cli, handle)
+  if (argv === undefined) {
+    return false
+  }
+  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  return out?.exitCode === 0
+}
+
+/** Opens a link in an Orca browser tab of the game's worktree; false when Orca could not. */
+export async function openInOrca(
+  $: EngineInterface,
+  url: string,
+  worktreeId: string
+): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const argv = tabCreateArgvOf(cli, url, worktreeId)
   if (argv === undefined) {
     return false
   }

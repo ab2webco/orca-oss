@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { needsLineOf, reviewTextOf, teammatesOf, workItemTextOf } from '../hooks/fleet-labels'
+import { needPartsOf, reviewTextOf, teammatesOf, workItemTextOf } from '../hooks/fleet-labels'
 import { setGameLocale } from '../hooks/game-strings'
 
 describe('fleet labels', () => {
@@ -24,12 +24,16 @@ describe('fleet labels', () => {
   it('counts teammates and joins what needs the person', () => {
     expect(teammatesOf(1)).toBe('Team 1 teammate')
     expect(teammatesOf(3)).toBe('Team 3 teammates')
-    expect(
-      needsLineOf([
+    const parts = needPartsOf(
+      [
         { name: 'x', text: 'waiting on you', url: null },
-        { name: '#4', text: 'CI failing', url: 'u' }
-      ])
-    ).toBe('Needs you: x waiting on you · #4 CI failing')
+        { name: '#4', text: 'CI failing', url: 'https://ci' }
+      ],
+      80
+    )
+    expect(parts.map((one) => one.text).join('')).toBe(
+      'Needs you: x waiting on you · #4 CI failing'
+    )
   })
 
   // Why: agent names, review numbers and tracker statuses are data and stay as Orca sent them.
@@ -43,9 +47,8 @@ describe('fleet labels', () => {
       expect(workItemTextOf({ ...item, status: 'In Review', statusGroup: 'review' })).toBe(
         'ENG-1 In Review'
       )
-      expect(needsLineOf([{ name: 'x', text: 'te espera', url: null }])).toBe(
-        'Te necesitan: x te espera'
-      )
+      const parts = needPartsOf([{ name: 'x', text: 'te espera', url: null }], 80)
+      expect(parts.map((one) => one.text).join('')).toBe('Te necesitan: x te espera')
     } finally {
       setGameLocale('en')
     }

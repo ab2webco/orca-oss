@@ -8,6 +8,7 @@ import {
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
+import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const dirs: string[] = []
@@ -384,6 +385,55 @@ describe('buildOrchestratorGameState', () => {
         tone: 'pending'
       }
     ])
+  })
+
+  it('keeps showing an agent activity after its call leaves the recent MCP calls', async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: 'tester',
+      taskTitle: null,
+      toolName: null,
+      paneKey: 'tab:qa'
+    }
+    const memory = new GameActivityMemory()
+    let calls = [
+      {
+        toolName: 'mcp__tambora__create_test_run',
+        input: '{"project_key":"CIN"}',
+        result: 'Created TR-CIN-12',
+        running: true,
+        at: 5
+      }
+    ]
+    const build = () =>
+      buildOrchestratorGameState({
+        settings: undefined,
+        worktree: worktree(
+          checkout(`orchestratorGame:
+  activity:
+    - name: Tambora run
+      tools: mcp__tambora__*
+      match: 'TR-([A-Z]+)-\\d+'
+      url: https://tambora.example/projects/{1}/testruns/{0}
+`)
+        ),
+        agents: [row],
+        leaderPaneKey: 'tab:qa',
+        mcpCallsOf: () => calls,
+        activityMemory: memory,
+        readReview: none,
+        readPlane: none,
+        readLinear: none
+      })
+    expect((await build()).agents[0]?.activity?.id).toBe('TR-CIN-12')
+
+    calls = [{ ...calls[0]!, toolName: 'mcp__plane__list', result: 'nothing', at: 9 }]
+    const later = await build()
+
+    expect(later.agents[0]?.activity).toMatchObject({ id: 'TR-CIN-12', running: false })
+    expect(later.activity).toMatchObject({ id: 'TR-CIN-12', running: false })
+    expect(later.links?.map((link) => link.id)).toEqual(['activity:tab:qa'])
   })
 
   it("adds the project's links, dropping one whose placeholder has no value here", async () => {

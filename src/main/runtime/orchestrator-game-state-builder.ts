@@ -8,6 +8,7 @@ import {
   gameActivityOf,
   type GameActivityCall
 } from '../../shared/orchestrator-game-activity'
+import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import {
   activityGameLinksOf,
@@ -54,6 +55,8 @@ export type OrchestratorGameStateInput = {
   terminalHandleOf?: (paneKey: string) => string | null
   /** A pane's recent MCP calls, newest first, held by the hook server in memory. */
   mcpCallsOf?: (paneKey: string) => readonly GameActivityCall[]
+  /** Keeps each pane's last match once its call leaves `mcpCallsOf`'s bounded window. */
+  activityMemory?: GameActivityMemory
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
@@ -154,8 +157,10 @@ export async function buildOrchestratorGameState(
     ...integrations.activity.flatMap((rule) => compileGameActivityRule(rule) ?? []),
     ...builtInGameActivityRules({ workItem, review: gameReview })
   ]
-  const activityOf = (paneKey: string): GameActivity | null =>
-    input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
+  const activityOf = (paneKey: string): GameActivity | null => {
+    const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
+    return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
+  }
   const agents = input.agents.map((row) => {
     const agent = gameAgentOf(
       row,

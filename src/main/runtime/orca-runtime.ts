@@ -655,6 +655,7 @@ import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
+import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -3573,6 +3574,7 @@ export class OrcaRuntimeService {
     | ((listener: (event: AgentStatusEventSource) => void) => () => void)
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
+  private readonly gameActivityMemory = new GameActivityMemory()
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -30163,6 +30165,7 @@ export class OrcaRuntimeService {
       leaderPaneKey: args.paneKey ?? null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
+      activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
       readReview: async () =>
         worktree?.repoId && summary?.branch

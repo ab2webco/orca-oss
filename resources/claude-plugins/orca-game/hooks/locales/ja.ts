@@ -28,6 +28,8 @@ export const JA: GameCatalog = {
     reviewStates: { open: 'オープン', draft: '下書き', merged: 'マージ済み', closed: 'クローズ' },
     ciWords: { success: '成功', failure: '失敗', pending: '実行中', neutral: '中立', none: 'なし' },
     couldNotOpen: (name) => `${name} のペインを開けませんでした`,
+    openHeading: '開く',
+    couldNotOpenLink: (label) => `${label} を開けませんでした`,
     merged: (review) => `${review} をマージしました`,
     ciGreen: (review) => `${review} の CI が成功しました`,
     questDescription:

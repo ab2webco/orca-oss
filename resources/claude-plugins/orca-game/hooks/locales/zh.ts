@@ -28,6 +28,8 @@ export const ZH: GameCatalog = {
     reviewStates: { open: '开放', draft: '草稿', merged: '已合并', closed: '已关闭' },
     ciWords: { success: '通过', failure: '失败', pending: '运行中', neutral: '中性', none: '无' },
     couldNotOpen: (name) => `无法打开 ${name} 的窗格`,
+    openHeading: '打开',
+    couldNotOpenLink: (label) => `无法打开 ${label}`,
     merged: (review) => `${review} 已合并`,
     ciGreen: (review) => `${review} CI 已通过`,
     questDescription: 'Quest 模式：动画 Claude、按流程阶段显示的角色卡片、安静的工具行',
