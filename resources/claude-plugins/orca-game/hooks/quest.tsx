@@ -12,7 +12,7 @@ import {
   startDemo,
   type Animated
 } from './quest-runtime'
-import { gameStrings } from './game-strings'
+import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
@@ -198,7 +198,7 @@ const registerCards = (on: On) => {
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={card.color} paddingX={1}>
         {e.props.isFirstOfReply ? (
-          <Text bold color={card.color}>{`${card.icon} ${card.name}`}</Text>
+          <Text bold color={card.color}>{`${card.icon} ${localizedNameOf(card.name)}`}</Text>
         ) : (
           <Box />
         )}
@@ -219,7 +219,7 @@ const registerCards = (on: On) => {
     const { Box, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
-        <Text bold color={teller.color}>{`${teller.icon} ${teller.name}`}</Text>
+        <Text bold color={teller.color}>{`${teller.icon} ${localizedNameOf(teller.name)}`}</Text>
         {drawn}
       </Box>
     )

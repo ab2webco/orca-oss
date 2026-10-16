@@ -776,7 +776,9 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
       "colors": { "O": "#d77757", "E": "#1a1a1a", "H": "#3a4a7a", "B": "#2a3a5a" }
     }
   },
-  "cards": { "working": { "icon": "☾", "name": "Night Owl", "color": "#8fa3d9" } },
+  "cards": {
+    "working": { "icon": "☾", "name": { "en": "Night Owl", "es": "Búho nocturno" }, "color": "#8fa3d9" }
+  },
   "teller": { "icon": "❝", "name": "Night Log", "color": "#9aa6c8" },
   "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" }
 }
@@ -788,6 +790,10 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   transparent and every other glyph must have a color.
 - `icon` is at most 4 characters and `name` at most 32, with no control or bidi characters: they
   reach the terminal as-is.
+- A card or teller `name` is a string, or one per language as `{ "en", "es", "ja", "ko", "zh" }`
+  with `en` required; the game shows the one for Orca's UI language and falls back to `en`. Other
+  language keys are dropped. A mod older than this drops a scene that uses the object form and
+  draws `quest`.
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the

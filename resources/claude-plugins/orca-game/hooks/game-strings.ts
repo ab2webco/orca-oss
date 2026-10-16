@@ -180,11 +180,19 @@ const isRasterCode = (code: number): boolean =>
 export const isRasterText = (text: string): boolean =>
   [...text].every((one) => isRasterCode(one.codePointAt(0) ?? 0))
 
+let activeLocale: GameLocale = 'en'
 let active: GameStrings = EN
 
 // Set once per session from ORCA_GAME_LOCALE, before anything is drawn.
 export const setGameLocale = (locale: GameLocale): void => {
+  activeLocale = locale
   active = stringsOf(locale)
 }
 
 export const gameStrings = (): GameStrings => active
+
+/** A scene's card or teller name: one string, or one per language with English required. */
+export type LocalizedName = string | ({ en: string } & Partial<Record<GameLocale, string>>)
+
+export const localizedNameOf = (name: LocalizedName, locale = activeLocale): string =>
+  typeof name === 'string' ? name : (name[locale] ?? name.en)

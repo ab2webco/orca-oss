@@ -6,6 +6,7 @@ import {
   gameLocaleOf,
   gameStrings,
   isRasterText,
+  localizedNameOf,
   setGameLocale,
   stringsOf,
   type ArtStrings,
@@ -82,6 +83,15 @@ describe('the catalog', () => {
     expect(isRasterText('考え中')).toBe(false)
     expect(isRasterText('생각 중')).toBe(false)
     expect(isRasterText('🎉')).toBe(false)
+  })
+
+  it('shows a scene name in the launch language, else its English', () => {
+    const name = { en: 'Squire', es: 'Escudero' }
+    expect(localizedNameOf(name, 'es')).toBe('Escudero')
+    expect(localizedNameOf(name, 'ja')).toBe('Squire')
+    expect(localizedNameOf('Pilot', 'es')).toBe('Pilot')
+    setGameLocale('es')
+    expect(localizedNameOf(name)).toBe('Escudero')
   })
 
   it('serves the language the session was launched with', () => {

@@ -31,6 +31,11 @@ It loads only when all of these hold, and otherwise Claude starts exactly as bef
 only that path and never a bare `orca`, which on Linux is the GNOME screen reader. Without it the
 scene still draws and the band says the state is unavailable.
 
+`ORCA_GAME_LOCALE` is Orca's UI language resolved like the renderer does (`system` reads the OS
+locale; a plugin language pack maps by its tag), one of `en`, `es`, `ja`, `ko`, `zh`, else `en`.
+The mod translates its words from it; text inside the pixel art stays English for ja, ko and zh
+because a Raster only takes width-1 characters.
+
 ## Configuration layers
 
 Each field resolves on its own; a later layer wins
@@ -80,5 +85,6 @@ A provider that is offline or unauthenticated only drops its own field.
 sends the valid ones in an optional `extensions.scenes`, each as `{ id, pluginId, definition }`
 with `id` namespaced `<publisher>.<id>/<scene id>`, and lists dropped ones in `warnings`. Settings
 → **Scene** offers quest plus the scenes of running plugins, and keeps showing an id from
-`orca.yaml` that nothing installed serves; the mod draws `quest` for it. The file format, limits
-and consent rules are in [Game scenes](./plugin-development.md#game-scenes).
+`orca.yaml` that nothing installed serves; the mod draws `quest` for it. Card and teller names may
+be per language (`{ "en": …, "es": … }`); the mod shows the `ORCA_GAME_LOCALE` one. The file
+format, limits and consent rules are in [Game scenes](./plugin-development.md#game-scenes).

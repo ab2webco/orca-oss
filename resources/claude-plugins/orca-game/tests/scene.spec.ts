@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { GAME_LOCALES, localizedNameOf } from '../hooks/game-strings'
 import { ACTIONS } from '../hooks/quest-policy'
 import { actionPixel, PROP_WIDTH } from '../hooks/action-props'
 import { DEFAULT_SCENE_ID, SCENES, sceneOf, setContributedScenes } from '../hooks/scenes/index'
@@ -54,6 +55,18 @@ describe('scene registry', () => {
     expect(new Set(Object.values(QUEST.looks).map((look) => look.skyTop)).size).toBe(6)
     expect(new Set(Object.values(QUEST.cards).map((card) => card.color)).size).toBe(6)
     expect(new Set(Object.values(QUEST.cards).map((card) => card.name)).size).toBe(6)
+  })
+
+  it('names every quest character in every language Orca ships', () => {
+    const names = [...Object.values(QUEST.cards), QUEST.teller].map((card) => card.name)
+    for (const locale of GAME_LOCALES) {
+      const shown = names.map((name) => localizedNameOf(name, locale))
+      expect(new Set(shown).size).toBe(7)
+      expect(shown.every((one) => typeof one === 'string' && one.length > 0)).toBe(true)
+    }
+    expect(localizedNameOf(QUEST.cards.working.name, 'es')).toBe('Escudero')
+    expect(localizedNameOf(QUEST.teller.name, 'es')).toBe('Narrador')
+    expect(localizedNameOf(QUEST.cards.handoff.name, 'en')).toBe('King')
   })
 
   it('every costume fits the scene rows and names a color for each glyph', () => {

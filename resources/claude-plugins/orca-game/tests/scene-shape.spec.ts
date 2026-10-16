@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { QUEST_SCENE } from '../hooks/scenes/quest'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
-import { sceneFile } from '../../../../src/shared/__fixtures__/orchestrator-game-scene'
+import {
+  byScenePhase,
+  sceneCard,
+  sceneFile
+} from '../../../../src/shared/__fixtures__/orchestrator-game-scene'
 
 const roundTrip = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
 const quest = roundTrip(QUEST_SCENE) as Record<string, unknown>
@@ -30,6 +34,20 @@ describe('sceneDefinitionOf', () => {
     expect(parseOrchestratorGameScene(JSON.stringify(quest), 'quest').ok).toBe(true)
   })
 
+  it('takes a name per language like Orca does, keeping only the languages it ships', () => {
+    const text = JSON.stringify(
+      sceneFile({
+        cards: byScenePhase({ ...sceneCard, name: { en: 'Pilot', es: 'Piloto', fr: 'Pilote' } }),
+        teller: { icon: '❝', name: { en: 'Narrator', ja: '語り手' }, color: '#8f9bb3' }
+      })
+    )
+    const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
+    const scene = sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')
+    expect(scene?.cards.pr.name).toEqual({ en: 'Pilot', es: 'Piloto' })
+    expect(scene?.teller.name).toEqual({ en: 'Narrator', ja: '語り手' })
+    expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+  })
+
   it.each([
     ['nothing', undefined],
     ['an array', [quest]],
@@ -50,6 +68,17 @@ describe('sceneDefinitionOf', () => {
     [
       'a name with a terminal escape',
       { ...quest, teller: { ...QUEST_SCENE.teller, name: 'x\u001b]0;pwned\u0007' } }
+    ],
+    [
+      'per-language names without English',
+      { ...quest, teller: { ...QUEST_SCENE.teller, name: { es: 'Narrador' } } }
+    ],
+    [
+      'a translated name with a terminal escape',
+      {
+        ...quest,
+        teller: { ...QUEST_SCENE.teller, name: { en: 'N', ko: 'x\u001b]0;pwned\u0007' } }
+      }
     ],
     [
       'a getter that throws',

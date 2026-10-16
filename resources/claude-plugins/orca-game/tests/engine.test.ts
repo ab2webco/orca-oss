@@ -364,6 +364,24 @@ describe('language', () => {
     await spinner.unmount()
   })
 
+  test('a reply card names its character in the launch language', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const reply = await $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AssistantMessage',
+      viewport: VIEWPORT,
+      props: { text: 'Listo.', isFirstOfReply: true }
+    })
+    // The open review puts the fleet in the pr phase, whose character is the Herald.
+    expect(await reply.find({ type: 'Text', text: /^✉ Heraldo$/ })).toBeDefined()
+    await reply.unmount()
+  })
+
   test('an unknown ORCA_GAME_LOCALE falls back to English', async ($, on) => {
     const world = worldOf({ env: { ORCA_GAME_LOCALE: 'fr' } })
     const clock = mock.clock(on)

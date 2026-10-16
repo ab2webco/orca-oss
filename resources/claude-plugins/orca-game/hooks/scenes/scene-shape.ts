@@ -1,3 +1,4 @@
+import { GAME_LOCALES, type GameLocale, type LocalizedName } from '../game-strings'
 import type {
   BandPalette,
   Card,
@@ -13,6 +14,7 @@ type Shape = Record<string, unknown>
 
 const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 const COSTUME_ROWS = 6
+const NAME_MAX = 32
 const SPRITE_ROW = /^[!-~]{10}$/
 const GLYPH = /^[!-~]$/
 const HEX = /^#[0-9a-fA-F]{6}$/
@@ -99,12 +101,36 @@ const costumeOf = (value: unknown): Costume | undefined => {
 const hexOf = (value: unknown): string | undefined =>
   typeof value === 'string' && HEX.test(value) ? value : undefined
 
+// Why: Orca strips languages it does not ship, so an unknown key is ignored, not a failure.
+const nameOf = (value: unknown): LocalizedName | undefined => {
+  if (!isShape(value)) {
+    return textOf(value, NAME_MAX)
+  }
+  const en = textOf(value.en, NAME_MAX)
+  if (en === undefined) {
+    return undefined
+  }
+  const name: { en: string } & Partial<Record<GameLocale, string>> = { en }
+  for (const locale of GAME_LOCALES) {
+    const said = value[locale]
+    if (locale === 'en' || said === undefined) {
+      continue
+    }
+    const text = textOf(said, NAME_MAX)
+    if (text === undefined) {
+      return undefined
+    }
+    name[locale] = text
+  }
+  return name
+}
+
 const cardOf = (value: unknown): Card | undefined => {
   if (!isShape(value)) {
     return undefined
   }
   const icon = textOf(value.icon, 4)
-  const name = textOf(value.name, 32)
+  const name = nameOf(value.name)
   const color = hexOf(value.color)
   return icon && name && color ? { icon, name, color } : undefined
 }

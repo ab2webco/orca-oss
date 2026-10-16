@@ -52,8 +52,13 @@ describe('worklog plugin fixture', () => {
     for (const scene of manifest.contributes.gameScenes) {
       const text = await readFile(join(root, scene.path), 'utf8')
       expect(Buffer.byteLength(text)).toBeLessThanOrEqual(ORCHESTRATOR_GAME_SCENE_MAX_BYTES)
+      // The template shows both name forms: per-language cards, a plain-string teller.
       expect(parseOrchestratorGameScene(text, `orca-samples.worklog/${scene.id}`)).toMatchObject({
-        ok: true
+        ok: true,
+        definition: {
+          cards: { working: { name: { en: 'Night Owl', es: 'Búho nocturno' } } },
+          teller: { name: 'Night Log' }
+        }
       })
     }
   })

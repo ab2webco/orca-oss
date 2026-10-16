@@ -72,7 +72,20 @@ const costumeSchema = z
     }
   })
 
-const cardSchema = z.object({ icon: displayText(4), name: displayText(32), color: hexColor })
+const sceneName = displayText(32)
+// Why: the mod shows the name in Orca's UI language; unknown languages are stripped, not rejected.
+const localizedSceneName = z.union([
+  sceneName,
+  z.object({
+    en: sceneName,
+    es: sceneName.optional(),
+    ja: sceneName.optional(),
+    ko: sceneName.optional(),
+    zh: sceneName.optional()
+  })
+])
+
+const cardSchema = z.object({ icon: displayText(4), name: localizedSceneName, color: hexColor })
 
 const byPhase = <T extends z.ZodType>(schema: T) =>
   z.object({

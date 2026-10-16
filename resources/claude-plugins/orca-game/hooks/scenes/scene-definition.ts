@@ -1,3 +1,4 @@
+import type { LocalizedName } from '../game-strings'
 import type { FlowPhase } from '../quest-policy'
 
 export type ScenePhase = FlowPhase | 'working'
@@ -23,7 +24,7 @@ export type Costume = {
   colors: Readonly<Record<string, number>>
 }
 
-export type Card = { icon: string; name: string; color: string }
+export type Card = { icon: string; name: LocalizedName; color: string }
 
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
 
