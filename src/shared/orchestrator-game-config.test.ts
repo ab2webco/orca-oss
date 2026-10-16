@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
+  ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   parseOrchestratorGameLayer,
   resolveOrchestratorGameConfig
 } from './orchestrator-game-config'
@@ -48,6 +49,13 @@ describe('parseOrchestratorGameLayer', () => {
       layer: { mode: 'zen', scene: 'quest', hud: true, rewards: false },
       warnings: []
     })
+  })
+
+  it('accepts every built-in scene id from orca.yaml', () => {
+    expect(ORCHESTRATOR_GAME_BUILT_IN_SCENES).toEqual(['quest', 'vigilante', 'jrpg', 'tamer'])
+    for (const scene of ORCHESTRATOR_GAME_BUILT_IN_SCENES) {
+      expect(parseOrchestratorGameLayer({ scene })).toEqual({ layer: { scene }, warnings: [] })
+    }
   })
 
   it('drops invalid values with a warning instead of failing', () => {

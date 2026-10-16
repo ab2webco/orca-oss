@@ -51,7 +51,7 @@ Each field resolves on its own; a later layer wins
 # orca.yaml
 orchestratorGame:
   mode: zen        # on | zen | off
-  scene: quest     # quest, or a plugin scene: <publisher>.<id>/<scene id>
+  scene: quest     # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
   hud: true        # teammate band above the prompt
   rewards: false   # XP, level-ups, celebrations
   tracker: true    # follow the linked work item in the flow
@@ -79,12 +79,32 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 
 A provider that is offline or unauthenticated only drops its own field.
 
+## Built-in scenes
+
+The mod ships four art sets ([`hooks/scenes/`](../../resources/claude-plugins/orca-game/hooks/scenes)),
+listed for Settings in `ORCHESTRATOR_GAME_BUILT_IN_SCENES`
+([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)). Each dresses the
+six phases (working · docs · build · verify · PR · handoff) and signs your messages with a teller.
+
+| Id          | Scene        | World                                        | Party by phase, then teller                                                         | On red CI          | Merge finale    |
+| ----------- | ------------ | -------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------ | --------------- |
+| `quest`     | Quest        | Mountains and hills, sun or night sky        | Squire · Sage · Blacksmith · Knight · Herald · King; Storyteller                    | the member flashes | —               |
+| `vigilante` | Night Watch  | Night skyline, rooftops, a signal in the sky | Night Watch · Detective · Gadgeteer · Mentor · Rooftop Run · Commissioner; Narrator | a masked rogue     | `◆ CASE CLOSED` |
+| `jrpg`      | Crystal Saga | Crystal spires under day, dusk, storm, night | Mercenary · Mage · Thief · Healer · Lancer · Hero; Chronicler                       | a rival swordsman  | `★ VICTORY ★`   |
+| `tamer`     | Beast Tamer  | Flower meadows                               | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | a wild glitch bug  | `◓ CAUGHT!`     |
+
+Quest is Jucer Orozco's original quest mode; the other three are his games from
+koombea/cineco-orchestrator PR #32. Names are translated to Spanish, Japanese, Korean and Chinese;
+the finale is pixel art, so it is English or Spanish. PR #32's per-game HUD words and colors, the
+Crystal Saga ATB bar, Beast Tamer evolution, the wild encounter while waiting, and each game's
+handed-off tile animation are not ported: they need logic beyond what a scene's data can describe.
+
 ## Scenes from plugins
 
-`quest` is built in. An Orca plugin can add more as JSON (`contributes.gameScenes`); `game.state`
+An Orca plugin can add more scenes as JSON (`contributes.gameScenes`); `game.state`
 sends the valid ones in an optional `extensions.scenes`, each as `{ id, pluginId, definition }`
 with `id` namespaced `<publisher>.<id>/<scene id>`, and lists dropped ones in `warnings`. Settings
-→ **Scene** offers quest plus the scenes of running plugins, and keeps showing an id from
+→ **Scene** offers the built-in scenes plus those of running plugins, and keeps showing an id from
 `orca.yaml` that nothing installed serves; the mod draws `quest` for it. Card and teller names may
 be per language (`{ "en": …, "es": … }`); the mod shows the `ORCA_GAME_LOCALE` one. The file
 format, limits and consent rules are in [Game scenes](./plugin-development.md#game-scenes).

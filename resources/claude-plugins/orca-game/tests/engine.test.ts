@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { VIGILANTE_SCENE } from '../hooks/scenes/vigilante'
 
 const VIEWPORT = { columns: 170, rows: 40, isFullscreen: true } as const
 const BAND = {
@@ -380,6 +381,30 @@ describe('language', () => {
     // The open review puts the fleet in the pr phase, whose character is the Herald.
     expect(await reply.find({ type: 'Text', text: /^✉ Heraldo$/ })).toBeDefined()
     await reply.unmount()
+  })
+
+  test('ORCA_GAME_SCENE=vigilante paints its band and signs replies as its characters', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_SCENE: 'vigilante', ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    const panel = await ui.find({ type: 'Text', text: / ▤ Panel / })
+    expect(panel?.props.backgroundColor).toBe(VIGILANTE_SCENE.band.gold)
+    await ui.unmount()
+    const reply = await $.ui.mount({
+      plugin: 'orca-game',
+      surface: 'terminal',
+      component: 'AssistantMessage',
+      viewport: VIEWPORT,
+      props: { text: 'Listo.', isFirstOfReply: true }
+    })
+    expect(await reply.find({ type: 'Text', text: /^↗ Carrera en azoteas$/ })).toBeDefined()
+    await reply.unmount()
+    const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
+    expect(await spinner.find({ type: 'Raster' })).toBeDefined()
+    await spinner.unmount()
   })
 
   test('an unknown ORCA_GAME_LOCALE falls back to English', async ($, on) => {

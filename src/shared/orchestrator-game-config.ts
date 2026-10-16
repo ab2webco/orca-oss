@@ -19,6 +19,11 @@ export type ResolvedOrchestratorGameConfig = {
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
 }
 
+// Why listed here: the bundled mod ships these art sets, so Settings offers them without a plugin.
+export const ORCHESTRATOR_GAME_BUILT_IN_SCENES = ['quest', 'vigilante', 'jrpg', 'tamer'] as const
+
+export type OrchestratorGameBuiltInScene = (typeof ORCHESTRATOR_GAME_BUILT_IN_SCENES)[number]
+
 export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   mode: 'on',
   scene: 'quest',

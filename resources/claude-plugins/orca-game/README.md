@@ -23,6 +23,10 @@ pixel art, the band and the Fleet pane). Everything specific to that project (Ji
 the coordination dir, wave/push/sweep actions, autostart) was removed; the fleet now comes only from
 Orca's CLI.
 
+The **Night Watch** (`vigilante`), **Crystal Saga** (`jrpg`) and **Beast Tamer** (`tamer`) scenes
+are also his, from PR #32 of that repo: worlds, costumes, foes, cards and finales, with the
+far-layer drawing (skyline, crystal spires, meadow, the signal) in `hooks/scenery.ts`.
+
 ## How Orca loads it
 
 Orca ships this folder as `<resourcesPath>/claude-plugins/orca-game` and starts Claude Agent Teams
@@ -100,9 +104,10 @@ re-awards: review merged 100, CI turning green 20, work item to review 50, to do
 ## Adding a scene
 
 1. Add `hooks/scenes/<id>.ts` exporting a `SceneDefinition` (`hooks/scenes/scene-definition.ts`):
-   a `Look` (sky, mountains, plants), a ten-column `Costume` and a message `Card` for each phase,
-   the Storyteller card and the band palette.
-2. Add it to `SCENES` in `hooks/scenes/index.ts`.
+   a `Look` (sky, far layer, plants), a ten-column `Costume` and a message `Card` for each phase,
+   the Storyteller card and the band palette; optionally a `foe` for red CI and a merge `finale`.
+2. Add it to `SCENES` in `hooks/scenes/index.ts`, and its id to Orca's
+   `ORCHESTRATOR_GAME_BUILT_IN_SCENES` (with a Settings label) so the picker offers it.
 3. Select it with `ORCA_GAME_SCENE=<id>` or the `scene` setting.
 
 The engine code reads only the definition, so nothing else changes.
