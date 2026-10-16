@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest'
+import { parseOrcaYaml } from './orca-yaml'
+
+describe('parseOrcaYaml orchestratorGame', () => {
+  it('reads the project layer of the orchestrator game', () => {
+    const parsed = parseOrcaYaml('orchestratorGame:\n  mode: zen\n  tracker: false\n')
+
+    expect(parsed?.orchestratorGame).toEqual({ mode: 'zen', tracker: false })
+    expect(parsed?.orchestratorGameWarnings).toBeUndefined()
+  })
+
+  it('keeps the valid fields and reports the invalid ones', () => {
+    const parsed = parseOrcaYaml('orchestratorGame:\n  mode: loud\n  hud: false\n')
+
+    expect(parsed?.orchestratorGame).toEqual({ hud: false })
+    expect(parsed?.orchestratorGameWarnings).toEqual([
+      'orchestratorGame.mode must be one of on, zen, off'
+    ])
+  })
+
+  it('leaves the other project defaults untouched', () => {
+    const parsed = parseOrcaYaml('scripts:\n  setup: pnpm install\n')
+
+    expect(parsed?.scripts.setup).toBe('pnpm install')
+    expect(parsed?.orchestratorGame).toBeUndefined()
+  })
+})

@@ -1,4 +1,5 @@
 import { parseDocument } from 'yaml'
+import { parseOrchestratorGameLayer } from './orchestrator-game-config'
 import type {
   OrcaDefaultTabTemplate,
   OrcaHooks,
@@ -234,6 +235,9 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
   const sharedDirectories = worktreeRecord
     ? normalizeSharedDirectories(worktreeRecord.sharedDirectories)
     : []
+  const orchestratorGame = parseOrchestratorGameLayer(record.orchestratorGame)
+  const hasOrchestratorGame =
+    Object.keys(orchestratorGame.layer).length > 0 || orchestratorGame.warnings.length > 0
 
   if (
     !setup &&
@@ -242,7 +246,8 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
     defaultTabs.length === 0 &&
     environmentRecipes.length === 0 &&
     environmentRecipeDiagnostics.length === 0 &&
-    sharedDirectories.length === 0
+    sharedDirectories.length === 0 &&
+    !hasOrchestratorGame
   ) {
     return null
   }
@@ -256,6 +261,12 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
     ...(defaultTabs.length > 0 ? { defaultTabs } : {}),
     ...(environmentRecipes.length > 0 ? { environmentRecipes } : {}),
     ...(environmentRecipeDiagnostics.length > 0 ? { environmentRecipeDiagnostics } : {}),
-    ...(sharedDirectories.length > 0 ? { worktree: { sharedDirectories } } : {})
+    ...(sharedDirectories.length > 0 ? { worktree: { sharedDirectories } } : {}),
+    ...(Object.keys(orchestratorGame.layer).length > 0
+      ? { orchestratorGame: orchestratorGame.layer }
+      : {}),
+    ...(orchestratorGame.warnings.length > 0
+      ? { orchestratorGameWarnings: orchestratorGame.warnings }
+      : {})
   }
 }
