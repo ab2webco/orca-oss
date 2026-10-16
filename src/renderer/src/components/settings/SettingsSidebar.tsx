@@ -179,7 +179,7 @@ export function SettingsSidebar({
 
   return (
     <aside
-      className="flex w-[280px] shrink-0 flex-col border-r border-worktree-sidebar-border bg-worktree-sidebar"
+      className="flex w-[280px] shrink-0 flex-col border-r border-worktree-sidebar-border bg-worktree-sidebar max-sm:max-h-[40%] max-sm:w-full max-sm:border-r-0 max-sm:border-b"
       style={leftSidebarStyle}
     >
       <div className="border-b border-worktree-sidebar-border px-3 py-3">

@@ -217,7 +217,7 @@ export function JiraIntegrationCard(): React.JSX.Element {
                 'Jira is connected for this runtime. Re-check if the connected site list looks stale.'
               )}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => void checkJiraConnection()}>
                 {translate(
                   'auto.components.settings.task.tracker.integration.cards.c90f2ef419',

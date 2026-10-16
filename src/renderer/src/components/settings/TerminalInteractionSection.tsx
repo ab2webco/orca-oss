@@ -181,7 +181,7 @@ export function TerminalInteractionSection({
                 {translate('auto.components.settings.TerminalPane.scrollSpeed.reset', 'Reset')}
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 @xl:grid-cols-3">
               <ScrollSpeedSlider
                 label={translate(
                   'auto.components.settings.TerminalPane.scrollSpeed.normal',

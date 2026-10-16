@@ -1234,7 +1234,7 @@ function Settings(): React.JSX.Element {
   return (
     <div
       ref={setSettingsRootNode}
-      className="settings-view-shell flex min-h-0 flex-1 overflow-hidden bg-background"
+      className="settings-view-shell flex min-h-0 flex-1 overflow-hidden bg-background max-sm:flex-col"
     >
       <SettingsSidebar
         settings={settings}
@@ -1251,7 +1251,8 @@ function Settings(): React.JSX.Element {
         onSelectSection={scrollToSection}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Why min-w-0: without it this flex child floors at its widest row and clips the page. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           ref={setContentScrollNode}
           className={cn(
@@ -1261,7 +1262,7 @@ function Settings(): React.JSX.Element {
         >
           <div
             className={cn(
-              'mx-auto flex w-full flex-col gap-10 px-8 pt-10',
+              'mx-auto flex w-full flex-col gap-10 px-8 pt-10 max-sm:px-4 max-sm:pt-6',
               isFocusedShortcutsPane ? 'h-full pb-6' : 'pb-24',
               isFocusedSetupGuidePane ? 'max-w-6xl' : 'max-w-4xl'
             )}

@@ -43,10 +43,12 @@ function ToolchainStatusRow({
       <ToolchainStatusIcon ok={ok} />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="text-sm font-medium text-foreground">{title}</div>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="min-w-0 flex-1 break-words text-xs text-muted-foreground">{detail}</div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 basis-36 text-xs text-muted-foreground wrap-break-word">
+            {detail}
+          </div>
           {actions ? (
-            <div className="flex shrink-0 flex-wrap justify-end gap-1">{actions}</div>
+            <div className="flex max-w-full shrink-0 flex-wrap justify-end gap-1">{actions}</div>
           ) : null}
         </div>
       </div>
