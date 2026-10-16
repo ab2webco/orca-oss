@@ -158,13 +158,22 @@ export const registerFleetPane = (on: On): void => {
           </Box>
           {list.items.map((one) => (
             <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
-              <Link href={one.url}>
-                <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
-                  {one.id}
-                </Text>
-              </Link>
-              {one.status !== undefined && <Text dimColor>{one.status}</Text>}
-              <Text wrap="truncate-end">{one.title}</Text>
+              {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
+              <Box flexShrink={0}>
+                <Link href={one.url}>
+                  <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
+                    {one.id}
+                  </Text>
+                </Link>
+              </Box>
+              {one.status !== undefined && (
+                <Box flexShrink={0}>
+                  <Text dimColor>{one.status}</Text>
+                </Box>
+              )}
+              <Box flexShrink={1} minWidth={0}>
+                <Text wrap="truncate-end">{one.title}</Text>
+              </Box>
             </Box>
           ))}
           {list.total > list.items.length && (
