@@ -18,10 +18,13 @@ export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')
 // Why both: JSON has no hex literals, so authors write '#rrggbb'; the mod always receives a number.
-const color = z.union([
-  z.number().int().min(0).max(0xffffff),
-  hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
-])
+const color = z.union(
+  [
+    z.number().int().min(0).max(0xffffff),
+    hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
+  ],
+  { error: 'must be a #rrggbb color or an integer from 0 to 16777215' }
+)
 // Why: names reach the terminal verbatim, so control and bidi characters could rewrite the screen.
 const displayText = (max: number) =>
   z
@@ -160,6 +163,20 @@ export type OrchestratorGameSceneSource = { pluginId: string; id: string } & (
   | { text: string }
   | { error: string }
 )
+
+/** Every reason Orca would refuse `text` as a scene, each as `path: message`; empty when valid. */
+export function orchestratorGameSceneIssues(text: string): string[] {
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return ['not valid JSON']
+  }
+  const parsed = sceneFileSchema.safeParse(raw)
+  return parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+}
 
 export function parseOrchestratorGameScene(
   text: string,

@@ -72,7 +72,14 @@ export function sceneFileTextOf(scene: SceneDefinition): string {
     teller: scene.teller,
     band: scene.band,
     ...(scene.foe ? { foe: costumeText(scene.foe) } : {}),
-    ...(scene.finale ? { finale: scene.finale } : {})
+    ...(scene.finale ? { finale: scene.finale } : {}),
+    ...(scene.hud
+      ? {
+          hud: Object.fromEntries(
+            Object.entries(scene.hud).map(([key, color]) => [key, hex(color)])
+          )
+        }
+      : {})
   }
   return `${JSON.stringify(file, null, 2)}\n`
 }

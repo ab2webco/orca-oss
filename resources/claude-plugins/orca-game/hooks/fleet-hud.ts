@@ -23,7 +23,7 @@ export const HUD_KEY = 'orca-game-hud'
 
 const HUD_PIXELS = HUD_ROWS * 2
 // Quest's night sky, for every scene that brings no hud palette of its own.
-const QUEST_HUD: HudPalette = {
+export const QUEST_HUD: HudPalette = {
   skyTop: 0x1a1f33,
   skyBottom: 0x2b3150,
   frame: 0xc9a24a,
