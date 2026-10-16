@@ -11309,6 +11309,26 @@
           "shadowed": "Installed, but the old copy still wins",
           "shadowedDetail": "Put {dir} first in your PATH and open a new terminal.",
           "failed": "Could not reinstall"
+        },
+        "OrchestratorGameSetting": {
+          "title": "Agent Teams game",
+          "description": "Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.",
+          "mode": "Game mode",
+          "on": "On",
+          "zen": "Zen",
+          "off": "Off",
+          "hud": "Teammate HUD",
+          "hudDescription": "Show the fleet band above Claude's prompt.",
+          "rewards": "Rewards",
+          "rewardsDescription": "XP, level-ups and celebrations when reviews merge or CI turns green.",
+          "tracker": "Work item tracking",
+          "trackerDescription": "Follow the linked Plane, Jira, Linear, GitHub or GitLab item in the flow.",
+          "inherit": "Inherit",
+          "projectDescription": "Override the game for this project on this machine. The project's orca.yaml sets its default.",
+          "sourceDefault": "default",
+          "sourceGlobal": "global setting",
+          "sourceProject": "from orca.yaml",
+          "sourceLocal": "this machine"
         }
       },
       "right": {

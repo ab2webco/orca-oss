@@ -10681,6 +10681,26 @@
         "HostAccountLoginDialog": {
           "reauthTitle": "{{server}}에서 재인증",
           "reauthDescription": "서버에 있는 기존 계정을 갱신하며 워크트리 고정은 그대로 유지됩니다. 같은 계정으로 로그인하세요. 다른 계정은 거부됩니다."
+        },
+        "OrchestratorGameSetting": {
+          "title": "Agent Teams 게임",
+          "description": "Claude Agent Teams 안의 픽셀 아트 장면, 팀원 HUD, 보상. 각 프로젝트는 orca.yaml에서 변경할 수 있습니다.",
+          "mode": "게임 모드",
+          "on": "켜기",
+          "zen": "Zen",
+          "off": "끄기",
+          "hud": "팀원 HUD",
+          "hudDescription": "Claude 프롬프트 위에 플릿 밴드를 표시합니다.",
+          "rewards": "보상",
+          "rewardsDescription": "리뷰가 병합되거나 CI가 통과하면 XP, 레벨 업, 축하를 표시합니다.",
+          "tracker": "작업 항목 추적",
+          "trackerDescription": "연결된 Plane, Jira, Linear, GitHub, GitLab 항목을 흐름에서 추적합니다.",
+          "inherit": "상속",
+          "projectDescription": "이 기기에서 이 프로젝트의 게임 설정을 재정의합니다. 기본값은 프로젝트의 orca.yaml에서 정합니다.",
+          "sourceDefault": "기본값",
+          "sourceGlobal": "전역 설정",
+          "sourceProject": "orca.yaml에서",
+          "sourceLocal": "이 기기"
         }
       },
       "right": {
