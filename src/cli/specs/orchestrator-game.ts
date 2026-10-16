@@ -38,6 +38,52 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['game', 'fleet'],
+    summary: "List the lead's members with their ticket, PR, CI, phase and next step",
+    usage: 'orca game fleet [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      'Phases: needs-you (waiting on a question), working, idle, finished (PR merged and ticket in review or done).',
+      'Running members are every one not finished; free slots are the cap minus them.'
+    ],
+    examples: ['orca game fleet', 'orca game fleet --json']
+  },
+  {
+    path: ['game', 'wave'],
+    summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
+    usage: 'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'repo', 'dry-run'],
+    positionalArgs: ['tickets'],
+    notes: [
+      'Without tickets, picks the To Do items in list order, skipping tickets a member already holds.',
+      'Each launch goes through `orca game launch`; tickets past the cap are skipped, never launched.',
+      '--dry-run prints the plan without launching anything.'
+    ],
+    examples: ['orca game wave --dry-run', 'orca game wave CIN-12,CIN-14 --json']
+  },
+  {
+    path: ['game', 'sweep'],
+    summary: 'List finished members and what each leaves pending; --close frees their tabs',
+    usage: 'orca game sweep [--close] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'close'],
+    notes: [
+      "--close releases each finished member's dispatch, or closes its terminal when it has none.",
+      'Working and waiting members and the lead are never touched; worktrees are left in place.'
+    ],
+    examples: ['orca game sweep', 'orca game sweep --close --json']
+  },
+  {
+    path: ['game', 'push'],
+    summary: "Send idle members the project's continue prompt",
+    usage: 'orca game push [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'dry-run'],
+    notes: [
+      "The prompt is orchestratorGame.orchestrator.pushPrompt in orca.yaml, or Orca's default.",
+      'A member waiting on a question or dialog is reported, never sent anything; working ones are left.'
+    ],
+    examples: ['orca game push --dry-run', 'orca game push --json']
+  },
+  {
     path: ['game', 'scene', 'new'],
     summary: 'Start a project scene file from the built-in Quest scene',
     usage: 'orca game scene new <path> [--json]',

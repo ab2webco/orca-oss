@@ -71,7 +71,6 @@ export function ticketOfMember(agent: GameAgent): string | null {
 }
 
 function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
-  const review = agent.review
   switch (phase) {
     case 'finished':
       return 'sweep --close'
@@ -79,7 +78,12 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
       return 'answer it'
     case 'working':
       return 'wait'
+    case 'idle':
+      return idleNextOf(agent.review)
   }
+}
+
+function idleNextOf(review: GameAgent['review']): string {
   if (!review) {
     return 'push'
   }

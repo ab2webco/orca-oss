@@ -154,6 +154,16 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })
 
+  it('counts a member whose turn ended as running until its PR is merged', async () => {
+    const member = { paneKey: 'm', state: 'done', isMember: true }
+    const { client, calls } = fakeClient(
+      stateWith({ agents: [member, { ...member, paneKey: 'n', state: 'working' }] })
+    )
+
+    await expect(launch(client)).rejects.toThrow(/2 of 2 members are running/)
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
   it('keeps the project prompt for a ticket outside the To Do, its unknown values left empty', async () => {
     const { client, calls } = fakeClient(stateWith())
 
