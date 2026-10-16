@@ -10795,6 +10795,12 @@
           "key": "按键",
           "keyPlaceholder": "x",
           "keyInvalid": "请为每个操作使用一个面板未占用的小写字母或数字 (不可用 r p q g t i o c w a、1-9)。"
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "系统浏览器",
+          "label": "在何处打开链接",
+          "description": "横栏和面板中的 PR、CI、工单和列表链接。系统浏览器保留了你的 GitHub 和 Jira 登录。"
         }
       },
       "right": {

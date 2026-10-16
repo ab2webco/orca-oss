@@ -1,6 +1,13 @@
 export type GameMode = 'on' | 'zen' | 'off'
 
-export type GameConfig = { mode: GameMode; scene: string; hud: boolean; rewards: boolean }
+/** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
+export type GameConfig = {
+  mode: GameMode
+  scene: string
+  hud: boolean
+  rewards: boolean
+  openLinks: 'orca' | 'system'
+}
 
 export type GameAgentState = 'working' | 'waiting' | 'idle' | 'done'
 

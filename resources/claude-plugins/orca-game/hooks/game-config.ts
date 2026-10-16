@@ -7,7 +7,8 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   mode: 'on',
   scene: DEFAULT_SCENE_ID,
   hud: true,
-  rewards: true
+  rewards: true,
+  openLinks: 'orca'
 }
 
 export const GAME_ENV_KEYS = [
@@ -34,7 +35,8 @@ export const gameConfigOfEnv = (env: GameEnv): GameConfig => {
     mode: isQuestMode(mode) ? mode : DEFAULT_GAME_CONFIG.mode,
     scene: scene === '' ? DEFAULT_GAME_CONFIG.scene : scene,
     hud: flagOf(env.ORCA_GAME_HUD, DEFAULT_GAME_CONFIG.hud),
-    rewards: flagOf(env.ORCA_GAME_REWARDS, DEFAULT_GAME_CONFIG.rewards)
+    rewards: flagOf(env.ORCA_GAME_REWARDS, DEFAULT_GAME_CONFIG.rewards),
+    openLinks: DEFAULT_GAME_CONFIG.openLinks
   }
 }
 
@@ -76,6 +78,17 @@ export const terminalFocusArgvOf = (
   return path === undefined || !isTerminalHandle(handle)
     ? undefined
     : [path, 'terminal', 'focus', '--terminal', handle, '--json']
+}
+
+/** Asks Orca to open a link in the desktop's system browser, where the person is signed in. */
+export const openLinkArgvOf = (
+  cli: string | null | undefined,
+  url: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined || httpUrlOf(url) === undefined
+    ? undefined
+    : [path, 'game', 'open-link', '--url', url, '--json']
 }
 
 /** Opens a link in a browser tab of the game's worktree, the same on every platform Orca runs on. */

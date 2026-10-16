@@ -10786,6 +10786,12 @@
           "key": "Tecla",
           "keyPlaceholder": "x",
           "keyInvalid": "Usa una letra o un dígito que el Panel no use (r p q g t i o c w a, 1-9), una vez por acción."
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "Navegador del sistema",
+          "label": "Abrir enlaces en",
+          "description": "Enlaces de PR, CI, tickets y listas de la banda y el Panel. El navegador del sistema tiene tus sesiones de GitHub y Jira."
         }
       },
       "right": {

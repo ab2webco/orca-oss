@@ -10786,6 +10786,12 @@
           "key": "키",
           "keyPlaceholder": "x",
           "keyInvalid": "패널이 쓰지 않는 소문자나 숫자 하나를 작업마다 다르게 지정하세요 (r p q g t i o c w a, 1-9 제외)."
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "시스템 브라우저",
+          "label": "링크 열기 위치",
+          "description": "밴드와 패널의 PR, CI, 티켓, 목록 링크입니다. 시스템 브라우저에는 GitHub와 Jira 로그인이 있습니다."
         }
       },
       "right": {

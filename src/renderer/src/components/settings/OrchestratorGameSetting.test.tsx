@@ -197,6 +197,33 @@ describe('ProjectOrchestratorGameSetting', () => {
   })
 })
 
+describe('where game links open', () => {
+  it('writes it globally and lets a project override or inherit what orca.yaml says', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const global = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+    )
+    click(global.container, '[aria-label="Open links in"] button', 'System browser')
+    global.unmount()
+
+    const project = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={{ openLinks: 'system' }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(project.container.textContent).toContain('System browser · from orca.yaml')
+    click(project.container, '[aria-label="Open links in"] button', 'Orca')
+    expect(updates).toEqual([
+      { orchestratorGame: { openLinks: 'system' } },
+      { orchestratorGameProjects: { repo1: { openLinks: 'orca' } } }
+    ])
+    project.unmount()
+  })
+})
+
 describe('game scene picker', () => {
   it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []

@@ -10,6 +10,7 @@ import type {
 import { actionHotkeysOf } from './action-results'
 import { reviewKindOf } from './band-chips'
 import { actionRunsOf, mcpCallTextOf, runAction, workOn } from './game-actions'
+import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
 import { actionLabelOf, todoActionOf } from './lead-actions'
@@ -30,7 +31,8 @@ export async function projectRowsOf(
   palette: BandPalette,
   isDemo: boolean
 ): Promise<RenderElement[]> {
-  const { Box, Text, Button, Link } = $.ui.resolve(e)
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const worktreeId = state.worktree?.id ?? ''
   const text = gameStrings().text
   const runs = await actionRunsOf($)
   const itemRow = (key: string, one: GameProjectItem) => (
@@ -48,11 +50,14 @@ export async function projectRowsOf(
       )}
       {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
       <Box flexShrink={0}>
-        <Link href={one.url}>
+        {gameLinkOf(
+          $,
+          e,
+          { key: `${key}-link-${one.id}`, url: one.url, worktreeId, label: one.id },
           <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
             {one.id}
           </Text>
-        </Link>
+        )}
       </Box>
       {one.status !== undefined && (
         <Box flexShrink={0}>
@@ -83,11 +88,14 @@ export async function projectRowsOf(
           ) : list.url === null ? (
             <Text bold>{heading}</Text>
           ) : (
-            <Link href={list.url}>
+            gameLinkOf(
+              $,
+              e,
+              { key: `${key}-link`, url: list.url, worktreeId, label: heading },
               <Text bold underline>
                 {heading}
               </Text>
-            </Link>
+            )
           )}
         </Box>
         {sections.flatMap((section, at) => [

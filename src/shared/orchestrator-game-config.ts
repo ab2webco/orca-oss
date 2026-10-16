@@ -25,12 +25,18 @@ export type OrchestratorGameMode = 'on' | 'zen' | 'off'
 
 export const ORCHESTRATOR_GAME_MODES: readonly OrchestratorGameMode[] = ['on', 'zen', 'off']
 
+/** Where the game's links open: Orca's own browser, or the system's where the person is signed in. */
+export type OrchestratorGameOpenLinks = 'orca' | 'system'
+
+export const ORCHESTRATOR_GAME_OPEN_LINKS: readonly OrchestratorGameOpenLinks[] = ['orca', 'system']
+
 export type OrchestratorGameConfig = {
   mode: OrchestratorGameMode
   scene: string
   hud: boolean
   rewards: boolean
   tracker: boolean
+  openLinks: OrchestratorGameOpenLinks
 }
 
 /** Lists that a later layer replaces whole; kept out of the config so Settings and the env stay scalar. */
@@ -72,7 +78,8 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   scene: 'quest',
   hud: true,
   rewards: true,
-  tracker: true
+  tracker: true,
+  openLinks: 'orca'
 }
 
 const KEYS = Object.keys(DEFAULT_ORCHESTRATOR_GAME_CONFIG) as (keyof OrchestratorGameConfig)[]
@@ -221,6 +228,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
         warnings.push(
           `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
         )
+      }
+    } else if (key === 'openLinks') {
+      if (value === 'orca' || value === 'system') {
+        layer.openLinks = value
+      } else {
+        warnings.push('orchestratorGame.openLinks must be orca or system')
       }
     } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {

@@ -94,4 +94,31 @@ describe('orca game state', () => {
       expect.objectContaining({ result: expect.objectContaining({ role: 'member', brief: null }) })
     )
   })
+
+  it('opens a link in the system browser through the host', async () => {
+    const calls: [string, unknown][] = []
+    const client = {
+      call: async (method: string, params: unknown) => {
+        calls.push([method, params])
+        return { ok: true, result: { opened: true } }
+      }
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game open-link']({
+      flags: new Map([['url', 'https://github.com/o/r/pulls']]),
+      client,
+      cwd: '/tmp',
+      json: true
+    })
+
+    expect(calls).toEqual([['game.openLink', { url: 'https://github.com/o/r/pulls' }]])
+    await expect(
+      ORCHESTRATOR_GAME_HANDLERS['game open-link']({
+        flags: new Map(),
+        client,
+        cwd: '/tmp',
+        json: true
+      })
+    ).rejects.toThrow(/url/i)
+  })
 })

@@ -10775,6 +10775,12 @@
           "key": "キー",
           "keyPlaceholder": "x",
           "keyInvalid": "パネルが使っていない英小文字か数字を 1 つ、アクションごとに別々に指定してください (r p q g t i o c w a、1-9 は使用不可)。"
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "システムのブラウザー",
+          "label": "リンクを開く場所",
+          "description": "バンドとパネルの PR、CI、チケット、リストのリンク。システムのブラウザーには GitHub と Jira のサインインがあります。"
         }
       },
       "right": {

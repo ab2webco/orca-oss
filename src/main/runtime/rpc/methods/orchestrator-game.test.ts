@@ -34,4 +34,26 @@ describe('game.state RPC', () => {
       ok: false
     })
   })
+
+  it('opens a game link in the system browser through the runtime, http(s) only', async () => {
+    const opened: string[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      openGameLinkInSystemBrowser: async (url: string) => {
+        opened.push(url)
+        return { opened: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const open = (url: unknown) =>
+      dispatcher.dispatch({ id: 'o', authToken: 'test', method: 'game.openLink', params: { url } })
+
+    await expect(open('https://github.com/o/r/pulls')).resolves.toMatchObject({
+      ok: true,
+      result: { opened: true }
+    })
+    await expect(open('file:///etc/passwd')).resolves.toMatchObject({ ok: false })
+    await expect(open('javascript:alert(1)')).resolves.toMatchObject({ ok: false })
+    expect(opened).toEqual(['https://github.com/o/r/pulls'])
+  })
 })

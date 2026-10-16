@@ -75,7 +75,16 @@ orchestratorGame:
   hud: true        # teammate band above the prompt
   rewards: false   # XP, level-ups, celebrations
   tracker: true    # follow the linked work item in the flow
+  openLinks: system # orca (default) | system: where the game's links open
 ```
+
+`openLinks: system` opens every game link (PR, CI, ticket, activity, the PR and To Do list
+headers, project links) in the desktop's default browser, where the person is signed in to GitHub
+and Jira; Orca's own browser has no such session, so a private repo shows a 404 there. The mod asks
+Orca with `orca game open-link <url>` (RPC `game.openLink`, http(s) only, Electron's
+`shell.openExternal` on macOS, Linux and Windows). A host with no desktop (`orca serve`) or an Orca
+older than the mod refuses it, and the link opens in an Orca tab as before. Settings shows it as
+**Open links in** (Orca / System browser), globally and per project.
 
 An invalid value is dropped and reported (Settings shows the source of every value,
 `orca game state` lists the warnings); it never stops the launch.

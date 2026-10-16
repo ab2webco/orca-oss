@@ -155,7 +155,8 @@ const configOf = (value: unknown): Partial<GameConfig> => {
     ...(isQuestMode(raw.mode) ? { mode: raw.mode } : {}),
     ...(scene === '' ? {} : { scene }),
     ...(typeof raw.hud === 'boolean' ? { hud: raw.hud } : {}),
-    ...(typeof raw.rewards === 'boolean' ? { rewards: raw.rewards } : {})
+    ...(typeof raw.rewards === 'boolean' ? { rewards: raw.rewards } : {}),
+    ...(raw.openLinks === 'orca' || raw.openLinks === 'system' ? { openLinks: raw.openLinks } : {})
   }
 }
 

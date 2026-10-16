@@ -91,6 +91,8 @@ type World = {
   calls: string[][]
   opened: string[]
   store: Record<string, unknown>
+  /** Other commands that exit 0, with no output. */
+  succeeds?: (argv: readonly string[]) => boolean
 }
 
 const worldOf = (patch: Partial<World> = {}): World => ({
@@ -122,7 +124,7 @@ const engine = (on: On, world: World) => {
   on('process.run', ($s, e) => {
     world.calls.push([...e.argv])
     const isGame = e.argv.join(' ') === GAME_STATE.join(' ')
-    const stdout = isGame ? world.stdout : null
+    const stdout = isGame ? world.stdout : world.succeeds?.(e.argv) ? '' : null
     return {
       value: {
         exitCode: stdout === null ? 1 : 0,
@@ -604,5 +606,62 @@ describe('lead name', () => {
     await $.turn.complete({ ...TURN })
     await clock.settle()
     expect(renames).toEqual([])
+  })
+})
+
+describe('links in the system browser', () => {
+  const OPEN = [ORCA_CLI, 'game', 'open-link', '--url', 'https://github.com/o/r/pull/42', '--json']
+  const systemWorld = () =>
+    worldOf({
+      stdout: JSON.stringify({ ...STATE, config: { openLinks: 'system' } })
+    })
+
+  test('the band and the Panel open them through Orca in the system browser', async ($, on) => {
+    const world = {
+      ...systemWorld(),
+      succeeds: (argv: readonly string[]) => argv[2] === 'open-link'
+    }
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    await band.press({ key: 'band-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[1] === 'game' && argv[2] === 'open-link')).toEqual([
+      OPEN
+    ])
+    await band.unmount()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    await pane.press({ key: 'open-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[2] === 'open-link')).toEqual([OPEN, OPEN])
+    expect(world.calls.some((argv) => argv[1] === 'tab')).toBe(false)
+    await pane.unmount()
+  })
+
+  test('fall back to an Orca tab when Orca cannot open the system browser', async ($, on) => {
+    const world = systemWorld()
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    await pane.press({ key: 'open-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[2] === 'open-link' || argv[1] === 'tab')).toEqual([
+      OPEN,
+      [
+        ORCA_CLI,
+        'tab',
+        'create',
+        '--url',
+        'https://github.com/o/r/pull/42',
+        '--worktree',
+        'id:wt-1',
+        '--json'
+      ]
+    ])
+    await pane.unmount()
   })
 })

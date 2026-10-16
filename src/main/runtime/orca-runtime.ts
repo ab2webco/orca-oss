@@ -645,7 +645,7 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
-import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import {
   withOrchestratorGameArgs,
@@ -30145,6 +30145,16 @@ export class OrcaRuntimeService {
       this.prepareOrchestratorGameForHandle(handle)
     ])
     return { env: { ...leader.env, ...game.env }, args: game.args }
+  }
+
+  /** A game link the project opens outside Orca, on the desktop where the person is signed in. */
+  async openGameLinkInSystemBrowser(url: string): Promise<{ opened: true }> {
+    // Why: a headless serve has no person at its screen; the mod then falls back to an Orca tab.
+    if (!this.getAvailableAuthoritativeWindow()) {
+      throw new Error('This Orca host has no desktop to open a system browser on.')
+    }
+    await shell.openExternal(url)
+    return { opened: true }
   }
 
   async getOrchestratorGameState(args: {

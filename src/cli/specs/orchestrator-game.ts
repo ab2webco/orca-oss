@@ -21,6 +21,18 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game lead']
   },
   {
+    path: ['game', 'open-link'],
+    summary: "Open a game link in the system browser of Orca Lab's desktop",
+    usage: 'orca game open-link <url> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'url'],
+    positionalArgs: ['url'],
+    notes: [
+      'Only http(s) links. The game mod runs it when orchestratorGame.openLinks is system.',
+      'Fails on a host with no desktop (orca serve) or an Orca older than it; the mod then opens an Orca tab.'
+    ],
+    examples: ['orca game open-link https://github.com/o/r/pulls']
+  },
+  {
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own child worktree, as this project's lead",
     usage: 'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--json]',

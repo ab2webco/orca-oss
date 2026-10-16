@@ -50,6 +50,10 @@ import {
 } from './orchestrator-game-setting-labels'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
 import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
+import {
+  OrchestratorGameOpenLinksRow,
+  orchestratorGameOpenLinksLabels
+} from './OrchestratorGameOpenLinksSetting'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -175,6 +179,11 @@ export function OrchestratorGameSetting({
             onChange={() => set(toggle.key, !config[toggle.key])}
           />
         ))}
+        <OrchestratorGameOpenLinksRow
+          value={config.openLinks}
+          disabled={config.mode === 'off'}
+          onChange={(next) => set('openLinks', next)}
+        />
       </SearchableSetting>
     </section>
   )
@@ -323,6 +332,11 @@ export function ProjectOrchestratorGameSetting({
             }
           />
         ))}
+        <OrchestratorGameOpenLinksRow
+          value={local?.openLinks ?? 'inherit'}
+          effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
+          onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
+        />
         <SettingsRow
           label={sceneTitle()}
           description={effective('scene', sceneFile ?? config.scene)}

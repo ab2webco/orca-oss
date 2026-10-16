@@ -1,4 +1,4 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { GameAgent } from '../types'
 import { fitCells } from './cell-width'
@@ -11,10 +11,11 @@ import {
 } from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
-import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
+import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
 import { runAction } from './game-actions'
+import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
@@ -39,7 +40,7 @@ export const registerFleetPane = (on: On): void => {
     const config = gameConfig()
     const scene = currentScene()
     const palette = scene.band
-    const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
@@ -114,6 +115,8 @@ export const registerFleetPane = (on: On): void => {
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
     const worktreeId = state.worktree?.id ?? ''
+    const link = (key: string, url: string, label: string, child: RenderElement) =>
+      gameLinkOf($, e, { key, url, worktreeId, label }, child)
     const linkButton = (one: PaneLink) => (
       <Button
         key={one.key}
@@ -121,7 +124,7 @@ export const registerFleetPane = (on: On): void => {
         hotkey={one.hotkey}
         onPress={() =>
           one.action === undefined
-            ? void openInOrca($, one.url, worktreeId).then((isOpen) => {
+            ? void openGameLink($, one.url, worktreeId).then((isOpen) => {
                 if (!isOpen) {
                   $.ui.toast(text.couldNotOpenLink(one.label))
                 }
@@ -184,27 +187,35 @@ export const registerFleetPane = (on: On): void => {
               <Text wrap="truncate-end">{member.says}</Text>
               {(agent.review !== undefined || agent.workItem !== undefined) && (
                 <Box flexDirection="row" gap={1}>
-                  {agent.review !== undefined && (
-                    <Link href={agent.review.url}>
+                  {agent.review !== undefined &&
+                    link(
+                      `review-${agent.paneKey}`,
+                      agent.review.url,
+                      reviewTextOf(agent.review),
                       <Text color={CI_COLORS[agent.review.ci]} underline>
                         {reviewTextOf(agent.review)}
                       </Text>
-                    </Link>
-                  )}
+                    )}
                   {agent.workItem !== undefined &&
                     (agent.workItem.url === '' ? (
                       <Text>{workItemTextOf(agent.workItem)}</Text>
                     ) : (
-                      <Link href={agent.workItem.url}>
+                      link(
+                        `work-item-${agent.paneKey}`,
+                        agent.workItem.url,
+                        workItemTextOf(agent.workItem),
                         <Text underline wrap="truncate-end">
                           {workItemTextOf(agent.workItem)}
                         </Text>
-                      </Link>
+                      )
                     ))}
                 </Box>
               )}
-              {agent.activity !== undefined && (
-                <Link key={`activity-${agent.paneKey}`} href={agent.activity.url}>
+              {agent.activity !== undefined &&
+                link(
+                  `activity-${agent.paneKey}`,
+                  agent.activity.url,
+                  agent.activity.id,
                   <Text
                     color={agent.activity.running ? 'cyan' : palette.parchment}
                     wrap="truncate-end"
@@ -218,8 +229,7 @@ export const registerFleetPane = (on: On): void => {
                       cardRoom
                     )}
                   </Text>
-                </Link>
-              )}
+                )}
             </Box>
           </Box>
         ))}
@@ -228,11 +238,14 @@ export const registerFleetPane = (on: On): void => {
             <Box width={10}>
               <Text dimColor>{text.reviewHeading}</Text>
             </Box>
-            <Link href={state.review.url}>
+            {link(
+              'pane-review',
+              state.review.url,
+              reviewTextOf(state.review),
               <Text color={CI_COLORS[state.review.ci]} underline>
                 {reviewTextOf(state.review)}
               </Text>
-            </Link>
+            )}
             <Text dimColor wrap="truncate-end">
               {state.review.title}
             </Text>
@@ -246,9 +259,12 @@ export const registerFleetPane = (on: On): void => {
             {state.workItem.url === '' ? (
               <Text>{workItemTextOf(state.workItem)}</Text>
             ) : (
-              <Link href={state.workItem.url}>
+              link(
+                'pane-work-item',
+                state.workItem.url,
+                workItemTextOf(state.workItem),
                 <Text underline>{workItemTextOf(state.workItem)}</Text>
-              </Link>
+              )
             )}
             <Text dimColor wrap="truncate-end">
               {state.workItem.title}

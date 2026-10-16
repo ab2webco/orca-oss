@@ -40,6 +40,30 @@ describe('resolveOrchestratorGameConfig', () => {
   })
 })
 
+describe('openLinks', () => {
+  it('opens links in Orca by default and in the system browser when a layer asks', () => {
+    expect(resolveOrchestratorGameConfig({}).config.openLinks).toBe('orca')
+    const resolved = resolveOrchestratorGameConfig({
+      global: { openLinks: 'system' },
+      project: { openLinks: 'orca' },
+      local: { openLinks: 'system' }
+    })
+    expect(resolved.config.openLinks).toBe('system')
+    expect(resolved.sources.openLinks).toBe('local')
+  })
+
+  it('reads it from orca.yaml, dropping anything but orca or system', () => {
+    expect(parseOrchestratorGameLayer({ openLinks: 'system' })).toEqual({
+      layer: { openLinks: 'system' },
+      warnings: []
+    })
+    expect(parseOrchestratorGameLayer({ openLinks: 'chrome' })).toEqual({
+      layer: {},
+      warnings: ['orchestratorGame.openLinks must be orca or system']
+    })
+  })
+})
+
 describe('resolveOrchestratorGameConfig sceneFile', () => {
   it('draws a project layer scene file over a scene at the same or a lower layer', () => {
     const resolved = resolveOrchestratorGameConfig({

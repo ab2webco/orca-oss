@@ -1,5 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
+import { RuntimeClientError } from '../runtime-client'
 import { DEFAULT_GAME_LEAD, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
@@ -41,6 +42,15 @@ function formatGameState(state: OrchestratorGameState): string {
 }
 
 export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
+  'game open-link': async ({ flags, client, json }) => {
+    const raw = flags.get('url')
+    const url = typeof raw === 'string' ? raw.trim() : ''
+    if (url === '') {
+      throw new RuntimeClientError('invalid_argument', 'Name the url to open.')
+    }
+    const result = await client.call<{ opened: true }>('game.openLink', { url })
+    printResult(result, json, () => `Opened ${url} in the system browser`)
+  },
   'game state': async ({ client, json }) => {
     const result = await client.call<OrchestratorGameState>('game.state', callerParams())
     printResult(result, json, formatGameState)

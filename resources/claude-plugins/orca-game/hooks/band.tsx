@@ -7,6 +7,7 @@ import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-ro
 import { needPartsOf } from './fleet-labels'
 import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
 import { runAction } from './game-actions'
+import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { ACTION_CHIP_PREFIX, actionChipsOf } from './lead-actions'
 import { openPane } from './fleet-pane'
@@ -54,7 +55,7 @@ export const registerBand = (on: On): void => {
       next(e).then(beneathOf),
       alliesStrip($, e, palette, columns)
     ])
-    const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     const showPet = isClawdReacting() && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
@@ -117,14 +118,9 @@ export const registerBand = (on: On): void => {
     const isFramed = columns >= HUD_MIN_COLUMNS
     const isArtShown = config.mode !== 'off' && e.surface === 'terminal'
     const art = await animate($, e, isFramed ? [...pet, hud] : pet)
-    const linkOf = (key: string, url: string, child: RenderElement) =>
-      url === '' ? (
-        child
-      ) : (
-        <Link key={key} href={url}>
-          {child}
-        </Link>
-      )
+    const worktreeId = state.worktree?.id ?? ''
+    const linkOf = (key: string, url: string, label: string, child: RenderElement) =>
+      url === '' ? child : gameLinkOf($, e, { key, url, worktreeId, label }, child)
     const pill = (key: string, label: string, color: string, isBold = false) => (
       <Text key={key} backgroundColor={palette.panel}>
         {' '}
@@ -161,6 +157,7 @@ export const registerBand = (on: On): void => {
         return linkOf(
           chip.key,
           link.href ?? '',
+          chip.label,
           <Text
             key={chip.key}
             color={link.color ?? palette.parchment}
@@ -236,11 +233,30 @@ export const registerBand = (on: On): void => {
         {rowsOf('band-chips', chips, CHIP_ROWS, chipOf, (count) => `+${count}`)}
         {needs.length > 0 && (
           <Box key="band-needs" flexDirection="row" overflow="hidden">
-            <Text color="red" bold wrap="truncate-end">
-              {needPartsOf(needs, columns).map((part) =>
-                linkOf(part.key, part.url ?? '', <Text key={part.key}>{part.text}</Text>)
-              )}
-            </Text>
+            {config.openLinks === 'system' ? (
+              // Why one Text per part: a system-browser link is a Button, which no Text may hold.
+              needPartsOf(needs, columns).map((part) =>
+                linkOf(
+                  part.key,
+                  part.url ?? '',
+                  part.text,
+                  <Text key={part.key} color="red" bold wrap="truncate-end">
+                    {part.text}
+                  </Text>
+                )
+              )
+            ) : (
+              <Text color="red" bold wrap="truncate-end">
+                {needPartsOf(needs, columns).map((part) =>
+                  linkOf(
+                    part.key,
+                    part.url ?? '',
+                    part.text,
+                    <Text key={part.key}>{part.text}</Text>
+                  )
+                )}
+              </Text>
+            )}
           </Box>
         )}
         {actionRows}

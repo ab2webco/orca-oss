@@ -3,7 +3,12 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
 import { syncActionCommands } from './action-commands'
-import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
+import {
+  gameStateArgvOf,
+  openLinkArgvOf,
+  tabCreateArgvOf,
+  terminalFocusArgvOf
+} from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
 import { fleetPhaseOf, partyOf } from './party'
@@ -53,13 +58,21 @@ export async function focusTerminal($: EngineInterface, handle: string): Promise
   return out?.exitCode === 0
 }
 
-/** Opens a link in an Orca browser tab of the game's worktree; false when Orca could not. */
-export async function openInOrca(
+/** Opens a link where the project asks: the system browser, else (or when that fails) an Orca tab. */
+export async function openGameLink(
   $: EngineInterface,
   url: string,
   worktreeId: string
 ): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const external = gameConfig().openLinks === 'system' ? openLinkArgvOf(cli, url) : undefined
+  if (external !== undefined) {
+    const out = await $.process.run(external, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+    // Why fall back: an older Orca or a host with no desktop has no system browser to offer.
+    if (out?.exitCode === 0) {
+      return true
+    }
+  }
   const argv = tabCreateArgvOf(cli, url, worktreeId)
   if (argv === undefined) {
     return false

@@ -11414,6 +11414,12 @@
           "keyInvalid": "Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.",
           "key": "Key",
           "keyPlaceholder": "x"
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "System browser",
+          "label": "Open links in",
+          "description": "PR, CI, ticket and list links from the band and the Panel. The system browser has your GitHub and Jira sign-ins."
         }
       },
       "right": {
