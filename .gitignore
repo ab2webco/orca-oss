@@ -109,6 +109,7 @@ docs/**
 !docs/reference/git-compatibility.md
 !docs/reference/lab-release-smoke-check.md
 !docs/reference/plugin-development.md
+!docs/reference/orchestrator-game.md
 !docs/reference/headless-linux-server.md
 !docs/reference/linux-glibc-compatibility.md
 !docs/reference/relay-grace-time-reconfiguration.md
