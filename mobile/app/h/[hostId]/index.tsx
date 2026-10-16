@@ -99,7 +99,7 @@ import {
 import type { RepoSummary } from '../../../src/worktree/host-worktree-rpc-types'
 import type { WorkspaceStatusDefinition } from '../../../../src/shared/worktree/types'
 import { DEFAULT_MOBILE_WORKSPACE_STATUSES } from '../../../src/worktree/mobile-workspace-statuses'
-import { PluginPanelsButton } from '../../../src/plugin-panels/PluginPanelsButton'
+import { HostPluginPanelsRow } from '../../../src/plugin-panels/HostPluginPanelsRow'
 
 function isErrorVerdict(v: ConnectionVerdict): boolean {
   return v.kind === 'warning' || v.kind === 'unreachable' || v.kind === 'auth-failed'
@@ -662,7 +662,7 @@ export function HostScreen({
     },
     [embedded, hostId, pathname, router]
   )
-  const pluginsButton = { host: hostId, conn: connState, open: navigateFromHostList }
+  const pluginsRow = { hostId, client, connState, open: navigateFromHostList }
 
   const openWorktreeSession = useCallback(
     (item: Worktree) => {
@@ -974,8 +974,6 @@ export function HostScreen({
                 />
               </Pressable>
 
-              <PluginPanelsButton {...pluginsButton} embedded />
-
               {floatingWorkspaceEnabled ? (
                 <Pressable
                   style={[
@@ -1088,8 +1086,6 @@ export function HostScreen({
               />
             </Pressable>
 
-            <PluginPanelsButton {...pluginsButton} />
-
             <Pressable style={styles.searchToggle} onPress={() => setShowSearch((s) => !s)}>
               {showSearch ? (
                 <X size={16} color={colors.textSecondary} />
@@ -1133,6 +1129,8 @@ export function HostScreen({
           />
         </View>
       )}
+
+      <HostPluginPanelsRow {...pluginsRow} />
 
       <HostWorkspaceListStates
         connState={connState}
