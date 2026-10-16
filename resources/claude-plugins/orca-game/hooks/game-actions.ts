@@ -16,14 +16,31 @@ export async function actionRunsOf($: EngineInterface): Promise<ActionRuns> {
 /** What an MCP action runs, as the Panel shows it beside the label. */
 export const mcpCallTextOf = (mcp: GameMcpCall): string => `${mcp.server}·${mcp.tool}`
 
+const RESEND_AFTER_MS = 3000
+// Why per key: a double press, a hotkey repeat or a retyped command must not queue the same turn twice.
+const sending = new Map<string, number>()
+
 // Why toast before the result: submit resolves only once the lead's turn starts.
-async function submitToLead($: EngineInterface, text: string, label: string): Promise<void> {
+async function submitToLead(
+  $: EngineInterface,
+  key: string,
+  text: string,
+  label: string
+): Promise<void> {
   const strings = gameStrings().text
   $.ui.toast(strings.sentToLead(label))
+  const now = await $.clock.now()
+  if ((sending.get(key) ?? -Infinity) > now) {
+    return
+  }
+  sending.set(key, Infinity)
   const result = await $.prompt.submit({ text }).catch(() => undefined)
   if (result === undefined || result.drop !== undefined) {
+    sending.delete(key)
     $.ui.toast(strings.couldNotSend(label))
+    return
   }
+  sending.set(key, (await $.clock.now()) + RESEND_AFTER_MS)
 }
 
 async function runMcp($: EngineInterface, id: string, mcp: GameMcpCall): Promise<ActionRun> {
@@ -59,7 +76,7 @@ export async function runAction(
     return undefined
   }
   if ('prompt' in action) {
-    await submitToLead($, commandPromptOf(action.prompt, typed), label)
+    await submitToLead($, action.id, commandPromptOf(action.prompt, typed), label)
     return undefined
   }
   return runMcp($, action.id, action.mcp)
@@ -79,5 +96,5 @@ export async function workOn(
     $.ui.toast(gameStrings().text.demoAction(label))
     return
   }
-  await submitToLead($, item.prompt, label)
+  await submitToLead($, `work-${item.id}`, item.prompt, label)
 }

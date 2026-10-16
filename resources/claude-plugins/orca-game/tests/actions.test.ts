@@ -202,6 +202,30 @@ describe('project actions in the Panel', () => {
   })
 })
 
+describe('a button pressed repeatedly', () => {
+  test('sends its prompt once, then again after the cooldown', async ($, on) => {
+    const world = worldOf()
+    const clock = await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'action-action-0' })
+    await ui.press({ key: 'action-action-0' })
+    await ui.press({ key: 'work-ORCA-2' })
+    await ui.press({ key: 'work-ORCA-2' })
+    await clock.settle()
+    expect(world.prompts).toEqual(['Open a PR for ORCA-1', 'Work on ORCA-2: Check'])
+    expect(world.toasts.filter((one) => one === 'Sent to the lead: Ship it')).toHaveLength(2)
+
+    await clock.advance(3001)
+    await ui.press({ key: 'action-action-0' })
+    expect(world.prompts).toEqual([
+      'Open a PR for ORCA-1',
+      'Work on ORCA-2: Check',
+      'Open a PR for ORCA-1'
+    ])
+    await ui.unmount()
+  })
+})
+
 describe('/quest demo', () => {
   test('shows actions and work buttons that only toast, never sending or calling', async ($, on) => {
     const world = worldOf()
