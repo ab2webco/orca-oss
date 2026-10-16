@@ -9887,6 +9887,45 @@ describe('registerPtyHandlers', () => {
     expect(result.launchConfig?.agentEnv).toMatchObject({ ORCA_GAME_MODE: 'full' })
   })
 
+  it('runs a bare orca launch through the dev build CLI in a development build (ORCA-586)', async () => {
+    const { app } = await import('electron')
+    const mockedApp = app as unknown as { isPackaged: boolean }
+    const prev = mockedApp.isPackaged
+    mockedApp.isPackaged = false
+    getPathMock.mockReturnValue('/tmp/orca-user-data')
+    try {
+      const leafId = '33333333-3333-4333-8333-333333333333'
+      const runtime = {
+        setPtyController: vi.fn(),
+        preAllocateHandleForPty: vi.fn(() => 'term_dev_cli'),
+        registerPreAllocatedHandleForPty: vi.fn(),
+        registerPty: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        getDriver: vi.fn(() => ({ kind: 'host' })),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+        cols: 80,
+        rows: 24,
+        cwd: '/repo',
+        command: 'orca claude-teams --dangerously-skip-permissions',
+        tabId: 'tab-1',
+        leafId,
+        worktreeId: 'wt-1',
+        env: { ORCA_PANE_KEY: `tab-1:${leafId}`, ORCA_TAB_ID: 'tab-1', ORCA_WORKTREE_ID: 'wt-1' }
+      })
+      expect(runtime.noteTerminalSpawnCommand).toHaveBeenCalledWith(
+        expect.any(String),
+        `'${join('/tmp/orca-user-data', 'cli', 'bin', 'orca')}' claude-teams --dangerously-skip-permissions`
+      )
+    } finally {
+      mockedApp.isPackaged = prev
+    }
+  })
+
   it('threads the validated pane identity into registerPty for a renderer PTY spawn (#7587)', async () => {
     const leafId = '88888888-8888-4888-8888-888888888888'
     const runtime = {

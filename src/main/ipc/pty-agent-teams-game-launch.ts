@@ -14,3 +14,15 @@ export function withAgentTeamsGameCommand(
   }
   return command.includes(pluginDir) ? command : withOrchestratorGameArgs(command, game)
 }
+
+// Why: a dev build's PATH puts its own `orca` first, but a shell profile can re-prepend
+// /usr/local/bin, so a bare `orca` reaches the installed release, which ignores this build's game.
+export function withDevOrcaCli(
+  command: string | undefined,
+  devCli: string | null
+): string | undefined {
+  if (command === undefined || devCli === null || !/^orca(\s|$)/.test(command)) {
+    return command
+  }
+  return `'${devCli.replace(/'/g, `'\\''`)}'${command.slice('orca'.length)}`
+}
