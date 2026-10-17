@@ -5,6 +5,7 @@ import {
   buildOrchestratorGameLaunch,
   orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
+  orchestratorGameCliPathOf,
   withOrchestratorGameArgs
 } from './orchestrator-game-launch'
 
@@ -109,6 +110,20 @@ describe('resolveOrchestratorGamePluginDir', () => {
   })
 })
 
+describe('orchestratorGameCliPathOf', () => {
+  // Why: the skills run "$ORCA_GAME_CLI" in Git Bash, which runs a word with a slash as a path.
+  it('hands Windows panes the CLI with forward slashes', () => {
+    expect(
+      orchestratorGameCliPathOf('C:\\Program Files\\Orca\\resources\\bin\\orca.exe', 'win32')
+    ).toBe('C:/Program Files/Orca/resources/bin/orca.exe')
+  })
+
+  it('leaves POSIX paths and a missing CLI alone', () => {
+    expect(orchestratorGameCliPathOf('/opt/orca a\\b', 'linux')).toBe('/opt/orca a\\b')
+    expect(orchestratorGameCliPathOf(null, 'win32')).toBeNull()
+  })
+})
+
 describe('withOrchestratorGameArgs', () => {
   it('puts the quoted plugin args right after the Claude executable', () => {
     expect(
@@ -121,5 +136,28 @@ describe('withOrchestratorGameArgs', () => {
 
   it('leaves the command alone when the game does not load', () => {
     expect(withOrchestratorGameArgs('claude', { args: [], env: {} })).toBe('claude')
+  })
+
+  // Why each character: spaces split, `&` chains, `^` escapes, `%` expands in cmd even inside
+  // quotes, `!` is delayed expansion, parentheses group, `'` closes a literal, unicode is a name.
+  const hostile = "C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it's\\orca-game"
+  const game = { args: ['--plugin-dir', hostile], env: {} }
+
+  it('quotes the plugin dir for PowerShell 5 and 7 as a verbatim literal', () => {
+    expect(withOrchestratorGameArgs('claude --teammate-mode in-process', game, 'powershell')).toBe(
+      "claude '--plugin-dir' 'C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it''s\\orca-game' --teammate-mode in-process"
+    )
+  })
+
+  it('quotes the plugin dir for cmd.exe, stepping out of the quotes only to escape percent', () => {
+    expect(withOrchestratorGameArgs('claude --teammate-mode in-process', game, 'cmd')).toBe(
+      'claude "--plugin-dir" "C:\\Users\\Zoë (dev)\\a & b ^c "^%"PATH"^%" !x! it\'s\\orca-game" --teammate-mode in-process'
+    )
+  })
+
+  it('quotes a backslash plugin dir for Git Bash as one POSIX word', () => {
+    expect(withOrchestratorGameArgs('claude', game, 'posix')).toBe(
+      "claude '--plugin-dir' 'C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it'\\''s\\orca-game'"
+    )
   })
 })

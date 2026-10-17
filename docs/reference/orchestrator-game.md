@@ -14,11 +14,12 @@ Both ways into a team load it with `--plugin-dir <bundled plugin>` and the `ORCA
 ([`orchestrator-game-launch.ts`](../../src/main/claude/orchestrator-game-launch.ts)):
 
 - `orca claude-teams`: `agentTeams.prepareLaunch` returns them and the CLI puts them before the
-  user's own args;
+  user's own args (not on Windows, where that command refuses to run);
 - a direct `claude` launch the app turns into a team (Settings → Agent Teams mode): the launch plan
   inserts them after the executable
   ([`claude-agent-teams-shim-env.ts`](../../src/main/runtime/claude-agent-teams-shim-env.ts)), for
-  local workspaces only, since the plugin folder is on this machine, and never on Windows.
+  local workspaces only, since the plugin folder is on this machine. On Windows the args are quoted
+  for the pane's shell (see [On Windows](#on-windows)); a WSL pane gets no game.
 
 It loads only when all of these hold, and otherwise Claude starts exactly as before:
 
@@ -35,6 +36,43 @@ scene still draws and the band says the state is unavailable.
 locale; a plugin language pack maps by its tag), one of `en`, `es`, `ja`, `ko`, `zh`, else `en`.
 The mod translates its words from it; text inside the pixel art stays English for ja, ko and zh
 because a Raster only takes width-1 characters.
+
+### On Windows
+
+The pane's shell parses the launch line, so `--plugin-dir` is quoted for it
+([`orchestrator-game-pane-shell.ts`](../../src/main/claude/orchestrator-game-pane-shell.ts) picks
+the shell the pty spawn will open, from the same settings and project runtime):
+
+| Pane shell | Quoting of the plugin dir |
+| --- | --- |
+| PowerShell 5.1 and 7 (the default) | a `'…'` literal, `'` doubled |
+| cmd.exe | `"…"`, stepping out of the quotes for each `%` as `"^%"`; `& ^ ( ) !` stay inside them |
+| Git Bash / MSYS | a POSIX `'…'` word, backslashes kept |
+| WSL (`wsl.exe`, a `\\wsl$` worktree, a WSL project runtime) | no game: the distro's Linux Claude cannot load a Windows plugin path, and `ORCA_GAME_*` is not crossed into the distro |
+
+A cmd pane with delayed expansion turned on in the registry would still read `!…!` in the path;
+Orca does not open cmd with `/V:ON`.
+
+`ORCA_GAME_CLI` is handed over with forward slashes (`C:/Program Files/…/orca.exe`): Claude Code
+runs its Bash tool through Git Bash on Windows, which runs a word with a `/` as a path, so the
+skills' `"$ORCA_GAME_CLI" game lead` works there; `orca game lead` prints its commands as one
+POSIX-quoted word with forward slashes for the same reason. A packaged Orca hands over
+`resources/bin/orca.exe`; a dev build's `orca-dev.cmd` cannot be started without a shell, so the
+mod runs a `.cmd`/`.bat` CLI as `%ComSpec% /d /v:off /s /c %ORCA_GAME_CLI_LINE%`, the quoted
+command line travelling in that env var, which cmd expands once after parsing; an argument with a
+quote or a line break is refused rather than run
+([`cli-invocation.ts`](../../resources/claude-plugins/orca-game/hooks/cli-invocation.ts)).
+
+What is verified where:
+
+- Unit tests, on every OS: each shell's quoting of a path with spaces, `& ^ % ! ( ) '` and
+  unicode; the pane-shell choice and the WSL skip; the cmd invocation of a `.cmd` CLI and the
+  native spelling of an `.exe` (vitest and `claude plugin test`).
+- The Windows CI job (`Windows platform tests`) runs the game suites and `claude plugin validate` /
+  `claude plugin test` of the mod on a Windows host.
+- Not verified by any automated check, only on a Windows desktop: a real cmd, PowerShell and Git
+  Bash pane loading the mod, the band polling `orca.exe`, and a dev build's `orca-dev.cmd` run
+  through cmd.exe by Claude Code's engine.
 
 ## Configuration layers
 

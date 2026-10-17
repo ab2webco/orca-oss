@@ -4,7 +4,8 @@ export type WindowsCommandInvocation = {
   windowsVerbatimArguments: true
 }
 
-function quoteCmdToken(value: string): string {
+/** One cmd.exe word that reaches the child unchanged, `%` included; quotes and line breaks are refused. */
+export function quoteCmdToken(value: string): string {
   if (/[\r\n"]/.test(value)) {
     throw new Error('Windows command tokens cannot contain quotes or line breaks.')
   }

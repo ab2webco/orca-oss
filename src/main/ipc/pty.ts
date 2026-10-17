@@ -270,6 +270,7 @@ import { isPtyIncarnationId } from '../../shared/pty-incarnation'
 import type { PtyListedSession } from '../../shared/pty-listed-session'
 import type { OrchestratorGameLaunch } from '../claude/orchestrator-game-launch'
 import { withAgentTeamsGameCommand, withDevOrcaCli } from './pty-agent-teams-game-launch'
+import { orchestratorGamePaneShell } from '../claude/orchestrator-game-pane-shell'
 
 // ─── Provider Registry ──────────────────────────────────────────────
 // Routes PTY operations by connectionId (null = local provider).
@@ -6949,6 +6950,12 @@ export function registerPtyHandlers(
         let effectiveLaunchConfig = args.launchConfig
         const noGame: OrchestratorGameLaunch = { args: [], env: {} }
         let agentTeamsGameLaunch = noGame
+        const agentTeamsGameShell = orchestratorGamePaneShell({
+          platform: process.platform,
+          shellOverride: terminalRuntimeOptions.shellOverride,
+          wslDistro: expectedWslDistro,
+          cwd
+        })
         const shouldPreAllocateTerminalHandle =
           runtime !== undefined &&
           ((!(provider instanceof LocalPtyProvider) &&
@@ -6967,9 +6974,9 @@ export function registerPtyHandlers(
             ...baseEnv,
             ...prepared.env
           }
-          // Why: the game plugin lives on this machine and Windows shells cannot take the POSIX-quoted dir.
+          // Why: the game plugin lives on this machine, so a WSL pane's Linux Claude cannot load it.
           const game =
-            process.platform !== 'win32' && typeof args.worktreeId === 'string'
+            agentTeamsGameShell !== null && typeof args.worktreeId === 'string'
               ? ((await runtime.prepareOrchestratorGameForWorktree?.(args.worktreeId)) ?? noGame)
               : noGame
           agentTeamsGameLaunch = game
@@ -6977,7 +6984,11 @@ export function registerPtyHandlers(
           if (args.launchConfig) {
             effectiveLaunchConfig = {
               ...args.launchConfig,
-              agentCommand: withAgentTeamsGameCommand(args.launchConfig.agentCommand, game),
+              agentCommand: withAgentTeamsGameCommand(
+                args.launchConfig.agentCommand,
+                game,
+                agentTeamsGameShell ?? undefined
+              ),
               agentEnv: {
                 ...args.launchConfig.agentEnv,
                 ...prepared.env,
@@ -7056,7 +7067,11 @@ export function registerPtyHandlers(
             ? join(app.getPath('userData'), 'cli', 'bin', 'orca')
             : null
         const launchCommand = withDevOrcaCli(
-          withAgentTeamsGameCommand(codexResumeLaunch.command, agentTeamsGameLaunch),
+          withAgentTeamsGameCommand(
+            codexResumeLaunch.command,
+            agentTeamsGameLaunch,
+            agentTeamsGameShell ?? undefined
+          ),
           devOrcaCli
         )
         baseEnv = stripSequencedStartupResumeArgv(baseEnv, codexResumeLaunch)

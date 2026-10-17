@@ -79,7 +79,31 @@ describe('claude agent teams shim env', () => {
     ).resolves.toBeNull()
   })
 
-  // Why: Windows panes run Claude through cmd/PowerShell, where the POSIX-quoted plugin dir is wrong.
+  it('quotes the orchestrator game for the shell of the pane it launches in', async () => {
+    const game = async () => ({
+      args: ['--plugin-dir', 'C:\\Program Files\\Orca\\orca-game'],
+      env: { ORCA_GAME_MODE: 'on' }
+    })
+    const launch = (gameShell: 'cmd' | 'powershell') =>
+      buildClaudeAgentTeamsLaunchPlan({
+        command: 'claude',
+        mode: 'in-process',
+        baseEnv: {},
+        createTeamEnv: () => ({}),
+        game,
+        gameShell
+      })
+
+    expect((await launch('cmd'))?.command).toBe(
+      'claude "--plugin-dir" "C:\\Program Files\\Orca\\orca-game" --teammate-mode in-process'
+    )
+    expect((await launch('powershell'))?.command).toBe(
+      "claude '--plugin-dir' 'C:\\Program Files\\Orca\\orca-game' --teammate-mode in-process"
+    )
+    expect((await launch('powershell'))?.env).toMatchObject({ ORCA_GAME_MODE: 'on' })
+  })
+
+  // Why skipped on Windows: a native-panes team launches in-process there, so the command differs.
   it.skipIf(process.platform === 'win32')(
     'adds the orchestrator game to a team launch and resolves it only for one',
     async () => {

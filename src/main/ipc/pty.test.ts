@@ -9887,6 +9887,65 @@ describe('registerPtyHandlers', () => {
     expect(result.launchConfig?.agentEnv).toMatchObject({ ORCA_GAME_MODE: 'full' })
   })
 
+  it('loads the Agent Teams game in a Windows cmd pane, quoted for cmd (ORCA-595)', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+    try {
+      const leafId = '44444444-4444-4444-8444-444444444444'
+      const pluginDir = 'C:\\Program Files\\Orca Lab\\resources\\claude-plugins\\orca-game'
+      const runtime = {
+        setPtyController: vi.fn(),
+        createPreAllocatedTerminalHandle: vi.fn(() => 'term_agent_teams'),
+        preAllocateHandleForPty: vi.fn(() => 'term_agent_teams'),
+        prepareClaudeAgentTeamsLeaderForHandle: vi.fn(async () => ({
+          env: { ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh', ORCA_AGENT_TEAMS_TOKEN: 'fresh-token' }
+        })),
+        prepareOrchestratorGameForWorktree: vi.fn(async () => ({
+          args: ['--plugin-dir', pluginDir],
+          env: { ORCA_GAME_MODE: 'on' }
+        })),
+        registerPreAllocatedHandleForPty: vi.fn(),
+        registerPty: vi.fn(),
+        noteTerminalSpawnCommand: vi.fn(),
+        getDriver: vi.fn(() => ({ kind: 'host' })),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn()
+      }
+
+      registerPtyHandlers(mainWindow as never, runtime as never, undefined, (() => ({
+        terminalWindowsShell: 'cmd.exe'
+      })) as never)
+      const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+        cols: 80,
+        rows: 24,
+        cwd: '/repo',
+        command: 'claude --teammate-mode auto',
+        tabId: 'tab-1',
+        leafId,
+        worktreeId: 'wt-1',
+        env: {
+          ORCA_PANE_KEY: `tab-1:${leafId}`,
+          ORCA_TAB_ID: 'tab-1',
+          ORCA_WORKTREE_ID: 'wt-1'
+        },
+        launchConfig: {
+          agentCommand: 'claude --teammate-mode auto',
+          agentArgs: '',
+          agentEnv: {}
+        },
+        launchAgent: 'claude'
+      })) as { launchConfig?: { agentCommand?: string } }
+
+      expect(runtime.prepareOrchestratorGameForWorktree).toHaveBeenCalledWith('wt-1')
+      expect(result.launchConfig?.agentCommand).toBe(
+        `claude "--plugin-dir" "${pluginDir}" --teammate-mode auto`
+      )
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
+    }
+  })
+
   it('runs a bare orca launch through the dev build CLI in a development build (ORCA-586)', async () => {
     const { app } = await import('electron')
     const mockedApp = app as unknown as { isPackaged: boolean }
