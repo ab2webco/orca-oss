@@ -11380,7 +11380,12 @@
           "title": "Lead",
           "description": "The session that talks to you and launches one member per ticket. orca.yaml sets the project default; these override it on this machine.",
           "yamlOnly": "The launch prompt and the project's rules live in orca.yaml under orchestratorGame.orchestrator.",
-          "actions": "Lead buttons"
+          "actions": "Lead buttons",
+          "accounts": "Member accounts",
+          "accountsDefault": "Orca's account",
+          "accountsAuto": "Most free quota",
+          "accountsDefaultOption": "Orca's",
+          "accountsAutoOption": "Most free"
         },
         "OrchestratorGameActionsSetting": {
           "labelInvalid": "Use 1 to 24 characters.",

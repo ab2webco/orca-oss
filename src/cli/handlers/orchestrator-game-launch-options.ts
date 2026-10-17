@@ -1,15 +1,7 @@
-import type { CommandHandler } from '../dispatch'
-import type { RuntimeAccountsSnapshot } from '../account-format'
-import { resolveManagedAccountSelector } from '../account-selector'
 import { RuntimeClientError } from '../runtime-client'
 import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
-import {
-  accountProviderOfAgent,
-  GAME_ACCOUNT_PROVIDER_LABELS
-} from '../../shared/orchestrator-game-member-agent'
+import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
-
-type Client = Parameters<CommandHandler>[0]['client']
 
 const LEAD_KEY_PREFIX = 'orchestratorGame.orchestrator.'
 
@@ -26,11 +18,9 @@ export type GameLaunchChoice = {
   agent: string
   model?: string
   effort?: string
-  /** An email, an account id, or `auto`; null keeps today's account selection. */
+  /** An email, an account id, or `auto` (the flag, or orchestrator.accounts: auto); null keeps today's selection. */
   account: string | null
 }
-
-export type GameAccountPin = { claudeAccountId?: string; codexAccountId?: string }
 
 function flagText(flags: Map<string, string | boolean>, name: string): string | undefined {
   if (!flags.has(name)) {
@@ -86,7 +76,11 @@ export function gameLaunchChoiceOf(
       '--effort needs a model: pass --model, or set orchestratorGame.orchestrator.model.'
     )
   }
-  if (typed.account !== undefined && accountProviderOfAgent(agent) === null) {
+  if (
+    typed.account !== undefined &&
+    typed.account !== 'auto' &&
+    accountProviderOfAgent(agent) === null
+  ) {
     throw new RuntimeClientError(
       'invalid_argument',
       `${agent} has no Orca-managed accounts; --account works for claude and codex members.`
@@ -96,35 +90,6 @@ export function gameLaunchChoiceOf(
     agent,
     ...(model === undefined ? {} : { model }),
     ...(model === undefined || effort === undefined ? {} : { effort }),
-    account: typed.account ?? null
+    account: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
   }
-}
-
-/** The worker-start pin for a named account, refused when it is another provider's. */
-export async function gameAccountPinOf(
-  client: Client,
-  choice: GameLaunchChoice
-): Promise<GameAccountPin> {
-  const provider = accountProviderOfAgent(choice.agent)
-  const selector = choice.account
-  if (selector === null || provider === null) {
-    return {}
-  }
-  const snapshot = (await client.call<RuntimeAccountsSnapshot>('accounts.snapshot')).result
-  const other = provider === 'claude' ? 'codex' : 'claude'
-  const named = (account: { id: string; email: string }): boolean =>
-    account.id === selector || account.email.toLowerCase() === selector.toLowerCase()
-  if (!snapshot[provider].accounts.some(named) && snapshot[other].accounts.some(named)) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `${selector} is a ${GAME_ACCOUNT_PROVIDER_LABELS[other]} account; a ${choice.agent} member needs a ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account. See \`orca game accounts\`.`
-    )
-  }
-  const id = resolveManagedAccountSelector({
-    flag: 'account',
-    providerLabel: GAME_ACCOUNT_PROVIDER_LABELS[provider],
-    selector,
-    accounts: snapshot[provider].accounts
-  })
-  return provider === 'claude' ? { claudeAccountId: id } : { codexAccountId: id }
 }

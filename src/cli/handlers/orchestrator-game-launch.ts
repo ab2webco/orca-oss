@@ -5,11 +5,12 @@ import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestr
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
 import {
-  gameAccountPinOf,
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
   type GameLaunchFlags
 } from './orchestrator-game-launch-options'
+import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
+import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
   GAME_WORK_PROMPT_PLACEHOLDERS,
@@ -23,12 +24,21 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameLaunchResult = {
   ticket: string
+  agent: string
+  /** The managed account's email and id; absent when Orca's own account selection applies. */
+  account?: string
+  accountId?: string
   runId: string
   taskId: string
   dispatchId: string
   state: string
   lastError?: string
 }
+
+type WorkerStartResult = Pick<
+  GameLaunchResult,
+  'runId' | 'taskId' | 'dispatchId' | 'state' | 'lastError'
+>
 
 const DISPLAY_NAME_MAX = 60
 
@@ -112,13 +122,18 @@ export async function launchGameMember(args: {
   prompt?: string | null
   /** --agent, --model, --effort and --account, over the lead config. */
   overrides?: GameLaunchFlags
+  /** Members this same command launched, so `auto` spreads them before game.state shows them. */
+  launched?: GameLaunchedOnAccount
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const title = item ? `${item.id} ${item.title}`.slice(0, DISPLAY_NAME_MAX) : ticket
-  const accountPin = await gameAccountPinOf(client, choice)
+  const memberAccount = await resolveGameMemberAccount(client, choice, {
+    agents: state.agents,
+    launched: args.launched
+  })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   if (choice.model) {
     await requireLaunchPreferences(client)
@@ -139,7 +154,7 @@ export async function launchGameMember(args: {
     taskTitle: title,
     callerTerminalHandle: from
   })
-  const worker = await client.call<Omit<GameLaunchResult, 'ticket'>>('orchestration.workerStart', {
+  const worker = await client.call<WorkerStartResult>('orchestration.workerStart', {
     task: task.result.task.id,
     // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
     ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
@@ -147,16 +162,23 @@ export async function launchGameMember(args: {
     displayName: title,
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
-    ...accountPin,
+    ...memberAccount.pin,
     run: runId,
     from,
     devMode: isDevCliInvocation()
   })
-  return { ticket, ...worker.result }
+  return {
+    ticket,
+    agent: choice.agent,
+    ...(memberAccount.account
+      ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
+      : {}),
+    ...worker.result
+  }
 }
 
 export const formatGameLaunch = (launched: GameLaunchResult): string =>
-  `${launched.ticket}: member ${launched.dispatchId} [${launched.state}]${launched.lastError ? `\n${launched.lastError}` : ''}`
+  `${launched.ticket}: member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}${launched.lastError ? `\n${launched.lastError}` : ''}`
 
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {

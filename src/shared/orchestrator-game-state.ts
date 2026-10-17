@@ -45,7 +45,11 @@ export type GameAgent = {
   /** The member worktree's own review and ticket; the lead's worktree's are the state's. */
   review?: GameReview
   workItem?: GameWorkItem
+  /** The managed account a member's agent runs on; absent when Orca cannot tell or from an older host. */
+  account?: GameMemberAccount
 }
+
+export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 
 export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 

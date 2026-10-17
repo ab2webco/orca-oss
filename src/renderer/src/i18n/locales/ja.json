@@ -10741,7 +10741,12 @@
           "title": "リーダー",
           "description": "あなたと対話し、チケットごとにメンバーを 1 人起動するセッションです。プロジェクトの既定値は orca.yaml で設定され、ここではこのマシンでそれを上書きします。",
           "yamlOnly": "起動プロンプトとプロジェクトのルールは orca.yaml の orchestratorGame.orchestrator で設定します。",
-          "actions": "リードのボタン"
+          "actions": "リードのボタン",
+          "accounts": "メンバーのアカウント",
+          "accountsDefault": "Orca のアカウント",
+          "accountsAuto": "空きクォータが最も多いもの",
+          "accountsDefaultOption": "Orca",
+          "accountsAutoOption": "最も空き"
         },
         "OrchestratorGameActionsSetting": {
           "labelInvalid": "1〜24 文字で入力してください。",

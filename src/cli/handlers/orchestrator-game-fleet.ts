@@ -117,6 +117,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
       launched: [],
       failed: []
     }
+    const launchedOnAccount = new Map<string, string[]>()
     for (const ticket of dryRun ? [] : wave.launch) {
       try {
         const launched = await launchGameMember({
@@ -126,8 +127,15 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           repo,
           flags,
           cwd,
-          overrides
+          overrides,
+          launched: launchedOnAccount
         })
+        if (launched.accountId) {
+          launchedOnAccount.set(launched.accountId, [
+            ...(launchedOnAccount.get(launched.accountId) ?? []),
+            ticket
+          ])
+        }
         wave.launched.push(launched)
         if (launched.state !== 'ready') {
           process.exitCode = 1

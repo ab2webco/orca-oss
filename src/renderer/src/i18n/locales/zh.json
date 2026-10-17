@@ -10761,7 +10761,12 @@
           "title": "负责人",
           "description": "与你对话并为每个工单启动一个成员的会话。项目默认值由 orca.yaml 设置；这里的设置会在此设备上覆盖它。",
           "yamlOnly": "启动提示词和项目规则位于 orca.yaml 的 orchestratorGame.orchestrator 下。",
-          "actions": "负责人按钮"
+          "actions": "负责人按钮",
+          "accounts": "成员账号",
+          "accountsDefault": "Orca 的账号",
+          "accountsAuto": "剩余额度最多的账号",
+          "accountsDefaultOption": "Orca",
+          "accountsAutoOption": "最空闲"
         },
         "OrchestratorGameActionsSetting": {
           "labelInvalid": "请使用 1 到 24 个字符。",

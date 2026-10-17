@@ -198,6 +198,28 @@ export function ProjectOrchestratorGameLeadSetting({
       isOn: lead.actions !== false
     }
   ]
+  const accountsText = {
+    label: translate(
+      'auto.components.settings.OrchestratorGameLeadSetting.accounts',
+      'Member accounts'
+    ),
+    default: translate(
+      'auto.components.settings.OrchestratorGameLeadSetting.accountsDefault',
+      "Orca's account"
+    ),
+    auto: translate(
+      'auto.components.settings.OrchestratorGameLeadSetting.accountsAuto',
+      'Most free quota'
+    ),
+    defaultOption: translate(
+      'auto.components.settings.OrchestratorGameLeadSetting.accountsDefaultOption',
+      "Orca's"
+    ),
+    autoOption: translate(
+      'auto.components.settings.OrchestratorGameLeadSetting.accountsAutoOption',
+      'Most free'
+    )
+  }
   const textOf = (key: LeadTextKey): string => {
     const value = lead[key]
     if (value !== undefined) {
@@ -240,6 +262,28 @@ export function ProjectOrchestratorGameLeadSetting({
           }
         />
       ))}
+      <SettingsRow
+        label={accountsText.label}
+        description={effective(
+          'accounts',
+          lead.accounts === 'auto' ? accountsText.auto : accountsText.default
+        )}
+        control={
+          <SettingsSegmentedControl
+            value={stored?.accounts ?? 'inherit'}
+            ariaLabel={accountsText.label}
+            size="sm"
+            options={[
+              { value: 'inherit', label: orchestratorGameInheritLabel() },
+              { value: 'default', label: accountsText.defaultOption },
+              { value: 'auto', label: accountsText.autoOption }
+            ]}
+            onChange={(next) =>
+              set('accounts', next === 'default' || next === 'auto' ? next : undefined)
+            }
+          />
+        }
+      />
       {fields().map((field) => {
         const value = stored?.[field.key]
         const text = value === undefined ? '' : String(value)

@@ -4,6 +4,7 @@ import {
   liveLinkedItemOf,
   settle,
   type GameAgentRow,
+  type GameMemberAccountOf,
   type GameMemberWork,
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
@@ -83,6 +84,7 @@ export type OrchestratorGameStateInput = {
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
   readLinkedStatus?: ReadLinkedStatus
+  accountOf?: GameMemberAccountOf
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
@@ -229,7 +231,9 @@ export async function buildOrchestratorGameState(
     terminalHandleOf: input.terminalHandleOf,
     activityOf,
     readMemberWork: input.readMemberWork,
-    readLinkedStatus: input.readLinkedStatus
+    readLinkedStatus: input.readLinkedStatus,
+    accountOf: input.accountOf,
+    leadWorktreeId: input.worktree?.id ?? null
   })
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {

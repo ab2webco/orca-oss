@@ -105,6 +105,11 @@ export function buildAccountListReport(
   snapshot: RuntimeAccountsSnapshot,
   terminal: ClaudeTerminalAccountReport
 ): AccountListReport {
+  return { accounts: accountListEntriesOf(snapshot), terminal }
+}
+
+/** Every managed Claude and Codex account with its cached quota, as `orca account list` shows it. */
+export function accountListEntriesOf(snapshot: RuntimeAccountsSnapshot): AccountListEntry[] {
   const claude = snapshot.claude.accounts.map((account): AccountListEntry => {
     const active = isActiveAccountId(account.id, snapshot.claude)
     return {
@@ -147,7 +152,7 @@ export function buildAccountListReport(
       )
     }
   })
-  return { accounts: [...claude, ...codex], terminal }
+  return [...claude, ...codex]
 }
 
 function formatWindow(label: string, window: RateLimitWindow | null | undefined): string | null {

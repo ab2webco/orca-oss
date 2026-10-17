@@ -116,6 +116,22 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     fromYaml.unmount()
   })
 
+  it('spreads members over accounts automatically on this machine, default unless set', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+    expect(view.container.textContent).toContain('Member accounts')
+    expect(view.container.textContent).toContain("Orca's account · default")
+    click(view.container, '[aria-label="Member accounts"] button', 'Most free')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { orchestrator: { accounts: 'auto' } } } }
+    ])
+    view.unmount()
+
+    const fromYaml = render({}, { orchestrator: { accounts: 'auto' } })
+    expect(fromYaml.container.textContent).toContain('Most free quota · from orca.yaml')
+    fromYaml.unmount()
+  })
+
   it('saves a typed value on blur and inherits when the field is cleared', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(

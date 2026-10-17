@@ -4,6 +4,7 @@ import {
   statusGroupOfName,
   type GameActivity,
   type GameAgent,
+  type GameMemberAccount,
   type GameMemberWorktree,
   type GameStatusGroup,
   type GameWorkItem
@@ -15,6 +16,13 @@ export type GameAgentRow = Pick<
   RuntimeWorktreeAgentRow,
   'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
 > & { parentPaneKey?: string | null }
+
+/** The account a member's agent runs on, read from its live pane and its worktree's pin. */
+export type GameMemberAccountOf = (member: {
+  paneKey: string
+  agentType: string | null
+  worktreeId: string | null
+}) => GameMemberAccount | null
 
 export type ReadLinkedStatus = (
   linked: WorkspaceLinkedItem
@@ -72,6 +80,9 @@ export async function gameFleetOf(args: {
   activityOf: (paneKey: string) => GameActivity | null
   readMemberWork: ((worktreeId: string) => Promise<GameMemberWork | null>) | undefined
   readLinkedStatus: ReadLinkedStatus | undefined
+  accountOf?: GameMemberAccountOf
+  /** The lead's worktree, where a member without one of its own runs. */
+  leadWorktreeId?: string | null
 }): Promise<GameAgent[]> {
   const { leaderPaneKey, teamHandles } = args
   const isMemberRow = (row: GameAgentRow): boolean =>
@@ -99,13 +110,22 @@ export async function gameFleetOf(args: {
         ? await liveLinkedItemOf(work.linkedWorkItem, args.readLinkedStatus)
         : null
       const activity = args.activityOf(row.paneKey)
+      const isMember = isMemberRow(row) || worktree !== undefined
+      const account = isMember
+        ? (args.accountOf?.({
+            paneKey: row.paneKey,
+            agentType: row.agentType,
+            worktreeId: worktree?.id ?? args.leadWorktreeId ?? null
+          }) ?? null)
+        : null
       return {
         ...gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null),
-        ...(isMemberRow(row) || worktree ? { isMember: true } : {}),
+        ...(isMember ? { isMember: true } : {}),
         ...(worktree ? { worktree } : {}),
         ...(review ? { review } : {}),
         ...(workItem ? { workItem } : {}),
-        ...(activity ? { activity } : {})
+        ...(activity ? { activity } : {}),
+        ...(account ? { account } : {})
       }
     })
   )

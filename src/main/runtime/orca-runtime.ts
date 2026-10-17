@@ -665,6 +665,8 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
+import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -30157,6 +30159,35 @@ export class OrcaRuntimeService {
     return { opened: true }
   }
 
+  // Why never throw: an unreadable account must cost the member its tag, not the whole game state.
+  private gameMemberAccountFor(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
+  ): ReturnType<typeof gameMemberAccountOf> {
+    const provider = accountProviderOfAgent(member.agentType)
+    const services = this.accountServices
+    if (!provider || !services) {
+      return null
+    }
+    try {
+      const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+      const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+      const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
+      return gameMemberAccountOf({
+        agentType: member.agentType,
+        live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
+        pinnedAccountId:
+          provider === 'claude' ? worktree?.claudeAccountId : worktree?.codexAccountId,
+        accounts: (provider === 'claude'
+          ? services.claudeAccounts
+          : services.codexAccounts
+        ).listAccounts().accounts
+      })
+    } catch {
+      return null
+    }
+  }
+
   async getOrchestratorGameState(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -30218,6 +30249,7 @@ export class OrcaRuntimeService {
               : null
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
+      accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
       leaderPaneKey: args.paneKey ?? null,
       callerParentPaneKey: args.paneKey
         ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)

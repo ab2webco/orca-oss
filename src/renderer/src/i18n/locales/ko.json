@@ -10752,7 +10752,12 @@
           "title": "리더",
           "description": "사용자와 대화하고 티켓마다 멤버 하나를 시작하는 세션입니다. 프로젝트 기본값은 orca.yaml에서 정하며, 여기서는 이 기기에서 이를 재정의합니다.",
           "yamlOnly": "시작 프롬프트와 프로젝트 규칙은 orca.yaml의 orchestratorGame.orchestrator에서 설정합니다.",
-          "actions": "리드 버튼"
+          "actions": "리드 버튼",
+          "accounts": "멤버 계정",
+          "accountsDefault": "Orca 계정",
+          "accountsAuto": "남은 할당량이 가장 많은 계정",
+          "accountsDefaultOption": "Orca",
+          "accountsAutoOption": "가장 여유"
         },
         "OrchestratorGameActionsSetting": {
           "labelInvalid": "1~24자로 입력하세요.",

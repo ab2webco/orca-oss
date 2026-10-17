@@ -26,7 +26,11 @@ export type OrchestratorGameLead = {
   rules?: string
   /** Orca's built-in lead buttons and slash commands (wave, status, push, sweep, stop); on unless false. */
   actions?: boolean
+  /** `auto` puts each member on the managed account of its agent with the most free quota. */
+  accounts?: OrchestratorGameAccounts
 }
+
+export type OrchestratorGameAccounts = 'default' | 'auto'
 
 export type OrchestratorGameLeadLayer = Partial<OrchestratorGameLead>
 
@@ -87,6 +91,12 @@ const switchKey =
     typeof value === 'boolean' ? { [key]: value } : `${at(key)} must be true or false`
 
 const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
+  accounts: (value) => {
+    const text = typeof value === 'string' ? value.trim() : ''
+    return text === 'default' || text === 'auto'
+      ? { accounts: text }
+      : `${at('accounts')} must be default or auto`
+  },
   autostart: switchKey('autostart'),
   actions: switchKey('actions'),
   cap: (value) =>

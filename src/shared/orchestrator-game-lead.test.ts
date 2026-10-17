@@ -39,6 +39,26 @@ describe('parseGameLead', () => {
     })
   })
 
+  it('takes accounts default or auto, and warns on anything else', () => {
+    expect(parseGameLead({ accounts: ' auto ' })).toEqual({
+      value: { accounts: 'auto' },
+      warnings: []
+    })
+    expect(parseGameLead({ accounts: 'default' }).value).toEqual({ accounts: 'default' })
+    expect(parseGameLead({ accounts: 'spread' })).toEqual({
+      value: {},
+      warnings: ['orchestratorGame.orchestrator.accounts must be default or auto']
+    })
+  })
+
+  it('resolves accounts key by key, Settings over orca.yaml', () => {
+    expect(resolveGameLead([undefined, { accounts: 'auto' }, undefined]).accounts).toBe('auto')
+    expect(
+      resolveGameLead([undefined, { accounts: 'auto' }, { accounts: 'default' }]).accounts
+    ).toBe('default')
+    expect(resolveGameLead([]).accounts).toBeUndefined()
+  })
+
   it('drops each bad key with a warning and keeps the rest', () => {
     const parsed = parseGameLead({
       autostart: 'yes',

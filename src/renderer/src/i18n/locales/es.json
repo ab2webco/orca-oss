@@ -10752,7 +10752,12 @@
           "title": "Líder",
           "description": "La sesión que habla contigo y lanza un miembro por ticket. orca.yaml define el valor del proyecto; estos ajustes lo cambian en este equipo.",
           "yamlOnly": "El prompt de lanzamiento y las reglas del proyecto se definen en orca.yaml, en orchestratorGame.orchestrator.",
-          "actions": "Botones del líder"
+          "actions": "Botones del líder",
+          "accounts": "Cuentas de los miembros",
+          "accountsDefault": "La cuenta de Orca",
+          "accountsAuto": "La de más cuota libre",
+          "accountsDefaultOption": "De Orca",
+          "accountsAutoOption": "Más libre"
         },
         "OrchestratorGameActionsSetting": {
           "labelInvalid": "Usa de 1 a 24 caracteres.",
