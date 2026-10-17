@@ -62,6 +62,15 @@ const updateCapableCallers = new Map<string, readonly string[]>([
     ['SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND', 'installedCommand={updateCommand}']
   ],
   [
+    'src/renderer/src/components/settings/OrchestratorGameScenesSkillCard.tsx',
+    [
+      'ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND',
+      'installedCommand={updateCommand}',
+      'const installCommand = activeSkillRuntime.installDisabledReason',
+      'const updateCommand = activeSkillRuntime.installDisabledReason'
+    ]
+  ],
+  [
     'src/renderer/src/components/settings/CliSection.tsx',
     ['ORCA_CLI_SKILL_UPDATE_COMMAND', 'installedCommand={cliSkillUpdateCommand}']
   ],

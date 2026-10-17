@@ -771,6 +771,21 @@
       },
       "ephemeralVmWorktreeCreation": {
         "sparseCheckoutUnsupported": "Las recetas con raíz aprovisionada no admiten sparse checkout."
+      },
+      "orcaGameScenes": {
+        "usage": {
+          "examples": {
+            "newScene": "Crea una escena nueva",
+            "newSceneSummary": "Parte de la plantilla, dibuja cada fase y valídala hasta que no tenga errores.",
+            "newScenePrompt": "Usa {{value0}} para crear una escena de Super Smash Bros para este proyecto y actívala.",
+            "changeColors": "Cambia los colores",
+            "changeColorsSummary": "Cambia el cielo, el mundo y la banda del equipo de la escena que ya tienes.",
+            "changeColorsPrompt": "Usa {{value0}} para cambiar los colores de la escena a una paleta de atardecer y valídala.",
+            "drawsQuest": "Arregla una escena que dibuja Quest",
+            "drawsQuestSummary": "Averigua por qué el juego vuelve a Quest y arregla el archivo hasta que se dibuje la escena.",
+            "drawsQuestPrompt": "Mi escena dibuja Quest en lugar de sí misma. Usa {{value0}} para averiguar por qué y arréglala."
+          }
+        }
       }
     },
     "hooks": {
@@ -10803,6 +10818,29 @@
           "timezone": "Zona horaria",
           "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
           "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."
+        },
+        "orcaGameScenes": {
+          "skill": {
+            "search": {
+              "title": "Habilidad de escenas del juego",
+              "description": "Permite a los agentes crear, cambiar el estilo y arreglar escenas personalizadas del juego de Agent Teams.",
+              "skillName": "orca-game-scenes",
+              "scene": "escena",
+              "customScene": "escena personalizada",
+              "theme": "tema",
+              "skin": "aspecto",
+              "agentTeams": "agent teams",
+              "game": "juego",
+              "skill": "habilidad"
+            }
+          }
+        },
+        "OrchestratorGameScenesSkillCard": {
+          "description": "Permite a los agentes crear, cambiar el estilo y arreglar escenas personalizadas: parten de la plantilla, validan el archivo hasta que no tenga errores y la activan para el proyecto.",
+          "terminalTitle": "Configuración de la habilidad de escenas del juego",
+          "terminalAriaLabel": "Terminal de instalación de la habilidad de escenas del juego",
+          "howToUse": "Cómo usarla",
+          "howToUseDescription": "Pide a un agente en una terminal una escena, un nuevo aspecto para la que ya tienes o por qué la tuya dibuja Quest."
         }
       },
       "right": {
