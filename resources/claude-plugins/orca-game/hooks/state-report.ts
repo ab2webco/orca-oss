@@ -125,10 +125,11 @@ export const stateReportOf = (
   const sources = state.sources ?? {}
   const sourced = (value: string, source: GameSource | undefined): string =>
     source === undefined ? value : `${value} ${words.from(source)}`
+  // Why demo apart: /orca-game:demo sets it, not /orca-game:mode.
   const overridden = (value: string, session: string | undefined, key: 'mode' | 'render') =>
     session === undefined || session === value
       ? ''
-      : ` · ${words.thisSession(session, `orca-game:${key}`)}`
+      : ` · ${words.thisSession(session, `orca-game:${session === 'demo' ? 'demo' : key}`)}`
   const settings: [string, string][] = []
   if (config.mode !== undefined) {
     settings.push([
@@ -170,8 +171,9 @@ export const stateReportOf = (
     ...(flags.length > 0 ? [flags.join(' · ')] : []),
     ...(lead === '' ? [] : [`${words.lead.padEnd(width)}${lead}`, ...members]),
     ...stopOf(body.stopped, words),
+    // Why not `-`: Claude Code draws a command's output as Markdown, where a list swallows the next lines.
     ...(state.warnings.length > 0
-      ? [words.warnings, ...state.warnings.map((one) => `  - ${one}`)]
+      ? [words.warnings, ...state.warnings.map((one) => `  • ${one}`)]
       : []),
     ...(links.length > 0 ? [words.links, ...links.map((one) => `  ${one}`)] : [])
   ].join('\n')

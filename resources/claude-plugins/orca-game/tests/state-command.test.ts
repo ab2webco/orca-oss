@@ -109,6 +109,13 @@ describe('/orca-game:state', () => {
     )
   })
 
+  test('says a CLI it refuses to start could not be started, running nothing', async ($, on) => {
+    const cli = 'C:/Orca "x"/orca.cmd'
+    const runs = await start($, on, { ORCA_GAME_CLI: cli, ComSpec: COMSPEC })
+    expect((await state($)).text).toBe(`orca game state failed: ${cli} could not be started`)
+    expect(runs).toEqual([])
+  })
+
   test("runs a Windows batch-file CLI through cmd.exe and speaks the pane's language", async ($, on) => {
     const cli = 'C:/Orca/orca-dev.cmd'
     const runs = await start($, on, {

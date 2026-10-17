@@ -116,7 +116,7 @@ describe('stateReportOf', () => {
         '  CIN-9   finished   PR #39 merged, CI green',
         'STOP since 2026-10-17T15:00:00.000Z (by lead): nothing is launched or pushed until `game resume`',
         'Warnings',
-        '  - orchestratorGame.extra is not a known setting',
+        '  • orchestratorGame.extra is not a known setting',
         'Links',
         '  Board  https://jira.example.com/board'
       ].join('\n')
@@ -129,6 +129,8 @@ describe('stateReportOf', () => {
     expect(report).toContain(
       'Render    classic (from default) · this session: hd (/orca-game:render)'
     )
+    const demo = stateReportOf(JSON.stringify(STATE), { mode: 'demo' }, EN) ?? ''
+    expect(demo).toContain('Mode      zen (from project) · this session: demo (/orca-game:demo)')
     const same = stateReportOf(JSON.stringify(STATE), { mode: 'zen', render: 'classic' }, EN) ?? ''
     expect(same).not.toContain('this session')
   })
