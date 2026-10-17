@@ -70,4 +70,24 @@ describe('game board RPC', () => {
       ]
     ])
   })
+
+  it('reads, sets and clears the STOP switch of the caller project', async () => {
+    const { send, calls } = dispatcherWith({
+      stopState: async () => ({ stopped: null }),
+      setStop: async () => ({ stopped: { since: 'x', by: 'lead' }, changed: true }),
+      clearStop: async () => ({ stopped: null, changed: true })
+    })
+
+    await send('game.stopSwitch', { terminalHandle: 'h1' })
+    await send('game.stopSwitch', { terminalHandle: 'h1', set: true })
+    await send('game.stopSwitch', { terminalHandle: 'h1', set: false })
+    await expect(send('game.stopSwitch', { set: 'yes' })).resolves.toMatchObject({ ok: false })
+
+    const caller = { worktreeId: undefined, terminalHandle: 'h1' }
+    expect(calls).toEqual([
+      ['stopState', caller],
+      ['setStop', caller],
+      ['clearStop', caller]
+    ])
+  })
 })

@@ -24,6 +24,9 @@ const GameEventsParams = z
   })
   .optional()
 
+// Why set optional: without it the call only reads, so the mod can poll it like game.state.
+const GameStopSwitchParams = z.object({ ...Caller, set: z.boolean().optional() })
+
 /** The project's shared board: events, the STOP switch and inboxes; newer than `game.history`. */
 export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
   defineMethod({
@@ -38,6 +41,18 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
         text: params.text,
         key: params.key
       })
+  }),
+  defineMethod({
+    name: 'game.stopSwitch',
+    params: GameStopSwitchParams,
+    handler: async (params, { runtime }) => {
+      const board = runtime.getGameBoard()
+      const caller = { worktreeId: params.worktreeId, terminalHandle: params.terminalHandle }
+      if (params.set === undefined) {
+        return board.stopState(caller)
+      }
+      return params.set ? board.setStop(caller) : board.clearStop(caller)
+    }
   }),
   defineMethod({
     name: 'game.events',

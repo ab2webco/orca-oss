@@ -31,5 +31,17 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
       'orca game event pr_opened --text "PR #41 open"',
       'orca game event question_parked --text "Which seat map?"'
     ]
+  },
+  {
+    path: ['game', 'resume'],
+    summary: "Clear the project's persistent STOP so launches, waves and pushes run again",
+    usage: 'orca game resume [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      'Run it only when the person says to resume. It relaunches nothing: launch or wave again after it.',
+      'Posts a resumed event. A member cannot clear STOP; only the lead can.',
+      'If the STOP file cannot be removed, the result says STOP is still set.'
+    ],
+    examples: ['orca game resume']
   }
 ]

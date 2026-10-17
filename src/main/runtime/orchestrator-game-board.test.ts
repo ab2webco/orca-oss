@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GameStopSwitch } from './orchestrator-game-stop-switch'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -21,6 +22,7 @@ function board(projectOf: (caller: { terminalHandle?: string }) => GameBoardProj
   let tick = 0
   return new GameBoard({
     store: new GameHistoryStore(() => dir),
+    stops: new GameStopSwitch(() => join(dir, 'stop')),
     projectOf: async (caller) => projectOf(caller),
     now: () => new Date(Date.UTC(2026, 9, 16, 10, 0, tick++))
   })
@@ -59,5 +61,38 @@ describe('GameBoard events', () => {
 
     expect((await game.events({ ticket: 'cin-1' })).events).toHaveLength(1)
     expect((await game.events({})).events).toHaveLength(2)
+  })
+})
+
+describe('GameBoard STOP', () => {
+  const lead = { terminalHandle: 'term_lead' }
+  const asMember = { terminalHandle: 'term_member' }
+  const projectOf = (caller: { terminalHandle?: string }) =>
+    caller.terminalHandle === 'term_member' ? MEMBER : LEAD
+
+  it('sets and clears STOP for the whole project, posting stopped and resumed once each', async () => {
+    const game = board(projectOf)
+
+    expect(await game.stopState(asMember)).toEqual({ stopped: null })
+    const set = await game.setStop(lead)
+    expect(set).toEqual({ stopped: { since: expect.any(String), by: 'lead' }, changed: true })
+    expect((await game.setStop(lead)).changed).toBe(false)
+    expect(await game.stopState(asMember)).toEqual({ stopped: set.stopped })
+
+    expect(await game.clearStop(lead)).toEqual({ stopped: null, changed: true })
+    expect((await game.clearStop(lead)).changed).toBe(false)
+    expect((await game.events(lead)).events.map((one) => [one.kind, one.by])).toEqual([
+      ['resumed', 'lead'],
+      ['stopped', 'lead']
+    ])
+  })
+
+  it('never lets a member set or clear STOP', async () => {
+    const game = board(projectOf)
+    await game.setStop(lead)
+
+    await expect(game.clearStop(asMember)).rejects.toThrow(/Only the lead/)
+    await expect(game.setStop(asMember)).rejects.toThrow(/Only the lead/)
+    expect((await game.stopState(lead)).stopped).not.toBeNull()
   })
 })

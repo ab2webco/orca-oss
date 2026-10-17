@@ -12,6 +12,7 @@ import {
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { postGameEvents } from './orchestrator-game-board-call'
+import { refuseWhileStopped } from './orchestrator-game-hold'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
@@ -212,6 +213,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const response = await readCallerGameState(client)
+    refuseWhileStopped(response.result, ticket)
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
     const { cap, running } = gameFleetReportOf(response.result)
     if (running >= cap) {

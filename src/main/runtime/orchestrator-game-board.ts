@@ -1,4 +1,6 @@
 import type { GameHistoryStore } from './orchestrator-game-history-store'
+import type { GameStopSwitch } from './orchestrator-game-stop-switch'
+import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import {
   filterGameEvents,
   type GameEvent,
@@ -29,6 +31,7 @@ export class GameBoard {
   constructor(
     private readonly deps: {
       store: GameHistoryStore
+      stops: GameStopSwitch
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       now?: () => Date
     }
@@ -43,6 +46,42 @@ export class GameBoard {
   ): Promise<{ events: GameEvent[] }> {
     const project = await this.deps.projectOf(args)
     return { events: filterGameEvents(await this.deps.store.events(project.key), args) }
+  }
+
+  /** Every caller reads it, members too; one that cannot be read counts as set. */
+  async stopState(caller: GameBoardCaller): Promise<{ stopped: GameStop | null }> {
+    const project = await this.deps.projectOf(caller)
+    return { stopped: await this.deps.stops.read(project.key) }
+  }
+
+  async setStop(caller: GameBoardCaller): Promise<{ stopped: GameStop; changed: boolean }> {
+    const project = await this.leadProjectOf(caller, 'set')
+    const result = await this.deps.stops.set(project.key, {
+      since: this.now().toISOString(),
+      by: 'lead'
+    })
+    if (result.changed) {
+      await this.postEvent({ ...caller, kind: 'stopped', text: 'STOP set: no launches or pushes' })
+    }
+    return result
+  }
+
+  async clearStop(caller: GameBoardCaller): Promise<{ stopped: null; changed: boolean }> {
+    const project = await this.leadProjectOf(caller, 'clear')
+    const { changed } = await this.deps.stops.clear(project.key)
+    if (changed) {
+      await this.postEvent({ ...caller, kind: 'resumed', text: 'STOP cleared' })
+    }
+    return { stopped: null, changed }
+  }
+
+  // Why: STOP is the lead's switch; a stopped member must not be able to lift it.
+  private async leadProjectOf(caller: GameBoardCaller, verb: string): Promise<GameBoardProject> {
+    const project = await this.deps.projectOf(caller)
+    if (project.isMember) {
+      throw new Error(`Only the lead can ${verb} the project's STOP.`)
+    }
+    return project
   }
 
   async postEvent(args: GameEventPost): Promise<{ posted: boolean; event: GameEvent }> {

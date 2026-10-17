@@ -61,6 +61,7 @@ function fakeClient(state: unknown, snapshot: unknown, refreshed: unknown = snap
     'terminal.show': { terminal: { handle: 'h1' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },
+    'game.stopSwitch': { stopped: null },
     'orchestration.workerStart': {
       runId: 'run_1',
       taskId: 'task_1',

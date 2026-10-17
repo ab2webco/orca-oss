@@ -668,6 +668,7 @@ import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
@@ -3607,6 +3608,7 @@ export class OrcaRuntimeService {
   )
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
+    stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
     projectOf: (caller) => this.gameBoardProjectOf(caller)
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
@@ -30386,6 +30388,13 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readStop: async () =>
+        (
+          await this.gameBoard.stopState({
+            worktreeId: worktree?.id,
+            terminalHandle: callerHandle ?? undefined
+          })
+        ).stopped,
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {

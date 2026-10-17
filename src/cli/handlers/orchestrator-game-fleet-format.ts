@@ -1,4 +1,6 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch'
+import { formatStop, type GameStopResult } from './orchestrator-game-stop'
+import type { GameHold } from './orchestrator-game-hold'
 import type {
   GameFleet,
   GameFleetRow,
@@ -125,4 +127,18 @@ export function formatPush(push: GamePushResult): string {
       return `${label} push ${outcome}: ${entry.prompt ?? ''}`
     })
     .join('\n')
+}
+
+export type GameHeldStopResult = GameStopResult & { hold: GameHold; told: string[] }
+
+export function formatHeldStop(result: GameHeldStopResult): string {
+  const { hold } = result
+  const head = hold.set
+    ? `STOP set${hold.stopped?.since ? ` since ${hold.stopped.since}` : ''}: launches, waves, pushes and moves are refused until \`orca game resume\`.`
+    : `STOP not set (${hold.reason ?? 'unknown'}); members were stopped anyway.`
+  return [
+    head,
+    formatStop(result),
+    ...(result.told.length > 0 ? [`Told to stop by message: ${result.told.join(', ')}`] : [])
+  ].join('\n')
 }
