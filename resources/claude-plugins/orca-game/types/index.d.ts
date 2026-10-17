@@ -184,6 +184,42 @@ export type HudPalette = {
   star: number
 }
 
+/** A cast member's sprite: one to seven rows of one width (1–10); each glyph a key of its `colors`, '.' transparent. */
+export type CastFrame = readonly string[]
+
+/** The scene's pet, which Pet hearts; a scene without one pets its hero, Clawd. */
+export type ScenePet = {
+  name?: LocalizedName
+  /** One to four walking frames, all the size of the first. */
+  frames: readonly CastFrame[]
+  /** Shown while it is petted. */
+  happy: CastFrame
+  colors: Readonly<Record<string, number>>
+}
+
+/** What Jev decided, as the advisor acts it out. */
+export type AdvisorGesture =
+  | 'lowered'
+  | 'raised'
+  | 'approved'
+  | 'unsure'
+  | 'escalated'
+  | 'ciRunning'
+  | 'ciPassed'
+  | 'ciFailed'
+
+/** Who stands for Jev in the scene; the gesture props are the game's, the body the scene's. */
+export type SceneAdvisor = {
+  name?: LocalizedName
+  /** One to four idle frames, all the size of the first. */
+  frames: readonly CastFrame[]
+  /** The body while one gesture plays, in place of the idle frames. */
+  gestures?: Readonly<Partial<Record<AdvisorGesture, CastFrame>>>
+  colors: Readonly<Record<string, number>>
+}
+
+export type SceneCast = { pet?: ScenePet; advisor?: SceneAdvisor }
+
 export type SceneDefinition = {
   id: string
   looks: Readonly<Record<ScenePhase, Look>>
@@ -196,6 +232,8 @@ export type SceneDefinition = {
   /** Caption painted while a merge runs; pixel art, so width-1 characters only. */
   finale?: LocalizedName
   hud?: HudPalette
+  /** The pet and Jev's advisor; either left out keeps Clawd or the referee. */
+  cast?: SceneCast
 }
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }

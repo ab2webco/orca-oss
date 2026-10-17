@@ -8,7 +8,9 @@ import {
   sceneCard,
   sceneCostume,
   sceneFile,
-  sceneLook
+  sceneAdvisor,
+  sceneLook,
+  scenePet
 } from '../../../../src/shared/__fixtures__/orchestrator-game-scene'
 
 const roundTrip = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
@@ -37,6 +39,34 @@ describe('sceneDefinitionOf', () => {
       orca.ok ? orca.definition : undefined
     )
     expect(parseOrchestratorGameScene(JSON.stringify(quest), 'quest').ok).toBe(true)
+  })
+
+  it('reads a cast as Orca serves it', () => {
+    const text = JSON.stringify(sceneFile({ cast: { pet: scenePet, advisor: sceneAdvisor } }))
+    const orca = parseOrchestratorGameScene(text, 'file:mc.json')
+    const scene = sceneDefinitionOf(JSON.parse(text), 'file:mc.json')
+    expect(scene?.cast?.pet?.colors.H).toBe(0xff5a8a)
+    expect(scene?.cast?.advisor?.gestures?.escalated).toEqual(sceneAdvisor.gestures.escalated)
+    expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+  })
+
+  it('drops only a cast member it cannot draw, and a gesture it does not act out', () => {
+    const advisor = { ...sceneAdvisor, gestures: { ...sceneAdvisor.gestures, dance: ['G'] } }
+    const cases = [
+      { pet: { ...scenePet, happy: ['W'] }, advisor },
+      { pet: { ...scenePet, colors: { W: '#d8d8d8' } }, advisor },
+      { pet: { ...scenePet, frames: [] }, advisor },
+      { pet: { ...scenePet, name: { es: 'Lobo' } }, advisor },
+      { pet: { ...scenePet, frames: [Array(8).fill('W')] }, advisor },
+      { pet: { ...scenePet, frames: [['WWWWWWWWWWW']] }, advisor }
+    ]
+    for (const cast of cases) {
+      const scene = sceneDefinitionOf(roundTrip({ ...quest, cast }), 'file:mc.json')
+      expect(scene?.cast).toEqual({
+        advisor: { ...sceneAdvisor, colors: { G: 0xb8b8b0, E: 0xd83a2e } }
+      })
+    }
+    expect(sceneDefinitionOf({ ...quest, cast: 7 }, 'file:mc.json')?.cast).toBeUndefined()
   })
 
   it('takes a name per language like Orca does, keeping only the languages it ships', () => {

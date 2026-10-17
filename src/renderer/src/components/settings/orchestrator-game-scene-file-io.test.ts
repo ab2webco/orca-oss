@@ -43,7 +43,7 @@ describe('sceneFileTextOf', () => {
       expect(scene).toBeDefined()
       const text = sceneFileTextOf(scene!)
       const parsed = parseOrchestratorGameScene(text, id)
-      expect(parsed).toEqual({ ok: true, definition: scene })
+      expect(parsed).toEqual({ ok: true, definition: scene, warnings: [] })
       expect(text).toMatch(/^\{\n {2}"looks": \{/)
       expect(text).toMatch(/"skyTop": "#[0-9a-f]{6}"/)
       expect(text).not.toMatch(/"id":/)

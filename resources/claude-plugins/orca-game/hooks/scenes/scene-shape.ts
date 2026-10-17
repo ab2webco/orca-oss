@@ -1,4 +1,5 @@
-import { GAME_LOCALES, isRasterText, type GameLocale, type LocalizedName } from '../game-strings'
+import { isRasterText, type LocalizedName } from '../game-strings'
+import { castOf } from './cast-shape'
 import {
   PLANT_KINDS,
   SCENERIES,
@@ -10,18 +11,14 @@ import {
   type SceneDefinition,
   type ScenePhase
 } from './scene-definition'
+import { colorOf, glyphColorsOf, hexOf, isShape, nameOf, textOf } from './scene-values'
 
 // Re-validates a scene Orca served, so bad data drops the scene instead of crashing the mod.
 
-type Shape = Record<string, unknown>
-
 const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 const COSTUME_ROWS = 6
-const NAME_MAX = 32
 const FINALE_MAX = 24
 const SPRITE_ROW = /^[!-~]{10}$/
-const GLYPH = /^[!-~]$/
-const HEX = /^#[0-9a-fA-F]{6}$/
 const LOOK_COLORS = [
   'skyTop',
   'skyBottom',
@@ -33,37 +30,6 @@ const LOOK_COLORS = [
   'plant',
   'cloud'
 ] as const
-
-const isShape = (value: unknown): value is Shape =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-// Why both, as Orca's parser: JSON has no hex literals, so a hand-written scene says '#rrggbb'.
-const colorOf = (value: unknown): number | undefined => {
-  if (typeof value === 'string') {
-    return HEX.test(value) ? Number.parseInt(value.slice(1), 16) : undefined
-  }
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffff
-    ? value
-    : undefined
-}
-
-// Why: card names reach the terminal verbatim; control, C1 and bidi characters could rewrite it.
-const isSafeCode = (code: number): boolean =>
-  !(
-    code <= 0x1f ||
-    (code >= 0x7f && code <= 0x9f) ||
-    [0x200b, 0x200e, 0x200f, 0x061c, 0x2060, 0xfeff, 0x2028, 0x2029].includes(code) ||
-    (code >= 0x202a && code <= 0x202e) ||
-    (code >= 0x2066 && code <= 0x2069)
-  )
-
-const textOf = (value: unknown, max: number): string | undefined =>
-  typeof value === 'string' &&
-  value.length > 0 &&
-  value.length <= max &&
-  [...value].every((one) => isSafeCode(one.codePointAt(0) ?? 0))
-    ? value
-    : undefined
 
 const lookOf = (value: unknown): Look | undefined => {
   if (!isShape(value) || typeof value.isNight !== 'boolean') {
@@ -97,55 +63,20 @@ const rowsOf = (value: unknown, count: number): string[] | undefined =>
     : undefined
 
 const costumeOf = (value: unknown): Costume | undefined => {
-  if (!isShape(value) || !isShape(value.colors)) {
+  if (!isShape(value)) {
     return undefined
   }
   const rows = rowsOf(value.rows, COSTUME_ROWS)
   const legs = rowsOf(value.legs, 2)
-  const entries = Object.entries(value.colors).map(
-    ([glyph, color]) => [glyph, colorOf(color)] as const
-  )
-  if (rows === undefined || legs === undefined || legs[0] === undefined || legs[1] === undefined) {
+  const colors = glyphColorsOf(value.colors)
+  if (rows === undefined || legs?.[0] === undefined || legs[1] === undefined || !colors) {
     return undefined
   }
-  if (
-    !entries.every(([glyph, color]) => GLYPH.test(glyph) && glyph !== '.' && color !== undefined)
-  ) {
-    return undefined
-  }
-  const colors = Object.fromEntries(entries) as Record<string, number>
   const glyphs = [...rows, ...legs].join('').replaceAll('.', '')
   if (![...glyphs].every((one) => Object.hasOwn(colors, one))) {
     return undefined
   }
   return { rows, legs: [legs[0], legs[1]], colors }
-}
-
-const hexOf = (value: unknown): string | undefined =>
-  typeof value === 'string' && HEX.test(value) ? value : undefined
-
-// Why: Orca strips languages it does not ship, so an unknown key is ignored, not a failure.
-const nameOf = (value: unknown, max = NAME_MAX): LocalizedName | undefined => {
-  if (!isShape(value)) {
-    return textOf(value, max)
-  }
-  const en = textOf(value.en, max)
-  if (en === undefined) {
-    return undefined
-  }
-  const name: { en: string } & Partial<Record<GameLocale, string>> = { en }
-  for (const locale of GAME_LOCALES) {
-    const said = value[locale]
-    if (locale === 'en' || said === undefined) {
-      continue
-    }
-    const text = textOf(said, max)
-    if (text === undefined) {
-      return undefined
-    }
-    name[locale] = text
-  }
-  return name
 }
 
 // Why width-1: a Raster refuses the whole frame over one wide character.
@@ -218,6 +149,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const foe = optionalOf(value.foe, costumeOf)
     const finale = optionalOf(value.finale, finaleOf)
     const hud = optionalOf(value.hud, hudOf)
+    const cast = castOf(value.cast)
     if (
       !looks ||
       !costumes ||
@@ -239,7 +171,8 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       band,
       ...(foe === undefined ? {} : { foe }),
       ...(finale === undefined ? {} : { finale }),
-      ...(hud === undefined ? {} : { hud })
+      ...(hud === undefined ? {} : { hud }),
+      ...(cast === undefined ? {} : { cast })
     }
   } catch {
     return undefined

@@ -97,9 +97,10 @@ export type OrchestratorGameStateInput = {
   }) => Promise<GameProjectWork>
 }
 
+// `notes` are parts of a scene that still draws, left out; `warning` means it fell back to Quest.
 type SceneFileOutcome =
-  | { scene: OrchestratorGameSceneExtension; warning?: undefined }
-  | { scene?: undefined; warning: string }
+  | { scene: OrchestratorGameSceneExtension; warning?: undefined; notes: string[] }
+  | { scene?: undefined; warning: string; notes?: undefined }
 
 // Why re-read every build: a scene being authored should redraw on the next poll, not after a restart.
 async function readSceneFile(
@@ -126,7 +127,8 @@ async function readSceneFile(
   const parsed = parseOrchestratorGameScene(text, id)
   return parsed.ok
     ? {
-        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition }
+        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition },
+        notes: parsed.warnings.map((one) => `Scene file ${path}: ${one}; drawn without it`)
       }
     : failed(parsed.error)
 }
@@ -245,6 +247,7 @@ export async function buildOrchestratorGameState(
     // Why the scene file first: the mod's note shows only the first warning, and this one changes the art.
     warnings: [
       ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),
+      ...(sceneFile?.notes ?? []),
       ...(project?.orchestratorGameWarnings ?? []),
       ...resolved.warnings,
       ...scenes.warnings,
