@@ -47,6 +47,9 @@ describe('sceneFileTextOf', () => {
       expect(text).toMatch(/^\{\n {2}"looks": \{/)
       expect(text).toMatch(/"skyTop": "#[0-9a-f]{6}"/)
       expect(text).not.toMatch(/"id":/)
+      // Why: a copied scene keeps its cast, as hand-editable as the rest.
+      expect(text).toMatch(/"cast": \{\n {4}"advisor": \{/)
+      expect(text).not.toMatch(/"[!-~]": \d+/)
       expect(text.endsWith('}\n')).toBe(true)
     }
   )

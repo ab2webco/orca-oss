@@ -12,6 +12,7 @@ export type {
   HudPalette,
   Look,
   SceneAdvisor,
+  SceneCast,
   SceneDefinition,
   ScenePet,
   ScenePhase

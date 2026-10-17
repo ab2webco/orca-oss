@@ -156,5 +156,25 @@ export const QUEST_SCENE: SceneDefinition = {
     name: { en: 'Storyteller', es: 'Narrador', ja: '語り部', ko: '이야기꾼', zh: '说书人' },
     color: '#8f9bb3'
   },
-  band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' }
+  band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' },
+  // Jev's advisor: a wizard whose staff glows while it waits.
+  cast: {
+    advisor: {
+      name: { en: 'Wizard', es: 'Mago', ja: '魔法使い', ko: '마법사', zh: '巫师' },
+      frames: [
+        ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
+        ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.G', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT']
+      ],
+      colors: {
+        P: 0x3e2a78,
+        Y: 0xffd84a,
+        S: 0xf0c9a0,
+        E: EYES,
+        W: 0xf2f2f2,
+        R: 0x5b3fa8,
+        T: 0x7a5230,
+        G: 0xfff4a0
+      }
+    }
+  }
 }

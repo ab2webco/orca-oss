@@ -181,5 +181,34 @@ export const VIGILANTE_SCENE: SceneDefinition = {
     legs: ['.P.P.P.P..', 'P.P.P.P.P.'],
     colors: { R: 0x8a2a3a, M: 0x1a1a1a, W: WHITE, S: HERO_SKIN, P: 0x2a2a2a }
   },
-  finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' }
+  finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' },
+  // Jev's advisor: the commissioner, grey mustache and trench coat, by the signal.
+  cast: {
+    advisor: {
+      name: { en: 'Commissioner', es: 'Comisionado', ja: '本部長', ko: '청장', zh: '局长' },
+      frames: [
+        ['..HHHH..', '.HSSSSH.', '.SGSGS..', '..MMMS..', '.CCWWCC.', 'SCCRWCCS', '.CC..CC.']
+      ],
+      gestures: {
+        escalated: [
+          '..HHHH..',
+          '.HSSSSH.',
+          '.SGSGS..',
+          '..MMMS..',
+          'SCCWWCC.',
+          '.CCRWCCS',
+          '.CC..CC.'
+        ]
+      },
+      colors: {
+        H: 0xc9ccd4,
+        S: HERO_SKIN,
+        G: 0x15161c,
+        M: 0xc9ccd4,
+        C: 0x8a6a4a,
+        W: WHITE,
+        R: 0xc0283a
+      }
+    }
+  }
 }

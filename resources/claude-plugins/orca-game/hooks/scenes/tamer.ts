@@ -169,5 +169,15 @@ export const TAMER_SCENE: SceneDefinition = {
     legs: ['M.M...M.M.', '.M.M.M.M..'],
     colors: { A: 0x8a8f99, M: 0x7a3fb0, R: 0xff3b3b, X: 0x2a1c40 }
   },
-  finale: { en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!' }
+  finale: { en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!' },
+  // Jev's advisor: the professor in a lab coat, who knows every creature's level.
+  cast: {
+    advisor: {
+      name: { en: 'Professor', es: 'Profesor', ja: '博士', ko: '박사', zh: '博士' },
+      frames: [
+        ['..HHHH..', '.HSSSS..', '.SESSS..', '..SSS...', '.WWWWWW.', 'SWWBWWWS', '..K..K..']
+      ],
+      colors: { H: 0x8a8a8a, S: FACE, E: EYES, W: 0xf4f4f4, B: 0x3a7bd6, K: 0x5a3a20 }
+    }
+  }
 }

@@ -188,6 +188,20 @@ describe('gesture props', () => {
     const empty = JSON.stringify(Array(10 * ADVISOR_PROP_WIDTH).fill(null))
     expect(frames.every((one) => one !== empty)).toBe(true)
     expect(advisorPropPixel('lowered', ADVISOR_PROP_WIDTH, 5, 0)).toBeUndefined()
+  })
+
+  // Why: the top two pixel rows are the bubbles' line, where a prop would be covered.
+  it('keep every prop below the bubbles at every beat', () => {
+    for (const gesture of ADVISOR_GESTURES) {
+      for (let age = 0; age < 24; age += 1) {
+        for (let dx = 0; dx < ADVISOR_PROP_WIDTH; dx += 1) {
+          expect([0, 1].map((y) => advisorPropPixel(gesture, dx, y, age))).toEqual([
+            undefined,
+            undefined
+          ])
+        }
+      }
+    }
     expect(advisorPropPixel('lowered', -1, 5, 0)).toBeUndefined()
   })
 })

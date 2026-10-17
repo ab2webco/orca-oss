@@ -172,5 +172,16 @@ export const JRPG_SCENE: SceneDefinition = {
     colors: { W: 0xdfe3ea, S: 0xf3dcc8, Q: 0x5fd38a, L: 0xc8ced8, K: 0x15161c }
   },
   // Why ★: PR #32 framed it with ♪, which is outside the characters a Raster is known to draw.
-  finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' }
+  finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' },
+  // Jev's advisor: a hooded oracle whose orb flickers while it reads the signs.
+  cast: {
+    advisor: {
+      name: { en: 'Oracle', es: 'Oráculo', ja: '預言者', ko: '예언자', zh: '先知' },
+      frames: [
+        ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'OBBBBBB.', '.BBBBBB.', '.BB..BB.'],
+        ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'QBBBBBB.', '.BBBBBB.', '.BB..BB.']
+      ],
+      colors: { B: NAVY, S: FACE, E: EYES, O: 0x9fe0ff, Q: 0xe8ecff }
+    }
+  }
 }

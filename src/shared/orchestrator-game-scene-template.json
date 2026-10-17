@@ -245,5 +245,30 @@
     "text": "#f1e2b8",
     "dim": "#8a90a8",
     "star": "#f5f3c8"
+  },
+  "cast": {
+    "advisor": {
+      "name": {
+        "en": "Wizard",
+        "es": "Mago",
+        "ja": "魔法使い",
+        "ko": "마법사",
+        "zh": "巫师"
+      },
+      "frames": [
+        ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.T", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"],
+        ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.G", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"]
+      ],
+      "colors": {
+        "P": "#3e2a78",
+        "Y": "#ffd84a",
+        "S": "#f0c9a0",
+        "E": "#1a1a1a",
+        "W": "#f2f2f2",
+        "R": "#5b3fa8",
+        "T": "#7a5230",
+        "G": "#fff4a0"
+      }
+    }
   }
 }

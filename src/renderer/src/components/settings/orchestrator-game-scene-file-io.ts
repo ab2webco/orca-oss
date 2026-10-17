@@ -11,6 +11,7 @@ import {
 import type {
   Costume,
   Look,
+  SceneCast,
   SceneDefinition
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import { joinPath } from '../../lib/path'
@@ -50,12 +51,18 @@ const lookText = (look: Look): Record<string, unknown> => ({
   cloud: hex(look.cloud)
 })
 
+const colorsText = (colors: Readonly<Record<string, number>>): Record<string, string> =>
+  Object.fromEntries(Object.entries(colors).map(([glyph, color]) => [glyph, hex(color)]))
+
 const costumeText = (costume: Costume): Record<string, unknown> => ({
   rows: costume.rows,
   legs: costume.legs,
-  colors: Object.fromEntries(
-    Object.entries(costume.colors).map(([glyph, color]) => [glyph, hex(color)])
-  )
+  colors: colorsText(costume.colors)
+})
+
+const castText = (cast: SceneCast): Record<string, unknown> => ({
+  ...(cast.pet ? { pet: { ...cast.pet, colors: colorsText(cast.pet.colors) } } : {}),
+  ...(cast.advisor ? { advisor: { ...cast.advisor, colors: colorsText(cast.advisor.colors) } } : {})
 })
 
 const byPhase = <T>(
@@ -80,7 +87,8 @@ export function sceneFileTextOf(scene: SceneDefinition): string {
             Object.entries(scene.hud).map(([key, color]) => [key, hex(color)])
           )
         }
-      : {})
+      : {}),
+    ...(scene.cast ? { cast: castText(scene.cast) } : {})
   }
   return `${JSON.stringify(file, null, 2)}\n`
 }

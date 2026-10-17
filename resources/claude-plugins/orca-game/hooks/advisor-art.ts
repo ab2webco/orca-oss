@@ -21,6 +21,7 @@ export const REFEREE: SceneAdvisor = {
 }
 
 // Nine pixel rows from the top of the scene to just above the ground, five columns, '.' clear.
+// Why nothing above row 2: the top two rows are the bubbles' line, which would hide a prop.
 type Prop = readonly string[]
 
 const PROP_COLORS: Readonly<Record<string, number>> = {
@@ -38,8 +39,8 @@ const PROP_COLORS: Readonly<Record<string, number>> = {
   P: 0x8a6a3a
 }
 
-const DOWN: Prop = ['.....', '.....', '.....', '..D..', '..D..', '..D.S', 'D.D.D', '.DDD.', '..D..']
-const UP: Prop = ['..U..', '.UUU.', 'U.U.U', '..U..', '..U..', '..U.S', '.....', '.....', '.....']
+const DOWN: Prop = ['.....', '.....', '..D..', '..D..', '..D.S', 'DDDDD', '.DDD.', '..D..', '.....']
+const UP: Prop = ['.....', '.....', '..U..', '.UUU.', 'UUUUU', '..U.S', '..U..', '..U..', '.....']
 const THUMB: Prop = [
   '.....',
   '.....',
@@ -53,22 +54,22 @@ const THUMB: Prop = [
 ]
 const UNSURE: Prop = [
   '.....',
+  '.....',
   '...YY',
   '...YY',
   '...YY',
-  '....S',
   '.MMM.',
   '.MLM.',
   '.MMM.',
   '...M.'
 ]
 const RED_CARD: Prop = [
+  '.....',
+  '.....',
   '...RR',
   '...RR',
   '...RR',
   '....S',
-  '.....',
-  '.....',
   '.....',
   '.....',
   '.....'
@@ -85,8 +86,8 @@ const WATCH: Prop = [
   '.CCC.'
 ]
 const FLAG: readonly Prop[] = [
-  ['.....', '.FFFP', 'FFFFP', '.FFFP', '....P', '....S', '.....', '.....', '.....'],
-  ['.....', 'FFF.P', '.FFFP', 'FFF.P', '....P', '....S', '.....', '.....', '.....']
+  ['.....', '.....', '.FFFP', 'FFFFP', '.FFFP', '....P', '....S', '.....', '.....'],
+  ['.....', '.....', 'FFF.P', '.FFFP', 'FFF.P', '....P', '....S', '.....', '.....']
 ]
 const HAND_OF_WATCH: readonly (readonly [number, number])[] = [
   [2, 5],
@@ -112,13 +113,14 @@ export const advisorPropPixel = (
   }
   const beat = Math.floor(age / 3)
   switch (gesture) {
+    // Both arrows bob down a pixel, so neither reaches the bubbles' line.
     case 'lowered':
       return propPixel(DOWN, dx, y - (beat % 2))
     case 'raised':
-      return propPixel(UP, dx, y + (beat % 2))
+      return propPixel(UP, dx, y - (beat % 2))
     case 'approved':
       // The whistle's toot, above the thumb.
-      return y === 1 && dx === beat % 3 ? WHITE : propPixel(THUMB, dx, y)
+      return y === 2 && dx === beat % 3 ? WHITE : propPixel(THUMB, dx, y)
     case 'unsure': {
       // The magnifier sweeps a column back and forth under the card.
       const sweep = y >= 5 && beat % 2 === 1 ? 1 : 0
