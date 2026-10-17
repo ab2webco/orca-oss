@@ -17,9 +17,6 @@
         "description": "Elija el idioma utilizado por la interfaz de Orca Lab.",
         "system": "Sistema",
         "english": "Inglés",
-        "chinese": "中文（简体）",
-        "korean": "한국어",
-        "japanese": "日本語",
         "spanish": "Español"
       },
       "statusBar": {
@@ -774,6 +771,21 @@
       },
       "ephemeralVmWorktreeCreation": {
         "sparseCheckoutUnsupported": "Las recetas con raíz aprovisionada no admiten sparse checkout."
+      },
+      "orcaGameScenes": {
+        "usage": {
+          "examples": {
+            "newScene": "Crea una escena nueva",
+            "newSceneSummary": "Parte de la plantilla, dibuja cada fase y valídala hasta que no tenga errores.",
+            "newScenePrompt": "Usa {{value0}} para crear una escena de Super Smash Bros para este proyecto y actívala.",
+            "changeColors": "Cambia los colores",
+            "changeColorsSummary": "Cambia el cielo, el mundo y la banda del equipo de la escena que ya tienes.",
+            "changeColorsPrompt": "Usa {{value0}} para cambiar los colores de la escena a una paleta de atardecer y valídala.",
+            "drawsQuest": "Arregla una escena que dibuja Quest",
+            "drawsQuestSummary": "Averigua por qué el juego vuelve a Quest y arregla el archivo hasta que se dibuje la escena.",
+            "drawsQuestPrompt": "Mi escena dibuja Quest en lugar de sí misma. Usa {{value0}} para averiguar por qué y arréglala."
+          }
+        }
       }
     },
     "hooks": {
@@ -9393,7 +9405,14 @@
             },
             "actions": "acciones",
             "buttons": "botones",
-            "position": "posición"
+            "position": "posición",
+            "memoryPressureTitle": "Aviso de memoria baja",
+            "memoryPressureDescription": "Avisa cuando el sistema se está quedando sin memoria y nombra las terminales que más usan.",
+            "memoryKeyword": "memoria",
+            "ramKeyword": "ram",
+            "swapKeyword": "swap",
+            "pressureKeyword": "presión",
+            "warningKeyword": "aviso"
           },
           "windows": {
             "search": {
@@ -10734,6 +10753,107 @@
           "sceneFileSshOffline": "Conecta este proyecto SSH para leer su archivo de escena.",
           "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
           "sceneFileNotText": "no es un archivo de texto"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "Límite de miembros",
+          "capInvalid": "Escribe un número entero del 1 al {{value0}}.",
+          "label": "Nombre del líder",
+          "labelInvalid": "Usa de 1 a 32 caracteres.",
+          "agent": "Agente",
+          "agentInvalid": "Usa un id de agente como claude o codex.",
+          "model": "Modelo",
+          "modelInvalid": "Usa un id de modelo como opus.",
+          "effort": "Esfuerzo",
+          "effortInvalid": "Usa un nivel de esfuerzo como high.",
+          "notSet": "Sin definir",
+          "autostart": "Iniciar como líder",
+          "effortNeedsModel": "Solo se usa con un modelo",
+          "title": "Líder",
+          "description": "La sesión que habla contigo y lanza un miembro por ticket. orca.yaml define el valor del proyecto; estos ajustes lo cambian en este equipo.",
+          "yamlOnly": "El prompt de lanzamiento y las reglas del proyecto se definen en orca.yaml, en orchestratorGame.orchestrator.",
+          "actions": "Botones del líder",
+          "accounts": "Cuentas de los miembros",
+          "accountsDefault": "La cuenta de Orca",
+          "accountsAuto": "La de más cuota libre",
+          "accountsDefaultOption": "De Orca",
+          "accountsAutoOption": "Más libre"
+        },
+        "OrchestratorGameActionsSetting": {
+          "labelInvalid": "Usa de 1 a 24 caracteres.",
+          "commandInvalid": "Usa un nombre en minúsculas como test-runs, de hasta 24 caracteres.",
+          "commandTaken": "Un botón del líder u otra acción ya usa este comando.",
+          "promptInvalid": "Escribe un prompt de 1 a 2000 caracteres, solo con los marcadores que permite orca.yaml.",
+          "mcpInvalid": "Indica el servidor MCP y una herramienta como list_test_runs.",
+          "argsInvalid": "Los argumentos deben ser un objeto JSON, como {\"project\": \"CIN\"}.",
+          "label": "Etiqueta",
+          "labelPlaceholder": "Test runs",
+          "command": "Comando",
+          "commandPlaceholder": "test-runs",
+          "kind": "Tipo",
+          "kindPrompt": "Prompt",
+          "kindMcp": "MCP",
+          "remove": "Quitar acción",
+          "prompt": "Prompt",
+          "promptPlaceholder": "Haz que los miembros ejecuten los test runs de Tambora de mis tickets en QA",
+          "server": "Servidor MCP",
+          "tool": "Herramienta",
+          "args": "Argumentos (JSON)",
+          "title": "Acciones",
+          "description": "Botones en la banda y en el Panel; cada uno también es un comando de barra. Una lista guardada aquí reemplaza la de orca.yaml en este equipo.",
+          "yamlEmpty": "orca.yaml no define acciones para este proyecto.",
+          "yamlList": "Acciones de orca.yaml",
+          "override": "Editar en este equipo",
+          "noneHere": "No hay acciones en este equipo.",
+          "add": "Añadir acción",
+          "save": "Guardar acciones",
+          "inherit": "Heredar de orca.yaml",
+          "key": "Tecla",
+          "keyPlaceholder": "x",
+          "keyInvalid": "Usa una letra o un dígito que el Panel no use (r p q g t i o c w a, 1-9), una vez por acción."
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "Navegador del sistema",
+          "label": "Abrir enlaces en",
+          "description": "Enlaces de PR, CI, tickets y listas de la banda y el Panel. El navegador del sistema tiene tus sesiones de GitHub y Jira."
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "Clásico",
+          "hd": "HD",
+          "label": "Render",
+          "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 10 filas con luz, clima y día y noche.",
+          "timezone": "Zona horaria",
+          "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
+          "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."
+        },
+        "orcaGameScenes": {
+          "skill": {
+            "search": {
+              "title": "Habilidad de escenas del juego",
+              "description": "Permite a los agentes crear, cambiar el estilo y arreglar escenas personalizadas del juego de Agent Teams.",
+              "skillName": "orca-game-scenes",
+              "scene": "escena",
+              "customScene": "escena personalizada",
+              "theme": "tema",
+              "skin": "aspecto",
+              "agentTeams": "agent teams",
+              "game": "juego",
+              "skill": "habilidad"
+            }
+          }
+        },
+        "OrchestratorGameScenesSkillCard": {
+          "description": "Permite a los agentes crear, cambiar el estilo y arreglar escenas personalizadas: parten de la plantilla, validan el archivo hasta que no tenga errores y la activan para el proyecto.",
+          "terminalTitle": "Configuración de la habilidad de escenas del juego",
+          "terminalAriaLabel": "Terminal de instalación de la habilidad de escenas del juego",
+          "howToUse": "Cómo usarla",
+          "howToUseDescription": "Pide a un agente en una terminal una escena, un nuevo aspecto para la que ya tienes o por qué la tuya dibuja Quest."
+        },
+        "MemoryPressureWarningSection": {
+          "title": "Memoria baja",
+          "description": "Los agentes, servidores MCP y builds que corren en las terminales pueden agotar la memoria. Orca nunca cierra una terminal por su cuenta.",
+          "thresholdLabel": "Avisar por debajo de",
+          "thresholdDescription": "Muestra el aviso cuando la memoria libre baja de este porcentaje de la memoria física. En macOS también aparece cuando el sistema informa presión de memoria. Las terminales en hosts SSH no se miden."
         }
       },
       "right": {
@@ -13975,7 +14095,8 @@
             "4a9568f773": "Atrás",
             "4f86e2a10b": "Saltar recorrido",
             "d974f32a83": "Descartar recorrido",
-            "ffa4412b66": "próximo"
+            "ffa4412b66": "próximo",
+            "complete": "Listo"
           },
           "ContextualTourProgressDots": {
             "7734cb8ad3": "de",
@@ -13985,7 +14106,17 @@
             "tour": {
               "overlay": {
                 "measurement": {
-                  "38b3155418": "Próximo"
+                  "38b3155418": "Próximo",
+                  "automations": {
+                    "intro": {
+                      "title": "¿Qué es una automatización?",
+                      "body": "Las automatizaciones ejecutan trabajo de agentes según una programación. Añade una automatización haciendo clic en este botón."
+                    },
+                    "results": {
+                      "title": "Encuentra los resultados",
+                      "body": "Las ejecuciones muestran cuándo se ejecutaron las automatizaciones, qué ocurrió y dónde revisar su salida."
+                    }
+                  }
                 }
               }
             }
@@ -15120,6 +15251,30 @@
           "closePanel": "Cerrar {{title}}",
           "close": "Cerrar",
           "closeTooltip": "Cerrar · Esc"
+        }
+      },
+      "memoryPressure": {
+        "MemoryPressureWarningCard": {
+          "title": "Queda poca memoria",
+          "dismiss": "Descartar",
+          "freeSummary": "{{value0}} libres de {{value1}}.",
+          "swapSummary": "Swap {{value0}} de {{value1}}.",
+          "lead": "Estas terminales usan más memoria. Cierra las que ya no necesites antes de que el sistema se quede sin memoria.",
+          "measuring": "Midiendo terminales…",
+          "empty": "Ninguna terminal local está usando mucha memoria. Puede deberse a otras apps.",
+          "untitled": "Terminal en segundo plano",
+          "idleUnknown": "inactividad desconocida",
+          "lastOutput": "última salida {{value0}}",
+          "open": "Abrir",
+          "close": "Cerrar",
+          "remote": "Las terminales SSH corren en sus hosts remotos y no se cuentan aquí ({{value0}} abiertas)."
+        },
+        "MemoryPressureCloseDialog": {
+          "title": "¿Cerrar {{value0}}?",
+          "description": "Esto termina la terminal y todo lo que corre en ella, incluida cualquier sesión de agente y los servidores que haya iniciado. Se pierde el trabajo sin guardar en esa terminal.",
+          "cancel": "Cancelar",
+          "closing": "Cerrando…",
+          "confirm": "Cerrar terminal"
         }
       }
     },

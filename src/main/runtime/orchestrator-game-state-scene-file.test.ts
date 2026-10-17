@@ -84,6 +84,21 @@ describe('buildOrchestratorGameState scene file', () => {
     expect(state.extensions?.scenes[0]?.definition.looks.pr.skyTop).toBe(0x102030)
   })
 
+  it('draws a scene file whose pet is invalid without its pet, and says why', async () => {
+    const state = await build(
+      checkout({
+        '.orca/scenes/space.json': JSON.stringify(sceneFile({ cast: { pet: { frames: [] } } }))
+      }),
+      { local: { sceneFile: '.orca/scenes/space.json' } }
+    )
+
+    expect(state.config.scene).toBe(ID)
+    expect(state.extensions?.scenes[0]?.definition.cast).toBeUndefined()
+    expect(state.warnings[0]).toMatch(
+      /^Scene file \.orca\/scenes\/space\.json: cast\.pet\.frames: .+; drawn without it$/
+    )
+  })
+
   it('reads the file again on every build, so an edit shows without a restart', async () => {
     const root = checkout({ '.orca/scenes/space.json': SPACE })
     const local = { sceneFile: '.orca/scenes/space.json' }

@@ -2,20 +2,27 @@ import type { GameReview, GameState } from '../types'
 import type { Level } from './fleet-hud'
 import { gameStrings } from './game-strings'
 
-export type RewardKind = 'review-merged' | 'ci-green' | 'work-item-review' | 'work-item-done'
+export type RewardKind =
+  | 'review-merged'
+  | 'ci-green'
+  | 'work-item-review'
+  | 'work-item-done'
+  | 'member-claimed'
 
 export const XP_BY_REWARD: Readonly<Record<RewardKind, number>> = {
   'review-merged': 100,
   'ci-green': 20,
   'work-item-review': 50,
-  'work-item-done': 70
+  'work-item-done': 70,
+  'member-claimed': 10
 }
 
-export type Reward = { id: string; kind: RewardKind; xp: number; label: string }
+/** `review` is the `#N` label of the review a reward is for, which a merge floats. */
+export type Reward = { id: string; kind: RewardKind; xp: number; label: string; review?: string }
 
 export type XpLedger = { total: number; awards: Record<string, { xp: number; at: number }> }
 
-const reward = (id: string, kind: RewardKind, label: string): Reward => ({
+export const reward = (id: string, kind: RewardKind, label: string): Reward => ({
   id,
   kind,
   xp: XP_BY_REWARD[kind],
@@ -30,11 +37,10 @@ export const isCiRed = (review: GameReview | null): boolean =>
   (review.state === 'open' || review.state === 'draft') &&
   review.ci === 'failure'
 
-// Only a change seen between two polls of the same worktree earns XP, so a restart never re-awards.
-export const rewardsOf = (previous: GameState | null, next: GameState): Reward[] => {
-  if (previous === null || (previous.worktree?.id ?? '') !== (next.worktree?.id ?? '')) {
-    return []
-  }
+type Work = Pick<GameState, 'review' | 'workItem'>
+
+/** A worktree's review and ticket moving on; the ids are the same from any pane that sees it. */
+export const workRewardsOf = (previous: Work, next: Work, worktreeId: string): Reward[] => {
   const out: Reward[] = []
   const before = previous.review
   const after = next.review
@@ -44,13 +50,17 @@ export const rewardsOf = (previous: GameState | null, next: GameState): Reward[]
     before.provider === after.provider &&
     before.number === after.number
   if (isSameReview) {
-    const key = `${after.provider}${reviewLabelOf(after)}@${next.worktree?.id ?? ''}`
+    const label = reviewLabelOf(after)
+    const key = `${after.provider}${label}@${worktreeId}`
     const text = gameStrings().text
     if (before.state !== 'merged' && after.state === 'merged') {
-      out.push(reward(`review-merged:${key}`, 'review-merged', text.merged(reviewLabelOf(after))))
+      out.push({
+        ...reward(`review-merged:${key}`, 'review-merged', text.merged(label)),
+        review: label
+      })
     }
     if (before.ci !== 'success' && after.ci === 'success') {
-      out.push(reward(`ci-green:${key}`, 'ci-green', text.ciGreen(reviewLabelOf(after))))
+      out.push({ ...reward(`ci-green:${key}`, 'ci-green', text.ciGreen(label)), review: label })
     }
   }
   const was = previous.workItem
@@ -68,6 +78,12 @@ export const rewardsOf = (previous: GameState | null, next: GameState): Reward[]
   }
   return out
 }
+
+// Only a change seen between two polls of the same worktree earns XP, so a restart never re-awards.
+export const rewardsOf = (previous: GameState | null, next: GameState): Reward[] =>
+  previous === null || (previous.worktree?.id ?? '') !== (next.worktree?.id ?? '')
+    ? []
+    : workRewardsOf(previous, next, next.worktree?.id ?? '')
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

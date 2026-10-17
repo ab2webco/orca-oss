@@ -197,6 +197,33 @@ describe('ProjectOrchestratorGameSetting', () => {
   })
 })
 
+describe('where game links open', () => {
+  it('writes it globally and lets a project override or inherit what orca.yaml says', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const global = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+    )
+    click(global.container, '[aria-label="Open links in"] button', 'System browser')
+    global.unmount()
+
+    const project = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={{ openLinks: 'system' }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(project.container.textContent).toContain('System browser · from orca.yaml')
+    click(project.container, '[aria-label="Open links in"] button', 'Orca')
+    expect(updates).toEqual([
+      { orchestratorGame: { openLinks: 'system' } },
+      { orchestratorGameProjects: { repo1: { openLinks: 'orca' } } }
+    ])
+    project.unmount()
+  })
+})
+
 describe('game scene picker', () => {
   it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []
@@ -298,5 +325,102 @@ describe('game scene picker', () => {
 
     expect(sceneSelect(view.container).value).toBe('file:.orca/scenes/deep-space.json')
     view.unmount()
+  })
+})
+
+function typeAndLeave(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  act(() => {
+    setter?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  act(() => {
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })
+}
+
+const timezoneField = (container: HTMLElement): HTMLInputElement => {
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Time zone"]')
+  expect(input).toBeTruthy()
+  return input as HTMLInputElement
+}
+
+describe('render and time zone', () => {
+  it('writes the render and a valid time zone globally, refusing a zone that does not exist', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+    )
+    click(view.container, '[aria-label="Render"] button', 'HD')
+    typeAndLeave(timezoneField(view.container), 'Mars/Olympus')
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
+      'Use local or an IANA time zone such as America/Bogota.'
+    )
+    typeAndLeave(timezoneField(view.container), ' America/Bogota ')
+    expect(updates).toEqual([
+      { orchestratorGame: { render: 'hd' } },
+      { orchestratorGame: { timezone: 'America/Bogota' } }
+    ])
+    view.unmount()
+  })
+
+  it('goes back to the local clock when the global zone is cleared', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { timezone: 'Asia/Tokyo' } }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(timezoneField(view.container).value).toBe('Asia/Tokyo')
+    typeAndLeave(timezoneField(view.container), '')
+    expect(updates).toEqual([{ orchestratorGame: {} }])
+    view.unmount()
+  })
+
+  it('shows the project its effective render and zone with their source and overrides or inherits them', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{ orchestratorGame: { timezone: 'America/Bogota' } }}
+        projectLayer={{ render: 'hd' }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(view.container.textContent).toContain('HD · from orca.yaml')
+    expect(view.container.textContent).toContain('America/Bogota · global setting')
+    click(view.container, '[aria-label="Render"] button', 'Classic')
+    typeAndLeave(timezoneField(view.container), 'Europe/Madrid')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { render: 'classic' } } },
+      { orchestratorGameProjects: { repo1: { timezone: 'Europe/Madrid' } } }
+    ])
+    view.unmount()
+  })
+})
+
+describe('the preview follows the render', () => {
+  it('previews hd globally and per project when the render resolves to hd', () => {
+    const global = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { render: 'hd' } }}
+        updateSettings={() => undefined}
+      />
+    )
+    const preview = (container: HTMLElement) =>
+      container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview(global.container)?.dataset.render).toBe('hd')
+    global.unmount()
+    const project = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{ orchestratorGame: { render: 'hd' } }}
+        projectLayer={{ render: 'classic' }}
+        updateSettings={() => undefined}
+      />
+    )
+    expect(preview(project.container)?.dataset.render).toBe('classic')
+    project.unmount()
   })
 })

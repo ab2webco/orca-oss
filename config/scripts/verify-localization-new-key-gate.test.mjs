@@ -11,7 +11,7 @@ import {
   isCriticalKey
 } from './verify-localization-new-key-gate.mjs'
 
-const LOCALES = ['es', 'ja', 'ko', 'zh']
+const LOCALES = ['es']
 
 function locales(keysByLocale) {
   return Object.fromEntries(LOCALES.map((locale) => [locale, new Set(keysByLocale[locale] ?? [])]))
@@ -22,12 +22,7 @@ describe('localization new-key gate', () => {
     const { addedKeys, addedUntranslated } = collectGateFindings({
       baseEnKeys: new Set(['a.existing']),
       headEnKeys: new Set(['a.existing', 'a.brandNew']),
-      localeKeysByName: locales({
-        es: ['a.existing'],
-        ja: ['a.existing'],
-        ko: ['a.existing'],
-        zh: ['a.existing']
-      })
+      localeKeysByName: locales({ es: ['a.existing'] })
     })
     expect(addedKeys).toEqual(['a.brandNew'])
     expect(addedUntranslated.map((finding) => finding.locale).sort()).toEqual(LOCALES)
@@ -37,12 +32,7 @@ describe('localization new-key gate', () => {
     const { addedUntranslated } = collectGateFindings({
       baseEnKeys: new Set(['a.existing']),
       headEnKeys: new Set(['a.existing', 'a.brandNew']),
-      localeKeysByName: locales({
-        es: ['a.existing', 'a.brandNew'],
-        ja: ['a.existing', 'a.brandNew'],
-        ko: ['a.existing', 'a.brandNew'],
-        zh: ['a.existing', 'a.brandNew']
-      })
+      localeKeysByName: locales({ es: ['a.existing', 'a.brandNew'] })
     })
     expect(addedUntranslated).toEqual([])
   })
@@ -167,18 +157,39 @@ describe('localization new-key gate exit code', () => {
   it('exits non-zero when the change adds an untranslated key', async () => {
     const { root, baseSha } = await repoWithCatalogs(
       { base: { existing: 'Existing' }, head: { existing: 'Existing', brandNew: 'Brand new' } },
-      { es: TRANSLATED, ja: TRANSLATED, ko: TRANSLATED, zh: TRANSLATED }
+      { es: TRANSLATED }
     )
     const { status, output } = runGateExpectingFailure(root, baseSha)
     expect(status).toBe(1)
     expect(output).toContain('brandNew')
+    expect(output).toContain('missing in es')
+  })
+
+  // Why: Orca Lab ships English and Spanish only (ORCA-596), so es is the one locale the gate owes.
+  it('ignores a stray catalog for a locale Orca Lab does not ship', async () => {
+    const translated = { existing: 'ya traducido', brandNew: 'nuevo' }
+    const { root, baseSha } = await repoWithCatalogs(
+      { base: { existing: 'Existing' }, head: { existing: 'Existing', brandNew: 'Brand new' } },
+      { es: translated, zh: TRANSLATED }
+    )
+    expect(runGate(root, baseSha).output).toContain('translated in 1 locale(s)')
+  })
+
+  it('exits non-zero when the Spanish catalog is missing', async () => {
+    const { root, baseSha } = await repoWithCatalogs(
+      { base: { existing: 'Existing' }, head: { existing: 'Existing', brandNew: 'Brand new' } },
+      {}
+    )
+    const { status, output } = runGateExpectingFailure(root, baseSha)
+    expect(status).toBe(1)
+    expect(output).toContain('missing in es')
   })
 
   it('exits zero once that key is translated everywhere', async () => {
     const translated = { existing: 'ya traducido', brandNew: 'nuevo' }
     const { root, baseSha } = await repoWithCatalogs(
       { base: { existing: 'Existing' }, head: { existing: 'Existing', brandNew: 'Brand new' } },
-      { es: translated, ja: translated, ko: translated, zh: translated }
+      { es: translated }
     )
     expect(runGate(root, baseSha).status).toBe(0)
   })
@@ -186,7 +197,7 @@ describe('localization new-key gate exit code', () => {
   it('exits zero on pre-existing untranslated debt it did not add', async () => {
     const { root, baseSha } = await repoWithCatalogs(
       { base: { oldDebt: 'Old', more: 'More' }, head: { oldDebt: 'Old', more: 'More' } },
-      { es: {}, ja: {}, ko: {}, zh: {} }
+      { es: {} }
     )
     expect(runGate(root, baseSha).status).toBe(0)
   })

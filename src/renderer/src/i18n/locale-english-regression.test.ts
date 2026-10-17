@@ -4,9 +4,8 @@
  * present catalog value always beats the English `translate()` fallback, so
  * those strings render English at runtime with nothing to signal the loss.
  *
- * Later translation passes (#11205 and friends) independently re-covered most of
- * ja/ko/zh, so the re-applied set is only what is still English at HEAD: es 182,
- * zh 55, ja 32, ko 17. The keys sampled below stayed English in all four.
+ * Later translation passes (#11205 and friends) re-covered part of the loss, so
+ * the re-applied set is only what was still English at HEAD (es 182).
  *
  * These are keys whose English source is UNCHANGED, so an English catalog value
  * can only be a revert. Locale-wide coverage is deliberately not asserted here:
@@ -16,11 +15,8 @@
 import { describe, expect, it } from 'vitest'
 import en from './locales/en.json'
 import es from './locales/es.json'
-import ja from './locales/ja.json'
-import ko from './locales/ko.json'
-import zh from './locales/zh.json'
 
-const catalogs = { es, ja, ko, zh }
+const catalogs = { es }
 
 function lookup(catalog: unknown, key: string): string | undefined {
   const value = key
@@ -36,8 +32,6 @@ function lookup(catalog: unknown, key: string): string | undefined {
 // Sampled across the reverted set: an unconditional sidebar filter row, plugin
 // command failures on two surfaces, a settings description, and a status-bar
 // metric — so a partial re-revert cannot pass by covering one namespace.
-// (workingSetDescription was re-translated upstream for ja/ko; it still guards
-// es/zh, and every other key here was English in all four.)
 const REVERTED_KEYS = [
   'auto.components.sidebar.SidebarFilter.detachedHead',
   'auto.App.pluginCommandFailed',

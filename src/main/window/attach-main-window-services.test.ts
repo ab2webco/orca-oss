@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Store } from '../persistence'
+import * as watcher from '../ipc/worktree-base-directory-watcher'
 
 const {
   onMock,
@@ -78,6 +79,11 @@ vi.mock('../ipc/worktrees', () => ({
 
 vi.mock('../ipc/worktree-change-invalidators', () => ({
   runWorktreeChangeInvalidators: runWorktreeChangeInvalidatorsMock
+}))
+
+vi.mock('../ipc/worktree-base-directory-watcher', () => ({
+  setWorktreeBaseDirectoryWatcherSyncContext: vi.fn(),
+  scheduleWorktreeBaseDirectoryWatcherSync: vi.fn()
 }))
 
 vi.mock('../ipc/pty', () => ({
@@ -235,6 +241,13 @@ describe('attachMainWindowServices', () => {
     releasePendingTccPromptNoticeMock.mockReset()
     systemPreferencesAskForMediaAccessMock.mockResolvedValue(true)
     systemPreferencesGetMediaAccessStatusMock.mockReturnValue('granted')
+  })
+
+  // Why: unmocked, the real sync fired 100 ms later and rejected after this file ended.
+  it('schedules the worktree base-directory watcher sync for this window and store', () => {
+    const [mainWindow, store] = [createMainWindow(), createStore()]
+    attachMainWindowServices(mainWindow as never, store, createRuntime() as never)
+    expect(watcher.scheduleWorktreeBaseDirectoryWatcherSync).toHaveBeenCalledWith(store, mainWindow)
   })
 
   // #11994: without this wiring, host-local repo IPC mutations never reach paired clients.

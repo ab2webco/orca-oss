@@ -9,6 +9,7 @@ import {
   type ClaudeAgentTeamsMode
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import type { AgentStartupShell } from '../../shared/tui-agent-startup-shell'
 import { resolvePathEnvKey } from '../pty/windows-path-segment-merge'
 import {
   withOrchestratorGameArgs,
@@ -36,22 +37,23 @@ export async function buildClaudeAgentTeamsLaunchPlan(args: {
   mode: ClaudeAgentTeamsMode | undefined
   baseEnv: Record<string, string | undefined>
   createTeamEnv: (shimDir: string, shimBin: string) => Record<string, string>
-  /** Resolved only for a team launch; the caller limits it to local panes. */
+  /** Resolved only for a team launch; the caller limits it to local panes the game can load in. */
   game?: () => Promise<OrchestratorGameLaunch>
+  /** The shell that parses the pane's command line; POSIX unless the caller names a Windows one. */
+  gameShell?: AgentStartupShell
 }): Promise<ClaudeAgentTeamsLaunchPlan | null> {
   const mode = args.mode ?? 'off'
   if (!args.command || mode === 'off' || !isDirectClaudeCommand(args.command)) {
     return null
   }
   const plan = await buildTeamPlan(args.command, mode, args)
-  // Why: Windows panes run through cmd/PowerShell, where the POSIX-quoted plugin dir would break.
-  const game = args.game && process.platform !== 'win32' ? await args.game() : undefined
+  const game = args.game ? await args.game() : undefined
   if (!game || game.args.length === 0) {
     return plan
   }
   return {
     ...plan,
-    command: withOrchestratorGameArgs(plan.command, game),
+    command: withOrchestratorGameArgs(plan.command, game, args.gameShell),
     env: { ...plan.env, ...game.env },
     game
   }

@@ -1,9 +1,20 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
+import {
+  gameFleetOf,
+  liveLinkedItemOf,
+  settle,
+  type GameAgentRow,
+  type GameMemberAccountOf,
+  type GameMemberLimitOf,
+  type GameMemberWork,
+  type ReadLinkedStatus
+} from './orchestrator-game-fleet'
 import { readWorktreeGameSceneFile } from '../worktree-game-scene-file'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
+  resolveOrchestratorGameLead,
   type ResolvedOrchestratorGameConfig
 } from '../../shared/orchestrator-game-config'
 import {
@@ -13,6 +24,8 @@ import {
 } from '../../shared/orchestrator-game-activity'
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
+import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
+import { gameListActionsOf, gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
 import {
   activityGameLinksOf,
   gameLinksOf,
@@ -25,13 +38,13 @@ import {
   type OrchestratorGameSceneSource
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
+import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import {
-  gameAgentOf,
   gameReviewOf,
   statusGroupOfName,
   statusGroupOfPlane,
   type GameActivity,
-  type GameStatusGroup,
+  type GameMemberWorktree,
   type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
@@ -40,7 +53,9 @@ import type {
   OrchestratorGameTodoSource
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
-import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
+import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
+import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
+import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
@@ -57,11 +72,12 @@ export type OrchestratorGameStateInput = {
     displayName: string
     linkedWorkItem: WorkspaceLinkedItem | null | undefined
   } | null
-  agents: Pick<
-    RuntimeWorktreeAgentRow,
-    'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
-  >[]
+  agents: GameAgentRow[]
+  /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
+  members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
+  /** The calling pane's own launcher; set when a lead started it through orchestration. */
+  callerParentPaneKey?: string | null
   terminalHandleOf?: (paneKey: string) => string | null
   /** The calling Team's terminals; when known, agents outside it are left out. */
   teamHandles?: ReadonlySet<string> | null
@@ -72,10 +88,17 @@ export type OrchestratorGameStateInput = {
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>
-  readLinkedStatus?: (
-    linked: WorkspaceLinkedItem
-  ) => Promise<{ name: string; group?: GameStatusGroup } | null>
+  readLinkedStatus?: ReadLinkedStatus
+  accountOf?: GameMemberAccountOf
+  limitOf?: GameMemberLimitOf
+  advisorOf?: (paneKey: string) => GameMemberAdvisor | null
+  /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
+  readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
+  /** The project's STOP; absent leaves `stopped` out, as from an older host. */
+  readStop?: () => Promise<GameStop | null>
+  /** The project's inboxes; read only for a lead. */
+  readInboxes?: () => Promise<GameInboxSummary[]>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -83,31 +106,10 @@ export type OrchestratorGameStateInput = {
   }) => Promise<GameProjectWork>
 }
 
-// Why: a tracker that is offline or unauthenticated must cost the game its badge, never the whole state.
-const settle = <T>(read: () => Promise<T | null>): Promise<T | null> => read().catch(() => null)
-
-function linkedItemOf(linked: WorkspaceLinkedItem | null | undefined): GameWorkItem | null {
-  if (!linked || linked.type !== 'issue') {
-    return null
-  }
-  const identifier =
-    linked.jiraIdentifier ??
-    linked.linearIdentifier ??
-    linked.planeIdentifier ??
-    `#${linked.number}`
-  return {
-    provider: linked.provider,
-    identifier,
-    title: linked.title,
-    url: linked.url,
-    status: '',
-    statusGroup: 'unknown'
-  }
-}
-
+// `notes` are parts of a scene that still draws, left out; `warning` means it fell back to Quest.
 type SceneFileOutcome =
-  | { scene: OrchestratorGameSceneExtension; warning?: undefined }
-  | { scene?: undefined; warning: string }
+  | { scene: OrchestratorGameSceneExtension; warning?: undefined; notes: string[] }
+  | { scene?: undefined; warning: string; notes?: undefined }
 
 // Why re-read every build: a scene being authored should redraw on the next poll, not after a restart.
 async function readSceneFile(
@@ -134,7 +136,8 @@ async function readSceneFile(
   const parsed = parseOrchestratorGameScene(text, id)
   return parsed.ok
     ? {
-        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition }
+        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition },
+        notes: parsed.warnings.map((one) => `Scene file ${path}: ${one}; drawn without it`)
       }
     : failed(parsed.error)
 }
@@ -156,18 +159,22 @@ export async function buildOrchestratorGameState(
   const integrations = resolveOrchestratorGameIntegrations(layers)
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
-  const [review, plane, linear, sceneSources, sceneFile] = await Promise.all([
+  const { readStop, readInboxes } = input
+  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
     tracker ? settle(input.readLinear) : Promise.resolve(null),
     readScenes ? settle(readScenes) : Promise.resolve(null),
-    readSceneFile(resolved, input.worktree)
+    readSceneFile(resolved, input.worktree),
+    readStop ? settleGameStop(readStop) : Promise.resolve(null),
+    readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
-  const config =
-    sceneFile?.warning === undefined
-      ? resolved.config
-      : { ...resolved.config, scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }
+  const config = {
+    ...resolved.config,
+    ...(sceneFile?.warning === undefined ? {} : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
+    timezone: desktopGameTimezoneOf(resolved.config.timezone)
+  }
   let workItem: GameWorkItem | null = null
   if (plane) {
     workItem = {
@@ -188,18 +195,7 @@ export async function buildOrchestratorGameState(
       statusGroup: statusGroupOfName(linear.stateName)
     }
   } else if (tracker) {
-    const linked = input.worktree?.linkedWorkItem
-    const readLinkedStatus = input.readLinkedStatus
-    workItem = linkedItemOf(linked)
-    const live =
-      workItem && linked && readLinkedStatus ? await settle(() => readLinkedStatus(linked)) : null
-    if (workItem && live) {
-      workItem = {
-        ...workItem,
-        status: live.name,
-        statusGroup: live.group ?? statusGroupOfName(live.name)
-      }
-    }
+    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
   }
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
@@ -207,12 +203,34 @@ export async function buildOrchestratorGameState(
     tracker && readProjectWork
       ? await settle(() => readProjectWork({ todo: integrations.todo, workItem }))
       : null
-  const projectLinks = projectGameLinksOf(integrations.links, {
+  const placeholders = {
     'workItem.identifier': workItem?.identifier,
     'workItem.provider': workItem?.provider,
     branch: input.worktree?.branch,
     'review.number': gameReview ? String(gameReview.number) : undefined
+  }
+  const projectLinks = projectGameLinksOf(integrations.links, placeholders)
+  const lead = resolveOrchestratorGameLead(layers)
+  const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const actions = gameStateActionsOf({
+    role,
+    lead,
+    project: gameActionsOf(integrations.actions, placeholders)
   })
+  const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
+  const listActions = gameListActionsOf(actions, {
+    todo: integrations.todo === 'off' ? undefined : integrations.todo?.action,
+    reviews: integrations.reviews.action
+  })
+  const todo = projectWork?.todo ?? null
+  const projectState = projectWork && {
+    reviews: projectWork.reviews && { ...projectWork.reviews, ...listActions.reviews },
+    todo: todo && {
+      ...todo,
+      ...listActions.todo,
+      items: todo.items.map((one) => ({ ...one, prompt: renderGameWorkPrompt(workPrompt, one) }))
+    }
+  }
   // Why: project rules first, so a repo can override what Orca's own integrations would link.
   const rules = [
     ...integrations.activity.flatMap((rule) => compileGameActivityRule(rule) ?? []),
@@ -222,21 +240,19 @@ export async function buildOrchestratorGameState(
     const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
-  const teamHandles = input.teamHandles
-  const rows = teamHandles
-    ? input.agents.filter((row) => {
-        const handle = input.terminalHandleOf?.(row.paneKey)
-        return handle !== null && handle !== undefined && teamHandles.has(handle)
-      })
-    : input.agents
-  const agents = rows.map((row) => {
-    const agent = gameAgentOf(
-      row,
-      input.leaderPaneKey,
-      input.terminalHandleOf?.(row.paneKey) ?? null
-    )
-    const activity = activityOf(row.paneKey)
-    return activity ? { ...agent, activity } : agent
+  const agents = await gameFleetOf({
+    agents: input.agents,
+    members: input.members ?? [],
+    leaderPaneKey: input.leaderPaneKey,
+    teamHandles: input.teamHandles,
+    terminalHandleOf: input.terminalHandleOf,
+    activityOf,
+    readMemberWork: input.readMemberWork,
+    readLinkedStatus: input.readLinkedStatus,
+    accountOf: input.accountOf,
+    limitOf: input.limitOf,
+    advisorOf: input.advisorOf,
+    leadWorktreeId: input.worktree?.id ?? null
   })
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {
@@ -245,9 +261,12 @@ export async function buildOrchestratorGameState(
     // Why the scene file first: the mod's note shows only the first warning, and this one changes the art.
     warnings: [
       ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),
+      ...(sceneFile?.notes ?? []),
+      ...(stop?.warning ? [stop.warning] : []),
       ...(project?.orchestratorGameWarnings ?? []),
       ...resolved.warnings,
-      ...scenes.warnings
+      ...scenes.warnings,
+      ...listActions.warnings
     ],
     worktree: input.worktree
       ? {
@@ -258,6 +277,8 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
+    lead,
+    role,
     review: gameReview,
     workItem,
     extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },
@@ -267,6 +288,9 @@ export async function buildOrchestratorGameState(
       extra: [...projectLinks, ...activityGameLinksOf(agents)]
     }),
     ...(leaderActivity ? { activity: leaderActivity } : {}),
-    ...(projectWork ? { project: projectWork } : {})
+    ...(stop ? { stopped: stop.stopped } : {}),
+    ...(inboxes ? { inboxes } : {}),
+    ...(projectState ? { project: projectState } : {}),
+    ...(actions.length > 0 ? { actions } : {})
   }
 }

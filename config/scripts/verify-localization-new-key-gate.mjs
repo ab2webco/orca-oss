@@ -5,6 +5,7 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
 import { resolvePullRequestDiffBase } from './git-pull-request-diff-base.mjs'
+import { SHIPPED_TARGET_LOCALES } from './shipped-ui-locales.mjs'
 
 // Blocks a PR that ADDS untranslated keys, and never asks anything of the debt
 // already on main (ORCA-284). Why not a coverage threshold: it cannot tell a new
@@ -139,21 +140,11 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2)) {
     return 1
   }
 
-  const localeFiles = (await fs.readdir(localesDir))
-    .filter(
-      (name) =>
-        name.endsWith('.json') &&
-        name !== 'en.json' &&
-        !name.startsWith('.') &&
-        !name.includes('-catalog-cache')
-    )
-    .sort()
+  // Why: the shipped list, not the folder, decides; a missing catalog owes every key.
   const localeKeysByName = {}
-  for (const fileName of localeFiles) {
-    const keys = await readCatalogKeys(path.join(localesDir, fileName))
-    if (keys) {
-      localeKeysByName[fileName.replace(/\.json$/, '')] = keys
-    }
+  for (const locale of SHIPPED_TARGET_LOCALES) {
+    localeKeysByName[locale] =
+      (await readCatalogKeys(path.join(localesDir, `${locale}.json`))) ?? new Map()
   }
 
   const base = resolveBase(root, requestedBase)

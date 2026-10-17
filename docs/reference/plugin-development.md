@@ -10,13 +10,13 @@ A plugin is a folder with an `orca-plugin.json` at its root
 ([`plugin-manifest.ts:190`](../../src/shared/plugins/plugin-manifest.ts)). It can
 contain two kinds of code, and they are very different places to be:
 
-| | **Panel** | **Worker** |
-| --- | --- | --- |
-| Runtime | Sandboxed iframe, opaque origin, `sandbox="allow-scripts"` only ([`PluginPanel.tsx:273-276`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)) | `child_process.fork` of the Electron binary as plain Node ([`plugin-host-process.ts:78-93`](../../src/main/plugins/plugin-host-process.ts)) |
-| Host API reach | 5 of the 13 methods, plus the bridge-level `panel.close` ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)) | all 13 |
-| Network | CSP `default-src 'none'; connect-src 'none'` ([`plugin-panel-shell.ts:25-27`](../../src/shared/plugins/plugin-panel-shell.ts)) | only hosts declared under `net:fetch` ([`plugin-host-preload.ts:66-78`](../../src/main/plugins/plugin-host-preload.ts)) |
-| Filesystem | none | read-only, own folder ([`plugin-worker-sandbox-args.ts:11-19`](../../src/main/plugins/plugin-worker-sandbox-args.ts)) |
-| Lifetime | while its surface is mounted | lazy: forked on the first command or subscribed event, reaped after 5 min idle ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
+|                | **Panel**                                                                                                                                                      | **Worker**                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime        | Sandboxed iframe, opaque origin, `sandbox="allow-scripts"` only ([`PluginPanel.tsx:273-276`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)) | `child_process.fork` of the Electron binary as plain Node ([`plugin-host-process.ts:78-93`](../../src/main/plugins/plugin-host-process.ts))                            |
+| Host API reach | 5 of the 13 methods, plus the bridge-level `panel.close` ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts))                         | all 13                                                                                                                                                                 |
+| Network        | CSP `default-src 'none'; connect-src 'none'` ([`plugin-panel-shell.ts:25-27`](../../src/shared/plugins/plugin-panel-shell.ts))                                 | only hosts declared under `net:fetch` ([`plugin-host-preload.ts:66-78`](../../src/main/plugins/plugin-host-preload.ts))                                                |
+| Filesystem     | none                                                                                                                                                           | read-only, own folder ([`plugin-worker-sandbox-args.ts:11-19`](../../src/main/plugins/plugin-worker-sandbox-args.ts))                                                  |
+| Lifetime       | while its surface is mounted                                                                                                                                   | lazy: forked on the first command or subscribed event, reaped after 5 min idle ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
 
 Two worked examples ship in this repo:
 [`examples/plugins/hello-orca`](../../examples/plugins/hello-orca) (minimal) and
@@ -48,26 +48,26 @@ manifest, which is also why a field cannot be "added later" by a plugin.
 
 ### Identity and gating
 
-| Field | Rule |
-| --- | --- |
-| `manifestVersion` | literal `1` ([`:109`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `pluginApi` | literal `1` — the host-API major you target ([`:125`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `id`, `publisher` | kebab-case `[a-z0-9]+(-[a-z0-9]+)*`, ≤ 64 chars, not `__proto__`/`prototype`/`constructor` ([`plugin-manifest-fields.ts:4-20`](../../src/shared/plugins/plugin-manifest-fields.ts)) |
-| identity | `<publisher>.<id>` — also the install directory name ([`plugin-manifest.ts:193-195`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `version` | semver ([`:56`, `:114`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `engines.orca` | only the `>=x.y.z` form ([`:62-65`](../../src/shared/plugins/plugin-manifest.ts)); below it the host refuses to load the plugin at discovery ([`plugin-discovery.ts:110-117`](../../src/main/plugins/plugin-discovery.ts)) |
-| `main` | relative path to the worker entry; optional ([`:127`](../../src/shared/plugins/plugin-manifest.ts)) |
-| `description`, `author`, `repository`, `icon` | optional ([`:116-121`](../../src/shared/plugins/plugin-manifest.ts)) |
+| Field                                         | Rule                                                                                                                                                                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifestVersion`                             | literal `1` ([`:109`](../../src/shared/plugins/plugin-manifest.ts))                                                                                                                                                        |
+| `pluginApi`                                   | literal `1` — the host-API major you target ([`:125`](../../src/shared/plugins/plugin-manifest.ts))                                                                                                                        |
+| `id`, `publisher`                             | kebab-case `[a-z0-9]+(-[a-z0-9]+)*`, ≤ 64 chars, not `__proto__`/`prototype`/`constructor` ([`plugin-manifest-fields.ts:4-20`](../../src/shared/plugins/plugin-manifest-fields.ts))                                        |
+| identity                                      | `<publisher>.<id>` — also the install directory name ([`plugin-manifest.ts:193-195`](../../src/shared/plugins/plugin-manifest.ts))                                                                                         |
+| `version`                                     | semver ([`:56`, `:114`](../../src/shared/plugins/plugin-manifest.ts))                                                                                                                                                      |
+| `engines.orca`                                | only the `>=x.y.z` form ([`:62-65`](../../src/shared/plugins/plugin-manifest.ts)); below it the host refuses to load the plugin at discovery ([`plugin-discovery.ts:110-117`](../../src/main/plugins/plugin-discovery.ts)) |
+| `main`                                        | relative path to the worker entry; optional ([`:127`](../../src/shared/plugins/plugin-manifest.ts))                                                                                                                        |
+| `description`, `author`, `repository`, `icon` | optional ([`:116-121`](../../src/shared/plugins/plugin-manifest.ts))                                                                                                                                                       |
 
-Every path in a manifest is a *portable relative path inside the plugin folder*
+Every path in a manifest is a _portable relative path inside the plugin folder_
 ([`plugin-manifest-fields.ts:24-28`](../../src/shared/plugins/plugin-manifest-fields.ts)),
 and realpath containment separately rejects symlink escapes when the file is
 read. Write `icons/logo.svg`, never `./icons\logo.svg` or an absolute path —
 both separators are accepted on import ([`plugin-host-runtime.ts:82`](../../src/main/plugins/plugin-host-runtime.ts)),
 but the manifest is compared as text.
 
-**Reserved identities.** A `publisher` of `ab2web`, *or any `id` starting with
-`orca-`*, is reserved ([`plugin-marketplace.ts:157-164`](../../src/shared/plugins/plugin-marketplace.ts)).
+**Reserved identities.** A `publisher` of `ab2web`, _or any `id` starting with
+`orca-`_, is reserved ([`plugin-marketplace.ts:157-164`](../../src/shared/plugins/plugin-marketplace.ts)).
 Such a plugin cannot be installed from a local path at all and must resolve to
 the `ab2webco` organisation over Git
 ([`plugin-install-trust.ts:11-30`](../../src/main/plugins/plugin-install-trust.ts)).
@@ -75,20 +75,20 @@ Pick something else.
 
 ### What `contributes` accepts
 
-| Key | Limit | Notes |
-| --- | --- | --- |
-| `panels` | 64 ([`:57`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, `entry`, optional `icon`, `surface` |
-| `commands` | 256 ([`:58`](../../src/shared/plugins/plugin-manifest.ts)) | `id`, `title`, optional `context` (`global`\|`worktree`) and `action` |
-| `events` | 4 — the whole closed set ([`:93-99`](../../src/shared/plugins/plugin-manifest.ts)) | `worktree.created`, `worktree.removed`, `agent.status.changed`, `notification.dispatched` |
-| `settings` | 32 ([`plugin-settings-contribution.ts:15`](../../src/shared/plugins/plugin-settings-contribution.ts)) | declarative form, rendered by Orca |
-| `automations` | 16 ([`plugin-automation-contribution.ts:32`](../../src/shared/plugins/plugin-automation-contribution.ts)) | scheduled work |
-| `keybindings` | 256 ([`plugin-content-pack-contributions.ts:11`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | must name a contributed command, and match its context ([`plugin-manifest-contribution-validation.ts:102-120`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts)) |
-| `languagePacks` | 16 ([`:10`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | one per locale |
-| `vmRecipes` | 64 ([`:12`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | |
-| `agents` | 64 ([`:13`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | agent profiles |
-| `skills` | 32 ([`:16`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | a directory holding a `SKILL.md`, served to **any** agent in **any** workspace |
-| `gameScenes` | 8 ([`:17`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | `id`, `path` to a JSON scene for the Agent Teams game — see [Game scenes](#game-scenes) |
-| `capabilities` | 32 ([`plugin-manifest.ts:174`](../../src/shared/plugins/plugin-manifest.ts)) | see below |
+| Key             | Limit                                                                                                            | Notes                                                                                                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `panels`        | 64 ([`:57`](../../src/shared/plugins/plugin-manifest.ts))                                                        | `id`, `title`, `entry`, optional `icon`, `surface`                                                                                                                                   |
+| `commands`      | 256 ([`:58`](../../src/shared/plugins/plugin-manifest.ts))                                                       | `id`, `title`, optional `context` (`global`\|`worktree`) and `action`                                                                                                                |
+| `events`        | 4 — the whole closed set ([`:93-99`](../../src/shared/plugins/plugin-manifest.ts))                               | `worktree.created`, `worktree.removed`, `agent.status.changed`, `notification.dispatched`                                                                                            |
+| `settings`      | 32 ([`plugin-settings-contribution.ts:15`](../../src/shared/plugins/plugin-settings-contribution.ts))            | declarative form, rendered by Orca                                                                                                                                                   |
+| `automations`   | 16 ([`plugin-automation-contribution.ts:32`](../../src/shared/plugins/plugin-automation-contribution.ts))        | scheduled work                                                                                                                                                                       |
+| `keybindings`   | 256 ([`plugin-content-pack-contributions.ts:11`](../../src/shared/plugins/plugin-content-pack-contributions.ts)) | must name a contributed command, and match its context ([`plugin-manifest-contribution-validation.ts:102-120`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts)) |
+| `languagePacks` | 16 ([`:10`](../../src/shared/plugins/plugin-content-pack-contributions.ts))                                      | one per locale                                                                                                                                                                       |
+| `vmRecipes`     | 64 ([`:12`](../../src/shared/plugins/plugin-content-pack-contributions.ts))                                      |                                                                                                                                                                                      |
+| `agents`        | 64 ([`:13`](../../src/shared/plugins/plugin-content-pack-contributions.ts))                                      | agent profiles                                                                                                                                                                       |
+| `skills`        | 32 ([`:16`](../../src/shared/plugins/plugin-content-pack-contributions.ts))                                      | a directory holding a `SKILL.md`, served to **any** agent in **any** workspace                                                                                                       |
+| `gameScenes`    | 8 ([`:17`](../../src/shared/plugins/plugin-content-pack-contributions.ts))                                       | `id`, `path` to a JSON scene for the Agent Teams game — see [Game scenes](#game-scenes)                                                                                              |
+| `capabilities`  | 32 ([`plugin-manifest.ts:174`](../../src/shared/plugins/plugin-manifest.ts))                                     | see below                                                                                                                                                                            |
 
 Cross-field rules that reject a manifest outright
 ([`plugin-manifest-contribution-validation.ts:122-182`](../../src/shared/plugins/plugin-manifest-contribution-validation.ts),
@@ -115,19 +115,19 @@ Eleven capability kinds exist, and only these
 ([`plugin-capabilities.ts:14-26`](../../src/shared/plugins/plugin-capabilities.ts)).
 A typo fails manifest validation rather than silently granting nothing.
 
-| Kind | Unlocks | Shown to the user as ([`:91-119`](../../src/shared/plugins/plugin-capabilities.ts)) |
-| --- | --- | --- |
-| `workspace:read` | `workspace.readContext` | "Read the name, branch, and terminal list of your focused worktree" |
-| `terminal:send` | `terminal.sendText` | "Type text into a terminal you can see (always a specific terminal)" |
-| `notifications:show` | `notifications.show` | "Show desktop notifications labeled with the plugin name" |
+| Kind                    | Unlocks                                                       | Shown to the user as ([`:91-119`](../../src/shared/plugins/plugin-capabilities.ts))                                                                                               |
+| ----------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace:read`        | `workspace.readContext`                                       | "Read the name, branch, and terminal list of your focused worktree"                                                                                                               |
+| `terminal:send`         | `terminal.sendText`                                           | "Type text into a terminal you can see (always a specific terminal)"                                                                                                              |
+| `notifications:show`    | `notifications.show`                                          | "Show desktop notifications labeled with the plugin name"                                                                                                                         |
 | `notifications:observe` | the `notification.dispatched` event (with `events:subscribe`) | "Receive a copy of the notifications Orca Lab raises, even ones this computer does not show, including their text, which can quote agent replies, tool input and terminal titles" |
-| `storage` | `storage.get/set/delete/keys` | "Store data in the plugin's own storage folder" |
-| `secrets` | `secrets.get/set/delete` | "Store and read secrets in the plugin's own encrypted vault" |
-| `settings:own` | `settings.get/set` | "Read and change the plugin's own settings" |
-| `events:subscribe` | `events.subscribe` and `contributes.events` | "Get notified when worktrees are created or removed and when agent status changes" |
-| `net:fetch` | `fetch` in the worker, to the declared hosts only | "Connect to these network hosts: …" |
-| `process:spawn` | `--allow-child-process` on the worker | "Start programs as you. Programs it starts are not constrained by this plugin worker's file or network permissions." |
-| `skills:contribute` | `contributes.skills` | "Teach every agent, in every project, how to use this plugin…" |
+| `storage`               | `storage.get/set/delete/keys`                                 | "Store data in the plugin's own storage folder"                                                                                                                                   |
+| `secrets`               | `secrets.get/set/delete`                                      | "Store and read secrets in the plugin's own encrypted vault"                                                                                                                      |
+| `settings:own`          | `settings.get/set`                                            | "Read and change the plugin's own settings"                                                                                                                                       |
+| `events:subscribe`      | `events.subscribe` and `contributes.events`                   | "Get notified when worktrees are created or removed and when agent status changes"                                                                                                |
+| `net:fetch`             | `fetch` in the worker, to the declared hosts only             | "Connect to these network hosts: …"                                                                                                                                               |
+| `process:spawn`         | `--allow-child-process` on the worker                         | "Start programs as you. Programs it starts are not constrained by this plugin worker's file or network permissions."                                                              |
+| `skills:contribute`     | `contributes.skills`                                          | "Teach every agent, in every project, how to use this plugin…"                                                                                                                    |
 
 `net:fetch` is the one scoped kind: it takes `hosts`, 1–64 entries, each a
 hostname or a `*.example.com` wildcard
@@ -155,7 +155,7 @@ The fingerprint is a SHA-256 over three parts
 2. whether `main` exists at all — adding a worker to a panel-only plugin crosses
    a trust boundary even with an unchanged capability list;
 3. **the installed tree's content hash**, but only when the manifest carries
-   *instructional* contributions: `keybindings`, `vmRecipes`, `agents`,
+   _instructional_ contributions: `keybindings`, `vmRecipes`, `agents`,
    `automations`, or `skills`
    ([`plugin-consent-fingerprint.ts:14-30`](../../src/shared/plugins/plugin-consent-fingerprint.ts)).
 
@@ -213,13 +213,13 @@ the host sanitises. Anything unrecognised falls back to the plug icon
 
 ### What the host puts around your HTML
 
-Your document is *appended to* a host-generated shell, so the shell's `<head>`
+Your document is _appended to_ a host-generated shell, so the shell's `<head>`
 parses first ([`plugin-panel-shell.ts:88-200`](../../src/shared/plugins/plugin-panel-shell.ts)).
 You get, without opting in:
 
 - **A CSP you cannot loosen** — `default-src 'none'; connect-src 'none';
-  script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;
-  font-src data:; base-uri 'none'; form-action 'none'`
+script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;
+font-src data:; base-uri 'none'; form-action 'none'`
   ([`:25-27`](../../src/shared/plugins/plugin-panel-shell.ts)). No network, no
   external scripts, no external images. A second CSP meta of your own can only
   tighten it.
@@ -279,7 +279,7 @@ nothing a token contains can break out of the `<style>` block.
 
 The panel posts to `window.parent` with `targetOrigin: '*'` — the frame's origin
 is opaque, so anything stricter is silently dropped; the host identifies the
-*sending window* instead of trusting an origin
+_sending window_ instead of trusting an origin
 ([`plugin-panel-bridge-host.ts:79-93`](../../src/renderer/src/components/right-sidebar/plugin-panel-bridge-host.ts)).
 
 Request: `{ type: 'orca-panel-action', requestId, action, params }`.
@@ -293,14 +293,14 @@ API table so they can never drift from the gate
 plus one bridge-level action
 ([`plugin-panel-bridge.ts:58-66`](../../src/shared/plugins/plugin-panel-bridge.ts)):
 
-| Action | Capability | Notes |
-| --- | --- | --- |
-| `workspace.readContext` | `workspace:read` | focused worktree, or `null` |
-| `terminal.sendText` | `terminal:send` | explicit `terminalId`, never "the active terminal" |
-| `notifications.show` | `notifications:show` | |
-| `storage.get` | `storage` | plugin-private namespace |
-| `storage.set` | `storage` | plugin-private namespace |
-| `panel.close` | none | asks the host to close the page this panel is on; params must be absent or `{}`; answers `{ closed: true }` |
+| Action                  | Capability           | Notes                                                                                                       |
+| ----------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `workspace.readContext` | `workspace:read`     | focused worktree, or `null`                                                                                 |
+| `terminal.sendText`     | `terminal:send`      | explicit `terminalId`, never "the active terminal"                                                          |
+| `notifications.show`    | `notifications:show` |                                                                                                             |
+| `storage.get`           | `storage`            | plugin-private namespace                                                                                    |
+| `storage.set`           | `storage`            | plugin-private namespace                                                                                    |
+| `panel.close`           | none                 | asks the host to close the page this panel is on; params must be absent or `{}`; answers `{ closed: true }` |
 
 `panel.close` is not a host API method, so workers cannot call it (they have no
 page) and it needs no capability — closing its own page grants the panel
@@ -348,7 +348,7 @@ Two things eat into those 30 before you do:
   interval at [`plugin-panel-bridge.ts:36`](../../src/shared/plugins/plugin-panel-bridge.ts)).
   A pong has its own reserved 1 KiB lane so a saturated data budget can never
   make a live panel look dead ([`:31`](../../src/shared/plugins/plugin-panel-bridge.ts)),
-  but the *count* still comes off the 30.
+  but the _count_ still comes off the 30.
 - Content-height reports, though the shell only sends one when the height
   actually changed ([`plugin-panel-shell.ts:166-171`](../../src/shared/plugins/plugin-panel-shell.ts)).
 
@@ -386,14 +386,14 @@ call('storage.get', { key: 'entries' }).then(function (read) {
 // arrives becomes a deadline instead of a frozen panel.
 request('storage.get', { key: 'entries' })
   .then(function (read) {
-    if (!read.ok) return fail(read)           // fail() paints read.reason
+    if (!read.ok) return fail(read) // fail() paints read.reason
     return request('storage.set', { key: 'entries', value: next }).then(function (write) {
       if (!write.ok) return fail(write)
-      input.value = ''                         // only after a confirmed write
+      input.value = '' // only after a confirmed write
       setStatus('Saved.')
     })
   })
-  .catch(reportUnexpected)                     // a throw while rendering, too
+  .catch(reportUnexpected) // a throw while rendering, too
 ```
 
 Three rules behind that shape, all of them in
@@ -430,8 +430,7 @@ handler, no error, no status change — the panel simply ignores the user.
 So give every control the state it actually has:
 
 ```html
-<input id="entry" type="text" disabled />
-<button id="add" type="button" disabled>Add entry</button>
+<input id="entry" type="text" disabled /> <button id="add" type="button" disabled>Add entry</button>
 ```
 
 ```js
@@ -454,7 +453,7 @@ belongs in `storage.*`, which is why this page keeps saying so.
 
 A panel that writes its status line and its list from more than one place has to
 decide which write wins. The flows do not finish in the order they started: a
-`load()` waiting on two bridge replies can land *after* a click that began later
+`load()` waiting on two bridge replies can land _after_ a click that began later
 and already wrote the newer truth, and then it paints the older one back —
 status cleared, the row the click just added gone, and no error anywhere.
 
@@ -462,8 +461,12 @@ Order of completion is not order of intent. Give the shared surface an owner:
 
 ```js
 var surfaceOwner = 0
-function claimSurface() { return ++surfaceOwner }
-function ownsSurface(owner) { return owner === surfaceOwner }
+function claimSurface() {
+  return ++surfaceOwner
+}
+function ownsSurface(owner) {
+  return owner === surfaceOwner
+}
 ```
 
 Each flow claims it when it starts and checks before it writes, so a superseded
@@ -485,11 +488,11 @@ Three separate stores, all per plugin, all under
 never a shared namespaced blob, so one plugin's key can never resolve into
 another's.
 
-| Store | File | Capability | Caps |
-| --- | --- | --- | --- |
-| `storage.*` | `storage.json` | `storage` | value ≤ 256 KiB, whole store ≤ 5 MiB, ≤ 1024 keys ([`plugin-host-api.ts:68-70`](../../src/shared/plugins/plugin-host-api.ts)) |
-| `settings.*` | `settings.json` | `settings:own` | same key rules |
-| `secrets.*` | encrypted vault | `secrets` | value ≤ 64 KiB ([`:83`](../../src/shared/plugins/plugin-host-api.ts)) |
+| Store        | File            | Capability     | Caps                                                                                                                          |
+| ------------ | --------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `storage.*`  | `storage.json`  | `storage`      | value ≤ 256 KiB, whole store ≤ 5 MiB, ≤ 1024 keys ([`plugin-host-api.ts:68-70`](../../src/shared/plugins/plugin-host-api.ts)) |
+| `settings.*` | `settings.json` | `settings:own` | same key rules                                                                                                                |
+| `secrets.*`  | encrypted vault | `secrets`      | value ≤ 64 KiB ([`:83`](../../src/shared/plugins/plugin-host-api.ts))                                                         |
 
 Keys are 1–256 chars and `__proto__`/`prototype`/`constructor` are rejected
 ([`:60-65`](../../src/shared/plugins/plugin-host-api.ts)). Values are plain JSON;
@@ -530,7 +533,9 @@ keep it short.
 ```js
 export default async function activate(orca) {
   orca.commands.register('my.command', async (args) => ({ ok: true }))
-  orca.events.on('worktree.created', async (payload) => { /* … */ })
+  orca.events.on('worktree.created', async (payload) => {
+    /* … */
+  })
   const stored = await orca.host.call('storage.get', { key: 'state' })
   orca.log('activated')
 }
@@ -571,7 +576,7 @@ Read that as a list of absences:
   `TEMP`, `TMP`, `ORCA_USER_DATA_PATH`, `XDG_CONFIG_HOME`, `SYSTEMROOT` (passed
   through as `SystemRoot`), `SYSTEMDRIVE`, `WINDIR`, `COMSPEC`, `PATHEXT`,
   `PROCESSOR_ARCHITECTURE`, `NUMBER_OF_PROCESSORS`. A token you exported in your
-  shell is *not* visible to a plugin. On Windows the lookup folds case, because
+  shell is _not_ visible to a plugin. On Windows the lookup folds case, because
   Windows env keys are case-insensitive and POSIX ones are not.
 - **No network modules.** The preload throws on importing `net`, `http`,
   `https`, `http2`, `tls`, `dns`, `dns/promises`, `dgram`
@@ -585,21 +590,21 @@ Read that as a list of absences:
 - **No Electron.** The entry is forked with `ELECTRON_RUN_AS_NODE`
   ([`plugin-host-entry.ts:1-6`](../../src/main/plugins/plugin-host-entry.ts)).
 
-If `process:spawn` *is* granted, note the consent line says it plainly:
+If `process:spawn` _is_ granted, note the consent line says it plainly:
 programs the plugin starts are **not** constrained by any of the above.
 
 ### Timeouts and supervision
 
-| Bound | Value |
-| --- | --- |
-| Ready after activation | 10 s ([`plugin-host-protocol.ts:108`](../../src/shared/plugins/plugin-host-protocol.ts)) |
-| A command invocation | 30 s ([`:109`](../../src/shared/plugins/plugin-host-protocol.ts)) |
-| An event handler | 5 min, then the worker is killed ([`plugin-host-process.ts:23, 288-292`](../../src/main/plugins/plugin-host-process.ts)) |
-| Unacknowledged events in flight | 64, then killed ([`:24, 281-285`](../../src/main/plugins/plugin-host-process.ts)) |
-| Idle reap | 5 min with no in-flight work ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
-| Concurrent live workers | 5; further activations queue ([`:114`](../../src/shared/plugins/plugin-host-protocol.ts)) |
-| Shutdown grace before SIGKILL | 2 s ([`plugin-host-process.ts:22`](../../src/main/plugins/plugin-host-process.ts)) |
-| Crash restarts | 3, backing off 500 / 2000 / 5000 ms, then `errored` ([`plugin-supervisor.ts:31-34`](../../src/main/plugins/plugin-supervisor.ts)) |
+| Bound                           | Value                                                                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Ready after activation          | 10 s ([`plugin-host-protocol.ts:108`](../../src/shared/plugins/plugin-host-protocol.ts))                                          |
+| A command invocation            | 30 s ([`:109`](../../src/shared/plugins/plugin-host-protocol.ts))                                                                 |
+| An event handler                | 5 min, then the worker is killed ([`plugin-host-process.ts:23, 288-292`](../../src/main/plugins/plugin-host-process.ts))          |
+| Unacknowledged events in flight | 64, then killed ([`:24, 281-285`](../../src/main/plugins/plugin-host-process.ts))                                                 |
+| Idle reap                       | 5 min with no in-flight work ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts))              |
+| Concurrent live workers         | 5; further activations queue ([`:114`](../../src/shared/plugins/plugin-host-protocol.ts))                                         |
+| Shutdown grace before SIGKILL   | 2 s ([`plugin-host-process.ts:22`](../../src/main/plugins/plugin-host-process.ts))                                                |
+| Crash restarts                  | 3, backing off 500 / 2000 / 5000 ms, then `errored` ([`plugin-supervisor.ts:31-34`](../../src/main/plugins/plugin-supervisor.ts)) |
 
 The worker is **lazy**: nothing forks until a command is invoked or a subscribed
 event arrives ([`plugin-worker-manager.ts:46`](../../src/main/plugins/plugin-worker-manager.ts),
@@ -698,7 +703,7 @@ chars), and optional `workspace`; then **exactly one** of:
 - `provider` + `prompt` — launches an agent; the prompt body lives in a file
   inside the plugin (≤ 128 KiB), never inline, so the reviewer reads the same
   bytes the content hash covers ([`:34-36, 64-70`](../../src/shared/plugins/plugin-automation-contribution.ts));
-- `command` — a shell string, ≤ 1024 chars, that *is* the run: no agent, no
+- `command` — a shell string, ≤ 1024 chars, that _is_ the run: no agent, no
   terminal, no model ([`:43, 72-78`](../../src/shared/plugins/plugin-automation-contribution.ts)).
 
 Both schemas are `.strict()`, hence a union rather than two optional fields.
@@ -708,8 +713,8 @@ What the host guarantees
 
 - They are **born disabled**. Turning on automatic work is the user's decision.
 - They are born **with no project**, unless the declaration says
-  `"workspace": "plugin-owned"` — which asks for a folder Orca creates *for the
-  plugin*, outside every user project. It is a literal, not a path: a plugin can
+  `"workspace": "plugin-owned"` — which asks for a folder Orca creates _for the
+  plugin_, outside every user project. It is a literal, not a path: a plugin can
   never name a directory or point at someone else's repo.
 - Reconciliation runs on explicit lifecycle transitions (consent, enable,
   disable, uninstall), not on every discovery refresh, so a flickering dev
@@ -761,16 +766,27 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
 
 ```jsonc
 {
-  "looks": {           // one per phase: the landscape
+  "looks": {
+    // one per phase: the landscape
     "working": {
-      "skyTop": "#0d1330", "skyBottom": "#2a3466", "sun": "#f2f0d8", "isNight": true,
-      "far": "#1f2748", "snow": "#8c97c4", "near": "#1b2b33", "ground": "#121c1e",
-      "plant": "#0d1714", "plantKind": "tree", "cloud": "#2e3a66",
-      "scenery": "skyline", "isSignal": true                         // both optional
+      "skyTop": "#0d1330",
+      "skyBottom": "#2a3466",
+      "sun": "#f2f0d8",
+      "isNight": true,
+      "far": "#1f2748",
+      "snow": "#8c97c4",
+      "near": "#1b2b33",
+      "ground": "#121c1e",
+      "plant": "#0d1714",
+      "plantKind": "tree",
+      "cloud": "#2e3a66",
+      "scenery": "skyline",
+      "isSignal": true // both optional
     }
     // docs, build, verify, pr, handoff …
   },
-  "costumes": {        // one per phase: Clawd's outfit
+  "costumes": {
+    // one per phase: Clawd's outfit
     "working": {
       "rows": ["..........", "..HHHHH...", ".HHHHHHH..", ".OEOOOEO..", "OBBBBBBBO.", ".BBBBBBB.."],
       "legs": [".O.O.O.O..", "O.O.O.O.O."],
@@ -778,24 +794,50 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
     }
   },
   "cards": {
-    "working": { "icon": "☾", "name": { "en": "Night Owl", "es": "Búho nocturno" }, "color": "#8fa3d9" }
+    "working": {
+      "icon": "☾",
+      "name": { "en": "Night Owl", "es": "Búho nocturno" },
+      "color": "#8fa3d9"
+    }
   },
   "teller": { "icon": "❝", "name": "Night Log", "color": "#9aa6c8" },
   "band": { "gold": "#f2c14e", "ink": "#0d1330", "panel": "#1f2748", "parchment": "#e8e4ff" },
-  "foe": { "rows": ["…six rows…"], "legs": ["…", "…"], "colors": { } },   // optional
-  "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" },          // optional
-  "hud": { "skyTop": "#0d1330", "skyBottom": "#1f2748", "frame": "#f2c14e",
-           "text": "#e8e4ff", "dim": "#9aa6c8", "star": "#ffffff" }        // optional, team band
+  "foe": { "rows": ["…six rows…"], "legs": ["…", "…"], "colors": {} }, // optional
+  "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" }, // optional
+  "hud": {
+    "skyTop": "#0d1330",
+    "skyBottom": "#1f2748",
+    "frame": "#f2c14e",
+    "text": "#e8e4ff",
+    "dim": "#9aa6c8",
+    "star": "#ffffff"
+  }, // optional, team band
+  "cast": {
+    // optional
+    "pet": {
+      "name": "Owl",
+      "frames": [["O.O", "OOO", ".O."]],
+      "happy": ["O.O", "OHO", ".O."],
+      "colors": { "O": "#8fa3d9", "H": "#ff5a8a" }
+    },
+    "advisor": {
+      "name": "Watchman",
+      "frames": [[".K.", "KKK", "K.K"]],
+      "colors": { "K": "#1a1a1a" }
+    }
+  }
 }
 ```
 
 - Pixel colors (`looks`, costume `colors`, `hud`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
   colors are `#rrggbb`.
-- A costume is exactly six `rows` plus two `legs` rows, each ten printable ASCII glyphs. `.` is
-  transparent and every other glyph must have a color.
+- A costume is 10×7: exactly six `rows` of body plus a seventh legs row whose two frames are the
+  two `legs` strings (they alternate while it walks; a sitting figure drops the row). Every row is
+  ten printable ASCII glyphs. `.` is transparent and every other glyph must have a color. Nothing is
+  mirrored when a figure walks back, so draw costumes facing right, the way the hero faces.
 - `icon` is at most 4 characters and `name` at most 32, with no control or bidi characters: they
   reach the terminal as-is.
-- A card or teller `name` is a string, or one per language as `{ "en", "es", "ja", "ko", "zh" }`
+- A card or teller `name` is a string, or one per language as `{ "en", "es" }`
   with `en` required; the game shows the one for Orca's UI language and falls back to `en`. Other
   language keys are dropped. A mod older than this drops a scene that uses the object form and
   draws `quest`.
@@ -804,14 +846,18 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   windows, on rooftops instead of hills), `crystals` or `meadow`. Optional `isSignal: true` draws a
   searchlight sign with its beam in place of the sun.
 - Optional `foe` is a costume, same rules as above, that faces a teammate whose CI is red: on its
-  Fleet tile in place of the phase prop, and in turns with it on the HUD.
+  Fleet tile in place of the phase prop, mirrored so it faces the teammate, and in turns with it
+  on the HUD as written.
 - Optional `finale` is a caption painted bottom-right while a merge runs: a string or one per
   language, at most 24 characters. It is drawn inside the pixel art, so it takes only width-1
-  characters (Latin with accents, punctuation, box drawing and blocks, `★`, card suits); write
-  Japanese, Korean and Chinese scenes' finale in a Latin script or leave those languages out.
+  characters (Latin with accents, punctuation, box drawing and blocks, `★`, card suits).
 - An Orca or mod older than these fields ignores `scenery`, `isSignal`, `foe` and `finale`; one
   that predates the `antenna`, `crystal` and `flower` plants drops a scene that uses them and draws
   `quest`.
+- Optional `cast` gives the scene a `pet` (what Pet hearts, trailing the hero) and Jev's
+  `advisor` (the referee otherwise), each sprite frames of 1 to 7 rows by 1 to 10 glyphs. An
+  invalid member is left out with a warning and the scene still draws; the rules and the advisor's
+  gestures are in [The cast](./orchestrator-game.md#the-cast-a-pet-and-jevs-advisor).
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the
@@ -830,13 +876,13 @@ running/idle ([`:197-208`](../../src/main/plugins/plugin-list-projection.ts)).
 
 - `invalid` — the manifest is missing, unparseable, fails validation, declares a
   missing artifact, or requires a newer Orca.
-- `pending` — installed but awaiting consent, or awaiting *re*-consent.
+- `pending` — installed but awaiting consent, or awaiting _re_-consent.
 - `idle` — enabled, no worker running. This is the normal resting state.
 - `errored` — crashed past the restart budget, or failed to activate.
 
 **Only `running`, `restarting` and `idle` mount a panel's document**
 ([`plugin-panels.ts:19-21`](../../src/renderer/src/store/plugin-panels.ts)).
-A `pending` plugin keeps its *surface* — the sidebar entry, the Settings page —
+A `pending` plugin keeps its _surface_ — the sidebar entry, the Settings page —
 but renders an approval notice instead of your HTML
 ([`plugin-panels.ts:26-28`](../../src/renderer/src/store/plugin-panels.ts),
 [`PluginPanel.tsx:156-161, 235-237`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)).
@@ -873,7 +919,7 @@ committed `node_modules` will blow it.
 
 - **Local path** — the folder must contain `orca-plugin.json`
   ([`plugin-install.ts:68-87`](../../src/main/plugins/plugin-install.ts)).
-- **Git URL + ref** — HTTPS or SSH only; Orca shells out to the *system* `git`
+- **Git URL + ref** — HTTPS or SSH only; Orca shells out to the _system_ `git`
   with argv arrays (never a shell string, never a vendored client) so your
   credential helpers and SSH remotes keep working, and resolves the ref to an
   exact commit ([`:110-145`](../../src/main/plugins/plugin-install.ts)).
@@ -897,7 +943,7 @@ the official index ([`plugin-list-projection.ts:258-264`](../../src/main/plugins
 An update installs into a new hash directory and swaps the pointer. Whether the
 user is prompted again depends only on the fingerprint: a changed capability
 set, a newly-added `main`, or — for a plugin with instructional contributions —
-*any* change at all. The old version directory stays for rollback.
+_any_ change at all. The old version directory stays for rollback.
 
 Bump `version` in the manifest for humans; the host's identity is the content
 hash, not the version string.

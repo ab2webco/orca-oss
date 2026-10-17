@@ -121,6 +121,17 @@ describe('Store', () => {
     expect((readDataFile() as PersistedState).settings.terminalLineHeight).toBe(1)
   })
 
+  it.each(['zh', 'ko', 'ja'])('migrates a persisted %s UI language to English', async (legacy) => {
+    const persisted = getDefaultPersistedState(testState.dir)
+    writeDataFile({ ...persisted, settings: { ...persisted.settings, uiLanguage: legacy } })
+
+    const store = await createStore()
+
+    expect(store.getSettings().uiLanguage).toBe('en')
+    store.flush()
+    expect((readDataFile() as PersistedState).settings.uiLanguage).toBe('en')
+  })
+
   it('returns default UI state when no data file exists', async () => {
     const store = await createStore()
     const ui = store.getUI()

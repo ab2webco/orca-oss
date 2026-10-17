@@ -24,10 +24,7 @@ const LAZY_LOCALE_LOADERS: Record<
   Exclude<SupportedUiLocale, 'en'>,
   () => Promise<{ default: Record<string, unknown> }>
 > = {
-  es: () => import('../../renderer/src/i18n/locales/es.json'),
-  ja: () => import('../../renderer/src/i18n/locales/ja.json'),
-  ko: () => import('../../renderer/src/i18n/locales/ko.json'),
-  zh: () => import('../../renderer/src/i18n/locales/zh.json')
+  es: () => import('../../renderer/src/i18n/locales/es.json')
 }
 
 const lazyLocaleBackend: BackendModule = {
@@ -51,6 +48,16 @@ const lazyLocaleBackend: BackendModule = {
 export function getMainSystemLocale(): string {
   try {
     return app.getLocale()
+  } catch {
+    return DEFAULT_UI_LOCALE
+  }
+}
+
+/** The person's first preferred OS language, for surfaces outside Orca's own window. */
+export function getPreferredSystemLocale(): string {
+  try {
+    // Why: on macOS getLocale() follows the app bundle's localizations, so a Spanish Mac reads en.
+    return app.getPreferredSystemLanguages()[0] ?? app.getLocale()
   } catch {
     return DEFAULT_UI_LOCALE
   }

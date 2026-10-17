@@ -36,4 +36,23 @@ describe('demo', () => {
     ).toBe(true)
     expect(demoFrameOf(DEMO_FRAMES)).toEqual(demoFrameOf(0))
   })
+
+  it('shows a prompt action, an MCP action and a To Do grouped by status with counts', () => {
+    const frames = Array.from({ length: DEMO_FRAMES }, (_, step) => demoFrameOf(step).state)
+    for (const state of frames) {
+      const actions = state.actions ?? []
+      expect(actions.some((one) => 'prompt' in one)).toBe(true)
+      expect(actions.some((one) => 'mcp' in one)).toBe(true)
+      const todo = state.project?.todo
+      expect(todo?.items.map((one) => one.group)).toEqual([
+        'in_progress',
+        'review',
+        'review',
+        'todo'
+      ])
+      expect(todo?.items.every((one) => (one.prompt ?? '') !== '')).toBe(true)
+      expect(todo?.groups?.review).toBeGreaterThan(0)
+      expect(todo?.total).toBeGreaterThanOrEqual(todo?.items.length ?? Infinity)
+    }
+  })
 })

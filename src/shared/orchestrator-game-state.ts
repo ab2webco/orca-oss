@@ -2,9 +2,14 @@ import type { AgentStatusState } from './agent-status-types'
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
+import type { GameAction } from './orchestrator-game-actions'
+import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
+import type { GameStop } from './orchestrator-game-stop-state'
+import type { GameInboxSummary } from './orchestrator-game-inbox'
+import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -36,7 +41,24 @@ export type GameAgent = {
   terminalHandle?: string
   /** Optional on the wire: older hosts send none, and an agent no rule matched gets none. */
   activity?: GameActivity
+  /** A session the lead launched through `orca orchestration`, which reports to it. */
+  isMember?: boolean
+  /** The member's own worktree, when it is not the lead's. */
+  worktree?: GameMemberWorktree
+  /** The member worktree's own review and ticket; the lead's worktree's are the state's. */
+  review?: GameReview
+  workItem?: GameWorkItem
+  /** The managed account a member's agent runs on; absent when Orca cannot tell or from an older host. */
+  account?: GameMemberAccount
+  /** Set while a member is stopped by its account's usage limit; absent from an older host. */
+  limit?: { resetsAt: number | null }
+  /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
+  advisor?: GameMemberAdvisor
 }
+
+export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
+
+export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 
 export type GameReview = {
   provider: Exclude<HostedReviewProvider, 'unsupported'>
@@ -87,6 +109,16 @@ export type OrchestratorGameState = {
   activity?: GameActivity
   /** My open PRs and tickets across the project; absent with the tracker off or from an older host. */
   project?: GameProjectWork
+  /** The project's buttons, filled for this worktree; absent when it declares none. */
+  actions?: GameAction[]
+  /** How this project's lead orchestrates; absent from an older host. */
+  lead?: OrchestratorGameLead
+  /** Whether the calling pane leads or was launched by a lead; absent from an older host. */
+  role?: 'lead' | 'member'
+  /** The project's persistent STOP, null when clear; absent from a host older than it. */
+  stopped?: GameStop | null
+  /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
+  inboxes?: GameInboxSummary[]
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

@@ -17,7 +17,10 @@ import {
   ORCHESTRATION_SKILL_UPDATE_COMMAND,
   ORCA_PLANE_SKILL_INSTALL_COMMAND,
   SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND,
-  SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND
+  SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND,
+  ORCA_GAME_SCENES_AGENT_SKILL_NAMES,
+  ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND,
+  ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND
 } from './agent-feature-install-commands'
 
 describe('agent feature skill commands', () => {
@@ -148,6 +151,16 @@ describe('agent feature skill commands', () => {
       'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
     )
     expect(SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND).toBe('npx skills update switch-account --global')
+  })
+
+  it('installs and updates orca-game-scenes from the lab fork that ships the game', () => {
+    expect(ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-game-scenes --global'
+    )
+    expect(ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills update orca-game-scenes --global'
+    )
+    expect(ORCA_GAME_SCENES_AGENT_SKILL_NAMES).toEqual(['orca-game-scenes'])
   })
 
   it('routes a bare fork-only name to the fork and everything else upstream', () => {

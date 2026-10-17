@@ -18,6 +18,8 @@ import {
   getTerminalWindowsShellSearchEntry
 } from './terminal-windows-search'
 import { ManageSessionsSection } from './ManageSessionsSection'
+import { MemoryPressureWarningSection } from './MemoryPressureWarningSection'
+import { getMemoryPressureWarningSearchEntries } from './memory-pressure-warning-search'
 import { TerminalAdvancedSection } from './TerminalAdvancedSection'
 import { TerminalInteractionSection } from './TerminalInteractionSection'
 import { TerminalRenderingSection } from './TerminalRenderingSection'
@@ -95,6 +97,13 @@ export function TerminalPane({
     ) : null,
     matchesSettingsSearch(searchQuery, getManageSessionsSearchEntries()) ? (
       <ManageSessionsSection key="manage-sessions" />
+    ) : null,
+    matchesSettingsSearch(searchQuery, getMemoryPressureWarningSearchEntries()) ? (
+      <MemoryPressureWarningSection
+        key="memory-pressure"
+        settings={settings}
+        updateSettings={updateSettings}
+      />
     ) : null,
     matchesSettingsSearch(searchQuery, getTerminalAdvancedSearchEntries()) ||
     (showWindowsPowerShellImplementation &&

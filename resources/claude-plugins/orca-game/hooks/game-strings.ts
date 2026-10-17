@@ -1,18 +1,23 @@
 import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
+import type { TodoHeading } from './todo-sections'
 import { ES } from './locales/es'
-import { JA } from './locales/ja'
-import { KO } from './locales/ko'
-import { ZH } from './locales/zh'
 
-// Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same five.
-export const GAME_LOCALES = ['en', 'es', 'ja', 'ko', 'zh'] as const satisfies readonly GameLocale[]
+// Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same two.
+export const GAME_LOCALES = ['en', 'es'] as const satisfies readonly GameLocale[]
 export type { GameLocale, LocalizedName }
 
 /** Words drawn as terminal text, where any character renders. */
 export type TextStrings = {
   panel: string
   refresh: string
-  petClawd: string
+  pet: string
+  /** Pet with the scene pet's name, as in "Pet Steve". */
+  petNamed: (name: string) => string
+  /** The Panel card's name for an advisor a scene left unnamed. */
+  advisor: string
+  /** The main conversation's model change, in the advisor card. */
+  advisorMain: string
+  advisorEmpty: string
   close: string
   view: string
   fleet: string
@@ -39,22 +44,55 @@ export type TextStrings = {
   couldNotOpenLink: (label: string) => string
   merged: (review: string) => string
   ciGreen: (review: string) => string
+  memberLaunched: (member: string) => string
   questDescription: string
   questModesHelp: string
   questShown: (mode: string) => string
   questDemo: string
   unknownMode: (asked: string) => string
+  questRenderShown: (render: string) => string
+  /** A mode or render this session set that differs from the config, with the configured one and its layer when known. */
+  sessionOverride: (value: string, configured: string, source?: string) => string
+  unknownRender: (asked: string) => string
   moreAllies: (count: number) => string
   /** `kind` is PR or MR, after the project's host. */
   myReviews: (kind: string, count: number) => string
   todo: (count: number) => string
+  actionsHeading: string
+  /** Toast once a prompt is queued for the lead's next turn. */
+  sentToLead: (label: string) => string
+  couldNotSend: (label: string) => string
+  actionRunning: string
+  /** Toast for an action pressed during /orca-game:demo, which runs nothing. */
+  demoAction: (label: string) => string
+  todoHeadings: Readonly<Record<TodoHeading, string>>
+  qa: (count: number) => string
+  workOn: (id: string) => string
+  /** Orca's own lead buttons, by the id after `lead:`. */
+  leadActions: Readonly<Record<LeadActionKey, string>>
+  /** What the typeahead shows for an action's slash command. */
+  actionCommandDescription: (label: string) => string
+  actionCommandRefused: (command: string) => string
+  actionCommandGone: (command: string) => string
+  /** A member stopped by its account's usage limit; `backIn` like "1h 30m", null when unknown. */
+  limited: (backIn: string | null) => string
+  /** Which of a member's model and effort Orca pinned at launch; empty for neither. */
+  advisorPinned: (pinned: { model: boolean; effort: boolean }) => string
+  /** One model in the fleet's summary of what Jev has the members on. */
+  membersOn: (count: number, model: string) => string
 }
+
+export type LeadActionKey = 'wave' | 'status' | 'push' | 'sweep' | 'stop'
 
 /** Words painted into a Raster, which only takes width-1 characters. */
 export type ArtStrings = {
   needsYou: string
   alert: (name: string) => string
   ciIsRed: string
+  /** hd's floating text when a review merges; `review` is like `#42`. */
+  mergedFloat: (review: string) => string
+  /** The crowned hero's label in hd when the project names no lead. */
+  lead: string
   noParty: string
   teammatesJoin: string
   level: string
@@ -87,7 +125,11 @@ const EN: GameStrings = {
   text: {
     panel: 'Panel',
     refresh: 'Refresh',
-    petClawd: 'Pet Clawd',
+    pet: 'Pet',
+    petNamed: (name) => `Pet ${name}`,
+    advisor: 'Advisor',
+    advisorMain: 'main conversation',
+    advisorEmpty: 'No decisions yet',
     close: 'Close',
     view: 'View',
     fleet: 'Fleet',
@@ -120,23 +162,60 @@ const EN: GameStrings = {
     couldNotOpenLink: (label) => `Could not open ${label}`,
     merged: (review) => `${review} merged`,
     ciGreen: (review) => `${review} CI is green`,
+    memberLaunched: (member) => `${member} launched`,
     questDescription:
-      'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
+      'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party.',
+      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
-      'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.',
+      'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
     unknownMode: (asked) =>
-      `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
+      `Unknown mode "${asked}". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.`,
+    questRenderShown: (render) => `Render: ${render}.`,
+    sessionOverride: (value, configured, source) =>
+      `${value} (this session; the project's setting is ${configured}${source ? `, from ${source}` : ''})`,
+    unknownRender: (asked) =>
+      `Unknown render "${asked}". Use /orca-game:render classic or /orca-game:render hd.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
-    todo: (count) => `To Do ${count}`
+    todo: (count) => `To Do ${count}`,
+    actionsHeading: 'Actions',
+    sentToLead: (label) => `Sent to the lead: ${label}`,
+    couldNotSend: (label) => `Could not send ${label}`,
+    actionRunning: 'running…',
+    demoAction: (label) => `Demo: ${label} is not run`,
+    todoHeadings: {
+      in_progress: 'In progress',
+      review: 'QA / review',
+      todo: 'To do',
+      backlog: 'Backlog',
+      other: 'Other'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `Work on ${id}`,
+    leadActions: { wave: 'Wave', status: 'Status', push: 'Push', sweep: 'Sweep', stop: 'Stop' },
+    actionCommandDescription: (label) => `Orca action: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command} is taken by another command; use its button in the band or the Panel`,
+    actionCommandGone: (command) => `/${command} is no longer one of this project's actions`,
+    limited: (backIn) => (backIn === null ? 'limited' : `limited · back in ${backIn}`),
+    advisorPinned: ({ model, effort }) =>
+      model && effort
+        ? 'model and effort pinned'
+        : model
+          ? 'model pinned'
+          : effort
+            ? 'effort pinned'
+            : '',
+    membersOn: (count, model) => `${count} on ${model}`
   },
   art: {
     needsYou: 'needs you!',
     alert: (name) => `${name} needs you!`,
     ciIsRed: 'CI is red',
+    mergedFloat: (review) => `${review} merged!`,
+    lead: 'Lead',
     noParty: 'No party yet.',
     teammatesJoin: 'Teammates join when the lead spawns them.',
     level: 'Lv',
@@ -163,10 +242,7 @@ const EN: GameStrings = {
 
 export const CATALOGS: Readonly<Record<GameLocale, GameCatalog>> = {
   en: EN,
-  es: ES,
-  ja: JA,
-  ko: KO,
-  zh: ZH
+  es: ES
 }
 
 export const gameLocaleOf = (value: string | null | undefined): GameLocale => {
@@ -191,6 +267,14 @@ const isRasterCode = (code: number): boolean =>
 export const isRasterText = (text: string): boolean =>
   [...text].every((one) => isRasterCode(one.codePointAt(0) ?? 0))
 
+const INVISIBLE = /[\p{M}\p{Cc}\p{Cf}︀-️]/u
+
+/** Text as a Raster can draw it: invisible marks dropped, anything wider or unknown shown as `?`. */
+export const rasterGlyphsOf = (text: string): string[] =>
+  [...text.normalize('NFC')].flatMap((one) =>
+    INVISIBLE.test(one) ? [] : isRasterCode(one.codePointAt(0) ?? 0) ? [one] : ['?']
+  )
+
 let activeLocale: GameLocale = 'en'
 let active: GameStrings = EN
 
@@ -201,6 +285,8 @@ export const setGameLocale = (locale: GameLocale): void => {
 }
 
 export const gameStrings = (): GameStrings => active
+
+export const gameLocale = (): GameLocale => activeLocale
 
 export const localizedNameOf = (name: LocalizedName, locale = activeLocale): string =>
   typeof name === 'string' ? name : (name[locale] ?? name.en)

@@ -44,9 +44,6 @@
         "description": "Choose the language used by the Orca Lab interface.",
         "system": "System",
         "english": "English",
-        "chinese": "中文（简体）",
-        "korean": "한국어",
-        "japanese": "日本語",
         "spanish": "Español"
       },
       "statusBar": {
@@ -884,6 +881,21 @@
       },
       "ephemeralVmWorktreeCreation": {
         "sparseCheckoutUnsupported": "Provisioned-root recipes do not support sparse checkout."
+      },
+      "orcaGameScenes": {
+        "usage": {
+          "examples": {
+            "newScene": "Make a new scene",
+            "newSceneSummary": "Start from the template, draw every phase and validate it until it is clean.",
+            "newScenePrompt": "Use {{value0}} to make a Super Smash Bros scene for this project and turn it on.",
+            "changeColors": "Change the colors",
+            "changeColorsSummary": "Restyle the sky, the world and the team band of the scene you already have.",
+            "changeColorsPrompt": "Use {{value0}} to change the scene's colors to a sunset palette and validate it.",
+            "drawsQuest": "Fix a scene that draws Quest",
+            "drawsQuestSummary": "Find why the game falls back to Quest and fix the file until it draws itself.",
+            "drawsQuestPrompt": "My scene draws Quest instead of itself. Use {{value0}} to find out why and fix it."
+          }
+        }
       }
     },
     "hooks": {
@@ -9832,7 +9844,14 @@
             },
             "actions": "actions",
             "buttons": "buttons",
-            "position": "position"
+            "position": "position",
+            "memoryPressureTitle": "Low memory warning",
+            "memoryPressureDescription": "Warn when the system is running out of memory and name the terminals using the most.",
+            "memoryKeyword": "memory",
+            "ramKeyword": "ram",
+            "swapKeyword": "swap",
+            "pressureKeyword": "pressure",
+            "warningKeyword": "warning"
           },
           "windows": {
             "search": {
@@ -11362,6 +11381,107 @@
           "sceneFileSshOffline": "Connect this SSH project to read its scene file.",
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
           "sceneFileNotText": "not a text file"
+        },
+        "OrchestratorGameLeadSetting": {
+          "cap": "Member cap",
+          "capInvalid": "Enter a whole number from 1 to {{value0}}.",
+          "label": "Lead name",
+          "labelInvalid": "Use 1 to 32 characters.",
+          "agent": "Agent",
+          "agentInvalid": "Use an agent id like claude or codex.",
+          "model": "Model",
+          "modelInvalid": "Use a model id like opus.",
+          "effort": "Effort",
+          "effortInvalid": "Use an effort level like high.",
+          "notSet": "Not set",
+          "autostart": "Start as lead",
+          "effortNeedsModel": "Used only with a model",
+          "title": "Lead",
+          "description": "The session that talks to you and launches one member per ticket. orca.yaml sets the project default; these override it on this machine.",
+          "yamlOnly": "The launch prompt and the project's rules live in orca.yaml under orchestratorGame.orchestrator.",
+          "actions": "Lead buttons",
+          "accounts": "Member accounts",
+          "accountsDefault": "Orca's account",
+          "accountsAuto": "Most free quota",
+          "accountsDefaultOption": "Orca's",
+          "accountsAutoOption": "Most free"
+        },
+        "OrchestratorGameActionsSetting": {
+          "labelInvalid": "Use 1 to 24 characters.",
+          "commandInvalid": "Use a lowercase name like test-runs, up to 24 characters.",
+          "commandTaken": "A lead button or another action already uses this command.",
+          "promptInvalid": "Write a prompt of 1 to 2000 characters, with only the placeholders orca.yaml allows.",
+          "mcpInvalid": "Name the MCP server and a tool like list_test_runs.",
+          "argsInvalid": "Arguments must be a JSON object, like {\"project\": \"CIN\"}.",
+          "label": "Label",
+          "labelPlaceholder": "Test runs",
+          "command": "Command",
+          "commandPlaceholder": "test-runs",
+          "kind": "Kind",
+          "kindPrompt": "Prompt",
+          "kindMcp": "MCP",
+          "remove": "Remove action",
+          "prompt": "Prompt",
+          "promptPlaceholder": "Have members run the Tambora test runs of my QA tickets",
+          "server": "MCP server",
+          "tool": "Tool",
+          "args": "Arguments (JSON)",
+          "title": "Actions",
+          "description": "Buttons in the band and the Panel, each also a slash command. A list saved here replaces the one in orca.yaml on this machine.",
+          "yamlEmpty": "orca.yaml sets no actions for this project.",
+          "yamlList": "Actions from orca.yaml",
+          "override": "Edit on this machine",
+          "noneHere": "No actions on this machine.",
+          "add": "Add action",
+          "save": "Save actions",
+          "inherit": "Inherit from orca.yaml",
+          "keyInvalid": "Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.",
+          "key": "Key",
+          "keyPlaceholder": "x"
+        },
+        "OrchestratorGameOpenLinksSetting": {
+          "orca": "Orca",
+          "system": "System browser",
+          "label": "Open links in",
+          "description": "PR, CI, ticket and list links from the band and the Panel. The system browser has your GitHub and Jira sign-ins."
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "Classic",
+          "hd": "HD",
+          "label": "Render",
+          "description": "Classic is the 5-row pixel art. HD draws a 9 to 10-row scene with light, weather and day and night.",
+          "timezone": "Time zone",
+          "timezoneDescription": "When HD turns to night. Empty or local follows this machine's clock.",
+          "timezoneInvalid": "Use local or an IANA time zone such as America/Bogota."
+        },
+        "orcaGameScenes": {
+          "skill": {
+            "search": {
+              "title": "Game scenes skill",
+              "description": "Let agents create, restyle and fix custom scenes for the Agent Teams game.",
+              "skillName": "orca-game-scenes",
+              "scene": "scene",
+              "customScene": "custom scene",
+              "theme": "theme",
+              "skin": "skin",
+              "agentTeams": "agent teams",
+              "game": "game",
+              "skill": "skill"
+            }
+          }
+        },
+        "OrchestratorGameScenesSkillCard": {
+          "description": "Lets agents make, restyle and fix custom scenes: they start from the template, validate the file until it is clean and turn it on for the project.",
+          "terminalTitle": "Game scenes skill setup",
+          "terminalAriaLabel": "Game scenes skill install terminal",
+          "howToUse": "How to use it",
+          "howToUseDescription": "Ask an agent in a terminal for a scene, a new look for the one you have, or why yours draws Quest."
+        },
+        "MemoryPressureWarningSection": {
+          "title": "Low Memory",
+          "description": "Agents, MCP servers and builds running in terminals can exhaust memory. Orca never closes a terminal on its own.",
+          "thresholdLabel": "Warn below",
+          "thresholdDescription": "Show the warning when free memory falls under this share of physical memory. On macOS it also shows when the system reports memory pressure. Terminals on SSH hosts are not measured."
         }
       },
       "right": {
@@ -16074,6 +16194,30 @@
           "closePanel": "Close {{title}}",
           "close": "Close",
           "closeTooltip": "Close · Esc"
+        }
+      },
+      "memoryPressure": {
+        "MemoryPressureWarningCard": {
+          "title": "Memory is running low",
+          "dismiss": "Dismiss",
+          "freeSummary": "{{value0}} of {{value1}} free.",
+          "swapSummary": "Swap {{value0}} of {{value1}}.",
+          "lead": "These terminals use the most memory. Close the ones you no longer need before the system runs out.",
+          "measuring": "Measuring terminals…",
+          "empty": "No local terminal is holding much memory. Other apps may be the cause.",
+          "untitled": "Background terminal",
+          "idleUnknown": "idle time unknown",
+          "lastOutput": "last output {{value0}}",
+          "open": "Open",
+          "close": "Close",
+          "remote": "SSH terminals run on their remote hosts and are not counted here ({{value0}} open)."
+        },
+        "MemoryPressureCloseDialog": {
+          "title": "Close {{value0}}?",
+          "description": "This ends the terminal and everything running in it, including any agent session and the servers it started. Unsaved work in that terminal is lost.",
+          "cancel": "Cancel",
+          "closing": "Closing…",
+          "confirm": "Close terminal"
         }
       }
     },

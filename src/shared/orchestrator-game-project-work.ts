@@ -1,10 +1,17 @@
 import type { CheckStatus, GitHubRepositoryIdentity } from './github/pull-request-types'
+import {
+  GAME_PROMPT_MAX,
+  GAME_WORK_PROMPT_PLACEHOLDERS,
+  unknownPlaceholderOf
+} from './orchestrator-game-actions'
 import { isHttpUrl } from './orchestrator-game-integrations'
 import type { GameLinkTone, GameStatusGroup } from './orchestrator-game-state'
 
 /** Project-wide work the band shows next to the worktree's own: my open PRs and my open tickets. */
 
 export const GAME_PROJECT_ITEMS_MAX = 5
+/** Why more than the Panel draws: `orca game wave` picks its tickets from these. Older mods cut at 5. */
+export const GAME_TODO_ITEMS_MAX = 30
 const GAME_TODO_TEXT_MAX = 64
 
 export const GAME_TODO_PROVIDERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
@@ -13,7 +20,15 @@ export type GameTodoProvider = (typeof GAME_TODO_PROVIDERS)[number]
 /** Where the To Do comes from; `project` is a Plane project id, Jira key or Linear team key. */
 export type OrchestratorGameTodoSource =
   | 'off'
-  | { provider: GameTodoProvider; project?: string; workspace?: string }
+  | {
+      provider: GameTodoProvider
+      project?: string
+      workspace?: string
+      /** What "work on" sends the lead: `{id}`, `{title}`, `{url}`, `{status}`. */
+      workPrompt?: string
+      /** An action's command or id the To Do link runs instead of opening the list. */
+      action?: string
+    }
 
 export type GameProjectItem = {
   id: string
@@ -21,6 +36,10 @@ export type GameProjectItem = {
   url: string
   status?: string
   tone?: GameLinkTone
+  /** A ticket's status group, so the Panel can head in-progress, QA and to-do apart. */
+  group?: GameStatusGroup
+  /** What "work on" sends the lead for this ticket. */
+  prompt?: string
 }
 
 /** `total` counts every open item; `items` keeps the first few, `url` opens the full list. */
@@ -29,17 +48,49 @@ export type GameProjectList = {
   total: number
   url: string | null
   items: GameProjectItem[]
+  /** Open tickets per status group, all of them and not only the items kept. */
+  groups?: Partial<Record<GameStatusGroup, number>>
+  /** The `game.state` action the To Do link runs instead of opening `url`. */
+  actionId?: string
 }
 
 export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
 
 const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,31}$/
+const TODO_ACTION = /^[a-z][a-z0-9:-]{0,63}$/
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const isTodoProvider = (value: unknown): value is GameTodoProvider =>
   typeof value === 'string' && (GAME_TODO_PROVIDERS as readonly string[]).includes(value)
+
+/** How the band's PR list behaves; `action` names one it runs instead of opening the list. */
+export type OrchestratorGameReviewsSource = { action?: string }
+
+export function parseGameReviewsSource(raw: unknown): {
+  value: OrchestratorGameReviewsSource | undefined
+  warnings: string[]
+} {
+  if (!isRecord(raw)) {
+    return { value: undefined, warnings: ['orchestratorGame.reviews must be a mapping'] }
+  }
+  const value: OrchestratorGameReviewsSource = {}
+  const warnings: string[] = []
+  for (const [key, entry] of Object.entries(raw)) {
+    const action = typeof entry === 'string' ? entry.trim() : ''
+    if (key !== 'action') {
+      warnings.push(`orchestratorGame.reviews.${key} is not a known setting`)
+    } else if (TODO_ACTION.test(action)) {
+      value.action = action
+    } else {
+      warnings.push(
+        'orchestratorGame.reviews.action must name an action by its command or id, like prs'
+      )
+    }
+  }
+  return { value, warnings }
+}
 
 export function parseGameTodoSource(raw: unknown): {
   value: OrchestratorGameTodoSource | undefined
@@ -55,9 +106,7 @@ export function parseGameTodoSource(raw: unknown): {
   if (!isTodoProvider(raw.provider)) {
     return refuse(`orchestratorGame.todo.provider must be one of ${GAME_TODO_PROVIDERS.join(', ')}`)
   }
-  const source: { provider: GameTodoProvider; project?: string; workspace?: string } = {
-    provider: raw.provider
-  }
+  const source: Exclude<OrchestratorGameTodoSource, 'off'> = { provider: raw.provider }
   for (const key of ['project', 'workspace'] as const) {
     if (raw[key] === undefined) {
       continue
@@ -72,20 +121,68 @@ export function parseGameTodoSource(raw: unknown): {
   if (source.provider === 'jira' && source.project && !JIRA_PROJECT_KEY.test(source.project)) {
     return refuse('orchestratorGame.todo.project must be a Jira project key like CIN')
   }
-  return { value: source, warnings: [] }
+  if (raw.workPrompt !== undefined) {
+    const workPrompt = typeof raw.workPrompt === 'string' ? raw.workPrompt.trim() : ''
+    if (workPrompt.length === 0 || workPrompt.length > GAME_PROMPT_MAX) {
+      return refuse(`orchestratorGame.todo.workPrompt must be 1 to ${GAME_PROMPT_MAX} characters`)
+    }
+    const unknown = unknownPlaceholderOf(workPrompt, GAME_WORK_PROMPT_PLACEHOLDERS)
+    if (unknown !== null) {
+      return refuse(`orchestratorGame.todo.workPrompt uses an unknown placeholder {${unknown}}`)
+    }
+    source.workPrompt = workPrompt
+  }
+  if (raw.action === undefined) {
+    return { value: source, warnings: [] }
+  }
+  // Why keep the rest: a mistyped action should cost the shortcut, never the To Do itself.
+  const action = typeof raw.action === 'string' ? raw.action.trim() : ''
+  if (!TODO_ACTION.test(action)) {
+    return {
+      value: source,
+      warnings: ['orchestratorGame.todo.action must name an action by its command or id, like jira']
+    }
+  }
+  return { value: { ...source, action }, warnings: [] }
 }
+
+// Why this order: what is being worked on first, then what waits on QA, then what is next.
+const GROUP_ORDER: readonly GameStatusGroup[] = [
+  'in_progress',
+  'review',
+  'todo',
+  'backlog',
+  'unknown',
+  'done',
+  'cancelled'
+]
+
+const groupRankOf = (item: GameProjectItem): number =>
+  item.group === undefined ? GROUP_ORDER.length : GROUP_ORDER.indexOf(item.group)
 
 export function gameProjectListOf(
   provider: string,
   items: readonly GameProjectItem[],
   url: string | null,
-  total: number = items.length
+  total: number = items.length,
+  max: number = GAME_PROJECT_ITEMS_MAX
 ): GameProjectList {
+  const grouped = items.filter((one) => one.group !== undefined)
+  const groups: Partial<Record<GameStatusGroup, number>> = {}
+  for (const one of grouped) {
+    if (one.group !== undefined) {
+      groups[one.group] = (groups[one.group] ?? 0) + 1
+    }
+  }
   return {
     provider,
     total,
     url: url !== null && isHttpUrl(url) ? url : null,
-    items: items.filter((one) => isHttpUrl(one.url)).slice(0, GAME_PROJECT_ITEMS_MAX)
+    items: items
+      .filter((one) => isHttpUrl(one.url))
+      .sort((left, right) => groupRankOf(left) - groupRankOf(right))
+      .slice(0, max),
+    ...(grouped.length > 0 ? { groups } : {})
   }
 }
 

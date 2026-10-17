@@ -7,7 +7,11 @@ export const ES: GameCatalog = {
   text: {
     panel: 'Panel',
     refresh: 'Actualizar',
-    petClawd: 'Acariciar a Clawd',
+    pet: 'Mimar',
+    petNamed: (name) => `Mimar a ${name}`,
+    advisor: 'Consejero',
+    advisorMain: 'conversación principal',
+    advisorEmpty: 'Sin decisiones todavía',
     close: 'Cerrar',
     view: 'Ver',
     fleet: 'Flota',
@@ -45,23 +49,66 @@ export const ES: GameCatalog = {
     couldNotOpenLink: (label) => `No se pudo abrir ${label}`,
     merged: (review) => `${review} mergeado`,
     ciGreen: (review) => `${review}: CI en verde`,
+    memberLaunched: (member) => `${member} en marcha`,
     questDescription:
-      'Modo quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
+      'Modo quest, forma corta de /orca-game:quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:
-      '/quest off lo muestra todo, /quest on oculta las filas de herramientas, /quest zen también oculta las notas de trabajo y /quest demo reproduce un grupo ficticio con guion.',
+      '/orca-game:mode on|zen|off: off lo muestra todo, on oculta las filas de herramientas y zen también oculta las notas de trabajo. /orca-game:render classic|hd elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego. /quest es la forma corta, que también funciona a mitad de un turno.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
-      'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /quest on vuelve a los datos reales.',
+      'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /orca-game:mode on vuelve a los datos reales.',
     unknownMode: (asked) =>
-      `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
+      `Modo desconocido "${asked}". Usa /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off o /orca-game:demo.`,
+    questRenderShown: (render) => `Render: ${render}.`,
+    sessionOverride: (value, configured, source) =>
+      `${value} (solo esta sesión; la configuración del proyecto es ${configured}${source ? `, de ${source}` : ''})`,
+    unknownRender: (asked) =>
+      `Render desconocido "${asked}". Usa /orca-game:render classic o /orca-game:render hd.`,
     moreAllies: (count) => `+${count} más`,
     myReviews: (kind, count) => `Mis ${kind}s ${count}`,
-    todo: (count) => `Por hacer ${count}`
+    todo: (count) => `Por hacer ${count}`,
+    actionsHeading: 'Acciones',
+    sentToLead: (label) => `Enviado al líder: ${label}`,
+    couldNotSend: (label) => `No se pudo enviar ${label}`,
+    actionRunning: 'ejecutando…',
+    demoAction: (label) => `Demo: ${label} no se ejecuta`,
+    todoHeadings: {
+      in_progress: 'En curso',
+      review: 'QA / revisión',
+      todo: 'Por hacer',
+      backlog: 'Backlog',
+      other: 'Otros'
+    },
+    qa: (count) => `QA ${count}`,
+    workOn: (id) => `Trabajar en ${id}`,
+    leadActions: {
+      wave: 'Ola',
+      status: 'Estado',
+      push: 'Reactivar',
+      sweep: 'Barrer',
+      stop: 'Detener'
+    },
+    actionCommandDescription: (label) => `Acción de Orca: ${label}`,
+    actionCommandRefused: (command) =>
+      `/${command} ya lo usa otro comando; usa su botón en la banda o en el Panel`,
+    actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`,
+    limited: (backIn) => (backIn === null ? 'limitado' : `limitado · vuelve en ${backIn}`),
+    advisorPinned: ({ model, effort }) =>
+      model && effort
+        ? 'modelo y esfuerzo fijados'
+        : model
+          ? 'modelo fijado'
+          : effort
+            ? 'esfuerzo fijado'
+            : '',
+    membersOn: (count, model) => `${count} con ${model}`
   },
   art: {
     needsYou: '¡te necesita!',
     alert: (name) => `¡${name} te necesita!`,
     ciIsRed: 'CI en rojo',
+    mergedFloat: (review) => `¡${review} mergeado!`,
+    lead: 'Líder',
     noParty: 'Aún no hay grupo.',
     teammatesJoin: 'Los compañeros llegan cuando el líder los crea.',
     level: 'Nv',

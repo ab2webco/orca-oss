@@ -1,7 +1,9 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { EngineInterface, On, RenderElement } from 'claude-code'
 
-import type { GameAgent, GameLinkTone, GameProjectList } from '../types'
-import { reviewKindOf } from './band-chips'
+import type { GameAgent } from '../types'
+import { advisorCard, advisorCardViewOf } from './advisor-card'
+import { ADVISOR_TILE_KEY } from './advisor-tile'
+import { petLabelOf } from './band-chips'
 import { fitCells } from './cell-width'
 import {
   activityTextOf,
@@ -11,25 +13,25 @@ import {
   workItemTextOf
 } from './fleet-labels'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { focusTerminal, openInOrca, refreshSoon, viewOf } from './fleet-sync'
+import { projectRowsOf } from './fleet-project'
+import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
+import { leadTitleOf } from './game-lead'
+import { runAction } from './game-actions'
+import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
+import { agentTagOf, cardTagRoomOf, limitTagOf } from './member-tags'
+import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
 // A card's text column: the pane less the tile, the round border and the padding.
 const CARD_CHROME = TILE_COLUMNS + 3
-const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
-  danger: 'red',
-  pending: 'yellow',
-  success: 'green',
-  neutral: 'white'
-}
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -43,7 +45,7 @@ export const registerFleetPane = (on: On): void => {
     const config = gameConfig()
     const scene = currentScene()
     const palette = scene.band
-    const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
@@ -51,7 +53,7 @@ export const registerFleetPane = (on: On): void => {
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
-    // Digits follow tile order; r, p and q are the menu's, i, o, c, w, a, g and t the links'.
+    // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
         key={`view-${agent.paneKey}`}
@@ -71,21 +73,28 @@ export const registerFleetPane = (on: On): void => {
       </Button>
     )
     const menuRow = (
-      <Box flexDirection="row" gap={1} flexWrap="wrap" marginTop={1}>
+      <Box flexDirection="row" columnGap={1} flexWrap="wrap">
         {menu(
           'refresh',
           'r',
           `↻ ${text.refresh}`,
           () => void refreshSoon($).catch(() => undefined)
         )}
-        {menu('pet', 'p', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
+        {menu('pet', 'p', petLabelOf(scene), () => clawdReact($, 'pet'))}
         {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
+    const advisorView = await advisorCardViewOf($)
+    const advisorTiles = advisorView === null ? [] : [advisorView.tile]
+    const advisorOf = (art: Map<string, RenderElement>) =>
+      advisorView === null
+        ? null
+        : advisorCard($, e, palette, advisorView.card, art.get(ADVISOR_TILE_KEY))
     if (v.state === null) {
       return (
         <Box flexDirection="column">
           <Text dimColor>{`${text.fleet} · ${v.note === '' ? text.loading : v.note}`}</Text>
+          {advisorOf(await animate($, e, advisorTiles))}
           {menuRow}
         </Box>
       )
@@ -112,81 +121,48 @@ export const registerFleetPane = (on: On): void => {
         rows: TILE_ROWS,
         draw: (at: number) =>
           tileCellsOf(scene, member.isDone ? 'handed' : member.phase, member.state, at, member.mood)
-      }))
+      })),
+      ...advisorTiles
     ])
     const counts = countsOf(state.agents)
+    const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
+    const advisorRowsOf = (agent: GameAgent) =>
+      (agent.advisor === undefined ? [] : memberAdvisorLinesOf(agent.advisor, cardRoom)).map(
+        (line, row) => (
+          <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
+            {line}
+          </Text>
+        )
+      )
     const worktreeId = state.worktree?.id ?? ''
+    const link = (key: string, url: string, label: string, child: RenderElement) =>
+      gameLinkOf($, e, { key, url, worktreeId, label }, child)
     const linkButton = (one: PaneLink) => (
       <Button
         key={one.key}
         plain
         hotkey={one.hotkey}
         onPress={() =>
-          void openInOrca($, one.url, worktreeId).then((isOpen) => {
-            if (!isOpen) {
-              $.ui.toast(text.couldNotOpenLink(one.label))
-            }
-          })
+          one.action === undefined
+            ? void openGameLink($, one.url, worktreeId).then((isOpen) => {
+                if (!isOpen) {
+                  $.ui.toast(text.couldNotOpenLink(one.label))
+                }
+              })
+            : void runAction($, one.action, v.isDemo).catch(() => undefined)
         }
       >
-        <Text backgroundColor={palette.panel} color={palette.parchment}>
-          {' '}
-          <Text color={palette.gold} bold>
-            {one.hotkey}
-          </Text>
-          {` ${one.label} `}
-        </Text>
+        <Text backgroundColor={palette.panel} color={palette.parchment}>{` ${one.label} `}</Text>
       </Button>
     )
     const links = paneLinksOf(state)
-    // My PRs and To Do: a heading that opens the list, then one link per item.
-    const projectRows = (key: string, heading: string, list: GameProjectList | null) =>
-      list !== null && (
-        <Box key={key} flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            {list.url === null ? (
-              <Text bold>{heading}</Text>
-            ) : (
-              <Link href={list.url}>
-                <Text bold underline>
-                  {heading}
-                </Text>
-              </Link>
-            )}
-          </Box>
-          {list.items.map((one) => (
-            <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
-              {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
-              <Box flexShrink={0}>
-                <Link href={one.url}>
-                  <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
-                    {one.id}
-                  </Text>
-                </Link>
-              </Box>
-              {one.status !== undefined && (
-                <Box flexShrink={0}>
-                  <Text dimColor>{one.status}</Text>
-                </Box>
-              )}
-              <Box flexShrink={1} minWidth={0}>
-                <Text wrap="truncate-end">{one.title}</Text>
-              </Box>
-            </Box>
-          ))}
-          {list.total > list.items.length && (
-            <Text dimColor>{text.moreAllies(list.total - list.items.length)}</Text>
-          )}
-        </Box>
-      )
-    const reviews = state.project?.reviews ?? null
-    const todo = state.project?.todo ?? null
+    const projectRows = await projectRowsOf($, e, state, palette, v.isDemo)
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
-        <Box flexDirection="row" gap={1} flexWrap="wrap">
+        <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           <Text backgroundColor={palette.gold} color={palette.ink} bold>
             {` ⚑ ${text.fleet} `}
           </Text>
@@ -198,6 +174,7 @@ export const registerFleetPane = (on: On): void => {
           </Text>
           {v.note !== '' && <Text color="yellow">{v.note}</Text>}
           {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
+          {fleetModels !== null && <Text color={palette.gold}>{fleetModels}</Text>}
         </Box>
         {needs.map((need) => (
           <Text key={`need-${need.name}`} color="red" wrap="truncate-end">
@@ -209,7 +186,7 @@ export const registerFleetPane = (on: On): void => {
             key={`card-${agent.paneKey}`}
             flexDirection="row"
             borderStyle="round"
-            borderColor={AGENT_COLORS[agent.state]}
+            borderColor={agent.limit === undefined ? AGENT_COLORS[agent.state] : 'red'}
           >
             {art.get(`tile-${member.key}`) ?? <Box width={TILE_COLUMNS} />}
             <Box flexDirection="column" paddingLeft={1} flexGrow={1} flexShrink={1}>
@@ -217,14 +194,71 @@ export const registerFleetPane = (on: On): void => {
                 <Text color={AGENT_COLORS[agent.state]} bold>
                   {agent.displayName}
                 </Text>
-                {agent.isLeader && <Text color={palette.gold}>{`♛ ${text.lead}`}</Text>}
+                {agent.isLeader && (
+                  <Text color={palette.gold}>{`♛ ${leadTitleOf(state, text.lead)}`}</Text>
+                )}
                 <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
-                <Text dimColor>{agent.agentType}</Text>
+                <Text dimColor wrap="truncate-end">
+                  {agentTagOf(
+                    agent,
+                    cardTagRoomOf(
+                      cardRoom,
+                      [
+                        agent.displayName,
+                        text.agentStates[agent.state],
+                        ...(agent.isLeader ? [`♛ ${leadTitleOf(state, text.lead)}`] : []),
+                        ...(agent.terminalHandle === undefined ? [] : [` ${text.view} `])
+                      ],
+                      agent.worktree !== undefined
+                    )
+                  )}
+                </Text>
+                {agent.worktree !== undefined && (
+                  <Text
+                    dimColor
+                    wrap="truncate-end"
+                  >{`⎇ ${agent.worktree.branch || agent.worktree.displayName}`}</Text>
+                )}
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
+              {agent.limit !== undefined && (
+                <Text color="red" bold wrap="truncate-end">
+                  {limitTagOf(agent.limit, Date.now())}
+                </Text>
+              )}
+              {advisorRowsOf(agent)}
               <Text wrap="truncate-end">{member.says}</Text>
-              {agent.activity !== undefined && (
-                <Link key={`activity-${agent.paneKey}`} href={agent.activity.url}>
+              {(agent.review !== undefined || agent.workItem !== undefined) && (
+                <Box flexDirection="row" gap={1}>
+                  {agent.review !== undefined &&
+                    link(
+                      `review-${agent.paneKey}`,
+                      agent.review.url,
+                      reviewTextOf(agent.review),
+                      <Text color={CI_COLORS[agent.review.ci]} underline>
+                        {reviewTextOf(agent.review)}
+                      </Text>
+                    )}
+                  {agent.workItem !== undefined &&
+                    (agent.workItem.url === '' ? (
+                      <Text>{workItemTextOf(agent.workItem)}</Text>
+                    ) : (
+                      link(
+                        `work-item-${agent.paneKey}`,
+                        agent.workItem.url,
+                        workItemTextOf(agent.workItem),
+                        <Text underline wrap="truncate-end">
+                          {workItemTextOf(agent.workItem)}
+                        </Text>
+                      )
+                    ))}
+                </Box>
+              )}
+              {agent.activity !== undefined &&
+                link(
+                  `activity-${agent.paneKey}`,
+                  agent.activity.url,
+                  agent.activity.id,
                   <Text
                     color={agent.activity.running ? 'cyan' : palette.parchment}
                     wrap="truncate-end"
@@ -238,21 +272,24 @@ export const registerFleetPane = (on: On): void => {
                       cardRoom
                     )}
                   </Text>
-                </Link>
-              )}
+                )}
             </Box>
           </Box>
         ))}
+        {advisorOf(art)}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
               <Text dimColor>{text.reviewHeading}</Text>
             </Box>
-            <Link href={state.review.url}>
+            {link(
+              'pane-review',
+              state.review.url,
+              reviewTextOf(state.review),
               <Text color={CI_COLORS[state.review.ci]} underline>
                 {reviewTextOf(state.review)}
               </Text>
-            </Link>
+            )}
             <Text dimColor wrap="truncate-end">
               {state.review.title}
             </Text>
@@ -266,23 +303,21 @@ export const registerFleetPane = (on: On): void => {
             {state.workItem.url === '' ? (
               <Text>{workItemTextOf(state.workItem)}</Text>
             ) : (
-              <Link href={state.workItem.url}>
+              link(
+                'pane-work-item',
+                state.workItem.url,
+                workItemTextOf(state.workItem),
                 <Text underline>{workItemTextOf(state.workItem)}</Text>
-              </Link>
+              )
             )}
             <Text dimColor wrap="truncate-end">
               {state.workItem.title}
             </Text>
           </Box>
         )}
-        {projectRows(
-          'project-reviews',
-          reviews === null ? '' : text.myReviews(reviewKindOf(reviews), reviews.total),
-          reviews
-        )}
-        {projectRows('project-todo', todo === null ? '' : text.todo(todo.total), todo)}
+        {projectRows}
         {links.length > 0 && (
-          <Box key="pane-links" flexDirection="row" gap={1} flexWrap="wrap">
+          <Box key="pane-links" flexDirection="row" columnGap={1} flexWrap="wrap">
             <Text dimColor>{text.openHeading}</Text>
             {links.map(linkButton)}
           </Box>

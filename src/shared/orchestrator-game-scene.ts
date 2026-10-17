@@ -1,5 +1,16 @@
 import { z } from 'zod'
-import { isSafeDisplayCharacter } from './skill-display-text'
+import {
+  orchestratorGameSceneCastOf,
+  type OrchestratorGameSceneCast
+} from './orchestrator-game-scene-cast'
+import {
+  color,
+  displayText,
+  glyph,
+  hexColor,
+  localizedSceneName,
+  uncoloredGlyphOf
+} from './orchestrator-game-scene-values'
 
 /** Scenes a plugin contributes to the Agent Teams game: inert JSON the bundled mod draws. */
 
@@ -16,34 +27,8 @@ export const ORCHESTRATOR_GAME_SCENE_MAX_BYTES = 64 * 1024
 // Why: the mod draws a costume as six rows plus a legs row inside an eight-pixel tile.
 export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
 
-const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')
-// Why both: JSON has no hex literals, so authors write '#rrggbb'; the mod always receives a number.
-const color = z.union(
-  [
-    z.number().int().min(0).max(0xffffff),
-    hexColor.transform((value) => Number.parseInt(value.slice(1), 16))
-  ],
-  { error: 'must be a #rrggbb color or an integer from 0 to 16777215' }
-)
-// Why: names reach the terminal verbatim, so control and bidi characters could rewrite the screen.
-const displayText = (max: number) =>
-  z
-    .string()
-    .min(1)
-    .max(max)
-    .refine(
-      (value) => [...value].every(isSafeDisplayCharacter),
-      'must not contain control characters'
-    )
 // Why ASCII: the mod indexes rows by UTF-16 unit, so one glyph must be one unit.
 const spriteRow = z.string().regex(/^[!-~]{10}$/, 'must be ten printable ASCII glyphs')
-const glyph = z
-  .string()
-  .regex(/^[!-~]$/, 'must be one printable ASCII glyph')
-  .refine((key) => key !== '.', {
-    message: "'.' is reserved for transparent"
-  })
-
 const lookSchema = z.object({
   skyTop: color,
   skyBottom: color,
@@ -67,28 +52,11 @@ const costumeSchema = z
     colors: z.record(glyph, color)
   })
   .superRefine((costume, ctx) => {
-    for (const row of [...costume.rows, ...costume.legs]) {
-      for (const one of row) {
-        if (one !== '.' && !Object.hasOwn(costume.colors, one)) {
-          ctx.addIssue({ code: 'custom', path: ['colors'], message: `glyph "${one}" has no color` })
-          return
-        }
-      }
+    const missing = uncoloredGlyphOf([...costume.rows, ...costume.legs], costume.colors)
+    if (missing !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['colors'], message: `glyph "${missing}" has no color` })
     }
   })
-
-const sceneName = displayText(32)
-// Why: the mod shows the name in Orca's UI language; unknown languages are stripped, not rejected.
-const localizedSceneName = z.union([
-  sceneName,
-  z.object({
-    en: sceneName,
-    es: sceneName.optional(),
-    ja: sceneName.optional(),
-    ko: sceneName.optional(),
-    zh: sceneName.optional()
-  })
-])
 
 const cardSchema = z.object({ icon: displayText(4), name: localizedSceneName, color: hexColor })
 
@@ -113,10 +81,7 @@ const finaleSchema = z.union([
   pixelArtText,
   z.object({
     en: pixelArtText,
-    es: pixelArtText.optional(),
-    ja: pixelArtText.optional(),
-    ko: pixelArtText.optional(),
-    zh: pixelArtText.optional()
+    es: pixelArtText.optional()
   })
 ])
 
@@ -151,7 +116,17 @@ const sceneFileSchema = z.object({
     .optional()
 })
 
-export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & { id: string }
+export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & {
+  id: string
+  cast?: OrchestratorGameSceneCast
+}
+
+type SceneParse =
+  | { ok: true; definition: OrchestratorGameSceneDefinition; warnings: string[] }
+  | { ok: false; error: string }
+
+const rawCastOf = (raw: unknown): unknown =>
+  typeof raw === 'object' && raw !== null && 'cast' in raw ? raw.cast : undefined
 
 export type OrchestratorGameSceneExtension = {
   id: string
@@ -173,15 +148,17 @@ export function orchestratorGameSceneIssues(text: string): string[] {
     return ['not valid JSON']
   }
   const parsed = sceneFileSchema.safeParse(raw)
-  return parsed.success
-    ? []
-    : parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+  return [
+    ...(parsed.success
+      ? []
+      : parsed.error.issues.map(
+          (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
+        )),
+    ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues
+  ]
 }
 
-export function parseOrchestratorGameScene(
-  text: string,
-  id: string
-): { ok: true; definition: OrchestratorGameSceneDefinition } | { ok: false; error: string } {
+export function parseOrchestratorGameScene(text: string, id: string): SceneParse {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -196,7 +173,13 @@ export function parseOrchestratorGameScene(
       error: `${issue?.path.join('.') || '(root)'}: ${issue?.message ?? 'invalid scene'}`
     }
   }
-  return { ok: true, definition: { ...parsed.data, id } }
+  // Why apart: a bad pet or advisor is left out with a warning; the scene and its hero still draw.
+  const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
+  return {
+    ok: true,
+    definition: { ...parsed.data, ...(cast === undefined ? {} : { cast }), id },
+    warnings: issues
+  }
 }
 
 // Why `<pluginId>/<id>`: two plugins, or a plugin and the built-in quest, can never share an id.
@@ -211,9 +194,7 @@ export function orchestratorGameScenesOf(sources: readonly OrchestratorGameScene
   const seen = new Set<string>()
   for (const source of sources) {
     const id = orchestratorGameSceneId(source.pluginId, source.id)
-    const parsed:
-      | { ok: true; definition: OrchestratorGameSceneDefinition }
-      | { ok: false; error: string } = seen.has(id)
+    const parsed: SceneParse = seen.has(id)
       ? { ok: false, error: 'duplicate scene id' }
       : 'error' in source
         ? { ok: false, error: source.error }
@@ -223,6 +204,7 @@ export function orchestratorGameScenesOf(sources: readonly OrchestratorGameScene
       continue
     }
     seen.add(id)
+    warnings.push(...parsed.warnings.map((one) => `game scene ${id}: ${one}; drawn without it`))
     scenes.push({ id, pluginId: source.pluginId, definition: parsed.definition })
   }
   return { scenes, warnings }

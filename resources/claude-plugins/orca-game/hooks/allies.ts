@@ -9,6 +9,10 @@ export type AdvisorAgent = {
   id: string
   title: string
   model: string | null
+  /** Absent from an item this build cannot read; null when Jev set none. */
+  effort: string | number | null
+  /** Why Jev picked the model (`lowered`, `kept-unsure`…); one this build does not know stays as text. */
+  why: string | null
   verdict: string
 }
 export type AdvisorCi = {
@@ -52,20 +56,26 @@ const listOf = <T>(
   if (!Array.isArray(value)) {
     return null
   }
-  const items: T[] = []
-  for (const item of value) {
+  // Why per item: one row Jev adds later must not take its whole line and band away.
+  return value.flatMap((item) => {
     const parsed = isRecord(item) ? read(item) : null
-    if (parsed === null) {
-      return null
-    }
-    items.push(parsed)
-  }
-  return items
+    return parsed === null ? [] : [parsed]
+  })
 }
+
+const isEffort = (value: unknown): value is string | number | null =>
+  value === null || isText(value) || typeof value === 'number'
 
 const agentOf = (raw: Record<string, unknown>): AdvisorAgent | null =>
   isText(raw.id) && isText(raw.title) && isTextOrNull(raw.model) && isText(raw.verdict)
-    ? { id: raw.id, title: raw.title, model: raw.model, verdict: raw.verdict }
+    ? {
+        id: raw.id,
+        title: raw.title,
+        model: raw.model,
+        effort: isEffort(raw.effort) ? raw.effort : null,
+        why: isText(raw.why) ? raw.why : null,
+        verdict: raw.verdict
+      }
     : null
 
 const ciOf = (raw: Record<string, unknown>): AdvisorCi | null =>
@@ -84,8 +94,7 @@ export const advisorOf = (value: unknown): Advisor | null => {
     return null
   }
   const { line, model, effort } = value
-  const isEffort = effort === null || isText(effort) || typeof effort === 'number'
-  if (!isTextOrNull(line) || !isTextOrNull(model) || !isEffort) {
+  if (!isTextOrNull(line) || !isTextOrNull(model) || !isEffort(effort)) {
     return null
   }
   const subagents = listOf(value.subagents, agentOf)

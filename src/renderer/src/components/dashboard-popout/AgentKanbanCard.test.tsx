@@ -317,9 +317,9 @@ describe('AgentKanbanCard', () => {
     expect(screen.getByText('2m')).toBeInTheDocument()
 
     await act(async () => {
-      await i18n.changeLanguage('ja')
+      await i18n.changeLanguage('es')
     })
 
-    expect(screen.getByText('2分')).toBeInTheDocument()
+    expect(screen.getByText('2 min')).toBeInTheDocument()
   })
 })

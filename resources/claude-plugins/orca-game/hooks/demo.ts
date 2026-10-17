@@ -1,7 +1,9 @@
 import type {
+  GameAction,
   GameAgent,
   GameCi,
   GameLinkTone,
+  GameProjectItem,
   GameProjectWork,
   GameState,
   GameStatusGroup
@@ -34,6 +36,8 @@ type Step = {
   action: Action | undefined
   caption: (art: ArtStrings) => string
   isResting?: boolean
+  /** Seats stopped by their account's usage limit, back in 90 minutes. */
+  limited?: readonly string[]
 }
 
 const SCRIPT: readonly Step[] = [
@@ -100,6 +104,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'pr',
     action: 'push',
+    limited: ['tester'],
     caption: () => 'DEMO · git push'
   },
   {
@@ -150,6 +155,20 @@ const SCRIPT: readonly Step[] = [
 export const DEMO_FRAMES = SCRIPT.length
 
 const DEMO_URL = 'https://example.invalid/demo'
+const DEMO_LIMIT_MS = 90 * 60_000
+
+// Members on other agents and managed accounts, so the Panel shows each card's tag.
+const DEMO_SEAT_AGENTS: Readonly<Record<string, Pick<GameAgent, 'agentType' | 'account'>>> = {
+  builder: {
+    agentType: 'claude',
+    account: { provider: 'claude', id: 'demo-ana', email: 'ana.lopez@example.invalid' }
+  },
+  tester: {
+    agentType: 'codex',
+    account: { provider: 'codex', id: 'demo-bo', email: 'bo@example.invalid' }
+  },
+  scribe: { agentType: 'claude' }
+}
 const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
   failure: 'danger',
   success: 'success',
@@ -157,6 +176,27 @@ const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
   neutral: 'neutral',
   none: 'neutral'
 }
+
+const todoOf = (
+  id: string,
+  title: string,
+  group: GameStatusGroup,
+  status: string
+): GameProjectItem => ({
+  id,
+  title,
+  url: `${DEMO_URL}/${id}`,
+  status,
+  group,
+  prompt: `Work on ${id}: ${title}`,
+  ...(group === 'in_progress' ? { tone: 'pending' } : group === 'review' ? { tone: 'success' } : {})
+})
+
+// Pressing either during /quest demo only toasts; the MCP server named here is never called.
+const DEMO_ACTIONS: GameAction[] = [
+  { id: 'action-0', label: 'Open a PR', prompt: 'Open a PR for the demo work item' },
+  { id: 'action-1', label: 'Test runs', mcp: { server: 'demo', tool: 'list_test_runs' } }
+]
 
 // The project lists follow the scripted PR's CI so the PRs chip changes color with it.
 const projectOf = (step: Step): GameProjectWork => ({
@@ -177,18 +217,15 @@ const projectOf = (step: Step): GameProjectWork => ({
   },
   todo: {
     provider: 'plane',
-    total: 3,
+    total: 7,
     url: `${DEMO_URL}/todo`,
     items: [
-      { id: 'ORCA-2', title: 'Demo ticket', url: `${DEMO_URL}/ORCA-2`, status: 'Todo' },
-      {
-        id: 'ORCA-3',
-        title: 'Another demo ticket',
-        url: `${DEMO_URL}/ORCA-3`,
-        status: 'In Progress',
-        tone: 'pending'
-      }
-    ]
+      todoOf('ORCA-3', 'Another demo ticket', 'in_progress', 'In Progress'),
+      todoOf('ORCA-4', 'Demo ticket in QA', 'review', 'QA'),
+      todoOf('ORCA-5', 'Second ticket in QA', 'review', 'QA'),
+      todoOf('ORCA-2', 'Demo ticket', 'todo', 'Todo')
+    ],
+    groups: { in_progress: 1, review: 2, todo: 3, backlog: 1 }
   }
 })
 
@@ -211,10 +248,11 @@ const stateOf = (step: Step): GameState => ({
     ...step.seats.map(([name, state, tool]) => ({
       paneKey: `demo-${name}`,
       displayName: name,
-      agentType: 'claude',
+      ...(DEMO_SEAT_AGENTS[name] ?? { agentType: 'claude' }),
       state,
       toolName: tool,
-      isLeader: false
+      isLeader: false,
+      ...(step.limited?.includes(name) ? { limit: { resetsAt: Date.now() + DEMO_LIMIT_MS } } : {})
     }))
   ],
   review: {
@@ -233,7 +271,8 @@ const stateOf = (step: Step): GameState => ({
     status: step.group === 'done' ? 'Done' : step.group === 'review' ? 'In Review' : 'In Progress',
     statusGroup: step.group
   },
-  project: projectOf(step)
+  project: projectOf(step),
+  actions: DEMO_ACTIONS
 })
 
 export const demoFrameOf = (step: number): DemoFrame => {

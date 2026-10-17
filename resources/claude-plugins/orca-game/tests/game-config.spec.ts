@@ -5,14 +5,36 @@ import {
   effectiveConfigOf,
   gameConfigOfEnv,
   gameStateArgvOf,
+  openLinkArgvOf,
   tabCreateArgvOf,
   terminalFocusArgvOf
 } from '../hooks/game-config'
 
 describe('gameConfigOfEnv', () => {
   it('defaults to quest mode on with the HUD and rewards', () => {
-    expect(gameConfigOfEnv({})).toEqual({ mode: 'on', scene: 'quest', hud: true, rewards: true })
+    expect(gameConfigOfEnv({})).toEqual({
+      mode: 'on',
+      scene: 'quest',
+      hud: true,
+      rewards: true,
+      openLinks: 'orca',
+      render: 'classic',
+      timezone: 'local'
+    })
     expect(DEFAULT_GAME_CONFIG).toEqual(gameConfigOfEnv({}))
+  })
+
+  it('asks Orca to open a link in the system browser, only an http(s) one', () => {
+    expect(openLinkArgvOf('/opt/orca', 'https://github.com/o/r/pulls')).toEqual([
+      '/opt/orca',
+      'game',
+      'open-link',
+      '--url',
+      'https://github.com/o/r/pulls',
+      '--json'
+    ])
+    expect(openLinkArgvOf('/opt/orca', 'file:///etc/passwd')).toBeUndefined()
+    expect(openLinkArgvOf('orca', 'https://github.com')).toBeUndefined()
   })
 
   it('reads every ORCA_GAME_* variable', () => {
@@ -23,7 +45,15 @@ describe('gameConfigOfEnv', () => {
         ORCA_GAME_HUD: '0',
         ORCA_GAME_REWARDS: 'false'
       })
-    ).toEqual({ mode: 'zen', scene: 'space', hud: false, rewards: false })
+    ).toEqual({
+      mode: 'zen',
+      scene: 'space',
+      hud: false,
+      rewards: false,
+      openLinks: 'orca',
+      render: 'classic',
+      timezone: 'local'
+    })
     expect(gameConfigOfEnv({ ORCA_GAME_HUD: '1', ORCA_GAME_REWARDS: 'true' })).toMatchObject({
       hud: true,
       rewards: true

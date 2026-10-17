@@ -63,7 +63,7 @@ export const ORCHESTRATOR_GAME_SCENE_HANDLERS: Record<string, CommandHandler> = 
     writeStdout(
       json
         ? JSON.stringify({ file: path, created: true }, null, 2)
-        : `Created ${path} from the built-in Quest scene.\n` +
+        : `Created ${path} from Quest with an example foe, finale and pet.\n` +
             `Edit it, then run: orca game scene validate ${path}`
     )
   },

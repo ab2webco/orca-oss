@@ -1,4 +1,5 @@
-import type { GameConfig, GameMode } from '../types'
+import type { GameConfig, GameMode, GameRender } from '../types'
+import { isGameRender, lookConfigOf, LOCAL_TIMEZONE } from './game-render'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { DEFAULT_SCENE_ID } from './scenes/index'
@@ -7,14 +8,19 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   mode: 'on',
   scene: DEFAULT_SCENE_ID,
   hud: true,
-  rewards: true
+  rewards: true,
+  openLinks: 'orca',
+  render: 'classic',
+  timezone: LOCAL_TIMEZONE
 }
 
 export const GAME_ENV_KEYS = [
   'ORCA_GAME_MODE',
   'ORCA_GAME_SCENE',
   'ORCA_GAME_HUD',
-  'ORCA_GAME_REWARDS'
+  'ORCA_GAME_REWARDS',
+  'ORCA_GAME_RENDER',
+  'ORCA_GAME_TIMEZONE'
 ] as const
 
 export type GameEnv = Partial<Record<(typeof GAME_ENV_KEYS)[number], string | null | undefined>>
@@ -30,11 +36,18 @@ const flagOf = (value: string | null | undefined, fallback: boolean): boolean =>
 export const gameConfigOfEnv = (env: GameEnv): GameConfig => {
   const mode = env.ORCA_GAME_MODE?.trim().toLowerCase()
   const scene = env.ORCA_GAME_SCENE?.trim() ?? ''
+  const look = lookConfigOf({
+    render: env.ORCA_GAME_RENDER?.trim().toLowerCase(),
+    timezone: env.ORCA_GAME_TIMEZONE?.trim()
+  })
   return {
     mode: isQuestMode(mode) ? mode : DEFAULT_GAME_CONFIG.mode,
     scene: scene === '' ? DEFAULT_GAME_CONFIG.scene : scene,
     hud: flagOf(env.ORCA_GAME_HUD, DEFAULT_GAME_CONFIG.hud),
-    rewards: flagOf(env.ORCA_GAME_REWARDS, DEFAULT_GAME_CONFIG.rewards)
+    rewards: flagOf(env.ORCA_GAME_REWARDS, DEFAULT_GAME_CONFIG.rewards),
+    openLinks: DEFAULT_GAME_CONFIG.openLinks,
+    render: look.render ?? DEFAULT_GAME_CONFIG.render,
+    timezone: look.timezone ?? DEFAULT_GAME_CONFIG.timezone
   }
 }
 
@@ -42,12 +55,18 @@ export const gameConfigOfEnv = (env: GameEnv): GameConfig => {
 export const effectiveConfigOf = (
   env: GameConfig,
   live: Partial<GameConfig>,
-  modeOverride: GameMode | undefined
+  modeOverride: GameMode | undefined,
+  renderOverride?: GameRender
 ): GameConfig => ({
   ...env,
   ...live,
-  ...(modeOverride === undefined ? {} : { mode: modeOverride })
+  ...(modeOverride === undefined ? {} : { mode: modeOverride }),
+  ...(isGameRender(renderOverride) ? { render: renderOverride } : {})
 })
+
+/** The game draws other plugins' lines only while it is on screen: a mode and its band. */
+export const isAbsorbingConfig = (config: GameConfig): boolean =>
+  config.mode !== 'off' && config.hud
 
 const ABSOLUTE_PATH = /^(?:\/|[A-Za-z]:[\\/])/
 
@@ -76,6 +95,17 @@ export const terminalFocusArgvOf = (
   return path === undefined || !isTerminalHandle(handle)
     ? undefined
     : [path, 'terminal', 'focus', '--terminal', handle, '--json']
+}
+
+/** Asks Orca to open a link in the desktop's system browser, where the person is signed in. */
+export const openLinkArgvOf = (
+  cli: string | null | undefined,
+  url: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined || httpUrlOf(url) === undefined
+    ? undefined
+    : [path, 'game', 'open-link', '--url', url, '--json']
 }
 
 /** Opens a link in a browser tab of the game's worktree, the same on every platform Orca runs on. */

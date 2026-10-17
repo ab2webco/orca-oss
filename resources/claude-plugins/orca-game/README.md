@@ -10,16 +10,26 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
 - **The band** above the prompt: a HUD with the lead as the hero and every teammate in the party
   (walking while it works, hopping with `needs you!` while it waits, hurt while CI is red), counts,
   the review, its CI, the work item, agent activity and project links as clickable chips, a
-  `Needs you:` line, and **Panel**, **Refresh** and **Pet Clawd**.
+  `Needs you:` line, and **Panel**, **Refresh** and **Pet** (`♥ Pet <name>` when the scene has a
+  pet of its own, which it hearts; Clawd otherwise).
 - **The Fleet pane** (Panel): the HUD at full width and one card per agent with its own animated
   tile and activity link, then the review and the work item as links. **Open** takes `i` (work
   item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
-  tab. `r` refreshes, `p` pets Clawd, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
+  tab. `r` refreshes, `p` pets, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
   that teammate's Orca pane.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
 - **Allies.** Other plugins keep running: their `$.ui.status` lines, and Jev's advisor state when
   Jev is installed, become rows of a strip under the band, and their band elements take the scene
   palette. See `docs/reference/orchestrator-game.md` (Other plugins in a game pane).
+- **The cast.** A scene's `cast` adds a pet beside the hero and the character that stands for Jev:
+  while Jev publishes, it acts out each new decision and CI state at the scene's edge (a referee
+  unless the scene dresses it), and the Panel lists its latest decisions. See
+  `docs/reference/orchestrator-game.md` (The cast).
+- **hd.** `render: hd` draws the spinner scene as a 9 to 10-row 2D-HD scene: a lit sky with clouds,
+  fogged layers, outlined and shaded characters, day and night on the project's `timezone`,
+  particles, the party following the hero, the crowned lead, floating team reactions and a thought
+  cloud (`hooks/scene-hd.ts` and the `hooks/hd-*.ts` files). See
+  `docs/reference/orchestrator-game.md` (Render: classic or hd).
 
 ## Origin
 
@@ -46,24 +56,56 @@ claude --plugin-dir "$(pwd)/resources/claude-plugins/orca-game"
 
 ## Configuration
 
-Read once when the mod loads:
+The env is the launch snapshot. Orca's live answer from `orca game state` (every 30 s and after
+each turn) can change mode, scene, HUD, rewards, render and timezone since, and `/orca-game:mode`
+overrides the mode for the session:
 
-| Variable            | Values                       | Default | Effect                                                 |
-| ------------------- | ---------------------------- | ------- | ------------------------------------------------------ |
-| `ORCA_GAME_MODE`    | `on`, `zen`, `off`           | `on`    | Quest mode                                             |
-| `ORCA_GAME_SCENE`   | a scene id or `file:<path>`  | `quest` | Art set; an unknown id falls back to `quest`           |
-| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false`      | `1`     | `0` hides the band                                     |
-| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false`      | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
-| `ORCA_GAME_LOCALE`  | `en`, `es`, `ja`, `ko`, `zh` | `en`    | Language of the game's words; anything else is English |
+| Variable             | Values                  | Default   | Effect                                                 |
+| -------------------- | ----------------------- | --------- | ------------------------------------------------------ |
+| `ORCA_GAME_MODE`     | `on`, `zen`, `off`      | `on`      | Quest mode                                             |
+| `ORCA_GAME_SCENE`    | a scene id              | `quest`   | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_HUD`      | `1`/`0`, `true`/`false` | `1`       | `0` hides the band                                     |
+| `ORCA_GAME_REWARDS`  | `1`/`0`, `true`/`false` | `1`       | `0` turns off XP, level-ups and the cheer confetti     |
+| `ORCA_GAME_RENDER`   | `classic`, `hd`         | `classic` | The 5-row pixel art, or the 9 to 10-row 2D-HD scene    |
+| `ORCA_GAME_TIMEZONE` | `local` or an IANA zone | `local`   | The clock hd's day and night follow                    |
+| `ORCA_GAME_LOCALE`   | `en`, `es`              | `en`      | Language of the game's words; anything else is English |
+
+A project's own scene file comes from `sceneFile` in its `orca.yaml`, which Orca reads and serves
+through `orca game state`; the env never carries a path.
+
+Other plugins can follow the game through its state `{ plugin: 'orca-game', key: 'absorbing' }`, a
+`boolean` that is true exactly while the game draws other plugins' lines (mode not `off` and the HUD
+on). It is written at load and on every change from the env, Orca's live config or
+`/orca-game:mode`.
 
 The words live in `hooks/game-strings.ts` (English) and `hooks/locales/`. Text drawn inside the
-pixel art (the HUD, the thought bubble) must be width-1 characters, so Japanese, Korean and Chinese
-keep English there and translate everything else.
+pixel art (the HUD, the thought bubble) must be width-1 characters, so a wide character there (a
+CJK teammate or file name an agent reports) is drawn as `?`; the text around the art shows it.
 
-The `config` that `orca game state` reports overrides the variables while the session runs, and
-`/quest on|zen|off` overrides the mode for the session. `/quest demo` plays a scripted fake party
-(every phase, action and reaction, one level-up) without running any command or writing XP;
-`/quest on` returns to real data.
+The `config` that `orca game state` reports overrides the variables while the session runs.
+
+## Commands: `/orca-game:`
+
+Typing `/orca-game:` lists every game command. Each is a plugin skill the mod answers itself
+(`hooks/game-commands.ts`), so no model turn runs and no shell is involved; the engine refuses a
+`:` in a name a mod registers, which is why they are skills.
+
+| Command                               | What it does                                                                                                                                                                           |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/orca-game:state`                    | The game state from a fresh `orca game state`: each setting with its layer, this session's mode and render, the lead and its members with their slots, a held STOP, warnings and links |
+| `/orca-game:mode on\|zen\|off`        | The mode for this session; alone, prints the mode and render                                                                                                                           |
+| `/orca-game:render classic\|hd`       | The render for this session; alone, prints the mode and render                                                                                                                         |
+| `/orca-game:demo`                     | A scripted fake party (every phase, action and reaction, one level-up) that runs no command and writes no XP; `/orca-game:mode on` returns to real data                                |
+| `/orca-game:quest [args]`             | The long form taking all of the above (`render hd`, `zen`, `demo`)                                                                                                                     |
+| `/orca-game:setup`, `/orca-game:lead` | Write the project's `orca.yaml` with you; make the session the project's lead                                                                                                          |
+
+`/quest [args]` is the short form of `/orca-game:quest`, registered by the mod as `immediate` so
+it runs at once even while a turn streams. A mode or render set this way is this
+pane's alone: `orca game state` reports only Orca's layers, so `/orca-game:mode` and
+`/orca-game:render` print the configured value and its layer beside an override, as in
+`Render: hd (this session; the project's setting is classic, from default).` Project buttons
+(`actions[].command` in `orca.yaml`) keep the names the project chose and are not under
+`/orca-game:`.
 
 ## Fleet data: `orca game state --json`
 
@@ -103,8 +145,11 @@ tracker status change (`orca plane status set`, `orca linear status set`, a trac
 the Herald, a merged one or a work item in review or done is the King).
 
 XP is earned only for a change seen between two polls of the same worktree, so a restart never
-re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A level needs
-100 XP times the level. CI red hurts the working party.
+re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A lead
+(`role` not `member`) also earns the same for each member in its own worktree, plus 10 when a
+member appears; those use the ids the member's pane would, so a shared store never counts one change
+twice ([`hooks/fleet-rewards.ts`](hooks/fleet-rewards.ts)). A level needs 100 XP times the level. CI
+red hurts the working party.
 
 ## Adding a scene
 

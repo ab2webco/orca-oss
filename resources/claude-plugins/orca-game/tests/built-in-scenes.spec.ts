@@ -7,6 +7,8 @@ import { ACTIONS } from '../hooks/quest-policy'
 import { SCENE_ROWS, sceneGridOf } from '../hooks/scene'
 import { SCENES, sceneOf, type SceneDefinition, type ScenePhase } from '../hooks/scenes/index'
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
+import { castOf } from '../hooks/scenes/cast-shape'
+import { REFEREE } from '../hooks/advisor-art'
 import { ORCHESTRATOR_GAME_BUILT_IN_SCENES } from '../../../../src/shared/orchestrator-game-config'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 import { digest, glyphs } from './grid-digest'
@@ -144,8 +146,6 @@ describe('built-in scenes draw', () => {
     expect(resting).not.toContain('CASE CLOSED')
     setGameLocale('es')
     expect(merge('vigilante', 'merge')).toContain('CASO CERRADO')
-    setGameLocale('ja')
-    expect(merge('vigilante', 'merge')).toContain('CASE CLOSED')
   })
 
   it('a red CI brings the foe into the tile and into the HUD; quest stays as it was', () => {
@@ -164,5 +164,28 @@ describe('built-in scenes draw', () => {
     const frames = [0, 9].map((tick) => shows(hudGridOf(scene('tamer'), member, 60, tick)))
     expect(frames).toEqual([false, true])
     expect(digest(tileGridOf(scene('quest'), 'build', 'working', 9, 'hurt'))).toBe('c4e6c47c')
+  })
+})
+
+describe('built-in casts', () => {
+  const advisors = Object.values(SCENES).map((one) => one.cast?.advisor)
+
+  it('dress Jev’s advisor for each world, each its own sprite, and pet no one but Clawd', () => {
+    expect(
+      Object.values(SCENES).map((one) => localizedNameOf(one.cast?.advisor?.name ?? '', 'en'))
+    ).toEqual(['Wizard', 'Commissioner', 'Oracle', 'Professor'])
+    expect(new Set(advisors.map((one) => JSON.stringify(one?.frames))).size).toBe(4)
+    expect(advisors).not.toContainEqual(REFEREE)
+    expect(Object.values(SCENES).every((one) => one.cast?.pet === undefined)).toBe(true)
+  })
+
+  it('name each advisor in every language, as the game re-reads a scene', () => {
+    for (const one of Object.values(SCENES)) {
+      const names = GAME_LOCALES.map((locale) =>
+        localizedNameOf(one.cast?.advisor?.name ?? '', locale)
+      )
+      expect(names.every((name) => name.length > 0)).toBe(true)
+      expect(castOf(JSON.parse(JSON.stringify(one.cast)))).toEqual(one.cast)
+    }
   })
 })

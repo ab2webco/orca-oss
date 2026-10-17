@@ -30,6 +30,9 @@ const CHECK: readonly (readonly [number, number])[] = [
 
 export type TileKind = ScenePhase | 'handed'
 
+/** What a tile shows behind its figures: the wall, and the floor on its last pixel row. */
+export const tileBackdropOf = (y: number): number => (y === TILE_FLOOR ? WOOD : WALL)
+
 const box = (x: number, y: number, left: number, top: number, right: number, bottom: number) =>
   x >= left && x <= right && y >= top && y <= bottom
 
@@ -168,7 +171,7 @@ export const tileGridOf = (
     for (let x = 0; x < TILE_COLUMNS; x += 1) {
       const pixel = (y: number): number =>
         tileClawd(scene, kind, state, x, y, moving, mood) ??
-        (y === TILE_FLOOR ? WOOD : (prop(x, y, moving) ?? WALL))
+        (y === TILE_FLOOR ? WOOD : (prop(x, y, moving) ?? tileBackdropOf(y)))
       grid.push([UPPER_HALF, pixel(row * 2), pixel(row * 2 + 1)])
     }
   }

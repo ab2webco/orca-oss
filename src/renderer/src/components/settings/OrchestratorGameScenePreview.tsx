@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { OrchestratorGameMode } from '../../../../shared/orchestrator-game-config'
+import type { OrchestratorGameConfig } from '../../../../shared/orchestrator-game-config'
 import { normalizeSupportedUiLocale } from '../../../../shared/ui-locale'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
@@ -85,12 +85,10 @@ function fileSceneOf(read: SceneFileState | null | undefined): SceneDefinition |
 
 /** The scene an Agent Teams pane draws on its spinner, painted by the mod's own code. */
 export function OrchestratorGameScenePreview({
-  scene,
-  mode,
+  config: { scene, mode, render },
   fileScene
 }: {
-  scene: string
-  mode: OrchestratorGameMode
+  config: Pick<OrchestratorGameConfig, 'scene' | 'mode' | 'render'>
   /** The read of a project's scene file, when `scene` is a `file:` id. */
   fileScene?: SceneFileState | null
 }): React.JSX.Element {
@@ -112,7 +110,9 @@ export function OrchestratorGameScenePreview({
   const [tick, setTick] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const locale = normalizeSupportedUiLocale(getIntlLocale())
-  const frame = definition ? scenePreviewFrameOf(definition, isAnimated ? tick : 0, locale) : null
+  const frame = definition
+    ? scenePreviewFrameOf(definition, isAnimated ? tick : 0, locale, render)
+    : null
 
   useEffect(() => {
     if (!isAnimated) {
@@ -146,6 +146,7 @@ export function OrchestratorGameScenePreview({
       data-slot="game-scene-preview"
       data-scene={definition?.id ?? scene}
       data-mode={mode}
+      data-render={render}
       data-phase={frame?.phase}
       data-tick={isAnimated ? tick : 0}
       data-animated={isAnimated}

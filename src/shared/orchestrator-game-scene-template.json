@@ -158,10 +158,7 @@
       "icon": "◆",
       "name": {
         "en": "Squire",
-        "es": "Escudero",
-        "ja": "従者",
-        "ko": "종자",
-        "zh": "侍从"
+        "es": "Escudero"
       },
       "color": "#7fa86a"
     },
@@ -169,10 +166,7 @@
       "icon": "✦",
       "name": {
         "en": "Sage",
-        "es": "Sabio",
-        "ja": "賢者",
-        "ko": "현자",
-        "zh": "贤者"
+        "es": "Sabio"
       },
       "color": "#9a7fe0"
     },
@@ -180,10 +174,7 @@
       "icon": "⚒",
       "name": {
         "en": "Blacksmith",
-        "es": "Herrero",
-        "ja": "鍛冶屋",
-        "ko": "대장장이",
-        "zh": "铁匠"
+        "es": "Herrero"
       },
       "color": "#d98a3d"
     },
@@ -191,10 +182,7 @@
       "icon": "⚔",
       "name": {
         "en": "Knight",
-        "es": "Caballero",
-        "ja": "騎士",
-        "ko": "기사",
-        "zh": "骑士"
+        "es": "Caballero"
       },
       "color": "#5b8fd6"
     },
@@ -202,10 +190,7 @@
       "icon": "✉",
       "name": {
         "en": "Herald",
-        "es": "Heraldo",
-        "ja": "伝令",
-        "ko": "전령",
-        "zh": "传令官"
+        "es": "Heraldo"
       },
       "color": "#3fae6f"
     },
@@ -213,10 +198,7 @@
       "icon": "♛",
       "name": {
         "en": "King",
-        "es": "Rey",
-        "ja": "王",
-        "ko": "왕",
-        "zh": "国王"
+        "es": "Rey"
       },
       "color": "#e0b020"
     }
@@ -225,10 +207,7 @@
     "icon": "❝",
     "name": {
       "en": "Storyteller",
-      "es": "Narrador",
-      "ja": "語り部",
-      "ko": "이야기꾼",
-      "zh": "说书人"
+      "es": "Narrador"
     },
     "color": "#8f9bb3"
   },
@@ -238,6 +217,21 @@
     "panel": "#2b3150",
     "parchment": "#f1e2b8"
   },
+  "foe": {
+    "rows": ["....GGG...", "...GGGGGG.", "...GGWDGWD", "...GGGWWG.", "..RRRRRR..", ".GRRBBRRG."],
+    "legs": ["..DD..DD..", ".DD....DD."],
+    "colors": {
+      "G": "#5a8f3a",
+      "W": "#f2f2f2",
+      "D": "#1f2a14",
+      "R": "#8a2a2a",
+      "B": "#5a3a22"
+    }
+  },
+  "finale": {
+    "en": "★ QUEST COMPLETE ★",
+    "es": "★ MISIÓN CUMPLIDA ★"
+  },
   "hud": {
     "skyTop": "#1a1f33",
     "skyBottom": "#2b3150",
@@ -245,5 +239,46 @@
     "text": "#f1e2b8",
     "dim": "#8a90a8",
     "star": "#f5f3c8"
+  },
+  "cast": {
+    "pet": {
+      "name": {
+        "en": "Fox",
+        "es": "Zorro"
+      },
+      "frames": [
+        [".....O.O", "T....OOO", "TOOOOOEO", ".OOOOOWD", ".D..D.D."],
+        [".....O.O", "T....OOO", "TOOOOOEO", ".OOOOOWD", "..D..D.D"]
+      ],
+      "happy": [".....O.O", "T....OOO", "TOOOOOHO", ".OOOOOWD", ".D..D.D."],
+      "colors": {
+        "O": "#d8782a",
+        "T": "#f2f2f2",
+        "W": "#f2f2f2",
+        "E": "#1a1a1a",
+        "D": "#1a1a1a",
+        "H": "#ff5a8a"
+      }
+    },
+    "advisor": {
+      "name": {
+        "en": "Wizard",
+        "es": "Mago"
+      },
+      "frames": [
+        ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.T", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"],
+        ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.G", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"]
+      ],
+      "colors": {
+        "P": "#3e2a78",
+        "Y": "#ffd84a",
+        "S": "#f0c9a0",
+        "E": "#1a1a1a",
+        "W": "#f2f2f2",
+        "R": "#5b3fa8",
+        "T": "#7a5230",
+        "G": "#fff4a0"
+      }
+    }
   }
 }

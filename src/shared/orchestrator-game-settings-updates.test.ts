@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
+  withOrchestratorGameProjectActions,
   withOrchestratorGameProjectField,
+  withOrchestratorGameProjectLead,
   withOrchestratorGameProjectScene
 } from './orchestrator-game-settings-updates'
 
@@ -50,5 +52,61 @@ describe('withOrchestratorGameProjectScene', () => {
         null
       )
     ).toEqual({ other: { mode: 'off' } })
+  })
+})
+
+describe('withOrchestratorGameProjectLead', () => {
+  it("sets one lead key for one project, keeping the project's other overrides", () => {
+    expect(
+      withOrchestratorGameProjectLead(
+        { repo1: { hud: false, orchestrator: { cap: 3 } }, other: { mode: 'off' } },
+        'repo1',
+        'autostart',
+        true
+      )
+    ).toEqual({
+      repo1: { hud: false, orchestrator: { cap: 3, autostart: true } },
+      other: { mode: 'off' }
+    })
+  })
+
+  it('drops an emptied lead block, then the project once nothing is left', () => {
+    expect(
+      withOrchestratorGameProjectLead(
+        { repo1: { hud: false, orchestrator: { model: 'opus' } } },
+        'repo1',
+        'model',
+        undefined
+      )
+    ).toEqual({ repo1: { hud: false } })
+    expect(
+      withOrchestratorGameProjectLead(
+        { repo1: { orchestrator: { label: 'Boss' } } },
+        'repo1',
+        'label',
+        undefined
+      )
+    ).toEqual({})
+  })
+})
+
+describe('withOrchestratorGameProjectActions', () => {
+  const actions = [{ label: 'Test runs', command: 'test-runs', prompt: 'Run the QA test runs' }]
+
+  it("replaces a project's whole action list on this machine, an empty one included", () => {
+    expect(withOrchestratorGameProjectActions({ repo1: { hud: false } }, 'repo1', actions)).toEqual(
+      {
+        repo1: { hud: false, actions }
+      }
+    )
+    expect(withOrchestratorGameProjectActions(undefined, 'repo1', [])).toEqual({
+      repo1: { actions: [] }
+    })
+  })
+
+  it('inherits orca.yaml again, dropping an entry left empty', () => {
+    expect(withOrchestratorGameProjectActions({ repo1: { actions } }, 'repo1', undefined)).toEqual(
+      {}
+    )
   })
 })

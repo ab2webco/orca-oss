@@ -645,13 +645,15 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
-import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import {
   withOrchestratorGameArgs,
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import type { GameMemberWork } from './orchestrator-game-fleet'
+import { GameReadCache } from './orchestrator-game-read-cache'
 import {
   GameProjectWorkCache,
   myOpenPullRequestsOf,
@@ -663,6 +665,20 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
+import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
+import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameStopSwitch } from './orchestrator-game-stop-switch'
+import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
+import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
+import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
+import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
+import {
+  accountLimitsOf,
+  gameMemberLimitOf,
+  type GameMemberLimit
+} from '../../shared/orchestrator-game-member-limit'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -775,6 +791,7 @@ import {
   resolveLocalProjectRuntimesForRepos
 } from '../project-runtime-git-options'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
+import { localOrchestratorGamePaneShell } from '../claude/orchestrator-game-pane-shell'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import { resolveTerminalOrchestrationCliCommand } from './orchestration/cli-command'
 import {
@@ -3019,6 +3036,9 @@ function getSetupRunnerCommandPlatformForLaunch(
   return getSetupRunnerCommandPlatformForPath(setup?.runnerScriptPath ?? '', fallbackPlatform)
 }
 
+// Why 40: a provider's limit notice is the last thing an agent prints before it stops.
+const GAME_MEMBER_LIMIT_TAIL_LINES = 40
+
 export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
@@ -3583,8 +3603,19 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameMemberAdvisors = new GameMemberAdvisors()
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(90_000)
+  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
+  private readonly gameHistory = new GameHistoryStore(() =>
+    join(app.getPath('userData'), 'orchestrator-game-history')
+  )
+  private readonly gameBoard = new GameBoard({
+    store: this.gameHistory,
+    stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
+    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    inboxSourceOf: (lead) => gameInboxSourceOf(this.getOrchestrationDb(), lead)
+  })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -11481,6 +11512,11 @@ export class OrcaRuntimeService {
 
   getPtyOutputSequence(ptyId: string): number {
     return this.ptyOutputSequenceById.get(ptyId) ?? 0
+  }
+
+  /** Null until the PTY prints in this app session (restored PTYs start unknown). */
+  getPtyLastOutputAt(ptyId: string): number | null {
+    return this.ptysById.get(ptyId)?.lastOutputAt ?? null
   }
 
   private getPtyLifecycleGeneration(ptyId: string): number {
@@ -27790,6 +27826,20 @@ export class OrcaRuntimeService {
           claudeAgentTeamsMode
         )
         let agentTeamsPlan: Awaited<ReturnType<typeof buildClaudeAgentTeamsLaunchPlan>> | undefined
+        // Why: the plugin dir is on this machine, so an SSH or WSL pane's Claude could not load it.
+        const gameShell =
+          workspace.connectionId === null
+            ? localOrchestratorGamePaneShell({
+                platform: process.platform,
+                settings: this.store?.getSettings?.(),
+                projectRuntime:
+                  process.platform === 'win32'
+                    ? this.resolveProjectRuntimeForWorktree(workspace.id)
+                    : undefined,
+                cwd,
+                fallbackHostShell: process.env.COMSPEC || 'powershell.exe'
+              })
+            : null
         try {
           agentTeamsPlan = adoptedBeforeLaunch
             ? undefined
@@ -27810,16 +27860,16 @@ export class OrcaRuntimeService {
                     shimDir,
                     shimBin
                   }).env,
-                // Why: the plugin dir is on this machine, so an SSH pane's remote Claude could not load it.
                 game:
-                  workspace.connectionId === null
+                  gameShell !== null
                     ? () =>
                         this.prepareOrchestratorGameFor({
                           repoId: workspace.repo?.id ?? null,
                           worktreePath: workspace.path,
                           connectionId: null
                         })
-                    : undefined
+                    : undefined,
+                ...(gameShell !== null ? { gameShell } : {})
               })
         } catch (error) {
           releaseStablePaneCreate?.()
@@ -27841,7 +27891,8 @@ export class OrcaRuntimeService {
                       effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
                         ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
                         : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand),
-                      agentTeamsPlan.game ?? { args: [], env: {} }
+                      agentTeamsPlan.game ?? { args: [], env: {} },
+                      gameShell ?? undefined
                     )
                   : agentTeamsPlan.command,
                 agentEnv: {
@@ -30144,20 +30195,186 @@ export class OrcaRuntimeService {
     return { env: { ...leader.env, ...game.env }, args: game.args }
   }
 
+  /** A game link the project opens outside Orca, on the desktop where the person is signed in. */
+  async openGameLinkInSystemBrowser(url: string): Promise<{ opened: true }> {
+    // Why: a headless serve has no person at its screen; the mod then falls back to an Orca tab.
+    if (!this.getAvailableAuthoritativeWindow()) {
+      throw new Error('This Orca host has no desktop to open a system browser on.')
+    }
+    await shell.openExternal(url)
+    return { opened: true }
+  }
+
+  // Why the lead's repo: history is the project's, kept on this Orca host for local, SSH and folder repos alike.
+  private async gameHistoryProjectOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{
+    key: string
+    worktreesById: Awaited<ReturnType<OrcaRuntimeService['getResolvedWorktreeMap']>>
+  }> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    const worktreeId =
+      args.worktreeId ??
+      (args.terminalHandle
+        ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+        : undefined)
+    const repoId = worktreeId ? worktreesById.get(worktreeId)?.repoId : undefined
+    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
+  }
+
+  getGameBoard(): GameBoard {
+    return this.gameBoard
+  }
+
+  // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
+  private async gameBoardProjectOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<GameBoardProject> {
+    const context = args.terminalHandle
+      ? this.getAgentStatusOrchestrationContextForHandle(args.terminalHandle)
+      : undefined
+    const leadHandle = context?.parentTerminalHandle
+    const leadWorktreeId = leadHandle ? this.getWorktreeIdForTerminalHandle(leadHandle) : null
+    const { key } = await this.gameHistoryProjectOf(
+      leadWorktreeId ? { worktreeId: leadWorktreeId } : args
+    )
+    const leadTerminal = leadHandle ?? args.terminalHandle
+    return {
+      key,
+      isMember: Boolean(leadHandle),
+      memberTicket: leadHandle ? ticketInText(context?.taskTitle ?? context?.displayName) : null,
+      lead: leadTerminal
+        ? { handle: leadTerminal, paneKey: this.getPaneKeyForTerminalHandle(leadTerminal) ?? null }
+        : null
+    }
+  }
+
+  async recordGameHistory(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    memberWorktreeId?: string
+    record: GameHistoryRecord
+  }): Promise<{ recorded: true; count: number }> {
+    const { key, worktreesById } = await this.gameHistoryProjectOf(args)
+    const memberRepoId = args.memberWorktreeId
+      ? worktreesById.get(args.memberWorktreeId)?.repoId
+      : undefined
+    const repo =
+      args.record.repo ??
+      (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
+    const records = await this.gameHistory.append(key, { ...args.record, repo })
+    return { recorded: true, count: records.length }
+  }
+
+  async listGameHistory(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket?: string
+    since?: string
+  }): Promise<{ records: GameHistoryRecord[] }> {
+    const { key } = await this.gameHistoryProjectOf(args)
+    return { records: filterGameHistory(await this.gameHistory.list(key), args) }
+  }
+
+  // Why never throw: an unreadable account must cost the member its tag, not the whole game state.
+  private gameMemberAccountFor(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
+  ): ReturnType<typeof gameMemberAccountOf> {
+    const provider = accountProviderOfAgent(member.agentType)
+    const services = this.accountServices
+    if (!provider || !services) {
+      return null
+    }
+    try {
+      const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+      const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+      const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
+      return gameMemberAccountOf({
+        agentType: member.agentType,
+        live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
+        pinnedAccountId:
+          provider === 'claude' ? worktree?.claudeAccountId : worktree?.codexAccountId,
+        accounts: (provider === 'claude'
+          ? services.claudeAccounts
+          : services.codexAccounts
+        ).listAccounts().accounts
+      })
+    } catch {
+      return null
+    }
+  }
+
+  /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
+  private async gameMemberLimitFor(member: {
+    paneKey: string
+    agentType: string | null
+    state: 'working' | 'waiting' | 'idle' | 'done'
+    account: { id: string } | null
+  }): Promise<GameMemberLimit | null> {
+    const provider = accountProviderOfAgent(member.agentType)
+    const services = this.accountServices
+    if (!provider || member.state === 'working') {
+      return null
+    }
+    const roster = services
+      ? (provider === 'claude' ? services.claudeAccounts : services.codexAccounts).listAccounts()
+      : null
+    const accountLimits =
+      services && roster && member.account
+        ? accountLimitsOf(
+            services.rateLimits.getState(),
+            provider,
+            member.account.id,
+            roster.activeAccountIdsByRuntime?.host ?? roster.activeAccountId
+          )
+        : null
+    const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+    const read = handle
+      ? await this.readTerminal(handle, { limit: GAME_MEMBER_LIMIT_TAIL_LINES }).catch(() => null)
+      : null
+    return gameMemberLimitOf({
+      state: member.state,
+      agentType: member.agentType,
+      accountLimits,
+      terminalTail: read ? read.tail.join('\n') : null,
+      now: Date.now()
+    })
+  }
+
   async getOrchestratorGameState(args: {
     worktreeId?: string
     terminalHandle?: string
     paneKey?: string
+    /** The calling member pane's Jev report, kept for its lead's state. */
+    advisor?: unknown
   }): Promise<OrchestratorGameState> {
+    if (args.paneKey && args.advisor !== undefined) {
+      this.gameMemberAdvisors.noteReport(args.paneKey, args.advisor, Date.now())
+    }
     const worktreesById = await this.getResolvedWorktreeMap()
     let worktreeId = args.worktreeId
     if (!worktreeId && args.terminalHandle) {
       worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
     }
     const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
-    const summary = worktree
-      ? (await this.getWorktreePs()).worktrees.find((row) => row.worktreeId === worktree.id)
-      : undefined
+    const summaries = (await this.getWorktreePs()).worktrees
+    const summary = worktree ? summaries.find((row) => row.worktreeId === worktree.id) : undefined
+    // Why: a member the lead launched with `orca orchestration` runs in its own child worktree.
+    const members = args.paneKey
+      ? summaries.flatMap((one) =>
+          one.worktreeId === worktree?.id
+            ? []
+            : one.agents
+                .filter((row) => row.parentPaneKey === args.paneKey)
+                .map((row) => ({
+                  row,
+                  worktree: { id: one.worktreeId, branch: one.branch, displayName: one.displayName }
+                }))
+        )
+      : []
     const callerHandle =
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
     return await buildOrchestratorGameState({
@@ -30174,12 +30391,50 @@ export class OrcaRuntimeService {
           }
         : null,
       agents: summary?.agents ?? [],
+      members,
+      readMemberWork: (memberWorktreeId) =>
+        this.gameMemberWork.read(memberWorktreeId, async () => {
+          const member = worktreesById.get(memberWorktreeId)
+          const memberSummary = summaries.find((row) => row.worktreeId === memberWorktreeId)
+          if (!member) {
+            return null
+          }
+          const review =
+            member.repoId && memberSummary?.branch
+              ? await this.getHostedReviewForBranch({
+                  repoSelector: `id:${member.repoId}`,
+                  branch: memberSummary.branch,
+                  linkedGitHubPR: memberSummary.linkedPR?.number ?? null,
+                  linkedGitLabMR: memberSummary.linkedGitLabMR ?? null
+                })
+              : null
+          return { review, linkedWorkItem: member.linkedWorkItem }
+        }),
+      accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      limitOf: (member) => this.gameMemberLimitFor(member),
+      advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       leaderPaneKey: args.paneKey ?? null,
+      callerParentPaneKey: args.paneKey
+        ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
+            ?.parentPaneKey
+        : null,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readInboxes: () =>
+        this.gameBoard.inboxSummary({
+          worktreeId: worktree?.id,
+          terminalHandle: callerHandle ?? undefined
+        }),
+      readStop: async () =>
+        (
+          await this.gameBoard.stopState({
+            worktreeId: worktree?.id,
+            terminalHandle: callerHandle ?? undefined
+          })
+        ).stopped,
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {
@@ -30314,7 +30569,7 @@ export class OrcaRuntimeService {
           workspaceId: planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace),
           omitDescription: true
         }),
-      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 20, site),
+      jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 50, site),
       linearAssigned: async (workspace) =>
         (await this.linearListIssues('assigned', 50, workspace)).items
     }

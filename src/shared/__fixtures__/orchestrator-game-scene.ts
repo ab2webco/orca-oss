@@ -36,3 +36,22 @@ export function sceneFile(overrides: Record<string, unknown> = {}): Record<strin
     ...overrides
   }
 }
+
+/** A scene's pet as an author writes it: two walking frames and a happy one. */
+export const scenePet = {
+  name: { en: 'Wolf', es: 'Lobo' },
+  frames: [
+    ['W...W', 'WWWWW', 'WEWEW', '.WWW.', '.W.W.'],
+    ['W...W', 'WWWWW', 'WEWEW', '.WWW.', 'W...W']
+  ],
+  happy: ['W...W', 'WWWWW', 'WHWHW', '.WWW.', '.W.W.'],
+  colors: { W: '#d8d8d8', E: '#1a1a1a', H: 0xff5a8a }
+}
+
+/** A scene's advisor: one idle frame and its own body for a red card. */
+export const sceneAdvisor = {
+  name: 'Golem',
+  frames: [['.GGG.', 'GEGEG', 'GGGGG', 'G.G.G', '.G.G.']],
+  gestures: { escalated: ['.GGG.', 'GEGEG', 'GGGGG', 'GGG.G', '.G.G.'] },
+  colors: { G: '#b8b8b0', E: '#d83a2e' }
+}

@@ -8,6 +8,7 @@ import type { PlaneWorkItem } from '../../shared/plane-types'
 import { derivePRCheckStatus } from '../../shared/pr-check-status'
 import {
   GAME_PROJECT_ITEMS_MAX,
+  GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
   reviewsListUrlOf,
   reviewToneOf,
@@ -23,6 +24,7 @@ import {
   statusGroupOfJira,
   statusGroupOfName,
   statusGroupOfPlane,
+  type GameStatusGroup,
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
 
@@ -167,6 +169,20 @@ async function readGitLabReviews(port: GameProjectWorkPort): Promise<GameProject
 
 const DONE_PLANE_GROUPS = new Set(['completed', 'cancelled'])
 
+const ticketOf = (
+  id: string,
+  one: { title: string; url: string },
+  status: string,
+  group: GameStatusGroup
+): GameProjectItem => ({
+  id,
+  title: one.title,
+  url: one.url,
+  status,
+  tone: todoToneOf(group),
+  group
+})
+
 async function readTodo(
   port: GameProjectWorkPort,
   source: TodoSource,
@@ -183,7 +199,8 @@ async function readTodo(
           project: source.project,
           repo
         }),
-      items.length
+      items.length,
+      GAME_TODO_ITEMS_MAX
     )
   switch (source.provider) {
     case 'plane': {
@@ -192,13 +209,14 @@ async function readTodo(
       ).filter((one) => !DONE_PLANE_GROUPS.has(one.state.group))
       return listOf(
         'plane',
-        open.map((one) => ({
-          id: one.identifier,
-          title: one.title,
-          url: one.url,
-          status: one.state.name,
-          tone: todoToneOf(statusGroupOfPlane(one.state.group, one.state.name))
-        }))
+        open.map((one) =>
+          ticketOf(
+            one.identifier,
+            one,
+            one.state.name,
+            statusGroupOfPlane(one.state.group, one.state.name)
+          )
+        )
       )
     }
     case 'jira': {
@@ -207,13 +225,14 @@ async function readTodo(
       const issues = await port.jiraSearch(jql, source.workspace)
       return listOf(
         'jira',
-        issues.map((one) => ({
-          id: one.key,
-          title: one.title,
-          url: one.url,
-          status: one.status.name,
-          tone: todoToneOf(statusGroupOfJira(one.status.categoryKey, one.status.name))
-        }))
+        issues.map((one) =>
+          ticketOf(
+            one.key,
+            one,
+            one.status.name,
+            statusGroupOfJira(one.status.categoryKey, one.status.name)
+          )
+        )
       )
     }
     case 'linear': {
@@ -222,13 +241,9 @@ async function readTodo(
       )
       return listOf(
         'linear',
-        issues.map((one) => ({
-          id: one.identifier,
-          title: one.title,
-          url: one.url,
-          status: one.state.name,
-          tone: todoToneOf(statusGroupOfName(one.state.name))
-        }))
+        issues.map((one) =>
+          ticketOf(one.identifier, one, one.state.name, statusGroupOfName(one.state.name))
+        )
       )
     }
     case 'github': {

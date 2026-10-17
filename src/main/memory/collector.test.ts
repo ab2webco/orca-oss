@@ -558,6 +558,39 @@ describe('collectMemorySnapshot', () => {
     expect(snapshot.totalFootprint).toBeNull()
   })
 
+  // Why: RSS hides compressed and swapped pages, so the low-memory warning ranks panes by footprint.
+  it('reports each session subtree footprint on macOS', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('darwin')
+    execMock.mockImplementation((cmd: string, _opts, cb) => {
+      const stdout = cmd.startsWith('top ')
+        ? ['PID    MEM', '10     100M', '11     2048M', '99     5M'].join('\n')
+        : ['10 1 0 1024', '11 10 0 2048', '99 1 0 512'].join('\n')
+      cb(null, { stdout, stderr: '' })
+    })
+    execFileMock.mockImplementation((_file, _args, _opts, cb) => cb(new Error('no host'), '', ''))
+    listRegisteredPtysMock.mockReturnValue([
+      { ptyId: 'pty-1', worktreeId: 'repo-1::/repo', sessionId: 'pty-1', paneKey: null, pid: 10 }
+    ])
+    const { collectMemorySnapshot } = await loadCollector()
+
+    const snapshot = await collectMemorySnapshot(emptyStore)
+
+    expect(snapshot.worktrees[0].sessions[0].footprint).toBe(2148 * 1024 * 1024)
+  })
+
+  it('leaves the session footprint absent where no footprint sweep exists', async () => {
+    vi.spyOn(os, 'platform').mockReturnValue('linux')
+    mockPsResponse('10 1 0 1024')
+    listRegisteredPtysMock.mockReturnValue([
+      { ptyId: 'pty-1', worktreeId: 'repo-1::/repo', sessionId: 'pty-1', paneKey: null, pid: 10 }
+    ])
+    const { collectMemorySnapshot } = await loadCollector()
+
+    const snapshot = await collectMemorySnapshot(emptyStore)
+
+    expect(snapshot.worktrees[0].sessions[0]).not.toHaveProperty('footprint')
+  })
+
   it('uses Typeperf during the CIM retry cooldown', async () => {
     vi.spyOn(os, 'platform').mockReturnValue('win32')
     execFileMock.mockImplementation((file, _args, _opts, cb) => {

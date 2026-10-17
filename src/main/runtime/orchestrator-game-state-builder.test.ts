@@ -43,6 +43,7 @@ function checkout(orcaYaml?: string): string {
 }
 
 const none = async () => null
+const LEAD_ACTION_IDS = ['lead:wave', 'lead:status', 'lead:push', 'lead:sweep', 'lead:stop']
 
 function worktree(path: string) {
   return {
@@ -179,6 +180,121 @@ describe('buildOrchestratorGameState', () => {
     ])
   })
 
+  it('counts the members the lead launched, in its worktree or in their own, as the fleet', async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: null,
+      toolName: null
+    }
+    const handles: Record<string, string> = {
+      'tab-1:lead': 'term_lead',
+      'tab-1:mate': 'term_mate',
+      'tab-4:here': 'term_here',
+      'tab-5:stranger': 'term_stranger'
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-1:mate' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead', taskTitle: 'CIN-7 Login' },
+        { ...row, paneKey: 'tab-5:stranger', parentPaneKey: 'tab-9:other-lead' }
+      ],
+      members: [
+        {
+          row: { ...row, paneKey: 'tab-6:away', taskTitle: 'CIN-8 Seats', state: 'blocked' },
+          worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+        }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      terminalHandleOf: (paneKey) =>
+        handles[paneKey] ?? (paneKey === 'tab-6:away' ? 'term_away' : null),
+      teamHandles: new Set(['term_lead', 'term_mate']),
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(
+      state.agents.map((agent) => [agent.paneKey, agent.displayName, agent.isMember ?? false])
+    ).toEqual([
+      ['tab-1:lead', null, false],
+      ['tab-1:mate', null, false],
+      ['tab-4:here', 'CIN-7 Login', true],
+      ['tab-6:away', 'CIN-8 Seats', true]
+    ])
+    expect(state.agents[3]).toMatchObject({
+      state: 'waiting',
+      terminalHandle: 'term_away',
+      worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+    })
+  })
+
+  it("gives each member in its own worktree that worktree's PR, CI and ticket", async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: 'CIN-8 Seats',
+      toolName: null
+    }
+    const asked: string[] = []
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      members: [
+        {
+          row: { ...row, paneKey: 'tab-6:away' },
+          worktree: { id: 'wt-cin-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+        },
+        {
+          row: { ...row, paneKey: 'tab-7:quiet' },
+          worktree: { id: 'wt-cin-9', branch: 'feat/cin-9', displayName: 'cin-9' }
+        }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readLinkedStatus: async () => ({ name: 'QA', group: 'review' }),
+      readMemberWork: async (worktreeId) => {
+        asked.push(worktreeId)
+        return worktreeId === 'wt-cin-8'
+          ? {
+              review: {
+                provider: 'github',
+                number: 12,
+                title: 'Seats',
+                url: 'https://github.com/o/r/pull/12',
+                state: 'open',
+                status: 'failure'
+              },
+              linkedWorkItem: {
+                provider: 'jira',
+                type: 'issue',
+                number: 0,
+                title: 'Seats',
+                url: 'https://jira.example/browse/CIN-8',
+                jiraIdentifier: 'CIN-8'
+              }
+            }
+          : null
+      }
+    })
+
+    expect(asked).toEqual(['wt-cin-8', 'wt-cin-9'])
+    expect(state.agents[0]).toMatchObject({
+      review: { number: 12, ci: 'failure', url: 'https://github.com/o/r/pull/12' },
+      workItem: { identifier: 'CIN-8', status: 'QA', statusGroup: 'review' }
+    })
+    expect(state.agents[1]).not.toHaveProperty('review')
+    expect(state.agents[1]).not.toHaveProperty('workItem')
+  })
+
   it('falls back to a linked item without status when no tracker answers', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,
@@ -304,7 +420,115 @@ describe('buildOrchestratorGameState', () => {
         workItem: expect.objectContaining({ provider: 'plane', identifier: 'ORCA-1' })
       }
     ])
-    expect(state.project).toEqual(project)
+    expect(state.project?.todo?.items).toEqual([
+      {
+        id: 'ORCA-9',
+        title: 'Mine',
+        url: 'https://app.plane.so/w/browse/ORCA-9/',
+        prompt: 'Work on ORCA-9: Mine\nhttps://app.plane.so/w/browse/ORCA-9/'
+      }
+    ])
+    expect(state.actions?.map((one) => one.id)).toEqual(LEAD_ACTION_IDS)
+  })
+
+  it("sends the project's lead, this machine's Settings over orca.yaml", async () => {
+    const yaml = 'orchestratorGame:\n  orchestrator:\n    cap: 2\n    rules: CIN flow\n'
+    const state = await buildOrchestratorGameState({
+      settings: { orchestratorGameProjects: { repo1: { orchestrator: { autostart: true } } } },
+      worktree: worktree(checkout(yaml)),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.lead).toEqual({ autostart: true, cap: 2, agent: 'claude', rules: 'CIN flow' })
+  })
+
+  it('names the calling pane a member when a lead launched it, else the lead', async () => {
+    const base = {
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: 'tab:m',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+
+    expect((await buildOrchestratorGameState(base)).role).toBe('lead')
+    expect(
+      (await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })).role
+    ).toBe('member')
+  })
+
+  it("sends Orca's lead buttons only to the lead, unless the project turns them off", async () => {
+    const base = {
+      settings: undefined,
+      worktree: worktree(checkout('orchestratorGame:\n  tracker: false\n')),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+    const lead = await buildOrchestratorGameState(base)
+    const member = await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })
+    const off = await buildOrchestratorGameState({
+      ...base,
+      worktree: worktree(
+        checkout('orchestratorGame:\n  tracker: false\n  orchestrator:\n    actions: false\n')
+      )
+    })
+
+    expect(lead.actions?.map((one) => [one.id, one.command])).toEqual(
+      LEAD_ACTION_IDS.map((id) => [id, id.slice('lead:'.length)])
+    )
+    expect(member.actions).toBeUndefined()
+    expect(off.actions).toBeUndefined()
+  })
+
+  it("sends the project's actions filled for this worktree and each ticket's work prompt", async () => {
+    const yaml = [
+      'orchestratorGame:',
+      '  todo:',
+      '    provider: jira',
+      '    project: CIN',
+      "    workPrompt: '/o:launch {id}'",
+      '  actions:',
+      '    - label: Ship',
+      "      prompt: 'Open the PR for {branch}'",
+      '    - label: Runs',
+      '      mcp:',
+      '        server: tambora',
+      '        tool: list_test_run_cases',
+      ''
+    ].join('\n')
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout(yaml)),
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readProjectWork: async () => ({
+        reviews: null,
+        todo: {
+          provider: 'jira',
+          total: 1,
+          url: null,
+          items: [{ id: 'CIN-7', title: 'Login', url: 'https://jira.example/browse/CIN-7' }]
+        }
+      })
+    })
+
+    expect(state.actions?.slice(5)).toEqual([
+      { id: 'action-0', label: 'Ship', prompt: `Open the PR for ${state.worktree?.branch}` },
+      { id: 'action-1', label: 'Runs', mcp: { server: 'tambora', tool: 'list_test_run_cases' } }
+    ])
+    expect(state.project?.todo?.items[0]?.prompt).toBe('/o:launch CIN-7')
   })
 
   it('reads no project work when the tracker is off or there is no worktree', async () => {

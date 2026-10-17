@@ -172,7 +172,9 @@ describe('resolveOrchestratorGameIntegrations', () => {
     expect(resolved).toEqual({
       links: [{ label: 'Project', url: 'https://p.example' }],
       activity: [],
-      todo: null
+      actions: [],
+      todo: null,
+      reviews: {}
     })
   })
 

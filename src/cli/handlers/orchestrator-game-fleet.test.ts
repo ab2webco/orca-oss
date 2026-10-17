@@ -1,0 +1,708 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
+import type { RuntimeClient } from '../runtime-client'
+import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+
+const merged = {
+  provider: 'github',
+  number: 41,
+  title: 'x',
+  url: 'https://github.com/o/r/pull/41',
+  state: 'merged',
+  ci: 'success'
+}
+
+const member = (overrides: Record<string, unknown>) => ({
+  paneKey: 'p',
+  displayName: 'CIN-1 Cartelera',
+  agentType: 'claude',
+  state: 'working',
+  toolName: null,
+  isLeader: false,
+  isMember: true,
+  terminalHandle: 'term_1',
+  ...overrides
+})
+
+const LEAD = {
+  paneKey: 'lead',
+  displayName: 'Lead',
+  agentType: 'claude',
+  state: 'idle',
+  toolName: null,
+  isLeader: true,
+  terminalHandle: 'term_lead'
+}
+
+const todoItem = (id: string, group = 'todo') => ({
+  id,
+  title: `${id} title`,
+  url: `https://jira/${id}`,
+  status: 'To Do',
+  group
+})
+
+function stateWith(overrides: Record<string, unknown> = {}) {
+  return {
+    config: { mode: 'on' },
+    agents: [LEAD],
+    worktree: { id: 'wt1', path: '/repo', branch: 'main', displayName: 'cineco' },
+    project: {
+      reviews: null,
+      todo: {
+        provider: 'jira',
+        total: 3,
+        url: null,
+        items: [todoItem('CIN-1'), todoItem('CIN-2'), todoItem('CIN-3')]
+      }
+    },
+    lead: { autostart: false, cap: 2, agent: 'claude' },
+    ...overrides
+  }
+}
+
+function fakeClient(state: unknown, overrides: Record<string, unknown> = {}) {
+  const calls: [string, unknown][] = []
+  const results: Record<string, unknown> = {
+    'game.state': state,
+    'terminal.show': { terminal: { handle: 'term_lead' } },
+    'orchestration.runCurrent': { run: { id: 'run_1' } },
+    'orchestration.taskCreate': { task: { id: 'task_1' } },
+    'game.stopSwitch': { stopped: null },
+    'orchestration.workerStart': {
+      runId: 'run_1',
+      taskId: 'task_1',
+      dispatchId: 'd1',
+      state: 'ready'
+    },
+    'orchestration.workerList': { workers: [], counts: {} },
+    'orchestration.workerRelease': { dispatchId: 'd9', state: 'released', processAction: 'closed' },
+    'terminal.close': { close: { handle: 'term_9', tabId: 't', ptyKilled: true } },
+    'terminal.send': { send: { handle: 'term_1', accepted: true } },
+    ...overrides
+  }
+  const client = {
+    call: async (method: string, params: unknown) => {
+      calls.push([method, params])
+      return { id: 'r', ok: true, result: results[method] }
+    }
+  } as unknown as RuntimeClient
+  return { client, calls }
+}
+
+const run = (
+  command: 'game fleet' | 'game wave' | 'game sweep' | 'game push' | 'game stop',
+  client: RuntimeClient,
+  flags: [string, string | boolean][] = []
+) =>
+  ORCHESTRATOR_GAME_FLEET_HANDLERS[command]({
+    flags: new Map(flags),
+    client,
+    cwd: '/repo',
+    json: true
+  })
+
+// Why: event posts and STOP reads are checked on their own (event-posts and hold tests).
+const BOARD_CALLS = new Set(['game.eventPost', 'game.stopSwitch'])
+const methods = (calls: [string, unknown][]) =>
+  calls.map(([method]) => method).filter((method) => !BOARD_CALLS.has(method))
+
+// Why: freeing a member first records it; these reads and the write are checked on their own.
+const HISTORY_CALLS = new Set([
+  ...BOARD_CALLS,
+  'game.historyRecord',
+  'orchestration.inbox',
+  'orchestration.workerShow'
+])
+const freeing = (calls: [string, unknown][]) =>
+  calls.filter(([method]) => !HISTORY_CALLS.has(method))
+
+describe('orca game fleet verbs', () => {
+  const saved = { ...process.env }
+  let output: string[] = []
+  const printed = () => JSON.parse(output.join('')).result
+
+  beforeEach(() => {
+    output = []
+    vi.spyOn(console, 'log').mockImplementation((line: string) => {
+      output.push(line)
+    })
+    process.env.ORCA_WORKTREE_ID = 'wt1'
+    process.env.ORCA_TERMINAL_HANDLE = 'term_lead'
+    process.env.ORCA_PANE_KEY = 'tab:lead'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    process.env = { ...saved }
+    process.exitCode = undefined
+  })
+
+  it('fleet reads the caller state once and prints the members with free slots', async () => {
+    const { client, calls } = fakeClient(stateWith({ agents: [LEAD, member({})] }))
+
+    await run('game fleet', client)
+
+    expect(calls).toEqual([
+      ['game.state', { worktreeId: 'wt1', terminalHandle: 'term_lead', paneKey: 'tab:lead' }]
+    ])
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        cap: 2,
+        running: 1,
+        free: 1,
+        rows: [expect.objectContaining({ ticket: 'CIN-1', phase: 'working' })]
+      })
+    )
+  })
+
+  it('fleet text counts limited members and says how to move them', async () => {
+    const { client } = fakeClient(
+      stateWith({
+        agents: [
+          LEAD,
+          member({
+            state: 'idle',
+            limit: { resetsAt: null },
+            account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' }
+          })
+        ]
+      })
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain('limited 1')
+    expect(text).toMatch(/limited\s+CIN-1.*game move CIN-1, or wait for the reset/)
+    expect(text).toMatch(/AGENT\s+ACCOUNT/)
+    expect(text).toMatch(/claude\s+ana@example\.com/)
+  })
+
+  it('wave --dry-run plans from the To Do without launching anything', async () => {
+    const { client, calls } = fakeClient(stateWith({ agents: [LEAD, member({})] }))
+
+    await run('game wave', client, [['dry-run', true]])
+
+    expect(methods(calls)).toEqual(['game.state'])
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        dryRun: true,
+        launch: ['CIN-2'],
+        skipped: [
+          { ticket: 'CIN-1', reason: 'already running' },
+          { ticket: 'CIN-3', reason: 'cap' }
+        ],
+        launched: []
+      })
+    )
+  })
+
+  it('wave launches the named tickets through the game launch path, never past the cap', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await run('game wave', client, [
+      ['tickets', 'cin-3, CIN-2,CIN-1'],
+      ['repo', 'name:cineco-frontend']
+    ])
+
+    const starts = calls.filter(([method]) => method === 'orchestration.workerStart')
+    expect(starts.map(([, params]) => params)).toEqual([
+      expect.objectContaining({
+        name: 'cin-3',
+        worktree: 'new-top-level',
+        repo: 'name:cineco-frontend'
+      }),
+      expect.objectContaining({
+        name: 'cin-2',
+        worktree: 'new-top-level',
+        repo: 'name:cineco-frontend'
+      })
+    ])
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        dryRun: false,
+        skipped: [{ ticket: 'CIN-1', reason: 'cap' }],
+        launched: [
+          expect.objectContaining({ ticket: 'CIN-3', dispatchId: 'd1', state: 'ready' }),
+          expect.objectContaining({ ticket: 'CIN-2', dispatchId: 'd1', state: 'ready' })
+        ]
+      })
+    )
+  })
+
+  it('wave gives every member it launches the same agent, model and effort overrides', async () => {
+    const { client, calls } = fakeClient(stateWith(), {
+      'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] }
+    })
+
+    await run('game wave', client, [
+      ['tickets', 'CIN-1,CIN-2'],
+      ['agent', 'codex'],
+      ['model', 'gpt-5.5'],
+      ['effort', 'high']
+    ])
+
+    const starts = calls.filter(([method]) => method === 'orchestration.workerStart')
+    expect(starts.map(([, params]) => params)).toEqual([
+      expect.objectContaining({ name: 'cin-1', agent: 'codex', model: 'gpt-5.5', effort: 'high' }),
+      expect.objectContaining({ name: 'cin-2', agent: 'codex', model: 'gpt-5.5', effort: 'high' })
+    ])
+  })
+
+  it('wave refuses a bad override before launching anything', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await expect(run('game wave', client, [['agent', 'cobol']])).rejects.toThrow(/Unknown agent/)
+    expect(calls).toEqual([])
+  })
+
+  it('sweep without --close only lists finished members and touches nothing', async () => {
+    const finished = member({
+      paneKey: 'f',
+      displayName: 'CIN-9',
+      review: merged,
+      terminalHandle: 'term_9'
+    })
+    const { client, calls } = fakeClient(
+      stateWith({ agents: [LEAD, finished, member({ state: 'waiting' })] })
+    )
+
+    await run('game sweep', client)
+
+    expect(methods(calls)).toEqual(['game.state'])
+    expect(printed()).toEqual({
+      closed: false,
+      finished: [
+        expect.objectContaining({
+          row: expect.objectContaining({ ticket: 'CIN-9' }),
+          pending: ['no linked ticket to confirm']
+        })
+      ]
+    })
+  })
+
+  it('sweep --close releases a finished member through its dispatch, or closes its terminal without one', async () => {
+    const agents = [
+      LEAD,
+      member({ state: 'waiting', terminalHandle: 'term_busy' }),
+      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' }),
+      member({ paneKey: 'g', displayName: 'CIN-8', review: merged, terminalHandle: 'term_8' })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [
+          { dispatchId: 'd_old', agentTerminalHandle: 'term_9', terminalState: 'released' },
+          { dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' },
+          { dispatchId: 'd_busy', agentTerminalHandle: 'term_busy', terminalState: 'active' }
+        ],
+        counts: {}
+      }
+    })
+
+    await run('game sweep', client, [['close', true]])
+
+    expect(freeing(calls.slice(1))).toEqual([
+      ['orchestration.workerList', {}],
+      ['orchestration.workerRelease', { dispatch: 'd9' }],
+      ['terminal.close', { terminal: 'term_8' }]
+    ])
+    expect(printed().finished.map((entry: { closed: unknown }) => entry.closed)).toEqual([
+      { via: 'release', dispatchId: 'd9', state: 'released' },
+      { via: 'close', terminal: 'term_8' }
+    ])
+  })
+
+  it('sweep --close leaves a release Orca could not prove as a failure, never a terminal close', async () => {
+    const agents = [
+      LEAD,
+      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [{ dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' }],
+        counts: {}
+      },
+      'orchestration.workerRelease': {
+        dispatchId: 'd9',
+        state: 'release_unknown',
+        processAction: 'none'
+      }
+    })
+
+    await run('game sweep', client, [['close', true]])
+
+    expect(methods(calls)).not.toContain('terminal.close')
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('sweep --close records each finished member in the history before freeing it', async () => {
+    const agents = [
+      LEAD,
+      member({
+        paneKey: 'f',
+        displayName: 'CIN-9',
+        review: merged,
+        terminalHandle: 'term_9',
+        workItem: {
+          provider: 'jira',
+          identifier: 'CIN-9',
+          title: 't',
+          url: 'u',
+          status: 'QA',
+          statusGroup: 'review'
+        },
+        account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' },
+        worktree: { id: 'wt_9', branch: 'cin-9', displayName: 'cin-9' }
+      })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [{ dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' }],
+        counts: {}
+      },
+      'orchestration.workerShow': { worker: { created_at: '2026-10-16 09:00:00' } },
+      'orchestration.inbox': {
+        messages: [
+          {
+            from_handle: 'term_9',
+            to_handle: 'term_lead',
+            type: 'worker_done',
+            subject: 'done',
+            body: 'CIN-9 merged, moved to QA',
+            created_at: '2026-10-16 11:00:00'
+          }
+        ],
+        count: 1
+      },
+      'game.historyRecord': { recorded: true, count: 1 }
+    })
+
+    await run('game sweep', client, [['close', true]])
+
+    const order = methods(calls)
+    expect(order.indexOf('game.historyRecord')).toBeLessThan(
+      order.indexOf('orchestration.workerRelease')
+    )
+    expect(calls.find(([method]) => method === 'game.historyRecord')?.[1]).toEqual({
+      worktreeId: 'wt1',
+      terminalHandle: 'term_lead',
+      memberWorktreeId: 'wt_9',
+      record: expect.objectContaining({
+        ticket: 'CIN-9',
+        branch: 'cin-9',
+        agent: 'claude',
+        account: 'ana@example.com',
+        launchedAt: '2026-10-16 09:00:00',
+        outcome: 'qa',
+        pr: '#41 merged',
+        lastReport: 'CIN-9 merged, moved to QA'
+      })
+    })
+  })
+
+  it('still frees a member when its record cannot be written, and says so', async () => {
+    const agents = [
+      LEAD,
+      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [{ dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' }],
+        counts: {}
+      }
+    })
+    const call = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      if (method === 'game.historyRecord') {
+        throw new Error('Unknown method: game.historyRecord')
+      }
+      return call(method, params)
+    }) as typeof client.call
+
+    await run('game sweep', client, [['close', true]])
+
+    expect(methods(calls)).toContain('orchestration.workerRelease')
+    expect(printed().finished[0]).toEqual(
+      expect.objectContaining({ history: 'not recorded: Unknown method: game.historyRecord' })
+    )
+  })
+
+  it('push sends the continue prompt only to idle members', async () => {
+    const agents = [
+      LEAD,
+      member({ paneKey: 'w', displayName: 'CIN-2', terminalHandle: 'term_2' }),
+      member({ paneKey: 'q', displayName: 'CIN-3', state: 'waiting', terminalHandle: 'term_3' }),
+      member({ paneKey: 'i', displayName: 'CIN-1', state: 'done', terminalHandle: 'term_1' })
+    ]
+    const { client, calls } = fakeClient(
+      stateWith({
+        agents,
+        lead: { autostart: false, cap: 2, agent: 'claude', pushPrompt: 'Go on {id}' }
+      })
+    )
+
+    await run('game push', client)
+
+    expect(calls.slice(1)).toEqual([
+      [
+        'terminal.send',
+        {
+          terminal: 'term_1',
+          text: 'Go on CIN-1',
+          enter: true,
+          agentPrompt: true,
+          client: { id: 'orca-cli', type: 'desktop' }
+        }
+      ]
+    ])
+    expect(
+      printed().members.map((entry: { action: string; sent?: boolean }) => [
+        entry.action,
+        entry.sent
+      ])
+    ).toEqual([
+      ['needs-you', false],
+      ['leave', false],
+      ['push', true]
+    ])
+  })
+
+  it('push --dry-run sends nothing', async () => {
+    const agents = [LEAD, member({ state: 'done' })]
+    const { client, calls } = fakeClient(stateWith({ agents }))
+
+    await run('game push', client, [['dry-run', true]])
+
+    expect(methods(calls)).toEqual(['game.state'])
+    expect(printed().members[0]).toEqual(expect.objectContaining({ action: 'push', sent: false }))
+  })
+
+  describe('stop', () => {
+    const worker = (
+      dispatchId: string,
+      agentTerminalHandle: string | null,
+      workerState: string,
+      terminalState: string,
+      worktreeId: string | null = null
+    ) => ({
+      dispatchId,
+      agentTerminalHandle,
+      workerState,
+      terminalState,
+      resource: worktreeId ? { worktreeId } : null
+    })
+
+    it('refuses without tickets or --all before reading anything', async () => {
+      const { client, calls } = fakeClient(stateWith())
+
+      await expect(run('game stop', client)).rejects.toThrow(/--all/)
+      expect(calls).toEqual([])
+    })
+
+    it('--all stops each live dispatch and closes the terminal the stop left running, never the lead', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' }),
+        member({ paneKey: 'b', displayName: 'CIN-2', terminalHandle: 'term_2' }),
+        member({ paneKey: 'c', displayName: 'CIN-3', terminalHandle: 'term_3' })
+      ]
+      const stops: Record<string, unknown> = {
+        d1: { dispatchId: 'd1', state: 'stopped', processAction: 'closed_agent_terminal' },
+        d2: { dispatchId: 'd2', state: 'stop_unknown', processAction: 'none', lastError: 'x' }
+      }
+      const { client, calls } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': {
+          workers: [
+            worker('d1', 'term_1', 'ready', 'active'),
+            worker('d2', 'term_2', 'ready', 'active'),
+            // Why: today's bug: the dispatch was stopped but its terminal stayed retained.
+            worker('d3', 'term_3', 'stopped', 'retained'),
+            worker('d_lead', 'term_lead', 'ready', 'active')
+          ],
+          counts: {}
+        }
+      })
+      const call = client.call.bind(client)
+      client.call = (async (method: string, params: { dispatch?: string }) =>
+        method === 'orchestration.workerStop'
+          ? (calls.push([method, params]), { ok: true, result: stops[params.dispatch ?? ''] })
+          : call(method, params)) as typeof client.call
+
+      await run('game stop', client, [['all', true]])
+
+      expect(freeing(calls.slice(1))).toEqual([
+        ['orchestration.workerList', {}],
+        ['orchestration.workerStop', { dispatch: 'd1' }],
+        ['orchestration.workerStop', { dispatch: 'd2' }],
+        ['terminal.close', { terminal: 'term_2' }],
+        ['terminal.close', { terminal: 'term_3' }]
+      ])
+      expect(printed().members).toEqual([
+        expect.objectContaining({
+          ticket: 'CIN-1',
+          outcome: 'stopped',
+          dispatchId: 'd1',
+          dispatchState: 'stopped'
+        }),
+        expect.objectContaining({
+          ticket: 'CIN-2',
+          outcome: 'stopped',
+          dispatchState: 'stop_unknown',
+          closedTerminal: 'term_2'
+        }),
+        expect.objectContaining({ ticket: 'CIN-3', outcome: 'stopped', closedTerminal: 'term_3' })
+      ])
+      expect(process.exitCode).toBeUndefined()
+    })
+
+    it('stops only the named members, finds a dispatch by worktree and reports unknown tickets', async () => {
+      const agents = [
+        LEAD,
+        member({
+          paneKey: 'a',
+          displayName: 'CIN-1',
+          terminalHandle: 'term_new',
+          worktree: { id: 'wt_1', branch: 'cin-1', displayName: 'cin-1' }
+        }),
+        member({ paneKey: 'b', displayName: 'CIN-2', terminalHandle: 'term_2' })
+      ]
+      const { client, calls } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': {
+          workers: [worker('d1', 'term_old', 'ready', 'active', 'wt_1')],
+          counts: {}
+        },
+        'orchestration.workerStop': {
+          dispatchId: 'd1',
+          state: 'stopped',
+          processAction: 'closed_agent_terminal'
+        }
+      })
+
+      await run('game stop', client, [['tickets', 'cin-1,CIN-9']])
+
+      expect(freeing(calls.slice(1))).toEqual([
+        ['orchestration.workerList', {}],
+        ['orchestration.workerStop', { dispatch: 'd1' }],
+        ['terminal.close', { terminal: 'term_new' }]
+      ])
+      expect(printed().members).toEqual([
+        expect.objectContaining({ ticket: 'CIN-1', outcome: 'stopped', dispatchId: 'd1' }),
+        expect.objectContaining({
+          ticket: 'CIN-9',
+          outcome: 'failed',
+          reason: 'no member holds CIN-9'
+        })
+      ])
+      expect(process.exitCode).toBe(1)
+    })
+
+    it('reports a member with nothing left as already stopped and a failed close as failed', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: undefined }),
+        member({ paneKey: 'b', displayName: 'CIN-2', terminalHandle: 'term_2' })
+      ]
+      const { client } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': { workers: [], counts: {} }
+      })
+      const call = client.call.bind(client)
+      client.call = (async (method: string, params: unknown) => {
+        if (method === 'terminal.close') {
+          throw new Error('terminal busy')
+        }
+        return call(method, params)
+      }) as typeof client.call
+
+      await run('game stop', client, [['all', true]])
+
+      expect(printed().members).toEqual([
+        expect.objectContaining({ ticket: 'CIN-1', outcome: 'already stopped' }),
+        expect.objectContaining({
+          ticket: 'CIN-2',
+          outcome: 'failed',
+          reason: 'closing term_2 failed: terminal busy'
+        })
+      ])
+      expect(process.exitCode).toBe(1)
+    })
+
+    it('still closes the terminal when the dispatch stop fails', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' })
+      ]
+      const { client, calls } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': {
+          workers: [worker('d1', 'term_1', 'ready', 'active')],
+          counts: {}
+        }
+      })
+      const call = client.call.bind(client)
+      client.call = (async (method: string, params: unknown) => {
+        if (method === 'orchestration.workerStop') {
+          calls.push([method, params])
+          throw new Error('runtime gone')
+        }
+        return call(method, params)
+      }) as typeof client.call
+
+      await run('game stop', client, [['all', true]])
+
+      expect(methods(calls).slice(-1)).toEqual(['terminal.close'])
+      expect(printed().members).toEqual([
+        expect.objectContaining({
+          outcome: 'stopped',
+          closedTerminal: 'term_1',
+          reason: 'dispatch stop failed: runtime gone'
+        })
+      ])
+    })
+
+    it('records each member as stopped, limited or failed before stopping it', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' }),
+        member({
+          paneKey: 'b',
+          displayName: 'CIN-2',
+          terminalHandle: 'term_2',
+          limit: { resetsAt: null }
+        }),
+        member({ paneKey: 'c', displayName: 'CIN-3', terminalHandle: 'term_3' })
+      ]
+      const { client, calls } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': {
+          workers: [
+            worker('d1', 'term_1', 'ready', 'active'),
+            worker('d2', 'term_2', 'ready', 'active'),
+            worker('d3', 'term_3', 'start_unknown', 'active')
+          ],
+          counts: {}
+        },
+        'orchestration.workerStop': { dispatchId: 'd', state: 'stopped', processAction: 'none' },
+        'game.historyRecord': { recorded: true, count: 1 }
+      })
+
+      await run('game stop', client, [['all', true]])
+
+      const records = calls
+        .filter(([method]) => method === 'game.historyRecord')
+        .map(([, params]) => (params as { record: { ticket: string; outcome: string } }).record)
+      expect(records.map((one) => [one.ticket, one.outcome])).toEqual([
+        ['CIN-1', 'stopped'],
+        ['CIN-2', 'limited'],
+        ['CIN-3', 'stopped']
+      ])
+      const order = methods(calls)
+      expect(order.indexOf('game.historyRecord')).toBeLessThan(
+        order.indexOf('orchestration.workerStop')
+      )
+    })
+  })
+})

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import en from './locales/en.json'
 import es from './locales/es.json'
-import ja from './locales/ja.json'
-import ko from './locales/ko.json'
-import zh from './locales/zh.json'
 import { CODEX_SESSION_OPTION_CATALOG } from '../../../shared/agent-session-option-catalog-claude-codex'
 
-const localizedCatalogs = { es, ja, ko, zh }
+const localizedCatalogs = { es }
 const englishSetting = en.auto.components.settings.ExperimentalPane.nativeChat
 const englishSearch = en.auto.components.settings.experimental.search.nativeChat
 const englishComposer = en.components['native-chat'].composer

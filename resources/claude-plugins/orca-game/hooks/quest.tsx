@@ -1,21 +1,35 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
-import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey, questCommandOf } from './quest-policy'
+import { GAME_COMMANDS, QUEST_ALIAS, gameCommandOf, type GameCommand } from './game-commands'
+import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
+  configuredConfig,
   currentScene,
   gameConfig,
+  publishAbsorbing,
   quest,
   ready,
   resetQuest,
   shownPhase,
-  spinnerCellsOf,
+  stageCellsOf,
+  stageOf,
   startDemo,
   type Animated
 } from './quest-runtime'
 import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
+import { forgetFrames, rememberFrame } from './frame-gate'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
+
+// Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
+const shownSetting = (key: 'mode' | 'render'): string => {
+  const value = gameConfig()[key]
+  const configured = configuredConfig()[key]
+  return value === configured
+    ? value
+    : gameStrings().text.sessionOverride(value, configured, quest.liveSources[key])
+}
 
 function hidden($: EngineInterface, e: RenderInput) {
   const { Box } = $.ui.resolve(e)
@@ -30,20 +44,20 @@ export async function animate(
   await ready($)
   if (isOff() || e.surface !== 'terminal' || items.length === 0) {
     quest.animations.delete(e.requestId)
+    forgetFrames(e.requestId)
     return new Map()
   }
   quest.animations.set(e.requestId, items)
   const { Raster } = $.ui.resolve(e)
   return new Map(
-    items.map((item) => [
-      item.key,
-      <Raster
-        key={item.key}
-        columns={item.columns}
-        rows={item.rows}
-        cells={item.draw(quest.tick)}
-      />
-    ])
+    items.map((item) => {
+      const cells = item.draw(quest.tick)
+      rememberFrame(e.requestId, item.key, cells)
+      return [
+        item.key,
+        <Raster key={item.key} columns={item.columns} rows={item.rows} cells={cells} />
+      ]
+    })
   )
 }
 
@@ -54,38 +68,47 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
   await ready($)
   await $.command
     .register({
-      name: 'quest',
+      name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|demo]',
+      argumentHint: '[off|on|zen|demo|render classic|hd]',
       immediate: true
     })
     .catch(() => undefined)
 }
 
-const registerCommand = (on: On) => {
-  on('command.run', { command: 'quest' }, async ($, e) => {
+const registerCommand = (on: On, command: GameCommand) => {
+  on('command.run', { command }, async ($, e) => {
     await ready($)
-    const asked = questCommandOf(e.args)
+    const asked = gameCommandOf(command, e.args)
     const text = gameStrings().text
     if ('error' in asked) {
       return { text: asked.error }
     }
     if ('show' in asked) {
-      const mode = quest.isDemo ? 'demo' : gameConfig().mode
-      return { text: `${text.questShown(mode)} ${text.questModesHelp}` }
+      const mode = quest.isDemo ? 'demo' : shownSetting('mode')
+      const render = text.questRenderShown(shownSetting('render'))
+      return { text: `${text.questShown(mode)} ${render} ${text.questModesHelp}` }
+    }
+    if ('render' in asked) {
+      quest.renderOverride = asked.render
+      $.ui.invalidate('ui.render')
+      return { text: text.questRenderShown(shownSetting('render')) }
     }
     if ('demo' in asked) {
       startDemo()
       $.ui.invalidate('ui.render')
+      await publishAbsorbing($)
       return { text: text.questDemo }
     }
     quest.isDemo = false
     quest.modeOverride = asked.mode
     if (asked.mode === 'off') {
       quest.stages.clear()
+      forgetFrames()
     }
     $.ui.invalidate('ui.render')
-    return { text: text.questShown(asked.mode) }
+    await publishAbsorbing($)
+    return { text: text.questShown(shownSetting('mode')) }
   })
 }
 
@@ -135,16 +158,18 @@ const registerSpinner = (on: On) => {
     await ready($)
     if (isOff() || e.surface !== 'terminal') {
       quest.stages.delete(e.requestId)
+      forgetFrames(e.requestId)
       return next(e)
     }
-    const columns = sceneColumnsOf(e.viewport?.columns)
-    const packed = spinnerCellsOf(columns)
-    quest.stages.set(e.requestId, { columns, rows: packed.rows })
+    const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)
+    quest.stages.set(e.requestId, stage)
+    const cells = stageCellsOf(stage)
+    rememberFrame(e.requestId, SCENE_KEY, cells)
     const spinner = await next(e)
     const { Box, Raster } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
-        <Raster key={SCENE_KEY} columns={columns} rows={packed.rows} cells={packed.cells} />
+        <Raster key={SCENE_KEY} columns={stage.columns} rows={stage.rows} cells={cells} />
         {spinner}
       </Box>
     )
@@ -227,7 +252,10 @@ const registerCards = (on: On) => {
 }
 
 export const registerQuest = (on: On): void => {
-  registerCommand(on)
+  const commands: readonly GameCommand[] = [QUEST_ALIAS, ...GAME_COMMANDS]
+  for (const command of commands) {
+    registerCommand(on, command)
+  }
   registerNotes(on)
   registerSpinner(on)
   registerQuietRows(on)

@@ -2,10 +2,21 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
-import { gameStateArgvOf, tabCreateArgvOf, terminalFocusArgvOf } from './game-config'
+import { syncActionCommands } from './action-commands'
+import { ADVISOR_REPORT_ENV, advisorReportOf, isPinnedValue } from './advisor-report'
+import { readJevAdvisor } from './advisor-state'
+import { cliInvocationOf } from './cli-invocation'
+import {
+  gameStateArgvOf,
+  openLinkArgvOf,
+  tabCreateArgvOf,
+  terminalFocusArgvOf
+} from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
+import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
+import { teamEventsOf } from './team-events'
 import {
   clawdReact,
   demoNow,
@@ -14,6 +25,7 @@ import {
   questFleet,
   questLiveConfig
 } from './quest-runtime'
+import { fleetRewardsOf } from './fleet-rewards'
 import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
@@ -32,50 +44,115 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
   return { ...v, state: v.state === null ? null : (gameStateOf(v.state) ?? null) }
 }
 
-async function readState($: EngineInterface): Promise<GameState | undefined> {
-  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+/** Runs the Orca CLI, through cmd.exe when Orca handed a Windows batch file; undefined when it could not. */
+async function runCli(
+  $: EngineInterface,
+  argv: readonly string[] | undefined,
+  extraEnv: Record<string, string> = {}
+) {
   if (argv === undefined) {
     return undefined
   }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const comspec = await $.env.get('ComSpec').catch(() => undefined)
+  const invocation = cliInvocationOf(argv, comspec)
+  if (invocation === undefined) {
+    return undefined
+  }
+  const env = { ...invocation.env, ...extraEnv }
+  const init =
+    Object.keys(env).length > 0 ? { timeoutMs: CLI_TIMEOUT_MS, env } : { timeoutMs: CLI_TIMEOUT_MS }
+  return await $.process.run(invocation.argv, init).catch(() => undefined)
+}
+
+// Module state: whether Orca holds a report from this pane that a Jev gone quiet must take back.
+let hasReportedAdvisor = false
+
+/** Jev's model, effort and Orca's pins for this pane's lead; nothing while Jev never published. */
+async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>> {
+  const advisor = await readJevAdvisor($, quest.tick).catch(() => null)
+  if (advisor === null && !hasReportedAdvisor) {
+    return {}
+  }
+  const [model, effort] = await Promise.all([
+    $.env.get('ORCA_AGENT_MODEL_PINNED').catch(() => undefined),
+    $.env.get('ORCA_AGENT_EFFORT_PINNED').catch(() => undefined)
+  ])
+  hasReportedAdvisor = advisor !== null
+  const pins = { model: isPinnedValue(model), effort: isPinnedValue(effort) }
+  return { [ADVISOR_REPORT_ENV]: advisorReportOf(advisor, pins) }
+}
+
+async function readState($: EngineInterface): Promise<GameState | undefined> {
+  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+  const out = await runCli($, argv, await advisorEnvOf($))
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
+}
+
+/** What a fresh `orca game state --json` answered, for a report the person asked for. */
+export type GameStateOutput =
+  | { kind: 'missing' }
+  | { kind: 'failed'; reason: string }
+  | { kind: 'ok'; stdout: string }
+
+export async function readGameStateOutput($: EngineInterface): Promise<GameStateOutput> {
+  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+  if (argv === undefined) {
+    return { kind: 'missing' }
+  }
+  const out = await runCli($, argv)
+  if (out === undefined) {
+    return { kind: 'failed', reason: `${argv[0]} could not be started` }
+  }
+  if (out.exitCode !== 0) {
+    const line = (out.stderr.trim() || out.stdout.trim()).split('\n')[0]?.trim() ?? ''
+    return { kind: 'failed', reason: `exit ${out.exitCode}${line === '' ? '' : `: ${line}`}` }
+  }
+  return { kind: 'ok', stdout: out.stdout }
 }
 
 /** Brings a teammate's Orca pane forward; false when Orca could not. */
 export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
-  const argv = terminalFocusArgvOf(cli, handle)
-  if (argv === undefined) {
-    return false
-  }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const out = await runCli($, terminalFocusArgvOf(cli, handle))
   return out?.exitCode === 0
 }
 
-/** Opens a link in an Orca browser tab of the game's worktree; false when Orca could not. */
-export async function openInOrca(
+/** Opens a link where the project asks: the system browser, else (or when that fails) an Orca tab. */
+export async function openGameLink(
   $: EngineInterface,
   url: string,
   worktreeId: string
 ): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
-  const argv = tabCreateArgvOf(cli, url, worktreeId)
-  if (argv === undefined) {
-    return false
+  const external = gameConfig().openLinks === 'system' ? openLinkArgvOf(cli, url) : undefined
+  if (external !== undefined) {
+    const out = await runCli($, external)
+    // Why fall back: an older Orca or a host with no desktop has no system browser to offer.
+    if (out?.exitCode === 0) {
+      return true
+    }
   }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const out = await runCli($, tabCreateArgvOf(cli, url, worktreeId))
   return out?.exitCode === 0
 }
 
 async function syncXp($: EngineInterface, before: GameState | null, next: GameState) {
   const stored = xpLedgerOf(await $.store.get(XP_KEY).catch(() => undefined))
-  const { ledger, awarded } = awardXp(stored, rewardsOf(before, next), await $.clock.now())
+  const earned = [...rewardsOf(before, next), ...fleetRewardsOf(before, next)]
+  const { ledger, awarded } = awardXp(stored, earned, await $.clock.now())
   if (awarded.length === 0) {
     return stored.total
   }
   await $.store.set(XP_KEY, ledger).catch(() => undefined)
   for (const one of awarded) {
     $.ui.toast(`+${one.xp} XP · ${one.label}`)
+  }
+  const art = gameStrings().art
+  const merged = awarded.find((one) => one.kind === 'review-merged')?.review
+  if (merged !== undefined) {
+    raiseTeamEvent($, 'merged', art.mergedFloat(merged))
+  } else {
+    raiseTeamEvent($, 'xp', `+${awarded.reduce((sum, one) => sum + one.xp, 0)} ${art.xp}`)
   }
   if (levelOf(ledger.total).level > levelOf(stored.total).level) {
     clawdReact($, 'level')
@@ -92,7 +169,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     if (setContributedScenes(next.extensions.scenes.map((one) => one.definition))) {
       $.ui.invalidate('ui.render')
     }
-    questLiveConfig($, next.config)
+    questLiveConfig($, next.config, next.sources)
   }
   const config = gameConfig()
   const xp =
@@ -109,7 +186,13 @@ export async function refresh($: EngineInterface): Promise<void> {
     note,
     xp
   }))
+  quest.clockMs = doneAt
   if (next !== undefined) {
+    syncHdTeam(next, config.rewards)
+    for (const one of teamEventsOf(before.state, next)) {
+      raiseTeamEvent($, one.kind, one.text)
+    }
+    await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
   }

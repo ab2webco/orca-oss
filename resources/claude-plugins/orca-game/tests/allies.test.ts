@@ -139,7 +139,18 @@ const engine = (on: On, env: Record<string, string>, statuses: Status[]) => {
   }))
 }
 
-const ALL = { plugins: [JEV, SCOUT, HERALD] }
+// What a plugin like Jev reads: the game's own `absorbing` value.
+const READER: Plugin = {
+  name: 'reader',
+  register(on) {
+    on('command.run', { command: 'absorbing' }, async ($) => {
+      const read = await $.state.get({ plugin: 'orca-game', key: 'absorbing' })
+      return { text: String(read.value) }
+    })
+  }
+}
+
+const ALL = { plugins: [JEV, SCOUT, HERALD, READER] }
 
 describe('allies strip', () => {
   test(
@@ -332,4 +343,51 @@ describe('allies strip', () => {
       await plain.unmount()
     }
   )
+  test(
+    'a new session drops the lines left by a plugin that never cleared them',
+    ALL,
+    async ($, on) => {
+      const clock = mock.clock(on)
+      engine(on, {}, [])
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      await $.turn.complete(TURN)
+      await clock.settle()
+      const drawn = async (text: RegExp) => {
+        const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+        const found = await ui.find({ type: 'Text', text })
+        await ui.unmount()
+        return found !== undefined
+      }
+      expect(await drawn(/^ herald arrived$/)).toBe(true)
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      expect(await drawn(/^ herald arrived$/)).toBe(false)
+      expect(await drawn(/^ 3 scouts out$/)).toBe(true)
+    }
+  )
+
+  test('it publishes whether it absorbs other plugins, and follows /quest', ALL, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, {}, [])
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const absorbing = async () =>
+      (await $.command.run({ command: 'absorbing', args: '' } as never)).text
+    expect(await absorbing()).toBe('true')
+    await $.command.run({ command: 'quest', args: 'off' } as never)
+    await clock.settle()
+    expect(await absorbing()).toBe('false')
+    await $.command.run({ command: 'quest', args: 'zen' } as never)
+    await clock.settle()
+    expect(await absorbing()).toBe('true')
+  })
+
+  test('a pane launched with its HUD off publishes that it absorbs nothing', ALL, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { ORCA_GAME_HUD: '0' }, [])
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect((await $.command.run({ command: 'absorbing', args: '' } as never)).text).toBe('false')
+  })
 })

@@ -1,3 +1,5 @@
+import { isRasterText } from './game-strings'
+
 // A cell is [codepoint, foreground, background]; UPPER_HALF packs two pixels per cell.
 export const UPPER_HALF = 0x2580
 
@@ -38,12 +40,37 @@ export const base64Of = (bytes: Uint8Array): string => {
   return out
 }
 
-// The Raster element takes cells as little-endian u32 triples, base64-encoded.
-export const cellsOf = (grid: readonly (readonly number[])[]): string =>
-  base64Of(new Uint8Array(new Uint32Array(grid.flat()).buffer))
+const pools = new Map<number, Uint32Array>()
+const MAX_POOLS = 8
 
+type NativeBase64 = { toBase64?: () => string }
+
+// The Raster element takes cells as little-endian u32 triples, base64-encoded.
+// Why pooled: a scene packs every tick, so one buffer per size is reused instead of allocated.
+export const cellsOf = (grid: readonly (readonly number[])[]): string => {
+  const length = grid.length * 3
+  let words = pools.get(length)
+  if (words === undefined) {
+    if (pools.size >= MAX_POOLS) {
+      pools.clear()
+    }
+    words = new Uint32Array(length)
+    pools.set(length, words)
+  }
+  for (let i = 0; i < grid.length; i += 1) {
+    const cell = grid[i]
+    words[i * 3] = cell?.[0] ?? 0
+    words[i * 3 + 1] = cell?.[1] ?? 0
+    words[i * 3 + 2] = cell?.[2] ?? 0
+  }
+  const bytes = new Uint8Array(words.buffer, 0, length * 4)
+  const native = (bytes as Uint8Array & NativeBase64).toBase64
+  return typeof native === 'function' ? native.call(bytes) : base64Of(bytes)
+}
+
+// Why: one wide glyph (a CJK name or file an agent reports) makes the Raster refuse the frame.
 export const glyphCell = (glyph: string, color: number, background: number): number[] => [
-  glyph.codePointAt(0) ?? 0x20,
+  isRasterText(glyph) ? (glyph.codePointAt(0) ?? 0x20) : 0x3f,
   color,
   background
 ]

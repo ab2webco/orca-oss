@@ -55,6 +55,24 @@ describe('parseGameState', () => {
     expect(parsed?.workItem).toEqual(STATE.workItem)
   })
 
+  it('keeps the layer of each config key Orca names, dropping unknown keys and layers', () => {
+    const sources = {
+      mode: 'project',
+      render: 'default',
+      tracker: 'local',
+      hud: 'env',
+      extra: 'global'
+    }
+    expect(parseGameState(JSON.stringify({ ...STATE, sources }))?.sources).toEqual({
+      mode: 'project',
+      render: 'default',
+      tracker: 'local'
+    })
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, sources: 'project' }))?.sources
+    ).toBeUndefined()
+  })
+
   it('unwraps the CLI result envelope', () => {
     const parsed = parseGameState(JSON.stringify({ id: 'x', ok: true, result: STATE }))
     expect(parsed?.agents).toHaveLength(2)
@@ -93,6 +111,25 @@ describe('parseGameState', () => {
   })
 
   // Why: the handle goes into the CLI's argv, so only the `term_` shape Orca issues is kept.
+  it('keeps a member the lead launched and the worktree it runs in, dropping a malformed one', () => {
+    const member = { ...STATE.agents[1], isMember: true }
+    const agents = [
+      {
+        ...member,
+        paneKey: 'tab:a',
+        worktree: { id: 'wt-8', branch: 'feat/cin-8', displayName: 'cin-8' }
+      },
+      { ...member, paneKey: 'tab:b', worktree: { id: 'wt-9', branch: 7 } },
+      { ...STATE.agents[1], paneKey: 'tab:c', isMember: 'yes' }
+    ]
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => [agent.isMember, agent.worktree])).toEqual([
+      [true, { id: 'wt-8', branch: 'feat/cin-8', displayName: 'cin-8' }],
+      [true, undefined],
+      [undefined, undefined]
+    ])
+  })
+
   it('keeps a terminal handle only in the shape Orca issues', () => {
     const handles = ['term_3f2a-9c_b', '', '--json', 'term_a b', 'term_', 7, 'pty:1']
     const agents = handles.map((terminalHandle, index) => ({

@@ -20,13 +20,13 @@ gh pr diff <n> -R stablyai/orca > /tmp/pr-<n>.diff
 
 Pick exactly one type:
 
-| Type              | What it is                                              |
-| ----------------- | ------------------------------------------------------- |
-| `feature`         | New user-visible capability                             |
-| `fix`             | Behavior correction, no new surface                     |
-| `perf`            | Same behavior, better cost                              |
+| Type              | What it is                                               |
+| ----------------- | -------------------------------------------------------- |
+| `feature`         | New user-visible capability                              |
+| `fix`             | Behavior correction, no new surface                      |
+| `perf`            | Same behavior, better cost                               |
 | `service-support` | SSH, relay, git providers, Plane/Linear, agent providers |
-| `security`        | Fixes or hardens a security surface                     |
+| `security`        | Fixes or hardens a security surface                      |
 | `ci-chore`        | CI, packaging, tooling, docs — no runtime `src/` change  |
 
 ## Step 2 — Which gates apply
@@ -56,7 +56,7 @@ grep '^+++ b/' /tmp/pr-<n>.diff | sed 's|^+++ b/||'   # changed paths
 pnpm vitest run --config config/vitest.config.ts <changed test paths>
 ```
 
-Test *significance* is not readable from a diff. To judge it, run the PR's new tests
+Test _significance_ is not readable from a diff. To judge it, run the PR's new tests
 against this repo **before** applying the PR: a test that already passes on unmodified
 code proves nothing. This requires the local branch from Step 7, so Q1 has two parts —
 "tests are present" is checkable now, "tests are significant" is checkable only after
@@ -190,18 +190,18 @@ change that only holds for one of those is not adoptable as-is.
 
 Exactly one of three. Record it in the tracking issue for the PR.
 
-| Outcome                 | When                                                                                                                        | Action                                                                                                                                                             |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Adopt**               | Every applicable gate is `yes`.                                                                                              | Proceed to Step 7.                                                                                                                                                  |
-| **Adopt with rework**   | The change is correct for the class of bug, but one or more gates fail on things the lab can fix locally — missing tests, a loose type, a Windows branch that is not escaped, an unbounded cleanup window. | Proceed to Step 7, then land the rework as a separate commit on the same adoption branch. The rework is part of the adoption, not a follow-up. Re-run Step 3 Q5 after it. |
-| **Reject**              | A security gate fails on the design rather than the implementation; the change only holds on one platform or one workspace shape; the diff is too broad to review; or the answer to any gate stays unknown. | Do not adopt. Record which gate failed and why, so the same PR is not re-triaged from scratch when upstream revises it.                                              |
+| Outcome               | When                                                                                                                                                                                                        | Action                                                                                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Adopt**             | Every applicable gate is `yes`.                                                                                                                                                                             | Proceed to Step 7.                                                                                                                                                        |
+| **Adopt with rework** | The change is correct for the class of bug, but one or more gates fail on things the lab can fix locally — missing tests, a loose type, a Windows branch that is not escaped, an unbounded cleanup window.  | Proceed to Step 7, then land the rework as a separate commit on the same adoption branch. The rework is part of the adoption, not a follow-up. Re-run Step 3 Q5 after it. |
+| **Reject**            | A security gate fails on the design rather than the implementation; the change only holds on one platform or one workspace shape; the diff is too broad to review; or the answer to any gate stays unknown. | Do not adopt. Record which gate failed and why, so the same PR is not re-triaged from scratch when upstream revises it.                                                   |
 
 **Who decides.** Steps 1–5 are mechanical and any reviewer can run them. The choice
-between *adopt with rework* and *reject* is the lab maintainer's, and so is any decision
+between _adopt with rework_ and _reject_ is the lab maintainer's, and so is any decision
 to adopt a PR partially (cherry-picking a subset of its files). Ambiguity is not
 resolved by the reviewer running the gates — it is escalated.
 
-**Partial adoption** is a form of *adopt with rework*: take the files that pass, drop
+**Partial adoption** is a form of _adopt with rework_: take the files that pass, drop
 the rest, and note in the tracking issue exactly what was left behind, so the next
 upstream sync does not silently pull it in.
 
@@ -215,6 +215,23 @@ git merge --squash FETCH_HEAD
 
 Resolve conflicts in favor of the lab's version where the two diverge intentionally.
 Then run Step 3 Q5 in full, plus the Q1 significance check the diff could not answer.
+
+### Paths the lab removed
+
+The lab ships English and Spanish only (ORCA-596). Upstream keeps editing the Chinese, Japanese and
+Korean catalogs, the game's `zh`/`ja`/`ko` word lists and their localization scripts and tests, so
+any merge of upstream work (an adoption here, or an upstream sync) stops on modify/delete conflicts
+for them. Resolve those as deleted, then handle the rest by hand:
+
+```sh
+pnpm run sync:resolve-removed-locales
+```
+
+It acts only mid-merge and only on the exact paths in `REMOVED_LOCALE_PATHS`
+(`config/scripts/resolve-removed-locale-paths.mjs`); every other conflict, other fork deletions
+included, stays unmerged. A strings change upstream made in those catalogs is not lost to the lab:
+if it adds English keys, they arrive through `en.json`, and the localization gate asks for their
+Spanish. `pnpm run verify:localization-catalog` fails if a dropped catalog comes back.
 Push to `fabolivark`, integrate into `main` on `ab2webco`, and release only after the
 gates are green on the merged result — not only on the adoption branch.
 

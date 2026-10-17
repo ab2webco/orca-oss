@@ -8,8 +8,7 @@ import {
   type OrchestratorGameBuiltInScene,
   type OrchestratorGameConfig,
   type OrchestratorGameLayer,
-  type OrchestratorGameMode,
-  type OrchestratorGameSource
+  type OrchestratorGameMode
 } from '../../../../shared/orchestrator-game-config'
 import {
   withOrchestratorGameField,
@@ -44,15 +43,25 @@ import {
   SettingsSwitchRow
 } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
+import {
+  orchestratorGameInheritLabel,
+  orchestratorGameModeLabels as modeLabels,
+  orchestratorGameSourceLabel as sourceLabel
+} from './orchestrator-game-setting-labels'
+import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
+import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
+import {
+  OrchestratorGameOpenLinksRow,
+  orchestratorGameOpenLinksLabels
+} from './OrchestratorGameOpenLinksSetting'
+import {
+  OrchestratorGameLookRows,
+  orchestratorGameRenderLabels
+} from './OrchestratorGameRenderSetting'
+import { OrchestratorGameScenesSkillCard } from './OrchestratorGameScenesSkillCard'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
-
-const modeLabels = (): Record<OrchestratorGameMode, string> => ({
-  on: translate('auto.components.settings.OrchestratorGameSetting.on', 'On'),
-  zen: translate('auto.components.settings.OrchestratorGameSetting.zen', 'Zen'),
-  off: translate('auto.components.settings.OrchestratorGameSetting.off', 'Off')
-})
 
 const toggles = (): { key: ToggleKey; label: string; description: string }[] => [
   {
@@ -164,7 +173,7 @@ export function OrchestratorGameSetting({
             />
           }
         />
-        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
+        <OrchestratorGameScenePreview config={config} />
         {toggles().map((toggle) => (
           <SettingsSwitchRow
             key={toggle.key}
@@ -175,24 +184,23 @@ export function OrchestratorGameSetting({
             onChange={() => set(toggle.key, !config[toggle.key])}
           />
         ))}
+        <OrchestratorGameOpenLinksRow
+          value={config.openLinks}
+          disabled={config.mode === 'off'}
+          onChange={(next) => set('openLinks', next)}
+        />
+        <OrchestratorGameLookRows
+          layer={layer}
+          disabled={config.mode === 'off'}
+          onChange={(key, value) =>
+            updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
+          }
+        />
       </SearchableSetting>
+      <OrchestratorGameScenesSkillCard />
     </section>
   )
 }
-
-const sourceLabel = (source: OrchestratorGameSource): string =>
-  ({
-    default: translate('auto.components.settings.OrchestratorGameSetting.sourceDefault', 'default'),
-    global: translate(
-      'auto.components.settings.OrchestratorGameSetting.sourceGlobal',
-      'global setting'
-    ),
-    project: translate(
-      'auto.components.settings.OrchestratorGameSetting.sourceProject',
-      'from orca.yaml'
-    ),
-    local: translate('auto.components.settings.OrchestratorGameSetting.sourceLocal', 'this machine')
-  })[source]
 
 type FieldValue = OrchestratorGameMode | 'true' | 'false'
 
@@ -267,7 +275,7 @@ export function ProjectOrchestratorGameSetting({
       )
     })
   const labels = modeLabels()
-  const inherit = translate('auto.components.settings.OrchestratorGameSetting.inherit', 'Inherit')
+  const inherit = orchestratorGameInheritLabel()
   const onOff = (value: boolean): string => (value ? labels.on : labels.off)
   const effective = (key: keyof OrchestratorGameConfig, text: string): string =>
     `${text} · ${sourceLabel(sources[key])}`
@@ -337,6 +345,19 @@ export function ProjectOrchestratorGameSetting({
             }
           />
         ))}
+        <OrchestratorGameOpenLinksRow
+          value={local?.openLinks ?? 'inherit'}
+          effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
+          onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
+        />
+        <OrchestratorGameLookRows
+          layer={local}
+          effective={{
+            render: effective('render', orchestratorGameRenderLabels()[config.render]),
+            timezone: effective('timezone', config.timezone)
+          }}
+          onChange={set}
+        />
         <SettingsRow
           label={sceneTitle()}
           description={effective('scene', sceneFile ?? config.scene)}
@@ -369,10 +390,19 @@ export function ProjectOrchestratorGameSetting({
         ) : (
           <OrchestratorGameSceneFileStatus read={file.state} />
         )}
-        <OrchestratorGameScenePreview
-          scene={config.scene}
-          mode={config.mode}
-          fileScene={file.state}
+        <OrchestratorGameScenePreview config={config} fileScene={file.state} />
+        <ProjectOrchestratorGameLeadSetting
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
+        />
+        <ProjectOrchestratorGameActionsSetting
+          key={repoId}
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
         />
       </div>
     </SearchableSetting>

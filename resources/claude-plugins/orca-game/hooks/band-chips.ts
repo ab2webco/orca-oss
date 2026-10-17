@@ -14,11 +14,19 @@ import {
   teammatesOf,
   workItemTextOf
 } from './fleet-labels'
-import { gameStrings } from './game-strings'
+import { gameStrings, localizedNameOf } from './game-strings'
+import { listActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
+import type { SceneDefinition } from './scenes/index'
 
 /** A link chip opens `href` when it has one and is drawn in `color`, else the scene's parchment. */
-export type BandChip = Chip & { isLink?: boolean; href?: string; color?: string }
+export type BandChip = Chip & {
+  isLink?: boolean
+  href?: string
+  color?: string
+  /** Pressing it runs this action instead of opening `href`. */
+  actionId?: string
+}
 
 export type Counts = { working: number; idle: number; done: number; waiting: number }
 
@@ -57,6 +65,16 @@ const projectChipOf = (
   ...(color === undefined ? {} : { color })
 })
 
+// Why no href with an action: the project asked for the list through the lead, not a URL.
+const withListAction = (state: GameState, list: 'todo' | 'reviews', chip: BandChip): BandChip => {
+  const action = listActionOf(state, list)
+  if (action === undefined) {
+    return chip
+  }
+  const { href: _href, ...rest } = chip
+  return { ...rest, actionId: action.id }
+}
+
 // Open PRs drawn one by one before the band falls back to a count.
 const BAND_PRS_MAX = 3
 
@@ -81,20 +99,46 @@ const projectChipsOf = (state: GameState): BandChip[] => {
     })
   )
   const needsCount = reviews !== null && (reviews.total === 0 || reviews.total > shown)
+  const inQa = todo?.groups?.review ?? 0
+  const qaChips: BandChip[] =
+    todo === null || inQa === 0
+      ? []
+      : [
+          {
+            key: 'band-qa',
+            priority: 4,
+            labels: [`✓ ${text.qa(inQa)}`, `✓ ${inQa}`],
+            ...(todo.url === null ? {} : { href: todo.url }),
+            color: 'green'
+          }
+        ]
   return [
     ...prChips,
     ...(needsCount
       ? [
-          projectChipOf(
-            'band-reviews',
-            '⇄',
-            text.myReviews(reviewKindOf(reviews), reviews.total),
-            reviews,
-            tone === undefined ? undefined : TONE_COLORS[tone]
+          withListAction(
+            state,
+            'reviews',
+            projectChipOf(
+              'band-reviews',
+              '⇄',
+              text.myReviews(reviewKindOf(reviews), reviews.total),
+              reviews,
+              tone === undefined ? undefined : TONE_COLORS[tone]
+            )
           )
         ]
       : []),
-    ...(todo === null ? [] : [projectChipOf('band-todo', '☐', text.todo(todo.total), todo)])
+    ...(todo === null
+      ? []
+      : [
+          withListAction(
+            state,
+            'todo',
+            projectChipOf('band-todo', '☐', text.todo(todo.total), todo)
+          )
+        ]),
+    ...qaChips
   ]
 }
 
@@ -191,12 +235,19 @@ export const stateChipsOf = (
   return chips
 }
 
-/** Panel, Refresh and Pet Clawd; the last two keep only their icon when the band is narrow. */
-export const menuChipsOf = (): Chip[] => {
+/** What Pet says: the scene pet's name when it has one, else plain Pet (Clawd, the hero). */
+export const petLabelOf = (scene: SceneDefinition): string => {
+  const text = gameStrings().text
+  const name = scene.cast?.pet?.name
+  return `♥ ${name === undefined ? text.pet : text.petNamed(localizedNameOf(name))}`
+}
+
+/** Panel, Refresh and Pet; the last two keep only their icon when the band is narrow. */
+export const menuChipsOf = (scene: SceneDefinition): Chip[] => {
   const text = gameStrings().text
   return [
     { key: 'band-panel', priority: 0, labels: [`▤ ${text.panel}`, '▤'] },
     { key: 'band-refresh', priority: 1, labels: [`↻ ${text.refresh}`, '↻'] },
-    { key: 'band-pet', priority: 2, labels: [`♥ ${text.petClawd}`, '♥'] }
+    { key: 'band-pet', priority: 2, labels: [petLabelOf(scene), '♥'] }
   ]
 }

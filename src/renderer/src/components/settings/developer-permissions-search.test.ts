@@ -8,10 +8,7 @@ import { matchesSettingsSearch } from './settings-search'
 // toggle (SecurityPrivacyExtension.appex Localizable.loctable, key LOCAL_NETWORK).
 const MACOS_LOCAL_NETWORK_LABEL = {
   en: 'local network',
-  es: 'red local',
-  ja: 'ローカルネットワーク',
-  ko: '로컬 네트워크',
-  zh: '本地网络'
+  es: 'red local'
 } as const
 
 function getLanEntry() {
@@ -50,14 +47,12 @@ describe('developer permissions LAN search', () => {
   })
 
   it('keeps the localized LAN wording findable', async () => {
-    expect(await searchInLocale('zh', '局域网')).toBe(true)
-    expect(await searchInLocale('ja', 'LAN')).toBe(true)
-    expect(await searchInLocale('ko', 'LAN')).toBe(true)
     expect(await searchInLocale('es', 'LAN')).toBe(true)
+    expect(await searchInLocale('es', 'red local')).toBe(true)
   })
 
-  it('indexes both wordings as distinct Chinese keywords', async () => {
-    await i18n.changeLanguage('zh')
-    expect(getLanEntry().keywords).toEqual(expect.arrayContaining(['局域网', '本地网络']))
+  it('indexes both wordings as distinct Spanish keywords', async () => {
+    await i18n.changeLanguage('es')
+    expect(getLanEntry().keywords).toEqual(expect.arrayContaining(['LAN', 'red local']))
   })
 })

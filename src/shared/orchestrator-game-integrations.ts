@@ -76,11 +76,11 @@ function templateProblem(
   return /[{}]/.test(bare) || !isHttpUrl(bare) ? 'must be an http(s) URL with a literal host' : null
 }
 
-function parseList<T>(
+export function parseGameList<T>(
   raw: unknown,
   key: string,
   max: number,
-  parseOne: (entry: unknown, at: string) => T | string
+  parseOne: (entry: unknown, at: string, index: number) => T | string
 ): Parsed<T> {
   if (raw === undefined || raw === null) {
     return { value: undefined, warnings: [] }
@@ -91,7 +91,7 @@ function parseList<T>(
   const value: T[] = []
   const warnings: string[] = []
   raw.slice(0, max).forEach((entry, index) => {
-    const parsed = parseOne(entry, `orchestratorGame.${key}[${index}]`)
+    const parsed = parseOne(entry, `orchestratorGame.${key}[${index}]`, index)
     if (typeof parsed === 'string') {
       warnings.push(parsed)
     } else {
@@ -162,11 +162,11 @@ function parseActivityRule(entry: unknown, at: string): OrchestratorGameActivity
 }
 
 export function parseGameLinkTemplates(raw: unknown): Parsed<OrchestratorGameLinkTemplate> {
-  return parseList(raw, 'links', GAME_LINKS_MAX, parseLink)
+  return parseGameList(raw, 'links', GAME_LINKS_MAX, parseLink)
 }
 
 export function parseGameActivityRules(raw: unknown): Parsed<OrchestratorGameActivityRule> {
-  return parseList(raw, 'activity', GAME_ACTIVITY_RULES_MAX, parseActivityRule)
+  return parseGameList(raw, 'activity', GAME_ACTIVITY_RULES_MAX, parseActivityRule)
 }
 
 export const toolGlobPattern = (glob: string): RegExp =>

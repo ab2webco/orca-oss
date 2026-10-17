@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
 
-const LOCALES = ['es', 'ja', 'ko', 'zh']
+const LOCALES = ['es']
 const KEYS = [
   'auto.hooks.useMacosTccPromptNotice.title',
   'auto.hooks.useMacosTccPromptNotice.description',
@@ -39,12 +39,9 @@ describe('macOS TCC prompt localization', () => {
     }
   })
 
-  it('uses the macOS Full Disk Access labels in Korean and Chinese', () => {
+  it('uses the macOS Full Disk Access label in Spanish', () => {
     expect(
-      getValue(readCatalog('ko'), 'auto.components.settings.DeveloperPermissionsPane.c566bca278')
-    ).toBe('전체 디스크 접근 권한')
-    expect(
-      getValue(readCatalog('zh'), 'auto.components.settings.DeveloperPermissionsPane.c566bca278')
-    ).toBe('完全磁盘访问权限')
+      getValue(readCatalog('es'), 'auto.components.settings.DeveloperPermissionsPane.c566bca278')
+    ).toBe('Acceso total al disco')
   })
 })

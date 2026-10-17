@@ -1,15 +1,24 @@
 import { actionPixel } from './action-props'
 import { gameStrings, localizedNameOf } from './game-strings'
-import { cellsOf, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
+import { cellsOf, glyphCell, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import { farPixel, GROUND, nearTopOf, plantPixel, sunPixel } from './scenery'
+import {
+  advisorPixel,
+  advisorStageOf,
+  castPixel,
+  castWidthOf,
+  petColumnOf,
+  petFrameOf,
+  type AdvisorPose
+} from './scene-cast'
 import type { Costume, Look, SceneDefinition } from './scenes/index'
+import { CLAWD_TOP, restColumnOf, SPRITE_WIDTH, walkColumn } from './walk-path'
 
 export const SCENE_ROWS = 5
 export const SCENE_TICK_MS = 120
 export const SCENE_KEY = 'orca-game-scene'
-export const CLAWD_TOP = 2
-export const SPRITE_WIDTH = 10
+export { CLAWD_TOP, restColumnOf, SPRITE_WIDTH, walkColumn }
 const MAX_COLUMNS = 512
 const MARGIN = 2
 const STAR = 0xf5f3c8
@@ -18,17 +27,10 @@ const BUBBLE_TEXT = 0x23232b
 const HEART = 0xff5a8a
 const FINALE_TEXT = 0xffffff
 const FINALE_PANEL = 0x1a1a24
+const ADVISOR_BUBBLE_MAX = 28
 
 export const sceneColumnsOf = (viewport: number | undefined): number =>
   Math.max(1, Math.min(MAX_COLUMNS, (viewport ?? 80) - MARGIN))
-
-export const walkColumn = (width: number, tick: number): number => {
-  const span = Math.max(1, width - 10)
-  const step = Math.floor(tick / 2) % (span * 2)
-  return step < span ? step : span * 2 - step
-}
-
-export const restColumnOf = (width: number): number => Math.max(0, Math.floor((width - 10) / 3))
 
 const clawdPixel = (
   costume: Costume,
@@ -64,21 +66,14 @@ const skyPixel = (look: Look, width: number, x: number, y: number, tick: number)
   return mix(look.skyTop, look.skyBottom, y / (GROUND - 1))
 }
 
-export const pixelOf = (
+const landscapePixel = (
   look: Look,
-  costume: Costume,
   width: number,
   x: number,
   y: number,
   tick: number,
-  lift = 0,
-  isResting = false
+  isResting: boolean
 ): number => {
-  const at = isResting ? restColumnOf(width) : walkColumn(width, tick)
-  const clawd = clawdPixel(costume, x, y + lift, tick, at, isResting)
-  if (clawd !== undefined) {
-    return clawd
-  }
   const scroll = isResting ? 0 : tick
   if (y === GROUND) {
     return hash(x + scroll, 7) % 9 === 0 ? mix(look.ground, 0x000000, 0.25) : look.ground
@@ -95,13 +90,23 @@ export const pixelOf = (
   )
 }
 
+export const paintBubble = (grid: number[][], left: number, text: string): void => {
+  const right = left + text.length + 1
+  const skyAt = (x: number) => grid[x]?.[1] ?? 0
+  grid[left] = [0x2590, BUBBLE, skyAt(left)]
+  Array.from(text).forEach((glyph, index) => {
+    grid[left + 1 + index] = glyphCell(glyph, BUBBLE_TEXT, BUBBLE)
+  })
+  grid[right] = [0x258c, BUBBLE, skyAt(right)]
+}
+
 const DOTS = ['.  ', '.. ', '...'] as const
 
 export const REACTION_TICKS = 24
 
 export type Reaction = { kind: 'pet' | 'hello' | 'level'; age: number }
 
-const reactionSaysOf = (kind: Reaction['kind']): string => {
+export const reactionSaysOf = (kind: Reaction['kind']): string => {
   const art = gameStrings().art
   return kind === 'pet' ? art.thanks : kind === 'hello' ? art.onIt : art.levelUp
 }
@@ -134,11 +139,11 @@ const sprinkle = (
   span: number,
   glyph: number,
   color: number,
-  bubble: { left: number; width: number }
+  isFree: (x: number) => boolean
 ) => {
   for (const offset of offsets) {
     const x = from + (offset % span)
-    if (x < bubble.left || x >= bubble.left + bubble.width) {
+    if (isFree(x)) {
       grid[x] = [glyph, color, grid[x]?.[1] ?? 0]
     }
   }
@@ -153,40 +158,59 @@ export const sceneGridOf = (
   since = -Infinity,
   reaction?: Reaction,
   isResting = false,
-  action?: Action
+  action?: Action,
+  advisor?: AdvisorPose
 ): number[][] => {
   const reacting = isReacting(reaction)
   const resting = isResting && !reacting
-  const lift = reacting && reaction.age % 6 < 3 ? 1 : 0
+  const hop = reacting && reaction.age % 6 < 3 ? 1 : 0
+  const pet = scene.cast?.pet
+  // A scene with a pet hearts the pet; without one, its hero is Clawd and gets petted.
+  const isPetted = reacting && reaction.kind === 'pet' && pet !== undefined
   const look = scene.looks[phase ?? 'working']
   const costume = scene.costumes[phase ?? 'working']
   const grid: number[][] = []
-  const walk = resting ? restColumnOf(columns) : walkColumn(columns, tick)
+  // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
+  const stage = advisorStageOf(columns, advisor)
+  const walk = resting ? restColumnOf(stage) : walkColumn(stage, tick)
   const shown = resting ? undefined : action
+  const petAt = pet === undefined ? 0 : petColumnOf(pet, stage, tick, resting)
+  const petFrame = pet === undefined ? undefined : petFrameOf(pet, tick, resting, isPetted)
   const at = (x: number, y: number) =>
     actionPixel(shown, x - walk - SPRITE_WIDTH, y, tick) ??
-    pixelOf(look, costume, columns, x, y, tick, lift, resting)
+    clawdPixel(costume, x, y + (isPetted ? 0 : hop), tick, walk, resting) ??
+    (pet === undefined || petFrame === undefined
+      ? undefined
+      : castPixel(petFrame, pet.colors, x, y, petAt, isPetted ? hop : 0)) ??
+    (advisor === undefined ? undefined : advisorPixel(advisor, columns, x, y, tick)) ??
+    landscapePixel(look, columns, x, y, tick, resting)
   for (let row = 0; row < SCENE_ROWS; row += 1) {
     for (let x = 0; x < columns; x += 1) {
       grid.push([UPPER_HALF, at(x, row * 2), at(x, row * 2 + 1)])
     }
   }
+  // Who speaks: the pet while it is petted, else the hero.
+  const speaker = isPetted
+    ? { at: petAt, width: castWidthOf(petFrame) }
+    : { at: walk, width: SPRITE_WIDTH }
   const said = reacting ? reactionSaysOf(reaction.kind) : resting ? snoreOf(tick) : caption
   const typedSince = reacting ? tick - reaction.age : resting ? -Infinity : since
-  const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, columns - 8))} `
+  const advisorText = advisorSaysOf(advisor, tick, columns)
+  // The hero's bubble ends where the advisor's begins.
+  const limit = advisorText === '' ? columns : columns - advisorText.length - 2
+  const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, Math.min(columns - 8, limit - 4)))} `
   const width = text.length + 2
-  const left = Math.max(0, Math.min(columns - width, walk + 9))
-  const skyAt = (x: number) => grid[x]?.[1] ?? 0
-  grid[left] = [0x2590, BUBBLE, skyAt(left)]
-  Array.from(text).forEach((glyph, index) => {
-    grid[left + 1 + index] = [glyph.codePointAt(0) ?? 0x20, BUBBLE_TEXT, BUBBLE]
-  })
-  grid[left + width - 1] = [0x258c, BUBBLE, skyAt(left + width - 1)]
-  const puff = walk + SPRITE_WIDTH
+  const left = Math.max(0, Math.min(limit - width, speaker.at + speaker.width - 1))
+  paintBubble(grid, left, text)
+  if (advisorText !== '') {
+    paintBubble(grid, limit, advisorText)
+  }
+  const puff = speaker.at + speaker.width
   if (puff < columns && puff < left + 1 && Math.floor(tick / 6) % 2 === 0) {
     grid[columns + puff] = [UPPER_HALF, BUBBLE, grid[columns + puff]?.[2] ?? 0]
   }
-  const bubble = { left, width }
+  // Hearts and stars land on neither bubble, nor past the scene's edge.
+  const isFree = (x: number) => (x < left || x >= left + width) && x < limit
   if (reacting && reaction.kind === 'level') {
     sprinkle(
       grid,
@@ -195,18 +219,18 @@ export const sceneGridOf = (
       10,
       0x2605,
       0xffd84a,
-      bubble
+      isFree
     )
   }
   if (reacting && reaction.kind === 'pet') {
     sprinkle(
       grid,
       [1, 5].map((o) => o + reaction.age),
-      walk,
-      9,
+      speaker.at,
+      Math.max(1, speaker.width - 1),
       0x2665,
       HEART,
-      bubble
+      isFree
     )
   }
   if (shown === 'merge' && scene.finale !== undefined) {
@@ -215,15 +239,33 @@ export const sceneGridOf = (
   return grid
 }
 
+// The advisor's words type in from the moment its gesture starts, cut to half the scene at most.
+export const advisorSaysOf = (
+  advisor: AdvisorPose | undefined,
+  tick: number,
+  columns: number
+): string => {
+  if (advisor === undefined || advisor.bubble === '') {
+    return ''
+  }
+  const room = Math.max(1, Math.min(ADVISOR_BUBBLE_MAX, Math.floor(columns / 2) - 4))
+  return ` ${bubbleTextOf(advisor.bubble, tick, tick - advisor.age, room)} `
+}
+
 // Bottom-right of the ground row, as PR #32 draws it, while a merge runs.
-const paintFinale = (grid: number[][], columns: number, finale: string): void => {
+export const paintFinale = (
+  grid: number[][],
+  columns: number,
+  finale: string,
+  rows = SCENE_ROWS
+): void => {
   const glyphs = Array.from(` ${finale} `)
   if (glyphs.length >= columns) {
     return
   }
-  const from = (SCENE_ROWS - 1) * columns + columns - glyphs.length - 1
+  const from = (rows - 1) * columns + columns - glyphs.length - 1
   glyphs.forEach((glyph, index) => {
-    grid[from + index] = [glyph.codePointAt(0) ?? 0x20, FINALE_TEXT, FINALE_PANEL]
+    grid[from + index] = glyphCell(glyph, FINALE_TEXT, FINALE_PANEL)
   })
 }
 

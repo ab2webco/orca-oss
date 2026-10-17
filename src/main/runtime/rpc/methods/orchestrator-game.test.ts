@@ -26,6 +26,30 @@ describe('game.state RPC', () => {
     expect(calls).toEqual([{ worktreeId: 'wt1', terminalHandle: 'h1', paneKey: 'tab:leaf' }])
   })
 
+  it("passes a member pane's Jev report on as it came, never refusing the state over it", async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getOrchestratorGameState: async (args: unknown) => {
+        calls.push(args)
+        return { config: { mode: 'on' } }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const advisor = { version: 9, model: ['a newer shape'] }
+
+    await expect(
+      dispatcher.dispatch(request({ paneKey: 'tab:member', advisor }))
+    ).resolves.toMatchObject({ ok: true })
+    await expect(
+      dispatcher.dispatch(request({ paneKey: 'tab:member', advisor: null }))
+    ).resolves.toMatchObject({ ok: true })
+    expect(calls).toEqual([
+      { paneKey: 'tab:member', advisor },
+      { paneKey: 'tab:member', advisor: null }
+    ])
+  })
+
   it('rejects a non-string worktree id', async () => {
     const runtime = { getRuntimeId: () => 'runtime' } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
@@ -33,5 +57,89 @@ describe('game.state RPC', () => {
     await expect(dispatcher.dispatch(request({ worktreeId: 4 }))).resolves.toMatchObject({
       ok: false
     })
+  })
+
+  it('opens a game link in the system browser through the runtime, http(s) only', async () => {
+    const opened: string[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      openGameLinkInSystemBrowser: async (url: string) => {
+        opened.push(url)
+        return { opened: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const open = (url: unknown) =>
+      dispatcher.dispatch({ id: 'o', authToken: 'test', method: 'game.openLink', params: { url } })
+
+    await expect(open('https://github.com/o/r/pulls')).resolves.toMatchObject({
+      ok: true,
+      result: { opened: true }
+    })
+    await expect(open('file:///etc/passwd')).resolves.toMatchObject({ ok: false })
+    await expect(open('javascript:alert(1)')).resolves.toMatchObject({ ok: false })
+    expect(opened).toEqual(['https://github.com/o/r/pulls'])
+  })
+
+  it('records a freed member for the caller project, refusing a malformed record', async () => {
+    const recorded: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      recordGameHistory: async (args: unknown) => {
+        recorded.push(args)
+        return { recorded: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const record = {
+      ticket: 'CIN-1',
+      repo: null,
+      branch: 'cin-1',
+      agent: 'claude',
+      account: null,
+      launchedAt: null,
+      endedAt: '2026-10-16T10:00:00.000Z',
+      outcome: 'merged',
+      pr: '#41 merged',
+      lastReport: null
+    }
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'h', authToken: 'test', method: 'game.historyRecord', params })
+
+    await expect(
+      send({ worktreeId: 'wt1', memberWorktreeId: 'wt-cin-1', record })
+    ).resolves.toMatchObject({ ok: true, result: { recorded: true } })
+    await expect(
+      send({ worktreeId: 'wt1', record: { ...record, outcome: 'won' } })
+    ).resolves.toMatchObject({
+      ok: false
+    })
+    expect(recorded).toEqual([
+      { worktreeId: 'wt1', terminalHandle: undefined, memberWorktreeId: 'wt-cin-1', record }
+    ])
+  })
+
+  it("lists the caller project's history with its filters", async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      listGameHistory: async (args: unknown) => {
+        asked.push(args)
+        return { records: [] }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await expect(
+      dispatcher.dispatch({
+        id: 'l',
+        authToken: 'test',
+        method: 'game.history',
+        params: { terminalHandle: 'h1', ticket: 'CIN-1', since: '2026-10-01' }
+      })
+    ).resolves.toMatchObject({ ok: true, result: { records: [] } })
+    expect(asked).toEqual([
+      { worktreeId: undefined, terminalHandle: 'h1', ticket: 'CIN-1', since: '2026-10-01' }
+    ])
   })
 })

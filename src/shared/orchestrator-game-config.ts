@@ -1,3 +1,10 @@
+import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
+import {
+  parseGameLead,
+  resolveGameLead,
+  type OrchestratorGameLead,
+  type OrchestratorGameLeadLayer
+} from './orchestrator-game-lead'
 import {
   parseGameActivityRules,
   parseGameLinkTemplates,
@@ -5,9 +12,17 @@ import {
   type OrchestratorGameLinkTemplate
 } from './orchestrator-game-integrations'
 import {
+  parseGameReviewsSource,
   parseGameTodoSource,
+  type OrchestratorGameReviewsSource,
   type OrchestratorGameTodoSource
 } from './orchestrator-game-project-work'
+import {
+  isLookKey,
+  lookFieldOf,
+  ORCHESTRATOR_GAME_LOCAL_TIMEZONE,
+  type OrchestratorGameRender
+} from './orchestrator-game-render'
 import {
   orchestratorGameSceneFileErrorText,
   orchestratorGameSceneFileId,
@@ -18,25 +33,41 @@ export type OrchestratorGameMode = 'on' | 'zen' | 'off'
 
 export const ORCHESTRATOR_GAME_MODES: readonly OrchestratorGameMode[] = ['on', 'zen', 'off']
 
+/** Where the game's links open: Orca's own browser, or the system's where the person is signed in. */
+export type OrchestratorGameOpenLinks = 'orca' | 'system'
+
+export const ORCHESTRATOR_GAME_OPEN_LINKS: readonly OrchestratorGameOpenLinks[] = ['orca', 'system']
+
 export type OrchestratorGameConfig = {
   mode: OrchestratorGameMode
   scene: string
   hud: boolean
   rewards: boolean
   tracker: boolean
+  openLinks: OrchestratorGameOpenLinks
+  render: OrchestratorGameRender
+  /** An IANA zone for the hd scene's day and night, or `local` for the machine's clock. */
+  timezone: string
 }
 
 /** Lists that a later layer replaces whole; kept out of the config so Settings and the env stay scalar. */
 export type OrchestratorGameIntegrations = {
   links: OrchestratorGameLinkTemplate[]
   activity: OrchestratorGameActivityRule[]
+  /** Project buttons that send the lead a prompt or run an MCP tool. */
+  actions: OrchestratorGameAction[]
   /** Where the band's To Do comes from; null picks it from the repo and its linked work item. */
   todo: OrchestratorGameTodoSource | null
+  /** What the PR list's link does; a later layer replaces it whole. */
+  reviews: OrchestratorGameReviewsSource
 }
 
 export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
-  Partial<Omit<OrchestratorGameIntegrations, 'todo'>> & {
+  Partial<Omit<OrchestratorGameIntegrations, 'todo' | 'reviews'>> & {
+    reviews?: OrchestratorGameReviewsSource
     todo?: OrchestratorGameTodoSource
+    /** How the lead orchestrates; merged key by key across layers. */
+    orchestrator?: OrchestratorGameLeadLayer
     /** A scene JSON relative to the worktree root; read only from the project layers. */
     sceneFile?: string
   }
@@ -61,7 +92,10 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   scene: 'quest',
   hud: true,
   rewards: true,
-  tracker: true
+  tracker: true,
+  openLinks: 'orca',
+  render: 'classic',
+  timezone: ORCHESTRATOR_GAME_LOCAL_TIMEZONE
 }
 
 const KEYS = Object.keys(DEFAULT_ORCHESTRATOR_GAME_CONFIG) as (keyof OrchestratorGameConfig)[]
@@ -89,10 +123,19 @@ export function resolveOrchestratorGameConfig(
       continue
     }
     for (const key of KEYS) {
-      if (layer[key] !== undefined) {
-        Object.assign(config, { [key]: layer[key] })
-        sources[key] = source
+      if (layer[key] === undefined) {
+        continue
       }
+      // Why: a hand-edited Settings value is not parsed on the way in, so it is checked here.
+      const checked = isLookKey(key)
+        ? lookFieldOf(key, layer[key])
+        : { value: layer[key], warning: undefined }
+      if (checked.warning !== undefined) {
+        warnings.push(checked.warning)
+        continue
+      }
+      Object.assign(config, { [key]: checked.value })
+      sources[key] = source
     }
     if (layer.scene !== undefined) {
       sceneFile = null
@@ -125,7 +168,13 @@ export function resolveOrchestratorGameConfig(
 export function resolveOrchestratorGameIntegrations(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
 ): OrchestratorGameIntegrations {
-  const resolved: OrchestratorGameIntegrations = { links: [], activity: [], todo: null }
+  const resolved: OrchestratorGameIntegrations = {
+    links: [],
+    activity: [],
+    actions: [],
+    todo: null,
+    reviews: {}
+  }
   for (const source of LAYER_ORDER) {
     const layer = layers[source]
     if (layer?.links !== undefined) {
@@ -134,12 +183,42 @@ export function resolveOrchestratorGameIntegrations(
     if (layer?.activity !== undefined) {
       resolved.activity = parseGameActivityRules(layer.activity).value ?? []
     }
+    if (layer?.actions !== undefined) {
+      resolved.actions = parseGameActions(layer.actions).value ?? []
+    }
+    if (layer?.reviews !== undefined) {
+      resolved.reviews = parseGameReviewsSource(layer.reviews).value ?? {}
+    }
     const todo = layer?.todo === undefined ? undefined : parseGameTodoSource(layer.todo).value
     if (todo !== undefined) {
       resolved.todo = todo
     }
   }
   return resolved
+}
+
+export function resolveOrchestratorGameLead(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
+): OrchestratorGameLead {
+  return resolveGameLead(LAYER_ORDER.map((source) => layers[source]?.orchestrator))
+}
+
+/** The layer a lead key's effective value comes from; 'default' when no layer sets a usable one. */
+export function gameLeadSourceOf(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>,
+  key: keyof OrchestratorGameLead
+): OrchestratorGameSource {
+  if (resolveOrchestratorGameLead(layers)[key] === undefined) {
+    return 'default'
+  }
+  let source: OrchestratorGameSource = 'default'
+  for (const name of LAYER_ORDER) {
+    const raw = layers[name]?.orchestrator
+    if (raw !== undefined && parseGameLead(raw).value?.[key] !== undefined) {
+      source = name
+    }
+  }
+  return source
 }
 
 const isMode = (value: unknown): value is OrchestratorGameMode =>
@@ -179,6 +258,19 @@ export function parseOrchestratorGameLayer(raw: unknown): {
           `orchestratorGame.sceneFile ${orchestratorGameSceneFileErrorText(parsed.error)}`
         )
       }
+    } else if (key === 'openLinks') {
+      if (value === 'orca' || value === 'system') {
+        layer.openLinks = value
+      } else {
+        warnings.push('orchestratorGame.openLinks must be orca or system')
+      }
+    } else if (isLookKey(key)) {
+      const checked = lookFieldOf(key, value)
+      if (checked.warning === undefined) {
+        Object.assign(layer, { [key]: checked.value })
+      } else {
+        warnings.push(checked.warning)
+      }
     } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {
         layer[key] = value
@@ -190,6 +282,24 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         Object.assign(layer, { [key]: parsed.value })
+      }
+    } else if (key === 'actions') {
+      const parsed = parseGameActions(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.actions = parsed.value
+      }
+    } else if (key === 'orchestrator') {
+      const parsed = parseGameLead(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.orchestrator = parsed.value
+      }
+    } else if (key === 'reviews') {
+      const parsed = parseGameReviewsSource(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value !== undefined) {
+        layer.reviews = parsed.value
       }
     } else if (key === 'todo') {
       const parsed = parseGameTodoSource(value)

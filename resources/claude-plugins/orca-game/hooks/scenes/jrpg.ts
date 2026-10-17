@@ -131,38 +131,38 @@ export const JRPG_SCENE: SceneDefinition = {
   cards: {
     working: {
       icon: '⚔',
-      name: { en: 'Mercenary', es: 'Mercenario', ja: '傭兵', ko: '용병', zh: '佣兵' },
+      name: { en: 'Mercenary', es: 'Mercenario' },
       color: '#f2d35a'
     },
     docs: {
       icon: '✦',
-      name: { en: 'Mage', es: 'Mago', ja: '魔道士', ko: '마법사', zh: '法师' },
+      name: { en: 'Mage', es: 'Mago' },
       color: '#9a7fe0'
     },
     build: {
       icon: '†',
-      name: { en: 'Thief', es: 'Ladrón', ja: '盗賊', ko: '도적', zh: '盗贼' },
+      name: { en: 'Thief', es: 'Ladrón' },
       color: '#2fa38a'
     },
     verify: {
       icon: '✚',
-      name: { en: 'Healer', es: 'Sanadora', ja: 'ヒーラー', ko: '힐러', zh: '治疗师' },
+      name: { en: 'Healer', es: 'Sanadora' },
       color: '#f2f0ea'
     },
     pr: {
       icon: '↑',
-      name: { en: 'Lancer', es: 'Lancero', ja: '槍騎士', ko: '창기사', zh: '枪骑士' },
+      name: { en: 'Lancer', es: 'Lancero' },
       color: '#5b8fd6'
     },
     handoff: {
       icon: '★',
-      name: { en: 'Hero', es: 'Héroe', ja: '勇者', ko: '용사', zh: '勇者' },
+      name: { en: 'Hero', es: 'Héroe' },
       color: '#ff7a59'
     }
   },
   teller: {
     icon: '❝',
-    name: { en: 'Chronicler', es: 'Cronista', ja: '記録者', ko: '기록자', zh: '史官' },
+    name: { en: 'Chronicler', es: 'Cronista' },
     color: '#aab4e8'
   },
   band: { gold: '#e8ecff', ink: '#1b2a8a', panel: '#0d1650', parchment: '#ffffff' },
@@ -172,5 +172,16 @@ export const JRPG_SCENE: SceneDefinition = {
     colors: { W: 0xdfe3ea, S: 0xf3dcc8, Q: 0x5fd38a, L: 0xc8ced8, K: 0x15161c }
   },
   // Why ★: PR #32 framed it with ♪, which is outside the characters a Raster is known to draw.
-  finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' }
+  finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' },
+  // Jev's advisor: a hooded oracle whose orb flickers while it reads the signs.
+  cast: {
+    advisor: {
+      name: { en: 'Oracle', es: 'Oráculo' },
+      frames: [
+        ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'OBBBBBB.', '.BBBBBB.', '.BB..BB.'],
+        ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'QBBBBBB.', '.BBBBBB.', '.BB..BB.']
+      ],
+      colors: { B: NAVY, S: FACE, E: EYES, O: 0x9fe0ff, Q: 0xe8ecff }
+    }
+  }
 }

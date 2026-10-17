@@ -10,12 +10,11 @@ vi.mock('electron', () => ({
   }
 }))
 
+import { app } from 'electron'
 import {
-  UI_LANGUAGE_CHINESE,
   UI_LANGUAGE_ENGLISH,
-  UI_LANGUAGE_JAPANESE,
-  UI_LANGUAGE_KOREAN,
-  UI_LANGUAGE_SPANISH
+  UI_LANGUAGE_SPANISH,
+  UI_LANGUAGE_SYSTEM
 } from '../../shared/ui-language'
 import {
   ensureMainI18n,
@@ -47,16 +46,14 @@ describe('main-i18n lazy locale loading', () => {
     expect(translateMain('menu.settings', 'Settings')).toBe('Ajustes')
   })
 
-  it('lazy-loads each remaining locale on demand', async () => {
-    await setMainUiLanguage(UI_LANGUAGE_JAPANESE)
-    expect(translateMain('menu.file', 'File')).not.toBe('File')
-
-    await setMainUiLanguage(UI_LANGUAGE_KOREAN)
-    expect(translateMain('menu.file', 'File')).not.toBe('File')
-
-    await setMainUiLanguage(UI_LANGUAGE_CHINESE)
-    expect(translateMain('menu.file', 'File')).not.toBe('File')
-  })
+  it.each(['zh-CN', 'ko-KR', 'ja-JP'])(
+    'serves English to a %s system, whose catalog Orca Lab no longer ships',
+    async (systemLocale) => {
+      vi.mocked(app.getLocale).mockReturnValueOnce(systemLocale)
+      expect(await setMainUiLanguage(UI_LANGUAGE_SYSTEM)).toBe('en')
+      expect(translateMain('menu.file', 'File')).toBe('File')
+    }
+  )
 
   it('uses caller English when a target catalog omits a key', async () => {
     await setMainUiLanguage(UI_LANGUAGE_SPANISH)

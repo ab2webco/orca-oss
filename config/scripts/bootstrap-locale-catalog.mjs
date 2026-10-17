@@ -15,21 +15,6 @@ const PLACEHOLDER_RE = /\{\{[^}]+\}\}/g
 const LOCALES_DIR = path.join('src', 'renderer', 'src', 'i18n', 'locales')
 
 const LOCALE_CONFIG = {
-  zh: {
-    targetLanguage: 'zh-CN',
-    displayName: 'Simplified Chinese',
-    cacheFile: '.zh-catalog-cache.json'
-  },
-  ko: {
-    targetLanguage: 'ko',
-    displayName: 'Korean',
-    cacheFile: '.ko-catalog-cache.json'
-  },
-  ja: {
-    targetLanguage: 'ja',
-    displayName: 'Japanese',
-    cacheFile: '.ja-catalog-cache.json'
-  },
   es: {
     targetLanguage: 'es',
     displayName: 'Spanish',

@@ -69,7 +69,7 @@ function triggerText(): string {
 
 describe('status-bar copy under a non-English UI language', () => {
   beforeAll(async () => {
-    await i18n.changeLanguage('ja')
+    await i18n.changeLanguage('es')
   })
 
   afterEach(() => {
@@ -81,8 +81,8 @@ describe('status-bar copy under a non-English UI language', () => {
   })
 
   it('translates both plural forms of the terminal session count', () => {
-    expect(formatTerminalSessionCount(1)).toBe('1 件のターミナルセッション')
-    expect(formatTerminalSessionCount(5)).toBe('5 件のターミナルセッション')
+    expect(formatTerminalSessionCount(1)).toBe('1 sesión de terminal')
+    expect(formatTerminalSessionCount(5)).toBe('5 sesiones de terminal')
   })
 
   it('translates every Resource Manager tooltip line', () => {
@@ -95,13 +95,13 @@ describe('status-bar copy under a non-English UI language', () => {
     ).toEqual([
       {
         id: 'summary',
-        text: 'リソースマネージャー - 512 MB - 2 件のターミナルセッション',
+        text: 'Administrador de recursos - 512 MB - 2 sesiones de terminal',
         emphasized: false
       },
-      { id: 'space-scan', text: '容量スキャンの準備完了', emphasized: true },
+      { id: 'space-scan', text: 'Escaneo de espacio listo', emphasized: true },
       {
         id: 'sessions-hint',
-        text: 'ターミナルセッションはワークスペースごとにグループ化されます。',
+        text: 'Las sesiones de terminal se agrupan por espacio de trabajo.',
         emphasized: false
       }
     ])
@@ -118,7 +118,7 @@ describe('status-bar copy under a non-English UI language', () => {
 
     const emphasized = lines.filter((line) => line.emphasized)
     expect(emphasized).toHaveLength(1)
-    expect(emphasized[0]?.text).toBe('容量スキャンの準備完了')
+    expect(emphasized[0]?.text).toBe('Escaneo de espacio listo')
     expect(emphasized[0]?.text).not.toBe('Space scan ready')
   })
 
@@ -128,19 +128,19 @@ describe('status-bar copy under a non-English UI language', () => {
     ).toEqual([
       {
         id: 'summary',
-        text: 'リソースマネージャー - メモリ情報を取得できません - 0 件のターミナルセッション',
+        text: 'Administrador de recursos - memoria no disponible - 0 sesiones de terminal',
         emphasized: false
       },
-      { id: 'sessions-hint', text: 'ターミナルセッションはまだありません。', emphasized: false }
+      { id: 'sessions-hint', text: 'Aún no hay sesiones de terminal.', emphasized: false }
     ])
   })
 
   it('translates the Resource Manager trigger label read by screen readers', () => {
     expect(getResourceManagerAriaLabel({ sessionCount: 1, spaceScanReady: true })).toBe(
-      'リソースマネージャー、1 件のターミナルセッション、容量スキャンの準備完了'
+      'Administrador de recursos, 1 sesión de terminal, Escaneo de espacio listo'
     )
     expect(getResourceManagerAriaLabel({ sessionCount: 3, spaceScanReady: false })).toBe(
-      'リソースマネージャー、3 件のターミナルセッション'
+      'Administrador de recursos, 3 sesiones de terminal'
     )
   })
 
@@ -151,21 +151,23 @@ describe('status-bar copy under a non-English UI language', () => {
     ])
     render(<SshStatusSegment compact={false} iconOnly={false} />)
 
-    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('リモートホスト接続状態')
-    expect(triggerText()).toContain('2 台のホスト')
+    expect(screen.getByRole('button').getAttribute('aria-label')).toBe(
+      'Estado de conexión del host remoto'
+    )
+    expect(triggerText()).toContain('2 hosts')
   })
 
   it('translates the singular host count', () => {
     setSshTargets([{ id: 'ssh-1', label: 'builder', status: 'connected' }])
     render(<SshStatusSegment compact={false} iconOnly={false} />)
 
-    expect(triggerText()).toContain('1 台のホスト')
+    expect(triggerText()).toContain('1 host')
   })
 
   it('translates the connecting and workspace-sync states', () => {
     setSshTargets([{ id: 'ssh-1', label: 'builder', status: 'connecting' }])
     render(<SshStatusSegment compact={false} iconOnly={false} />)
-    expect(triggerText()).toContain('接続中…')
+    expect(triggerText()).toContain('Conectando…')
     cleanup()
 
     setSshTargets([
@@ -173,11 +175,11 @@ describe('status-bar copy under a non-English UI language', () => {
       { id: 'ssh-2', label: 'openclaw', status: 'connected', syncPhase: 'error' }
     ])
     render(<SshStatusSegment compact={false} iconOnly={false} />)
-    expect(triggerText()).toContain('ワークスペースの競合')
+    expect(triggerText()).toContain('Conflicto del espacio de trabajo')
     cleanup()
 
     setSshTargets([{ id: 'ssh-1', label: 'builder', status: 'connected', syncPhase: 'error' }])
     render(<SshStatusSegment compact={false} iconOnly={false} />)
-    expect(triggerText()).toContain('ワークスペースの同期エラー')
+    expect(triggerText()).toContain('Error de sincronización del espacio de trabajo')
   })
 })

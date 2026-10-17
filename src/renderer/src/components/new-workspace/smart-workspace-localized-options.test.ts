@@ -19,16 +19,16 @@ describe('smart-workspace-localized-options', () => {
       'Name'
     ])
 
-    await i18n.changeLanguage('zh')
+    await i18n.changeLanguage('es')
 
     expect(getSmartWorkspaceNameModes().map((mode) => mode.label)).toEqual([
-      '智能',
+      'Inteligente',
       'GitHub',
       'Linear',
       'Jira',
       'GitLab',
-      '分支',
-      '名称'
+      'Rama',
+      'Nombre'
     ])
 
     await i18n.changeLanguage('en')
@@ -52,13 +52,13 @@ describe('smart-workspace-localized-options', () => {
       'All'
     ])
 
-    await i18n.changeLanguage('zh')
+    await i18n.changeLanguage('es')
 
     expect(getMrStateFilters().map((filter) => filter.label)).toEqual([
-      '开放',
-      '合并',
-      '已关闭',
-      '全部'
+      'Abierto',
+      'Fusionado',
+      'Cerrado',
+      'Todo'
     ])
   })
 })

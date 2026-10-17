@@ -5,11 +5,16 @@ import { TAMER_SCENE } from './tamer'
 import { VIGILANTE_SCENE } from './vigilante'
 
 export type {
+  AdvisorGesture,
   Card,
+  CastFrame,
   Costume,
   HudPalette,
   Look,
+  SceneAdvisor,
+  SceneCast,
   SceneDefinition,
+  ScenePet,
   ScenePhase
 } from './scene-definition'
 

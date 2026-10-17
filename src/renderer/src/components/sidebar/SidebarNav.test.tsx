@@ -355,11 +355,11 @@ describe('SidebarNav', () => {
     expect(queryButtonByText(container, 'Orca Lab Mobile')).not.toBeNull()
 
     await act(async () => {
-      await i18n.changeLanguage('zh')
+      await i18n.changeLanguage('es')
     })
 
-    expect(queryButtonByText(container, '自动化')).not.toBeNull()
-    expect(queryButtonByText(container, 'Orca Lab 手机端')).not.toBeNull()
+    expect(queryButtonByText(container, 'Automatizaciones')).not.toBeNull()
+    expect(queryButtonByText(container, 'Orca Lab Móvil')).not.toBeNull()
   })
 
   it('updates labels when pseudo-localization is enabled after mount', async () => {

@@ -13,7 +13,13 @@ export type Need = { name: string; text: string; url: string | null }
 
 const FLOW_ORDER: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 
-export const worktreePhaseOf = (state: GameState): FlowPhase | undefined => {
+type Work = Pick<GameState, 'review' | 'workItem'>
+
+// A member in its own worktree is read by that worktree's PR and ticket, the rest by the lead's.
+const workOf = (agent: GameAgent, state: GameState): Work =>
+  agent.worktree ? { review: agent.review ?? null, workItem: agent.workItem ?? null } : state
+
+export const worktreePhaseOf = (state: Work): FlowPhase | undefined => {
   const group = state.workItem?.statusGroup
   if (state.review?.state === 'merged' || group === 'review' || group === 'done') {
     return 'handoff'
@@ -21,13 +27,13 @@ export const worktreePhaseOf = (state: GameState): FlowPhase | undefined => {
   return state.review?.state === 'open' || state.review?.state === 'draft' ? 'pr' : undefined
 }
 
-const isFinished = (state: GameState): boolean =>
+const isFinished = (state: Work): boolean =>
   state.review?.state === 'merged' || state.workItem?.statusGroup === 'done'
 
 const memberStateOf = (agent: GameAgent): MemberState =>
   agent.state === 'done' ? 'idle' : agent.state
 
-const moodOf = (agent: GameAgent, state: GameState, hasRewards: boolean): Mood => {
+const moodOf = (agent: GameAgent, state: Work, hasRewards: boolean): Mood => {
   const isDone = agent.state === 'done'
   if (!isDone && isCiRed(state.review)) {
     return 'hurt'
@@ -47,13 +53,14 @@ const saysOf = (agent: GameAgent): string => {
 export const memberOf = (agent: GameAgent, state: GameState, hasRewards: boolean): PartyMember => {
   const tool = agent.toolName ?? ''
   const isDone = agent.state === 'done'
-  const shared = worktreePhaseOf(state)
+  const work = workOf(agent, state)
+  const shared = worktreePhaseOf(work)
   return {
     key: agent.paneKey,
     name: agent.displayName,
     phase: isDone ? 'handoff' : (phaseOf(tool, {}) ?? shared ?? 'working'),
     state: memberStateOf(agent),
-    mood: moodOf(agent, state, hasRewards),
+    mood: moodOf(agent, work, hasRewards),
     action: agent.state === 'working' ? actionOf(tool, {}) : undefined,
     says: saysOf(agent),
     isDone
@@ -89,7 +96,14 @@ export const needsOf = (state: GameState): Need[] => {
             url: linkOfKind(state.links, 'ci')?.url ?? state.review.url
           }
         ]
-      : [])
+      : []),
+    ...state.agents
+      .filter((agent) => agent.worktree !== undefined && agent.review && isCiRed(agent.review))
+      .map((agent) => ({
+        name: agent.displayName,
+        text: ciFailingNeed,
+        url: agent.review?.url ?? null
+      }))
   ]
 }
 

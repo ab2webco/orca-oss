@@ -1,6 +1,7 @@
 import type { CommandHandler } from './dispatch'
 import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
 import { PLANE_HANDLER_GROUPS } from './plane-handler-groups'
+import { ORCHESTRATOR_GAME_HANDLER_GROUPS } from './orchestrator-game-handler-groups'
 
 export type HandlerGroup = {
   name: string
@@ -14,6 +15,7 @@ export type HandlerGroup = {
 // real exports by handler-group-manifest.test.ts, so drift fails CI, not dispatch.
 export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   ...PLANE_HANDLER_GROUPS,
+  ...ORCHESTRATOR_GAME_HANDLER_GROUPS,
   {
     name: 'speech',
     keys: ['speech transcribe', 'speech models list', 'speech models download'],
@@ -44,17 +46,6 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'dashboard-popout',
     keys: ['dashboard popout show', 'dashboard popout open', 'dashboard popout close'],
     load: async () => (await import('./handlers/dashboard-popout.js')).DASHBOARD_POPOUT_HANDLERS
-  },
-  {
-    name: 'orchestrator-game',
-    keys: ['game state'],
-    load: async () => (await import('./handlers/orchestrator-game.js')).ORCHESTRATOR_GAME_HANDLERS
-  },
-  {
-    name: 'orchestrator-game-scenes',
-    keys: ['game scene new', 'game scene validate', 'game scene list'],
-    load: async () =>
-      (await import('./handlers/orchestrator-game-scenes.js')).ORCHESTRATOR_GAME_SCENE_HANDLERS
   },
   {
     name: 'automations',

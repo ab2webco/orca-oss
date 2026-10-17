@@ -42,15 +42,15 @@ function renderSurface(isLastStep: boolean): ReactElement {
 }
 
 describe('ContextualTourOverlaySurface localization', () => {
-  it('renders default tour actions in Korean when the UI locale is Korean', async () => {
-    await setRendererUiLanguage('ko')
+  it('renders default tour actions in Spanish when the UI locale is Spanish', async () => {
+    await setRendererUiLanguage('es')
 
     const firstStep = renderToStaticMarkup(renderSurface(false))
     const finalStep = renderToStaticMarkup(renderSurface(true))
 
-    expect(firstStep).toContain('다음')
+    expect(firstStep).toContain('Próximo')
     expect(firstStep).not.toContain('>Next<')
-    expect(finalStep).toContain('완료')
+    expect(finalStep).toContain('Listo')
     expect(finalStep).not.toContain('>Done<')
   })
 })

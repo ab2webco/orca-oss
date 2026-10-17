@@ -29,11 +29,11 @@ const rendered = (strings: TextStrings | ArtStrings): string[] =>
   })
 
 describe('gameLocaleOf', () => {
-  it('takes the five languages Orca ships, in any case or padding', () => {
-    expect(GAME_LOCALES).toEqual(['en', 'es', 'ja', 'ko', 'zh'])
+  it('takes the two languages Orca ships, in any case or padding', () => {
+    expect(GAME_LOCALES).toEqual(['en', 'es'])
     expect(gameLocaleOf('es')).toBe('es')
-    expect(gameLocaleOf(' JA ')).toBe('ja')
-    expect(gameLocaleOf('zh')).toBe('zh')
+    expect(gameLocaleOf(' ES ')).toBe('es')
+    expect(gameLocaleOf('en')).toBe('en')
   })
 
   it('reads anything else as English', () => {
@@ -42,6 +42,10 @@ describe('gameLocaleOf', () => {
     expect(gameLocaleOf('')).toBe('en')
     expect(gameLocaleOf('fr')).toBe('en')
     expect(gameLocaleOf('es-MX')).toBe('en')
+    // Why: Orca Lab dropped these UI languages (ORCA-596); an older Orca may still send them.
+    expect(gameLocaleOf('ja')).toBe('en')
+    expect(gameLocaleOf('ko')).toBe('en')
+    expect(gameLocaleOf('zh')).toBe('en')
   })
 })
 
@@ -54,9 +58,9 @@ describe('the catalog', () => {
     }
   })
 
-  it('falls back to English for a key a language leaves out', () => {
+  it('gives Spanish its own text and art over the English base', () => {
     expect(stringsOf('es').text).not.toEqual(stringsOf('en').text)
-    expect(stringsOf('ja').art).toEqual(stringsOf('en').art)
+    expect(stringsOf('es').art).not.toEqual(stringsOf('en').art)
   })
 
   it('speaks Spanish with tú and counts with the right plural', () => {
@@ -74,7 +78,6 @@ describe('the catalog', () => {
     for (const locale of GAME_LOCALES) {
       expect(rendered(stringsOf(locale).art).filter((one) => !isRasterText(one))).toEqual([])
     }
-    expect(stringsOf('ja').art).toEqual(stringsOf('en').art)
     expect(stringsOf('es').art.thinking).toBe('pensando')
   })
 
@@ -88,7 +91,7 @@ describe('the catalog', () => {
   it('shows a scene name in the launch language, else its English', () => {
     const name = { en: 'Squire', es: 'Escudero' }
     expect(localizedNameOf(name, 'es')).toBe('Escudero')
-    expect(localizedNameOf(name, 'ja')).toBe('Squire')
+    expect(localizedNameOf({ en: 'Squire' }, 'es')).toBe('Squire')
     expect(localizedNameOf('Pilot', 'es')).toBe('Pilot')
     setGameLocale('es')
     expect(localizedNameOf(name)).toBe('Escudero')
@@ -96,8 +99,8 @@ describe('the catalog', () => {
 
   it('serves the language the session was launched with', () => {
     expect(gameStrings().text.close).toBe('Close')
-    setGameLocale('ko')
-    expect(gameStrings().text.close).toBe('닫기')
-    expect(gameStrings().art.thinking).toBe('thinking')
+    setGameLocale('es')
+    expect(gameStrings().text.close).toBe('Cerrar')
+    expect(gameStrings().art.thinking).toBe('pensando')
   })
 })

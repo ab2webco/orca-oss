@@ -272,7 +272,7 @@ describe('AppearancePane', () => {
     ).toBeNull()
   })
 
-  it('renders the language dropdown with system, english, chinese, korean, japanese, and spanish options', async () => {
+  it('renders the language dropdown with only system, english and spanish options', async () => {
     mocks.state.settingsSearchQuery = 'language'
     const updateSettings = vi.fn()
     const settings = {
@@ -284,32 +284,34 @@ describe('AppearancePane', () => {
     const languageTrigger = container.querySelector<HTMLButtonElement>(
       '[data-slot="select-trigger"][aria-label="Language"]'
     )
-    const chineseOption = container.querySelector<HTMLButtonElement>(
-      '[data-slot="select-item"][data-value="zh"]'
+    const languageSelect = languageTrigger?.closest('[data-slot="language-select"]')
+    const options = Array.from(
+      languageSelect?.querySelectorAll<HTMLButtonElement>('[data-slot="select-item"]') ?? []
     )
+    const spanishOption = options.find((option) => option.dataset.value === 'es')
 
     expect(languageTrigger).not.toBeNull()
-    expect(chineseOption).not.toBeNull()
+    expect(options.map((option) => option.dataset.value)).toEqual(['system', 'en', 'es'])
     expect(container.textContent).not.toContain('Advanced')
     expect(container.textContent).toContain('System')
     expect(container.textContent).toContain('English')
-    expect(container.textContent).toContain('中文（简体）')
-    expect(container.textContent).toContain('한국어')
-    expect(container.textContent).toContain('日本語')
     expect(container.textContent).toContain('Español')
+    expect(container.textContent).not.toContain('中文（简体）')
+    expect(container.textContent).not.toContain('한국어')
+    expect(container.textContent).not.toContain('日本語')
 
     await act(async () => {
-      chineseOption?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      spanishOption?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(updateSettings).toHaveBeenCalledWith({ uiLanguage: 'zh' })
+    expect(updateSettings).toHaveBeenCalledWith({ uiLanguage: 'es' })
   })
 
   it('includes the selected language in the collapsed Interface summary', async () => {
     mocks.state.settingsSearchQuery = ''
     const settings = {
       ...getDefaultSettings('/tmp'),
-      uiLanguage: 'zh' as const,
+      uiLanguage: 'es' as const,
       theme: 'dark' as const,
       appFontFamily: 'Inter'
     }
@@ -326,7 +328,7 @@ describe('AppearancePane', () => {
 
     expect(interfaceToggle?.getAttribute('aria-expanded')).toBe('false')
     // Summary is only rendered on the collapsed toggle (children stay mounted but hidden).
-    expect(interfaceToggle?.textContent).toContain('Dark · 中文（简体） · Inter')
+    expect(interfaceToggle?.textContent).toContain('Dark · Español · Inter')
   })
 
   it('updates the left sidebar appearance from sidebar settings', async () => {

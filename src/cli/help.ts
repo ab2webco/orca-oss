@@ -139,6 +139,9 @@ Computer Use:
   computer paste-text       Paste text through the native clipboard path
   computer set-value        Set the value of a settable app element
 
+Agent Teams Game:
+  game                      Lead a fleet of members and author game scenes
+
 Linear:
   linear                    Read Linear ticket context for agents
 
@@ -383,7 +386,7 @@ export function printHelp(specs: CommandSpec[], commandPath: string[] = []): voi
   }
 
   if (isCommandGroup(commandPath)) {
-    console.log(formatGroupHelp(specs, commandPath[0]))
+    console.log(formatGroupHelp(specs, commandPath))
     return
   }
 
@@ -429,13 +432,15 @@ export function formatCommandHelp(spec: CommandSpec): string {
   return lines.join('\n')
 }
 
-export function formatGroupHelp(specs: CommandSpec[], group: string): string {
-  const groupSpecs = specs.filter((spec) => spec.path[0] === group)
-  const lines = [`orca ${group}`, '', `Usage: orca ${group} <command> [options]`, '', 'Commands:']
-  for (const spec of groupSpecs) {
-    lines.push(`  ${spec.path.slice(1).join(' ').padEnd(18)} ${spec.summary}`)
+export function formatGroupHelp(specs: CommandSpec[], group: string[]): string {
+  // Why the full path: a nested group like `game scene` lists only its own commands.
+  const isInGroup = (spec: CommandSpec) => group.every((part, index) => spec.path[index] === part)
+  const name = group.join(' ')
+  const lines = [`orca ${name}`, '', `Usage: orca ${name} <command> [options]`, '', 'Commands:']
+  for (const spec of specs.filter(isInGroup)) {
+    lines.push(`  ${spec.path.slice(group.length).join(' ').padEnd(18)} ${spec.summary}`)
   }
-  lines.push('', `Run \`orca ${group} <command> --help\` for command-specific usage.`)
+  lines.push('', `Run \`orca ${name} <command> --help\` for command-specific usage.`)
   return lines.join('\n')
 }
 

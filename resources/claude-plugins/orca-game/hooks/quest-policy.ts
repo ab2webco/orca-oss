@@ -1,4 +1,5 @@
-import type { FlowPhase, GameMode } from '../types'
+import type { FlowPhase, GameMode, GameRender } from '../types'
+import { isGameRender } from './game-render'
 import { gameStrings } from './game-strings'
 
 export const QUEST_MODES: readonly GameMode[] = ['off', 'on', 'zen']
@@ -8,15 +9,25 @@ export const NOTE_MIN_CHARS = 240
 export const isQuestMode = (value: unknown): value is GameMode =>
   typeof value === 'string' && (QUEST_MODES as readonly string[]).includes(value)
 
-export type QuestCommand = { mode: GameMode } | { error: string } | { show: true } | { demo: true }
+export type QuestCommand =
+  | { mode: GameMode }
+  | { render: GameRender }
+  | { error: string }
+  | { show: true }
+  | { demo: true }
 
 export const questCommandOf = (args: string): QuestCommand => {
-  const asked = (args.trim().split(/\s+/)[0] ?? '').toLowerCase()
+  const words = args.trim().toLowerCase().split(/\s+/)
+  const asked = words[0] ?? ''
   if (asked === '') {
     return { show: true }
   }
   if (asked === 'demo') {
     return { demo: true }
+  }
+  if (asked === 'render') {
+    const render = words[1] ?? ''
+    return isGameRender(render) ? { render } : { error: gameStrings().text.unknownRender(render) }
   }
   return isQuestMode(asked) ? { mode: asked } : { error: gameStrings().text.unknownMode(asked) }
 }

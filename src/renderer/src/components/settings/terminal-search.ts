@@ -32,6 +32,7 @@ import {
   getTerminalWindowSearchEntries
 } from './terminal-window-setup-search'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { getMemoryPressureWarningSearchEntries } from './memory-pressure-warning-search'
 
 export {
   getTerminalAdvancedTypographySearchEntries,
@@ -118,6 +119,7 @@ export function getTerminalPaneSearchEntries(platform: {
     ...getTerminalRightClickToPasteSearchEntry(),
     ...getTerminalSetupScriptSearchEntries(),
     ...getManageSessionsSearchEntries(),
+    ...getMemoryPressureWarningSearchEntries(),
     ...getTerminalAdvancedSearchEntries(),
     ...(platform.isMac
       ? [...getTerminalMacOptionSearchEntries(), ...getTerminalMacYenSearchEntries()]

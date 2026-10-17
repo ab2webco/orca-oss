@@ -1,6 +1,25 @@
 export type GameMode = 'on' | 'zen' | 'off'
 
-export type GameConfig = { mode: GameMode; scene: string; hud: boolean; rewards: boolean }
+/** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
+export type GameConfig = {
+  mode: GameMode
+  scene: string
+  hud: boolean
+  rewards: boolean
+  openLinks: 'orca' | 'system'
+  render: GameRender
+  /** An IANA zone hd's day and night follow, or `local` for the machine's clock. */
+  timezone: string
+}
+
+/** The config layer a key's value came from, as `orca game state` names it. */
+export type GameSource = 'default' | 'global' | 'project' | 'local'
+
+/** Each config key's layer; `tracker` is Orca's own key the mod does not draw. */
+export type GameSources = Partial<Record<keyof GameConfig | 'tracker', GameSource>>
+
+/** The 5-row pixel art, or the 9 to 10-row 2D-HD scene. */
+export type GameRender = 'classic' | 'hd'
 
 export type GameAgentState = 'working' | 'waiting' | 'idle' | 'done'
 
@@ -18,7 +37,35 @@ export type GameAgent = {
   terminalHandle?: string
   /** Only an agent a project or built-in activity rule matched has one. */
   activity?: GameActivity
+  /** A session the lead launched, which reports to it; false for the lead and its teammates. */
+  isMember?: boolean
+  /** The member's own worktree, when it is not the lead's. */
+  worktree?: GameMemberWorktree
+  /** The member worktree's own review and ticket. */
+  review?: GameReview
+  workItem?: GameWorkItem
+  /** Set while a member is stopped by its account's usage limit; `resetsAt` is Unix ms. */
+  limit?: GameMemberLimit
+  /** The managed account a member's agent runs on; absent when Orca's own selection applies. */
+  account?: GameMemberAccount
+  /** What Jev in the member's own pane has it on; absent without Jev there or from an older Orca. */
+  advisor?: GameMemberAdvisor
 }
+
+/** A model and effort as Jev names them; null where Jev set none. */
+export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
+
+/** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
+export type GameMemberAdvisor = GameMemberAdvisorPick & {
+  pinned: { model: boolean; effort: boolean }
+  previous?: GameMemberAdvisorPick
+}
+
+export type GameMemberLimit = { resetsAt: number | null }
+
+export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
+
+export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 
 export type GameCi = 'pending' | 'success' | 'failure' | 'neutral' | 'none'
 
@@ -70,6 +117,10 @@ export type GameProjectItem = {
   url: string
   status?: string
   tone?: GameLinkTone
+  /** A ticket's status group; an issue list from GitHub or GitLab has none. */
+  group?: GameStatusGroup
+  /** What "work on" sends the lead for this ticket. */
+  prompt?: string
 }
 
 /** `total` counts every open item; `items` holds the first few and `url` opens the full list. */
@@ -78,14 +129,33 @@ export type GameProjectList = {
   total: number
   url: string | null
   items: GameProjectItem[]
+  /** Open tickets per status group, all of them and not only `items`. */
+  groups?: Partial<Record<GameStatusGroup, number>>
+  /** The action (an id in `actions`) the To Do link runs instead of opening `url`. */
+  actionId?: string
 }
 
 /** My open PRs and tickets across the project, not only this worktree's. */
 export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
 
+export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
+
+/** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
+/** `command` names the slash command that runs it, as `/<command>`; `key` its Panel hotkey. */
+export type GameAction = { id: string; label: string; command?: string; key?: string } & (
+  | { prompt: string }
+  | { mcp: GameMcpCall }
+)
+
+/** The last run of an MCP action: its text lines, or the error. */
+export type ActionRun = { status: 'running' | 'done' | 'error'; lines: string[] }
+
+/** Keyed by action id; `call` names the tool that ran, so a renumbered action drops a stale run. */
+export type ActionRuns = Record<string, ActionRun & { call: string; run: number }>
+
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
 
-export type GameLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
+export type GameLocale = 'en' | 'es'
 
 /** A scene's card or teller name: one string, or one per language with English required. */
 export type LocalizedName = string | ({ en: string } & Partial<Record<GameLocale, string>>)
@@ -137,6 +207,42 @@ export type HudPalette = {
   star: number
 }
 
+/** A cast member's sprite: one to seven rows of one width (1–10); each glyph a key of its `colors`, '.' transparent. */
+export type CastFrame = readonly string[]
+
+/** The scene's pet, which Pet hearts; a scene without one pets its hero, Clawd. */
+export type ScenePet = {
+  name?: LocalizedName
+  /** One to four walking frames, all the size of the first. */
+  frames: readonly CastFrame[]
+  /** Shown while it is petted. */
+  happy: CastFrame
+  colors: Readonly<Record<string, number>>
+}
+
+/** What Jev decided, as the advisor acts it out. */
+export type AdvisorGesture =
+  | 'lowered'
+  | 'raised'
+  | 'approved'
+  | 'unsure'
+  | 'escalated'
+  | 'ciRunning'
+  | 'ciPassed'
+  | 'ciFailed'
+
+/** Who stands for Jev in the scene; the gesture props are the game's, the body the scene's. */
+export type SceneAdvisor = {
+  name?: LocalizedName
+  /** One to four idle frames, all the size of the first. */
+  frames: readonly CastFrame[]
+  /** The body while one gesture plays, in place of the idle frames. */
+  gestures?: Readonly<Partial<Record<AdvisorGesture, CastFrame>>>
+  colors: Readonly<Record<string, number>>
+}
+
+export type SceneCast = { pet?: ScenePet; advisor?: SceneAdvisor }
+
 export type SceneDefinition = {
   id: string
   looks: Readonly<Record<ScenePhase, Look>>
@@ -149,12 +255,16 @@ export type SceneDefinition = {
   /** Caption painted while a merge runs; pixel art, so width-1 characters only. */
   finale?: LocalizedName
   hud?: HudPalette
+  /** The pet and Jev's advisor; either left out keeps Clawd or the referee. */
+  cast?: SceneCast
 }
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }
 
 export type GameState = {
   config: Partial<GameConfig>
+  /** Absent from a host that sends no layers. */
+  sources?: GameSources
   warnings: string[]
   worktree: GameWorktree | null
   agents: GameAgent[]
@@ -167,7 +277,17 @@ export type GameState = {
   activity: GameActivity | null
   /** Absent from a host older than project work or with the tracker off. */
   project?: GameProjectWork
+  /** Absent from a host older than project actions or with none configured. */
+  actions?: GameAction[]
+  /** How the project's lead orchestrates; absent from an older host. */
+  lead?: GameLead
+  /** Whether this pane leads or a lead launched it; absent from an older host. */
+  role?: GameRole
 }
+
+export type GameLead = { autostart: boolean; cap: number; label?: string }
+
+export type GameRole = 'lead' | 'member'
 
 export type FleetState = {
   isLoading: boolean
@@ -182,10 +302,31 @@ export type AllyStatus = { plugin: string; text: string }
 
 export type AlliesState = { statuses: AllyStatus[] }
 
+/** One of Jev's decisions as the Panel lists it; `title` null is the main conversation's model. */
+export type AdvisorLogEntry = {
+  key: string
+  title: string | null
+  model: string | null
+  effort: string | number | null
+  verdict: string
+  gesture: AdvisorGesture | null
+  at: number
+}
+
+/** Jev's latest decisions in this pane, oldest first, a few at most. */
+export type AdvisorLog = { decisions: AdvisorLogEntry[] }
+
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
-    'orca-game': { fleet: FleetState; allies: AlliesState }
+    'orca-game': {
+      fleet: FleetState
+      allies: AlliesState
+      advisor: AdvisorLog
+      actions: ActionRuns
+      /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */
+      absorbing: boolean
+    }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
     'orca-jev-mod-skills': { advisor: unknown }
   }

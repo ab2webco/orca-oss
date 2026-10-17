@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import type { GlobalSettings } from '../../src/shared/global-settings-types'
+import type { DiscoveredSkill, SkillDiscoveryResult } from '../../src/shared/skills'
 import {
   byScenePhase,
   sceneFile,
@@ -283,10 +284,21 @@ test("a project's scene file previews when valid, says why when not, and renders
   expect(repo, 'the harness seeds one repo').not.toBeNull()
   const { id: repoId, path: repoPath } = repo as { id: string; path: string }
   // Why a magenta sky: a preview that paints it can only be drawing the file, never Quest.
+  // Why a spring-green pet: the preview draws the file's cast with the game's own code.
   mkdirSync(join(repoPath, '.orca', 'scenes'), { recursive: true })
+  const pet = {
+    name: 'Sprout',
+    frames: [['PPPP', 'P..P']],
+    happy: ['PPPP', 'PPPP'],
+    colors: { P: '#00ff7f' }
+  }
   writeFileSync(
     join(repoPath, '.orca', 'scenes', 'space.json'),
-    JSON.stringify(sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }) }), null, 2)
+    JSON.stringify(
+      sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }), cast: { pet } }),
+      null,
+      2
+    )
   )
   writeFileSync(
     join(repoPath, '.orca', 'scenes', 'broken.json'),
@@ -316,23 +328,20 @@ test("a project's scene file previews when valid, says why when not, and renders
 
   const preview = orcaPage.getByRole('img', { name: 'Preview of space (custom)' })
   await expect(preview).toBeVisible()
-  await expect
-    .poll(async () =>
-      preview.evaluate((canvas) => {
-        const element = canvas as HTMLCanvasElement
-        const data = element
-          .getContext('2d')
-          ?.getImageData(0, 0, element.width, element.height).data
-        let magenta = 0
-        for (let index = 0; data && index < data.length; index += 4) {
-          if (data[index] === 255 && data[index + 1] === 0 && data[index + 2] === 255) {
-            magenta += 1
-          }
+  const pixelsOf = (rgb: readonly [number, number, number]) =>
+    preview.evaluate((canvas, [red, green, blue]) => {
+      const element = canvas as HTMLCanvasElement
+      const data = element.getContext('2d')?.getImageData(0, 0, element.width, element.height).data
+      let count = 0
+      for (let index = 0; data && index < data.length; index += 4) {
+        if (data[index] === red && data[index + 1] === green && data[index + 2] === blue) {
+          count += 1
         }
-        return magenta
-      })
-    )
-    .toBeGreaterThan(0)
+      }
+      return count
+    }, rgb)
+  await expect.poll(async () => pixelsOf([255, 0, 255])).toBeGreaterThan(0)
+  await expect.poll(async () => pixelsOf([0, 255, 127])).toBeGreaterThan(0)
   await expect(orcaPage.getByText('.orca/scenes/space.json · this machine')).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-valid', path)
 
@@ -403,4 +412,314 @@ test("the project's scene files are listed in the Scene picker and picking one s
       await expect(orcaPage.getByRole('listbox')).toBeHidden()
     }
   }
+})
+
+test("the project lead shows orca.yaml's values, overrides them on this machine and renders at every width", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repo = await orcaPage.evaluate(() => {
+    const first = window.__store!.getState().repos[0]
+    return first ? { id: first.id, path: first.path } : null
+  })
+  expect(repo, 'the harness seeds one repo').not.toBeNull()
+  const { id: repoId, path: repoPath } = repo as { id: string; path: string }
+  writeFileSync(
+    join(repoPath, 'orca.yaml'),
+    'orchestratorGame:\n  orchestrator:\n    autostart: true\n    cap: 6\n'
+  )
+
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+  const lead = orcaPage.locator('[data-slot="game-lead-settings"]')
+  await expect(lead).toBeVisible({ timeout: 15_000 })
+  await expect(lead.getByText('On · from orca.yaml')).toBeVisible()
+  await expect(lead.getByText('6 · from orca.yaml')).toBeVisible()
+  await expect(lead.getByText('claude · default')).toBeVisible()
+
+  await lead
+    .getByRole('radiogroup', { name: 'Start as lead' })
+    .getByRole('radio', { name: 'Off' })
+    .click()
+  const model = lead.getByRole('textbox', { name: 'Model' })
+  await model.fill('opus')
+  await model.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId]: { orchestrator: { autostart: false, model: 'opus' } } })
+  await expect(lead.getByText('Off · this machine')).toBeVisible()
+  await expect(lead.getByText('opus · this machine')).toBeVisible()
+
+  await expect(lead.getByText("Orca's account · default")).toBeVisible()
+  await lead
+    .getByRole('radiogroup', { name: 'Member accounts' })
+    .getByRole('radio', { name: 'Most free' })
+    .click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'auto' } } })
+  await expect(lead.getByText('Most free quota · this machine')).toBeVisible()
+
+  const cap = lead.getByRole('textbox', { name: 'Member cap' })
+  await cap.fill('40')
+  await cap.press('Enter')
+  await expect(lead.getByRole('alert')).toHaveText('Enter a whole number from 1 to 12.')
+  expect((await savedGameSettings(orcaPage)).orchestratorGameProjects).toEqual({
+    [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'auto' } }
+  })
+
+  const yamlOnly = lead.getByText('The launch prompt and the project', { exact: false })
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      // Why: a lead field must never be wider than the section it sits in.
+      const overflow = await lead.evaluate((section) => {
+        const right = section.getBoundingClientRect().right
+        return Array.from(section.querySelectorAll('input, [role="radiogroup"]'))
+          .map((element) => element.getBoundingClientRect().right - right)
+          .filter((excess) => excess > 0.5)
+      })
+      expect(overflow, `a lead control overflows its section at ${width}px`).toEqual([])
+      await lead.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-top-${theme}-${width}.png`) })
+      await yamlOnly.evaluate((element) => element.scrollIntoView({ block: 'end' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-end-${theme}-${width}.png`) })
+    }
+  }
+})
+
+test("the project's Actions editor saves this machine's list and renders at every width", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? null)
+  expect(repoId, 'the harness seeds one repo').not.toBeNull()
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+
+  await expect(orcaPage.getByRole('radiogroup', { name: 'Lead buttons' })).toBeVisible({
+    timeout: 15_000
+  })
+  await expect(orcaPage.getByRole('radiogroup', { name: 'Open links in' }).first()).toBeVisible()
+  await orcaPage.getByRole('button', { name: 'Edit on this machine' }).click()
+  for (const [label, command, prompt] of [
+    ['Test runs', 'test-runs', 'Have members run the Tambora test runs of my QA tickets'],
+    ['Daily log', 'daily', 'Write the daily log of what the members did']
+  ] as const) {
+    await orcaPage.getByRole('button', { name: 'Add action' }).click()
+    const n = await orcaPage.locator('[data-slot="game-action-row"]').count()
+    await orcaPage.getByLabel(`Label ${n}`).fill(label)
+    await orcaPage.getByLabel(`Command ${n}`).fill(command)
+    await orcaPage.getByLabel(`Prompt ${n}`).fill(prompt)
+  }
+  await orcaPage.getByLabel('Key 2').fill('x')
+  await orcaPage.getByRole('button', { name: 'Save actions' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({
+      [repoId as string]: {
+        actions: [
+          {
+            label: 'Test runs',
+            command: 'test-runs',
+            prompt: 'Have members run the Tambora test runs of my QA tickets'
+          },
+          {
+            label: 'Daily log',
+            command: 'daily',
+            key: 'x',
+            prompt: 'Write the daily log of what the members did'
+          }
+        ]
+      }
+    })
+
+  // An MCP row with a refused command shows the inline error the screenshots should carry.
+  await orcaPage.getByRole('button', { name: 'Add action' }).click()
+  await orcaPage.getByLabel('Label 3').fill('Runs')
+  await orcaPage.getByLabel('Command 3').fill('wave')
+  await orcaPage
+    .getByRole('radiogroup', { name: 'Kind 3' })
+    .getByRole('radio', { name: 'MCP' })
+    .click()
+  await orcaPage.getByLabel('MCP server 3').fill('tambora')
+  await orcaPage.getByLabel('Tool 3').fill('list_test_runs')
+  await expect(orcaPage.getByRole('alert')).toHaveText(
+    'A lead button or another action already uses this command.'
+  )
+  await expect(orcaPage.getByRole('button', { name: 'Save actions' })).toBeDisabled()
+
+  const editor = orcaPage.locator('[data-slot="game-actions-settings"]')
+  await shootAll(electronApp, orcaPage, testInfo, 'actions', editor)
+  // Why a box check: at phone widths the editor is taller than the window, so no shot holds all of it.
+  for (const width of WIDTHS) {
+    await setWindowWidth(electronApp, orcaPage, width)
+    const box = await editor.boundingBox()
+    expect(box?.width ?? 0, `editor fits ${width}`).toBeLessThanOrEqual(width)
+  }
+})
+
+test('the render and time zone rows persist globally and per project and render at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const render = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
+  await expect(render).toBeVisible({ timeout: 15_000 })
+  await render.getByRole('radio', { name: 'HD' }).click()
+  const zone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
+  await zone.fill('Mars/Olympus')
+  await zone.press('Enter')
+  await expect(orcaPage.getByRole('alert').filter({ hasText: 'IANA time zone' })).toBeVisible()
+  await zone.fill('America/Bogota')
+  await zone.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ render: 'hd', timezone: 'America/Bogota' })
+  await shootAll(electronApp, orcaPage, testInfo, 'render-global', zone)
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? null)
+  expect(repoId, 'the harness seeds one repo').not.toBeNull()
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+  const projectRender = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
+  await expect(projectRender).toBeVisible({ timeout: 15_000 })
+  await expect(orcaPage.getByText('HD · global setting')).toBeVisible()
+  await expect(orcaPage.getByText('America/Bogota · global setting')).toBeVisible()
+  await projectRender.getByRole('radio', { name: 'Classic' }).click()
+  const projectZone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
+  await projectZone.fill('Europe/Madrid')
+  await projectZone.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId as string]: { render: 'classic', timezone: 'Europe/Madrid' } })
+  await expect(orcaPage.getByText('Classic · this machine')).toBeVisible()
+  await shootAll(electronApp, orcaPage, testInfo, 'render-project', projectZone)
+})
+
+type SkillDiscoveryMockGlobal = typeof globalThis & {
+  __orcaGameScenesSkillDiscovery?: SkillDiscoveryResult
+}
+
+const SCENES_SKILL: DiscoveredSkill = {
+  id: 'home-orca-game-scenes',
+  name: 'orca-game-scenes',
+  description: null,
+  providers: ['agent-skills'],
+  sourceKind: 'home',
+  sourceLabel: 'home',
+  rootPath: '/Users/test/.agents/skills',
+  directoryPath: '/Users/test/.agents/skills/orca-game-scenes',
+  skillFilePath: '/Users/test/.agents/skills/orca-game-scenes/SKILL.md',
+  installed: true,
+  updatedAt: null
+}
+
+async function setSkillDiscovery(
+  app: ElectronApplication,
+  skills: DiscoveredSkill[]
+): Promise<void> {
+  await app.evaluate(
+    ({ ipcMain }, result) => {
+      const global_ = globalThis as SkillDiscoveryMockGlobal
+      const isFirst = global_.__orcaGameScenesSkillDiscovery === undefined
+      global_.__orcaGameScenesSkillDiscovery = result
+      if (isFirst) {
+        ipcMain.removeHandler('skills:discover')
+        ipcMain.handle(
+          'skills:discover',
+          () => (globalThis as SkillDiscoveryMockGlobal).__orcaGameScenesSkillDiscovery
+        )
+      }
+    },
+    { skills, sources: [], scannedAt: Date.now() }
+  )
+}
+
+test('the game section installs the scenes skill, shows its examples and renders at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  // Why a stub: the isolated home has no skills, and a real install needs the network.
+  await setSkillDiscovery(electronApp, [])
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const card = orcaPage.locator('#orca-game-scenes-skill')
+  await expect(card.getByRole('heading', { name: 'Game scenes skill' })).toBeVisible({
+    timeout: 15_000
+  })
+  await card.getByRole('button', { name: 'Re-check' }).click()
+  await expect(card.getByText('Not installed', { exact: true })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Install', exact: true })).toBeEnabled()
+  const cliReady = await orcaPage.evaluate(async () => {
+    const status = await window.api.cli.getInstallStatus()
+    return status.state === 'installed' && status.pathConfigured === true
+  })
+  const notice = card.getByText('Before opening setup, Orca may show a system prompt', {
+    exact: false
+  })
+  await expect(notice).toBeVisible({ visible: !cliReady })
+  for (const title of ['Make a new scene', 'Change the colors', 'Fix a scene that draws Quest']) {
+    await expect(card.getByRole('button', { name: title })).toBeVisible()
+  }
+  await card.getByRole('button', { name: 'Make a new scene' }).click()
+  const dialog = orcaPage.getByRole('dialog')
+  await expect(dialog).toContainText(
+    'Use /orca-game-scenes to make a Super Smash Bros scene for this project and turn it on.'
+  )
+  await orcaPage.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  const shootCard = async (name: string): Promise<void> => {
+    for (const theme of THEMES) {
+      await setTheme(orcaPage, theme)
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        await card.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+        // Why: at phone widths the settings column itself overflows (ORCA-588); the card stays inside it.
+        const excess = await card.evaluate((element) => {
+          const column = element.parentElement?.getBoundingClientRect()
+          const box = element.getBoundingClientRect()
+          return column ? box.right - column.right : 0
+        })
+        expect(excess, `skill card wider than its column at ${width}px`).toBeLessThanOrEqual(0.5)
+        await orcaPage.screenshot({ path: testInfo.outputPath(`${name}-${theme}-${width}.png`) })
+      }
+    }
+    await setWindowWidth(electronApp, orcaPage, 1440)
+  }
+  await shootCard('scenes-skill-missing')
+
+  await setSkillDiscovery(electronApp, [SCENES_SKILL])
+  await card.getByRole('button', { name: 'Re-check' }).click()
+  await expect(card.getByText('Not installed', { exact: true })).toBeHidden()
+  await expect(card.getByRole('button', { name: 'Update', exact: true })).toBeEnabled()
+  await expect(notice).toBeHidden()
+  await shootCard('scenes-skill-installed')
 })

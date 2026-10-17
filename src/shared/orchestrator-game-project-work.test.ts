@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   GAME_PROJECT_ITEMS_MAX,
+  GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
+  parseGameReviewsSource,
   parseGameTodoSource,
   reviewsListUrlOf,
   reviewToneOf,
@@ -19,6 +21,21 @@ describe('parseGameTodoSource', () => {
     expect(
       parseGameTodoSource({ provider: 'jira', project: ' CIN ', workspace: 'koombea' })
     ).toEqual({ value: { provider: 'jira', project: 'CIN', workspace: 'koombea' }, warnings: [] })
+  })
+
+  it('takes the action the To Do runs instead of opening its list, by command or id', () => {
+    expect(parseGameTodoSource({ provider: 'jira', action: ' jira ' })).toEqual({
+      value: { provider: 'jira', action: 'jira' },
+      warnings: []
+    })
+    expect(parseGameTodoSource({ provider: 'jira', action: 'lead:status' }).value).toEqual({
+      provider: 'jira',
+      action: 'lead:status'
+    })
+    expect(parseGameTodoSource({ provider: 'jira', action: 'Show my To Do' })).toEqual({
+      value: { provider: 'jira' },
+      warnings: ['orchestratorGame.todo.action must name an action by its command or id, like jira']
+    })
   })
 
   it('refuses an unknown provider or an oversized project with a warning naming the key', () => {
@@ -44,6 +61,27 @@ describe('parseGameTodoSource', () => {
   })
 })
 
+describe('parseGameReviewsSource', () => {
+  it('takes the action the PR list runs instead of opening it, warning on a bad name', () => {
+    expect(parseGameReviewsSource({ action: ' prs ' })).toEqual({
+      value: { action: 'prs' },
+      warnings: []
+    })
+    expect(parseGameReviewsSource({ action: 'My PRs' })).toEqual({
+      value: {},
+      warnings: [
+        'orchestratorGame.reviews.action must name an action by its command or id, like prs'
+      ]
+    })
+    expect(parseGameReviewsSource({ list: 'x' }).warnings).toEqual([
+      'orchestratorGame.reviews.list is not a known setting'
+    ])
+    expect(parseGameReviewsSource('prs').warnings).toEqual([
+      'orchestratorGame.reviews must be a mapping'
+    ])
+  })
+})
+
 describe('gameProjectListOf', () => {
   it('keeps the first items with an http(s) url and counts every one it was given', () => {
     const items = Array.from({ length: 8 }, (_, at) => ({
@@ -56,6 +94,19 @@ describe('gameProjectListOf', () => {
     expect(list.items).toHaveLength(GAME_PROJECT_ITEMS_MAX)
     expect(list.items.map((one) => one.id)).toEqual(['#0', '#2', '#3', '#4', '#5'])
     expect(list.url).toBe('https://github.com/o/r/pulls')
+  })
+
+  it('keeps up to the given max, sorted by status group', () => {
+    const items = Array.from({ length: 40 }, (_, at) => ({
+      id: `CIN-${at}`,
+      title: 'x',
+      url: `https://jira/CIN-${at}`,
+      group: at % 2 === 0 ? ('todo' as const) : ('in_progress' as const)
+    }))
+    const list = gameProjectListOf('jira', items, null, 40, GAME_TODO_ITEMS_MAX)
+    expect(GAME_TODO_ITEMS_MAX).toBe(30)
+    expect(list.items).toHaveLength(30)
+    expect(list.items.slice(0, 20).every((one) => one.group === 'in_progress')).toBe(true)
   })
 
   it('drops a list url that is not http(s)', () => {

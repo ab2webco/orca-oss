@@ -8,9 +8,6 @@ import { repairCacheMap, repairCatalog } from './locale-translation-policy.mjs'
 const LOCALES_DIR = path.join('src', 'renderer', 'src', 'i18n', 'locales')
 
 const LOCALE_CACHE_FILES = {
-  ko: '.ko-catalog-cache.json',
-  zh: '.zh-catalog-cache.json',
-  ja: '.ja-catalog-cache.json',
   es: '.es-catalog-cache.json'
 }
 
@@ -57,7 +54,7 @@ export async function repairLocale(root, locale) {
 }
 
 export async function main(root = process.cwd(), locale = parseLocaleArg(process.argv)) {
-  const locales = locale ? [locale] : ['ko', 'zh', 'ja', 'es']
+  const locales = locale ? [locale] : Object.keys(LOCALE_CACHE_FILES)
   const unsupported = locales.filter((code) => !LOCALE_CACHE_FILES[code])
   if (unsupported.length > 0) {
     console.error(`Unsupported locale(s): ${unsupported.join(', ')}`)

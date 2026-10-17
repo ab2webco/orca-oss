@@ -1,13 +1,18 @@
-import type { PlantKind, Scenery } from '../../types'
+import type { AdvisorGesture, PlantKind, Scenery } from '../../types'
 
 export type {
+  AdvisorGesture,
   BandPalette,
   Card,
+  CastFrame,
   Costume,
   HudPalette,
   Look,
   PlantKind,
+  SceneAdvisor,
+  SceneCast,
   SceneDefinition,
+  ScenePet,
   ScenePhase,
   Scenery
 } from '../../types'
@@ -30,3 +35,20 @@ const SCENERY_SET: Readonly<Record<Scenery, true>> = {
   meadow: true
 }
 export const SCENERIES = Object.keys(SCENERY_SET) as readonly Scenery[]
+
+const ADVISOR_GESTURE_SET: Readonly<Record<AdvisorGesture, true>> = {
+  lowered: true,
+  raised: true,
+  approved: true,
+  unsure: true,
+  escalated: true,
+  ciRunning: true,
+  ciPassed: true,
+  ciFailed: true
+}
+export const ADVISOR_GESTURES = Object.keys(ADVISOR_GESTURE_SET) as readonly AdvisorGesture[]
+
+// Why: a cast member stands on the ground under the bubble row, as tall as the hero at most.
+export const CAST_MAX_ROWS = 7
+export const CAST_MAX_WIDTH = 10
+export const CAST_MAX_FRAMES = 4

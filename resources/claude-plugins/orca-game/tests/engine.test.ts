@@ -90,13 +90,17 @@ type World = {
   stdout: string | null
   calls: string[][]
   opened: string[]
+  toasts: string[]
   store: Record<string, unknown>
+  /** Other commands that exit 0, with no output. */
+  succeeds?: (argv: readonly string[]) => boolean
 }
 
 const worldOf = (patch: Partial<World> = {}): World => ({
   stdout: JSON.stringify({ id: 'x', ok: true, result: STATE }),
   calls: [],
   opened: [],
+  toasts: [],
   store: {},
   ...patch
 })
@@ -108,7 +112,10 @@ const engine = (on: On, world: World) => {
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
   on('turn.complete', () => ({ text: 'ok' }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', ($s, e) => {
+    world.toasts.push(e.text)
+    return { value: undefined }
+  })
   on('ui.open', ($s, e) => {
     world.opened.push(e.id)
     return { value: { isPlaced: true } }
@@ -122,7 +129,7 @@ const engine = (on: On, world: World) => {
   on('process.run', ($s, e) => {
     world.calls.push([...e.argv])
     const isGame = e.argv.join(' ') === GAME_STATE.join(' ')
-    const stdout = isGame ? world.stdout : null
+    const stdout = isGame ? world.stdout : world.succeeds?.(e.argv) ? '' : null
     return {
       value: {
         exitCode: stdout === null ? 1 : 0,
@@ -296,7 +303,7 @@ describe('quest mode', () => {
     expect(await off.find({ type: 'Raster' })).toBeUndefined()
     await off.unmount()
     const zen = await $.command.run({ command: 'quest', args: 'zen' } as never)
-    expect(zen).toMatchObject({ text: 'Quest: zen.' })
+    expect(zen).toMatchObject({ text: "Quest: zen (this session; the project's setting is off)." })
     const loud = await $.command.run({ command: 'quest', args: 'loud' } as never)
     expect(loud).toMatchObject({ text: expect.stringMatching(/^Unknown mode/) })
     const on2 = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
@@ -352,16 +359,29 @@ describe('language', () => {
     expect(loud).toMatchObject({ text: expect.stringMatching(/^Modo desconocido/) })
   })
 
-  // Why: a Raster refuses characters drawn two columns wide, so CJK keeps English pixel art.
-  test('ORCA_GAME_LOCALE=ja translates the text and still draws the art', async ($, on) => {
-    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'ja' } })
+  // Why: Orca Lab dropped ja/ko/zh (ORCA-596), so an older Orca's ja launch gets English, while
+  // CJK names agents report still reach the text and the art keeps drawing.
+  test('ORCA_GAME_LOCALE=ja draws English, with CJK teammate names, and still draws the art', async ($, on) => {
+    const cjk = {
+      ...STATE,
+      agents: [
+        agent('リーダー', 'working', 'Edit', true),
+        agent('設計担当', 'working', 'Edit'),
+        agent('検証担当', 'waiting', null)
+      ]
+    }
+    const world = worldOf({
+      env: { ORCA_GAME_LOCALE: 'ja' },
+      stdout: JSON.stringify({ id: 'x', ok: true, result: cjk })
+    })
     const clock = mock.clock(on)
     engine(on, world)
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
     const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
     expect(await ui.find({ type: 'Raster' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^チーム 2 人$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Team 2 teammates$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^検証担当 waiting on you$/ })).toBeDefined()
     await ui.unmount()
     const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
     expect(await spinner.find({ type: 'Raster' })).toBeDefined()
@@ -438,6 +458,50 @@ describe('rewards', () => {
     expect(world.store['xp-ledger']).toMatchObject({ total: 120 })
   })
 
+  const fleetOf = (prState: string) =>
+    JSON.stringify({
+      ...STATE,
+      role: 'lead',
+      worktree: { id: 'wt-main', path: '/w', branch: 'main', displayName: 'main' },
+      review: null,
+      workItem: null,
+      agents: [
+        agent('lead', 'working', null, true),
+        {
+          ...agent('ORCA-12', 'working', 'Edit'),
+          isMember: true,
+          worktree: { id: 'wt-12', branch: 'feat/orca-12', displayName: 'orca-12' },
+          review: { ...review(prState, 'success'), number: 41 }
+        }
+      ]
+    })
+
+  test("a lead earns XP when a member's PR merges, though it has no PR of its own", async ($, on) => {
+    const world = worldOf({ stdout: fleetOf('open') })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(world.store['xp-ledger']).toBeUndefined()
+    world.stdout = fleetOf('merged')
+    await clock.advance(30000)
+    await clock.advance(30000)
+    expect(world.store['xp-ledger']).toMatchObject({ total: 100 })
+    expect(world.toasts).toEqual(['+100 XP · ORCA-12 · #41 merged'])
+  })
+
+  test('ORCA_GAME_REWARDS=0 earns nothing for the fleet either', async ($, on) => {
+    const world = worldOf({ stdout: fleetOf('open'), env: { ORCA_GAME_REWARDS: '0' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    world.stdout = fleetOf('merged')
+    await clock.advance(30000)
+    expect(world.store['xp-ledger']).toBeUndefined()
+    expect(world.toasts).toEqual([])
+  })
+
   test('ORCA_GAME_REWARDS=0 earns nothing', async ($, on) => {
     const world = worldOf({ stdout: open, env: { ORCA_GAME_REWARDS: '0' } })
     const clock = mock.clock(on)
@@ -447,5 +511,219 @@ describe('rewards', () => {
     world.stdout = merged
     await clock.advance(30000)
     expect(world.store['xp-ledger']).toBeUndefined()
+  })
+})
+
+describe('lead autostart', () => {
+  const leadWorld = (role: 'lead' | 'member', autostart: boolean) =>
+    worldOf({
+      stdout: JSON.stringify({
+        id: 'x',
+        ok: true,
+        result: { ...STATE, lead: { autostart, cap: 4, agent: 'claude' }, role }
+      })
+    })
+
+  const startCounting = (on: On) => {
+    const ran: string[] = []
+    on('command.run', { command: 'orca-game:lead' }, ($s, e) => {
+      ran.push(e.command)
+      return { text: '' }
+    })
+    return ran
+  }
+
+  test('loads the lead rules once in a project that asks for it', async ($, on) => {
+    const world = leadWorld('lead', true)
+    const clock = mock.clock(on)
+    engine(on, world)
+    const ran = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual(['orca-game:lead'])
+    expect(world.store['lead-started-sessions']).toEqual(['s1'])
+
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual(['orca-game:lead'])
+  })
+
+  test('never makes a member or a project without autostart the lead', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, leadWorld('member', true))
+    const ran = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(ran).toEqual([])
+  })
+})
+
+describe('lead name', () => {
+  const namedWorld = (label: string, role: 'lead' | 'member' = 'lead') =>
+    worldOf({
+      stdout: JSON.stringify({
+        id: 'x',
+        ok: true,
+        result: {
+          ...STATE,
+          agents: [agent('lead', 'working', 'Edit', true)],
+          lead: { autostart: true, cap: 4, agent: 'claude', label },
+          role
+        }
+      })
+    })
+
+  const startCounting = (on: On) => {
+    const renames: string[] = []
+    on('command.run', { command: 'orca-game:lead' }, () => ({ text: '' }))
+    on('command.run', { command: 'rename' }, ($s, e) => {
+      renames.push(e.args)
+      return { text: '' }
+    })
+    return renames
+  }
+
+  test('the Panel crowns the lead with the label from Settings', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Text', text: '♛ Orquestador' })).toBeDefined()
+    await pane.unmount()
+  })
+
+  test('names a started lead session after the label and follows a new label', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador'])
+
+    world.stdout = namedWorld('Capitán').stdout
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador', 'Capitán'])
+  })
+
+  test('names the session once the person runs the lead skill in a project without autostart', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    world.stdout = (world.stdout ?? '').replace('"autostart":true', '"autostart":false')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual([])
+    await $.command.run({
+      command: 'orca-game:lead',
+      args: '',
+      origin: { kind: 'composer' }
+    } as never)
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador'])
+  })
+
+  test('never renames a session the person named', async ($, on) => {
+    const world = namedWorld('Orquestador')
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.command.run({
+      command: 'rename',
+      args: 'mine',
+      origin: { kind: 'composer' }
+    } as never)
+    world.stdout = namedWorld('Capitán').stdout
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual(['Orquestador', 'mine'])
+  })
+
+  test('never renames a member, even one whose session ran the lead skill', async ($, on) => {
+    const world = namedWorld('Orquestador', 'member')
+    world.store = { 'lead-started-sessions': ['s1'] }
+    const clock = mock.clock(on)
+    engine(on, world)
+    const renames = startCounting(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await $.turn.complete({ ...TURN })
+    await clock.settle()
+    expect(renames).toEqual([])
+  })
+})
+
+describe('links in the system browser', () => {
+  const OPEN = [ORCA_CLI, 'game', 'open-link', '--url', 'https://github.com/o/r/pull/42', '--json']
+  const systemWorld = () =>
+    worldOf({
+      stdout: JSON.stringify({ ...STATE, config: { openLinks: 'system' } })
+    })
+
+  test('the band and the Panel open them through Orca in the system browser', async ($, on) => {
+    const world = {
+      ...systemWorld(),
+      succeeds: (argv: readonly string[]) => argv[2] === 'open-link'
+    }
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    await band.press({ key: 'band-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[1] === 'game' && argv[2] === 'open-link')).toEqual([
+      OPEN
+    ])
+    await band.unmount()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    await pane.press({ key: 'open-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[2] === 'open-link')).toEqual([OPEN, OPEN])
+    expect(world.calls.some((argv) => argv[1] === 'tab')).toBe(false)
+    await pane.unmount()
+  })
+
+  test('fall back to an Orca tab when Orca cannot open the system browser', async ($, on) => {
+    const world = systemWorld()
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    await pane.press({ key: 'open-review' })
+    await clock.settle()
+    expect(world.calls.filter((argv) => argv[2] === 'open-link' || argv[1] === 'tab')).toEqual([
+      OPEN,
+      [
+        ORCA_CLI,
+        'tab',
+        'create',
+        '--url',
+        'https://github.com/o/r/pull/42',
+        '--worktree',
+        'id:wt-1',
+        '--json'
+      ]
+    ])
+    await pane.unmount()
   })
 })
