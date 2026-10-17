@@ -23,6 +23,11 @@ import { hdSceneGridOf } from './scene-hd'
 import { daylightAt } from './hd-daylight'
 import { advisorSpriteOf } from './advisor-art'
 import { SCENES } from './scenes/index'
+import { advisorCardOf } from './advisor-card-rows'
+import { advisorTileGridOf } from './advisor-tile'
+import { advisorOf } from './allies'
+import { TILE_COLUMNS, tileGridOf } from './fleet-tiles'
+import { gameStrings, setGameLocale } from './game-strings'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 export const SCENE_IDS = Object.keys(SCENES)
 export const sceneOfFile = (text) => {
@@ -41,6 +46,22 @@ export const gridOf = ({ scene, render, columns, tick, hour, caption }) => {
     ? hdSceneGridOf({ scene: definition, phase: 'build', columns, rows: 9, tick, caption, since: 0,
         action: 'edit', light: daylightAt(hour), party: PARTY, lead: 'Lead', advisor })
     : sceneGridOf(definition, 'build', columns, tick, caption, 0, undefined, false, 'edit', advisor)
+}
+const JEV = { version: 1, locale: 'es', line: 'jev · 2 agentes', model: 'glm-5.3', modelId: 'glm-5.3',
+  effort: 'high', subagents: [], ci: [], notices: [] }
+const LOG = [
+  { key: 'a1', title: 'Fix CI', model: 'Opus 5.5', effort: 'high', verdict: 'igual', gesture: 'approved', at: 1 },
+  { key: 'a2', title: 'Write docs', model: 'Haiku 4.5', effort: null, verdict: 'Haiku basta', gesture: 'lowered', at: 2 }
+]
+// The Panel's advisor card under a member card, as the pane stacks them.
+export const cardsOf = ({ scene, isLogged }) => {
+  setGameLocale('es')
+  const definition = typeof scene === 'string' ? SCENES[scene] : scene
+  const sprite = advisorSpriteOf(definition)
+  const card = advisorCardOf(sprite, advisorOf(JEV), isLogged ? LOG : [])
+  return { card, tileColumns: TILE_COLUMNS, palette: definition.band,
+    tile: advisorTileGridOf(sprite, card.pose, 0), member: tileGridOf(definition, 'working', 'working', 0),
+    empty: gameStrings().text.advisorEmpty }
 }
 `
 
@@ -64,6 +85,75 @@ font-style:normal;text-align:center;overflow:hidden}
 </style><div id="g">${cells}</div>`
 }
 
+const TERMINAL = 0x111111
+const NAMED = { green: 0x5fd75f, yellow: 0xffd75f, red: 0xff5f5f, cyan: 0x5fd7d7, dim: 0x808080 }
+const colorOf = (name) => NAMED[name] ?? Number.parseInt(name.slice(1), 16)
+const GESTURE_COLORS = { lowered: 'green', raised: 'yellow', unsure: 'yellow', escalated: 'red' }
+
+// Approximates the card's Ink layout: round border, the tile, then text cut to the room left.
+const cardGridOf = (columns, tile, tileColumns, lines, border) => {
+  const room = columns - tileColumns - 3
+  const tileRows = tile.length / tileColumns
+  const rows = Math.max(tileRows, lines.length)
+  const grid = []
+  const put = (glyph, fg) => grid.push([glyph.codePointAt(0), fg, TERMINAL])
+  const edge = (left, right) => {
+    put(left, border)
+    for (let x = 1; x < columns - 1; x += 1) {
+      put('─', border)
+    }
+    put(right, border)
+  }
+  edge('╭', '╮')
+  for (let row = 0; row < rows; row += 1) {
+    put('│', border)
+    for (let x = 0; x < tileColumns; x += 1) {
+      grid.push(row < tileRows ? tile[row * tileColumns + x] : [0x20, TERMINAL, TERMINAL])
+    }
+    put(' ', TERMINAL)
+    const glyphs = (lines[row] ?? []).flatMap(([text, color], index) =>
+      [...(index === 0 ? text : ` ${text}`)].map((glyph) => [glyph, colorOf(color)])
+    )
+    const shown =
+      glyphs.length > room ? [...glyphs.slice(0, room - 1), ['…', glyphs[room - 1][1]]] : glyphs
+    for (let x = 0; x < room; x += 1) {
+      put(shown[x]?.[0] ?? ' ', shown[x]?.[1] ?? TERMINAL)
+    }
+    put('│', border)
+  }
+  edge('╰', '╯')
+  return grid
+}
+
+const cardsGridOf = (columns, { card, tile, member, tileColumns, palette, empty }) => {
+  const header = [
+    [`◆ ${card.name}`, palette.gold],
+    [card.badge, palette.parchment],
+    [card.line ?? '', 'dim']
+  ]
+  const rows =
+    card.rows.length === 0
+      ? [[[empty, 'dim']]]
+      : card.rows.map((row) => [[row.text, GESTURE_COLORS[row.gesture] ?? palette.parchment]])
+  const memberLines = [
+    [
+      ['lead', 'cyan'],
+      ['working', 'cyan']
+    ],
+    [['editing scene-hd.ts', '#dddddd']]
+  ]
+  return [
+    ...cardGridOf(columns, member, tileColumns, memberLines, colorOf('cyan')),
+    ...cardGridOf(
+      columns,
+      tile,
+      tileColumns,
+      [header.filter(([text]) => text !== ''), ...rows],
+      colorOf(palette.gold)
+    )
+  ]
+}
+
 const main = async () => {
   await mkdir(out, { recursive: true })
   const bundle = join(out, 'scene-entry.mjs')
@@ -75,7 +165,7 @@ const main = async () => {
     outfile: bundle,
     logLevel: 'warning'
   })
-  const { SCENE_IDS, gridOf, sceneOfFile } = await import(pathToFileURL(bundle).href)
+  const { SCENE_IDS, gridOf, cardsOf, sceneOfFile } = await import(pathToFileURL(bundle).href)
   const custom = sceneFile === undefined ? [] : [sceneOfFile(await readFile(sceneFile, 'utf8'))]
   const browser = await chromium.launch()
   const page = await browser.newPage({ deviceScaleFactor: 1 })
@@ -123,6 +213,20 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
     const names = shots.slice(before).map((path) => path.slice(out.length + 1, -'.png'.length))
     await sheetOf(id, names)
   }
+  const cardShots = shots.length
+  for (const scene of [...SCENE_IDS, ...custom]) {
+    const id = typeof scene === 'string' ? scene : 'scene-file'
+    for (const columns of [60, 40]) {
+      for (const isLogged of [true, false]) {
+        const grid = cardsGridOf(columns, cardsOf({ scene, isLogged }))
+        await shoot(`card-${id}-${isLogged ? 'logged' : 'empty'}-${columns}`, grid, columns)
+      }
+    }
+  }
+  await sheetOf(
+    'cards',
+    shots.slice(cardShots).map((path) => path.slice(out.length + 1, -'.png'.length))
+  )
   await browser.close()
   await rm(bundle)
   await writeFile(join(out, 'index.txt'), `${shots.join('\n')}\n`)

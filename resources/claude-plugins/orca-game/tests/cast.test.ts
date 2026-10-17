@@ -298,6 +298,8 @@ describe('Jev’s advisor', () => {
       expect(
         await pane.find({ type: 'Text', text: /Task a1 · Opus 5\.5·medium · igual/ })
       ).toBeDefined()
+      const tile = await pane.find({ type: 'Raster', key: 'advisor-tile' })
+      expect(tile?.props).toMatchObject({ columns: 22, rows: 4 })
       await pane.unmount()
     }
   )
@@ -310,6 +312,7 @@ describe('Jev’s advisor', () => {
     const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
     expect(await pane.find({ type: 'Text', text: /^ ♥ Pet $/ })).toBeDefined()
     expect(await pane.find({ type: 'Box', key: 'advisor-card' })).toBeUndefined()
+    expect(await pane.find({ type: 'Raster', key: 'advisor-tile' })).toBeUndefined()
     await pane.unmount()
   })
 

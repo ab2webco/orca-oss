@@ -1,7 +1,8 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { GameAgent } from '../types'
-import { advisorCard } from './advisor-card'
+import { advisorCard, advisorCardViewOf } from './advisor-card'
+import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { petLabelOf } from './band-chips'
 import { fitCells } from './cell-width'
 import {
@@ -82,12 +83,17 @@ export const registerFleetPane = (on: On): void => {
         {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
-    const advisor = await advisorCard($, e, palette)
+    const advisorView = await advisorCardViewOf($)
+    const advisorTiles = advisorView === null ? [] : [advisorView.tile]
+    const advisorOf = (art: Map<string, RenderElement>) =>
+      advisorView === null
+        ? null
+        : advisorCard($, e, palette, advisorView.card, art.get(ADVISOR_TILE_KEY))
     if (v.state === null) {
       return (
         <Box flexDirection="column">
           <Text dimColor>{`${text.fleet} · ${v.note === '' ? text.loading : v.note}`}</Text>
-          {advisor}
+          {advisorOf(await animate($, e, advisorTiles))}
           {menuRow}
         </Box>
       )
@@ -114,7 +120,8 @@ export const registerFleetPane = (on: On): void => {
         rows: TILE_ROWS,
         draw: (at: number) =>
           tileCellsOf(scene, member.isDone ? 'handed' : member.phase, member.state, at, member.mood)
-      }))
+      })),
+      ...advisorTiles
     ])
     const counts = countsOf(state.agents)
     const needs = needsOf(state)
@@ -257,7 +264,7 @@ export const registerFleetPane = (on: On): void => {
             </Box>
           </Box>
         ))}
-        {advisor}
+        {advisorOf(art)}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>

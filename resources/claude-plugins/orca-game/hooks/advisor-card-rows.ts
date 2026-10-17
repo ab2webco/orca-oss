@@ -15,6 +15,8 @@ export type AdvisorCard = {
   badge: string
   line: string | null
   rows: AdvisorCardRow[]
+  /** The latest decision's gesture, which the card's tile poses as. */
+  pose: AdvisorGesture | null
 }
 
 const modelEffortOf = (model: string | null, effort: string | number | null): string =>
@@ -42,10 +44,12 @@ export const advisorCardOf = (
 ): AdvisorCard => {
   const decisions = log.length > 0 ? log : advisor.subagents.map(decisionOf)
   const line = advisor.line?.trim().split('\n')[0]?.trim() ?? ''
+  const rows = decisions.slice(-CARD_ROWS).map(rowOf)
   return {
     name: localizedNameOf(sprite.name ?? gameStrings().text.advisor),
     badge: modelEffortOf(advisor.model, advisor.effort),
     line: line === '' ? null : line,
-    rows: decisions.slice(-CARD_ROWS).map(rowOf)
+    rows,
+    pose: rows.at(-1)?.gesture ?? null
   }
 }

@@ -66,6 +66,14 @@ describe('advisorCardOf', () => {
     expect(card.rows.map((one) => one.gesture)).toEqual(['approved', 'lowered', 'approved'])
   })
 
+  it('poses as the latest decision, and idle with none or one without a gesture', () => {
+    expect(
+      advisorCardOf(REFEREE, jev(), [entry('a1'), entry('a2', { gesture: 'raised' })]).pose
+    ).toBe('raised')
+    expect(advisorCardOf(REFEREE, jev(), [entry('a1', { gesture: null })]).pose).toBeNull()
+    expect(advisorCardOf(REFEREE, jev(), []).pose).toBeNull()
+  })
+
   it('falls back to the agents running now when nothing is logged yet', () => {
     const card = advisorCardOf(
       REFEREE,
