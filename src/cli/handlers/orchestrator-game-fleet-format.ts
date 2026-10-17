@@ -23,7 +23,8 @@ export type SweepClose =
 
 export type GameSweepResult = {
   closed: boolean
-  finished: (GameSweepEntry & { closed?: SweepClose | null })[]
+  /** `history` says why a member's record was not written; it is freed anyway. */
+  finished: (GameSweepEntry & { closed?: SweepClose | null; history?: string })[]
 }
 
 export type GamePushResult = {
@@ -99,7 +100,7 @@ export function formatSweep(sweep: GameSweepResult): string {
   }
   const lines = sweep.finished.map(
     (entry) =>
-      `${ticketLabel(entry.row)} ${entry.row.review ?? ''}${formatSweepClose(entry.closed)}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}`
+      `${ticketLabel(entry.row)} ${entry.row.review ?? ''}${formatSweepClose(entry.closed)}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}${entry.history ? `\n  history ${entry.history}` : ''}`
   )
   return sweep.closed
     ? lines.join('\n')

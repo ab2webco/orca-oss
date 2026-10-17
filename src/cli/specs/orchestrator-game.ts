@@ -115,6 +115,23 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game member CIN-12', 'orca game member CIN-12 --json']
   },
   {
+    path: ['game', 'history'],
+    summary:
+      "The project's members already freed: ticket, outcome, PR, agent, account and last report",
+    usage: 'orca game history [--ticket <id>] [--since <date>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'since'],
+    notes: [
+      '`game sweep --close` and `game stop` write one record per member before freeing it; outcomes: merged, qa, stopped, failed, limited.',
+      'Kept per project on the Orca host that runs the lead (also for SSH and folder projects), the last 200 records; newest first.',
+      '--since takes a date (2026-10-15) or date-time; it compares with when the member was freed. Read-only.'
+    ],
+    examples: [
+      'orca game history',
+      'orca game history --ticket CIN-12 --json',
+      'orca game history --since 2026-10-15'
+    ]
+  },
+  {
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:
@@ -135,7 +152,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca game sweep [--close] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'close'],
     notes: [
-      "--close releases each finished member's dispatch, or closes its terminal when it has none.",
+      '--close records each finished member in `orca game history`, then releases its dispatch, or closes its terminal when it has none.',
       'Working and waiting members and the lead are never touched; worktrees are left in place.'
     ],
     examples: ['orca game sweep', 'orca game sweep --close --json']
@@ -158,7 +175,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'all'],
     positionalArgs: ['tickets'],
     notes: [
-      "Stops each member's live dispatch, then closes its terminal when the agent is still there.",
+      'Records each member in `orca game history`, stops its live dispatch, then closes its terminal when the agent is still there.',
       'Never touches the lead. Worktrees are left in place.',
       'Name tickets or pass --all; each member is reported stopped, already stopped or failed.'
     ],

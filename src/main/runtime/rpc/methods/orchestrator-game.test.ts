@@ -56,4 +56,66 @@ describe('game.state RPC', () => {
     await expect(open('javascript:alert(1)')).resolves.toMatchObject({ ok: false })
     expect(opened).toEqual(['https://github.com/o/r/pulls'])
   })
+
+  it('records a freed member for the caller project, refusing a malformed record', async () => {
+    const recorded: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      recordGameHistory: async (args: unknown) => {
+        recorded.push(args)
+        return { recorded: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const record = {
+      ticket: 'CIN-1',
+      repo: null,
+      branch: 'cin-1',
+      agent: 'claude',
+      account: null,
+      launchedAt: null,
+      endedAt: '2026-10-16T10:00:00.000Z',
+      outcome: 'merged',
+      pr: '#41 merged',
+      lastReport: null
+    }
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'h', authToken: 'test', method: 'game.historyRecord', params })
+
+    await expect(
+      send({ worktreeId: 'wt1', memberWorktreeId: 'wt-cin-1', record })
+    ).resolves.toMatchObject({ ok: true, result: { recorded: true } })
+    await expect(
+      send({ worktreeId: 'wt1', record: { ...record, outcome: 'won' } })
+    ).resolves.toMatchObject({
+      ok: false
+    })
+    expect(recorded).toEqual([
+      { worktreeId: 'wt1', terminalHandle: undefined, memberWorktreeId: 'wt-cin-1', record }
+    ])
+  })
+
+  it("lists the caller project's history with its filters", async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      listGameHistory: async (args: unknown) => {
+        asked.push(args)
+        return { records: [] }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await expect(
+      dispatcher.dispatch({
+        id: 'l',
+        authToken: 'test',
+        method: 'game.history',
+        params: { terminalHandle: 'h1', ticket: 'CIN-1', since: '2026-10-01' }
+      })
+    ).resolves.toMatchObject({ ok: true, result: { records: [] } })
+    expect(asked).toEqual([
+      { worktreeId: undefined, terminalHandle: 'h1', ticket: 'CIN-1', since: '2026-10-01' }
+    ])
+  })
 })

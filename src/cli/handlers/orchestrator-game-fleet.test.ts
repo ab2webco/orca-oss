@@ -103,6 +103,15 @@ const run = (
 
 const methods = (calls: [string, unknown][]) => calls.map(([method]) => method)
 
+// Why: freeing a member first records it; these reads and the write are checked on their own.
+const HISTORY_CALLS = new Set([
+  'game.historyRecord',
+  'orchestration.inbox',
+  'orchestration.workerShow'
+])
+const freeing = (calls: [string, unknown][]) =>
+  calls.filter(([method]) => !HISTORY_CALLS.has(method))
+
 describe('orca game fleet verbs', () => {
   const saved = { ...process.env }
   let output: string[] = []
@@ -293,7 +302,7 @@ describe('orca game fleet verbs', () => {
 
     await run('game sweep', client, [['close', true]])
 
-    expect(calls.slice(1)).toEqual([
+    expect(freeing(calls.slice(1))).toEqual([
       ['orchestration.workerList', {}],
       ['orchestration.workerRelease', { dispatch: 'd9' }],
       ['terminal.close', { terminal: 'term_8' }]
@@ -325,6 +334,98 @@ describe('orca game fleet verbs', () => {
 
     expect(methods(calls)).not.toContain('terminal.close')
     expect(process.exitCode).toBe(1)
+  })
+
+  it('sweep --close records each finished member in the history before freeing it', async () => {
+    const agents = [
+      LEAD,
+      member({
+        paneKey: 'f',
+        displayName: 'CIN-9',
+        review: merged,
+        terminalHandle: 'term_9',
+        workItem: {
+          provider: 'jira',
+          identifier: 'CIN-9',
+          title: 't',
+          url: 'u',
+          status: 'QA',
+          statusGroup: 'review'
+        },
+        account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' },
+        worktree: { id: 'wt_9', branch: 'cin-9', displayName: 'cin-9' }
+      })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [{ dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' }],
+        counts: {}
+      },
+      'orchestration.workerShow': { worker: { created_at: '2026-10-16 09:00:00' } },
+      'orchestration.inbox': {
+        messages: [
+          {
+            from_handle: 'term_9',
+            to_handle: 'term_lead',
+            type: 'worker_done',
+            subject: 'done',
+            body: 'CIN-9 merged, moved to QA',
+            created_at: '2026-10-16 11:00:00'
+          }
+        ],
+        count: 1
+      },
+      'game.historyRecord': { recorded: true, count: 1 }
+    })
+
+    await run('game sweep', client, [['close', true]])
+
+    const order = methods(calls)
+    expect(order.indexOf('game.historyRecord')).toBeLessThan(
+      order.indexOf('orchestration.workerRelease')
+    )
+    expect(calls.find(([method]) => method === 'game.historyRecord')?.[1]).toEqual({
+      worktreeId: 'wt1',
+      terminalHandle: 'term_lead',
+      memberWorktreeId: 'wt_9',
+      record: expect.objectContaining({
+        ticket: 'CIN-9',
+        branch: 'cin-9',
+        agent: 'claude',
+        account: 'ana@example.com',
+        launchedAt: '2026-10-16 09:00:00',
+        outcome: 'qa',
+        pr: '#41 merged',
+        lastReport: 'CIN-9 merged, moved to QA'
+      })
+    })
+  })
+
+  it('still frees a member when its record cannot be written, and says so', async () => {
+    const agents = [
+      LEAD,
+      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [{ dispatchId: 'd9', agentTerminalHandle: 'term_9', terminalState: 'active' }],
+        counts: {}
+      }
+    })
+    const call = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      if (method === 'game.historyRecord') {
+        throw new Error('Unknown method: game.historyRecord')
+      }
+      return call(method, params)
+    }) as typeof client.call
+
+    await run('game sweep', client, [['close', true]])
+
+    expect(methods(calls)).toContain('orchestration.workerRelease')
+    expect(printed().finished[0]).toEqual(
+      expect.objectContaining({ history: 'not recorded: Unknown method: game.historyRecord' })
+    )
   })
 
   it('push sends the continue prompt only to idle members', async () => {
@@ -430,7 +531,7 @@ describe('orca game fleet verbs', () => {
 
       await run('game stop', client, [['all', true]])
 
-      expect(calls.slice(1)).toEqual([
+      expect(freeing(calls.slice(1))).toEqual([
         ['orchestration.workerList', {}],
         ['orchestration.workerStop', { dispatch: 'd1' }],
         ['orchestration.workerStop', { dispatch: 'd2' }],
@@ -480,7 +581,7 @@ describe('orca game fleet verbs', () => {
 
       await run('game stop', client, [['tickets', 'cin-1,CIN-9']])
 
-      expect(calls.slice(1)).toEqual([
+      expect(freeing(calls.slice(1))).toEqual([
         ['orchestration.workerList', {}],
         ['orchestration.workerStop', { dispatch: 'd1' }],
         ['terminal.close', { terminal: 'term_new' }]
@@ -556,6 +657,47 @@ describe('orca game fleet verbs', () => {
           reason: 'dispatch stop failed: runtime gone'
         })
       ])
+    })
+
+    it('records each member as stopped, limited or failed before stopping it', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' }),
+        member({
+          paneKey: 'b',
+          displayName: 'CIN-2',
+          terminalHandle: 'term_2',
+          limit: { resetsAt: null }
+        }),
+        member({ paneKey: 'c', displayName: 'CIN-3', terminalHandle: 'term_3' })
+      ]
+      const { client, calls } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': {
+          workers: [
+            worker('d1', 'term_1', 'ready', 'active'),
+            worker('d2', 'term_2', 'ready', 'active'),
+            worker('d3', 'term_3', 'start_unknown', 'active')
+          ],
+          counts: {}
+        },
+        'orchestration.workerStop': { dispatchId: 'd', state: 'stopped', processAction: 'none' },
+        'game.historyRecord': { recorded: true, count: 1 }
+      })
+
+      await run('game stop', client, [['all', true]])
+
+      const records = calls
+        .filter(([method]) => method === 'game.historyRecord')
+        .map(([, params]) => (params as { record: { ticket: string; outcome: string } }).record)
+      expect(records.map((one) => [one.ticket, one.outcome])).toEqual([
+        ['CIN-1', 'stopped'],
+        ['CIN-2', 'limited'],
+        ['CIN-3', 'stopped']
+      ])
+      const order = methods(calls)
+      expect(order.indexOf('game.historyRecord')).toBeLessThan(
+        order.indexOf('orchestration.workerStop')
+      )
     })
   })
 })

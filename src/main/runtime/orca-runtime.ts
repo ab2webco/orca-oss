@@ -666,6 +666,8 @@ import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orch
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { GameHistoryStore } from './orchestrator-game-history-store'
+import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   accountLimitsOf,
@@ -3598,6 +3600,9 @@ export class OrcaRuntimeService {
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(90_000)
   private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
+  private readonly gameHistory = new GameHistoryStore(() =>
+    join(app.getPath('userData'), 'orchestrator-game-history')
+  )
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -30165,6 +30170,51 @@ export class OrcaRuntimeService {
     }
     await shell.openExternal(url)
     return { opened: true }
+  }
+
+  // Why the lead's repo: history is the project's, kept on this Orca host for local, SSH and folder repos alike.
+  private async gameHistoryProjectOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{
+    key: string
+    worktreesById: Awaited<ReturnType<OrcaRuntimeService['getResolvedWorktreeMap']>>
+  }> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    const worktreeId =
+      args.worktreeId ??
+      (args.terminalHandle
+        ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+        : undefined)
+    const repoId = worktreeId ? worktreesById.get(worktreeId)?.repoId : undefined
+    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
+  }
+
+  async recordGameHistory(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    memberWorktreeId?: string
+    record: GameHistoryRecord
+  }): Promise<{ recorded: true; count: number }> {
+    const { key, worktreesById } = await this.gameHistoryProjectOf(args)
+    const memberRepoId = args.memberWorktreeId
+      ? worktreesById.get(args.memberWorktreeId)?.repoId
+      : undefined
+    const repo =
+      args.record.repo ??
+      (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
+    const records = await this.gameHistory.append(key, { ...args.record, repo })
+    return { recorded: true, count: records.length }
+  }
+
+  async listGameHistory(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket?: string
+    since?: string
+  }): Promise<{ records: GameHistoryRecord[] }> {
+    const { key } = await this.gameHistoryProjectOf(args)
+    return { records: filterGameHistory(await this.gameHistory.list(key), args) }
   }
 
   // Why never throw: an unreadable account must cost the member its tag, not the whole game state.

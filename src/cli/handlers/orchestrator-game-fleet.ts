@@ -15,6 +15,7 @@ import { launchGameMember, readCallerGameState } from './orchestrator-game-launc
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
+import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
@@ -30,6 +31,7 @@ type WorkerRow = {
   dispatchId: string
   agentTerminalHandle: string | null
   terminalState: string | null
+  workerState: string
 }
 
 const TICKET = /^[A-Z0-9][A-Z0-9_-]{0,39}$/
@@ -53,6 +55,14 @@ function ticketsOf(flags: Map<string, string | boolean>): string[] {
   return tickets
 }
 
+// Why: a terminal reused across dispatches keeps its released rows; only a live one owns it now.
+const liveDispatchOf = (handle: string | null, workers: WorkerRow[]): WorkerRow | undefined =>
+  handle === null
+    ? undefined
+    : workers.findLast(
+        (worker) => worker.agentTerminalHandle === handle && worker.terminalState !== 'released'
+      )
+
 async function closeFinished(
   client: Client,
   entry: GameSweepEntry,
@@ -62,10 +72,7 @@ async function closeFinished(
   if (!handle) {
     return null
   }
-  // Why: a terminal reused across dispatches keeps its released rows; only a live one owns it now.
-  const dispatch = workers.findLast(
-    (worker) => worker.agentTerminalHandle === handle && worker.terminalState !== 'released'
-  )
+  const dispatch = liveDispatchOf(handle, workers)
   try {
     if (dispatch) {
       const { result } = await client.call<{
@@ -156,8 +163,19 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
       const { result } = await client.call<{ workers: WorkerRow[] }>('orchestration.workerList', {})
       sweep.finished = []
       for (const entry of entries) {
+        const member = agentOfRow(response.result, entry.row)
+        const history = member
+          ? await recordFreedMember({
+              client,
+              member,
+              freedBy: 'sweep',
+              workers: result.workers,
+              dispatch: liveDispatchOf(entry.row.terminalHandle, result.workers)
+            })
+          : null
         sweep.finished.push({
           ...entry,
+          ...(history ? { history } : {}),
           closed: await closeFinished(client, entry, result.workers)
         })
       }

@@ -1,5 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-fleet-verbs'
+import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -21,6 +22,8 @@ export type GameStopEntry = {
   dispatchState?: string
   closedTerminal?: string
   reason?: string
+  /** Why its history record was not written; it is stopped anyway. */
+  history?: string
 }
 
 export type GameStopResult = { members: GameStopEntry[] }
@@ -111,7 +114,12 @@ export async function stopGameMembers(
       {}
     )
     for (const target of targets) {
-      members.push(await stopOne(client, target, result.workers))
+      const member = agentOfRow(state, target.row)
+      const history = member
+        ? await recordFreedMember({ client, member, freedBy: 'stop', workers: result.workers })
+        : null
+      const entry = await stopOne(client, target, result.workers)
+      members.push(history ? { ...entry, history } : entry)
     }
   }
   for (const ticket of missing) {
@@ -138,7 +146,7 @@ export function formatStop(stop: GameStopResult): string {
         member.dispatchId ? `dispatch ${member.dispatchId} ${member.dispatchState ?? '?'}` : '',
         member.closedTerminal ? `closed ${member.closedTerminal}` : ''
       ].filter(Boolean)
-      return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}`
+      return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}${member.history ? `\n  history ${member.history}` : ''}`
     })
     .join('\n')
 }
