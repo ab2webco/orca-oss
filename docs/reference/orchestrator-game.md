@@ -320,6 +320,7 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN.  # optional: appended to Orca's own rules
     actions: false    # optional: hide Orca's lead buttons and their slash commands (on by default)
+    accounts: auto    # optional: default (Orca's own account selection) or auto (see below)
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
@@ -331,9 +332,23 @@ The lead's verbs, run from the lead's terminal
 - `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
   `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
-  investigation.
-- `orca game fleet` — each member's ticket, state, PR, CI, branch, phase (`needs-you`, `working`,
-  `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
+  investigation. Per-launch overrides of the lead config (also on `game wave`, for every member it
+  launches):
+  - `--agent <id>` — any agent Orca knows (`claude`, `codex`, `gemini`, …); an unknown id is
+    refused. Another agent than the lead's does not inherit the lead's `model`/`effort`.
+  - `--model <id>`, `--effort <level>` — the same values `orchestrator.model`/`effort` take;
+    `--effort` needs a model.
+  - `--account <email|id|auto>` — the managed account the member runs on, mapped to worker-start's
+    `--claude-account` or `--codex-account` by the agent. Only `claude` and `codex` have managed
+    accounts; another provider's account, or an account for any other agent, is refused. `auto` is
+    the pick below. The result names the agent and the account.
+  - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
+    3 s apart, with the same orchestration request id, so the runtime never starts a second member
+    for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
+  `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
+  `orchestration worker-start --on` refuses account pins because the server resolves its own).
+- `orca game fleet` — each member's ticket, state, PR, CI, branch, agent, account, phase
+  (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
@@ -347,11 +362,52 @@ The lead's verbs, run from the lead's terminal
   dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
+- `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
+  reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
+  usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
+  No credentials. `--refresh` asks the providers first; Orca reads an inactive account's usage
+  lazily, so without it an account can read `unknown`.
+- `orca game move <ticket> [--account <email|id|auto>] [--dry-run]` — moves a member to another
+  account of its agent (`auto`, the default, excludes the one it is on). A Claude member is switched
+  in its own terminal and resumes the same session through Orca's in-place switch
+  (`orca account switch --terminal`); a Codex member is stopped and started again in its own
+  worktree on the new account, linked to the old dispatch with `--retry-of`. When every other
+  account is near or limited, nothing moves and the result says when the first one is back.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
   reported stopped, already stopped or failed; the lead and the worktrees are never touched. The
   lead's rules tell it to run `game stop --all` at once when the person says stop.
+
+### Accounts and limited members
+
+`accounts: auto` (orca.yaml or the project Settings' **Member accounts**) puts each new member on
+the managed account of its agent with the most free quota
+([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
+
+- An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
+- At 90% or more of either window it is **near** and skipped, as at 100% (**limited**): a member's
+  turn can burn several points of a 5h window, so a launch past 90% would stop mid-ticket.
+- Accounts within 5 points of each other tie; the tie goes to the one with fewer of this lead's
+  members (including the ones the same `game wave` just launched).
+- An account with no usage reading is **unknown** and ranks after every known-free one; when one is
+  unknown, Orca refreshes usage once (bounded to 20 s) before picking.
+- Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
+  fail are picked. An agent without managed accounts launches on its own login.
+- When every account is near or limited the launch is refused with when the first is back.
+  `default` (or unset) keeps Orca's own account selection.
+
+A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
+that has not reset, or its terminal shows a provider usage-limit message while its account is not
+verifiably back under its limit (the same guard Orca's auto-switch uses)
+([`orchestrator-game-member-limit.ts`](../../src/shared/orchestrator-game-member-limit.ts)).
+`game state` carries it as the member's `limit: { resetsAt }`, and each member's account as
+`account: { provider, id, email }`. `game fleet` shows the phase `limited` with `game move` as the
+next step, `game push` leaves it alone, and the Panel card turns red with `limited · back in 1h 30m`
+(Spanish `limitado · vuelve en 1h 30m`, and the mod's other languages). Every card carries a dim
+`codex · ana@…` tag: the email's domain never shows, and the name shortens, then drops, as the card
+narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
+its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
 
 ## Built-in scenes
 

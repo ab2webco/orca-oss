@@ -156,6 +156,19 @@ export const DEMO_FRAMES = SCRIPT.length
 
 const DEMO_URL = 'https://example.invalid/demo'
 const DEMO_LIMIT_MS = 90 * 60_000
+
+// Members on other agents and managed accounts, so the Panel shows each card's tag.
+const DEMO_SEAT_AGENTS: Readonly<Record<string, Pick<GameAgent, 'agentType' | 'account'>>> = {
+  builder: {
+    agentType: 'claude',
+    account: { provider: 'claude', id: 'demo-ana', email: 'ana.lopez@example.invalid' }
+  },
+  tester: {
+    agentType: 'codex',
+    account: { provider: 'codex', id: 'demo-bo', email: 'bo@example.invalid' }
+  },
+  scribe: { agentType: 'claude' }
+}
 const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
   failure: 'danger',
   success: 'success',
@@ -235,7 +248,7 @@ const stateOf = (step: Step): GameState => ({
     ...step.seats.map(([name, state, tool]) => ({
       paneKey: `demo-${name}`,
       displayName: name,
-      agentType: 'claude',
+      ...(DEMO_SEAT_AGENTS[name] ?? { agentType: 'claude' }),
       state,
       toolName: tool,
       isLeader: false,

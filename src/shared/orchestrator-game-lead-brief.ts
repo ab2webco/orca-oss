@@ -41,6 +41,19 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `- ${run('game push')} tells stopped members to continue; one waiting on a question is left to you.`,
     `- When the person says stop/detener, run ${run('game stop --all')} at once, then confirm what stopped;`,
     "  don't relaunch or re-arm watchers until asked.",
+    '- The person may ask for an agent or an account per ticket ("lanza CIN-1 con Codex"): pass',
+    '  `--agent <id>`, `--account <email|id>`, `--model <id>` or `--effort <level>` to game launch or game wave.',
+    `- ${run('game accounts')} lists each managed account per agent with its 5h and 7d use, when it resets`,
+    '  and the members on it; read it before choosing an account or answering about quota.',
+    ...(lead.accounts === 'auto'
+      ? [
+          "- This project uses accounts: auto: Orca puts each member on its agent's freest account, so",
+          "  don't pick an account yourself unless the person names one."
+        ]
+      : []),
+    `- A member in phase \`limited\` hit its account's usage limit: ${run('game move <ticket>')} moves it to`,
+    '  another account of its agent. When every account is limited, tell the person when the first account is back',
+    '  and wait; then push it. A launch that fails on the network is retried by Orca; say so only if it still fails.',
     `- ${run('game state --json')} lists every member (\`isMember\`) with its state, PR, CI and ticket.`,
     `- For anything else about members, load ${run('skills get orchestration')}.`
   ]

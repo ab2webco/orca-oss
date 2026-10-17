@@ -22,7 +22,7 @@ import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
-import { limitTagOf } from './member-tags'
+import { agentTagOf, cardTagRoomOf, limitTagOf } from './member-tags'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
@@ -176,7 +176,21 @@ export const registerFleetPane = (on: On): void => {
                   <Text color={palette.gold}>{`♛ ${leadTitleOf(state, text.lead)}`}</Text>
                 )}
                 <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
-                <Text dimColor>{agent.agentType}</Text>
+                <Text dimColor wrap="truncate-end">
+                  {agentTagOf(
+                    agent,
+                    cardTagRoomOf(
+                      cardRoom,
+                      [
+                        agent.displayName,
+                        text.agentStates[agent.state],
+                        ...(agent.isLeader ? [`♛ ${leadTitleOf(state, text.lead)}`] : []),
+                        ...(agent.terminalHandle === undefined ? [] : [` ${text.view} `])
+                      ],
+                      agent.worktree !== undefined
+                    )
+                  )}
+                </Text>
                 {agent.worktree !== undefined && (
                   <Text
                     dimColor

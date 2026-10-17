@@ -60,10 +60,13 @@ export function formatFleet(fleet: GameFleet): string {
     row.review ?? '-',
     row.ci ?? '-',
     row.branch ?? '-',
+    row.agent ?? '-',
+    row.account ?? '-',
     row.next,
     row.name
   ])
-  return `${head}\n${tableOf([['PHASE', 'TICKET', 'STATUS', 'STATE', 'PR', 'CI', 'BRANCH', 'NEXT', 'NAME'], ...rows])}`
+  const header = ['PHASE', 'TICKET', 'STATUS', 'STATE', 'PR', 'CI', 'BRANCH', 'AGENT', 'ACCOUNT']
+  return `${head}\n${tableOf([[...header, 'NEXT', 'NAME'], ...rows])}`
 }
 
 export function formatWave(wave: GameWaveResult): string {

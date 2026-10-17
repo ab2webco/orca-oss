@@ -71,4 +71,23 @@ describe('gameLeadBriefOf', () => {
       true
     )
   })
+
+  it('names the account tools, lets the person pick an agent or account per ticket, and handles a limited member', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('`orca game accounts`')
+    expect(brief).toContain('"lanza CIN-1 con Codex"')
+    expect(brief).toContain('--agent <id>')
+    expect(brief).toContain('--account <email|id>')
+    expect(brief).toContain('`orca game move <ticket>`')
+    expect(brief).toContain('when the first account is back')
+    expect(brief).not.toContain('accounts: auto')
+  })
+
+  it('leaves the account to Orca with accounts: auto unless the person names one', () => {
+    const brief = gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, accounts: 'auto' }, 'cineco')
+
+    expect(brief).toContain('accounts: auto')
+    expect(brief).toContain("don't pick an account yourself unless the person names one")
+  })
 })

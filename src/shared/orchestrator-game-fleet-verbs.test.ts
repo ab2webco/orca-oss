@@ -192,6 +192,24 @@ describe('gameFleetReportOf', () => {
     )
   })
 
+  it('names the agent and the managed account each member runs on', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          agentType: 'codex',
+          account: { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }
+        }),
+        member({ paneKey: 'g', displayName: 'CIN-2', agentType: 'gemini' })
+      ]
+    }).rows
+
+    expect(rows.map((row) => [row.agent, row.account])).toEqual([
+      ['codex', 'bo@example.com'],
+      ['gemini', null]
+    ])
+  })
+
   it('reads the ticket from the member name or branch when no ticket is linked', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

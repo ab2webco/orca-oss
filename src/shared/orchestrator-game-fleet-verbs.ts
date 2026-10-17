@@ -23,6 +23,9 @@ export type GameFleetRow = {
   phase: GameMemberPhase
   next: string
   terminalHandle: string | null
+  agent: string | null
+  /** The managed account's email; null when Orca's own selection applies or it cannot tell. */
+  account: string | null
   /** When a limited member's account resets (ISO); null when unknown or not limited. */
   limitedUntil: string | null
 }
@@ -122,6 +125,8 @@ function rowOf(agent: GameAgent): GameFleetRow {
     phase,
     next: nextOf(agent, phase),
     terminalHandle: agent.terminalHandle ?? null,
+    agent: agent.agentType,
+    account: agent.account?.email ?? null,
     limitedUntil:
       agent.limit?.resetsAt === null || agent.limit === undefined
         ? null

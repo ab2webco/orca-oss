@@ -145,7 +145,14 @@ describe('orca game fleet verbs', () => {
   it('fleet text counts limited members and says how to move them', async () => {
     const { client } = fakeClient(
       stateWith({
-        agents: [LEAD, member({ state: 'idle', limit: { resetsAt: null } })]
+        agents: [
+          LEAD,
+          member({
+            state: 'idle',
+            limit: { resetsAt: null },
+            account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' }
+          })
+        ]
       })
     )
 
@@ -159,6 +166,8 @@ describe('orca game fleet verbs', () => {
     const text = output.join('\n')
     expect(text).toContain('limited 1')
     expect(text).toMatch(/limited\s+CIN-1.*game move CIN-1, or wait for the reset/)
+    expect(text).toMatch(/AGENT\s+ACCOUNT/)
+    expect(text).toMatch(/claude\s+ana@example\.com/)
   })
 
   it('wave --dry-run plans from the To Do without launching anything', async () => {

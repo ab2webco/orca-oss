@@ -34,9 +34,13 @@ export type GameAgent = {
   workItem?: GameWorkItem
   /** Set while a member is stopped by its account's usage limit; `resetsAt` is Unix ms. */
   limit?: GameMemberLimit
+  /** The managed account a member's agent runs on; absent when Orca's own selection applies. */
+  account?: GameMemberAccount
 }
 
 export type GameMemberLimit = { resetsAt: number | null }
+
+export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 
 export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 

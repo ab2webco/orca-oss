@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
-import { limitTagOf } from '../hooks/member-tags'
+import { agentTagOf, cardTagRoomOf, limitTagOf } from '../hooks/member-tags'
 
 const NOW = 1_000_000
 const MINUTE = 60_000
@@ -45,5 +45,30 @@ describe('member limit', () => {
     } finally {
       setGameLocale('en')
     }
+  })
+})
+
+describe('member agent and account tag', () => {
+  const account = { provider: 'codex', id: 'acct_ana', email: 'ana.lopez@example.com' }
+
+  it("keeps a member's account and drops a malformed one", () => {
+    expect(parseGameState(stateWith({ account }))?.agents[0]?.account).toEqual(account)
+    expect(
+      parseGameState(stateWith({ account: { provider: 'codex', id: 'x' } }))?.agents[0]?.account
+    ).toBeUndefined()
+  })
+
+  it('names the agent and the account, never the whole email, shorter as the room shrinks', () => {
+    expect(agentTagOf({ agentType: 'codex', account }, 40)).toBe('codex · ana.lopez@…')
+    expect(agentTagOf({ agentType: 'codex', account }, 14)).toBe('codex · ana…@…')
+    expect(agentTagOf({ agentType: 'codex', account }, 8)).toBe('codex')
+    expect(agentTagOf({ agentType: 'gemini' }, 40)).toBe('gemini')
+  })
+})
+
+describe('card tag room', () => {
+  it("leaves the tag what the header's other parts and their gaps do not take", () => {
+    expect(cardTagRoomOf(31, ['builder', 'trabajando'], false)).toBe(12)
+    expect(cardTagRoomOf(31, ['builder', 'trabajando'], true)).toBe(3)
   })
 })
