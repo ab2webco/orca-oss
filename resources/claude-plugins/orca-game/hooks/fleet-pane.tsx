@@ -181,7 +181,9 @@ export const registerFleetPane = (on: On): void => {
             leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
             tile: art.get(`tile-${member.key}`),
             view:
-              agent.terminalHandle === undefined ? null : view(agent, agent.terminalHandle, index),
+              agent.terminalHandle === undefined
+                ? undefined
+                : view(agent, agent.terminalHandle, index),
             advisorRows: advisorRowsOf(agent),
             link
           })

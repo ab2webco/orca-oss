@@ -27,8 +27,8 @@ export type MemberCardParts = {
   scene: SceneDefinition
   room: number
   leadTitle: string | null
-  tile: RenderElement | undefined
-  view: RenderElement | null
+  tile?: RenderElement
+  view?: RenderElement
   advisorRows: RenderElement[]
   link: (key: string, url: string, label: string, child: RenderElement) => RenderElement
 }
@@ -60,7 +60,7 @@ export function memberCard(
   const color = AGENT_COLORS[agent.state]
   const heading = memberHeadingOf(agent)
   const crown = parts.leadTitle === null ? '' : `♛ ${parts.leadTitle}`
-  const viewCells = parts.view === null ? 0 : cellWidthOf(` ${text.view} `) + HOTKEY_CELLS + 1
+  const viewCells = parts.view === undefined ? 0 : cellWidthOf(` ${text.view} `) + HOTKEY_CELLS + 1
   const crownCells = crown === '' ? 0 : cellWidthOf(crown) + 1
   const head = memberHeadOf(
     heading.name,
