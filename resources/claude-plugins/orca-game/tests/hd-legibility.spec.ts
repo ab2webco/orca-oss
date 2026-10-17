@@ -104,7 +104,7 @@ const SKY_ROWS = 2
 const skyAt = (scene: SceneDefinition, phase: ScenePhase, hour: number): number[] =>
   hdSceneGridOf({
     scene,
-    phase,
+    phase: phase === 'working' ? undefined : phase,
     columns: 120,
     rows: 9,
     tick: 41,

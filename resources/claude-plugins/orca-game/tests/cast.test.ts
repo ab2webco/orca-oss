@@ -1,6 +1,6 @@
 // Runs under `claude plugin test`: the scene's pet, and Jev's advisor acting out its decisions.
 import { describe, expect, mock, test } from 'claude-code/testing'
-import type { Plugin } from 'claude-code/testing'
+import type { Plugin, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { QUEST_SCENE } from '../hooks/scenes/quest'
@@ -203,7 +203,7 @@ const LOWERED = JSON.stringify(
   ])
 )
 
-const spinnerCells = async ($: Parameters<Parameters<typeof test>[2]>[0]) => {
+const spinnerCells = async ($: Parameters<TestBody>[0]) => {
   const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
   const raster = await spinner.find({ type: 'Raster' })
   await spinner.unmount()

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
 import { agentTagOf, cardTagRoomOf, limitTagOf } from '../hooks/member-tags'
+import type { GameMemberAccount } from '../types'
 
 const NOW = 1_000_000
 const MINUTE = 60_000
@@ -49,7 +50,11 @@ describe('member limit', () => {
 })
 
 describe('member agent and account tag', () => {
-  const account = { provider: 'codex', id: 'acct_ana', email: 'ana.lopez@example.com' }
+  const account: GameMemberAccount = {
+    provider: 'codex',
+    id: 'acct_ana',
+    email: 'ana.lopez@example.com'
+  }
 
   it("keeps a member's account and drops a malformed one", () => {
     expect(parseGameState(stateWith({ account }))?.agents[0]?.account).toEqual(account)
