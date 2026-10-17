@@ -8,6 +8,7 @@ import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
+import type { GameInboxSummary } from './orchestrator-game-inbox'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -113,6 +114,8 @@ export type OrchestratorGameState = {
   role?: 'lead' | 'member'
   /** The project's persistent STOP, null when clear; absent from a host older than it. */
   stopped?: GameStop | null
+  /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
+  inboxes?: GameInboxSummary[]
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

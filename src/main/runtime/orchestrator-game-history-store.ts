@@ -12,7 +12,29 @@ import {
   type GameEvent
 } from '../../shared/orchestrator-game-events'
 
-type ProjectLog = { records: GameHistoryRecord[]; events: GameEvent[] }
+type ProjectLog = {
+  records: GameHistoryRecord[]
+  events: GameEvent[]
+  /** Per inbox (`lead` or a ticket), the newest orchestration message sequence the board marked read. */
+  cursors: Record<string, number>
+}
+
+// Why bounded: one cursor per ticket ever launched would grow without end.
+const CURSORS_MAX = 200
+
+function cursorsOf(parsed: unknown): Record<string, number> {
+  const raw =
+    typeof parsed === 'object' && parsed !== null && 'cursors' in parsed ? parsed.cursors : null
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      (entry): entry is [string, number] =>
+        entry[0].length <= 40 && typeof entry[1] === 'number' && Number.isFinite(entry[1])
+    )
+  )
+}
 
 const listOf = <T>(parsed: unknown, key: string, parse: (raw: unknown) => T | null): T[] => {
   const list =
@@ -35,6 +57,22 @@ export class GameHistoryStore {
 
   async events(projectKey: string): Promise<GameEvent[]> {
     return (await this.read(projectKey)).events
+  }
+
+  async cursors(projectKey: string): Promise<Record<string, number>> {
+    return (await this.read(projectKey)).cursors
+  }
+
+  /** Moves an inbox's read cursor forward, never back. */
+  async markInboxRead(projectKey: string, inbox: string, sequence: number): Promise<void> {
+    await this.update(projectKey, (current) => {
+      if ((current.cursors[inbox] ?? 0) >= sequence) {
+        return null
+      }
+      const { [inbox]: _old, ...others } = current.cursors
+      const kept = Object.entries(others).slice(-(CURSORS_MAX - 1))
+      return { ...current, cursors: { ...Object.fromEntries(kept), [inbox]: sequence } }
+    })
   }
 
   async append(projectKey: string, record: GameHistoryRecord): Promise<GameHistoryRecord[]> {
@@ -61,17 +99,18 @@ export class GameHistoryStore {
     try {
       text = await readFile(this.fileOf(projectKey), 'utf8')
     } catch {
-      return { records: [], events: [] }
+      return { records: [], events: [], cursors: {} }
     }
     try {
       const parsed: unknown = JSON.parse(text)
       return {
         records: listOf(parsed, 'records', parseGameHistoryRecord),
-        events: listOf(parsed, 'events', parseGameEvent)
+        events: listOf(parsed, 'events', parseGameEvent),
+        cursors: cursorsOf(parsed)
       }
     } catch {
       // Why: a damaged file must cost the history, never the stop or sweep that writes it.
-      return { records: [], events: [] }
+      return { records: [], events: [], cursors: {} }
     }
   }
 

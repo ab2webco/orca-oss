@@ -43,6 +43,39 @@ describe('orca game state', () => {
     expect(output.join('')).toContain('"mode": "zen"')
   })
 
+  it('says in text when the project is on STOP and how many messages the lead has unread', async () => {
+    const client = {
+      call: async () => ({
+        ok: true,
+        result: {
+          config: { mode: 'on', scene: 'quest' },
+          sources: { mode: 'default' },
+          agents: [],
+          warnings: [],
+          stopped: { since: '2026-10-16T10:00:00.000Z', by: 'lead' },
+          inboxes: [
+            { key: 'lead', unread: 2, last: null },
+            { key: 'CIN-1', unread: 1, last: null },
+            { key: 'CIN-2', unread: 0, last: null }
+          ]
+        }
+      })
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game state']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain(
+      'STOP since 2026-10-16T10:00:00.000Z (by lead): `orca game resume` lifts it'
+    )
+    expect(text).toContain('Inbox: 2 unread; CIN-1 1')
+  })
+
   it('prints the lead brief built from the project lead settings', async () => {
     const client = {
       call: async () => ({

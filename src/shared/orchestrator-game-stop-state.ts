@@ -22,11 +22,15 @@ export function parseGameStop(raw: unknown): GameStop {
   return { since, by: typeof by === 'string' ? by.slice(0, BY_MAX) : null }
 }
 
+/** `STOP since … (by lead)`, or why an unreadable one counts as set. */
+export function gameStopLabel(stop: GameStop): string {
+  return stop.unreadable
+    ? 'STOP (its STOP state cannot be read, so it counts as set)'
+    : `STOP${stop.since ? ` since ${stop.since}` : ''}${stop.by ? ` (by ${stop.by})` : ''}`
+}
+
 export function gameStopRefusal(stop: GameStop, what: string): string {
-  const when = stop.unreadable
-    ? ' (its STOP state cannot be read, so it counts as set)'
-    : `${stop.since ? ` since ${stop.since}` : ''}${stop.by ? ` (by ${stop.by})` : ''}`
-  return `The project is on STOP${when}: ${what} is refused until \`orca game resume\`.`
+  return `The project is on ${gameStopLabel(stop)}: ${what} is refused until \`orca game resume\`.`
 }
 
 /** Reads STOP for `game state`; a read that fails counts as set, with a warning naming why. */

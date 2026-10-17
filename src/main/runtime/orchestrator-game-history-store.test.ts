@@ -106,3 +106,18 @@ describe('GameHistoryStore events', () => {
     expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-3'])
   })
 })
+
+describe('GameHistoryStore inbox cursors', () => {
+  it('moves each inbox cursor forward only, next to the history and events', async () => {
+    const { store: first, dir } = store()
+    await first.append('repo-a', record('CIN-1'))
+    await first.markInboxRead('repo-a', 'lead', 7)
+    await first.markInboxRead('repo-a', 'lead', 3)
+    await first.markInboxRead('repo-a', 'CIN-1', 2)
+
+    const again = new GameHistoryStore(() => dir)
+    expect(await again.cursors('repo-a')).toEqual({ lead: 7, 'CIN-1': 2 })
+    expect(await again.cursors('repo-b')).toEqual({})
+    expect((await again.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1'])
+  })
+})

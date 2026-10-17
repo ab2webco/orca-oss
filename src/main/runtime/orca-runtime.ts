@@ -669,6 +669,7 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
+import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
@@ -3609,7 +3610,8 @@ export class OrcaRuntimeService {
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
     stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
-    projectOf: (caller) => this.gameBoardProjectOf(caller)
+    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    inboxSourceOf: (lead) => gameInboxSourceOf(this.getOrchestrationDb(), lead)
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
@@ -30215,10 +30217,14 @@ export class OrcaRuntimeService {
     const { key } = await this.gameHistoryProjectOf(
       leadWorktreeId ? { worktreeId: leadWorktreeId } : args
     )
+    const leadTerminal = leadHandle ?? args.terminalHandle
     return {
       key,
       isMember: Boolean(leadHandle),
-      memberTicket: leadHandle ? ticketInText(context?.taskTitle ?? context?.displayName) : null
+      memberTicket: leadHandle ? ticketInText(context?.taskTitle ?? context?.displayName) : null,
+      lead: leadTerminal
+        ? { handle: leadTerminal, paneKey: this.getPaneKeyForTerminalHandle(leadTerminal) ?? null }
+        : null
     }
   }
 
@@ -30388,6 +30394,11 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readInboxes: () =>
+        this.gameBoard.inboxSummary({
+          worktreeId: worktree?.id,
+          terminalHandle: callerHandle ?? undefined
+        }),
       readStop: async () =>
         (
           await this.gameBoard.stopState({

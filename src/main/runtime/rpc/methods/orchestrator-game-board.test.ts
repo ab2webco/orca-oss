@@ -90,4 +90,27 @@ describe('game board RPC', () => {
       ['clearStop', caller]
     ])
   })
+
+  it("reads the caller's game inbox with its filters", async () => {
+    const { send, calls } = dispatcherWith({
+      inbox: async () => ({ inbox: { key: 'lead', unread: 0, messages: [], newest: 0 } })
+    })
+
+    await expect(
+      send('game.inbox', { terminalHandle: 'h1', ticket: 'CIN-1', unread: true, markRead: true })
+    ).resolves.toMatchObject({ ok: true, result: { inbox: { key: 'lead' } } })
+    await expect(send('game.inbox', { markRead: 'yes' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      [
+        'inbox',
+        {
+          worktreeId: undefined,
+          terminalHandle: 'h1',
+          ticket: 'CIN-1',
+          unread: true,
+          markRead: true
+        }
+      ]
+    ])
+  })
 })

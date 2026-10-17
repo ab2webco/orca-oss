@@ -13,8 +13,13 @@ afterEach(() => {
   }
 })
 
-const LEAD: GameBoardProject = { key: 'repo:r1', isMember: false, memberTicket: null }
-const MEMBER: GameBoardProject = { key: 'repo:r1', isMember: true, memberTicket: 'CIN-7' }
+const LEAD: GameBoardProject = { key: 'repo:r1', isMember: false, memberTicket: null, lead: null }
+const MEMBER: GameBoardProject = {
+  key: 'repo:r1',
+  isMember: true,
+  memberTicket: 'CIN-7',
+  lead: null
+}
 
 function board(projectOf: (caller: { terminalHandle?: string }) => GameBoardProject) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-board-'))
@@ -24,6 +29,7 @@ function board(projectOf: (caller: { terminalHandle?: string }) => GameBoardProj
     store: new GameHistoryStore(() => dir),
     stops: new GameStopSwitch(() => join(dir, 'stop')),
     projectOf: async (caller) => projectOf(caller),
+    inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
     now: () => new Date(Date.UTC(2026, 9, 16, 10, 0, tick++))
   })
 }

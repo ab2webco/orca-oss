@@ -2,6 +2,12 @@ import type { GameHistoryStore } from './orchestrator-game-history-store'
 import type { GameStopSwitch } from './orchestrator-game-stop-switch'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import {
+  gameInboxesOf,
+  type GameInbox,
+  type GameInboxSource,
+  type GameInboxSummary
+} from '../../shared/orchestrator-game-inbox'
+import {
   filterGameEvents,
   type GameEvent,
   type GameEventKind
@@ -16,7 +22,14 @@ export type GameBoardProject = {
   isMember: boolean
   /** A member's ticket, from its task. */
   memberTicket: string | null
+  /** The lead's terminal, whose run holds the project's mail; null when Orca cannot tell. */
+  lead: GameBoardLead | null
 }
+
+export type GameBoardLead = { handle: string; paneKey: string | null }
+
+// Why 20: the lead's and the recent tickets'; game state stays small on every poll.
+const INBOX_SUMMARY_MAX = 20
 
 export type GameEventPost = GameBoardCaller & {
   kind: GameEventKind
@@ -33,6 +46,7 @@ export class GameBoard {
       store: GameHistoryStore
       stops: GameStopSwitch
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
+      inboxSourceOf: (lead: GameBoardLead) => GameInboxSource
       now?: () => Date
     }
   ) {}
@@ -46,6 +60,49 @@ export class GameBoard {
   ): Promise<{ events: GameEvent[] }> {
     const project = await this.deps.projectOf(args)
     return { events: filterGameEvents(await this.deps.store.events(project.key), args) }
+  }
+
+  /** A member reads only its own ticket's inbox; the lead its own, or a ticket's with `ticket`. */
+  async inbox(
+    args: GameBoardCaller & { ticket?: string; unread?: boolean; markRead?: boolean }
+  ): Promise<{ inbox: GameInbox }> {
+    const project = await this.deps.projectOf(args)
+    const key = project.isMember
+      ? project.memberTicket
+      : args.ticket?.trim().toUpperCase() || 'lead'
+    if (!key) {
+      throw new Error('This member has no ticket, so it has no game inbox.')
+    }
+    const found = (await this.inboxesOf(project)).find((one) => one.key === key)
+    const inbox = found ?? { key, unread: 0, messages: [], newest: 0 }
+    if (args.markRead && inbox.newest > 0) {
+      await this.deps.store.markInboxRead(project.key, key, inbox.newest)
+    }
+    return {
+      inbox: args.unread
+        ? { ...inbox, messages: inbox.messages.filter((one) => one.unread) }
+        : inbox
+    }
+  }
+
+  async inboxSummary(caller: GameBoardCaller): Promise<GameInboxSummary[]> {
+    const project = await this.deps.projectOf(caller)
+    return (await this.inboxesOf(project)).slice(0, INBOX_SUMMARY_MAX).map((inbox) => {
+      const last = inbox.messages[0]
+      return {
+        key: inbox.key,
+        unread: inbox.unread,
+        last: last ? { at: last.at, from: last.from, subject: last.subject } : null
+      }
+    })
+  }
+
+  private async inboxesOf(project: GameBoardProject): Promise<GameInbox[]> {
+    if (!project.lead) {
+      return []
+    }
+    const source = this.deps.inboxSourceOf(project.lead)
+    return gameInboxesOf(source, await this.deps.store.cursors(project.key))
   }
 
   /** Every caller reads it, members too; one that cannot be read counts as set. */

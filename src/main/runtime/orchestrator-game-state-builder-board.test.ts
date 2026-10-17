@@ -37,3 +37,28 @@ describe('buildOrchestratorGameState board', () => {
     expect('stopped' in (await buildOrchestratorGameState(base))).toBe(false)
   })
 })
+
+describe('buildOrchestratorGameState inboxes', () => {
+  const inboxes = [{ key: 'lead', unread: 2, last: null }]
+
+  it("gives the lead the project's inboxes with unread counts", async () => {
+    const state = await buildOrchestratorGameState({ ...base, readInboxes: async () => inboxes })
+    expect(state.inboxes).toEqual(inboxes)
+  })
+
+  it('gives a member none, and leaves them out when they cannot be read', async () => {
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readInboxes: async () => inboxes
+    })
+    expect('inboxes' in member).toBe(false)
+    const failed = await buildOrchestratorGameState({
+      ...base,
+      readInboxes: async () => {
+        throw new Error('db closed')
+      }
+    })
+    expect('inboxes' in failed).toBe(false)
+  })
+})
