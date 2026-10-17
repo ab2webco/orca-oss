@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseOrchestratorGameScene } from './orchestrator-game-scene'
 import {
   ORCHESTRATOR_GAME_SCENE_TEMPLATE,
   orchestratorGameSceneIssues
@@ -7,6 +8,17 @@ import {
 describe('orchestratorGameSceneIssues', () => {
   it('finds nothing in a valid scene', () => {
     expect(orchestratorGameSceneIssues(ORCHESTRATOR_GAME_SCENE_TEMPLATE)).toEqual([])
+  })
+
+  it('carries an example of every optional block, all of them drawn', () => {
+    const parsed = parseOrchestratorGameScene(ORCHESTRATOR_GAME_SCENE_TEMPLATE, 'template')
+    expect(parsed.ok && parsed.warnings).toEqual([])
+    const definition = parsed.ok ? parsed.definition : undefined
+    expect(definition?.foe).toBeDefined()
+    expect(definition?.finale).toBeDefined()
+    expect(definition?.hud).toBeDefined()
+    expect(definition?.cast?.pet).toBeDefined()
+    expect(definition?.cast?.advisor).toBeDefined()
   })
 
   it('lists every problem with the path that has it, not only the first', () => {
