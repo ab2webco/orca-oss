@@ -606,21 +606,31 @@ the runtime does not know is dropped with a warning (Settings refuses such a zon
   and a textured ground line. Every character (the hero, the party, the pet and Jev's advisor) gets
   a 1-px outline inked from its own palette's darkest colour, a lit and a shaded side and a ground
   shadow, so a scene file's figures keep their colours
-  ([`hd-sprite.ts`](../../resources/claude-plugins/orca-game/hooks/hd-sprite.ts)).
+  ([`hd-sprite.ts`](../../resources/claude-plugins/orca-game/hooks/hd-sprite.ts)). The outline is
+  always a dark ink line: below half the luminance of the figure's darkest colour and below 0.03
+  relative luminance, so a palette whose darkest colour is bright (a cyan cape) never reads as a
+  glow. The far and mid layers keep at least 8 of CIE lightness from the sky row behind them, on one
+  side for the whole layer: darker than a bright sky, lighter than a night sky too dark to sink
+  below ([`hd-layer-contrast.ts`](../../resources/claude-plugins/orca-game/hooks/hd-layer-contrast.ts)).
 
 On top of that hd adds:
 
 - **Day and night** from the clock in `timezone`, sampled at start, on
   every refresh and about every 30 seconds: dark from 19:00 to 05:00, light from 07:00 to 17:00, an
-  orange tint around 06:00 and 18:00, stars and the moon at night. A look that is already a night
-  sky keeps it. `local` means the desktop's zone: Orca hands the pane its own IANA zone at launch and
+  orange tint around 06:00 and 18:00, stars and the moon at night, clouds dimmed with the sky. A
+  look authored as night (every Night Watch phase but the handoff) is its own midnight; by day it is
+  lifted toward an overcast sky with a sun and lighter scenery, and a dark day look (a red alert, a
+  dusk) is lifted just enough that noon still reads as day. Costume colours never change with the
+  hour in a night look ([`hd-daylight.ts`](../../resources/claude-plugins/orca-game/hooks/hd-daylight.ts)).
+  `local` means the desktop's zone: Orca hands the pane its own IANA zone at launch and
   in `game state` (`sources` still says where `local` came from), so a pane on an SSH host, whose
   clock is usually UTC, turns to night when the person's evening does.
 - **Light and particles**: shafts from the sun, bloom around bright pixels, a vignette and softened
   top and bottom rows (the characters are spared both); dust by day, fireflies at night, snow in
   Night Watch, glitter in Crystal Saga and embers over the campfire the hero rests by.
 - **Motion**: a four-frame walk with a body bob, breathing at rest, and the party following the hero
-  (or sitting by the fire), each member outlined in its state colour with a pulsing `!` over the one
+  (or sitting by the fire), each member's outline tinted with its state colour (darkened to the same
+  ink, so it never glows) with a pulsing `!` over the one
   waiting on you. A member that joins walks in from the right edge; one that leaves walks off; the
   first refresh marches nobody.
 - **The lead**: when this pane is the project's lead (`role: lead` in `game state`) the hero wears a
