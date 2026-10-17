@@ -1,21 +1,18 @@
 #!/usr/bin/env node
 // Renders the game mod's scene grids (the cells its Raster receives) to PNGs, so a render can be looked at.
 // These are cell-grid renders in a browser, not terminal screenshots: a terminal's font and gamma differ.
-// Usage: node config/scripts/orca-game-scene-captures.mjs [--out <dir>] [--scene-file <json>]
+// Usage: node config/scripts/orca-game-scene-captures.mjs [--out <dir>] [--scene-file <json>] [--phases <all|a,b>]
+// A scene file is drawn in every phase and the built-ins in build, unless --phases says otherwise.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
+import { captureOptionsOf, scenePhasesOf, sceneShotsOf } from './orca-game-scene-capture-plan.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const mod = join(root, 'resources/claude-plugins/orca-game/hooks')
-const argOf = (name) => {
-  const at = process.argv.indexOf(name)
-  return at === -1 ? undefined : process.argv[at + 1]
-}
-const out = resolve(argOf('--out') ?? join(root, 'out/orca-game-captures'))
-const sceneFile = argOf('--scene-file')
+const { out, sceneFile, phases } = captureOptionsOf(process.argv.slice(2), root)
 
 const ENTRY = `
 import { sceneGridOf } from './scene'
@@ -40,13 +37,13 @@ const PARTY = [
   { key: 'a', phase: 'verify', state: 'working' },
   { key: 'b', phase: 'docs', state: 'waiting' }
 ]
-export const gridOf = ({ scene, render, columns, tick, hour, caption }) => {
+export const gridOf = ({ scene, phase, render, columns, tick, hour, caption }) => {
   const definition = typeof scene === 'string' ? SCENES[scene] : scene
   const advisor = { sprite: advisorSpriteOf(definition), gesture: 'approved', age: 30, bubble: 'kept Opus' }
   return render === 'hd'
-    ? hdSceneGridOf({ scene: definition, phase: 'build', columns, rows: 9, tick, caption, since: 0,
+    ? hdSceneGridOf({ scene: definition, phase, columns, rows: 9, tick, caption, since: 0,
         action: 'edit', light: daylightAt(hour), party: PARTY, lead: 'Lead', advisor })
-    : sceneGridOf(definition, 'build', columns, tick, caption, 0, undefined, false, 'edit', advisor)
+    : sceneGridOf(definition, phase, columns, tick, caption, 0, undefined, false, 'edit', advisor)
 }
 const JEV = { version: 1, locale: 'es', line: 'jev · 2 agentes', model: 'glm-5.3', modelId: 'glm-5.3',
   effort: 'high', subagents: [], ci: [], notices: [] }
@@ -190,7 +187,7 @@ const main = async () => {
     await page.locator('#g').screenshot({ path })
     shots.push(path)
   }
-  // One sheet per scene with its six captures labelled, so a whole scene is looked at in one image.
+  // A sheet of labelled captures, so a whole phase of a scene is looked at in one image.
   const sheetOf = async (id, names) => {
     const panels = await Promise.all(
       names.map(async (name) => {
@@ -208,24 +205,16 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
   }
   for (const scene of [...SCENE_IDS, ...custom]) {
     const id = typeof scene === 'string' ? scene : 'scene-file'
-    const before = shots.length
-    for (const columns of [130, 60]) {
-      const caption = 'Editing scene-hd.ts'
-      await shoot(
-        `${id}-classic-${columns}`,
-        gridOf({ scene, render: 'classic', columns, tick: 41, caption }),
-        columns
-      )
-      for (const [time, hour] of [
-        ['day', 12],
-        ['night', 22]
-      ]) {
-        const grid = gridOf({ scene, render: 'hd', columns, tick: 41, hour, caption })
-        await shoot(`${id}-hd-${time}-${columns}`, grid, columns)
+    // One sheet per phase: six captures stay readable, thirty-six in one image do not.
+    for (const phase of scenePhasesOf(phases, typeof scene !== 'string')) {
+      const before = shots.length
+      for (const shot of sceneShotsOf(id, [phase])) {
+        const caption = 'Editing scene-hd.ts'
+        await shoot(shot.name, gridOf({ scene, ...shot, tick: 41, caption }), shot.columns)
       }
+      const names = shots.slice(before).map((path) => path.slice(out.length + 1, -'.png'.length))
+      await sheetOf(`${id}-${phase}`, names)
     }
-    const names = shots.slice(before).map((path) => path.slice(out.length + 1, -'.png'.length))
-    await sheetOf(id, names)
   }
   const cardShots = shots.length
   for (const scene of [...SCENE_IDS, ...custom]) {
