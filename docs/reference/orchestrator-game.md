@@ -349,7 +349,8 @@ The lead's verbs, run from the lead's terminal
   `orchestration worker-start --on` refuses account pins because the server resolves its own).
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
-    agent's process env, so a model router outside Orca (Jev) leaves that choice alone. The same
+    agent's process env, so a model router outside Orca can leave that choice alone (Jev does not
+    read them yet). The same
     holds for every agent and every launch that asks for a model or effort
     (`orchestration worker-start --model/--effort`, a model picked in the composer): Orca sets a pin
     only for a value it was asked for and applied, never for a catalog default it filled in (Codex's
