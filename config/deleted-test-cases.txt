@@ -5,3 +5,11 @@
 src/renderer/src/i18n/ja-technical-literal-mistranslations.test.ts # ja.json technical literals
 src/renderer/src/i18n/ko-ui-semantic-mistranslations.test.ts # ko.json corrected UI values
 src/renderer/src/i18n/zh-technical-literal-mistranslations.test.ts # zh.json technical literals
+config/scripts/locale-cjk-preservation.test.mjs # zh/ja/ko catalogs keep their CJK copy
+config/scripts/locale-ko-key-overrides.test.mjs # Korean key-override table
+config/scripts/locale-translation-policy-ko-round5.test.mjs # Korean repair rules
+config/scripts/locale-translation-policy.ja-relocalization.test.mjs # Japanese repair rules
+config/scripts/locale-translation-policy.ja-round5.test.mjs # Japanese repair rules
+config/scripts/locale-translation-policy.zh-round5.test.mjs # Chinese repair rules
+config/scripts/locale-translation-policy.zh-status-bar-usage.test.mjs # Chinese status-bar repairs
+config/scripts/locale-count-fragment-separator.test.mjs # zh/ja/ko count-fragment key overrides

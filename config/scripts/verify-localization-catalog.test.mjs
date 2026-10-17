@@ -87,6 +87,24 @@ describe('verify-localization-catalog', () => {
     await expect(verifyLocalizationCatalog(root, { fix: false })).resolves.toBe(0)
   })
 
+  // Why: Orca Lab ships English and Spanish only (ORCA-596); an upstream sync can bring a dropped
+  // catalog back, and nothing would load it.
+  it('rejects a catalog for a locale Orca Lab does not ship', async () => {
+    const { root, localesDir } = makeProject({
+      sourceText: 'export {}\n',
+      enCatalog: { auto: { example: { greeting: 'Hello' } } },
+      esCatalog: { auto: { example: { greeting: 'Hola' } } }
+    })
+    writeJson(path.join(localesDir, 'zh.json'), { auto: { example: { greeting: '你好' } } })
+    const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(verifyLocalizationCatalog(root, { fix: false })).resolves.toBe(1)
+      expect(report).toHaveBeenCalledWith(expect.stringContaining('zh.json'))
+    } finally {
+      report.mockRestore()
+    }
+  })
+
   it('does not invent values for keys without string fallbacks', async () => {
     const { root, localesDir } = makeProject({
       sourceText:
@@ -164,8 +182,10 @@ describe('verify-localization-catalog', () => {
         new Map([
           ['components.agentSessionContinuation.originalAgent', 'Original agent: {{agent}}']
         ]),
-        new Map([['components.agentSessionContinuation.originalAgent', '原智能体：{{agent}}']]),
-        'zh'
+        new Map([
+          ['components.agentSessionContinuation.originalAgent', 'Agente original: {{agent}}']
+        ]),
+        'es'
       )
     ).toEqual([])
   })

@@ -5,24 +5,17 @@
 
 // Renderings a locale is expected to use. They are translations, never machine-translation
 // errors, so a brand revert must leave them alone. Nonsense forms that share the same English
-// term (zh 回购 "repurchase agreement", ja 端子 "electrical connector", es "Comprometerse")
-// stay in BRAND_MISTRANSLATIONS and keep getting reverted.
+// term (es "Comprometerse") stay in BRAND_MISTRANSLATIONS and keep getting reverted.
 const GENERIC_TERM_FAMILIES = [
   {
     terms: ['Agent', 'Agents', 'agent', 'agents'],
     renderings: {
-      ko: ['에이전트'],
-      ja: ['エージェント'],
-      zh: ['智能体'],
       es: ['Agente', 'agente', 'Agentes', 'agentes']
     }
   },
   {
     terms: ['Commit', 'Commits', 'commit', 'commits'],
     renderings: {
-      ko: ['커밋'],
-      ja: ['コミット'],
-      zh: ['提交'],
       es: [
         'Confirmación',
         'confirmación',
@@ -36,27 +29,18 @@ const GENERIC_TERM_FAMILIES = [
   {
     terms: ['Continue'],
     renderings: {
-      ko: ['계속하다', '계속'],
-      ja: ['続ける', '続行'],
-      zh: ['继续'],
       es: ['Continuar', 'continuar']
     }
   },
   {
     terms: ['Repo', 'Repos', 'repo', 'repos'],
     renderings: {
-      ko: ['저장소', '레포'],
-      ja: ['リポジトリ', 'リポ'],
-      zh: ['存储库', '仓库'],
       es: ['Repositorio', 'repositorio', 'Repositorios', 'repositorios']
     }
   },
   {
     terms: ['Terminal', 'Terminals', 'terminal', 'terminals'],
     renderings: {
-      ko: ['터미널'],
-      ja: ['ターミナル'],
-      zh: ['终端'],
       es: ['Terminales', 'terminales']
     }
   }
@@ -92,8 +76,8 @@ function spansOf(value, needle) {
   return spans
 }
 
-// Why: zh 终端子进程 ("terminal sub-process") contains 端子, so a blind revert of the
-// electrical-connector mistranslation would cut a valid word in half.
+// Why: a canonical rendering can contain a mistranslated form, so a blind revert would cut a
+// valid word in half.
 export function overlapsCanonicalRendering(term, locale, value, start, end) {
   const renderings = RENDERINGS_BY_TERM.get(term)?.[locale] ?? []
   return renderings.some((form) =>
