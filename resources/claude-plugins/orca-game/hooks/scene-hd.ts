@@ -1,6 +1,6 @@
 import { actionPixel } from './action-props'
 import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
-import { landAtNight, NOON, type Daylight } from './hd-daylight'
+import { dayLiftOf, landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import {
   bloomInto,
   FLASH_COLOR,
@@ -104,9 +104,10 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const event = isTeamEventShown(input.event) ? input.event : undefined
   const resting = input.isResting === true && reaction === undefined
   const look = scene.looks[input.phase ?? 'working']
-  const light = look.isNight ? NOON : (input.light ?? NOON)
+  const light = input.light ?? (look.isNight ? MIDNIGHT : NOON)
   const frame = hdFrameOf({ look, width: columns, rows, tick, scroll: resting ? 0 : tick, light })
   const { ground, pixels } = frame
+  const dayLift = dayLiftOf(look)
   const pose = hdHeroPoseOf(tick, resting)
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
   // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
@@ -151,7 +152,10 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     spriteWidth: HD_SPRITE_WIDTH
   })
   const crown = input.lead === undefined ? undefined : crownAtOf(sprite.rows, walk, top)
-  const figureLight = { night: frame.light.night * 0.5, dusk: frame.light.dusk }
+  // Why NOON for a night look: its costumes are drawn for the dark and keep their own colours.
+  const figureLight = look.isNight
+    ? NOON
+    : { night: frame.light.night * 0.5, dusk: frame.light.dusk }
   const glow = (x: number, y: number, color: number): number => {
     if (!resting) {
       return color
@@ -188,7 +192,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const figure = figureAt(x, y)
     if (figure !== undefined) {
       figures[y * columns + x] = 1
-      return glow(x, y, landAtNight(figure, figureLight))
+      return glow(x, y, landInLight(figure, figureLight))
     }
     const held =
       input.advisor === undefined || advisor === undefined
@@ -209,10 +213,16 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
         (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
       const shade = underHero ? SHADOW : underOther ? MEMBER_SHADOW : 0
       const soil = mix(hdGroundPixel(frame, x, y), 0x000000, shade)
-      return glow(x, y, landAtNight(soil, frame.light))
+      return glow(x, y, landInLight(soil, frame.light, dayLift, look.isNight))
     }
     const land = hdPlantPixel(frame, x, y) ?? hdMidPixel(frame, x, y) ?? hdFarPixel(frame, x, y)
-    return glow(x, y, land === undefined ? hdSkyPixel(frame, x, y) : landAtNight(land, frame.light))
+    return glow(
+      x,
+      y,
+      land === undefined
+        ? hdSkyPixel(frame, x, y)
+        : landInLight(land, frame.light, dayLift, look.isNight)
+    )
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)
@@ -224,8 +234,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
       buffer[y * columns + x] = at(x, y)
     }
   }
-  const night = Math.max(frame.light.night, look.isNight ? 1 : 0)
-  const particles = particleKindOf(scene.id, night, resting)
+  const particles = particleKindOf(scene.id, frame.light.night, resting)
   particlesInto(buffer, columns, pixels, ground, tick, particles, fireLeft)
   // Why spared: the vignette and bloom would darken or tint the figures out of their own colours.
   bloomInto(buffer, columns, pixels, figures)

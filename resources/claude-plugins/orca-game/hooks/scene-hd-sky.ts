@@ -1,4 +1,4 @@
-import { NOON, skyAtNight, type Daylight } from './hd-daylight'
+import { cloudInLight, MIDNIGHT, NOON, skyInLight, type Daylight } from './hd-daylight'
 import { hash, mix } from './pixel-canvas'
 import type { Look } from './scenes/index'
 
@@ -6,6 +6,7 @@ import type { Look } from './scenes/index'
 
 const STAR = 0xf5f3c8
 const MOON = 0xe8ecff
+const DAY_SUN = 0xfff2c8
 const SIGNAL_EMBLEM = 0x1c1f2b
 const MAX_KEPT = 6
 
@@ -22,25 +23,34 @@ export type HdSky = {
   sunX: number
   sunY: number
   sunR: number
+  /** The clouds' colour in this light. */
+  cloud: number
   sky: SkyLayer
 }
 
 const gradientOf = (frame: Omit<HdSky, 'sky'>, y: number): number =>
   mix(frame.look.skyTop, frame.look.skyBottom, Math.min(1, y / Math.max(1, frame.ground - 1)))
 
-const isNightOf = (frame: Pick<HdSky, 'look' | 'light'>): boolean =>
-  frame.look.isNight || frame.light.night > 0.5
+const isNightOf = (frame: Pick<HdSky, 'light'>): boolean => frame.light.night > 0.5
+
+// A night look keeps its own moon (or signal) after dark and shows a sun by day.
+const discOf = (frame: Omit<HdSky, 'sky'>): number => {
+  if (isNightOf(frame)) {
+    return frame.look.isNight ? frame.look.sun : MOON
+  }
+  return frame.look.isNight ? DAY_SUN : frame.look.sun
+}
 
 const staticSkyOf = (frame: Omit<HdSky, 'sky'>, x: number, y: number) => {
   const { look, sunX, sunY, sunR } = frame
-  const color = skyAtNight(gradientOf(frame, y), y, frame.ground, frame.light)
-  const light = frame.light.night > 0.5 ? MOON : look.sun
+  const color = skyInLight(gradientOf(frame, y), y, frame.ground, frame.light, look)
+  const light = discOf(frame)
+  const isSignal = look.isSignal === true && isNightOf(frame)
   const d = Math.hypot(x - sunX, (y - sunY) * 1.05)
-  const isBeam =
-    look.isSignal === true && y > sunY && Math.abs(x - (sunX - (y - sunY) * 1.4)) <= 1.2
+  const isBeam = isSignal && y > sunY && Math.abs(x - (sunX - (y - sunY) * 1.4)) <= 1.2
   const beamed = isBeam ? mix(color, look.sun, 0.35) : color
   if (d <= sunR) {
-    const isEmblem = look.isSignal === true && Math.abs(x - sunX) <= 1 && Math.abs(y - sunY) <= 0.6
+    const isEmblem = isSignal && Math.abs(x - sunX) <= 1 && Math.abs(y - sunY) <= 0.6
     return { color: isEmblem ? SIGNAL_EMBLEM : light, isDisc: true }
   }
   const glow = d <= sunR * 2.8 ? (1 - (d - sunR) / (sunR * 1.8)) ** 2 * 0.42 : 0
@@ -60,11 +70,12 @@ export const hdSkyOf = (args: {
   tick: number
   light?: Daylight
 }): HdSky => {
-  const light = args.light ?? NOON
+  const light = args.light ?? (args.look.isNight ? MIDNIGHT : NOON)
   const steady = { night: quantize(light.night), dusk: quantize(light.dusk) }
   const base = {
     ...args,
     light: steady,
+    cloud: cloudInLight(args.look.cloud, steady, args.look.isNight),
     sunX: args.width - 16,
     sunY: args.pixels * 0.24,
     sunR: Math.max(2.2, args.pixels * 0.11)
@@ -130,7 +141,7 @@ export const hdSkyPixel = (frame: HdSky, x: number, y: number): number => {
   }
   const cloud = Math.max(band(pixels * 0.14, 9, 31, 12), band(pixels * 0.3, 13, 37, 18))
   if (cloud > 0) {
-    color = mix(color, look.cloud, cloud === 1 ? 0.92 : 0.6)
+    color = mix(color, frame.cloud, cloud === 1 ? 0.92 : 0.6)
   }
   const isStar = isNightOf(frame) && y < frame.ground * 0.55 && hash(x, y) % 41 === 0
   return isStar && (hash(x, y) + Math.floor(tick / 6)) % 5 !== 0 ? STAR : color

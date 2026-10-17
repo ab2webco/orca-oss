@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { STATE_RING } from '../hooks/hd-party'
-import { luminanceOf } from '../hooks/hd-lightness'
+import { daylightAt } from '../hooks/hd-daylight'
+import { lightnessOf, luminanceOf } from '../hooks/hd-lightness'
 import { costumeSpriteOf, frameSpriteOf, hdSpritePixel, type HdSprite } from '../hooks/hd-sprite'
+import { UPPER_HALF } from '../hooks/pixel-canvas'
 import { hdSceneGridOf } from '../hooks/scene-hd'
-import { SCENES, type SceneDefinition } from '../hooks/scenes/index'
+import { SCENES, type SceneDefinition, type ScenePhase } from '../hooks/scenes/index'
 import { ORCHESTRATOR_GAME_SCENE_TEMPLATE } from '../../../../src/shared/orchestrator-game-scene-authoring'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 
@@ -92,5 +94,44 @@ describe('hd outlines', () => {
     expect(
       grid.some((cell) => cell[1] === STATE_RING.working || cell[2] === STATE_RING.working)
     ).toBe(false)
+  })
+})
+
+const STAR = 0xf5f3c8
+const SKY_ROWS = 2
+
+const skyAt = (scene: SceneDefinition, phase: ScenePhase, hour: number): number[] =>
+  hdSceneGridOf({
+    scene,
+    phase,
+    columns: 120,
+    rows: 9,
+    tick: 41,
+    caption: '',
+    since: 0,
+    light: daylightAt(hour)
+  })
+    .slice(0, SKY_ROWS * 120)
+    .flatMap((cell) => (cell[0] === UPPER_HALF ? [cell[1] ?? 0, cell[2] ?? 0] : []))
+
+const meanLightnessOf = (colors: readonly number[]): number =>
+  colors.reduce((sum, color) => sum + lightnessOf(color), 0) / Math.max(1, colors.length)
+
+describe('hd day and night', () => {
+  it('lights every built-in scene’s sky clearly at noon and darkens it with stars at midnight', () => {
+    for (const scene of Object.values(SCENES)) {
+      for (const phase of Object.keys(scene.looks) as ScenePhase[]) {
+        const noon = skyAt(scene, phase, 12)
+        const midnight = skyAt(scene, phase, 0)
+        const gap = meanLightnessOf(noon) - meanLightnessOf(midnight)
+        expect([scene.id, phase, gap > 20]).toEqual([scene.id, phase, true])
+        expect([scene.id, phase, noon.includes(STAR), midnight.includes(STAR)]).toEqual([
+          scene.id,
+          phase,
+          false,
+          true
+        ])
+      }
+    }
   })
 })
