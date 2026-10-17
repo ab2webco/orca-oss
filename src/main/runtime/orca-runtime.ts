@@ -667,6 +667,8 @@ import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
@@ -3603,6 +3605,10 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  private readonly gameBoard = new GameBoard({
+    store: this.gameHistory,
+    projectOf: (caller) => this.gameBoardProjectOf(caller)
+  })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -30188,6 +30194,30 @@ export class OrcaRuntimeService {
         : undefined)
     const repoId = worktreeId ? worktreesById.get(worktreeId)?.repoId : undefined
     return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
+  }
+
+  getGameBoard(): GameBoard {
+    return this.gameBoard
+  }
+
+  // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
+  private async gameBoardProjectOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<GameBoardProject> {
+    const context = args.terminalHandle
+      ? this.getAgentStatusOrchestrationContextForHandle(args.terminalHandle)
+      : undefined
+    const leadHandle = context?.parentTerminalHandle
+    const leadWorktreeId = leadHandle ? this.getWorktreeIdForTerminalHandle(leadHandle) : null
+    const { key } = await this.gameHistoryProjectOf(
+      leadWorktreeId ? { worktreeId: leadWorktreeId } : args
+    )
+    return {
+      key,
+      isMember: Boolean(leadHandle),
+      memberTicket: leadHandle ? ticketInText(context?.taskTitle ?? context?.displayName) : null
+    }
   }
 
   async recordGameHistory(args: {

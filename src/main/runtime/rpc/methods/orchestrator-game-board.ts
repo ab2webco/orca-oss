@@ -1,0 +1,53 @@
+import { z } from 'zod'
+import { defineMethod, type RpcMethod } from '../core'
+import { GAME_EVENT_KINDS, GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
+
+// Why the caller's worktree or terminal: the board belongs to the lead's project, and a member's to its lead's.
+const Caller = {
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional()
+}
+
+const GameEventPostParams = z.object({
+  ...Caller,
+  kind: z.enum(GAME_EVENT_KINDS),
+  ticket: z.string().max(40).optional(),
+  text: z.string().max(GAME_EVENT_TEXT_MAX).optional(),
+  key: z.string().max(120).optional()
+})
+
+const GameEventsParams = z
+  .object({
+    ...Caller,
+    ticket: z.string().max(40).optional(),
+    since: z.string().max(40).optional()
+  })
+  .optional()
+
+/** The project's shared board: events, the STOP switch and inboxes; newer than `game.history`. */
+export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
+  defineMethod({
+    name: 'game.eventPost',
+    params: GameEventPostParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().postEvent({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        kind: params.kind,
+        ticket: params.ticket,
+        text: params.text,
+        key: params.key
+      })
+  }),
+  defineMethod({
+    name: 'game.events',
+    params: GameEventsParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().events({
+        worktreeId: params?.worktreeId,
+        terminalHandle: params?.terminalHandle,
+        ticket: params?.ticket,
+        since: params?.since
+      })
+  })
+]
