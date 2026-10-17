@@ -47,7 +47,7 @@ describe('hd geometry', () => {
 
   it('fills rows × columns for every built-in scene and phase at any width, without throwing', () => {
     for (const scene of Object.values(SCENES)) {
-      for (const phase of ['working', 'docs', 'build', 'verify', 'pr', 'handoff'] as const) {
+      for (const phase of [undefined, 'docs', 'build', 'verify', 'pr', 'handoff'] as const) {
         for (const columns of [1, 2, 7, 13, 20, 60, 130]) {
           for (const rows of [9, 10]) {
             const grid = hdSceneGridOf(input({ scene, phase, columns, rows }))
@@ -171,9 +171,14 @@ describe('hd characters', () => {
     const file = {
       ...QUEST,
       id: 'file:.orca/scenes/teal.json',
-      costumes: Object.fromEntries(
-        Object.keys(QUEST.costumes).map((phase) => [phase, costume])
-      ) as typeof QUEST.costumes
+      costumes: {
+        working: costume,
+        docs: costume,
+        build: costume,
+        verify: costume,
+        pr: costume,
+        handoff: costume
+      }
     }
     const grid = hdSceneGridOf(input({ scene: file, isResting: true, caption: '' }))
     const shown = new Set(grid.flatMap((cell) => [cell[1], cell[2]]))

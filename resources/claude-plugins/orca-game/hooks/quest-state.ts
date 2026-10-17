@@ -3,6 +3,9 @@ import { advisorSpriteOf } from './advisor-art'
 import { advisorPoseAt, isAdvisorActingAt } from './advisor-state'
 import { demoFrameOf, type DemoFrame } from './demo'
 import { DEFAULT_GAME_CONFIG, effectiveConfigOf, isAbsorbingConfig } from './game-config'
+import { daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
+import type { TeamEvent } from './hd-overlay'
+import type { HdMember, March } from './hd-party'
 import type { Action, FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
@@ -39,6 +42,14 @@ type QuestRuntime = {
   stages: Map<string, Stage>
   animations: Map<string, readonly Animated[]>
   cardPhases: Map<string, ScenePhase>
+  /** The time hd's day and night read, sampled from `$.clock`; 0 until the first sample. */
+  clockMs: number
+  hdParty: readonly HdMember[]
+  isHdPartySeen: boolean
+  leavers: readonly HdMember[]
+  marches: ReadonlyMap<string, March>
+  lead: string | undefined
+  event: { kind: TeamEvent['kind']; text: string; at: number } | undefined
 }
 
 // Module state: a hot reload starts it over, which only costs the scene its current pose.
@@ -63,7 +74,14 @@ export const quest: QuestRuntime = {
   replies: new Set<string>(),
   stages: new Map<string, Stage>(),
   animations: new Map<string, readonly Animated[]>(),
-  cardPhases: new Map<string, ScenePhase>()
+  cardPhases: new Map<string, ScenePhase>(),
+  clockMs: 0,
+  hdParty: [],
+  isHdPartySeen: false,
+  leavers: [],
+  marches: new Map<string, March>(),
+  lead: undefined,
+  event: undefined
 }
 
 export const gameConfig = (): GameConfig =>
@@ -100,6 +118,19 @@ export const isClawdReacting = (): boolean => isReacting(reactionAt(quest.tick))
 /** Jev's advisor acts something out now, so the band shows the scene when no spinner does. */
 export const isAdvisorActing = (): boolean =>
   isAbsorbingConfig(gameConfig()) && isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen')
+
+/** hd's light now, on the project's timezone; noon until the clock is first read. */
+export const daylightNow = (): Daylight =>
+  quest.clockMs === 0 ? NOON : daylightAt(hourOf(quest.clockMs, gameConfig().timezone))
+
+export const teamEventAt = (tick: number): TeamEvent | undefined =>
+  quest.event === undefined
+    ? undefined
+    : { kind: quest.event.kind, text: quest.event.text, age: tick - quest.event.at }
+
+/** The caption is the alert of a teammate waiting on the person. */
+export const isAlertShown = (): boolean =>
+  !quest.isDemo && quest.caption === '' && quest.alert !== ''
 
 // Why absorbing: while the game is not drawing Jev's lines, Jev draws its own and the scene has no advisor.
 export const advisorShownAt = (tick: number) =>

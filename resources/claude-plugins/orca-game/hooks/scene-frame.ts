@@ -1,9 +1,15 @@
+import type { HdMember } from './hd-party'
+import { partyOf } from './party'
 import { cellsOf } from './pixel-canvas'
 import {
   advisorShownAt,
   currentScene,
+  daylightNow,
+  demoNow,
   gameConfig,
+  isAlertShown,
   quest,
+  teamEventAt,
   reactionAt,
   shownAction,
   shownCaption,
@@ -23,6 +29,13 @@ export const stageOf = (columns: number, viewportRows?: number): Stage =>
     ? { columns, rows: hdRowsOf(viewportRows), render: 'hd' }
     : { columns, rows: SCENE_ROWS, render: 'classic' }
 
+const demoPartyOf = (hasRewards: boolean): HdMember[] =>
+  partyOf(demoNow().state, hasRewards).map((one) => ({
+    key: one.key,
+    phase: one.phase,
+    state: one.state
+  }))
+
 // Why the stage's render: a blit between a /quest render flip and the next ui.render keeps the Raster's rows.
 export const stageCellsOf = (stage: Stage): string => {
   const since = quest.isDemo ? quest.demoAt : quest.captionAt
@@ -39,7 +52,14 @@ export const stageCellsOf = (stage: Stage): string => {
         reaction: reactionAt(quest.tick),
         isResting: shownResting(),
         action: shownAction(),
-        advisor: advisorShownAt(quest.tick)
+        advisor: advisorShownAt(quest.tick),
+        isWaiting: isAlertShown(),
+        light: daylightNow(),
+        party: quest.isDemo ? demoPartyOf(gameConfig().rewards) : quest.hdParty,
+        leavers: quest.isDemo ? [] : quest.leavers,
+        marches: quest.isDemo ? new Map() : quest.marches,
+        lead: quest.isDemo ? undefined : quest.lead,
+        event: teamEventAt(quest.tick)
       })
     )
   }

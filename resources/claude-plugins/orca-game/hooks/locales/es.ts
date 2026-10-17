@@ -95,6 +95,8 @@ export const ES: GameCatalog = {
     needsYou: '¡te necesita!',
     alert: (name) => `¡${name} te necesita!`,
     ciIsRed: 'CI en rojo',
+    mergedFloat: (review) => `¡${review} mergeado!`,
+    lead: 'Líder',
     noParty: 'Aún no hay grupo.',
     teammatesJoin: 'Los compañeros llegan cuando el líder los crea.',
     level: 'Nv',

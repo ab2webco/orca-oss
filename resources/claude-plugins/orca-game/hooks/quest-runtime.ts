@@ -5,6 +5,7 @@ import { isAdvisorCueEndingAt } from './advisor-state'
 import { DEMO_STEP_TICKS } from './demo'
 import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
+import { raiseTeamEvent } from './hd-team'
 import { restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
 import { demoNow, gameConfig, quest } from './quest-state'
 import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene'
@@ -23,6 +24,9 @@ export {
   type Stage
 } from './quest-state'
 export { petScene, stageCellsOf, stageOf } from './scene-frame'
+
+// Why: hd's day and night move by minutes, so the clock is read about every 30 seconds, not every tick.
+const CLOCK_EVERY_TICKS = 250
 
 let loading: Promise<void> | undefined
 let publishedAbsorbing: boolean | undefined
@@ -57,6 +61,9 @@ export function questFleet(
   const alert = waiting === '' ? '' : gameStrings().art.alert(waiting)
   if (aggregate === quest.fleetPhase && alert === quest.alert) {
     return
+  }
+  if (alert !== '' && alert !== quest.alert) {
+    raiseTeamEvent($, 'needs', alert)
   }
   quest.fleetPhase = aggregate
   quest.alert = alert
@@ -103,6 +110,9 @@ async function repaint($: EngineInterface): Promise<void> {
     $.ui.invalidate('ui.render')
   }
   quest.tick += 1
+  if (quest.tick % CLOCK_EVERY_TICKS === 0) {
+    quest.clockMs = await $.clock.now().catch(() => quest.clockMs)
+  }
   if (quest.isDemo && quest.tick - quest.demoAt >= DEMO_STEP_TICKS) {
     quest.demoAt = quest.tick
     quest.demoStep += 1
@@ -137,6 +147,7 @@ async function load($: EngineInterface): Promise<void> {
     ORCA_GAME_TIMEZONE: timezone
   })
   await publishAbsorbing($)
+  quest.clockMs = await $.clock.now().catch(() => 0)
   const rows = (await $.session.messages().catch(() => [])) as readonly StoredRow[]
   const restored = restoredNotesOf(rows)
   for (const key of restored.notes) {
@@ -179,6 +190,12 @@ export function resetQuest(): void {
     isDone: false,
     action: undefined,
     isDemo: false,
-    caption: ''
+    caption: '',
+    hdParty: [],
+    isHdPartySeen: false,
+    leavers: [],
+    marches: new Map(),
+    lead: undefined,
+    event: undefined
   })
 }

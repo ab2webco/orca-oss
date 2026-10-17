@@ -11,7 +11,8 @@ import {
 } from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
-import { fleetPhaseOf, partyOf } from './party'
+import { raiseTeamEvent, syncHdTeam } from './hd-team'
+import { fleetPhaseOf, needsOf, partyOf } from './party'
 import {
   clawdReact,
   demoNow,
@@ -20,7 +21,7 @@ import {
   questFleet,
   questLiveConfig
 } from './quest-runtime'
-import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
+import { awardXp, levelOf, reviewLabelOf, rewardsOf, xpLedgerOf } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
 export const POLL_EVERY_MS = 30000
@@ -91,11 +92,23 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
   for (const one of awarded) {
     $.ui.toast(`+${one.xp} XP · ${one.label}`)
   }
+  const art = gameStrings().art
+  if (awarded.some((one) => one.kind === 'review-merged') && next.review !== null) {
+    raiseTeamEvent($, 'merged', art.mergedFloat(reviewLabelOf(next.review)))
+  } else {
+    raiseTeamEvent($, 'xp', `+${awarded.reduce((sum, one) => sum + one.xp, 0)} ${art.xp}`)
+  }
   if (levelOf(ledger.total).level > levelOf(stored.total).level) {
     clawdReact($, 'level')
   }
   return ledger.total
 }
+
+// Why counted: a CI that turns red plays once, not on every poll it stays red.
+const redCiCountOf = (state: GameState | null): number =>
+  state === null
+    ? 0
+    : needsOf(state).filter((one) => one.text === gameStrings().text.ciFailingNeed).length
 
 export async function refresh($: EngineInterface): Promise<void> {
   const before = await readFleet($)
@@ -123,7 +136,12 @@ export async function refresh($: EngineInterface): Promise<void> {
     note,
     xp
   }))
+  quest.clockMs = doneAt
   if (next !== undefined) {
+    syncHdTeam(next, config.rewards)
+    if (redCiCountOf(next) > redCiCountOf(before.state)) {
+      raiseTeamEvent($, 'fail', gameStrings().art.ciIsRed)
+    }
     await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
