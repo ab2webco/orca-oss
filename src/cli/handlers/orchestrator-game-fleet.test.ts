@@ -101,10 +101,13 @@ const run = (
     json: true
   })
 
-const methods = (calls: [string, unknown][]) => calls.map(([method]) => method)
+// Why: the event posts are checked on their own, in orchestrator-game-event-posts.test.ts.
+const methods = (calls: [string, unknown][]) =>
+  calls.map(([method]) => method).filter((method) => method !== 'game.eventPost')
 
 // Why: freeing a member first records it; these reads and the write are checked on their own.
 const HISTORY_CALLS = new Set([
+  'game.eventPost',
   'game.historyRecord',
   'orchestration.inbox',
   'orchestration.workerShow'

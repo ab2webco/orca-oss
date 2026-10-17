@@ -24,6 +24,8 @@ import {
   type GameSweepEntry
 } from '../../shared/orchestrator-game-fleet-verbs'
 import type { RuntimeTerminalSend } from '../../shared/runtime-types'
+import { observedGameEventsOf } from '../../shared/orchestrator-game-observed-events'
+import { postGameEvents } from './orchestrator-game-board-call'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -104,6 +106,7 @@ async function closeFinished(
 export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = {
   'game fleet': async ({ client, json }) => {
     const response = await readCallerGameState(client)
+    await postGameEvents(client, observedGameEventsOf(response.result.agents))
     printResult({ ...response, result: gameFleetReportOf(response.result) }, json, formatFleet)
   },
   'game wave': async ({ flags, client, cwd, json }) => {
@@ -157,6 +160,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game sweep': async ({ flags, client, json }) => {
     const close = flags.get('close') === true
     const response = await readCallerGameState(client)
+    await postGameEvents(client, observedGameEventsOf(response.result.agents))
     const entries = gameSweepOf(response.result)
     const sweep: GameSweepResult = { closed: close, finished: entries }
     if (close && entries.some((entry) => entry.row.terminalHandle)) {

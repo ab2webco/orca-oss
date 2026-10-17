@@ -11,6 +11,7 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { postGameEvents } from './orchestrator-game-board-call'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
@@ -182,7 +183,7 @@ export async function launchGameMember(args: {
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
   )
-  return {
+  const launched: GameLaunchResult = {
     ticket,
     agent: choice.agent,
     ...(memberAccount.account
@@ -190,6 +191,14 @@ export async function launchGameMember(args: {
       : {}),
     ...worker.result
   }
+  await postGameEvents(client, [
+    {
+      kind: 'claimed',
+      ticket,
+      text: `member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}`
+    }
+  ])
+  return launched
 }
 
 export const formatGameLaunch = (launched: GameLaunchResult): string =>

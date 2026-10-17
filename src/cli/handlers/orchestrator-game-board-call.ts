@@ -1,6 +1,7 @@
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../../shared/runtime-rpc-envelope'
+import type { GameEventKind } from '../../shared/orchestrator-game-events'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -46,5 +47,22 @@ export async function callGameBoard<T>(
       )
     }
     throw error
+  }
+}
+
+export type GameEventDraft = {
+  kind: GameEventKind
+  ticket?: string
+  text?: string
+  key?: string
+}
+
+/** Posts what a command did or saw; never fails it, since an older Orca keeps no events. */
+export async function postGameEvents(
+  client: Client,
+  drafts: readonly GameEventDraft[]
+): Promise<void> {
+  for (const draft of drafts) {
+    await client.call('game.eventPost', { ...gameBoardCaller(), ...draft }).catch(() => undefined)
   }
 }
