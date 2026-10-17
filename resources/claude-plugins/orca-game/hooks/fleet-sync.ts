@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
 import { syncActionCommands } from './action-commands'
+import { cliInvocationOf } from './cli-invocation'
 import {
   gameStateArgvOf,
   openLinkArgvOf,
@@ -38,23 +39,32 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
   return { ...v, state: v.state === null ? null : (gameStateOf(v.state) ?? null) }
 }
 
-async function readState($: EngineInterface): Promise<GameState | undefined> {
-  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+/** Runs the Orca CLI, through cmd.exe when Orca handed a Windows batch file; undefined when it could not. */
+async function runCli($: EngineInterface, argv: readonly string[] | undefined) {
   if (argv === undefined) {
     return undefined
   }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const comspec = await $.env.get('ComSpec').catch(() => undefined)
+  const invocation = cliInvocationOf(argv, comspec)
+  if (invocation === undefined) {
+    return undefined
+  }
+  const init = invocation.env
+    ? { timeoutMs: CLI_TIMEOUT_MS, env: invocation.env }
+    : { timeoutMs: CLI_TIMEOUT_MS }
+  return await $.process.run(invocation.argv, init).catch(() => undefined)
+}
+
+async function readState($: EngineInterface): Promise<GameState | undefined> {
+  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+  const out = await runCli($, argv)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 
 /** Brings a teammate's Orca pane forward; false when Orca could not. */
 export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
-  const argv = terminalFocusArgvOf(cli, handle)
-  if (argv === undefined) {
-    return false
-  }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const out = await runCli($, terminalFocusArgvOf(cli, handle))
   return out?.exitCode === 0
 }
 
@@ -67,17 +77,13 @@ export async function openGameLink(
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
   const external = gameConfig().openLinks === 'system' ? openLinkArgvOf(cli, url) : undefined
   if (external !== undefined) {
-    const out = await $.process.run(external, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+    const out = await runCli($, external)
     // Why fall back: an older Orca or a host with no desktop has no system browser to offer.
     if (out?.exitCode === 0) {
       return true
     }
   }
-  const argv = tabCreateArgvOf(cli, url, worktreeId)
-  if (argv === undefined) {
-    return false
-  }
-  const out = await $.process.run(argv, { timeoutMs: CLI_TIMEOUT_MS }).catch(() => undefined)
+  const out = await runCli($, tabCreateArgvOf(cli, url, worktreeId))
   return out?.exitCode === 0
 }
 
