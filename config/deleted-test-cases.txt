@@ -1,1 +1,7 @@
 # Test files allowed to lose cases, with why. One path per line.
+
+# ORCA-596: Orca Lab ships English and Spanish only. These pinned values inside the
+# zh/ja/ko catalogs, which were removed with the languages.
+src/renderer/src/i18n/ja-technical-literal-mistranslations.test.ts # ja.json technical literals
+src/renderer/src/i18n/ko-ui-semantic-mistranslations.test.ts # ko.json corrected UI values
+src/renderer/src/i18n/zh-technical-literal-mistranslations.test.ts # zh.json technical literals
