@@ -10,6 +10,7 @@ import {
   type GameLaunchFlags
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
+import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
@@ -144,7 +145,7 @@ export async function launchGameMember(args: {
     from,
     `${lead.label ?? 'Lead'} of ${project}: one member per ticket`
   )
-  const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
+  const taskParams = {
     spec: renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
       id: item?.id ?? ticket,
       title: item?.title ?? '',
@@ -153,8 +154,15 @@ export async function launchGameMember(args: {
     }),
     taskTitle: title,
     callerTerminalHandle: from
-  })
-  const worker = await client.call<WorkerStartResult>('orchestration.workerStart', {
+  }
+  const task = await callWithLaunchRetry((requestId) =>
+    client.call<{ task: { id: string } }>(
+      'orchestration.taskCreate',
+      taskParams,
+      requestId ? { orchestrationRequestId: requestId } : undefined
+    )
+  )
+  const workerParams = {
     task: task.result.task.id,
     // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
     ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
@@ -166,7 +174,14 @@ export async function launchGameMember(args: {
     run: runId,
     from,
     devMode: isDevCliInvocation()
-  })
+  }
+  const worker = await callWithLaunchRetry((requestId) =>
+    client.call<WorkerStartResult>(
+      'orchestration.workerStart',
+      workerParams,
+      requestId ? { orchestrationRequestId: requestId } : undefined
+    )
+  )
   return {
     ticket,
     agent: choice.agent,

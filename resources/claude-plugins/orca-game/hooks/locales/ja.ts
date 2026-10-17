@@ -68,6 +68,7 @@ export const JA: GameCatalog = {
     actionCommandDescription: (label) => `Orca アクション: ${label}`,
     actionCommandRefused: (command) =>
       `/${command} は別のコマンドが使っています。バンドかパネルのボタンを使ってください`,
-    actionCommandGone: (command) => `/${command} はこのプロジェクトのアクションではなくなりました`
+    actionCommandGone: (command) => `/${command} はこのプロジェクトのアクションではなくなりました`,
+    limited: (backIn) => (backIn === null ? '利用上限' : `利用上限 · ${backIn} 後に復帰`)
   }
 }

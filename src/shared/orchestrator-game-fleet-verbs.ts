@@ -7,9 +7,9 @@ import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orches
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
-export type GameMemberPhase = 'needs-you' | 'working' | 'idle' | 'finished'
+export type GameMemberPhase = 'needs-you' | 'limited' | 'working' | 'idle' | 'finished'
 
-const PHASES: readonly GameMemberPhase[] = ['needs-you', 'working', 'idle', 'finished']
+const PHASES: readonly GameMemberPhase[] = ['needs-you', 'limited', 'working', 'idle', 'finished']
 
 export type GameFleetRow = {
   name: string
@@ -23,6 +23,8 @@ export type GameFleetRow = {
   phase: GameMemberPhase
   next: string
   terminalHandle: string | null
+  /** When a limited member's account resets (ISO); null when unknown or not limited. */
+  limitedUntil: string | null
 }
 
 export type GameFleet = {
@@ -50,6 +52,9 @@ export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   if (isFinishedMember(agent)) {
     return 'finished'
   }
+  if (agent.limit) {
+    return 'limited'
+  }
   if (agent.state === 'waiting') {
     return 'needs-you'
   }
@@ -76,12 +81,17 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
       return 'sweep --close'
     case 'needs-you':
       return 'answer it'
+    case 'limited':
+      return limitedNextOf(agent)
     case 'working':
       return 'wait'
     case 'idle':
       return idleNextOf(agent.review)
   }
 }
+
+const limitedNextOf = (agent: GameAgent): string =>
+  `game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}, or wait for the reset`
 
 function idleNextOf(review: GameAgent['review']): string {
   if (!review) {
@@ -111,7 +121,11 @@ function rowOf(agent: GameAgent): GameFleetRow {
     branch: agent.worktree?.branch ?? null,
     phase,
     next: nextOf(agent, phase),
-    terminalHandle: agent.terminalHandle ?? null
+    terminalHandle: agent.terminalHandle ?? null,
+    limitedUntil:
+      agent.limit?.resetsAt === null || agent.limit === undefined
+        ? null
+        : new Date(agent.limit.resetsAt).toISOString()
   }
 }
 
@@ -126,7 +140,7 @@ const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
 
 export function gameFleetReportOf(state: FleetInput): GameFleet {
   const rows = byPhase(membersOf(state).map(rowOf), (row) => row.phase)
-  const counts = { 'needs-you': 0, working: 0, idle: 0, finished: 0 }
+  const counts = { 'needs-you': 0, limited: 0, working: 0, idle: 0, finished: 0 }
   for (const row of rows) {
     counts[row.phase] += 1
   }
@@ -232,6 +246,9 @@ export function gamePushPlanOf(state: FleetInput): GamePushEntry[] {
       }
       if (row.phase === 'working') {
         return { ...base, action: 'leave', reason: 'working' }
+      }
+      if (row.phase === 'limited') {
+        return { ...base, action: 'leave', reason: `limited by its account: ${row.next}` }
       }
       if (!row.terminalHandle) {
         return { ...base, action: 'leave', reason: 'no terminal to send to' }

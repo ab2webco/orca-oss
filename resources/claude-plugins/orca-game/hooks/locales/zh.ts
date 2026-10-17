@@ -66,6 +66,7 @@ export const ZH: GameCatalog = {
     },
     actionCommandDescription: (label) => `Orca 操作: ${label}`,
     actionCommandRefused: (command) => `/${command} 已被其他命令占用;请使用横栏或面板中的按钮`,
-    actionCommandGone: (command) => `/${command} 已不再是此项目的操作`
+    actionCommandGone: (command) => `/${command} 已不再是此项目的操作`,
+    limited: (backIn) => (backIn === null ? '已达用量上限' : `已达用量上限 · ${backIn} 后恢复`)
   }
 }

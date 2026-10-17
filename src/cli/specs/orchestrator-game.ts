@@ -67,7 +67,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca game fleet [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
     notes: [
-      'Phases: needs-you (waiting on a question), working, idle, finished (PR merged and ticket in review or done).',
+      'Phases: needs-you (waiting on a question), limited (stopped by its account usage limit; `game move` it or wait), working, idle, finished (PR merged and ticket in review or done).',
       'Running members are every one not finished; free slots are the cap minus them.'
     ],
     examples: ['orca game fleet', 'orca game fleet --json']
@@ -85,6 +85,20 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       '--refresh asks the providers for fresh usage first; without it Orca answers from its cached reading. No credentials are printed.'
     ],
     examples: ['orca game accounts', 'orca game accounts --refresh --json']
+  },
+  {
+    path: ['game', 'move'],
+    summary: 'Move a member its account limit stopped onto another managed account',
+    usage: 'orca game move <ticket> [--account <email|id|auto>] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'account', 'dry-run'],
+    positionalArgs: ['ticket'],
+    notes: [
+      "--account defaults to auto: the other account of the member's agent with the most free quota.",
+      'A Claude member is switched in its own terminal and resumes the same session (`orca account switch`); any other member is stopped and started again in its own worktree on the new account, linked with --retry-of.',
+      'When every other account is at or near its limit, nothing moves and the result says when the first is usable again.',
+      'Agents without Orca-managed accounts cannot move; wait for their reset.'
+    ],
+    examples: ['orca game move CIN-12', 'orca game move CIN-12 --account ana@example.com --json']
   },
   {
     path: ['game', 'wave'],

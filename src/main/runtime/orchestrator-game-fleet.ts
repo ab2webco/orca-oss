@@ -9,6 +9,7 @@ import {
   type GameStatusGroup,
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
+import type { GameMemberLimit } from '../../shared/orchestrator-game-member-limit'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
@@ -23,6 +24,14 @@ export type GameMemberAccountOf = (member: {
   agentType: string | null
   worktreeId: string | null
 }) => GameMemberAccount | null
+
+/** Whether a stopped member hit its account's usage limit; read only for members. */
+export type GameMemberLimitOf = (member: {
+  paneKey: string
+  agentType: string | null
+  state: GameAgent['state']
+  account: GameMemberAccount | null
+}) => Promise<GameMemberLimit | null>
 
 export type ReadLinkedStatus = (
   linked: WorkspaceLinkedItem
@@ -81,6 +90,7 @@ export async function gameFleetOf(args: {
   readMemberWork: ((worktreeId: string) => Promise<GameMemberWork | null>) | undefined
   readLinkedStatus: ReadLinkedStatus | undefined
   accountOf?: GameMemberAccountOf
+  limitOf?: GameMemberLimitOf
   /** The lead's worktree, where a member without one of its own runs. */
   leadWorktreeId?: string | null
 }): Promise<GameAgent[]> {
@@ -118,14 +128,28 @@ export async function gameFleetOf(args: {
             worktreeId: worktree?.id ?? args.leadWorktreeId ?? null
           }) ?? null)
         : null
+      const agent = gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null)
+      const limitOf = args.limitOf
+      const limit =
+        isMember && limitOf
+          ? await settle(() =>
+              limitOf({
+                paneKey: row.paneKey,
+                agentType: row.agentType,
+                state: agent.state,
+                account
+              })
+            )
+          : null
       return {
-        ...gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null),
+        ...agent,
         ...(isMember ? { isMember: true } : {}),
         ...(worktree ? { worktree } : {}),
         ...(review ? { review } : {}),
         ...(workItem ? { workItem } : {}),
         ...(activity ? { activity } : {}),
-        ...(account ? { account } : {})
+        ...(account ? { account } : {}),
+        ...(limit ? { limit } : {})
       }
     })
   )

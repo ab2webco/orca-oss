@@ -47,6 +47,8 @@ export type GameAgent = {
   workItem?: GameWorkItem
   /** The managed account a member's agent runs on; absent when Orca cannot tell or from an older host. */
   account?: GameMemberAccount
+  /** Set while a member is stopped by its account's usage limit; absent from an older host. */
+  limit?: { resetsAt: number | null }
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }

@@ -49,4 +49,38 @@ describe('buildOrchestratorGameState member accounts', () => {
       ['tab-6:away', { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }]
     ])
   })
+
+  it('marks a member its account limit stopped, asking only for members', async () => {
+    const asked: unknown[] = []
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead', state: 'done' }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      accountOf: () => ({ provider: 'claude', id: 'acct_ana', email: 'ana@example.com' }),
+      limitOf: async (member) => {
+        asked.push(member)
+        return { resetsAt: 123 }
+      },
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(asked).toEqual([
+      {
+        paneKey: 'tab-4:here',
+        agentType: 'claude',
+        state: 'done',
+        account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' }
+      }
+    ])
+    expect(state.agents.map((agent) => [agent.paneKey, agent.limit])).toEqual([
+      ['tab-1:lead', undefined],
+      ['tab-4:here', { resetsAt: 123 }]
+    ])
+  })
 })

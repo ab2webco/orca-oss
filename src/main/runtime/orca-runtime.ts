@@ -667,6 +667,11 @@ import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
+import {
+  accountLimitsOf,
+  gameMemberLimitOf,
+  type GameMemberLimit
+} from '../../shared/orchestrator-game-member-limit'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
@@ -3022,6 +3027,9 @@ function getSetupRunnerCommandPlatformForLaunch(
 ): 'windows' | 'posix' {
   return getSetupRunnerCommandPlatformForPath(setup?.runnerScriptPath ?? '', fallbackPlatform)
 }
+
+// Why 40: a provider's limit notice is the last thing an agent prints before it stops.
+const GAME_MEMBER_LIMIT_TAIL_LINES = 40
 
 export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
@@ -30188,6 +30196,43 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
+  private async gameMemberLimitFor(member: {
+    paneKey: string
+    agentType: string | null
+    state: 'working' | 'waiting' | 'idle' | 'done'
+    account: { id: string } | null
+  }): Promise<GameMemberLimit | null> {
+    const provider = accountProviderOfAgent(member.agentType)
+    const services = this.accountServices
+    if (!provider || member.state === 'working') {
+      return null
+    }
+    const roster = services
+      ? (provider === 'claude' ? services.claudeAccounts : services.codexAccounts).listAccounts()
+      : null
+    const accountLimits =
+      services && roster && member.account
+        ? accountLimitsOf(
+            services.rateLimits.getState(),
+            provider,
+            member.account.id,
+            roster.activeAccountIdsByRuntime?.host ?? roster.activeAccountId
+          )
+        : null
+    const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+    const read = handle
+      ? await this.readTerminal(handle, { limit: GAME_MEMBER_LIMIT_TAIL_LINES }).catch(() => null)
+      : null
+    return gameMemberLimitOf({
+      state: member.state,
+      agentType: member.agentType,
+      accountLimits,
+      terminalTail: read ? read.tail.join('\n') : null,
+      now: Date.now()
+    })
+  }
+
   async getOrchestratorGameState(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -30250,6 +30295,7 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      limitOf: (member) => this.gameMemberLimitFor(member),
       leaderPaneKey: args.paneKey ?? null,
       callerParentPaneKey: args.paneKey
         ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)

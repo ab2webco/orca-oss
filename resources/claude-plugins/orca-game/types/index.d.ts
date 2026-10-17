@@ -32,7 +32,11 @@ export type GameAgent = {
   /** The member worktree's own review and ticket. */
   review?: GameReview
   workItem?: GameWorkItem
+  /** Set while a member is stopped by its account's usage limit; `resetsAt` is Unix ms. */
+  limit?: GameMemberLimit
 }
+
+export type GameMemberLimit = { resetsAt: number | null }
 
 export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 

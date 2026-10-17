@@ -142,6 +142,25 @@ describe('orca game fleet verbs', () => {
     )
   })
 
+  it('fleet text counts limited members and says how to move them', async () => {
+    const { client } = fakeClient(
+      stateWith({
+        agents: [LEAD, member({ state: 'idle', limit: { resetsAt: null } })]
+      })
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain('limited 1')
+    expect(text).toMatch(/limited\s+CIN-1.*game move CIN-1, or wait for the reset/)
+  })
+
   it('wave --dry-run plans from the To Do without launching anything', async () => {
     const { client, calls } = fakeClient(stateWith({ agents: [LEAD, member({})] }))
 

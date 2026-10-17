@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
-import type { RuntimeClient } from '../runtime-client'
+import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 
 const TODO_ITEM = {
@@ -312,5 +312,34 @@ describe('orca game launch', () => {
       ])
     ).rejects.toThrow(/gemini has no Orca-managed accounts/)
     expect(gemini.calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
+  it('retries a launch the network dropped once, with the same request id', async () => {
+    const { client, calls } = fakeClient(stateWith())
+    const options: unknown[] = []
+    let failed = false
+    const flaky = {
+      call: async (method: string, params: unknown, option?: unknown) => {
+        if (method === 'orchestration.workerStart') {
+          options.push(option)
+          if (!failed) {
+            failed = true
+            calls.push([method, params])
+            throw new RuntimeClientError('runtime_unavailable', 'dropped', {
+              orchestrationRequestId: 'rq_1'
+            })
+          }
+        }
+        return client.call(method, params)
+      }
+    } as unknown as RuntimeClient
+
+    await launch(flaky)
+
+    expect(calls.filter(([method]) => method === 'orchestration.workerStart')).toHaveLength(2)
+    expect(options).toEqual([undefined, { orchestrationRequestId: 'rq_1' }])
+    expect(JSON.parse(output.join('')).result).toEqual(
+      expect.objectContaining({ dispatchId: 'dispatch_1', state: 'ready' })
+    )
   })
 })

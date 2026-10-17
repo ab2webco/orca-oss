@@ -73,6 +73,7 @@ export const KO: GameCatalog = {
     actionCommandDescription: (label) => `Orca 작업: ${label}`,
     actionCommandRefused: (command) =>
       `/${command}은(는) 다른 명령이 사용 중입니다. 밴드나 패널의 버튼을 사용하세요`,
-    actionCommandGone: (command) => `/${command}은(는) 더 이상 이 프로젝트의 작업이 아닙니다`
+    actionCommandGone: (command) => `/${command}은(는) 더 이상 이 프로젝트의 작업이 아닙니다`,
+    limited: (backIn) => (backIn === null ? '사용 한도' : `사용 한도 · ${backIn} 후 복귀`)
   }
 }

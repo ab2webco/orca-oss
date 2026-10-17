@@ -19,6 +19,7 @@ import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
+import { memberLimitOf } from './member-tags'
 
 const parseJson = (text: string): unknown => {
   try {
@@ -200,6 +201,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const worktree = memberWorktreeOf(value.worktree)
   const review = worktree ? reviewOf(value.review) : null
   const workItem = worktree ? workItemOf(value.workItem) : null
+  const limit = memberLimitOf(value.limit)
   return [
     {
       paneKey,
@@ -213,7 +215,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(value.isMember === true ? { isMember: true } : {}),
       ...(worktree === undefined ? {} : { worktree }),
       ...(review === null ? {} : { review }),
-      ...(workItem === null ? {} : { workItem })
+      ...(workItem === null ? {} : { workItem }),
+      ...(limit === undefined ? {} : { limit })
     }
   ]
 }

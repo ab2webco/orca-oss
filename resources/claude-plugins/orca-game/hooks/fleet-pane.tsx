@@ -22,6 +22,7 @@ import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
+import { limitTagOf } from './member-tags'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
@@ -163,7 +164,7 @@ export const registerFleetPane = (on: On): void => {
             key={`card-${agent.paneKey}`}
             flexDirection="row"
             borderStyle="round"
-            borderColor={AGENT_COLORS[agent.state]}
+            borderColor={agent.limit === undefined ? AGENT_COLORS[agent.state] : 'red'}
           >
             {art.get(`tile-${member.key}`) ?? <Box width={TILE_COLUMNS} />}
             <Box flexDirection="column" paddingLeft={1} flexGrow={1} flexShrink={1}>
@@ -184,6 +185,11 @@ export const registerFleetPane = (on: On): void => {
                 )}
                 {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
               </Box>
+              {agent.limit !== undefined && (
+                <Text color="red" bold wrap="truncate-end">
+                  {limitTagOf(agent.limit, Date.now())}
+                </Text>
+              )}
               <Text wrap="truncate-end">{member.says}</Text>
               {(agent.review !== undefined || agent.workItem !== undefined) && (
                 <Box flexDirection="row" gap={1}>

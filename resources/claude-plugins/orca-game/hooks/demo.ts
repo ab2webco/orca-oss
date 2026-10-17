@@ -36,6 +36,8 @@ type Step = {
   action: Action | undefined
   caption: (art: ArtStrings) => string
   isResting?: boolean
+  /** Seats stopped by their account's usage limit, back in 90 minutes. */
+  limited?: readonly string[]
 }
 
 const SCRIPT: readonly Step[] = [
@@ -102,6 +104,7 @@ const SCRIPT: readonly Step[] = [
     xp: 80,
     phase: 'pr',
     action: 'push',
+    limited: ['tester'],
     caption: () => 'DEMO · git push'
   },
   {
@@ -152,6 +155,7 @@ const SCRIPT: readonly Step[] = [
 export const DEMO_FRAMES = SCRIPT.length
 
 const DEMO_URL = 'https://example.invalid/demo'
+const DEMO_LIMIT_MS = 90 * 60_000
 const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
   failure: 'danger',
   success: 'success',
@@ -234,7 +238,8 @@ const stateOf = (step: Step): GameState => ({
       agentType: 'claude',
       state,
       toolName: tool,
-      isLeader: false
+      isLeader: false,
+      ...(step.limited?.includes(name) ? { limit: { resetsAt: Date.now() + DEMO_LIMIT_MS } } : {})
     }))
   ],
   review: {

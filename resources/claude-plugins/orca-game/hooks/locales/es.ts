@@ -81,7 +81,8 @@ export const ES: GameCatalog = {
     actionCommandDescription: (label) => `Acción de Orca: ${label}`,
     actionCommandRefused: (command) =>
       `/${command} ya lo usa otro comando; usa su botón en la banda o en el Panel`,
-    actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`
+    actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`,
+    limited: (backIn) => (backIn === null ? 'limitado' : `limitado · vuelve en ${backIn}`)
   },
   art: {
     needsYou: '¡te necesita!',

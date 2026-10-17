@@ -5,6 +5,8 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameStopWorker = {
   dispatchId: string
+  taskId?: string
+  runId?: string
   agentTerminalHandle: string | null
   workerState: string
   terminalState: string | null
@@ -35,7 +37,11 @@ const STOPPABLE: ReadonlySet<string> = new Set([
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-function dispatchOf(target: GameStopTarget, workers: GameStopWorker[]): GameStopWorker | undefined {
+/** The member's live dispatch: the one on its terminal, else the one in its worktree. */
+export function dispatchOf(
+  target: { row: Pick<GameStopTarget['row'], 'terminalHandle'>; worktreeId: string | null },
+  workers: GameStopWorker[]
+): GameStopWorker | undefined {
   const handle = target.row.terminalHandle
   const live = workers.filter((worker) => STOPPABLE.has(worker.workerState))
   return (

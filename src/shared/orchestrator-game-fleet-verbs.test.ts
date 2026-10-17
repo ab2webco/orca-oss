@@ -92,6 +92,51 @@ describe('memberPhaseOf', () => {
   })
 })
 
+describe('limited members', () => {
+  const RESET = Date.UTC(2026, 9, 16, 15, 30)
+  const limited = member({
+    paneKey: 'l',
+    displayName: 'CIN-5 Stuck',
+    state: 'idle',
+    limit: { resetsAt: RESET }
+  })
+
+  it('puts a member its account limit stopped in its own phase, after needs-you, still holding a slot', () => {
+    expect(memberPhaseOf(limited)).toBe('limited')
+    expect(memberPhaseOf({ ...finished, limit: { resetsAt: null } })).toBe('finished')
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [
+        member({ paneKey: 'w', displayName: 'CIN-2 Busy' }),
+        limited,
+        member({ paneKey: 'q', displayName: 'CIN-4 Asks', state: 'waiting' })
+      ]
+    })
+    expect(fleet.rows.map((row) => [row.ticket, row.phase])).toEqual([
+      ['CIN-4', 'needs-you'],
+      ['CIN-5', 'limited'],
+      ['CIN-2', 'working']
+    ])
+    expect(fleet.counts.limited).toBe(1)
+    expect(fleet.free).toBe(0)
+    expect(fleet.rows[1]).toEqual(
+      expect.objectContaining({
+        limitedUntil: new Date(RESET).toISOString(),
+        next: 'game move CIN-5, or wait for the reset'
+      })
+    )
+  })
+
+  it('never pushes a limited member: a prompt cannot get past its limit', () => {
+    expect(gamePushPlanOf({ lead: DEFAULT_GAME_LEAD, agents: [limited] })).toEqual([
+      expect.objectContaining({
+        action: 'leave',
+        reason: 'limited by its account: game move CIN-5, or wait for the reset'
+      })
+    ])
+  })
+})
+
 describe('gameFleetReportOf', () => {
   it('lists only members, sorted needs-you, working, idle, finished, with free slots from the cap', () => {
     const fleet = gameFleetReportOf({
@@ -111,7 +156,7 @@ describe('gameFleetReportOf', () => {
       ['CIN-3', 'idle'],
       ['CIN-9', 'finished']
     ])
-    expect(fleet.counts).toEqual({ 'needs-you': 1, working: 1, idle: 1, finished: 1 })
+    expect(fleet.counts).toEqual({ 'needs-you': 1, limited: 0, working: 1, idle: 1, finished: 1 })
     expect({ cap: fleet.cap, running: fleet.running, free: fleet.free }).toEqual({
       cap: 4,
       running: 3,

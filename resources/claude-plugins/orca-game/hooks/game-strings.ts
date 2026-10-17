@@ -65,6 +65,8 @@ export type TextStrings = {
   actionCommandDescription: (label: string) => string
   actionCommandRefused: (command: string) => string
   actionCommandGone: (command: string) => string
+  /** A member stopped by its account's usage limit; `backIn` like "1h 30m", null when unknown. */
+  limited: (backIn: string | null) => string
 }
 
 export type LeadActionKey = 'wave' | 'status' | 'push' | 'sweep' | 'stop'
@@ -169,7 +171,8 @@ const EN: GameStrings = {
     actionCommandDescription: (label) => `Orca action: ${label}`,
     actionCommandRefused: (command) =>
       `/${command} is taken by another command; use its button in the band or the Panel`,
-    actionCommandGone: (command) => `/${command} is no longer one of this project's actions`
+    actionCommandGone: (command) => `/${command} is no longer one of this project's actions`,
+    limited: (backIn) => (backIn === null ? 'limited' : `limited · back in ${backIn}`)
   },
   art: {
     needsYou: 'needs you!',

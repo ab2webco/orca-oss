@@ -22,6 +22,16 @@ import type { GameAgent } from '../../shared/orchestrator-game-state'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
+/** What `auto` weighs besides usage; `exclude` is an account the member must leave. */
+export type GameMemberAccountContext = {
+  agents: readonly GameAgent[]
+  launched?: GameLaunchedOnAccount
+  exclude?: string
+}
+
+/** The error code of an `auto` pick that found every account at or near its limit. */
+export const GAME_ACCOUNTS_LIMITED = 'accounts_limited'
+
 export type GameAccountPin = { claudeAccountId?: string; codexAccountId?: string }
 
 /** The account a member is launched on; `account` is null when Orca's own selection applies. */
@@ -69,13 +79,16 @@ function namedAccount(
 async function autoAccount(
   client: Client,
   provider: GameAccountProvider,
-  context: { agents: readonly GameAgent[]; launched?: GameLaunchedOnAccount }
+  context: GameMemberAccountContext
 ): Promise<GameMemberAccountChoice> {
   const usagesOf = (snapshot: RuntimeAccountsSnapshot) =>
     gameAccountUsagesOf({
-      entries: accountListEntriesOf(snapshot).filter(isAutoPickableAccount),
+      entries: accountListEntriesOf(snapshot).filter(
+        (entry) => isAutoPickableAccount(entry) && entry.id !== context.exclude
+      ),
       provider,
-      ...context
+      agents: context.agents,
+      launched: context.launched
     })
   let usages = usagesOf(await readAccounts(client))
   // Why one refresh: Orca reads an inactive account's usage lazily, so a cold cache would make it look unknown.
@@ -96,7 +109,7 @@ async function autoAccount(
   }
   if (pick.kind === 'limited') {
     throw new RuntimeClientError(
-      'accounts_limited',
+      GAME_ACCOUNTS_LIMITED,
       `Every ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_PERCENT}%+ of its 5h or 7d window); the first is usable again ${gameResetInText(pick.resetsAt, now)}${pick.resetsAt === null ? '' : ` (${new Date(pick.resetsAt).toISOString()})`}. Wait for it, or name one with --account <email|id>. See \`orca game accounts\`.`
     )
   }
@@ -107,7 +120,7 @@ async function autoAccount(
 export async function resolveGameMemberAccount(
   client: Client,
   choice: GameLaunchChoice,
-  context: { agents: readonly GameAgent[]; launched?: GameLaunchedOnAccount }
+  context: GameMemberAccountContext
 ): Promise<GameMemberAccountChoice> {
   const provider = accountProviderOfAgent(choice.agent)
   if (choice.account === null || provider === null) {

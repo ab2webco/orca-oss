@@ -1,0 +1,108 @@
+import { describe, expect, it } from 'vitest'
+import { accountLimitsOf, gameMemberLimitOf } from './orchestrator-game-member-limit'
+import type { ProviderRateLimits } from './rate-limit-types'
+
+const NOW = 1_000_000
+const HOUR = 3_600_000
+
+const limits = (session: number, resetsAt: number | null = NOW + HOUR): ProviderRateLimits => ({
+  provider: 'claude',
+  status: 'ok',
+  session: { usedPercent: session, windowMinutes: 300, resetsAt, resetDescription: null },
+  weekly: {
+    usedPercent: 10,
+    windowMinutes: 10080,
+    resetsAt: NOW + 48 * HOUR,
+    resetDescription: null
+  },
+  updatedAt: NOW,
+  error: null
+})
+
+const LIMIT_TEXT = "You've hit your usage limit · resets 3pm"
+
+describe('gameMemberLimitOf', () => {
+  it("is limited until the reset when the member's account is exhausted and it stopped", () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: limits(100),
+        terminalTail: null,
+        now: NOW
+      })
+    ).toEqual({ resetsAt: NOW + HOUR })
+  })
+
+  it('is limited when its terminal says so and its account is not known to have quota', () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'waiting',
+        agentType: 'codex',
+        accountLimits: null,
+        terminalTail: LIMIT_TEXT,
+        now: NOW
+      })
+    ).toEqual({ resetsAt: null })
+  })
+
+  it('ignores old limit text once its account has quota again, and a member still working', () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: limits(20),
+        terminalTail: LIMIT_TEXT,
+        now: NOW
+      })
+    ).toBeNull()
+    expect(
+      gameMemberLimitOf({
+        state: 'working',
+        agentType: 'claude',
+        accountLimits: limits(100),
+        terminalTail: LIMIT_TEXT,
+        now: NOW
+      })
+    ).toBeNull()
+  })
+
+  it('never calls a context or token limit a usage limit, nor an agent with no managed accounts', () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: null,
+        terminalTail: 'Context limit reached',
+        now: NOW
+      })
+    ).toBeNull()
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'gemini',
+        accountLimits: null,
+        terminalTail: LIMIT_TEXT,
+        now: NOW
+      })
+    ).toBeNull()
+  })
+})
+
+describe('accountLimitsOf', () => {
+  it("reads the active account's limits, else its cached inactive reading", () => {
+    const active = limits(50)
+    const inactive = limits(70)
+    const state = {
+      claude: active,
+      codex: null,
+      inactiveClaudeAccounts: [
+        { accountId: 'acct_b', rateLimits: inactive, updatedAt: NOW, isFetching: false }
+      ],
+      inactiveCodexAccounts: []
+    }
+    expect(accountLimitsOf(state, 'claude', 'acct_b', 'acct_a')).toBe(inactive)
+    expect(accountLimitsOf(state, 'claude', 'acct_a', 'acct_a')).toBe(active)
+    expect(accountLimitsOf(state, 'codex', 'acct_x', null)).toBeNull()
+  })
+})
