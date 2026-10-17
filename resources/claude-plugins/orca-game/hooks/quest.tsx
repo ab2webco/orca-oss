@@ -147,7 +147,7 @@ const registerSpinner = (on: On) => {
       quest.stages.delete(e.requestId)
       return next(e)
     }
-    const stage = stageOf(sceneColumnsOf(e.viewport?.columns))
+    const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)
     quest.stages.set(e.requestId, stage)
     const spinner = await next(e)
     const { Box, Raster } = $.ui.resolve(e)

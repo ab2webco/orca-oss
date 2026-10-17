@@ -2,6 +2,12 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+const spinnerOf = (rows: number) =>
+  ({
+    component: 'Spinner',
+    viewport: { columns: 130, rows, isFullscreen: true },
+    props: { word: 'Working', message: null, suffix: '', mode: 'thinking' }
+  }) as const
 const ORCA_CLI = '/opt/orca/bin/orca'
 const GAME_STATE = [ORCA_CLI, 'game', 'state', '--json']
 
@@ -76,5 +82,25 @@ describe('/quest render', () => {
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
+  })
+})
+
+const rasterOf = async ($: Parameters<Parameters<typeof test>[1]>[0], rows: number) => {
+  const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...spinnerOf(rows) })
+  const raster = await spinner.find({ type: 'Raster' })
+  await spinner.unmount()
+  return raster?.props
+}
+
+describe('the hd scene above the spinner', () => {
+  test('draws 9 rows, 10 on a tall terminal, and back to 5 in classic', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { ORCA_GAME_RENDER: 'hd' })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect((await rasterOf($, 40))?.rows).toBe(9)
+    expect((await rasterOf($, 60))?.rows).toBe(10)
+    await quest($, 'render classic')
+    expect((await rasterOf($, 60))?.rows).toBe(5)
   })
 })
