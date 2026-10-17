@@ -52,15 +52,11 @@ const listOf = <T>(
   if (!Array.isArray(value)) {
     return null
   }
-  const items: T[] = []
-  for (const item of value) {
+  // Why per item: one row Jev adds later must not take its whole line and band away.
+  return value.flatMap((item) => {
     const parsed = isRecord(item) ? read(item) : null
-    if (parsed === null) {
-      return null
-    }
-    items.push(parsed)
-  }
-  return items
+    return parsed === null ? [] : [parsed]
+  })
 }
 
 const agentOf = (raw: Record<string, unknown>): AdvisorAgent | null =>

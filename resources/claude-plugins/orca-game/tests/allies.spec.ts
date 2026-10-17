@@ -62,13 +62,19 @@ describe('advisorOf', () => {
     expect(advisorOf({ ...ADVISOR, version: 2 })).toBeNull()
     expect(advisorOf({ ...ADVISOR, line: 5 })).toBeNull()
     expect(advisorOf({ ...ADVISOR, subagents: {} })).toBeNull()
-    expect(advisorOf({ ...ADVISOR, ci: [{ id: 'c1' }] })).toBeNull()
-    expect(
-      advisorOf({
-        ...ADVISOR,
-        notices: [{ id: 'n', level: 'loud', text: 'x', at: 1 }]
-      })
-    ).toBeNull()
+  })
+
+  it('drops only the item it cannot read and keeps the rest of Jev', () => {
+    const advisor = advisorOf({
+      ...ADVISOR,
+      subagents: [...ADVISOR.subagents, { id: 'a2' }],
+      ci: [{ id: 'c0' }, ...ADVISOR.ci],
+      notices: [{ id: 'n', level: 'loud', text: 'x', at: 1 }, ...ADVISOR.notices]
+    })
+    expect(advisor?.line).toBe('jev · 1 agent')
+    expect(advisor?.subagents.map((one) => one.id)).toEqual(['a1'])
+    expect(advisor?.ci.map((one) => one.id)).toEqual(['c1'])
+    expect(advisor?.notices.map((one) => one.id)).toEqual(['n1'])
   })
 })
 
