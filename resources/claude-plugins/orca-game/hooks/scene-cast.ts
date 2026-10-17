@@ -69,7 +69,7 @@ export const advisorStageOf = (columns: number, pose: AdvisorPose | undefined): 
         columns - castWidthOf(pose.sprite.frames[0]) - ADVISOR_PROP_WIDTH - 1
       )
 
-const advisorFrameOf = (pose: AdvisorPose, tick: number): CastFrame => {
+export const advisorFrameOf = (pose: AdvisorPose, tick: number): CastFrame => {
   const gestured = pose.gesture === undefined ? undefined : pose.sprite.gestures?.[pose.gesture]
   const frames = pose.sprite.frames
   return gestured ?? frames[Math.floor(tick / 8) % frames.length] ?? []

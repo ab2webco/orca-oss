@@ -240,7 +240,11 @@ export const sceneGridOf = (
 }
 
 // The advisor's words type in from the moment its gesture starts, cut to half the scene at most.
-const advisorSaysOf = (advisor: AdvisorPose | undefined, tick: number, columns: number): string => {
+export const advisorSaysOf = (
+  advisor: AdvisorPose | undefined,
+  tick: number,
+  columns: number
+): string => {
   if (advisor === undefined || advisor.bubble === '') {
     return ''
   }

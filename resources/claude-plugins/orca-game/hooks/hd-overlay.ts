@@ -48,22 +48,29 @@ export const shakeGrid = (grid: number[][], columns: number, dx: number): number
   return out
 }
 
-const isNearBox = (box: ThoughtBox | undefined, row: number, from: number, to: number): boolean =>
-  box !== undefined &&
-  row >= box.row - 1 &&
-  row <= box.row + box.lines &&
-  to > box.left - 3 &&
-  from <= box.right + 3
+/** The clouds on screen: the hero's (or its pet's) first, then the advisor's. */
+export type Clouds = readonly (ThoughtBox | undefined)[]
 
-/** The event's text rising from the hero's head; skipped when wider than the scene or over the cloud. */
+const isNearBox = (boxes: Clouds, row: number, from: number, to: number): boolean =>
+  boxes.some(
+    (box) =>
+      box !== undefined &&
+      row >= box.row - 1 &&
+      row <= box.row + box.lines &&
+      to > box.left - 3 &&
+      from <= box.right + 3
+  )
+
+/** The event's text rising from the hero's head; skipped when wider than the scene or over a cloud. */
 export const floatInto = (
   grid: number[][],
   columns: number,
   event: TeamEvent,
   startRow: number,
   centre: number,
-  box: ThoughtBox | undefined
+  boxes: Clouds
 ): void => {
+  const box = boxes[0]
   const text = rasterGlyphsOf(` ${event.text} `)
   if (text.length > columns) {
     return
@@ -73,7 +80,7 @@ export const floatInto = (
   // Why the sides: the cloud sits by the hero's head, so a text that would cover it rises beside it.
   const start = [centred, (box?.left ?? 0) - 4 - text.length, (box?.right ?? 0) + 5].find(
     (one) =>
-      one >= 0 && one + text.length <= columns && !isNearBox(box, row, one, one + text.length)
+      one >= 0 && one + text.length <= columns && !isNearBox(boxes, row, one, one + text.length)
   )
   if (start === undefined) {
     return
@@ -92,7 +99,7 @@ export const sparklesInto = (
   from: number,
   span: number,
   reaction: Reaction | undefined,
-  box: ThoughtBox | undefined
+  boxes: Clouds
 ): void => {
   if (reaction === undefined || (reaction.kind !== 'level' && reaction.kind !== 'pet')) {
     return
@@ -103,7 +110,7 @@ export const sparklesInto = (
   for (const offset of offsets) {
     const x: number = from + ((offset + reaction.age) % Math.max(1, span))
     const at = row * columns + x
-    if (x >= 0 && x < columns && !isNearBox(box, row, x, x + 1) && grid[at] !== undefined) {
+    if (x >= 0 && x < columns && !isNearBox(boxes, row, x, x + 1) && grid[at] !== undefined) {
       grid[at] = [glyph, color, grid[at]?.[1] ?? 0]
     }
   }
@@ -116,7 +123,7 @@ export const waitingMarksInto = (
   members: readonly PlacedMember[],
   spriteWidth: number,
   tick: number,
-  box: ThoughtBox | undefined
+  boxes: Clouds
 ): void => {
   for (const one of members) {
     if (one.member.state !== 'waiting') {
@@ -125,7 +132,7 @@ export const waitingMarksInto = (
     const row = Math.max(0, Math.floor(one.top / 2) - 1)
     const x = one.left + Math.floor(spriteWidth / 2)
     const at = row * columns + x
-    if (grid[at] !== undefined && !isNearBox(box, row, x - 2, x + 3)) {
+    if (grid[at] !== undefined && !isNearBox(boxes, row, x - 2, x + 3)) {
       grid[at] = [0x21, Math.floor(tick / 4) % 2 === 0 ? WAITING : WAITING_DIM, grid[at]?.[2] ?? 0]
     }
   }

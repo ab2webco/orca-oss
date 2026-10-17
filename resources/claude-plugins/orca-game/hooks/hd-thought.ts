@@ -12,6 +12,8 @@ export type ThoughtMood =
   | 'red'
   | 'idle'
   | 'reacting'
+  /** Plain words typing in, as the advisor speaks. */
+  | 'saying'
 
 export const CLOUD = 0xf4f4f0
 const CLOUD_LIGHT = 0xffffff
@@ -40,6 +42,8 @@ export type ThoughtAt = {
   headRight: number
   headTop: number
   floor: number
+  /** The longest line, when shorter than the cloud's own limit. */
+  room?: number
 }
 
 export type ThoughtBox = { left: number; right: number; row: number; lines: number }
@@ -147,8 +151,13 @@ export const drawThought = (
 ): ThoughtBox | undefined => {
   const { columns, rows, tick } = at
   const thought = textOf(rasterGlyphsOf(said).join(''), mood, tick)
-  const room = Math.min(MAX_LINE, Math.max(4, Math.min(at.limit, columns) - 8))
-  const isTyped = mood === 'working' || mood === 'waiting' || mood === 'merged' || mood === 'red'
+  const room = Math.min(at.room ?? MAX_LINE, Math.max(4, Math.min(at.limit, columns) - 8))
+  const isTyped =
+    mood === 'working' ||
+    mood === 'waiting' ||
+    mood === 'merged' ||
+    mood === 'red' ||
+    mood === 'saying'
   const shown = isTyped ? Math.max(1, (tick - since) * 3) : thought.to - thought.from
   let index = 0
   const lines = thoughtLinesOf(thought.text, room)

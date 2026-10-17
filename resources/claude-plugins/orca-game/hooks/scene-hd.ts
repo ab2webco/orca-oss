@@ -1,5 +1,5 @@
 import { actionPixel } from './action-props'
-import { gameStrings, localizedNameOf, rasterGlyphsOf } from './game-strings'
+import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
 import { landAtNight, NOON, type Daylight } from './hd-daylight'
 import {
   bloomInto,
@@ -10,32 +10,22 @@ import {
   particlesInto,
   vignetteInto
 } from './hd-fx'
-import {
-  isTeamEventShown,
-  floatInto,
-  labelInto,
-  quakeOf,
-  shakeGrid,
-  sparklesInto,
-  waitingMarksInto,
-  type TeamEvent
-} from './hd-overlay'
+import { isTeamEventShown, quakeOf, shakeGrid, type TeamEvent } from './hd-overlay'
 import {
   crownAtOf,
   crownPixel,
   FIRE_WIDTH,
   hdCampfirePixel,
-  LEAD_GOLD,
   placedPartyOf,
   STATE_RING,
   type HdMember,
   type March
 } from './hd-party'
 import { costumeSpriteOf, hdSpritePixel } from './hd-sprite'
-import { drawThought, thoughtMoodOf } from './hd-thought'
+import { hdWordsInto } from './hd-words'
 import { mix, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
-import { isReacting, paintFinale, reactionSaysOf, snoreOf, type Reaction } from './scene'
+import { isReacting, type Reaction } from './scene'
 import type { AdvisorPose } from './scene-cast'
 import {
   hdFarPixel,
@@ -104,7 +94,9 @@ const SHADOW = 0.38
 const MEMBER_SHADOW = 0.3
 const FIRE_GLOW = 0xff9a2e
 
+// Reused across frames of the same size; the mask marks which pixels are figures.
 let buffer = new Uint32Array(0)
+let figures = new Uint8Array(0)
 
 export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const { scene, columns, rows, tick } = input
@@ -117,10 +109,31 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const { ground, pixels } = frame
   const pose = hdHeroPoseOf(tick, resting)
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
-  const walk = resting ? hdRestColumnOf(columns) : hdWalkColumn(columns, tick)
-  const heading = resting || hdWalkColumn(columns, tick + 2) >= walk ? 1 : -1
-  const lift = reaction !== undefined && reaction.age % 6 < 3 ? 2 : 0
+  // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
+  const stage = hdStageOf(columns, input.advisor, HD_SPRITE_WIDTH)
+  const walk = resting ? hdRestColumnOf(stage) : hdWalkColumn(stage, tick)
+  const heading = resting || hdWalkColumn(stage, tick + 2) >= walk ? 1 : -1
+  const petDef = scene.cast?.pet
+  const isPetted = reaction?.kind === 'pet' && petDef !== undefined
+  const hop = reaction !== undefined && reaction.age % 6 < 3 ? 2 : 0
+  const lift = isPetted ? 0 : hop
   const top = ground - sprite.rows.length + 1 - lift - pose.bob
+  const pet =
+    petDef === undefined
+      ? undefined
+      : hdPetOf({
+          pet: petDef,
+          walkOf: (at) => hdWalkColumn(stage, at),
+          tick,
+          isResting: resting,
+          isPetted,
+          restLeft: walk,
+          heroWidth: HD_SPRITE_WIDTH,
+          ground,
+          lift: isPetted ? hop : 0
+        })
+  const advisor =
+    input.advisor === undefined ? undefined : hdAdvisorOf(input.advisor, columns, ground, tick)
   const shown = resting ? undefined : input.action
   const fireLeft = walk + HD_SPRITE_WIDTH + 1
   const members = placedPartyOf({
@@ -128,10 +141,10 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     party: input.party ?? [],
     leavers: input.leavers ?? [],
     marches: input.marches ?? new Map(),
-    columns,
+    columns: stage,
     ground,
     tick,
-    walk,
+    walk: pet === undefined || resting ? walk : walk - heading * (pet.sprite.width + 1),
     heading,
     isResting: resting,
     fireRight: fireLeft + FIRE_WIDTH,
@@ -146,39 +159,55 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const d = Math.hypot(x - (fireLeft + FIRE_WIDTH / 2), (y - (ground - 2)) * 1.3)
     return d < 12 ? mix(color, FIRE_GLOW, (1 - d / 12) * 0.3) : color
   }
-  const at = (x: number, y: number): number => {
-    const crowned = crown === undefined ? undefined : crownPixel(x, y, crown.left, crown.top)
-    if (crowned !== undefined) {
-      return crowned
-    }
-    const prop = actionPixel(shown, x - walk - HD_SPRITE_WIDTH + 1, CLAWD_TOP + (y - top - 1), tick)
-    if (prop !== undefined) {
-      return prop
-    }
-    const hero = hdSpritePixel(sprite, x, y, walk, top)
+  const figureAt = (x: number, y: number): number | undefined => {
+    const hero = hdSpritePixel(sprite, x, y, walk, top) ?? castPixelOf(pet, x, y)
     if (hero !== undefined) {
-      return glow(x, y, landAtNight(hero, figureLight))
+      return hero
     }
     for (const one of members) {
-      const ring = STATE_RING[one.member.state]
-      const member = hdSpritePixel(one.sprite, x, y, one.left, one.top, ring)
+      const member = hdSpritePixel(
+        one.sprite,
+        x,
+        y,
+        one.left,
+        one.top,
+        STATE_RING[one.member.state]
+      )
       if (member !== undefined) {
-        return glow(x, y, landAtNight(member, figureLight))
+        return member
       }
     }
-    const fire = resting ? hdCampfirePixel(x - fireLeft, ground - 1 - y, tick) : undefined
-    if (fire !== undefined) {
-      return fire
+    return castPixelOf(advisor, x, y)
+  }
+  const at = (x: number, y: number): number => {
+    const crowned = crown === undefined ? undefined : crownPixel(x, y, crown.left, crown.top)
+    const prop = actionPixel(shown, x - walk - HD_SPRITE_WIDTH + 1, CLAWD_TOP + (y - top - 1), tick)
+    if (crowned !== undefined || prop !== undefined) {
+      return crowned ?? prop ?? 0
     }
+    const figure = figureAt(x, y)
+    if (figure !== undefined) {
+      figures[y * columns + x] = 1
+      return glow(x, y, landAtNight(figure, figureLight))
+    }
+    const held =
+      input.advisor === undefined || advisor === undefined
+        ? undefined
+        : hdAdvisorPropPixel(input.advisor, advisor, x, y, ground)
+    const fire = resting ? hdCampfirePixel(x - fireLeft, ground - 1 - y, tick) : undefined
     const pond = hdPondPixel(frame, x, y)
-    if (pond !== undefined) {
-      return glow(x, y, pond)
+    if (held !== undefined || fire !== undefined || pond !== undefined) {
+      return held ?? fire ?? glow(x, y, pond ?? 0)
     }
     if (y >= ground) {
-      const underHero = y === ground && lift === 0 && x > walk && x < walk + HD_SPRITE_WIDTH - 1
-      const underMember =
-        y === ground && members.some((one) => x > one.left && x < one.left + HD_SPRITE_WIDTH - 1)
-      const shade = underHero ? SHADOW : underMember ? MEMBER_SHADOW : 0
+      const isUnder = (left: number, width: number) =>
+        y === ground && x > left && x < left + width - 1
+      const underHero = lift === 0 && isUnder(walk, HD_SPRITE_WIDTH)
+      const underOther =
+        members.some((one) => isUnder(one.left, HD_SPRITE_WIDTH)) ||
+        (pet !== undefined && isUnder(pet.left, pet.sprite.width)) ||
+        (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
+      const shade = underHero ? SHADOW : underOther ? MEMBER_SHADOW : 0
       const soil = mix(hdGroundPixel(frame, x, y), 0x000000, shade)
       return glow(x, y, landAtNight(soil, frame.light))
     }
@@ -187,24 +216,20 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)
+    figures = new Uint8Array(columns * pixels)
   }
+  figures.fill(0)
   for (let y = 0; y < pixels; y += 1) {
     for (let x = 0; x < columns; x += 1) {
       buffer[y * columns + x] = at(x, y)
     }
   }
   const night = Math.max(frame.light.night, look.isNight ? 1 : 0)
-  particlesInto(
-    buffer,
-    columns,
-    pixels,
-    ground,
-    tick,
-    particleKindOf(scene.id, night, resting),
-    fireLeft
-  )
-  bloomInto(buffer, columns, pixels)
-  vignetteInto(buffer, columns, pixels)
+  const particles = particleKindOf(scene.id, night, resting)
+  particlesInto(buffer, columns, pixels, ground, tick, particles, fireLeft)
+  // Why spared: the vignette and bloom would darken or tint the figures out of their own colours.
+  bloomInto(buffer, columns, pixels, figures)
+  vignetteInto(buffer, columns, pixels, figures)
   const flashKind = event?.kind ?? (reaction?.kind === 'level' ? 'level' : undefined)
   if (flashKind !== undefined) {
     const age = event?.age ?? reaction?.age ?? 0
@@ -217,48 +242,29 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
       grid.push([UPPER_HALF, upper, buffer[(row * 2 + 1) * columns + x] ?? upper])
     }
   }
-  const isRed = event?.kind === 'fail'
-  const mood = thoughtMoodOf({
-    caption: input.caption,
-    isResting: resting,
-    isReacting: reaction !== undefined,
-    isWaiting: input.isWaiting === true,
-    isRed,
-    isMerging: shown === 'merge'
-  })
-  const art = gameStrings().art
-  const said =
-    reaction !== undefined
-      ? reactionSaysOf(reaction.kind)
-      : mood === 'idle'
-        ? snoreOf(tick)
-        : isRed && input.caption === ''
-          ? art.ciIsRed
-          : input.caption
-  const since =
-    reaction !== undefined ? tick - reaction.age : isRed ? tick - event.age : input.since
-  const box = drawThought(grid, said, mood, since, {
+  const hero = { left: walk, top, width: HD_SPRITE_WIDTH }
+  hdWordsInto(grid, {
+    scene,
     columns,
     rows,
     tick,
-    left: walk + HD_SPRITE_WIDTH - 2,
-    limit: columns,
-    row: rows >= 8 ? 2 : 1,
-    headRight: walk + HD_SPRITE_WIDTH - 1,
-    headTop: top,
-    floor: ground - 1
+    ground,
+    caption: input.caption,
+    since: input.since,
+    isResting: resting,
+    isWaiting: input.isWaiting === true,
+    reaction,
+    event,
+    action: shown,
+    lead: input.lead,
+    hero,
+    speaker:
+      isPetted && pet !== undefined
+        ? { left: pet.left, top: pet.top, width: pet.sprite.width }
+        : hero,
+    members,
+    memberWidth: HD_SPRITE_WIDTH,
+    advisor: input.advisor
   })
-  waitingMarksInto(grid, columns, members, HD_SPRITE_WIDTH, tick, box)
-  sparklesInto(grid, columns, box?.row ?? 1, walk, HD_SPRITE_WIDTH, reaction, box)
-  if (event !== undefined) {
-    const centre = walk + Math.floor(HD_SPRITE_WIDTH / 2)
-    floatInto(grid, columns, event, Math.max(0, Math.floor(top / 2)), centre, box)
-  }
-  if (input.lead !== undefined) {
-    labelInto(grid, columns, rows - 1, walk + HD_SPRITE_WIDTH / 2, input.lead, LEAD_GOLD)
-  }
-  if (shown === 'merge' && scene.finale !== undefined) {
-    paintFinale(grid, columns, rasterGlyphsOf(localizedNameOf(scene.finale)).join(''), rows)
-  }
   return shakeGrid(grid, columns, quakeOf(event))
 }

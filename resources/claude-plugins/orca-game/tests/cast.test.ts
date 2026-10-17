@@ -226,6 +226,27 @@ describe('Jev’s advisor', () => {
     expect(without).not.toBe(withJev)
   })
 
+  test(
+    'stands in the hd scene only while Jev’s value is there to read',
+    WITH_JEV,
+    async ($, on) => {
+      const clock = mock.clock(on)
+      const env = {
+        ORCA_GAME_RENDER: 'hd',
+        TEST_ADVISOR: FIRST,
+        TEST_ADVISOR_NEXT: '{"version":2}'
+      }
+      engine(on, env, undefined)
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      const withJev = await spinnerCells($)
+      expect(withJev).toBeDefined()
+      await $.turn.complete(TURN)
+      await clock.settle()
+      expect(await spinnerCells($)).not.toBe(withJev)
+    }
+  )
+
   test('acts out a lowered model and logs it for the Panel', WITH_JEV, async ($, on) => {
     const clock = mock.clock(on)
     engine(on, { TEST_ADVISOR: FIRST, TEST_ADVISOR_NEXT: LOWERED }, undefined)

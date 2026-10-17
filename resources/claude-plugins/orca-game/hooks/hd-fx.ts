@@ -107,7 +107,12 @@ const SPREAD: readonly (readonly [number, number, number])[] = [
 ]
 
 /** Bright pixels (sun, moon, snow, flames, lit windows) bleed into their darker neighbours. */
-export const bloomInto = (buf: Uint32Array, columns: number, pixels: number): void => {
+export const bloomInto = (
+  buf: Uint32Array,
+  columns: number,
+  pixels: number,
+  keep?: Uint8Array
+): void => {
   const src = buf.slice()
   for (let i = 0; i < src.length; i += 1) {
     const color = src[i] ?? 0
@@ -120,22 +125,28 @@ export const bloomInto = (buf: Uint32Array, columns: number, pixels: number): vo
       const nx = x + dx
       const ny = y + dy
       const j = ny * columns + nx
-      if (nx >= 0 && nx < columns && ny >= 0 && ny < pixels && lumaOf(src[j] ?? 0) < 200) {
+      const isInside = nx >= 0 && nx < columns && ny >= 0 && ny < pixels
+      if (isInside && keep?.[j] !== 1 && lumaOf(src[j] ?? 0) < 200) {
         buf[j] = mix(buf[j] ?? 0, color, k)
       }
     }
   }
 }
 
-/** Darker side edges, and the top and bottom two rows softened like a tilt-shift lens. */
-export const vignetteInto = (buf: Uint32Array, columns: number, pixels: number): void => {
+/** Darker side edges, and the top and bottom two rows softened like a tilt-shift lens; `keep` is spared. */
+export const vignetteInto = (
+  buf: Uint32Array,
+  columns: number,
+  pixels: number,
+  keep?: Uint8Array
+): void => {
   const reach = Math.max(6, Math.floor(columns / 14))
   for (let y = 0; y < pixels; y += 1) {
     for (let x = 0; x < columns; x += 1) {
       const edge = Math.min(x, columns - 1 - x)
       const dark =
         (edge < reach ? (1 - edge / reach) * 0.32 : 0) + (y === 0 || y === pixels - 1 ? 0.12 : 0)
-      if (dark > 0) {
+      if (dark > 0 && keep?.[y * columns + x] !== 1) {
         buf[y * columns + x] = mix(buf[y * columns + x] ?? 0, 0x000000, dark)
       }
     }
@@ -146,7 +157,9 @@ export const vignetteInto = (buf: Uint32Array, columns: number, pixels: number):
     }
     const row = buf.slice(y * columns, (y + 1) * columns)
     for (let x = 1; x < columns - 1; x += 1) {
-      buf[y * columns + x] = mix(mix(row[x - 1] ?? 0, row[x + 1] ?? 0, 0.5), row[x] ?? 0, 0.5)
+      if (keep?.[y * columns + x] !== 1) {
+        buf[y * columns + x] = mix(mix(row[x - 1] ?? 0, row[x + 1] ?? 0, 0.5), row[x] ?? 0, 0.5)
+      }
     }
   }
 }
