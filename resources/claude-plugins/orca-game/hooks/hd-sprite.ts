@@ -1,9 +1,13 @@
+import { luminanceOf, withLuminance } from './hd-lightness'
 import { mix } from './pixel-canvas'
 import type { Costume } from './scenes/index'
 
 // hd characters: any glyph art gets a 1-px outline and a lit and a shaded side, from its own palette.
 
 const EDGE = '#'
+// Why a ceiling: a bright palette's darkest colour (a cyan cape) would outline as a glow, not ink.
+const INK_CEILING = 0.03
+const INK_RATIO = 0.5
 
 export type HdSprite = {
   /** The art grown by one pixel on every side; `#` is the outline. */
@@ -13,10 +17,24 @@ export type HdSprite = {
   width: number
   colors: Readonly<Record<string, number>>
   outline: number
+  /** The luminance the outline and any state ring stay under. */
+  ink: number
 }
 
 const lumaOf = (color: number): number =>
   0.299 * ((color >> 16) & 255) + 0.587 * ((color >> 8) & 255) + 0.114 * (color & 255)
+
+const darkestOf = (colors: Readonly<Record<string, number>>): number =>
+  Object.values(colors).reduce<number | undefined>(
+    (best, one) => (best === undefined || lumaOf(one) < lumaOf(best) ? one : best),
+    undefined
+  ) ?? 0x202020
+
+export const inkOf = (colors: Readonly<Record<string, number>>): number =>
+  Math.min(INK_CEILING, luminanceOf(darkestOf(colors)) * INK_RATIO)
+
+const inked = (color: number, ink: number): number =>
+  luminanceOf(color) < ink ? color : withLuminance(color, ink * 0.97)
 
 const outlines = new WeakMap<object, number>()
 
@@ -26,12 +44,23 @@ export const outlineOf = (colors: Readonly<Record<string, number>>): number => {
   if (kept !== undefined) {
     return kept
   }
-  const darkest = Object.values(colors).reduce<number | undefined>(
-    (best, one) => (best === undefined || lumaOf(one) < lumaOf(best) ? one : best),
-    undefined
-  )
-  const made = mix(darkest ?? 0x202020, 0x000000, 0.55)
+  const made = inked(mix(darkestOf(colors), 0x000000, 0.55), inkOf(colors))
   outlines.set(colors, made)
+  return made
+}
+
+const rings = new Map<number, Map<number, number>>()
+
+/** A state colour darkened to the sprite's ink, so a teammate's ring tints its outline without glowing. */
+export const ringOf = (sprite: HdSprite, ring: number): number => {
+  const own = rings.get(sprite.ink) ?? new Map<number, number>()
+  rings.set(sprite.ink, own)
+  const kept = own.get(ring)
+  if (kept !== undefined) {
+    return kept
+  }
+  const made = inked(ring, sprite.ink)
+  own.set(ring, made)
   return made
 }
 
@@ -58,7 +87,8 @@ const spriteOf = (body: readonly string[], colors: Readonly<Record<string, numbe
     }
     rows.push(line)
   }
-  return { rows, shade: Int8Array.from(shade), width, colors, outline: outlineOf(colors) }
+  const outline = outlineOf(colors)
+  return { rows, shade: Int8Array.from(shade), width, colors, outline, ink: inkOf(colors) }
 }
 
 const frames = new WeakMap<object, Map<string, HdSprite>>()
@@ -90,7 +120,7 @@ export const frameSpriteOf = (
   colors: Readonly<Record<string, number>>
 ): HdSprite => cachedOf(frame, 'f', () => spriteOf(frame, colors))
 
-/** The sprite's colour at (x, y) with its top-left corner at (left, top); `ring` recolours the outline. */
+/** The sprite's colour at (x, y) with its top-left corner at (left, top); `ring` tints the outline. */
 export const hdSpritePixel = (
   sprite: HdSprite,
   x: number,
@@ -106,7 +136,7 @@ export const hdSpritePixel = (
     return undefined
   }
   if (glyph === EDGE) {
-    return ring ?? sprite.outline
+    return ring === undefined ? sprite.outline : ringOf(sprite, ring)
   }
   const color = sprite.colors[glyph]
   if (color === undefined) {

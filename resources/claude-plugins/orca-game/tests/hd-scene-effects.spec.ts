@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { rasterGlyphsOf } from '../hooks/game-strings'
 import { daylightAt } from '../hooks/hd-daylight'
 import { LEAD_GOLD, STATE_RING } from '../hooks/hd-party'
+import { costumeSpriteOf, ringOf } from '../hooks/hd-sprite'
 import { drawThought, trailOf } from '../hooks/hd-thought'
 import { UPPER_HALF } from '../hooks/pixel-canvas'
 import { sceneGridOf } from '../hooks/scene'
@@ -169,10 +170,12 @@ describe('team reactions', () => {
 })
 
 describe('the party and the lead', () => {
-  it('follows the hero in its state colour with a ! over the one waiting, and classic draws none of it', () => {
+  it('follows the hero outlined in its state colour inked dark, with a ! over the one waiting, and classic draws none of it', () => {
     const party = [{ key: 'a', phase: 'build' as const, state: 'waiting' as const }]
     const grid = hdSceneGridOf(input({ party, isResting: true }))
-    expect(colorsOf(grid).has(STATE_RING.waiting)).toBe(true)
+    const ring = ringOf(costumeSpriteOf(QUEST.costumes.build, 0, true), STATE_RING.waiting)
+    expect(colorsOf(grid).has(ring)).toBe(true)
+    expect(colorsOf(grid).has(STATE_RING.waiting)).toBe(false)
     expect(grid.some((cell) => cell[0] === 0x21 && cell[1] !== 0x23232b)).toBe(true)
     expect(hdSceneGridOf(input({ isResting: true })).some((cell) => cell[0] === 0x21)).toBe(false)
     const classic = sceneGridOf(QUEST, 'build', 120, 41, 'x', 0, undefined, true)
@@ -184,8 +187,9 @@ describe('the party and the lead', () => {
     const marches = new Map([['a', { kind: 'in' as const, at: 41 }]])
     const arriving = hdSceneGridOf(input({ party, marches, tick: 41 }))
     const settled = hdSceneGridOf(input({ party, marches, tick: 41 + 30 }))
+    const ring = ringOf(costumeSpriteOf(QUEST.costumes.build, 0, false), STATE_RING.working)
     const ringColumns = (grid: number[][]) =>
-      grid.flatMap((cell, i) => (cell.includes(STATE_RING.working) ? [i % 120] : []))
+      grid.flatMap((cell, i) => (cell.includes(ring) ? [i % 120] : []))
     expect(Math.min(...ringColumns(arriving))).toBeGreaterThan(Math.max(...ringColumns(settled)))
   })
 

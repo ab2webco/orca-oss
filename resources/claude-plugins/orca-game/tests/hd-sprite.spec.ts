@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { costumeSpriteOf, frameSpriteOf, hdSpritePixel, outlineOf } from '../hooks/hd-sprite'
+import {
+  costumeSpriteOf,
+  frameSpriteOf,
+  hdSpritePixel,
+  outlineOf,
+  ringOf
+} from '../hooks/hd-sprite'
 import { mix } from '../hooks/pixel-canvas'
 import { sceneOf } from '../hooks/scenes/index'
 
@@ -15,7 +21,9 @@ describe('hd sprites', () => {
     expect(outlineOf({ A: 0x30a0ff })).not.toBe(outlineOf({ A: 0xff8040 }))
     const sprite = frameSpriteOf(['X'], { X: 0x30a0ff })
     expect(hdSpritePixel(sprite, 1, 0, 0, 0)).toBe(outlineOf({ X: 0x30a0ff }))
-    expect(hdSpritePixel(sprite, 1, 0, 0, 0, 0x4fc3f7)).toBe(0x4fc3f7)
+    const ring = hdSpritePixel(sprite, 1, 0, 0, 0, 0x4fc3f7)
+    expect(ring).toBe(ringOf(sprite, 0x4fc3f7))
+    expect([ring === 0x4fc3f7, ring === sprite.outline]).toEqual([false, false])
   })
 
   it('lights the top-left, shades the bottom-right and keeps the costume colour inside', () => {
