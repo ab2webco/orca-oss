@@ -49,7 +49,7 @@ export function advisorCard(
   e: RenderInput,
   palette: BandPalette,
   card: AdvisorCard,
-  tile: RenderElement | undefined
+  tile?: RenderElement
 ): RenderElement {
   const { Box, Text } = $.ui.resolve(e)
   return (
