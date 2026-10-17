@@ -33,7 +33,8 @@ export const GAME_LEAD_ACTIONS: readonly GameAction[] = [
     id: 'lead:stop',
     label: 'Stop',
     command: 'stop',
-    prompt: 'Stop every member now with `game stop --all` and confirm.'
+    prompt:
+      'Stop every member now and hold the STOP with `game stop --all --hold`; confirm, and resume only when I say so.'
   }
 ]
 

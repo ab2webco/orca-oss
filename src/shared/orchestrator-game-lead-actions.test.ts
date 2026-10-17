@@ -25,7 +25,8 @@ describe('gameStateActionsOf', () => {
         'Run a wave now: fill every free member slot from my To Do with `game wave`, then tell me what you launched.'
     })
     expect(GAME_LEAD_ACTIONS.find((one) => one.id === 'lead:stop')).toMatchObject({
-      prompt: 'Stop every member now with `game stop --all` and confirm.'
+      prompt:
+        'Stop every member now and hold the STOP with `game stop --all --hold`; confirm, and resume only when I say so.'
     })
   })
 
