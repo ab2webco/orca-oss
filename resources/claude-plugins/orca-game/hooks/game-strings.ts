@@ -271,5 +271,7 @@ export const setGameLocale = (locale: GameLocale): void => {
 
 export const gameStrings = (): GameStrings => active
 
+export const gameLocale = (): GameLocale => activeLocale
+
 export const localizedNameOf = (name: LocalizedName, locale = activeLocale): string =>
   typeof name === 'string' ? name : (name[locale] ?? name.en)
