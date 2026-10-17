@@ -10,7 +10,9 @@ const GameStateParams = z
   .object({
     worktreeId: z.string().optional(),
     terminalHandle: z.string().optional(),
-    paneKey: z.string().optional()
+    paneKey: z.string().optional(),
+    // Why unknown: a report this host cannot read must cost the member its Jev row, never its state.
+    advisor: z.unknown().optional()
   })
   .optional()
 
@@ -80,7 +82,8 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       runtime.getOrchestratorGameState({
         worktreeId: params?.worktreeId,
         terminalHandle: params?.terminalHandle,
-        paneKey: params?.paneKey
+        paneKey: params?.paneKey,
+        advisor: params?.advisor
       })
   })
 ]

@@ -1,7 +1,8 @@
-import type {
-  GameMemberAdvisor,
-  GameMemberAdvisorPick,
-  GameMemberAdvisorReport
+import {
+  parseGameMemberAdvisorReport,
+  type GameMemberAdvisor,
+  type GameMemberAdvisorPick,
+  type GameMemberAdvisorReport
 } from '../../shared/orchestrator-game-member-advisor'
 
 const GAME_MEMBER_ADVISOR_PANES_MAX = 64
@@ -37,6 +38,14 @@ export class GameMemberAdvisors {
         break
       }
       this.byPane.delete(stale)
+    }
+  }
+
+  /** A pane's report as it came over the wire; one this build cannot read leaves the last. */
+  noteReport(paneKey: string, raw: unknown, now: number): void {
+    const report = parseGameMemberAdvisorReport(raw)
+    if (report !== undefined) {
+      this.note(paneKey, report, now)
     }
   }
 

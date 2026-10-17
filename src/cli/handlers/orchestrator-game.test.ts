@@ -43,6 +43,38 @@ describe('orca game state', () => {
     expect(output.join('')).toContain('"mode": "zen"')
   })
 
+  it("hands on the member pane's Jev report from the env, dropping one that is not JSON", async () => {
+    const calls: unknown[] = []
+    const client = {
+      call: async (_method: string, params: unknown) => {
+        calls.push(params)
+        return { ok: true, result: { config: { mode: 'on' }, agents: [] } }
+      }
+    } as unknown as RuntimeClient
+    const run = () =>
+      ORCHESTRATOR_GAME_HANDLERS['game state']({
+        flags: new Map(),
+        client,
+        cwd: '/tmp',
+        json: true
+      })
+    const caller = { worktreeId: 'wt1', terminalHandle: 'h1', paneKey: 'tab:leaf' }
+
+    process.env.ORCA_GAME_ADVISOR = '{"version":1,"model":"Sonnet 5.5","effort":null}'
+    await run()
+    process.env.ORCA_GAME_ADVISOR = 'null'
+    await run()
+    process.env.ORCA_GAME_ADVISOR = '{not json'
+    await run()
+
+    expect(calls).toEqual([
+      { ...caller, advisor: { version: 1, model: 'Sonnet 5.5', effort: null } },
+      { ...caller, advisor: null },
+      caller
+    ])
+    expect(Object.keys(calls[2] as object)).not.toContain('advisor')
+  })
+
   it('says in text when the project is on STOP and how many messages the lead has unread', async () => {
     const client = {
       call: async () => ({

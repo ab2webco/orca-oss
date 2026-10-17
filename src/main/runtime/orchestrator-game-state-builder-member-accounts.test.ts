@@ -83,4 +83,38 @@ describe('buildOrchestratorGameState member accounts', () => {
       ['tab-4:here', { resetsAt: 123 }]
     ])
   })
+
+  it("carries each member's Jev report, asking only for members", async () => {
+    const asked: string[] = []
+    const jev = {
+      model: 'Sonnet 5.5',
+      effort: 'high',
+      pinned: { model: true, effort: false },
+      previous: { model: 'Opus 5.5', effort: 'high' }
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-5:quiet', parentPaneKey: 'tab-1:lead' }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      advisorOf: (paneKey) => {
+        asked.push(paneKey)
+        return paneKey === 'tab-4:here' ? jev : null
+      },
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(asked).toEqual(['tab-4:here', 'tab-5:quiet'])
+    expect(state.agents.map((agent) => [agent.paneKey, agent.advisor])).toEqual([
+      ['tab-1:lead', undefined],
+      ['tab-4:here', jev],
+      ['tab-5:quiet', undefined]
+    ])
+  })
 })

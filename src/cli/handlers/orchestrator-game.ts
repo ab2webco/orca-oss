@@ -24,6 +24,19 @@ const callerParams = () => ({
   paneKey: process.env.ORCA_PANE_KEY
 })
 
+// Why the env: an older CLI ignores a variable it does not know, where an unknown flag could fail the poll.
+const advisorParams = (): { advisor?: unknown } => {
+  const raw = process.env.ORCA_GAME_ADVISOR
+  if (raw === undefined || raw === '') {
+    return {}
+  }
+  try {
+    return { advisor: JSON.parse(raw) as unknown }
+  } catch {
+    return {}
+  }
+}
+
 function formatGameState(state: OrchestratorGameState): string {
   const lines = [
     `Game: ${state.config.mode} (scene ${state.config.scene}, mode from ${state.sources.mode})`,
@@ -67,7 +80,10 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, () => `Opened ${url} in the system browser`)
   },
   'game state': async ({ client, json }) => {
-    const result = await client.call<OrchestratorGameState>('game.state', callerParams())
+    const result = await client.call<OrchestratorGameState>('game.state', {
+      ...callerParams(),
+      ...advisorParams()
+    })
     printResult(result, json, formatGameState)
   },
   'game lead': async ({ client, json }) => {

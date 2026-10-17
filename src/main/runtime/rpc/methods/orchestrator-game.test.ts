@@ -26,6 +26,30 @@ describe('game.state RPC', () => {
     expect(calls).toEqual([{ worktreeId: 'wt1', terminalHandle: 'h1', paneKey: 'tab:leaf' }])
   })
 
+  it("passes a member pane's Jev report on as it came, never refusing the state over it", async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getOrchestratorGameState: async (args: unknown) => {
+        calls.push(args)
+        return { config: { mode: 'on' } }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const advisor = { version: 9, model: ['a newer shape'] }
+
+    await expect(
+      dispatcher.dispatch(request({ paneKey: 'tab:member', advisor }))
+    ).resolves.toMatchObject({ ok: true })
+    await expect(
+      dispatcher.dispatch(request({ paneKey: 'tab:member', advisor: null }))
+    ).resolves.toMatchObject({ ok: true })
+    expect(calls).toEqual([
+      { paneKey: 'tab:member', advisor },
+      { paneKey: 'tab:member', advisor: null }
+    ])
+  })
+
   it('rejects a non-string worktree id', async () => {
     const runtime = { getRuntimeId: () => 'runtime' } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })

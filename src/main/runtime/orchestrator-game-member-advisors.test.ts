@@ -64,4 +64,16 @@ describe('GameMemberAdvisors', () => {
     expect(store.of('pane-a', 4)?.model).toBe('A')
     expect(store.of('pane-c', 4)?.model).toBe('C')
   })
+
+  it("notes a pane's raw report: null forgets, one it cannot read leaves the last", () => {
+    const store = new GameMemberAdvisors()
+    const raw = { version: 1, model: 'Opus 5.5', effort: 'high', pinned: { effort: true } }
+    store.noteReport('pane-a', raw, 0)
+    expect(store.of('pane-a', 1)).toEqual(on('Opus 5.5'))
+    store.noteReport('pane-a', { version: 2 }, 1)
+    store.noteReport('pane-a', undefined, 1)
+    expect(store.of('pane-a', 2)).toEqual(on('Opus 5.5'))
+    store.noteReport('pane-a', null, 2)
+    expect(store.of('pane-a', 3)).toBeNull()
+  })
 })

@@ -9,6 +9,7 @@ import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
+import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -51,6 +52,8 @@ export type GameAgent = {
   account?: GameMemberAccount
   /** Set while a member is stopped by its account's usage limit; absent from an older host. */
   limit?: { resetsAt: number | null }
+  /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
+  advisor?: GameMemberAdvisor
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
