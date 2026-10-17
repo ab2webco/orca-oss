@@ -546,6 +546,37 @@ jobs:
           printf '  %s\n' $files
           pnpm exec vitest run --config config/vitest.config.ts $files
 
+      # Why: the Agent Teams game loads in Windows panes, so its per-shell quoting, CLI
+      # invocation and mod suites run on a Windows host too.
+      - name: Run Agent Teams game tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run --config config/vitest.config.ts \
+            src/shared/orchestrator-game \
+            src/main/claude/orchestrator-game \
+            src/main/runtime/orchestrator-game \
+            src/main/runtime/claude-agent-teams \
+            src/main/ipc/pty-agent-teams-game-launch \
+            src/main/claude-accounts/windows-command-invocation \
+            src/cli/handlers/orchestrator-game \
+            resources/claude-plugins/orca-game/tests
+
+      # Why pinned: the release the mod's engine tests were verified against (mods need 2.1.287+).
+      # The engine runs the tests in its own sandbox, with no sign-in.
+      - name: Validate and test the orca-game mod
+        shell: bash
+        working-directory: resources/claude-plugins/orca-game
+        env:
+          DISABLE_AUTOUPDATER: '1'
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: |
+          set -euo pipefail
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          claude --version
+          claude plugin validate .
+          claude plugin test .
+
       - name: Report platform test coverage
         if: always()
         run: node config/scripts/report-platform-test-coverage.mjs
