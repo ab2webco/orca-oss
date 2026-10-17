@@ -7,7 +7,8 @@ name: Sync from upstream (stablyai/orca)
 # merging a mirror reverts the fork — so it is published as a readable snapshot
 # and any open PR is closed. It NEVER pushes to the fork's default branch and
 # NEVER auto-resolves conflicts; the divergence means most syncs conflict
-# (pty.ts, persistence.ts, daemon/*, i18n locales) and land in reviewed chunks.
+# (pty.ts, persistence.ts, daemon/*, i18n locales) and land in reviewed chunks. The zh/ja/ko
+# paths the lab removed resolve with `pnpm run sync:resolve-removed-locales` (ORCA-596).
 
 on:
   schedule:
