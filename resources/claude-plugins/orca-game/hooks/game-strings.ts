@@ -50,7 +50,7 @@ export type TextStrings = {
   questDemo: string
   unknownMode: (asked: string) => string
   questRenderShown: (render: string) => string
-  /** A /quest value that differs from the config, with the configured one and its layer when known. */
+  /** A mode or render this session set that differs from the config, with the configured one and its layer when known. */
   sessionOverride: (value: string, configured: string, source?: string) => string
   unknownRender: (asked: string) => string
   moreAllies: (count: number) => string
@@ -62,7 +62,7 @@ export type TextStrings = {
   sentToLead: (label: string) => string
   couldNotSend: (label: string) => string
   actionRunning: string
-  /** Toast for an action pressed during /quest demo, which runs nothing. */
+  /** Toast for an action pressed during /orca-game:demo, which runs nothing. */
   demoAction: (label: string) => string
   todoHeadings: Readonly<Record<TodoHeading, string>>
   qa: (count: number) => string
@@ -158,19 +158,19 @@ const EN: GameStrings = {
     merged: (review) => `${review} merged`,
     ciGreen: (review) => `${review} CI is green`,
     questDescription:
-      'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
+      'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party, /quest render classic|hd picks the look.',
+      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
-      'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.',
+      'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
     unknownMode: (asked) =>
-      `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
+      `Unknown mode "${asked}". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.`,
     questRenderShown: (render) => `Render: ${render}.`,
     sessionOverride: (value, configured, source) =>
       `${value} (this session; the project's setting is ${configured}${source ? `, from ${source}` : ''})`,
     unknownRender: (asked) =>
-      `Unknown render "${asked}". Use /quest render classic or /quest render hd.`,
+      `Unknown render "${asked}". Use /orca-game:render classic or /orca-game:render hd.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
     todo: (count) => `To Do ${count}`,

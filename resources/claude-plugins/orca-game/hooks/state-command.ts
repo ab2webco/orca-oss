@@ -1,13 +1,11 @@
 import type { EngineInterface, On } from 'claude-code'
 
 import { readGameStateOutput } from './fleet-sync'
+import { STATE_COMMAND } from './game-commands'
 import { gameLocale } from './game-strings'
 import { quest, ready } from './quest-runtime'
 import { stateReportOf } from './state-report'
 import { stateReportWordsOf } from './state-report-words'
-
-/** The plugin skill the mod answers itself, so no model turn runs and no shell is involved. */
-export const STATE_SKILL = 'orca-game:state'
 
 async function stateText($: EngineInterface): Promise<string> {
   await ready($)
@@ -24,7 +22,8 @@ async function stateText($: EngineInterface): Promise<string> {
 }
 
 export const registerStateCommand = (on: On): void => {
-  on('command.run', { command: STATE_SKILL }, async ($) => {
+  // Why the mod answers: no model turn runs and no shell is involved, so every Windows pane shell works.
+  on('command.run', { command: STATE_COMMAND }, async ($) => {
     const text = await stateText($)
     return { text, context: [text] }
   })

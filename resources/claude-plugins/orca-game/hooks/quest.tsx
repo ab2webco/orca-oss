@@ -1,6 +1,7 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
-import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey, questCommandOf } from './quest-policy'
+import { GAME_COMMANDS, QUEST_ALIAS, gameCommandOf, type GameCommand } from './game-commands'
+import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
   configuredConfig,
   currentScene,
@@ -67,7 +68,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
   await ready($)
   await $.command
     .register({
-      name: 'quest',
+      name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
       argumentHint: '[off|on|zen|demo|render classic|hd]',
       immediate: true
@@ -75,10 +76,10 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .catch(() => undefined)
 }
 
-const registerCommand = (on: On) => {
-  on('command.run', { command: 'quest' }, async ($, e) => {
+const registerCommand = (on: On, command: GameCommand) => {
+  on('command.run', { command }, async ($, e) => {
     await ready($)
-    const asked = questCommandOf(e.args)
+    const asked = gameCommandOf(command, e.args)
     const text = gameStrings().text
     if ('error' in asked) {
       return { text: asked.error }
@@ -251,7 +252,9 @@ const registerCards = (on: On) => {
 }
 
 export const registerQuest = (on: On): void => {
-  registerCommand(on)
+  for (const command of [QUEST_ALIAS, ...GAME_COMMANDS]) {
+    registerCommand(on, command)
+  }
   registerNotes(on)
   registerSpinner(on)
   registerQuietRows(on)

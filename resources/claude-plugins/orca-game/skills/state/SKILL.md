@@ -19,4 +19,5 @@ this session (Claude Code older than 2.1.287, or the pane was not started by Orc
    run a bare `orca`: on Linux it is usually the GNOME screen reader, and elsewhere it may be
    another Orca build.
 2. Otherwise run `"$ORCA_GAME_CLI" game state` with Bash and show its lines as they are, then say
-   in one line that `/quest` values set in this pane do not show there.
+   in one line that a mode or render this pane set with `/orca-game:mode` or `/orca-game:render`
+   does not show there.

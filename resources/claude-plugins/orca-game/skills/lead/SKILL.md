@@ -35,3 +35,9 @@ allowed-tools: Bash
    `"$ORCA_GAME_CLI" game state --json`: each member (`isMember`) with its ticket, state,
    PR and CI, and what needs the person. With no members yet, say you are ready and ask which
    ticket to start.
+
+4. **What is yours to report.** `/orca-game:mode` and `/orca-game:render` (or `/quest`) change
+   only this pane, for this session; `game state` reports the configured value and its layer, so
+   a difference between them is the person's choice, not a discrepancy. Read your mail only with
+   `"$ORCA_GAME_CLI" game inbox` (your project's lead and ticket addresses), never with a bare
+   `orchestration inbox`, which without `--terminal` returns every project's mail on the machine.

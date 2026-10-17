@@ -154,7 +154,7 @@ describe('/quest render', () => {
       /^Quest: on\. Render: hd \(this session; the project's setting is classic\)\. /
     )
     expect(await quest($, 'render neon')).toBe(
-      'Unknown render "neon". Use /quest render classic or /quest render hd.'
+      'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
     )
     expect(await quest($, 'render classic')).toBe('Render: classic.')
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
@@ -174,7 +174,9 @@ describe('/quest render', () => {
     expect(await quest($, 'render hd')).toBe(`Render: ${render}.`)
     const mode = "zen (this session; the project's setting is on, from project)"
     expect(await quest($, 'zen')).toBe(`Quest: ${mode}.`)
-    expect(await quest($, '')).toContain(`Quest: ${mode}. Render: ${render}. /quest off`)
+    expect(await quest($, '')).toContain(
+      `Quest: ${mode}. Render: ${render}. /orca-game:mode on|zen|off: `
+    )
     expect(await quest($, 'on')).toBe('Quest: on.')
     expect(await quest($, 'render classic')).toBe('Render: classic.')
   })
@@ -195,6 +197,46 @@ describe('/quest render', () => {
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
+  })
+})
+
+const run = async ($: Dollar, command: string, args = '') =>
+  (await $.command.run({ command, args } as never)).text ?? ''
+
+// Why: the game's own commands live under /orca-game:, so typing it lists them all.
+describe('the /orca-game: commands', () => {
+  test('mode, render and demo split /quest, and quest is its long form', async ($, on) => {
+    const clock = mock.clock(on)
+    const world = worldOf({
+      config: { mode: 'on', render: 'classic' },
+      sources: { mode: 'default', render: 'default' }
+    })
+    engine(on, {}, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+    expect(await run($, 'orca-game:render', 'hd')).toBe(
+      "Render: hd (this session; the project's setting is classic, from default)."
+    )
+    expect(await run($, 'orca-game:mode', 'zen')).toBe(
+      "Quest: zen (this session; the project's setting is on, from default)."
+    )
+    const shown = await run($, 'orca-game:quest')
+    expect(shown).toMatch(
+      /^Quest: zen \(.+\)\. Render: hd \(.+\)\. \/orca-game:mode on\|zen\|off: /
+    )
+    expect(await run($, 'orca-game:mode')).toBe(shown)
+    expect(await run($, 'orca-game:render')).toBe(shown)
+    expect(await run($, 'orca-game:quest', 'render classic')).toBe('Render: classic.')
+    expect(await run($, 'orca-game:mode', 'render')).toBe(
+      'Unknown mode "render". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.'
+    )
+    expect(await run($, 'orca-game:render', 'neon')).toBe(
+      'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
+    )
+    expect(await run($, 'orca-game:demo')).toMatch(
+      /^Quest: demo\. .+ \/orca-game:mode on returns to real data\.$/
+    )
+    expect(await run($, 'quest', 'on')).toBe('Quest: on.')
   })
 })
 

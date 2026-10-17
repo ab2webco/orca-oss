@@ -50,19 +50,19 @@ export const ES: GameCatalog = {
     merged: (review) => `${review} mergeado`,
     ciGreen: (review) => `${review}: CI en verde`,
     questDescription:
-      'Modo quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
+      'Modo quest, forma corta de /orca-game:quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:
-      '/quest off lo muestra todo, /quest on oculta las filas de herramientas, /quest zen también oculta las notas de trabajo, /quest demo reproduce un grupo ficticio con guion y /quest render classic|hd elige el aspecto.',
+      '/orca-game:mode on|zen|off: off lo muestra todo, on oculta las filas de herramientas y zen también oculta las notas de trabajo. /orca-game:render classic|hd elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego. /quest es la forma corta, que también funciona a mitad de un turno.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
-      'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /quest on vuelve a los datos reales.',
+      'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /orca-game:mode on vuelve a los datos reales.',
     unknownMode: (asked) =>
-      `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
+      `Modo desconocido "${asked}". Usa /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off o /orca-game:demo.`,
     questRenderShown: (render) => `Render: ${render}.`,
     sessionOverride: (value, configured, source) =>
       `${value} (solo esta sesión; la configuración del proyecto es ${configured}${source ? `, de ${source}` : ''})`,
     unknownRender: (asked) =>
-      `Render desconocido "${asked}". Usa /quest render classic o /quest render hd.`,
+      `Render desconocido "${asked}". Usa /orca-game:render classic o /orca-game:render hd.`,
     moreAllies: (count) => `+${count} más`,
     myReviews: (kind, count) => `Mis ${kind}s ${count}`,
     todo: (count) => `Por hacer ${count}`,
