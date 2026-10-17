@@ -90,4 +90,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('accounts: auto')
     expect(brief).toContain("don't pick an account yourself unless the person names one")
   })
+
+  it('answers about members from Orca, not from memory: member, fleet and history', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('`orca game member <ticket>`')
+    expect(brief).toContain('never from memory')
+    expect(brief).toContain('a status question')
+    expect(brief).toContain('`orca game history`')
+    expect(brief).toContain('"what did CIN-1 do", yesterday\'s work')
+    expect(brief).toContain('cite its record')
+  })
 })
