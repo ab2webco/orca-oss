@@ -1,4 +1,4 @@
-import { actionPixel } from './action-props'
+import { actionPixel, PROP_WIDTH } from './action-props'
 import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import {
@@ -16,12 +16,14 @@ import {
   crownPixel,
   FIRE_WIDTH,
   hdCampfirePixel,
+  hdTrailOf,
+  MAX_SHOWN,
   placedPartyOf,
   STATE_RING,
   type HdMember,
   type March
 } from './hd-party'
-import { costumeSpriteOf, hdSpritePixel } from './hd-sprite'
+import { costumeSpriteOf, frameSpriteOf, hdSpritePixel } from './hd-sprite'
 import { hdWordsInto } from './hd-words'
 import { mix, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
@@ -75,8 +77,11 @@ export const hdRowsOf = (viewportRows: number | undefined): number => {
   return Math.min(HD_MAX_ROWS, Math.round(5 + (third - 5) / 2))
 }
 
+// Columns the hero keeps clear ahead of it for its prop.
+const WALK_SLACK = 8
+
 export const hdWalkColumn = (width: number, tick: number): number => {
-  const span = Math.max(1, width - HD_SPRITE_WIDTH - 8)
+  const span = Math.max(1, width - HD_SPRITE_WIDTH - WALK_SLACK)
   const step = Math.floor(tick / 2) % (span * 2)
   return step < span ? step : span * 2 - step
 }
@@ -111,9 +116,22 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
   // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
   const stage = hdStageOf(columns, input.advisor, HD_SPRITE_WIDTH)
-  const walk = resting ? hdRestColumnOf(stage) : hdWalkColumn(stage, tick)
-  const heading = resting || hdWalkColumn(stage, tick + 2) >= walk ? 1 : -1
   const petDef = scene.cast?.pet
+  // Why a trail: the pet and party walk behind the hero, so its path starts where they all fit.
+  const party = input.party ?? []
+  const {
+    shown: following,
+    pitch,
+    trail
+  } = hdTrailOf({
+    stage,
+    count: party.length,
+    petWidth:
+      petDef?.frames[0] === undefined ? 0 : frameSpriteOf(petDef.frames[0], petDef.colors).width,
+    spriteWidth: HD_SPRITE_WIDTH,
+    slack: WALK_SLACK
+  })
+  const walk = resting ? hdRestColumnOf(stage) : trail + hdWalkColumn(stage - trail, tick)
   const isPetted = reaction?.kind === 'pet' && petDef !== undefined
   const hop = reaction !== undefined && reaction.age % 6 < 3 ? 2 : 0
   const lift = isPetted ? 0 : hop
@@ -123,29 +141,30 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
       ? undefined
       : hdPetOf({
           pet: petDef,
-          walkOf: (at) => hdWalkColumn(stage, at),
           tick,
           isResting: resting,
           isPetted,
-          restLeft: walk,
+          heroLeft: walk,
           heroWidth: HD_SPRITE_WIDTH,
           ground,
           lift: isPetted ? hop : 0
         })
   const advisor =
     input.advisor === undefined ? undefined : hdAdvisorOf(input.advisor, columns, ground, tick)
-  const shown = resting ? undefined : input.action
+  const shown =
+    resting || walk + HD_SPRITE_WIDTH - 1 + PROP_WIDTH > stage ? undefined : input.action
   const fireLeft = walk + HD_SPRITE_WIDTH + 1
   const members = placedPartyOf({
     scene,
-    party: input.party ?? [],
+    party,
     leavers: input.leavers ?? [],
     marches: input.marches ?? new Map(),
     columns: stage,
     ground,
     tick,
-    walk: pet === undefined || resting ? walk : walk - heading * (pet.sprite.width + 1),
-    heading,
+    walk: pet === undefined || resting ? walk : pet.left,
+    pitch,
+    shown: resting ? MAX_SHOWN : following,
     isResting: resting,
     fireRight: fireLeft + FIRE_WIDTH,
     spriteWidth: HD_SPRITE_WIDTH
