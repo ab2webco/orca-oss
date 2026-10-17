@@ -5,7 +5,8 @@ export const KO: GameCatalog = {
   text: {
     panel: '패널',
     refresh: '새로고침',
-    petClawd: 'Clawd 쓰다듬기',
+    pet: '쓰다듬기',
+    petNamed: (name) => `${name} 쓰다듬기`,
     close: '닫기',
     view: '보기',
     fleet: '플릿',

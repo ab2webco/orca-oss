@@ -5,7 +5,8 @@ export const ZH: GameCatalog = {
   text: {
     panel: '面板',
     refresh: '刷新',
-    petClawd: '摸摸 Clawd',
+    pet: '摸摸',
+    petNamed: (name) => `摸摸 ${name}`,
     close: '关闭',
     view: '查看',
     fleet: '舰队',

@@ -7,7 +7,8 @@ export const ES: GameCatalog = {
   text: {
     panel: 'Panel',
     refresh: 'Actualizar',
-    petClawd: 'Acariciar a Clawd',
+    pet: 'Mimar',
+    petNamed: (name) => `Mimar a ${name}`,
     close: 'Cerrar',
     view: 'Ver',
     fleet: 'Flota',

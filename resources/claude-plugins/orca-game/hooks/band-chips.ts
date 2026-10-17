@@ -14,9 +14,10 @@ import {
   teammatesOf,
   workItemTextOf
 } from './fleet-labels'
-import { gameStrings } from './game-strings'
+import { gameStrings, localizedNameOf } from './game-strings'
 import { listActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
+import type { SceneDefinition } from './scenes/index'
 
 /** A link chip opens `href` when it has one and is drawn in `color`, else the scene's parchment. */
 export type BandChip = Chip & {
@@ -234,12 +235,19 @@ export const stateChipsOf = (
   return chips
 }
 
-/** Panel, Refresh and Pet Clawd; the last two keep only their icon when the band is narrow. */
-export const menuChipsOf = (): Chip[] => {
+/** What Pet says: the scene pet's name when it has one, else plain Pet (Clawd, the hero). */
+export const petLabelOf = (scene: SceneDefinition): string => {
+  const text = gameStrings().text
+  const name = scene.cast?.pet?.name
+  return `♥ ${name === undefined ? text.pet : text.petNamed(localizedNameOf(name))}`
+}
+
+/** Panel, Refresh and Pet; the last two keep only their icon when the band is narrow. */
+export const menuChipsOf = (scene: SceneDefinition): Chip[] => {
   const text = gameStrings().text
   return [
     { key: 'band-panel', priority: 0, labels: [`▤ ${text.panel}`, '▤'] },
     { key: 'band-refresh', priority: 1, labels: [`↻ ${text.refresh}`, '↻'] },
-    { key: 'band-pet', priority: 2, labels: [`♥ ${text.petClawd}`, '♥'] }
+    { key: 'band-pet', priority: 2, labels: [petLabelOf(scene), '♥'] }
   ]
 }

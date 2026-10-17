@@ -5,7 +5,8 @@ export const JA: GameCatalog = {
   text: {
     panel: 'パネル',
     refresh: '更新',
-    petClawd: 'Clawd をなでる',
+    pet: 'なでる',
+    petNamed: (name) => `${name} をなでる`,
     close: '閉じる',
     view: '表示',
     fleet: 'フリート',

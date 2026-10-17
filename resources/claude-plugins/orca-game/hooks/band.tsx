@@ -76,7 +76,7 @@ export const registerBand = (on: On): void => {
       'band-refresh': () => void refreshSoon($).catch(() => undefined),
       'band-pet': () => clawdReact($, 'pet')
     }
-    const menuRows = rowsOf('band-menu', menuChipsOf(), MENU_ROWS, (chip) => (
+    const menuRows = rowsOf('band-menu', menuChipsOf(currentScene()), MENU_ROWS, (chip) => (
       <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
         <Text
           backgroundColor={chip.key === 'band-panel' ? palette.gold : palette.panel}

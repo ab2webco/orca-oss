@@ -1,6 +1,7 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { GameAgent } from '../types'
+import { petLabelOf } from './band-chips'
 import { fitCells } from './cell-width'
 import {
   activityTextOf,
@@ -76,7 +77,7 @@ export const registerFleetPane = (on: On): void => {
           `↻ ${text.refresh}`,
           () => void refreshSoon($).catch(() => undefined)
         )}
-        {menu('pet', 'p', `♥ ${text.petClawd}`, () => clawdReact($, 'pet'))}
+        {menu('pet', 'p', petLabelOf(scene), () => clawdReact($, 'pet'))}
         {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )

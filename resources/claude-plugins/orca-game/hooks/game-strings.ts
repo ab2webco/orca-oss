@@ -13,7 +13,9 @@ export type { GameLocale, LocalizedName }
 export type TextStrings = {
   panel: string
   refresh: string
-  petClawd: string
+  pet: string
+  /** Pet with the scene pet's name, as in "Pet Steve". */
+  petNamed: (name: string) => string
   close: string
   view: string
   fleet: string
@@ -108,7 +110,8 @@ const EN: GameStrings = {
   text: {
     panel: 'Panel',
     refresh: 'Refresh',
-    petClawd: 'Pet Clawd',
+    pet: 'Pet',
+    petNamed: (name) => `Pet ${name}`,
     close: 'Close',
     view: 'View',
     fleet: 'Fleet',

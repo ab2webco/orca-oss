@@ -250,7 +250,7 @@ describe('band layout', () => {
       expect(chips).toContain('#901 open · CI failing')
       expect(chips).toContain('ORCA-586 In Progress')
       expect(shownOf(await ui.find({ type: 'Box', key: 'band-menu-band-panel' }))).toContain(
-        'Pet Clawd'
+        '♥ Pet'
       )
       await ui.unmount()
     }
