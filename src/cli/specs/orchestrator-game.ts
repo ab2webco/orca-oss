@@ -101,6 +101,20 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game move CIN-12', 'orca game move CIN-12 --account ana@example.com --json']
   },
   {
+    path: ['game', 'member'],
+    summary: 'What one member is doing now and what it did since its launch, in one bounded read',
+    usage: 'orca game member <ticket|terminal-handle> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'member'],
+    positionalArgs: ['member'],
+    notes: [
+      'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes.',
+      'Since launch: every dispatch of its task, the last 10 messages between it and the lead (questions, answers, worker_done), its last 10 commits since the base, PR, CI and ticket status.',
+      'A part Orca cannot read is listed under notes; the rest still prints. Read-only.',
+      'A member already freed is in `orca game history`.'
+    ],
+    examples: ['orca game member CIN-12', 'orca game member CIN-12 --json']
+  },
+  {
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:
