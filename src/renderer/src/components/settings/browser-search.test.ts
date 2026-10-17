@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import ko from '@/i18n/locales/ko.json'
+import es from '@/i18n/locales/es.json'
 import { i18n } from '@/i18n/i18n'
 import { getBrowserPaneSearchEntries, getTerminalLinkActionSearchKeywords } from './browser-search'
 import {
@@ -146,18 +146,18 @@ describe('Link Routing description localization', () => {
     await i18n.changeLanguage('en')
   })
 
-  it('renders the Korean copy with the shortcut interpolated', async () => {
-    const koCopy = (
-      ko.auto.components.settings.BrowserLinkRoutingSetting as unknown as Record<string, string>
+  it('renders the Spanish copy with the shortcut interpolated', async () => {
+    const esCopy = (
+      es.auto.components.settings.BrowserLinkRoutingSetting as unknown as Record<string, string>
     )['description']
-    expect(koCopy).toBeTruthy()
-    expect(koCopy).toContain('{{shortcut}}')
+    expect(esCopy).toBeTruthy()
+    expect(esCopy).toContain('{{shortcut}}')
 
-    i18n.addResourceBundle('ko', 'translation', ko, true, true)
-    await i18n.changeLanguage('ko')
+    i18n.addResourceBundle('es', 'translation', es, true, true)
+    await i18n.changeLanguage('es')
 
     const description = getBrowserLinkRoutingDescription({ isMac: true })
-    expect(description).toBe(koCopy.replace('{{shortcut}}', '⇧⌘-click'))
+    expect(description).toBe(esCopy.replace('{{shortcut}}', '⇧⌘-click'))
     expect(description).not.toMatch(/\{\{.+?\}\}/)
     // Fails when the copy is a hardcoded English literal.
     expect(description).not.toContain("Orca Lab's built-in browser")
@@ -174,17 +174,17 @@ describe('Link Routing description localization', () => {
     )
   })
 
-  it('renders the Korean copy for the invert-on variant', async () => {
-    const koBase = (
-      ko.auto.components.settings.BrowserLinkRoutingSetting as unknown as Record<string, string>
+  it('renders the Spanish copy for the invert-on variant', async () => {
+    const esBase = (
+      es.auto.components.settings.BrowserLinkRoutingSetting as unknown as Record<string, string>
     )['descriptionBase']
-    expect(koBase).toBeTruthy()
+    expect(esBase).toBeTruthy()
 
-    i18n.addResourceBundle('ko', 'translation', ko, true, true)
-    await i18n.changeLanguage('ko')
+    i18n.addResourceBundle('es', 'translation', es, true, true)
+    await i18n.changeLanguage('es')
 
     const description = getBrowserLinkRoutingDescription({ isMac: true }, true)
-    expect(description).toBe(koBase)
+    expect(description).toBe(esBase)
     // Fails when the invert-on branch regresses to a hardcoded English literal.
     expect(description).not.toContain("Orca Lab's built-in browser")
   })

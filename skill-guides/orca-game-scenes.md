@@ -78,17 +78,17 @@ its status, from any folder of the project.
 
 Top level, all required unless marked optional:
 
-| Key       | What it draws                                                                 |
-| --------- | ----------------------------------------------------------------------------- |
-| `looks`   | The world behind the lead, one per phase                                       |
-| `costumes`| The character, one per phase                                                   |
-| `cards`   | Each phase's card: icon, name, color (Fleet pane, captions)                    |
-| `teller`  | The narrator card that frames replies                                          |
-| `band`    | Colors of the chips under the band                                             |
-| `foe`     | Optional. The costume a teammate with red CI trades turns with                 |
-| `finale`  | Optional. Caption painted while a merge runs                                   |
-| `hud`     | Optional. The team band's frame, sky and text colors                          |
-| `cast`    | Optional. The scene's pet (what Pet hearts) and who stands for Jev            |
+| Key        | What it draws                                                      |
+| ---------- | ------------------------------------------------------------------ |
+| `looks`    | The world behind the lead, one per phase                           |
+| `costumes` | The character, one per phase                                       |
+| `cards`    | Each phase's card: icon, name, color (Fleet pane, captions)        |
+| `teller`   | The narrator card that frames replies                              |
+| `band`     | Colors of the chips under the band                                 |
+| `foe`      | Optional. The costume a teammate with red CI trades turns with     |
+| `finale`   | Optional. Caption painted while a merge runs                       |
+| `hud`      | Optional. The team band's frame, sky and text colors               |
+| `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
 The file must be at most 64 KB.
@@ -97,14 +97,14 @@ The file must be at most 64 KB.
 
 `looks`, `costumes` and `cards` each need all six phases, with exactly these keys:
 
-| Phase     | When the game is in it                                                    |
-| --------- | ------------------------------------------------------------------------- |
-| `working` | Default: thinking, reading, any tool without a more specific phase         |
-| `docs`    | Editing docs (`docs/`, `.md`, `.mdx`) or running a spec/plan/docs skill    |
-| `build`   | Editing any other file, or an implement/build skill                        |
-| `verify`  | Tests, lint, typecheck (vitest, jest, pytest, tsc, eslint, `npm test`…)    |
-| `pr`      | `git push`, `gh pr create/edit/review`, `glab mr create/update`            |
-| `handoff` | Merging (`gh pr merge`, `glab mr merge`) or moving the tracker ticket      |
+| Phase     | When the game is in it                                                  |
+| --------- | ----------------------------------------------------------------------- |
+| `working` | Default: thinking, reading, any tool without a more specific phase      |
+| `docs`    | Editing docs (`docs/`, `.md`, `.mdx`) or running a spec/plan/docs skill |
+| `build`   | Editing any other file, or an implement/build skill                     |
+| `verify`  | Tests, lint, typecheck (vitest, jest, pytest, tsc, eslint, `npm test`…) |
+| `pr`      | `git push`, `gh pr create/edit/review`, `glab mr create/update`         |
+| `handoff` | Merging (`gh pr merge`, `glab mr merge`) or moving the tracker ticket   |
 
 ### Colors
 
@@ -116,10 +116,19 @@ The file must be at most 64 KB.
 
 ```json
 {
-  "skyTop": "#5c94fc", "skyBottom": "#a4c8fc", "sun": "#fcd800", "isNight": false,
-  "far": "#80d010", "snow": "#fcfcfc", "near": "#00a800", "ground": "#c84c0c",
-  "plant": "#00a800", "plantKind": "flower", "cloud": "#fcfcfc",
-  "scenery": "meadow", "isSignal": false
+  "skyTop": "#5c94fc",
+  "skyBottom": "#a4c8fc",
+  "sun": "#fcd800",
+  "isNight": false,
+  "far": "#80d010",
+  "snow": "#fcfcfc",
+  "near": "#00a800",
+  "ground": "#c84c0c",
+  "plant": "#00a800",
+  "plantKind": "flower",
+  "cloud": "#fcfcfc",
+  "scenery": "meadow",
+  "isSignal": false
 }
 ```
 
@@ -140,8 +149,15 @@ The file must be at most 64 KB.
 {
   "rows": ["...CCCCC..", "..CCCCCCCC", "..HHSSES..", "..SSSHHHH.", "..RROYORR.", ".SROOOOORS"],
   "legs": ["..HH..HH..", ".HH....HH."],
-  "colors": { "C": "#d82800", "H": "#883c00", "S": "#fca044", "E": "#000000",
-              "R": "#d82800", "O": "#2038ec", "Y": "#fcd800" }
+  "colors": {
+    "C": "#d82800",
+    "H": "#883c00",
+    "S": "#fca044",
+    "E": "#000000",
+    "R": "#d82800",
+    "O": "#2038ec",
+    "Y": "#fcd800"
+  }
 }
 ```
 
@@ -163,7 +179,7 @@ The file must be at most 64 KB.
 
 - `icon`: 1 to 4 characters, no control characters. One visible symbol reads best.
 - `name`: 1 to 32 characters, either a plain string or one per language with `en`
-  required and `es`, `ja`, `ko`, `zh` optional. Other languages are dropped, not refused.
+  required and `es` optional. Other languages are dropped, not refused.
   The game shows the name in Orca's UI language and falls back to `en`.
 - `color`: `#rrggbb`.
 - `teller` is the same shape: the narrator whose card frames the lead's replies.
@@ -181,8 +197,14 @@ readable: aim for strong contrast (dark on light or light on dark).
 ### `hud` (optional)
 
 ```json
-{ "skyTop": "#5c94fc", "skyBottom": "#a4c8fc", "frame": "#c84c0c",
-  "text": "#fcfcfc", "dim": "#fcd800", "star": "#fcfcfc" }
+{
+  "skyTop": "#5c94fc",
+  "skyBottom": "#a4c8fc",
+  "frame": "#c84c0c",
+  "text": "#fcfcfc",
+  "dim": "#fcd800",
+  "star": "#fcfcfc"
+}
 ```
 
 The team band above the prompt (the party strip). All six keys are required when `hud` is
@@ -200,7 +222,7 @@ against the sky. Teammate names keep the game's state colors (working, idle, wai
 
 1 to 24 characters, painted into the pixel art, so only width-1 characters: Latin letters
 and accents, digits, punctuation, box drawing and block characters, `★` and card suits.
-Japanese, Korean, Chinese and emoji are refused. A plain string or per-language object.
+CJK characters and emoji are refused. A plain string or per-language object.
 
 ### `cast` (optional)
 
@@ -242,18 +264,18 @@ Japanese, Korean, Chinese and emoji are refused. A plain string or per-language 
 
 ## Common problems
 
-| Validate says                                            | Fix                                                              |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| `…rows.N: must be ten printable ASCII glyphs`            | Count the row: exactly 10 characters, no spaces or accents       |
-| `…colors: glyph "X" has no color`                        | Add `"X": "#rrggbb"` to that costume's `colors`                  |
-| `…: must be a #rrggbb color or an integer…`              | Six hex digits with `#`, or an integer                           |
-| `cards.<phase>.color: must be a #rrggbb color`           | Cards, teller and band take `#rrggbb` strings only               |
-| `looks.<phase>: Invalid input: expected object…`         | A phase is missing: all six of `working docs build verify pr handoff` |
-| `…name: Too big: expected string to have <=32 characters`| Shorten it (each language separately)                            |
-| `finale…: must be width-1 characters…`                   | Remove emoji and CJK characters from the finale                  |
-| `cast.<member>…: every row of a frame must be the same width` | Pad the short rows with `.`                                 |
-| `cast.<member>.frames: every frame must be the size of the first` | Same width and height for every frame, `happy` and gesture |
-| `not valid JSON`                                         | Trailing comma, missing quote or comment: JSON allows none       |
+| Validate says                                                     | Fix                                                                   |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `…rows.N: must be ten printable ASCII glyphs`                     | Count the row: exactly 10 characters, no spaces or accents            |
+| `…colors: glyph "X" has no color`                                 | Add `"X": "#rrggbb"` to that costume's `colors`                       |
+| `…: must be a #rrggbb color or an integer…`                       | Six hex digits with `#`, or an integer                                |
+| `cards.<phase>.color: must be a #rrggbb color`                    | Cards, teller and band take `#rrggbb` strings only                    |
+| `looks.<phase>: Invalid input: expected object…`                  | A phase is missing: all six of `working docs build verify pr handoff` |
+| `…name: Too big: expected string to have <=32 characters`         | Shorten it (each language separately)                                 |
+| `finale…: must be width-1 characters…`                            | Remove emoji and CJK characters from the finale                       |
+| `cast.<member>…: every row of a frame must be the same width`     | Pad the short rows with `.`                                           |
+| `cast.<member>.frames: every frame must be the size of the first` | Same width and height for every frame, `happy` and gesture            |
+| `not valid JSON`                                                  | Trailing comma, missing quote or comment: JSON allows none            |
 
 If the game still draws Quest after `validate` passes: check the path in Settings or
 `orca.yaml` (relative to the project root, exact case), that project Settings is not

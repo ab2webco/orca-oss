@@ -42,13 +42,8 @@ describe('ORCA-392 "Orca Lab" rename', () => {
 
   it('restores a machine-translated "Lab" instead of leaving a half-translated product name', () => {
     const cases = [
-      { locale: 'zh', localeValue: '无法连接到 Orca 实验室。' },
-      { locale: 'zh', localeValue: '无法连接到虎鲸实验室。' },
-      { locale: 'ja', localeValue: 'Orca ラボ に接続できません。' },
-      { locale: 'ja', localeValue: 'シャチラボに接続できません。' },
-      { locale: 'ko', localeValue: 'Orca 랩에 연결할 수 없습니다.' },
-      { locale: 'ko', localeValue: '오르카 랩에 연결할 수 없습니다.' },
-      { locale: 'es', localeValue: 'No se puede conectar con Laboratorio Orca.' }
+      { locale: 'es', localeValue: 'No se puede conectar con Laboratorio Orca.' },
+      { locale: 'es', localeValue: 'No se puede conectar con Orca Laboratorio.' }
     ]
     for (const { locale, localeValue } of cases) {
       const repaired = repairTranslatedValue({
@@ -64,13 +59,12 @@ describe('ORCA-392 "Orca Lab" rename', () => {
   it('keeps a renamed key override instead of reverting the catalog to "Orca"', () => {
     expect(
       repairTranslatedValue({
-        key: 'auto.components.github.project.ProjectViewWrapper.1850fceac8',
-        enValue:
-          "{{value0}}/{{value1}} isn't added to Orca Lab. Add it to start work, or open in GitHub.",
-        localeValue: '{{value0}}/{{value1}}이(가) Orca Lab에 추가되어 있지 않습니다.',
-        locale: 'ko'
+        key: 'auto.hooks.useMacosTccPromptNotice.title',
+        enValue: 'Seeing “Orca Lab would like to access…” prompts?',
+        localeValue: '¿Ves avisos de “Orca quiere acceder…”?',
+        locale: 'es'
       })
-    ).toContain('Orca Lab에')
+    ).toContain('Orca Lab quiere')
   })
 
   it('keeps the pinned Spanish translation reachable under the renamed English key', () => {

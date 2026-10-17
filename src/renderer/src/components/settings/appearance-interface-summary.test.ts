@@ -7,11 +7,11 @@ describe('resolveInterfaceSectionSummary', () => {
     const settings = {
       ...getDefaultSettings('/tmp'),
       theme: 'dark' as const,
-      uiLanguage: 'zh' as const,
+      uiLanguage: 'es' as const,
       appFontFamily: 'Inter'
     }
 
-    expect(resolveInterfaceSectionSummary(settings)).toBe('Dark · 中文（简体） · Inter')
+    expect(resolveInterfaceSectionSummary(settings)).toBe('Dark · Español · Inter')
   })
 
   it('falls back to the default font label when app font is empty', () => {

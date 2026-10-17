@@ -70,7 +70,7 @@ describe('prepareOrchestratorGameLaunch', () => {
   it("passes Orca's UI language, resolving the system choice from the OS locale", async () => {
     const chosen = await prepareOrchestratorGameLaunch({
       ...base,
-      settings: { uiLanguage: 'ko' },
+      settings: { uiLanguage: 'en' },
       repoId: null,
       worktreePath: null,
       systemLocale: 'es-ES'
@@ -83,7 +83,7 @@ describe('prepareOrchestratorGameLaunch', () => {
       systemLocale: 'es-ES'
     })
 
-    expect(chosen.env.ORCA_GAME_LOCALE).toBe('ko')
+    expect(chosen.env.ORCA_GAME_LOCALE).toBe('en')
     expect(system.env.ORCA_GAME_LOCALE).toBe('es')
   })
 

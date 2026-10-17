@@ -69,6 +69,7 @@
     "verify:built-skills-cli": "node config/scripts/verify-skills-cli-runtime.cjs out",
     "verify:localization-catalog": "node config/scripts/verify-localization-catalog.mjs",
     "sync:localization-catalog": "node config/scripts/verify-localization-catalog.mjs --fix",
+    "sync:resolve-removed-locales": "node config/scripts/resolve-removed-locale-paths.mjs",
     "verify:localization-extraction": "node config/scripts/verify-localization-extraction.mjs",
     "verify:localization-coverage": "node config/scripts/audit-localization-coverage.mjs --check",
     "verify:localization-new-keys": "node config/scripts/verify-localization-new-key-gate.mjs",

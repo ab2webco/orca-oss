@@ -8,6 +8,7 @@ import ts from 'typescript-api'
 
 import { canonicalGenericRenderings } from './locale-generic-ui-terms.mjs'
 import { repairTranslatedValue } from './locale-translation-policy.mjs'
+import { isShippedCatalogFile } from './shipped-ui-locales.mjs'
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts'])
 const SKIP_PATH_PARTS = new Set(['.git', 'dist', 'node_modules', 'out', '__snapshots__', 'assets'])
@@ -516,6 +517,13 @@ export async function main(root = process.cwd(), options = parseArgs(process.arg
         !fileName.includes('-catalog-cache')
     )
     .sort()
+
+  const unshipped = localeFiles.filter((fileName) => !isShippedCatalogFile(fileName))
+  if (unshipped.length > 0) {
+    console.error(`Orca Lab does not ship ${unshipped.join(', ')}; delete it.`)
+    console.error('Mid-merge, `pnpm run sync:resolve-removed-locales` resolves it as deleted.')
+    return 1
+  }
 
   for (const fileName of localeFiles) {
     const localeName = fileName.replace(/\.json$/, '')

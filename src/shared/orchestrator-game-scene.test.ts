@@ -33,6 +33,7 @@ describe('parseOrchestratorGameScene', () => {
     expect(parsed.ok && parsed.definition.costumes.pr.colors.H).toBe(0x3f6e46)
   })
 
+  // Why: Orca Lab ships English and Spanish only (ORCA-596); other languages are dropped, not refused.
   it('takes a card or teller name per language, with English required', () => {
     const parsed = parse(
       scene({
@@ -40,12 +41,8 @@ describe('parseOrchestratorGameScene', () => {
         teller: { icon: '❝', name: { en: 'Narrator', zh: '旁白' }, color: '#8f9bb3' }
       })
     )
-    expect(parsed.ok && parsed.definition.cards.pr.name).toEqual({
-      en: 'Pilot',
-      es: 'Piloto',
-      ja: 'パイロット'
-    })
-    expect(parsed.ok && parsed.definition.teller.name).toEqual({ en: 'Narrator', zh: '旁白' })
+    expect(parsed.ok && parsed.definition.cards.pr.name).toEqual({ en: 'Pilot', es: 'Piloto' })
+    expect(parsed.ok && parsed.definition.teller.name).toEqual({ en: 'Narrator' })
     const plain = parse(scene())
     expect(plain.ok && plain.definition.teller.name).toBe('Narrator')
   })
@@ -147,7 +144,7 @@ describe('parseOrchestratorGameScene', () => {
     [
       'a translated teller name with a terminal escape',
       JSON.stringify(
-        scene({ teller: { icon: '❝', name: { en: 'N', ko: 'x\u001b[2J' }, color: '#8f9bb3' } })
+        scene({ teller: { icon: '❝', name: { en: 'N', es: 'x\u001b[2J' }, color: '#8f9bb3' } })
       ),
       'teller.name'
     ],
@@ -168,7 +165,7 @@ describe('parseOrchestratorGameScene', () => {
     ],
     [
       'a finale the pixel art cannot draw',
-      JSON.stringify(scene({ finale: { en: 'WIN', zh: '胜利' } })),
+      JSON.stringify(scene({ finale: { en: 'WIN', es: '胜利' } })),
       'finale'
     ],
     ['an overlong finale', JSON.stringify(scene({ finale: 'x'.repeat(25) })), 'finale'],

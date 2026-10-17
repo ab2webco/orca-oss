@@ -12,19 +12,19 @@ describe('repairCatalog with un-bootstrapped keys', () => {
     }
   }
 
-  const translatedOnly = () => ({ auto: { lib: { agent: { catalog: { '760bc6883d': '사본' } } } } })
+  const translatedOnly = () => ({
+    auto: { lib: { agent: { catalog: { '760bc6883d': 'Códice' } } } }
+  })
 
   it('skips leaves the locale catalog is missing instead of throwing', () => {
-    for (const locale of ['ko', 'ja', 'zh', 'es']) {
-      const localeCatalog = translatedOnly()
-      expect(() => repairCatalog(enCatalog, localeCatalog, locale), locale).not.toThrow()
-      expect(localeCatalog.auto.components, locale).toBeUndefined()
-    }
+    const localeCatalog = translatedOnly()
+    expect(() => repairCatalog(enCatalog, localeCatalog, 'es')).not.toThrow()
+    expect(localeCatalog.auto.components).toBeUndefined()
   })
 
   it('still repairs the leaves that are present', () => {
     const localeCatalog = translatedOnly()
-    expect(repairCatalog(enCatalog, localeCatalog, 'ko')).toBe(1)
+    expect(repairCatalog(enCatalog, localeCatalog, 'es')).toBe(1)
     expect(localeCatalog.auto.lib.agent.catalog['760bc6883d']).toBe('Codex')
   })
 })

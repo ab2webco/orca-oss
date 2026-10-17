@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { HUD_ROWS, hudGridOf, xpTextOf } from '../hooks/fleet-hud'
-import { setGameLocale } from '../hooks/game-strings'
+import { gameLocaleOf, isRasterText, setGameLocale } from '../hooks/game-strings'
 import { isRestingOf } from '../hooks/party-sprites'
 import { TILE_COLUMNS, TILE_ROWS, tileGridOf } from '../hooks/fleet-tiles'
 import { levelOf } from '../hooks/rewards'
@@ -80,18 +80,26 @@ describe('hud', () => {
     expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('8c4630ff')
   })
 
-  // Why: the HUD is a Raster, so a language drawn two columns wide keeps its English art.
-  it('writes the HUD in Spanish, and in English for a language a Raster cannot draw', () => {
+  // Why: Orca Lab dropped ja/ko/zh (ORCA-596), so an older Orca's ja launch draws English art.
+  it('writes the HUD in Spanish, and in English for a language Orca no longer ships', () => {
     try {
       setGameLocale('es')
       expect(glyphs(hudGridOf(QUEST, party, 90, 4))).toContain('CI en rojo')
       expect(glyphs(hudGridOf(QUEST, [], 80, 0))).toContain('Aún no hay grupo.')
       expect(xpTextOf(levelOf(130))).toBe('Nv 2 □□□□□ 30/200 XP')
-      setGameLocale('ja')
+      setGameLocale(gameLocaleOf('ja'))
       expect(glyphs(hudGridOf(QUEST, [], 80, 0))).toContain('No party yet.')
     } finally {
       setGameLocale('en')
     }
+  })
+
+  // Why: a Raster refuses a frame holding one wide character, and agents can be named in any script.
+  it('keeps the HUD drawable when a teammate is named in CJK', () => {
+    const named = [{ ...party[0], name: '設計担当' }, party[1], { ...party[2], name: '검증' }]
+    const shown = glyphs(hudGridOf(QUEST, named, 90, 4))
+    expect(isRasterText(shown)).toBe(true)
+    expect(shown).toContain('CIN-944')
   })
 
   it('an empty party says how teammates join, and the demo wears a tag', () => {

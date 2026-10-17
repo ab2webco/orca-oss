@@ -11,11 +11,8 @@
 import { describe, expect, it } from 'vitest'
 import en from './locales/en.json'
 import es from './locales/es.json'
-import ja from './locales/ja.json'
-import ko from './locales/ko.json'
-import zh from './locales/zh.json'
 
-const LOCALE_CATALOGS = { es, ja, ko, zh }
+const LOCALE_CATALOGS = { es }
 
 function lookupIn(catalog: unknown, key: string): string | undefined {
   const value = key

@@ -7,14 +7,14 @@ import { matchesSettingsSearch } from './settings-search'
 // Native word for "language" in each supported UI language. These must be
 // findable no matter which locale the interface is currently rendered in, so a
 // speaker can locate (and switch to) their language from any starting point.
-const NATIVE_LANGUAGE_WORDS = ['语言', '語言', '언어', '言語', 'Idioma']
+const NATIVE_LANGUAGE_WORDS = ['Language', 'Idioma']
 
 describe('getLanguageEntries', () => {
   afterEach(async () => {
     await i18n.changeLanguage('en')
   })
 
-  it.each(['en', 'zh', 'ko', 'ja', 'es'])(
+  it.each(['en', 'es'])(
     'indexes every native word for "language" under the %s UI locale',
     async (locale) => {
       await i18n.changeLanguage(locale)
@@ -22,6 +22,15 @@ describe('getLanguageEntries', () => {
       for (const word of NATIVE_LANGUAGE_WORDS) {
         expect(matchesSettingsSearch(word, entry)).toBe(true)
       }
+    }
+  )
+
+  // Why: Orca Lab no longer ships these languages (ORCA-596), so search must not offer them.
+  it.each(['中文（简体）', '한국어', '日本語', '语言', '언어', '言語'])(
+    'does not index %s',
+    async (word) => {
+      await i18n.changeLanguage('en')
+      expect(matchesSettingsSearch(word, getLanguageEntries()[0])).toBe(false)
     }
   )
 

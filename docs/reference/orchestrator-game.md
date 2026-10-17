@@ -33,9 +33,9 @@ only that path and never a bare `orca`, which on Linux is the GNOME screen reade
 scene still draws and the band says the state is unavailable.
 
 `ORCA_GAME_LOCALE` is Orca's UI language resolved like the renderer does (`system` reads the OS
-locale; a plugin language pack maps by its tag), one of `en`, `es`, `ja`, `ko`, `zh`, else `en`.
-The mod translates its words from it; text inside the pixel art stays English for ja, ko and zh
-because a Raster only takes width-1 characters.
+locale; a plugin language pack maps by its tag), one of `en`, `es`, else `en`. The mod translates
+its words from it. A Raster only takes width-1 characters, so a wide character inside the pixel art
+(a CJK teammate or file name an agent reports) is drawn as `?`.
 
 ### On Windows
 
@@ -43,11 +43,11 @@ The pane's shell parses the launch line, so `--plugin-dir` is quoted for it
 ([`orchestrator-game-pane-shell.ts`](../../src/main/claude/orchestrator-game-pane-shell.ts) picks
 the shell the pty spawn will open, from the same settings and project runtime):
 
-| Pane shell | Quoting of the plugin dir |
-| --- | --- |
-| PowerShell 5.1 and 7 (the default) | a `'…'` literal, `'` doubled |
-| cmd.exe | `"…"`, stepping out of the quotes for each `%` as `"^%"`; `& ^ ( ) !` stay inside them |
-| Git Bash / MSYS | a POSIX `'…'` word, backslashes kept |
+| Pane shell                                                  | Quoting of the plugin dir                                                                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| PowerShell 5.1 and 7 (the default)                          | a `'…'` literal, `'` doubled                                                                                           |
+| cmd.exe                                                     | `"…"`, stepping out of the quotes for each `%` as `"^%"`; `& ^ ( ) !` stay inside them                                 |
+| Git Bash / MSYS                                             | a POSIX `'…'` word, backslashes kept                                                                                   |
 | WSL (`wsl.exe`, a `\\wsl$` worktree, a WSL project runtime) | no game: the distro's Linux Claude cannot load a Windows plugin path, and `ORCA_GAME_*` is not crossed into the distro |
 
 A cmd pane with delayed expansion turned on in the registry would still read `!…!` in the path;
@@ -107,12 +107,12 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 ```yaml
 # orca.yaml
 orchestratorGame:
-  mode: zen        # on | zen | off
-  scene: quest     # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
-  sceneFile: .orca/scenes/mario.json  # optional: the project's own scene; wins over scene (below)
-  hud: true        # teammate band above the prompt
-  rewards: false   # XP, level-ups, celebrations
-  tracker: true    # follow the linked work item in the flow
+  mode: zen # on | zen | off
+  scene: quest # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
+  sceneFile: .orca/scenes/mario.json # optional: the project's own scene; wins over scene (below)
+  hud: true # teammate band above the prompt
+  rewards: false # XP, level-ups, celebrations
+  tracker: true # follow the linked work item in the flow
   openLinks: system # orca (default) | system: where the game's links open
 ```
 
@@ -294,6 +294,7 @@ Where the To Do comes from, first match wins:
    Without `workspace` Orca uses the workspace or site selected on its Tasks page. `todo: off`
    hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
    since it goes into the JQL.
+
 2. The Plane project this repo was last launched from on the Tasks page.
 3. The tracker of the worktree's linked item (a Jira or Linear item scopes to its key's prefix).
 4. Issues assigned to me on the repo's GitHub or GitLab.
@@ -353,19 +354,19 @@ project Settings edits all but the two prompts and `rules`, which live in `orca.
 # orca.yaml
 orchestratorGame:
   orchestrator:
-    autostart: true   # a plain session in this project starts as the lead
-    cap: 4            # members running at once, 1 to 12; launches past it are refused
-    agent: claude     # what a member runs, as `orca orchestration worker-start --agent` names it
-    model: opus       # optional
-    effort: high      # optional, used only with a model
-    label: Orquestador          # optional: the lead's name
-    launchPrompt: |             # optional: what a new member is told; {id} {title} {url} {status}
+    autostart: true # a plain session in this project starts as the lead
+    cap: 4 # members running at once, 1 to 12; launches past it are refused
+    agent: claude # what a member runs, as `orca orchestration worker-start --agent` names it
+    model: opus # optional
+    effort: high # optional, used only with a model
+    label: Orquestador # optional: the lead's name
+    launchPrompt: | # optional: what a new member is told; {id} {title} {url} {status}
       Implement {id}: {title}
-    pushPrompt: |               # optional: what `game push` sends a stopped member; same placeholders
+    pushPrompt: | # optional: what `game push` sends a stopped member; same placeholders
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
-    rules: Members report TERMINADO CIN-NNN.  # optional: appended to Orca's own rules
-    actions: false    # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: auto    # optional: default (Orca's own account selection) or auto (see below)
+    rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
+    actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
+    accounts: auto # optional: default (Orca's own account selection) or auto (see below)
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
@@ -390,8 +391,8 @@ The lead's verbs, run from the lead's terminal
   - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
     3 s apart, with the same orchestration request id, so the runtime never starts a second member
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
-  `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
-  `orchestration worker-start --on` refuses account pins because the server resolves its own).
+    `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
+    `orchestration worker-start --on` refuses account pins because the server resolves its own).
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
     agent's process env, so a model router outside Orca can leave that choice alone (Jev does not
@@ -572,8 +573,8 @@ six phases (working · docs · build · verify · PR · handoff) and signs your 
 | `tamer`     | Beast Tamer  | Flower meadows                               | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | a wild glitch bug  | `◓ CAUGHT!`     |
 
 Quest is Jucer Orozco's original quest mode; the other three are his games from
-koombea/cineco-orchestrator PR #32. Names are translated to Spanish, Japanese, Korean and Chinese;
-the finale is pixel art, so it is English or Spanish. PR #32's per-game HUD words and colors, the
+koombea/cineco-orchestrator PR #32. Names are translated to Spanish; the finale is pixel art, in
+English or Spanish. PR #32's per-game HUD words and colors, the
 Crystal Saga ATB bar, Beast Tamer evolution, the wild encounter while waiting, and each game's
 handed-off tile animation are not ported: they need logic beyond what a scene's data can describe.
 
@@ -773,4 +774,4 @@ labels shorten first (`2 working` to `• 2`, the review to `#42 ✗`, Refresh a
 icon), then chips drop and a `+N` counts them. Below 37 columns the HUD frame has no room for a
 teammate, so it becomes one line of text (`Lv 2 · • builder  ! scribe`); above that, teammates the
 frame cannot seat are counted as `+N` on its top edge. Widths are measured in terminal cells, so
-Japanese, Korean and Chinese labels count two per character.
+CJK text in a label (a teammate, branch or ticket name) counts two per character.

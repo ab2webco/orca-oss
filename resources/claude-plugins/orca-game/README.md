@@ -55,13 +55,13 @@ The env is the launch snapshot. Orca's live answer from `orca game state` (every
 each turn) can change mode, scene, HUD and rewards since, and `/quest on|zen|off` overrides the mode
 for the session:
 
-| Variable            | Values                       | Default | Effect                                                 |
-| ------------------- | ---------------------------- | ------- | ------------------------------------------------------ |
-| `ORCA_GAME_MODE`    | `on`, `zen`, `off`           | `on`    | Quest mode                                             |
-| `ORCA_GAME_SCENE`   | a scene id                   | `quest` | Art set; an unknown id falls back to `quest`           |
-| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false`      | `1`     | `0` hides the band                                     |
-| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false`      | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
-| `ORCA_GAME_LOCALE`  | `en`, `es`, `ja`, `ko`, `zh` | `en`    | Language of the game's words; anything else is English |
+| Variable            | Values                  | Default | Effect                                                 |
+| ------------------- | ----------------------- | ------- | ------------------------------------------------------ |
+| `ORCA_GAME_MODE`    | `on`, `zen`, `off`      | `on`    | Quest mode                                             |
+| `ORCA_GAME_SCENE`   | a scene id              | `quest` | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false` | `1`     | `0` hides the band                                     |
+| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false` | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
+| `ORCA_GAME_LOCALE`  | `en`, `es`              | `en`    | Language of the game's words; anything else is English |
 
 A project's own scene file comes from `sceneFile` in its `orca.yaml`, which Orca reads and serves
 through `orca game state`; the env never carries a path.
@@ -71,8 +71,8 @@ Other plugins can follow the game through its state `{ plugin: 'orca-game', key:
 on). It is written at load and on every change from the env, Orca's live config or `/quest`.
 
 The words live in `hooks/game-strings.ts` (English) and `hooks/locales/`. Text drawn inside the
-pixel art (the HUD, the thought bubble) must be width-1 characters, so Japanese, Korean and Chinese
-keep English there and translate everything else.
+pixel art (the HUD, the thought bubble) must be width-1 characters, so a wide character there (a
+CJK teammate or file name an agent reports) is drawn as `?`; the text around the art shows it.
 
 The `config` that `orca game state` reports overrides the variables while the session runs, and
 `/quest on|zen|off` overrides the mode for the session. `/quest demo` plays a scripted fake party

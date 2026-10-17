@@ -81,10 +81,7 @@ const finaleSchema = z.union([
   pixelArtText,
   z.object({
     en: pixelArtText,
-    es: pixelArtText.optional(),
-    ja: pixelArtText.optional(),
-    ko: pixelArtText.optional(),
-    zh: pixelArtText.optional()
+    es: pixelArtText.optional()
   })
 ])
 

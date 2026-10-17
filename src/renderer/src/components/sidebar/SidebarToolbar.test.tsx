@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store'
 import { i18n } from '@/i18n/i18n'
-import ko from '@/i18n/locales/ko.json'
+import es from '@/i18n/locales/es.json'
 import SidebarToolbar from './SidebarToolbar'
 
 const mocks = vi.hoisted(() => ({
@@ -137,13 +137,13 @@ describe('SidebarToolbar moved workspace board hint', () => {
     expect(container.querySelector('button[aria-label="Workspace board"]')).not.toBeNull()
 
     await act(async () => {
-      await i18n.changeLanguage('ko')
+      await i18n.changeLanguage('es')
     })
 
     // Why: read the expected copy from the catalog instead of hardcoding it, so
-    // editing the Korean wording cannot fail this test as a bogus stale-render
+    // editing the Spanish wording cannot fail this test as a bogus stale-render
     // report.
-    const localized = ko.auto.components.sidebar.SidebarToolbar['49f62c5665']
+    const localized = es.auto.components.sidebar.SidebarToolbar['49f62c5665']
     expect(localized).not.toBe('Workspace board')
     expect(container.querySelector(`button[aria-label="${localized}"]`)).not.toBeNull()
   })

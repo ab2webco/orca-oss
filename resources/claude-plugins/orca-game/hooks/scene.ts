@@ -1,6 +1,6 @@
 import { actionPixel } from './action-props'
 import { gameStrings, localizedNameOf } from './game-strings'
-import { cellsOf, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
+import { cellsOf, glyphCell, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import { farPixel, GROUND, nearTopOf, plantPixel, sunPixel } from './scenery'
 import {
@@ -95,7 +95,7 @@ const paintBubble = (grid: number[][], left: number, text: string): void => {
   const skyAt = (x: number) => grid[x]?.[1] ?? 0
   grid[left] = [0x2590, BUBBLE, skyAt(left)]
   Array.from(text).forEach((glyph, index) => {
-    grid[left + 1 + index] = [glyph.codePointAt(0) ?? 0x20, BUBBLE_TEXT, BUBBLE]
+    grid[left + 1 + index] = glyphCell(glyph, BUBBLE_TEXT, BUBBLE)
   })
   grid[right] = [0x258c, BUBBLE, skyAt(right)]
 }
@@ -256,7 +256,7 @@ const paintFinale = (grid: number[][], columns: number, finale: string): void =>
   }
   const from = (SCENE_ROWS - 1) * columns + columns - glyphs.length - 1
   glyphs.forEach((glyph, index) => {
-    grid[from + index] = [glyph.codePointAt(0) ?? 0x20, FINALE_TEXT, FINALE_PANEL]
+    grid[from + index] = glyphCell(glyph, FINALE_TEXT, FINALE_PANEL)
   })
 }
 

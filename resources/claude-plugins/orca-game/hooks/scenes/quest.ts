@@ -122,45 +122,45 @@ export const QUEST_SCENE: SceneDefinition = {
   cards: {
     working: {
       icon: '◆',
-      name: { en: 'Squire', es: 'Escudero', ja: '従者', ko: '종자', zh: '侍从' },
+      name: { en: 'Squire', es: 'Escudero' },
       color: '#7fa86a'
     },
     docs: {
       icon: '✦',
-      name: { en: 'Sage', es: 'Sabio', ja: '賢者', ko: '현자', zh: '贤者' },
+      name: { en: 'Sage', es: 'Sabio' },
       color: '#9a7fe0'
     },
     build: {
       icon: '⚒',
-      name: { en: 'Blacksmith', es: 'Herrero', ja: '鍛冶屋', ko: '대장장이', zh: '铁匠' },
+      name: { en: 'Blacksmith', es: 'Herrero' },
       color: '#d98a3d'
     },
     verify: {
       icon: '⚔',
-      name: { en: 'Knight', es: 'Caballero', ja: '騎士', ko: '기사', zh: '骑士' },
+      name: { en: 'Knight', es: 'Caballero' },
       color: '#5b8fd6'
     },
     pr: {
       icon: '✉',
-      name: { en: 'Herald', es: 'Heraldo', ja: '伝令', ko: '전령', zh: '传令官' },
+      name: { en: 'Herald', es: 'Heraldo' },
       color: '#3fae6f'
     },
     handoff: {
       icon: '♛',
-      name: { en: 'King', es: 'Rey', ja: '王', ko: '왕', zh: '国王' },
+      name: { en: 'King', es: 'Rey' },
       color: '#e0b020'
     }
   },
   teller: {
     icon: '❝',
-    name: { en: 'Storyteller', es: 'Narrador', ja: '語り部', ko: '이야기꾼', zh: '说书人' },
+    name: { en: 'Storyteller', es: 'Narrador' },
     color: '#8f9bb3'
   },
   band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' },
   // Jev's advisor: a wizard whose staff glows while it waits.
   cast: {
     advisor: {
-      name: { en: 'Wizard', es: 'Mago', ja: '魔法使い', ko: '마법사', zh: '巫师' },
+      name: { en: 'Wizard', es: 'Mago' },
       frames: [
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.G', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT']

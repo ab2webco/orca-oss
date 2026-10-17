@@ -35,10 +35,7 @@ export const localizedSceneName = z.union([
   sceneName,
   z.object({
     en: sceneName,
-    es: sceneName.optional(),
-    ja: sceneName.optional(),
-    ko: sceneName.optional(),
-    zh: sceneName.optional()
+    es: sceneName.optional()
   })
 ])
 

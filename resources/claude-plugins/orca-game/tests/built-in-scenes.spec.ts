@@ -146,8 +146,6 @@ describe('built-in scenes draw', () => {
     expect(resting).not.toContain('CASE CLOSED')
     setGameLocale('es')
     expect(merge('vigilante', 'merge')).toContain('CASO CERRADO')
-    setGameLocale('ja')
-    expect(merge('vigilante', 'merge')).toContain('CASE CLOSED')
   })
 
   it('a red CI brings the foe into the tile and into the HUD; quest stays as it was', () => {

@@ -10,7 +10,7 @@ const WHITE = 0xf4f4f4
 
 /** Black-and-white stripes, a cap and a whistle; it faces left, toward the field and its props. */
 export const REFEREE: SceneAdvisor = {
-  name: { en: 'Referee', es: 'Árbitro', ja: '審判', ko: '심판', zh: '裁判' },
+  name: { en: 'Referee', es: 'Árbitro' },
   frames: [
     ['..KKKK..', '.KKKKK..', '.GSESS..', '.WKWKWK.', 'SWKWKWKS', '..KKKK..', '..K..K..'],
     ['..KKKK..', '.KKKKK..', '.GSESS..', '.WKWKWK.', 'SWKWKWKS', '..KKKK..', '..K..K..'],

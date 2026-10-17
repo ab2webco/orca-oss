@@ -75,7 +75,7 @@ describe('PetOverlay sprite keyframes', () => {
   let container: HTMLDivElement | null = null
 
   beforeEach(async () => {
-    await i18n.changeLanguage('zh')
+    await i18n.changeLanguage('es')
     installLocalStorage()
   })
 
@@ -100,8 +100,8 @@ describe('PetOverlay sprite keyframes', () => {
     expect(css).toContain('transform: translateY(0)')
     expect(css).toContain('background-position:')
     expect(css).toContain('to { background-position:')
-    expect(css).not.toContain('变换')
-    expect(css).not.toContain('背景位置')
-    expect(css).not.toContain('到 {')
+    expect(css).not.toContain('transformar')
+    expect(css).not.toContain('posición de fondo')
+    expect(css).not.toContain('hasta {')
   })
 })

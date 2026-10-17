@@ -169,7 +169,7 @@ describe('oversized-pr-review-guard', () => {
     const bigData = [
       { path: 'src/main/feature.ts', additions: 10 },
       { path: 'src/renderer/src/i18n/locales/en.json', additions: 3093 },
-      { path: 'src/renderer/src/i18n/locales/ko.json', additions: 592 },
+      { path: 'src/renderer/src/i18n/locales/es.json', additions: 592 },
       // El caso original del ticket: andamiaje de test que no lleva `.test.`.
       { path: 'mobile/test-doubles/plane-tasks-harness.tsx', additions: 313 }
     ]

@@ -129,38 +129,38 @@ export const TAMER_SCENE: SceneDefinition = {
   cards: {
     working: {
       icon: '◓',
-      name: { en: 'Tamer', es: 'Domadora', ja: 'テイマー', ko: '테이머', zh: '驯兽师' },
+      name: { en: 'Tamer', es: 'Domadora' },
       color: '#3a7bd6'
     },
     docs: {
       icon: '❦',
-      name: { en: 'Leafling', es: 'Hojín', ja: 'リーフリン', ko: '리플링', zh: '小叶灵' },
+      name: { en: 'Leafling', es: 'Hojín' },
       color: '#5fbf6a'
     },
     build: {
       icon: '♨',
-      name: { en: 'Emberpup', es: 'Brasita', ja: 'エンバーパップ', ko: '엠버펍', zh: '火苗犬' },
+      name: { en: 'Emberpup', es: 'Brasita' },
       color: '#e0663a'
     },
     verify: {
       icon: 'ϟ',
-      name: { en: 'Voltbit', es: 'Voltín', ja: 'ボルトビット', ko: '볼트빗', zh: '电电兽' },
+      name: { en: 'Voltbit', es: 'Voltín' },
       color: '#7fd3c8'
     },
     pr: {
       icon: '≈',
-      name: { en: 'Aquafin', es: 'Aletín', ja: 'アクアフィン', ko: '아쿠아핀', zh: '水鳍鱼' },
+      name: { en: 'Aquafin', es: 'Aletín' },
       color: '#9fe0ff'
     },
     handoff: {
       icon: '✧',
-      name: { en: 'Starling', es: 'Estrellín', ja: 'スターリング', ko: '스탈링', zh: '星灵鸟' },
+      name: { en: 'Starling', es: 'Estrellín' },
       color: '#f5e6a8'
     }
   },
   teller: {
     icon: '❝',
-    name: { en: 'Professor', es: 'Profesor', ja: '博士', ko: '박사', zh: '博士' },
+    name: { en: 'Professor', es: 'Profesor' },
     color: '#e0a13a'
   },
   band: { gold: '#f2d35a', ink: '#2f6fb0', panel: '#2f6fb0', parchment: '#ffffff' },
@@ -173,7 +173,7 @@ export const TAMER_SCENE: SceneDefinition = {
   // Jev's advisor: the professor in a lab coat, who knows every creature's level.
   cast: {
     advisor: {
-      name: { en: 'Professor', es: 'Profesor', ja: '博士', ko: '박사', zh: '博士' },
+      name: { en: 'Professor', es: 'Profesor' },
       frames: [
         ['..HHHH..', '.HSSSS..', '.SESSS..', '..SSS...', '.WWWWWW.', 'SWWBWWWS', '..K..K..']
       ],

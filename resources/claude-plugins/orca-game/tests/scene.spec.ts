@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { GAME_LOCALES, localizedNameOf } from '../hooks/game-strings'
+import { GAME_LOCALES, isRasterText, localizedNameOf } from '../hooks/game-strings'
 import { ACTIONS } from '../hooks/quest-policy'
 import { actionPixel, PROP_WIDTH } from '../hooks/action-props'
 import { DEFAULT_SCENE_ID, SCENES, sceneOf, setContributedScenes } from '../hooks/scenes/index'
@@ -83,6 +83,14 @@ describe('scene registry', () => {
 })
 
 describe('scene', () => {
+  // Why: an agent can edit a file named in any script; one wide glyph makes the Raster refuse the frame.
+  it('a bubble over a CJK file name stays drawable', () => {
+    const columns = sceneColumnsOf(82)
+    const shown = rowText(sceneGridOf(QUEST, 'build', columns, 5, 'Editing ゲーム.tsx'), columns, 0)
+    expect(isRasterText(shown)).toBe(true)
+    expect(shown).toContain(' Editing ???.tsx ')
+  })
+
   it('a bubble over Claude says what it does, and nothing else covers the landscape', () => {
     const columns = sceneColumnsOf(82)
     const grid = sceneGridOf(QUEST, 'build', columns, 5, 'Editing view.tsx')
