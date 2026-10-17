@@ -1,5 +1,6 @@
 import type { TelemetryConsentState } from '../../shared/telemetry-consent-types'
 import type { MemorySnapshot, StatsSummary } from '../../shared/process-stats-types'
+import type { MemoryPressureState } from '../../shared/memory-pressure-types'
 
 export type StatsApi = {
   getSummary: () => Promise<StatsSummary>
@@ -32,6 +33,10 @@ export type DiagnosticsUploadPayload =
 
 export type MemoryApi = {
   getSnapshot: () => Promise<MemorySnapshot>
+  getPressureWarning: () => Promise<MemoryPressureState>
+  refreshPressureWarning: () => Promise<MemoryPressureState>
+  dismissPressureWarning: (episodeId: number) => Promise<void>
+  onPressureWarning: (callback: (state: MemoryPressureState) => void) => () => void
 }
 
 export type DiagnosticsApi = {

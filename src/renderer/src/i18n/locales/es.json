@@ -9405,7 +9405,14 @@
             },
             "actions": "acciones",
             "buttons": "botones",
-            "position": "posición"
+            "position": "posición",
+            "memoryPressureTitle": "Aviso de memoria baja",
+            "memoryPressureDescription": "Avisa cuando el sistema se está quedando sin memoria y nombra las terminales que más usan.",
+            "memoryKeyword": "memoria",
+            "ramKeyword": "ram",
+            "swapKeyword": "swap",
+            "pressureKeyword": "presión",
+            "warningKeyword": "aviso"
           },
           "windows": {
             "search": {
@@ -10841,6 +10848,12 @@
           "terminalAriaLabel": "Terminal de instalación de la habilidad de escenas del juego",
           "howToUse": "Cómo usarla",
           "howToUseDescription": "Pide a un agente en una terminal una escena, un nuevo aspecto para la que ya tienes o por qué la tuya dibuja Quest."
+        },
+        "MemoryPressureWarningSection": {
+          "title": "Memoria baja",
+          "description": "Los agentes, servidores MCP y builds que corren en las terminales pueden agotar la memoria. Orca nunca cierra una terminal por su cuenta.",
+          "thresholdLabel": "Avisar por debajo de",
+          "thresholdDescription": "Muestra el aviso cuando la memoria libre baja de este porcentaje de la memoria física. En macOS también aparece cuando el sistema informa presión de memoria. Las terminales en hosts SSH no se miden."
         }
       },
       "right": {
@@ -15238,6 +15251,30 @@
           "closePanel": "Cerrar {{title}}",
           "close": "Cerrar",
           "closeTooltip": "Cerrar · Esc"
+        }
+      },
+      "memoryPressure": {
+        "MemoryPressureWarningCard": {
+          "title": "Queda poca memoria",
+          "dismiss": "Descartar",
+          "freeSummary": "{{value0}} libres de {{value1}}.",
+          "swapSummary": "Swap {{value0}} de {{value1}}.",
+          "lead": "Estas terminales usan más memoria. Cierra las que ya no necesites antes de que el sistema se quede sin memoria.",
+          "measuring": "Midiendo terminales…",
+          "empty": "Ninguna terminal local está usando mucha memoria. Puede deberse a otras apps.",
+          "untitled": "Terminal en segundo plano",
+          "idleUnknown": "inactividad desconocida",
+          "lastOutput": "última salida {{value0}}",
+          "open": "Abrir",
+          "close": "Cerrar",
+          "remote": "Las terminales SSH corren en sus hosts remotos y no se cuentan aquí ({{value0}} abiertas)."
+        },
+        "MemoryPressureCloseDialog": {
+          "title": "¿Cerrar {{value0}}?",
+          "description": "Esto termina la terminal y todo lo que corre en ella, incluida cualquier sesión de agente y los servidores que haya iniciado. Se pierde el trabajo sin guardar en esa terminal.",
+          "cancel": "Cancelar",
+          "closing": "Cerrando…",
+          "confirm": "Cerrar terminal"
         }
       }
     },

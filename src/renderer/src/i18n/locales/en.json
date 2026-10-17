@@ -9844,7 +9844,14 @@
             },
             "actions": "actions",
             "buttons": "buttons",
-            "position": "position"
+            "position": "position",
+            "memoryPressureTitle": "Low memory warning",
+            "memoryPressureDescription": "Warn when the system is running out of memory and name the terminals using the most.",
+            "memoryKeyword": "memory",
+            "ramKeyword": "ram",
+            "swapKeyword": "swap",
+            "pressureKeyword": "pressure",
+            "warningKeyword": "warning"
           },
           "windows": {
             "search": {
@@ -11469,6 +11476,12 @@
           "terminalAriaLabel": "Game scenes skill install terminal",
           "howToUse": "How to use it",
           "howToUseDescription": "Ask an agent in a terminal for a scene, a new look for the one you have, or why yours draws Quest."
+        },
+        "MemoryPressureWarningSection": {
+          "title": "Low Memory",
+          "description": "Agents, MCP servers and builds running in terminals can exhaust memory. Orca never closes a terminal on its own.",
+          "thresholdLabel": "Warn below",
+          "thresholdDescription": "Show the warning when free memory falls under this share of physical memory. On macOS it also shows when the system reports memory pressure. Terminals on SSH hosts are not measured."
         }
       },
       "right": {
@@ -16181,6 +16194,30 @@
           "closePanel": "Close {{title}}",
           "close": "Close",
           "closeTooltip": "Close · Esc"
+        }
+      },
+      "memoryPressure": {
+        "MemoryPressureWarningCard": {
+          "title": "Memory is running low",
+          "dismiss": "Dismiss",
+          "freeSummary": "{{value0}} of {{value1}} free.",
+          "swapSummary": "Swap {{value0}} of {{value1}}.",
+          "lead": "These terminals use the most memory. Close the ones you no longer need before the system runs out.",
+          "measuring": "Measuring terminals…",
+          "empty": "No local terminal is holding much memory. Other apps may be the cause.",
+          "untitled": "Background terminal",
+          "idleUnknown": "idle time unknown",
+          "lastOutput": "last output {{value0}}",
+          "open": "Open",
+          "close": "Close",
+          "remote": "SSH terminals run on their remote hosts and are not counted here ({{value0}} open)."
+        },
+        "MemoryPressureCloseDialog": {
+          "title": "Close {{value0}}?",
+          "description": "This ends the terminal and everything running in it, including any agent session and the servers it started. Unsaved work in that terminal is lost.",
+          "cancel": "Cancel",
+          "closing": "Closing…",
+          "confirm": "Close terminal"
         }
       }
     },

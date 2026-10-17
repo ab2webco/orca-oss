@@ -61,6 +61,7 @@ import {
 } from './components/terminal-pane/use-system-prefers-dark'
 import RightSidebar from './components/right-sidebar'
 import { StarNagCard } from './components/StarNagCard'
+import { MemoryPressureWarningCard } from './components/memory-pressure/MemoryPressureWarningCard'
 import { StarNagAgentValueMomentObserver } from './components/star-nag/StarNagAgentValueMomentObserver'
 import { StarNagToastHost } from './components/star-nag/StarNagToastHost'
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
@@ -2693,6 +2694,14 @@ function App(): React.JSX.Element {
               compact
             >
               <StarNagCard />
+            </RecoverableRenderErrorBoundary>
+            <RecoverableRenderErrorBoundary
+              boundaryId="overlay.memory-pressure"
+              surface="overlay"
+              resetKey={activeView}
+              compact
+            >
+              <MemoryPressureWarningCard />
             </RecoverableRenderErrorBoundary>
             <RecoverableRenderErrorBoundary
               boundaryId="overlay.star-nag-toast"
