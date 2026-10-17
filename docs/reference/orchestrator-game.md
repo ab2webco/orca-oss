@@ -116,7 +116,7 @@ orchestratorGame:
   rewards: false # XP, level-ups, celebrations
   tracker: true # follow the linked work item in the flow
   openLinks: system # orca (default) | system: where the game's links open
-  render: hd       # classic (default) | hd: see "Render: classic or hd" below
+  render: hd # classic (default) | hd: see "Render: classic or hd" below
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
 ```
 
@@ -399,8 +399,8 @@ The lead's verbs, run from the lead's terminal
     `orchestration worker-start --on` refuses account pins because the server resolves its own).
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
-    agent's process env, so a model router outside Orca can leave that choice alone (Jev does not
-    read them yet). The same
+    agent's process env, so a model router outside Orca can leave that choice alone (Jev 0.13.1+
+    honors them in game panes only). The same
     holds for every agent and every launch that asks for a model or effort
     (`orchestration worker-start --model/--effort`, a model picked in the composer): Orca sets a pin
     only for a value it was asked for and applied, never for a catalog default it filled in (Codex's
