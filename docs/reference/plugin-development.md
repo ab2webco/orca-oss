@@ -831,8 +831,10 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
 
 - Pixel colors (`looks`, costume `colors`, `hud`) are `#rrggbb` or an integer `0..0xFFFFFF`; card and band
   colors are `#rrggbb`.
-- A costume is exactly six `rows` plus two `legs` rows, each ten printable ASCII glyphs. `.` is
-  transparent and every other glyph must have a color.
+- A costume is 10×7: exactly six `rows` of body plus a seventh legs row whose two frames are the
+  two `legs` strings (they alternate while it walks; a sitting figure drops the row). Every row is
+  ten printable ASCII glyphs. `.` is transparent and every other glyph must have a color. Nothing is
+  mirrored when a figure walks back, so draw costumes facing right, the way the hero faces.
 - `icon` is at most 4 characters and `name` at most 32, with no control or bidi characters: they
   reach the terminal as-is.
 - A card or teller `name` is a string, or one per language as `{ "en", "es" }`
@@ -844,7 +846,8 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   windows, on rooftops instead of hills), `crystals` or `meadow`. Optional `isSignal: true` draws a
   searchlight sign with its beam in place of the sun.
 - Optional `foe` is a costume, same rules as above, that faces a teammate whose CI is red: on its
-  Fleet tile in place of the phase prop, and in turns with it on the HUD.
+  Fleet tile in place of the phase prop, mirrored so it faces the teammate, and in turns with it
+  on the HUD as written.
 - Optional `finale` is a caption painted bottom-right while a merge runs: a string or one per
   language, at most 24 characters. It is drawn inside the pixel art, so it takes only width-1
   characters (Latin with accents, punctuation, box drawing and blocks, `★`, card suits).
