@@ -34,6 +34,7 @@
     "check:renderer-brand-drift-ratchet": "node config/scripts/check-renderer-brand-drift-ratchet.mjs",
     "check:feature-wall-assets": "node config/scripts/check-feature-wall-assets.mjs",
     "generate:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --write",
+    "capture:orca-game-scenes": "node config/scripts/orca-game-scene-captures.mjs",
     "verify:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --check",
     "generate:panel-font-data-uri": "node config/scripts/generate-panel-font-data-uri.mjs --write",
     "verify:panel-font-data-uri": "node config/scripts/generate-panel-font-data-uri.mjs",

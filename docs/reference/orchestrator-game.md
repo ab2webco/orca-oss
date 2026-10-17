@@ -47,14 +47,15 @@ and clears every `orca game state` warning. Its key summary is
 Each field resolves on its own; a later layer wins
 ([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)):
 
-1. Orca defaults: `mode: on`, `scene: quest`, `hud`, `rewards` and `tracker` all `true`.
+1. Orca defaults: `mode: on`, `scene: quest`, `hud`, `rewards` and `tracker` all `true`,
+   `render: classic`, `timezone: local`.
 2. Global Settings → Agents → **Agent Teams game** (`orchestratorGame`).
 3. The project's committed `orca.yaml` — owned by whoever owns the repo, a dev or a company.
 4. Settings → the project → **Agent Teams game**, this machine only
    (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
 
 Both Settings pages group the game's controls (mode, scene, teammate HUD, rewards, work item
-tracking) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
+tracking, where links open, render and time zone) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
 panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
 imports `hooks/scene.ts`, `scenery.ts` and `scenes/`), so it cannot drift from what a pane draws:
@@ -76,6 +77,8 @@ orchestratorGame:
   rewards: false   # XP, level-ups, celebrations
   tracker: true    # follow the linked work item in the flow
   openLinks: system # orca (default) | system: where the game's links open
+  render: hd       # classic (default) | hd: see "Render: classic or hd" below
+  timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
 ```
 
 `openLinks: system` opens every game link (PR, CI, ticket, activity, the PR and To Do list
@@ -462,6 +465,76 @@ handed-off tile animation are not ported: they need logic beyond what a scene's 
 Each also dresses Jev's advisor ([The cast](#the-cast-a-pet-and-jevs-advisor)): Quest a wizard,
 Night Watch the commissioner, Crystal Saga an oracle and Beast Tamer the professor. None has a pet,
 so Pet hearts Clawd, the hero, as before.
+
+## Render: classic or hd
+
+`render` picks how the spinner scene is drawn
+([`orchestrator-game-render.ts`](../../src/shared/orchestrator-game-render.ts) validates it and
+`timezone`; the mod mirrors both in
+[`game-render.ts`](../../resources/claude-plugins/orca-game/hooks/game-render.ts)). It resolves per
+key like the rest, reaches the pane as `ORCA_GAME_RENDER` and `ORCA_GAME_TIMEZONE` at launch and
+through `game state` afterwards, and `/quest render classic|hd` overrides it for the session the way
+`/quest on|zen|off` overrides the mode; `/quest` alone prints both. `orca game state` prints
+`Render: hd (from project), timezone America/Bogota (from global)`, and an unknown render or a zone
+the runtime does not know is dropped with a warning (Settings refuses such a zone on entry).
+
+- **classic** (default): the 5-row pixel art above.
+- **hd** ([`scene-hd.ts`](../../resources/claude-plugins/orca-game/hooks/scene-hd.ts)): 9 rows, 10
+  once the terminal is 48 rows tall, at native resolution. A sky gradient with the sun or moon and
+  its glow, two drifting cloud layers, far scenery fogged toward the sky, a mid layer of hills, near
+  trees, cactus, crystals, antennas or flowers scaled to the characters, a pond that mirrors the sky,
+  and a textured ground line. Every character (the hero, the party, the pet and Jev's advisor) gets
+  a 1-px outline inked from its own palette's darkest colour, a lit and a shaded side and a ground
+  shadow, so a scene file's figures keep their colours
+  ([`hd-sprite.ts`](../../resources/claude-plugins/orca-game/hooks/hd-sprite.ts)).
+
+On top of that hd adds:
+
+- **Day and night** from the clock in `timezone` (`local` is the machine's), sampled at start, on
+  every refresh and about every 30 seconds: dark from 19:00 to 05:00, light from 07:00 to 17:00, an
+  orange tint around 06:00 and 18:00, stars and the moon at night. A look that is already a night
+  sky keeps it.
+- **Light and particles**: shafts from the sun, bloom around bright pixels, a vignette and softened
+  top and bottom rows (the characters are spared both); dust by day, fireflies at night, snow in
+  Night Watch, glitter in Crystal Saga and embers over the campfire the hero rests by.
+- **Motion**: a four-frame walk with a body bob, breathing at rest, and the party following the hero
+  (or sitting by the fire), each member outlined in its state colour with a pulsing `!` over the one
+  waiting on you. A member that joins walks in from the right edge; one that leaves walks off; the
+  first refresh marches nobody.
+- **The lead**: when this pane is the project's lead (`role: lead` in `game state`) the hero wears a
+  crown and its label (`orchestrator.label`, else `Lead`) under its feet.
+- **Team reactions**, from what each refresh already reads: a reward floats `+N XP` with a gold
+  flash, a teammate starting to wait floats `<name> needs you!` in red, a merged review floats
+  `#N merged!` with a white flash, and CI turning red flashes red, shakes the scene a column for a
+  few ticks and rains from a grey cloud. A floating text wider than the scene is skipped, and one
+  that would cover a cloud rises beside it.
+- **The thought cloud** carries what the hero says: puffs along its top, a highlight and a shadow, a
+  1-px outline and a trail of two bubbles that bobs toward the hero's head. The petted pet speaks
+  from it, and Jev's advisor says its words in a cloud of its own at the right edge, which the
+  hero's cloud, hearts and floating texts never cover.
+
+Every drawn text goes through one glyph filter
+([`rasterGlyphsOf`](../../resources/claude-plugins/orca-game/hooks/game-strings.ts)): invisible marks
+are dropped, and anything wider than a cell or outside the Latin, punctuation, box and block ranges
+a Raster draws becomes `?`, so an emoji in a caption can never make the terminal refuse the frame.
+The art uses only the upper half block and text glyphs that SF Mono, Menlo, Consolas and DejaVu Sans
+Mono carry.
+
+The band above the prompt holds 8 rows at most, so its pet scene (the advisor acting while the lead
+is idle, Pet without a spinner) stays classic in either render.
+
+**Cost.** At 120 columns, median of 9 rounds of 800 frames with the cells packed: classic 0.126 ms
+walking and 0.103 ms at rest (0.136 and 0.114 before hd landed), hd 0.570 and 0.585 ms. The sky
+(gradient, sun or moon, glow) is cached by size, look and quantized daylight; the far and mid
+silhouettes by size and scroll step; outlined sprites by costume and frame. The pixel and cell
+buffers are reused per size, and a tick that draws the frame a Raster already shows sends nothing
+([`frame-gate.ts`](../../resources/claude-plugins/orca-game/hooks/frame-gate.ts)).
+
+`pnpm run capture:orca-game-scenes -- [--out <dir>] [--scene-file <json>]`
+([`orca-game-scene-captures.mjs`](../../config/scripts/orca-game-scene-captures.mjs)) renders every
+built-in scene, and a scene file, in classic and hd, day and night, at 130 and 60 columns to PNGs
+through Playwright. They draw the cells the mod hands its Raster in a browser: not terminal
+screenshots, since a terminal's font and gamma differ.
 
 ## A project's own scene file
 

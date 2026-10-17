@@ -25,6 +25,11 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   while Jev publishes, it acts out each new decision and CI state at the scene's edge (a referee
   unless the scene dresses it), and the Panel lists its latest decisions. See
   `docs/reference/orchestrator-game.md` (The cast).
+- **hd.** `render: hd` draws the spinner scene as a 9 to 10-row 2D-HD scene: a lit sky with clouds,
+  fogged layers, outlined and shaded characters, day and night on the project's `timezone`,
+  particles, the party following the hero, the crowned lead, floating team reactions and a thought
+  cloud (`hooks/scene-hd.ts` and the `hooks/hd-*.ts` files). See
+  `docs/reference/orchestrator-game.md` (Render: classic or hd).
 
 ## Origin
 
@@ -52,16 +57,18 @@ claude --plugin-dir "$(pwd)/resources/claude-plugins/orca-game"
 ## Configuration
 
 The env is the launch snapshot. Orca's live answer from `orca game state` (every 30 s and after
-each turn) can change mode, scene, HUD and rewards since, and `/quest on|zen|off` overrides the mode
+each turn) can change mode, scene, HUD, rewards, render and timezone since, and `/quest on|zen|off` overrides the mode
 for the session:
 
-| Variable            | Values                       | Default | Effect                                                 |
-| ------------------- | ---------------------------- | ------- | ------------------------------------------------------ |
-| `ORCA_GAME_MODE`    | `on`, `zen`, `off`           | `on`    | Quest mode                                             |
-| `ORCA_GAME_SCENE`   | a scene id                   | `quest` | Art set; an unknown id falls back to `quest`           |
-| `ORCA_GAME_HUD`     | `1`/`0`, `true`/`false`      | `1`     | `0` hides the band                                     |
-| `ORCA_GAME_REWARDS` | `1`/`0`, `true`/`false`      | `1`     | `0` turns off XP, level-ups and the cheer confetti     |
-| `ORCA_GAME_LOCALE`  | `en`, `es`, `ja`, `ko`, `zh` | `en`    | Language of the game's words; anything else is English |
+| Variable             | Values                       | Default   | Effect                                                 |
+| -------------------- | ---------------------------- | --------- | ------------------------------------------------------ |
+| `ORCA_GAME_MODE`     | `on`, `zen`, `off`           | `on`      | Quest mode                                             |
+| `ORCA_GAME_SCENE`    | a scene id                   | `quest`   | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_HUD`      | `1`/`0`, `true`/`false`      | `1`       | `0` hides the band                                     |
+| `ORCA_GAME_REWARDS`  | `1`/`0`, `true`/`false`      | `1`       | `0` turns off XP, level-ups and the cheer confetti     |
+| `ORCA_GAME_RENDER`   | `classic`, `hd`              | `classic` | The 5-row pixel art, or the 9 to 10-row 2D-HD scene    |
+| `ORCA_GAME_TIMEZONE` | `local` or an IANA zone      | `local`   | The clock hd's day and night follow                    |
+| `ORCA_GAME_LOCALE`   | `en`, `es`, `ja`, `ko`, `zh` | `en`      | Language of the game's words; anything else is English |
 
 A project's own scene file comes from `sceneFile` in its `orca.yaml`, which Orca reads and serves
 through `orca game state`; the env never carries a path.
@@ -75,7 +82,8 @@ pixel art (the HUD, the thought bubble) must be width-1 characters, so Japanese,
 keep English there and translate everything else.
 
 The `config` that `orca game state` reports overrides the variables while the session runs, and
-`/quest on|zen|off` overrides the mode for the session. `/quest demo` plays a scripted fake party
+`/quest on|zen|off` overrides the mode for the session, `/quest render classic|hd` the render;
+`/quest` alone prints both. `/quest demo` plays a scripted fake party
 (every phase, action and reaction, one level-up) without running any command or writing XP;
 `/quest on` returns to real data.
 
