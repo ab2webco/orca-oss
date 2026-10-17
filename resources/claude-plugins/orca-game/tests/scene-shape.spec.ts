@@ -56,7 +56,7 @@ describe('sceneDefinitionOf', () => {
     const orca = parseOrchestratorGameScene(text, 'acme.space/orbit')
     const scene = sceneDefinitionOf(JSON.parse(text), 'acme.space/orbit')
     expect(scene?.cards.pr.name).toEqual({ en: 'Pilot', es: 'Piloto' })
-    expect(scene?.teller.name).toEqual({ en: 'Narrator', ja: '語り手' })
+    expect(scene?.teller.name).toEqual({ en: 'Narrator' })
     expect(scene).toEqual(orca.ok ? orca.definition : undefined)
   })
 
@@ -158,7 +158,7 @@ describe('sceneDefinitionOf', () => {
     ['a signal that is not a boolean', { looks: byScenePhase({ ...sceneLook, isSignal: 'yes' }) }],
     ['an unknown plant', { looks: byScenePhase({ ...sceneLook, plantKind: 'fern' }) }],
     ['a foe glyph with no color', { foe: { ...sceneCostume, legs: ['.Q.O.O.O..', 'O.O.O.O.O.'] } }],
-    ['a finale a Raster cannot draw', { finale: { en: 'WIN', ja: '勝利' } }],
+    ['a finale a Raster cannot draw', { finale: { en: 'WIN', es: '勝利' } }],
     ['a finale too long for the scene', { finale: 'x'.repeat(25) }],
     ['a hud missing its frame', { hud: { skyTop: 1, skyBottom: 2, text: 3, dim: 4, star: 5 } }]
   ])('drops a scene with %s, as Orca does', (_label, patch) => {
@@ -207,7 +207,7 @@ describe('sceneDefinitionOf', () => {
         ...quest,
         teller: {
           ...QUEST_SCENE.teller,
-          name: { en: 'N', ko: 'x\u001b]0;pwned\u0007' }
+          name: { en: 'N', es: 'x\u001b]0;pwned\u0007' }
         }
       }
     ],

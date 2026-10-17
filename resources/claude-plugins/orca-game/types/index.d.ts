@@ -85,7 +85,7 @@ export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProje
 
 export type GameWorktree = { id: string; path: string; branch: string; displayName: string }
 
-export type GameLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
+export type GameLocale = 'en' | 'es'
 
 /** A scene's card or teller name: one string, or one per language with English required. */
 export type LocalizedName = string | ({ en: string } & Partial<Record<GameLocale, string>>)

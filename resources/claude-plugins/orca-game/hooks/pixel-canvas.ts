@@ -1,3 +1,5 @@
+import { isRasterText } from './game-strings'
+
 // A cell is [codepoint, foreground, background]; UPPER_HALF packs two pixels per cell.
 export const UPPER_HALF = 0x2580
 
@@ -42,8 +44,9 @@ export const base64Of = (bytes: Uint8Array): string => {
 export const cellsOf = (grid: readonly (readonly number[])[]): string =>
   base64Of(new Uint8Array(new Uint32Array(grid.flat()).buffer))
 
+// Why: one wide glyph (a CJK name or file an agent reports) makes the Raster refuse the frame.
 export const glyphCell = (glyph: string, color: number, background: number): number[] => [
-  glyph.codePointAt(0) ?? 0x20,
+  isRasterText(glyph) ? (glyph.codePointAt(0) ?? 0x20) : 0x3f,
   color,
   background
 ]

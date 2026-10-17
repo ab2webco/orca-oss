@@ -135,44 +135,41 @@ export const VIGILANTE_SCENE: SceneDefinition = {
   cards: {
     working: {
       icon: '◣',
-      name: { en: 'Night Watch', es: 'Vigía nocturno', ja: '夜警', ko: '야경꾼', zh: '守夜人' },
+      name: { en: 'Night Watch', es: 'Vigía nocturno' },
       color: '#6f7a99'
     },
     docs: {
       icon: '✎',
-      name: { en: 'Detective', es: 'Detective', ja: '探偵', ko: '탐정', zh: '侦探' },
+      name: { en: 'Detective', es: 'Detective' },
       color: '#c9a36a'
     },
     build: {
       icon: '⚙',
-      name: { en: 'Gadgeteer', es: 'Inventor', ja: '発明家', ko: '발명가', zh: '发明家' },
+      name: { en: 'Gadgeteer', es: 'Inventor' },
       color: '#56c8d8'
     },
     verify: {
       icon: '⌘',
-      name: { en: 'Mentor', es: 'Mentor', ja: '師匠', ko: '스승', zh: '导师' },
+      name: { en: 'Mentor', es: 'Mentor' },
       color: '#c9ccd4'
     },
     pr: {
       icon: '↗',
       name: {
         en: 'Rooftop Run',
-        es: 'Carrera en azoteas',
-        ja: '屋上ラン',
-        ko: '옥상 질주',
-        zh: '屋顶疾行'
+        es: 'Carrera en azoteas'
       },
       color: '#d8b23c'
     },
     handoff: {
       icon: '★',
-      name: { en: 'Commissioner', es: 'Comisionado', ja: '本部長', ko: '청장', zh: '局长' },
+      name: { en: 'Commissioner', es: 'Comisionado' },
       color: '#5b8fd6'
     }
   },
   teller: {
     icon: '❝',
-    name: { en: 'Narrator', es: 'Narrador', ja: 'ナレーター', ko: '내레이터', zh: '旁白' },
+    name: { en: 'Narrator', es: 'Narrador' },
     color: '#8f9bb3'
   },
   band: { gold: '#8a93a8', ink: '#05070f', panel: '#1a1d2e', parchment: '#e6e8ee' },

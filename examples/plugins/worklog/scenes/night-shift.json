@@ -146,10 +146,7 @@
       "icon": "☾",
       "name": {
         "en": "Night Owl",
-        "es": "Búho nocturno",
-        "ja": "夜ふかし",
-        "ko": "올빼미",
-        "zh": "夜猫子"
+        "es": "Búho nocturno"
       },
       "color": "#8fa3d9"
     },
@@ -157,10 +154,7 @@
       "icon": "✎",
       "name": {
         "en": "Archivist",
-        "es": "Archivista",
-        "ja": "記録係",
-        "ko": "기록 담당",
-        "zh": "档案员"
+        "es": "Archivista"
       },
       "color": "#a99bf0"
     },
@@ -168,10 +162,7 @@
       "icon": "⚙",
       "name": {
         "en": "Mechanic",
-        "es": "Mecánico",
-        "ja": "整備士",
-        "ko": "정비사",
-        "zh": "机械师"
+        "es": "Mecánico"
       },
       "color": "#f2c14e"
     },
@@ -179,10 +170,7 @@
       "icon": "✓",
       "name": {
         "en": "Inspector",
-        "es": "Inspector",
-        "ja": "検査官",
-        "ko": "검사관",
-        "zh": "检查员"
+        "es": "Inspector"
       },
       "color": "#5fd3c0"
     },
@@ -190,10 +178,7 @@
       "icon": "✉",
       "name": {
         "en": "Courier",
-        "es": "Mensajero",
-        "ja": "配達人",
-        "ko": "배달부",
-        "zh": "信使"
+        "es": "Mensajero"
       },
       "color": "#ff8fa3"
     },
@@ -201,10 +186,7 @@
       "icon": "★",
       "name": {
         "en": "Dawn Keeper",
-        "es": "Guardián del alba",
-        "ja": "夜明けの番人",
-        "ko": "새벽지기",
-        "zh": "黎明守护者"
+        "es": "Guardián del alba"
       },
       "color": "#f5e6a0"
     }

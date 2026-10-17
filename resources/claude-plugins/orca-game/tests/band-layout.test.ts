@@ -99,6 +99,27 @@ const STATE = {
   }
 }
 
+// Why: agents and branches can be named in any script; wide text must fit in the en/es UI too.
+const CJK_STATE = {
+  ...STATE,
+  worktree: { ...STATE.worktree, branch: 'feat/ゲーム画面', displayName: 'ゲーム' },
+  agents: STATE.agents.map((agent, index) => ({
+    ...agent,
+    displayName: ['リーダー', '設計担当者', '検証担当者', '記録係'][index] ?? agent.displayName
+  })),
+  review: { ...STATE.review, title: '機能: ゲーム画面の追加' },
+  workItem: { ...STATE.workItem, title: 'ゲーム画面' }
+}
+
+const CJK_ADVISOR = {
+  ...ADVISOR,
+  line: 'jev · 2 名のエージェントがブランチ feat/ゲーム画面 で作業中',
+  subagents: ADVISOR.subagents.map((one) => ({
+    ...one,
+    title: '他のプラグインの状態行をまとめる帯を書く'
+  }))
+}
+
 const JEV: Plugin = {
   name: 'orca-jev-mod-skills',
   register(on) {
@@ -124,7 +145,7 @@ const SCOUT: Plugin = {
   }
 }
 
-const engine = (on: On, env: Record<string, string>) => {
+const engine = (on: On, env: Record<string, string>, state: object = STATE) => {
   mock.env(on, {
     ORCA_GAME_CLI: '/opt/orca/bin/orca',
     TEST_ADVISOR: JSON.stringify(ADVISOR),
@@ -141,7 +162,7 @@ const engine = (on: On, env: Record<string, string>) => {
   on('process.run', () => ({
     value: {
       exitCode: 0,
-      stdout: JSON.stringify(STATE),
+      stdout: JSON.stringify(state),
       stderr: '',
       isStdoutTruncated: false,
       isStderrTruncated: false
@@ -170,9 +191,15 @@ const rowWidthOf = (row: unknown): number =>
 const ALL = { plugins: [JEV, SCOUT] }
 const WIDTHS = [32, 40, 50, 60, 80, 120, 160] as const
 
-const mount = async ($: Engine, on: On, columns: number, env: Record<string, string> = {}) => {
+const mount = async (
+  $: Engine,
+  on: On,
+  columns: number,
+  env: Record<string, string> = {},
+  state: object = STATE
+) => {
   const clock = mock.clock(on)
-  engine(on, env)
+  engine(on, env, state)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
   return $.ui.mount({
@@ -186,9 +213,22 @@ const mount = async ($: Engine, on: On, columns: number, env: Record<string, str
 
 describe('band layout', () => {
   for (const columns of WIDTHS) {
-    for (const locale of ['es', 'en', 'ja']) {
-      test(`every row fits ${columns} columns in ${locale}`, ALL, async ($, on) => {
-        const ui = await mount($, on, columns, { ORCA_GAME_LOCALE: locale })
+    for (const [label, env, state] of [
+      ['es', { ORCA_GAME_LOCALE: 'es' }, STATE],
+      ['en', { ORCA_GAME_LOCALE: 'en' }, STATE],
+      [
+        'es with CJK names',
+        { ORCA_GAME_LOCALE: 'es', TEST_ADVISOR: JSON.stringify(CJK_ADVISOR) },
+        CJK_STATE
+      ],
+      [
+        'en with CJK names',
+        { ORCA_GAME_LOCALE: 'en', TEST_ADVISOR: JSON.stringify(CJK_ADVISOR) },
+        CJK_STATE
+      ]
+    ] as const) {
+      test(`every row fits ${columns} columns in ${label}`, ALL, async ($, on) => {
+        const ui = await mount($, on, columns, env, state)
         const rows = (await ui.findAll({ type: 'Box' })).filter(
           (one) => one.key !== undefined && /^band-(chips|menu)-/.test(one.key)
         )

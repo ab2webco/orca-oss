@@ -32,9 +32,9 @@ only that path and never a bare `orca`, which on Linux is the GNOME screen reade
 scene still draws and the band says the state is unavailable.
 
 `ORCA_GAME_LOCALE` is Orca's UI language resolved like the renderer does (`system` reads the OS
-locale; a plugin language pack maps by its tag), one of `en`, `es`, `ja`, `ko`, `zh`, else `en`.
-The mod translates its words from it; text inside the pixel art stays English for ja, ko and zh
-because a Raster only takes width-1 characters.
+locale; a plugin language pack maps by its tag), one of `en`, `es`, else `en`. The mod translates
+its words from it. A Raster only takes width-1 characters, so a wide character inside the pixel art
+(a CJK teammate or file name an agent reports) is drawn as `?`.
 
 ## Configuration layers
 
@@ -63,12 +63,12 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 ```yaml
 # orca.yaml
 orchestratorGame:
-  mode: zen        # on | zen | off
-  scene: quest     # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
-  sceneFile: .orca/scenes/mario.json  # optional: the project's own scene; wins over scene (below)
-  hud: true        # teammate band above the prompt
-  rewards: false   # XP, level-ups, celebrations
-  tracker: true    # follow the linked work item in the flow
+  mode: zen # on | zen | off
+  scene: quest # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
+  sceneFile: .orca/scenes/mario.json # optional: the project's own scene; wins over scene (below)
+  hud: true # teammate band above the prompt
+  rewards: false # XP, level-ups, celebrations
+  tracker: true # follow the linked work item in the flow
 ```
 
 An invalid value is dropped and reported (Settings shows the source of every value,
@@ -226,6 +226,7 @@ Where the To Do comes from, first match wins:
    Without `workspace` Orca uses the workspace or site selected on its Tasks page. `todo: off`
    hides the To Do and keeps the PRs. A Jira `project` must be a project key (`CIN`),
    since it goes into the JQL.
+
 2. The Plane project this repo was last launched from on the Tasks page.
 3. The tracker of the worktree's linked item (a Jira or Linear item scopes to its key's prefix).
 4. Issues assigned to me on the repo's GitHub or GitLab.
@@ -249,8 +250,8 @@ six phases (working · docs · build · verify · PR · handoff) and signs your 
 | `tamer`     | Beast Tamer  | Flower meadows                               | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | a wild glitch bug  | `◓ CAUGHT!`     |
 
 Quest is Jucer Orozco's original quest mode; the other three are his games from
-koombea/cineco-orchestrator PR #32. Names are translated to Spanish, Japanese, Korean and Chinese;
-the finale is pixel art, so it is English or Spanish. PR #32's per-game HUD words and colors, the
+koombea/cineco-orchestrator PR #32. Names are translated to Spanish; the finale is pixel art, in
+English or Spanish. PR #32's per-game HUD words and colors, the
 Crystal Saga ATB bar, Beast Tamer evolution, the wild encounter while waiting, and each game's
 handed-off tile animation are not ported: they need logic beyond what a scene's data can describe.
 
@@ -358,4 +359,4 @@ labels shorten first (`2 working` to `• 2`, the review to `#42 ✗`, Refresh a
 icon), then chips drop and a `+N` counts them. Below 37 columns the HUD frame has no room for a
 teammate, so it becomes one line of text (`Lv 2 · • builder  ! scribe`); above that, teammates the
 frame cannot seat are counted as `+N` on its top edge. Widths are measured in terminal cells, so
-Japanese, Korean and Chinese labels count two per character.
+CJK text in a label (a teammate, branch or ticket name) counts two per character.

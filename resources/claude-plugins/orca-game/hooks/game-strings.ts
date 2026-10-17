@@ -1,11 +1,8 @@
 import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
 import { ES } from './locales/es'
-import { JA } from './locales/ja'
-import { KO } from './locales/ko'
-import { ZH } from './locales/zh'
 
-// Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same five.
-export const GAME_LOCALES = ['en', 'es', 'ja', 'ko', 'zh'] as const satisfies readonly GameLocale[]
+// Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same two.
+export const GAME_LOCALES = ['en', 'es'] as const satisfies readonly GameLocale[]
 export type { GameLocale, LocalizedName }
 
 /** Words drawn as terminal text, where any character renders. */
@@ -163,10 +160,7 @@ const EN: GameStrings = {
 
 export const CATALOGS: Readonly<Record<GameLocale, GameCatalog>> = {
   en: EN,
-  es: ES,
-  ja: JA,
-  ko: KO,
-  zh: ZH
+  es: ES
 }
 
 export const gameLocaleOf = (value: string | null | undefined): GameLocale => {

@@ -352,16 +352,29 @@ describe('language', () => {
     expect(loud).toMatchObject({ text: expect.stringMatching(/^Modo desconocido/) })
   })
 
-  // Why: a Raster refuses characters drawn two columns wide, so CJK keeps English pixel art.
-  test('ORCA_GAME_LOCALE=ja translates the text and still draws the art', async ($, on) => {
-    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'ja' } })
+  // Why: Orca Lab dropped ja/ko/zh (ORCA-596), so an older Orca's ja launch gets English, while
+  // CJK names agents report still reach the text and the art keeps drawing.
+  test('ORCA_GAME_LOCALE=ja draws English, with CJK teammate names, and still draws the art', async ($, on) => {
+    const cjk = {
+      ...STATE,
+      agents: [
+        agent('リーダー', 'working', 'Edit', true),
+        agent('設計担当', 'working', 'Edit'),
+        agent('検証担当', 'waiting', null)
+      ]
+    }
+    const world = worldOf({
+      env: { ORCA_GAME_LOCALE: 'ja' },
+      stdout: JSON.stringify({ id: 'x', ok: true, result: cjk })
+    })
     const clock = mock.clock(on)
     engine(on, world)
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
     const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
     expect(await ui.find({ type: 'Raster' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^チーム 2 人$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Team 2 teammates$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^検証担当 waiting on you$/ })).toBeDefined()
     await ui.unmount()
     const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
     expect(await spinner.find({ type: 'Raster' })).toBeDefined()
