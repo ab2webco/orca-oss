@@ -122,4 +122,27 @@ describe('withOrchestratorGameArgs', () => {
   it('leaves the command alone when the game does not load', () => {
     expect(withOrchestratorGameArgs('claude', { args: [], env: {} })).toBe('claude')
   })
+
+  // Why each character: spaces split, `&` chains, `^` escapes, `%` expands in cmd even inside
+  // quotes, `!` is delayed expansion, parentheses group, `'` closes a literal, unicode is a name.
+  const hostile = "C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it's\\orca-game"
+  const game = { args: ['--plugin-dir', hostile], env: {} }
+
+  it('quotes the plugin dir for PowerShell 5 and 7 as a verbatim literal', () => {
+    expect(withOrchestratorGameArgs('claude --teammate-mode in-process', game, 'powershell')).toBe(
+      "claude '--plugin-dir' 'C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it''s\\orca-game' --teammate-mode in-process"
+    )
+  })
+
+  it('quotes the plugin dir for cmd.exe, stepping out of the quotes only to escape percent', () => {
+    expect(withOrchestratorGameArgs('claude --teammate-mode in-process', game, 'cmd')).toBe(
+      'claude "--plugin-dir" "C:\\Users\\Zoë (dev)\\a & b ^c "^%"PATH"^%" !x! it\'s\\orca-game" --teammate-mode in-process'
+    )
+  })
+
+  it('quotes a backslash plugin dir for Git Bash as one POSIX word', () => {
+    expect(withOrchestratorGameArgs('claude', game, 'posix')).toBe(
+      "claude '--plugin-dir' 'C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it'\\''s\\orca-game'"
+    )
+  })
 })

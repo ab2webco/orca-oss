@@ -786,6 +786,7 @@ import {
   resolveLocalProjectRuntimesForRepos
 } from '../project-runtime-git-options'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
+import { localOrchestratorGamePaneShell } from '../claude/orchestrator-game-pane-shell'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import { resolveTerminalOrchestrationCliCommand } from './orchestration/cli-command'
 import {
@@ -27808,6 +27809,20 @@ export class OrcaRuntimeService {
           claudeAgentTeamsMode
         )
         let agentTeamsPlan: Awaited<ReturnType<typeof buildClaudeAgentTeamsLaunchPlan>> | undefined
+        // Why: the plugin dir is on this machine, so an SSH or WSL pane's Claude could not load it.
+        const gameShell =
+          workspace.connectionId === null
+            ? localOrchestratorGamePaneShell({
+                platform: process.platform,
+                settings: this.store?.getSettings?.(),
+                projectRuntime:
+                  process.platform === 'win32'
+                    ? this.resolveProjectRuntimeForWorktree(workspace.id)
+                    : undefined,
+                cwd,
+                fallbackHostShell: process.env.COMSPEC || 'powershell.exe'
+              })
+            : null
         try {
           agentTeamsPlan = adoptedBeforeLaunch
             ? undefined
@@ -27828,16 +27843,16 @@ export class OrcaRuntimeService {
                     shimDir,
                     shimBin
                   }).env,
-                // Why: the plugin dir is on this machine, so an SSH pane's remote Claude could not load it.
                 game:
-                  workspace.connectionId === null
+                  gameShell !== null
                     ? () =>
                         this.prepareOrchestratorGameFor({
                           repoId: workspace.repo?.id ?? null,
                           worktreePath: workspace.path,
                           connectionId: null
                         })
-                    : undefined
+                    : undefined,
+                ...(gameShell !== null ? { gameShell } : {})
               })
         } catch (error) {
           releaseStablePaneCreate?.()
@@ -27859,7 +27874,8 @@ export class OrcaRuntimeService {
                       effectiveClaudeAgentTeamsMode === 'in-process' || process.platform === 'win32'
                         ? addClaudeTeammateModeInProcess(launchOpts.launchConfig.agentCommand)
                         : addClaudeTeammateModeAuto(launchOpts.launchConfig.agentCommand),
-                      agentTeamsPlan.game ?? { args: [], env: {} }
+                      agentTeamsPlan.game ?? { args: [], env: {} },
+                      gameShell ?? undefined
                     )
                   : agentTeamsPlan.command,
                 agentEnv: {

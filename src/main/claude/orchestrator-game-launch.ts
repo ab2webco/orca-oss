@@ -8,7 +8,8 @@ import {
   resolveUiLocale,
   type SupportedUiLocale
 } from '../../shared/ui-locale'
-import { quotePosixShell } from '../../shared/wsl-login-shell-command'
+import { quoteStartupArg, type AgentStartupShell } from '../../shared/tui-agent-startup-shell'
+import { quoteCmdToken } from '../claude-accounts/windows-command-invocation'
 
 // Why: Claude Code loads plugin hook modules ("mods") from this version on.
 export const ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION = '2.1.287'
@@ -72,11 +73,21 @@ export function buildOrchestratorGameLaunch(args: {
   }
 }
 
-/** Inserts the game's Claude args after the executable of a POSIX shell command line. */
-export function withOrchestratorGameArgs(command: string, launch: OrchestratorGameLaunch): string {
+/** Quotes one game arg for the shell that parses the pane's command line. */
+export function quoteOrchestratorGameArg(arg: string, shell: AgentStartupShell): string {
+  // Why not quoteStartupArg for cmd: its carets stay literal inside quotes, and `%` expands there.
+  return shell === 'cmd' ? quoteCmdToken(arg) : quoteStartupArg(arg, shell)
+}
+
+/** Inserts the game's Claude args after the executable, quoted for the pane's shell. */
+export function withOrchestratorGameArgs(
+  command: string,
+  launch: OrchestratorGameLaunch,
+  shell: AgentStartupShell = 'posix'
+): string {
   if (launch.args.length === 0) {
     return command
   }
-  const quoted = launch.args.map(quotePosixShell).join(' ')
+  const quoted = launch.args.map((arg) => quoteOrchestratorGameArg(arg, shell)).join(' ')
   return command.replace(/^(\S+)/, (executable) => `${executable} ${quoted}`)
 }

@@ -15,6 +15,16 @@ describe('withAgentTeamsGameCommand', () => {
     expect(withAgentTeamsGameCommand(once, game)).toBe(once)
   })
 
+  it('quotes for the pane shell and still adds the plugin dir only once', () => {
+    const windowsGame = { args: ['--plugin-dir', 'C:\\Orca 100%\\orca-game'], env: {} }
+    const once = withAgentTeamsGameCommand('claude', windowsGame, 'cmd')
+    expect(once).toBe('claude "--plugin-dir" "C:\\Orca 100"^%"\\orca-game"')
+    expect(withAgentTeamsGameCommand(once, windowsGame, 'cmd')).toBe(once)
+    expect(withAgentTeamsGameCommand('claude', windowsGame, 'powershell')).toBe(
+      "claude '--plugin-dir' 'C:\\Orca 100%\\orca-game'"
+    )
+  })
+
   it('leaves the command alone without a game or a command', () => {
     expect(withAgentTeamsGameCommand('claude', { args: [], env: {} })).toBe('claude')
     expect(withAgentTeamsGameCommand(undefined, game)).toBeUndefined()
