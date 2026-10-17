@@ -49,6 +49,7 @@ export const ES: GameCatalog = {
     couldNotOpenLink: (label) => `No se pudo abrir ${label}`,
     merged: (review) => `${review} mergeado`,
     ciGreen: (review) => `${review}: CI en verde`,
+    memberLaunched: (member) => `${member} en marcha`,
     questDescription:
       'Modo quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:

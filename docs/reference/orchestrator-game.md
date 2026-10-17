@@ -2,7 +2,8 @@
 
 Claude Agent Teams panes (`orca claude-teams`) load a Claude Code plugin that turns the session
 into a small game: a pixel-art scene on the spinner, cards per flow phase, a teammate HUD above
-the prompt, and rewards when reviews merge or CI turns green. It started as the quest mode of the
+the prompt, and rewards when reviews merge, CI turns green or tickets move on (a project lead's
+own and its members'). It started as the quest mode of the
 `o` plugin in koombea/cineco-orchestrator (Jucer Orozco) and lives in
 [`resources/claude-plugins/orca-game`](../../resources/claude-plugins/orca-game).
 
@@ -494,6 +495,31 @@ next step, `game push` leaves it alone, and the Panel card turns red with `limit
 `codex · ana@…` tag: the email's domain never shows, and the name shortens, then drops, as the card
 narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
 its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
+
+### The lead's XP
+
+A lead on the base branch has no PR or ticket of its own, so its XP comes from its members
+([`fleet-rewards.ts`](../../resources/claude-plugins/orca-game/hooks/fleet-rewards.ts)). Each
+refresh compares every member in `game state` that runs in its own worktree with the previous
+refresh, matched by that worktree's id:
+
+| Event                                           | XP  |
+| ----------------------------------------------- | --- |
+| a member appears (launched, or took a ticket)   | 10  |
+| its PR's CI turns green                         | 20  |
+| its ticket moves to a review group (QA, Review) | 50  |
+| its ticket moves to done                        | 70  |
+| its PR merges                                   | 100 |
+
+The first refresh of a session awards nothing, so a member launched or a PR merged while the lead
+pane was closed earns nothing. A member that leaves earns nothing more, and a launch is keyed by
+the member's worktree, so the same member returning in a new pane is not a second launch. The
+review and ticket awards use the ids the member's own pane gives the same change, so when the lead
+and the member share an account (the mod's store is one file per Claude config folder) the ledger
+counts it once. A member pane (`role: member`) earns only its own work. Toasts name the member
+(`+100 XP · ORCA-12 · #41 merged`), a merge floats `#41 merged!`, and `rewards: false` turns all
+of it off. The board's `claimed` event is not in `game state`, so a launch is read from the member
+appearing there instead.
 
 ## The shared board: events, STOP and inboxes
 

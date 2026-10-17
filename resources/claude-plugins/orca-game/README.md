@@ -125,8 +125,11 @@ tracker status change (`orca plane status set`, `orca linear status set`, a trac
 the Herald, a merged one or a work item in review or done is the King).
 
 XP is earned only for a change seen between two polls of the same worktree, so a restart never
-re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A level needs
-100 XP times the level. CI red hurts the working party.
+re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A lead
+(`role` not `member`) also earns the same for each member in its own worktree, plus 10 when a
+member appears; those use the ids the member's pane would, so a shared store never counts one change
+twice ([`hooks/fleet-rewards.ts`](hooks/fleet-rewards.ts)). A level needs 100 XP times the level. CI
+red hurts the working party.
 
 ## Adding a scene
 
