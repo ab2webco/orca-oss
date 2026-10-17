@@ -61,7 +61,7 @@ function rowMeta(row: MemoryPressureRow): string {
           'last output {{value0}}',
           { value0: formatUiRelativeTime(-row.idleMs) }
         )
-  return [row.agentType ? formatAgentTypeLabel(row.agentType) : null, row.project, idle]
+  return [row.agentType ? formatAgentTypeLabel(row.agentType) : null, idle]
     .filter(Boolean)
     .join(' · ')
 }
@@ -155,8 +155,8 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
 
   return (
     <div
-      // Why: UpdateCard owns bottom-10 when it shows; sit above it rather than cover an update prompt.
-      className={`fixed right-4 z-40 w-[380px] max-w-[calc(100vw-32px)] max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto ${
+      // Why: above UpdateCard's bottom-10 slot, and z-[47] over the floating-terminal trigger (z-[46]) it would otherwise cover rows with.
+      className={`fixed right-4 z-[47] w-[380px] max-w-[calc(100vw-32px)] max-[480px]:left-4 max-[480px]:right-4 max-[480px]:w-auto ${
         updateCardVisible ? 'bottom-[220px]' : 'bottom-10'
       }`}
       data-testid="memory-pressure-warning"
@@ -215,7 +215,7 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
           ) : (
             <ul className="flex flex-col divide-y divide-border/60 rounded-md border border-border/60">
               {rows.map((row) => (
-                <li key={row.sessionId} className="flex flex-col gap-1 px-2.5 py-2">
+                <li key={row.sessionId} className="flex flex-col gap-0.5 px-2.5 py-2">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium">
                       {row.title ?? untitledLabel()}
@@ -224,6 +224,7 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
                       {formatBytes(row.memory)}
                     </span>
                   </div>
+                  <span className="truncate text-xs text-muted-foreground">{row.project}</span>
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-xs text-muted-foreground">
                       {rowMeta(row)}

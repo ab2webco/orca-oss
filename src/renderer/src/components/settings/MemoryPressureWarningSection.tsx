@@ -13,6 +13,8 @@ import { SearchableSetting } from './SearchableSetting'
 import { getMemoryPressureWarningSearchEntries } from './memory-pressure-warning-search'
 import { translate } from '@/i18n/i18n'
 
+export const MEMORY_PRESSURE_SECTION_ID = 'memory-pressure-warning'
+
 type MemoryPressureWarningSectionProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
@@ -41,7 +43,7 @@ export function MemoryPressureWarningSection({
         )}
       />
       <div className="divide-y divide-border/40">
-        <SearchableSetting {...entry}>
+        <SearchableSetting {...entry} id={MEMORY_PRESSURE_SECTION_ID}>
           <SettingsSwitchRow
             label={entry.title}
             description={entry.description}
