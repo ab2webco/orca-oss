@@ -4,14 +4,8 @@ import type { GameAgent } from '../types'
 import { advisorCard, advisorCardViewOf } from './advisor-card'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { petLabelOf } from './band-chips'
-import { fitCells } from './cell-width'
-import {
-  activityTextOf,
-  AGENT_COLORS,
-  CI_COLORS,
-  reviewTextOf,
-  workItemTextOf
-} from './fleet-labels'
+import { CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
 import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
@@ -25,13 +19,12 @@ import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
-import { agentTagOf, cardTagRoomOf, limitTagOf } from './member-tags'
 import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
-// A card's text column: the pane less the tile, the round border and the padding.
-const CARD_CHROME = TILE_COLUMNS + 3
+// A card's text column: the pane less the tile, the round border and the padding on each side.
+const CARD_CHROME = TILE_COLUMNS + 4
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -181,101 +174,18 @@ export const registerFleetPane = (on: On): void => {
             {` ! ${need.name}  ${need.text}`}
           </Text>
         ))}
-        {members.map(({ agent, member }, index) => (
-          <Box
-            key={`card-${agent.paneKey}`}
-            flexDirection="row"
-            borderStyle="round"
-            borderColor={agent.limit === undefined ? AGENT_COLORS[agent.state] : 'red'}
-          >
-            {art.get(`tile-${member.key}`) ?? <Box width={TILE_COLUMNS} />}
-            <Box flexDirection="column" paddingLeft={1} flexGrow={1} flexShrink={1}>
-              <Box flexDirection="row" gap={1}>
-                <Text color={AGENT_COLORS[agent.state]} bold>
-                  {agent.displayName}
-                </Text>
-                {agent.isLeader && (
-                  <Text color={palette.gold}>{`♛ ${leadTitleOf(state, text.lead)}`}</Text>
-                )}
-                <Text color={AGENT_COLORS[agent.state]}>{text.agentStates[agent.state]}</Text>
-                <Text dimColor wrap="truncate-end">
-                  {agentTagOf(
-                    agent,
-                    cardTagRoomOf(
-                      cardRoom,
-                      [
-                        agent.displayName,
-                        text.agentStates[agent.state],
-                        ...(agent.isLeader ? [`♛ ${leadTitleOf(state, text.lead)}`] : []),
-                        ...(agent.terminalHandle === undefined ? [] : [` ${text.view} `])
-                      ],
-                      agent.worktree !== undefined
-                    )
-                  )}
-                </Text>
-                {agent.worktree !== undefined && (
-                  <Text
-                    dimColor
-                    wrap="truncate-end"
-                  >{`⎇ ${agent.worktree.branch || agent.worktree.displayName}`}</Text>
-                )}
-                {agent.terminalHandle !== undefined && view(agent, agent.terminalHandle, index)}
-              </Box>
-              {agent.limit !== undefined && (
-                <Text color="red" bold wrap="truncate-end">
-                  {limitTagOf(agent.limit, Date.now())}
-                </Text>
-              )}
-              {advisorRowsOf(agent)}
-              <Text wrap="truncate-end">{member.says}</Text>
-              {(agent.review !== undefined || agent.workItem !== undefined) && (
-                <Box flexDirection="row" gap={1}>
-                  {agent.review !== undefined &&
-                    link(
-                      `review-${agent.paneKey}`,
-                      agent.review.url,
-                      reviewTextOf(agent.review),
-                      <Text color={CI_COLORS[agent.review.ci]} underline>
-                        {reviewTextOf(agent.review)}
-                      </Text>
-                    )}
-                  {agent.workItem !== undefined &&
-                    (agent.workItem.url === '' ? (
-                      <Text>{workItemTextOf(agent.workItem)}</Text>
-                    ) : (
-                      link(
-                        `work-item-${agent.paneKey}`,
-                        agent.workItem.url,
-                        workItemTextOf(agent.workItem),
-                        <Text underline wrap="truncate-end">
-                          {workItemTextOf(agent.workItem)}
-                        </Text>
-                      )
-                    ))}
-                </Box>
-              )}
-              {agent.activity !== undefined &&
-                link(
-                  `activity-${agent.paneKey}`,
-                  agent.activity.url,
-                  agent.activity.id,
-                  <Text
-                    color={agent.activity.running ? 'cyan' : palette.parchment}
-                    wrap="truncate-end"
-                  >
-                    {fitCells(
-                      activityTextOf({
-                        name: agent.activity.name,
-                        label: agent.activity.id,
-                        running: agent.activity.running
-                      }),
-                      cardRoom
-                    )}
-                  </Text>
-                )}
-            </Box>
-          </Box>
-        ))}
+        {members.map(({ agent, member }, index) =>
+          memberCard($, e, agent, member, {
+            scene,
+            room: cardRoom,
+            leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
+            tile: art.get(`tile-${member.key}`),
+            view:
+              agent.terminalHandle === undefined ? null : view(agent, agent.terminalHandle, index),
+            advisorRows: advisorRowsOf(agent),
+            link
+          })
+        )}
         {advisorOf(art)}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>

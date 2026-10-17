@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
-import { agentTagOf, cardTagRoomOf, limitTagOf } from '../hooks/member-tags'
+import { agentTagOf, limitTagOf } from '../hooks/member-tags'
 import type { GameMemberAccount } from '../types'
 
 const NOW = 1_000_000
@@ -68,12 +68,5 @@ describe('member agent and account tag', () => {
     expect(agentTagOf({ agentType: 'codex', account }, 14)).toBe('codex · ana…@…')
     expect(agentTagOf({ agentType: 'codex', account }, 8)).toBe('codex')
     expect(agentTagOf({ agentType: 'gemini' }, 40)).toBe('gemini')
-  })
-})
-
-describe('card tag room', () => {
-  it("leaves the tag what the header's other parts and their gaps do not take", () => {
-    expect(cardTagRoomOf(31, ['builder', 'trabajando'], false)).toBe(12)
-    expect(cardTagRoomOf(31, ['builder', 'trabajando'], true)).toBe(3)
   })
 })

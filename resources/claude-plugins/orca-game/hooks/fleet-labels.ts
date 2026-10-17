@@ -1,4 +1,5 @@
 import type {
+  GameAgent,
   GameAgentState,
   GameCi,
   GameLink,
@@ -10,6 +11,7 @@ import type {
 } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import { agentTagOf } from './member-tags'
 import type { Need } from './party'
 import { reviewLabelOf } from './rewards'
 
@@ -134,3 +136,91 @@ export const needPartsOf = (needs: readonly Need[], columns: number): NeedPart[]
 }
 
 export const teammatesOf = (count: number): string => gameStrings().text.teammates(count)
+
+export type MemberHeading = { name: string; title: string }
+
+const TICKET = /^([A-Za-z][A-Za-z0-9]*-\d+)\s+(.*)$/
+// Orca's own fixed-length cut of a long task name.
+const ORCA_CUT = '...'
+
+/** A member's ticket id apart from its title; the work item's title is whole, the name's may be cut. */
+export const memberHeadingOf = (
+  agent: Pick<GameAgent, 'displayName' | 'workItem'>
+): MemberHeading => {
+  const match = TICKET.exec(agent.displayName)
+  const name = agent.workItem?.identifier ?? match?.[1] ?? agent.displayName
+  if (agent.workItem !== undefined && agent.workItem.title !== '') {
+    return { name, title: agent.workItem.title }
+  }
+  const rest = match?.[2] ?? ''
+  if (!rest.endsWith(ORCA_CUT)) {
+    return { name, title: rest }
+  }
+  const words = rest.slice(0, -ORCA_CUT.length).trimEnd().split(' ')
+  return { name, title: `${(words.length > 1 ? words.slice(0, -1) : words).join(' ')}…` }
+}
+
+/** The text cut at its last word that fits with an ellipsis; mid-word only when one word overflows. */
+export const fitWords = (text: string, room: number): string => {
+  if (cellWidthOf(text) <= room) {
+    return text
+  }
+  const words = text.split(' ')
+  let kept = ''
+  for (const word of words) {
+    const next = kept === '' ? word : `${kept} ${word}`
+    if (cellWidthOf(next) + 1 > room) {
+      break
+    }
+    kept = next
+  }
+  return kept === '' ? fitCells(text, room) : `${kept}…`
+}
+
+const BRANCH_MARK = '⎇ '
+
+/** The branch without `refs/heads/`, its start cut so the name's end stays. */
+export const branchLabelOf = (branch: string, room: number): string => {
+  const whole = `${BRANCH_MARK}${branch.replace(/^refs\/heads\//, '')}`
+  if (cellWidthOf(whole) <= room) {
+    return whole
+  }
+  const glyphs = Array.from(whole.slice(BRANCH_MARK.length))
+  let tail = ''
+  for (let at = glyphs.length - 1; at >= 0; at -= 1) {
+    const next = `${glyphs[at]}${tail}`
+    if (cellWidthOf(`${BRANCH_MARK}…${next}`) > room) {
+      break
+    }
+    tail = next
+  }
+  return tail === '' ? fitCells(whole, room) : `${BRANCH_MARK}…${tail}`
+}
+
+/** A card's first row: the state is never cut, the name gives way to it. */
+export const memberHeadOf = (
+  name: string,
+  state: string,
+  room: number
+): { name: string; state: string } => ({
+  name: fitCells(name, room - cellWidthOf(state) - 1),
+  state
+})
+
+const META_GAP = ' · '
+// Why 8: a branch keeps at least `⎇ …/604` beside the agent tag.
+const BRANCH_MIN_CELLS = 8
+
+/** `claude · ana@… · ⎇ feat/x`: the tag shortens before the branch loses its minimum. */
+export const memberMetaOf = (
+  agent: Pick<GameAgent, 'agentType' | 'account' | 'worktree'>,
+  room: number
+): string => {
+  const branch = agent.worktree?.branch || agent.worktree?.displayName || ''
+  if (branch === '') {
+    return fitCells(agentTagOf(agent, room), room)
+  }
+  const tag = agentTagOf(agent, room - META_GAP.length - BRANCH_MIN_CELLS)
+  const left = room - cellWidthOf(tag) - META_GAP.length
+  return left <= 0 ? fitCells(tag, room) : `${tag}${META_GAP}${branchLabelOf(branch, left)}`
+}

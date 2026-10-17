@@ -249,6 +249,27 @@ describe("the lead's Panel", () => {
     await ui.unmount()
   })
 
+  // Why: one font size, so the ticket id is its own bold Text and the title a plain one below it.
+  test("ranks a member's card by color and weight, the branch without refs/heads/", async ($, on) => {
+    const state = leadState()
+    const long = {
+      ...state.agents[1],
+      displayName: 'ORCA-601 El lead del juego delega en subagentes internos de...',
+      toolName: 'Bash',
+      worktree: { id: 'w', branch: 'refs/heads/fabolivark/orca-601', displayName: 'orca-601' }
+    }
+    await start($, on, {}, [], { ...state, agents: [state.agents[0], long] })
+    const ui = await pane($)
+    expect((await ui.find({ type: 'Text', text: /^ORCA-601$/ }))?.props.bold).toBe(true)
+    const title = await ui.find({ type: 'Text', text: /^El lead del juego/ })
+    expect(title?.text).toBe('El lead del juego delega en subagentes internos…')
+    expect(title?.props.bold).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /^working$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /fabolivark\/orca-601$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /refs\/heads/ })).toBeUndefined()
+    await ui.unmount()
+  })
+
   test('draws no Jev row for a member whose Orca or Jev sends none', async ($, on) => {
     await start($, on, {}, [], leadState())
     const ui = await pane($)
