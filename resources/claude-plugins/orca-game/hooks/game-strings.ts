@@ -44,6 +44,7 @@ export type TextStrings = {
   couldNotOpenLink: (label: string) => string
   merged: (review: string) => string
   ciGreen: (review: string) => string
+  memberLaunched: (member: string) => string
   questDescription: string
   questModesHelp: string
   questShown: (mode: string) => string
@@ -155,6 +156,7 @@ const EN: GameStrings = {
     couldNotOpenLink: (label) => `Could not open ${label}`,
     merged: (review) => `${review} merged`,
     ciGreen: (review) => `${review} CI is green`,
+    memberLaunched: (member) => `${member} launched`,
     questDescription:
       'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:

@@ -23,7 +23,8 @@ import {
   questFleet,
   questLiveConfig
 } from './quest-runtime'
-import { awardXp, levelOf, reviewLabelOf, rewardsOf, xpLedgerOf } from './rewards'
+import { fleetRewardsOf } from './fleet-rewards'
+import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
 export const POLL_EVERY_MS = 30000
@@ -91,7 +92,8 @@ export async function openGameLink(
 
 async function syncXp($: EngineInterface, before: GameState | null, next: GameState) {
   const stored = xpLedgerOf(await $.store.get(XP_KEY).catch(() => undefined))
-  const { ledger, awarded } = awardXp(stored, rewardsOf(before, next), await $.clock.now())
+  const earned = [...rewardsOf(before, next), ...fleetRewardsOf(before, next)]
+  const { ledger, awarded } = awardXp(stored, earned, await $.clock.now())
   if (awarded.length === 0) {
     return stored.total
   }
@@ -100,8 +102,9 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
     $.ui.toast(`+${one.xp} XP · ${one.label}`)
   }
   const art = gameStrings().art
-  if (awarded.some((one) => one.kind === 'review-merged') && next.review !== null) {
-    raiseTeamEvent($, 'merged', art.mergedFloat(reviewLabelOf(next.review)))
+  const merged = awarded.find((one) => one.kind === 'review-merged')?.review
+  if (merged !== undefined) {
+    raiseTeamEvent($, 'merged', art.mergedFloat(merged))
   } else {
     raiseTeamEvent($, 'xp', `+${awarded.reduce((sum, one) => sum + one.xp, 0)} ${art.xp}`)
   }

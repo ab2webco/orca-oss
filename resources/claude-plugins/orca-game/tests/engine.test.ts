@@ -90,6 +90,7 @@ type World = {
   stdout: string | null
   calls: string[][]
   opened: string[]
+  toasts: string[]
   store: Record<string, unknown>
   /** Other commands that exit 0, with no output. */
   succeeds?: (argv: readonly string[]) => boolean
@@ -99,6 +100,7 @@ const worldOf = (patch: Partial<World> = {}): World => ({
   stdout: JSON.stringify({ id: 'x', ok: true, result: STATE }),
   calls: [],
   opened: [],
+  toasts: [],
   store: {},
   ...patch
 })
@@ -110,7 +112,10 @@ const engine = (on: On, world: World) => {
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
   on('turn.complete', () => ({ text: 'ok' }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', ($s, e) => {
+    world.toasts.push(e.text)
+    return { value: undefined }
+  })
   on('ui.open', ($s, e) => {
     world.opened.push(e.id)
     return { value: { isPlaced: true } }
@@ -451,6 +456,50 @@ describe('rewards', () => {
     await clock.advance(30000)
     await clock.advance(30000)
     expect(world.store['xp-ledger']).toMatchObject({ total: 120 })
+  })
+
+  const fleetOf = (prState: string) =>
+    JSON.stringify({
+      ...STATE,
+      role: 'lead',
+      worktree: { id: 'wt-main', path: '/w', branch: 'main', displayName: 'main' },
+      review: null,
+      workItem: null,
+      agents: [
+        agent('lead', 'working', null, true),
+        {
+          ...agent('ORCA-12', 'working', 'Edit'),
+          isMember: true,
+          worktree: { id: 'wt-12', branch: 'feat/orca-12', displayName: 'orca-12' },
+          review: { ...review(prState, 'success'), number: 41 }
+        }
+      ]
+    })
+
+  test("a lead earns XP when a member's PR merges, though it has no PR of its own", async ($, on) => {
+    const world = worldOf({ stdout: fleetOf('open') })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    expect(world.store['xp-ledger']).toBeUndefined()
+    world.stdout = fleetOf('merged')
+    await clock.advance(30000)
+    await clock.advance(30000)
+    expect(world.store['xp-ledger']).toMatchObject({ total: 100 })
+    expect(world.toasts).toEqual(['+100 XP · ORCA-12 · #41 merged'])
+  })
+
+  test('ORCA_GAME_REWARDS=0 earns nothing for the fleet either', async ($, on) => {
+    const world = worldOf({ stdout: fleetOf('open'), env: { ORCA_GAME_REWARDS: '0' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    world.stdout = fleetOf('merged')
+    await clock.advance(30000)
+    expect(world.store['xp-ledger']).toBeUndefined()
+    expect(world.toasts).toEqual([])
   })
 
   test('ORCA_GAME_REWARDS=0 earns nothing', async ($, on) => {
