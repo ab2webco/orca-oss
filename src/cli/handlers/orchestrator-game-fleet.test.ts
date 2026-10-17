@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
 import type { RuntimeClient } from '../runtime-client'
+import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 
 const merged = {
   provider: 'github',
@@ -191,6 +192,32 @@ describe('orca game fleet verbs', () => {
         ]
       })
     )
+  })
+
+  it('wave gives every member it launches the same agent, model and effort overrides', async () => {
+    const { client, calls } = fakeClient(stateWith(), {
+      'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] }
+    })
+
+    await run('game wave', client, [
+      ['tickets', 'CIN-1,CIN-2'],
+      ['agent', 'codex'],
+      ['model', 'gpt-5.5'],
+      ['effort', 'high']
+    ])
+
+    const starts = calls.filter(([method]) => method === 'orchestration.workerStart')
+    expect(starts.map(([, params]) => params)).toEqual([
+      expect.objectContaining({ name: 'cin-1', agent: 'codex', model: 'gpt-5.5', effort: 'high' }),
+      expect.objectContaining({ name: 'cin-2', agent: 'codex', model: 'gpt-5.5', effort: 'high' })
+    ])
+  })
+
+  it('wave refuses a bad override before launching anything', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await expect(run('game wave', client, [['agent', 'cobol']])).rejects.toThrow(/Unknown agent/)
+    expect(calls).toEqual([])
   })
 
   it('sweep without --close only lists finished members and touches nothing', async () => {

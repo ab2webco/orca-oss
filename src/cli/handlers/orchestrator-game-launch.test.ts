@@ -21,6 +21,15 @@ function stateWith(overrides: Record<string, unknown> = {}) {
   }
 }
 
+const ACCOUNTS = {
+  claude: {
+    accounts: [{ id: 'acct_ana', email: 'ana@example.com' }],
+    activeAccountId: 'acct_ana'
+  },
+  codex: { accounts: [{ id: 'acct_bo', email: 'bo@example.com' }], activeAccountId: null },
+  rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
+}
+
 function fakeClient(state: unknown, run: { id: string } | null = { id: 'run_1' }) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
@@ -28,6 +37,7 @@ function fakeClient(state: unknown, run: { id: string } | null = { id: 'run_1' }
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] },
     'orchestration.runCurrent': { run },
+    'accounts.snapshot': ACCOUNTS,
     'orchestration.runCreate': { run: { id: 'run_new', objective: 'x' } },
     'orchestration.taskCreate': { task: { id: 'task_1', status: 'ready' } },
     'orchestration.workerStart': {
@@ -205,5 +215,102 @@ describe('orca game launch', () => {
     expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
       expect.objectContaining({ worktree: 'new-top-level', repo: 'name:cineco-frontend' })
     )
+  })
+
+  it('runs the member on another agent, model and effort for this launch only', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        lead: { autostart: false, cap: 2, agent: 'claude', model: 'opus', effort: 'max' }
+      })
+    )
+
+    await launch(client, 'CIN-12', [
+      ['agent', 'codex'],
+      ['model', 'gpt-5.5'],
+      ['effort', 'high']
+    ])
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ agent: 'codex', model: 'gpt-5.5', effort: 'high' })
+    )
+  })
+
+  it("never hands another agent the lead's model", async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        lead: { autostart: false, cap: 2, agent: 'claude', model: 'opus', effort: 'max' }
+      })
+    )
+
+    await launch(client, 'CIN-12', [['agent', 'codex']])
+
+    const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    expect(start).toEqual(expect.objectContaining({ agent: 'codex' }))
+    expect(start).not.toHaveProperty('model')
+    expect(start).not.toHaveProperty('effort')
+  })
+
+  it('refuses an agent Orca does not know and a malformed model before any call', async () => {
+    const cases: [[string, string], RegExp][] = [
+      [['agent', 'cobol'], /Unknown agent "cobol"/],
+      [['model', 'not a model!'], /--model must be a provider model id/]
+    ]
+    for (const [flag, refusal] of cases) {
+      const { client, calls } = fakeClient(stateWith())
+
+      await expect(launch(client, 'CIN-12', [flag])).rejects.toThrow(refusal)
+      expect(calls).toEqual([])
+    }
+  })
+
+  it('refuses an effort when neither the flags nor the lead name a model', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await expect(launch(client, 'CIN-12', [['effort', 'high']])).rejects.toThrow(
+      /--effort needs a model/
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
+  it('pins a Claude member to the named account by email or id', async () => {
+    for (const selector of ['ANA@example.com', 'acct_ana']) {
+      const { client, calls } = fakeClient(stateWith())
+
+      await launch(client, 'CIN-12', [['account', selector]])
+
+      expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+        expect.objectContaining({ agent: 'claude', claudeAccountId: 'acct_ana' })
+      )
+    }
+  })
+
+  it('pins a Codex member to a Codex account', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client, 'CIN-12', [
+      ['agent', 'codex'],
+      ['account', 'bo@example.com']
+    ])
+
+    const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    expect(start).toEqual(expect.objectContaining({ agent: 'codex', codexAccountId: 'acct_bo' }))
+    expect(start).not.toHaveProperty('claudeAccountId')
+  })
+
+  it("refuses another provider's account, and an account for an agent with none", async () => {
+    const codexForClaude = fakeClient(stateWith())
+    await expect(
+      launch(codexForClaude.client, 'CIN-12', [['account', 'bo@example.com']])
+    ).rejects.toThrow(/bo@example.com is a Codex account; a claude member needs a Claude account/)
+    expect(codexForClaude.calls.map(([method]) => method)).not.toContain('orchestration.taskCreate')
+
+    const gemini = fakeClient(stateWith())
+    await expect(
+      launch(gemini.client, 'CIN-12', [
+        ['agent', 'gemini'],
+        ['account', 'ana@example.com']
+      ])
+    ).rejects.toThrow(/gemini has no Orca-managed accounts/)
+    expect(gemini.calls.map(([method]) => method)).toEqual(['game.state'])
   })
 })

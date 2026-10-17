@@ -1,6 +1,13 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
 
+const GAME_LAUNCH_OVERRIDE_FLAGS = ['agent', 'account', 'model', 'effort'] as const
+
+const GAME_LAUNCH_OVERRIDE_NOTES = [
+  "--agent, --model and --effort override the lead config for this member; another agent than the lead's gets its own default model unless --model is given. --effort needs a model.",
+  "--account (email or id from `orca game accounts`) pins a claude or codex member to that managed account; another provider's account, or an agent with no managed accounts, is refused."
+]
+
 export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'state'],
@@ -35,20 +42,23 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own child worktree, as this project's lead",
-    usage: 'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo', 'prompt'],
+    usage:
+      'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo', 'prompt', ...GAME_LAUNCH_OVERRIDE_FLAGS],
     positionalArgs: ['ticket'],
     notes: [
       'Run it from the lead terminal: the member reports to it through Orca orchestration.',
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
       "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
-      '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.'
+      '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.',
+      ...GAME_LAUNCH_OVERRIDE_NOTES
     ],
     examples: [
       'orca game launch CIN-1232 --json',
       'orca game launch CIN-1232 --prompt "Run the Tambora test run of {id} and report pass/fail"',
-      'orca game launch CIN-1232 --repo name:cineco-frontend --json'
+      'orca game launch CIN-1232 --repo name:cineco-frontend --json',
+      'orca game launch CIN-1232 --agent codex --account ana@example.com'
     ]
   },
   {
@@ -65,13 +75,15 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
-    usage: 'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--dry-run] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'repo', 'dry-run'],
+    usage:
+      'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'repo', 'dry-run', ...GAME_LAUNCH_OVERRIDE_FLAGS],
     positionalArgs: ['tickets'],
     notes: [
       'Without tickets, picks the To Do items in list order, skipping tickets a member already holds.',
       'Each launch goes through `orca game launch`; tickets past the cap are skipped, never launched.',
-      '--dry-run prints the plan without launching anything.'
+      '--dry-run prints the plan without launching anything.',
+      '--agent, --account, --model and --effort apply to every member the wave launches.'
     ],
     examples: ['orca game wave --dry-run', 'orca game wave CIN-12,CIN-14 --json']
   },

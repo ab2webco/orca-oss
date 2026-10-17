@@ -5,6 +5,12 @@ import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestr
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
 import {
+  gameAccountPinOf,
+  gameLaunchChoiceOf,
+  parseGameLaunchFlags,
+  type GameLaunchFlags
+} from './orchestrator-game-launch-options'
+import {
   GAME_PROMPT_MAX,
   GAME_WORK_PROMPT_PLACEHOLDERS,
   unknownPlaceholderOf
@@ -104,13 +110,17 @@ export async function launchGameMember(args: {
   cwd: string
   /** Replaces the project's launchPrompt for this member. */
   prompt?: string | null
+  /** --agent, --model, --effort and --account, over the lead config. */
+  overrides?: GameLaunchFlags
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
+  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const title = item ? `${item.id} ${item.title}`.slice(0, DISPLAY_NAME_MAX) : ticket
+  const accountPin = await gameAccountPinOf(client, choice)
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
-  if (lead.model) {
+  if (choice.model) {
     await requireLaunchPreferences(client)
   }
   const project = state.worktree?.displayName ?? 'this project'
@@ -135,8 +145,9 @@ export async function launchGameMember(args: {
     ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
     name: ticket.toLowerCase(),
     displayName: title,
-    agent: lead.agent,
-    ...(lead.model ? { model: lead.model, effort: lead.effort } : {}),
+    agent: choice.agent,
+    ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
+    ...accountPin,
     run: runId,
     from,
     devMode: isDevCliInvocation()
@@ -151,9 +162,11 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
   'game launch': async ({ flags, client, cwd, json }) => {
     const ticket = requiredTicket(flags)
     const prompt = taskPromptOf(flags)
+    const overrides = parseGameLaunchFlags(flags)
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const response = await readCallerGameState(client)
+    gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
     const { cap, running } = gameFleetReportOf(response.result)
     if (running >= cap) {
       throw new RuntimeClientError(
@@ -168,7 +181,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       repo,
       flags,
       cwd,
-      prompt
+      prompt,
+      overrides
     })
     if (launched.state !== 'ready') {
       process.exitCode = 1

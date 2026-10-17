@@ -12,6 +12,8 @@ import {
   type SweepClose
 } from './orchestrator-game-fleet-format'
 import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
+import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
 import {
   gameFleetReportOf,
@@ -102,8 +104,10 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const dryRun = flags.get('dry-run') === true
+    const overrides = parseGameLaunchFlags(flags)
     const response = await readCallerGameState(client)
     const state = response.result
+    gameLaunchChoiceOf(overrides, state.lead ?? DEFAULT_GAME_LEAD)
     const { cap, free } = gameFleetReportOf(state)
     const wave: GameWaveResult = {
       dryRun,
@@ -115,7 +119,15 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     }
     for (const ticket of dryRun ? [] : wave.launch) {
       try {
-        const launched = await launchGameMember({ client, state, ticket, repo, flags, cwd })
+        const launched = await launchGameMember({
+          client,
+          state,
+          ticket,
+          repo,
+          flags,
+          cwd,
+          overrides
+        })
         wave.launched.push(launched)
         if (launched.state !== 'ready') {
           process.exitCode = 1
