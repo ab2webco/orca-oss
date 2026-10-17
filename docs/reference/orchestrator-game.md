@@ -347,6 +347,18 @@ The lead's verbs, run from the lead's terminal
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
   `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
   `orchestration worker-start --on` refuses account pins because the server resolves its own).
+  - A member started with a model or an effort — from these flags or from the lead's
+    `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
+    agent's process env, so a model router outside Orca (Jev) leaves that choice alone. The same
+    holds for every agent and every launch that asks for a model or effort
+    (`orchestration worker-start --model/--effort`, a model picked in the composer): Orca sets a pin
+    only for a value it was asked for and applied, never for a catalog default it filled in (Codex's
+    effort) nor for one the user's own agent arguments override
+    ([`agent-launch-pin-env.ts`](../../src/shared/agent-launch-pin-env.ts)). The env rides the same
+    channel as Settings' per-agent env, so it reaches an SSH member's remote process too; a resumed
+    session is not re-pinned, since Orca does not replay launch-time model flags on resume. With
+    `worker-start --on`, the connected server builds the launch, so it pins only from a version
+    that has this.
 - `orca game fleet` — each member's ticket, state, PR, CI, branch, agent, account, phase
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
