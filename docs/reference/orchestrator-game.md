@@ -669,7 +669,11 @@ On top of that hd adds:
   top and bottom rows (the characters are spared both); dust by day, fireflies at night, snow in
   Night Watch, glitter in Crystal Saga and embers over the campfire the hero rests by.
 - **Motion**: a four-frame walk with a body bob, breathing at rest, and the party following the hero
-  (or sitting by the fire), each member's outline tinted with its state colour (darkened to the same
+  (or sitting by the fire). Walking, the pet goes right behind the hero and the party behind the
+  pet, always on the hero's left since no figure is mirrored, and the hero's path starts where all
+  of them fit; a narrow stage closes the party up (down to 8 columns apart, then without the
+  hero's prop) and draws only the teammates that fit whole
+  ([`hd-party.ts`](../../resources/claude-plugins/orca-game/hooks/hd-party.ts)). Each member's outline tinted with its state colour (darkened to the same
   ink, so it never glows) with a pulsing `!` over the one
   waiting on you. A member that joins walks in from the right edge; one that leaves walks off; the
   first refresh marches nobody.
@@ -704,10 +708,11 @@ silhouettes by size and scroll step; outlined sprites by costume and frame. The 
 buffers are reused per size, and a tick that draws the frame a Raster already shows sends nothing
 ([`frame-gate.ts`](../../resources/claude-plugins/orca-game/hooks/frame-gate.ts)).
 
-`pnpm run capture:orca-game-scenes -- [--out <dir>] [--scene-file <json>]`
+`pnpm run capture:orca-game-scenes -- [--out <dir>] [--scene-file <json>] [--phases <all|a,b>]`
 ([`orca-game-scene-captures.mjs`](../../config/scripts/orca-game-scene-captures.mjs)) renders every
 built-in scene, and a scene file, in classic and hd, day and night, at 130 and 60 columns to PNGs
-through Playwright. They draw the cells the mod hands its Raster in a browser: not terminal
+through Playwright, with one labelled sheet per scene and phase. A scene file is drawn in every
+phase and the built-ins in `build`, unless `--phases` names others. They draw the cells the mod hands its Raster in a browser: not terminal
 screenshots, since a terminal's font and gamma differ.
 
 ## A project's own scene file
@@ -802,6 +807,8 @@ same block in a project's scene file, a plugin's scene and a built-in one.
 
 - **Sprites.** A frame is 1 to 7 rows of one width from 1 to 10 printable ASCII glyphs, standing on
   the ground; `.` is transparent and every other glyph needs a color (`#rrggbb` or an integer).
+  Frames are drawn as written, never mirrored: the pet faces right like the hero it follows, the
+  advisor left, toward the lead.
   Every frame of one member, `happy` and each gesture body included, is the size of the first.
   Names follow the card rules (a string or one per language, at most 32 characters).
 - **A bad member is left out, not the scene.** Orca drops only the invalid `pet` or `advisor` and
@@ -809,7 +816,8 @@ same block in a project's scene file, a plugin's scene and a built-in one.
   `game scene <id>: …; drawn without it` for a plugin scene), so a typo never takes the scene and
   its hero away. `orca game scene validate` lists those problems like any other. A gesture key the
   game does not know is ignored, so a scene written for a newer game still loads.
-- **The pet** walks behind the hero along its path and sits beside it when the hero rests. The
+- **The pet** walks behind the hero (classic: along its path a few steps back; hd: right behind it,
+  ahead of the party) and sits beside it when the hero rests. The
   button reads `♥ Pet <name>` (Spanish `♥ Mimar a <name>`), or `♥ Pet` (`♥ Mimar`) when the pet or
   the scene has no name, in the band and the Panel (`p`). Pet shows its `happy` frame, makes it hop
   and sprinkles the hearts on it; the hero stays on the ground. A scene with no pet hearts the hero,

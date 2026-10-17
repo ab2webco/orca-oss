@@ -1,6 +1,6 @@
 import { ADVISOR_PROP_WIDTH, advisorPropPixel } from './advisor-art'
 import { frameSpriteOf, hdSpritePixel, type HdSprite } from './hd-sprite'
-import { advisorFrameOf, PET_TRAIL_TICKS, petFrameOf, type AdvisorPose } from './scene-cast'
+import { advisorFrameOf, petFrameOf, type AdvisorPose } from './scene-cast'
 import type { ScenePet } from './scenes/index'
 import { GROUND } from './scenery'
 
@@ -22,26 +22,21 @@ export const hdStageOf = (
         columns - ((pose.sprite.frames[0]?.[0]?.length ?? 0) + 2) - ADVISOR_PROP_WIDTH - 1
       )
 
-/** The pet on the hero's path a few ticks behind, or sitting just left of the resting hero. */
+/** The pet right behind the walking hero, ahead of the party, or sitting just left of the resting hero. */
 export const hdPetOf = (args: {
   pet: ScenePet
-  walkOf: (tick: number) => number
   tick: number
   isResting: boolean
   isPetted: boolean
-  restLeft: number
+  heroLeft: number
   heroWidth: number
   ground: number
   lift: number
 }): PlacedCast => {
   const frame = petFrameOf(args.pet, args.tick, args.isResting, args.isPetted)
   const sprite = frameSpriteOf(frame, args.pet.colors)
-  const behind = args.restLeft - sprite.width
-  const left = args.isResting
-    ? behind >= 0
-      ? behind
-      : args.restLeft + args.heroWidth
-    : args.walkOf(Math.max(0, args.tick - PET_TRAIL_TICKS))
+  const behind = args.heroLeft - sprite.width
+  const left = args.isResting ? (behind >= 0 ? behind : args.heroLeft + args.heroWidth) : behind - 1
   return { sprite, left, top: args.ground - sprite.rows.length + 1 - args.lift }
 }
 

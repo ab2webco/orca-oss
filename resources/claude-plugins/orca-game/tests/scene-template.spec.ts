@@ -8,9 +8,16 @@ import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-
 
 // Why: Orca's CLI ships a copy of Quest it cannot import from here; this fails when they drift.
 describe('the scene template `orca game scene new` writes', () => {
-  it('is the built-in Quest with its hud palette, and the game draws it as Orca parses it', () => {
+  it('is the built-in Quest with its hud palette plus example extras, drawn as Orca parses it', () => {
     const parsed = parseOrchestratorGameScene(ORCHESTRATOR_GAME_SCENE_TEMPLATE, 'quest')
-    expect(parsed.ok ? parsed.definition : parsed.error).toEqual({ ...QUEST_SCENE, hud: QUEST_HUD })
+    const definition = parsed.ok ? parsed.definition : undefined
+    // Why: Quest has no foe, finale or pet; the template adds one of each to show their shape.
+    const { foe, finale, cast, ...quest } = definition ?? QUEST_SCENE
+    expect([foe, finale, cast?.pet].every((extra) => extra !== undefined)).toBe(true)
+    expect({ ...quest, cast: { advisor: cast?.advisor } }).toEqual({
+      ...QUEST_SCENE,
+      hud: QUEST_HUD
+    })
     expect(sceneDefinitionOf(JSON.parse(ORCHESTRATOR_GAME_SCENE_TEMPLATE), 'quest')).toEqual(
       parsed.ok ? parsed.definition : undefined
     )

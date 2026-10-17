@@ -188,7 +188,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['game', 'scene', 'new'],
-    summary: 'Start a project scene file from the built-in Quest scene',
+    summary: 'Start a project scene file: Quest with an example foe, finale and pet',
     usage: 'orca game scene new <path> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'path'],
     positionalArgs: ['path'],

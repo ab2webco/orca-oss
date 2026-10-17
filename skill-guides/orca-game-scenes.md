@@ -27,7 +27,9 @@ Do not hand back a scene until `orca game scene validate` says it is valid.
 Run every step; skipping validation is the usual way scenes ship broken.
 
 1. **Start from the template**, never from a blank file. It is the built-in Quest with every
-   required block filled in, plus its team-band palette:
+   required block filled in, its team-band palette (`hud`) and its advisor (a wizard), plus an
+   example of each optional block Quest lacks: a `foe` (a goblin), a `finale` and a `cast.pet`
+   (a fox). Replace them all; none of them is meant to stay:
 
    ```text
    orca game scene new .orca/scenes/<name>.json
@@ -35,6 +37,8 @@ Run every step; skipping validation is the usual way scenes ship broken.
 
    It refuses to overwrite an existing file. Keep scenes under `.orca/scenes/` so Settings
    and `orca game scene list` find them. `<name>` is lowercase with dashes (`mario-bros`).
+   `orca game --help`, `orca game scene --help` and `orca game scene new --help` list the
+   commands and their flags.
 
 2. **Edit the JSON** following the format below. Change one block at a time.
 
@@ -71,12 +75,55 @@ Run every step; skipping validation is the usual way scenes ship broken.
    from them, so a costume whose colors are all pale gets a pale outline. `/quest render classic`
    returns (or set `orchestratorGame.render` for the project).
 
-6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed.
-   A private scene (licensed characters, personal jokes) stays uncommitted: add `.orca/` to
-   `.git/info/exclude`, not to `.gitignore`, so nothing about it reaches the repo.
+6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed. For a
+   private scene (licensed characters, personal jokes) see [Private scenes](#private-scenes).
 
 `orca game scene list` shows the built-in scene ids and every file in `.orca/scenes/` with
 its status, from any folder of the project.
+
+## Private scenes
+
+`sceneFile` is always a path inside the worktree: Orca refuses an absolute path, a `..` part and
+a link that resolves outside the worktree, and global Settings never takes a `sceneFile`. These
+are the only ways to keep a scene out of the repo:
+
+- **An uncommitted file in the worktree.** Keep it in `.orca/scenes/` and add the line
+  `.orca/scenes/<name>.json` (or `.orca/`) to `.git/info/exclude`, not to `.gitignore`, so
+  nothing about it is committed (in a linked worktree `.git` is a file: the exclude file is
+  `$(git rev-parse --git-common-dir)/info/exclude`, shared by every worktree). Select it in
+  project Settings (this machine only), not in `orca.yaml`, which is committed. The file lives only in that checkout: each worktree reads its
+  own copy, so a child worktree (`orca game launch`) or a fresh clone draws Quest until it gets
+  one. A folder workspace has no `.git`; just never share the file.
+- **A personal plugin outside the project.** A folder with an `orca-plugin.json` whose
+  `contributes.gameScenes` lists the scene (`{ "id": "<scene>", "path": "scenes/<scene>.json" }`),
+  added under Settings → Plugins (the plugin system must be on); add the folder under
+  **Development** to have edits picked up without reinstalling. Select it as
+  `<publisher>.<id>/<scene>` in the **Scene** list of Settings → Agents → **Agent Teams game**
+  (every project) or of Settings → the project → **Agent Teams game** (that project), where it is
+  listed under the plugin's name. It follows you into every project and worktree on this machine
+  and never touches a repo. See `docs/reference/plugin-development.md` (Game scenes) for the manifest.
+
+`orca game scene validate` takes any path, so validate a plugin's scene file the same way.
+
+## Looking at it without a pane
+
+`/quest demo` in a Claude Agent Teams pane is the real check. Without a pane, an Orca **source
+checkout** (with its dependencies and Playwright's Chromium installed) renders a scene file to
+PNGs:
+
+```text
+pnpm run capture:orca-game-scenes -- --scene-file /abs/path/<name>.json --out /tmp/<name>-captures
+```
+
+- Every phase of the file is drawn, in classic and in hd by day and by night, at 130 and 60
+  columns, with the advisor, the hero at a fixed step and, in hd, a two-member party:
+  `scene-file-<phase>-classic-130.png`, `scene-file-<phase>-hd-day-60.png`… and one sheet per
+  phase, `sheet-scene-file-<phase>.png`, with its six captures labelled. Look at the sheets.
+- `--phases build,pr` (or `all`) limits or widens the phases; the built-in scenes, drawn too for
+  comparison, default to `build`. The Panel's advisor and member cards land in `sheet-cards.png`
+  and `sheet-members.png`; `index.txt` lists every file.
+- They are the cells the game hands the terminal, painted in a browser: a terminal's font and
+  gamma differ, so confirm in a pane before you report.
 
 ## Format
 
@@ -165,15 +212,22 @@ The file must be at most 64 KB.
 }
 ```
 
-- Exactly **6** `rows` and **2** `legs`; every row is exactly **10** characters of printable
-  ASCII (`!` to `~`). No spaces, no accents, no emoji: count the characters of each row.
+- The figure is **10 wide by 7 tall**: 6 `rows` of body, then one legs row. `legs` holds the
+  **2 frames** of that seventh row, which alternate while the character walks; make them differ
+  slightly. Every row is exactly **10** characters of printable ASCII (`!` to `~`). No spaces,
+  no accents, no emoji: count the characters of each row.
 - `.` is transparent. Every other glyph used in `rows` or `legs` needs an entry in `colors`
   (one ASCII character as key, `.` not allowed as a key).
-- The two `legs` rows alternate while the character walks; make them differ slightly.
-- Draw the head in the top rows and keep the figure inside the 10×8 box; the game adds the
-  walk, the blink and the reactions.
-- `foe` uses the same shape. It shows on a teammate whose CI is red, in turns with its own
-  costume, and on its tile.
+- A resting or idle figure sits: the legs row is dropped and the body moves down one row, so
+  the 6 body rows must read on their own. hd draws the same 10×7 with a 1-pixel outline (12×9).
+- Draw the head in the top rows; the game adds the walk, the blink and the reactions.
+- **Facing.** Nothing is mirrored when a figure walks back: every costume is drawn exactly as
+  written, everywhere. The hero faces **right** (its prop is drawn on its right, the pet and
+  the party walk on its left), so draw every costume facing right.
+- `foe` uses the same shape and also faces right as written. It shows on a teammate whose CI is
+  red: on the band it replaces that teammate's costume in turns, **as written**; on the
+  teammate's Panel tile it stands at the right, **mirrored** (it faces left, toward the
+  teammate). Draw it once, facing right; the tile flips it.
 
 ### `cards.<phase>` and `teller`
 
@@ -250,7 +304,8 @@ CJK characters and emoji are refused. A plain string or per-language object.
 }
 ```
 
-- `pet` walks behind the lead and is what **♥ Pet** hearts; its `name` labels the button
+- `pet` walks behind the lead (in hd right behind it, the party behind the pet) and is what
+  **♥ Pet** hearts; its `name` labels the button
   (`♥ Pet Wolf`). Without a pet, Pet hearts the lead's own character, so a scene whose lead is
   not Clawd (a licensed hero, a mascot) should bring one. `frames` are 1 to 4 walking frames,
   `happy` the frame shown while petted.
@@ -262,7 +317,9 @@ CJK characters and emoji are refused. A plain string or per-language object.
   `ciFailed`). Without an advisor the game draws a referee.
 - A frame is 1 to 7 rows, every row the same width, 1 to 10 printable ASCII glyphs; every
   frame of one member is the size of the first. `.` is transparent; every other glyph needs a
-  color. Draw them facing left, toward the lead.
+  color. Frames are drawn as written, never mirrored: draw the **pet facing right**, the way
+  the hero walks (it follows on the hero's left), and the **advisor facing left**, toward the
+  lead (it stands at the right edge and holds its props out on its left).
 - An invalid `pet` or `advisor` is left out with a warning and the rest of the scene still
   draws, but `validate` reports it: fix it before you report.
 
@@ -294,5 +351,9 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
   `cast` pet whenever the lead is not Clawd, or Pet hearts the lead.
 - Give every costume, pet and advisor one dark color (eyes, hair, boots): hd inks its outline
   from it, and without one the figure blurs into a light sky.
+- In hd a narrow pane closes the party up behind the hero, and only the teammates that fit whole
+  are drawn: at 60 columns with an advisor, usually two walking (with a pet) and one sitting by
+  the fire. That is the layout, not your scene.
 - Before reporting, validate, then look at it with `/quest demo` in a pane, in classic and in
-  `/quest render hd`, and describe what you saw. A file that validates can still be ugly; the check is looking at it.
+  `/quest render hd` (or, without a pane, at the [captures](#looking-at-it-without-a-pane)),
+  and describe what you saw. A file that validates can still be ugly; the check is looking at it.

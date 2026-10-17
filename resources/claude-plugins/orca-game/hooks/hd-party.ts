@@ -61,7 +61,33 @@ export type PlacedMember = {
   sprite: HdSprite
 }
 
-/** Each shown teammate's sprite and where it stands this tick. */
+// Below this a teammate hides more than half of the one in front of it.
+const MIN_PITCH = 8
+
+/** The walking party behind the hero: how many teammates fit, their pitch, and the columns they take. */
+export const hdTrailOf = (args: {
+  stage: number
+  count: number
+  petWidth: number
+  spriteWidth: number
+  slack: number
+}): { shown: number; pitch: number; trail: number } => {
+  const { stage, spriteWidth } = args
+  const petGap = args.petWidth === 0 ? 0 : args.petWidth + 1
+  // Why two rooms: the hero keeps its walk and prop while they fit, and gives them up before a teammate.
+  const rooms = [stage - spriteWidth - args.slack - 1, stage - spriteWidth - 1]
+  for (let shown = Math.min(args.count, MAX_SHOWN); shown > 0; shown -= 1) {
+    for (const room of rooms) {
+      const pitch = Math.min(spriteWidth - 1, Math.floor((room - petGap) / shown))
+      if (pitch >= MIN_PITCH) {
+        return { shown, pitch, trail: petGap + shown * pitch }
+      }
+    }
+  }
+  return { shown: 0, pitch: spriteWidth - 1, trail: petGap }
+}
+
+/** Each shown teammate's sprite and where it stands this tick: walking, always left of `walk`. */
 export const placedPartyOf = (args: {
   scene: SceneDefinition
   party: readonly HdMember[]
@@ -71,18 +97,19 @@ export const placedPartyOf = (args: {
   ground: number
   tick: number
   walk: number
-  heading: number
+  pitch: number
+  shown: number
   isResting: boolean
   fireRight: number
   spriteWidth: number
 }): PlacedMember[] => {
   const { columns, ground, tick, spriteWidth } = args
-  return [...args.party.slice(0, MAX_SHOWN), ...args.leavers]
+  return [...args.party.slice(0, args.shown), ...args.leavers]
     .slice(0, MAX_SHOWN + 2)
     .map((member, i) => {
       const home = args.isResting
         ? args.fireRight + 1 + i * (spriteWidth - 1)
-        : args.walk - args.heading * (i + 1) * (spriteWidth - 1)
+        : args.walk - (i + 1) * args.pitch
       const left = home + marchShiftOf(args.marches.get(member.key), tick, columns - home)
       const isSitting = args.isResting || member.state === 'idle'
       const sprite = costumeSpriteOf(
