@@ -182,6 +182,12 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   `{ provider, total, url, items }` or `null`; `items` holds the first 5 as
   `{ id, title, url, status?, tone? }` and `url` opens the full list. `tracker: false` leaves
   it out.
+- `stopped` (optional) — the project's persistent STOP as `{ since, by }`, or `null` when it is
+  clear; one whose state cannot be read is `{ since: null, by: null, unreadable: true }` and counts
+  as set (see [The shared board](#the-shared-board-events-stop-and-inboxes)). A host older than it
+  sends none. The mod does not draw it yet.
+- `inboxes` (optional, the lead only) — `{ key, unread, last }` per inbox, the lead's (`key: lead`)
+  first, then each ticket's, at most 20; `last` is `{ at, from, subject }` or `null`.
 
 A provider that is offline or unauthenticated only drops its own field. `links` and `activity`
 are new optional fields: a mod built before them reads the state exactly as before, and this mod
@@ -279,7 +285,8 @@ orchestratorGame:
 - **Prompts** may use the link placeholders; one with no value in this worktree is left out.
 - **Lead buttons.** The lead also gets Orca's own five first: Wave, Status, Push, Sweep and Stop
   (`/wave`, `/status`, `/push`, `/sweep`, `/stop`), each a prompt asking it to run the matching
-  `orca game` verb ([`orchestrator-game-lead-actions.ts`](../../src/shared/orchestrator-game-lead-actions.ts)).
+  `orca game` verb ([`orchestrator-game-lead-actions.ts`](../../src/shared/orchestrator-game-lead-actions.ts));
+  Stop runs `game stop --all --hold`, so it also holds the project's STOP.
   A member gets none. `orchestratorGame.orchestrator.actions: false` turns them off; a project
   action whose command a lead button already uses keeps its button without the command.
 - **Where they show.** The band draws one chip row (`▸ Ola`, `▸ Estado`… in the session language;
@@ -406,8 +413,13 @@ The lead's verbs, run from the lead's terminal
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
-  reported stopped, already stopped or failed; the lead and the worktrees are never touched. The
-  lead's rules tell it to run `game stop --all` at once when the person says stop.
+  reported stopped, already stopped or failed; the lead and the worktrees are never touched.
+  `--all --hold` first sets the project's persistent STOP, then stops every member; the lead's rules
+  tell it to run that at once when the person stops everyone ("detén todo y que no sigan").
+- `orca game resume` — clears STOP, only when the person says so; it relaunches nothing.
+- `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` and
+  `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
+  have it read events and inbox before answering "qué pasó".
 
 ### Accounts and limited members
 
@@ -438,6 +450,73 @@ next step, `game push` leaves it alone, and the Panel card turns red with `limit
 `codex · ana@…` tag: the email's domain never shows, and the name shortens, then drops, as the card
 narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
 its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
+
+## The shared board: events, STOP and inboxes
+
+What one member did or asked outlives its tab and its account, so the lead can answer from it
+after a restart. Everything here lives on the Orca host that runs the lead, per project (the lead
+worktree's repo, so SSH and folder projects too); a member's calls land on its lead's project even
+when it works in another repo (`--repo`), since the host resolves it through the member's dispatch
+([`orchestrator-game-board.ts`](../../src/main/runtime/orchestrator-game-board.ts)).
+
+**Events** — an append-only record, kept in the same per-project file as `game history`
+(`orchestrator-game-history/`), the last 500
+([`orchestrator-game-events.ts`](../../src/shared/orchestrator-game-events.ts)). Each event is
+`{ at, kind, ticket, text, by }`, with `kind` one of `claimed`, `pr_opened`, `merged`, `qa_handoff`,
+`question_parked`, `failed`, `stopped`, `resumed`, and `by` `lead` or the member's ticket.
+
+- `game launch` (and each launch of `game wave`) posts `claimed` once the member started.
+- `game fleet` and `game sweep` post `merged` for a member whose PR is merged and `qa_handoff` for
+  one whose ticket is in review. Each carries a key (`merged CIN-1 #41`), and the board keeps one
+  event per key, so running them on every turn posts each once (while the key is among the last 500).
+- `game stop --hold` and `game resume` post `stopped` and `resumed` when they change STOP.
+- A member posts its own with `orca game event pr_opened --text "PR #41"`; it always posts under its
+  own ticket, whatever `--ticket` says. A project asks its members for `question_parked` and
+  `failed` in its `launchPrompt`.
+- A post never fails the command that makes it: an Orca without events just keeps none.
+
+**STOP** — one file per project in `orchestrator-game-stop/`, apart from the history so a damaged
+history never reads as STOP ([`orchestrator-game-stop-switch.ts`](../../src/main/runtime/orchestrator-game-stop-switch.ts)).
+
+- While it is set, `game launch`, `game wave`, `game push` and `game move` are refused before they
+  touch anything, with when and by whom it was set. A wave reads it again before each launch, so a
+  STOP set mid-wave leaves the rest unlaunched.
+- It fails closed: a file that exists but cannot be read or parsed, or a STOP read that fails during
+  a wave, counts as set. Only a missing file is clear.
+- Only the lead sets or clears it; a member's attempt is refused, and the lead is never refused,
+  since it is where STOP is cleared. `game resume` reports STOP as still set when the file cannot
+  be removed.
+- `game stop --all --hold` sets STOP first, then stops every member. A member the stop could not
+  end gets an urgent `STOP` orchestration message. If STOP cannot be set (an older Orca, a write
+  error), the members are stopped anyway and the result says why, with exit code 1.
+- **What Orca does not enforce.** Members are not refused tool calls. Orca's managed hook is
+  fire-and-forget: it never reads the hook server's reply, exits 0 on any failure, and on SSH and
+  WSL the relay forwards events one way only, so a PreToolUse refusal would need a new blocking
+  hook endpoint, a member-only `--settings` launch hook, and relay changes, and it would still
+  fail open whenever the hook cannot reach Orca. Stopping the member's agent (`game stop`) is what
+  actually ends its work; STOP keeps the lead from starting or pushing another.
+
+**Inboxes** — Orca orchestration mail already outlives a member: messages live in the host's
+`orchestration.db` and are never deleted when a terminal closes, a dispatch is stopped or released,
+or the app restarts. `game inbox` reads it by party instead of by terminal handle
+([`orchestrator-game-inbox.ts`](../../src/shared/orchestrator-game-inbox.ts),
+[`orchestrator-game-inbox-source.ts`](../../src/main/runtime/orchestrator-game-inbox-source.ts)):
+
+- The lead's inbox is its terminal plus its current run's mailbox (`run:<id>`, where `worker_done`
+  lands); a ticket's is every terminal and `dispatch:<id>` mailbox its members had in the lead's
+  current run, closed ones included. The ticket comes from each task's title. Newest first, the last
+  50; older mail stays in `orca orchestration inbox`.
+- A message is unread until the agent it went to read it (`orchestration check`) or the board's own
+  read cursor passed it. `--mark-read` moves that cursor and never marks orchestration mail read, so
+  the lead's `orchestration check --wait` still gets every message.
+- A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
+  a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
+- `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
+
+**Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,
+`game.eventPost`, `game.stopSwitch` and `game.inbox`, and the optional `stopped` and `inboxes` fields
+of `game.state`. A CLI against an older host says to update Orca for `events`, `event`, `inbox` and
+`resume`; launches and sweeps there post nothing and see no STOP, since that host cannot hold one.
 
 ## Built-in scenes
 
