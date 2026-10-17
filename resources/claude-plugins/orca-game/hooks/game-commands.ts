@@ -33,7 +33,8 @@ export const gameCommandOf = (command: GameCommand, args: string): QuestCommand 
       return { error: gameStrings().text.unknownMode(asked) }
     case 'orca-game:render':
       return asked === '' ? { show: true } : questCommandOf(`render ${asked}`)
-    default:
+    case 'orca-game:quest':
+    case QUEST_ALIAS:
       return questCommandOf(args)
   }
 }
