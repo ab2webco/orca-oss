@@ -31,6 +31,10 @@ export type HdSky = {
 const gradientOf = (frame: Omit<HdSky, 'sky'>, y: number): number =>
   mix(frame.look.skyTop, frame.look.skyBottom, Math.min(1, y / Math.max(1, frame.ground - 1)))
 
+/** The sky's gradient row in this light, without the sun, clouds or stars. */
+export const skyRowOf = (frame: Omit<HdSky, 'sky' | 'cloud'>, y: number): number =>
+  skyInLight(gradientOf(frame, y), y, frame.ground, frame.light, frame.look)
+
 const isNightOf = (frame: Pick<HdSky, 'light'>): boolean => frame.light.night > 0.5
 
 // A night look keeps its own moon (or signal) after dark and shows a sun by day.
@@ -43,7 +47,7 @@ const discOf = (frame: Omit<HdSky, 'sky'>): number => {
 
 const staticSkyOf = (frame: Omit<HdSky, 'sky'>, x: number, y: number) => {
   const { look, sunX, sunY, sunR } = frame
-  const color = skyInLight(gradientOf(frame, y), y, frame.ground, frame.light, look)
+  const color = skyRowOf(frame, y)
   const light = discOf(frame)
   const isSignal = look.isSignal === true && isNightOf(frame)
   const d = Math.hypot(x - sunX, (y - sunY) * 1.05)

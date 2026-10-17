@@ -1,6 +1,6 @@
 import { actionPixel } from './action-props'
 import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
-import { dayLiftOf, landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
+import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import {
   bloomInto,
   FLASH_COLOR,
@@ -107,7 +107,6 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const light = input.light ?? (look.isNight ? MIDNIGHT : NOON)
   const frame = hdFrameOf({ look, width: columns, rows, tick, scroll: resting ? 0 : tick, light })
   const { ground, pixels } = frame
-  const dayLift = dayLiftOf(look)
   const pose = hdHeroPoseOf(tick, resting)
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
   // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
@@ -213,16 +212,13 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
         (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
       const shade = underHero ? SHADOW : underOther ? MEMBER_SHADOW : 0
       const soil = mix(hdGroundPixel(frame, x, y), 0x000000, shade)
-      return glow(x, y, landInLight(soil, frame.light, dayLift, look.isNight))
+      return glow(x, y, landInLight(soil, frame.light, frame.dayLift, look.isNight))
     }
-    const land = hdPlantPixel(frame, x, y) ?? hdMidPixel(frame, x, y) ?? hdFarPixel(frame, x, y)
-    return glow(
-      x,
-      y,
-      land === undefined
-        ? hdSkyPixel(frame, x, y)
-        : landInLight(land, frame.light, dayLift, look.isNight)
-    )
+    const plant = hdPlantPixel(frame, x, y)
+    if (plant !== undefined) {
+      return glow(x, y, landInLight(plant, frame.light, frame.dayLift, look.isNight))
+    }
+    return glow(x, y, hdMidPixel(frame, x, y) ?? hdFarPixel(frame, x, y) ?? hdSkyPixel(frame, x, y))
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)

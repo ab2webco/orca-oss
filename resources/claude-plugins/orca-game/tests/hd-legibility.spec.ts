@@ -6,6 +6,7 @@ import { lightnessOf, luminanceOf } from '../hooks/hd-lightness'
 import { costumeSpriteOf, frameSpriteOf, hdSpritePixel, type HdSprite } from '../hooks/hd-sprite'
 import { UPPER_HALF } from '../hooks/pixel-canvas'
 import { hdSceneGridOf } from '../hooks/scene-hd'
+import { hdFarPixel, hdFrameOf, hdMidPixel, hdSkyBaseOf } from '../hooks/scene-hd-land'
 import { SCENES, type SceneDefinition, type ScenePhase } from '../hooks/scenes/index'
 import { ORCHESTRATOR_GAME_SCENE_TEMPLATE } from '../../../../src/shared/orchestrator-game-scene-authoring'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
@@ -131,6 +132,55 @@ describe('hd day and night', () => {
           false,
           true
         ])
+      }
+    }
+  })
+})
+
+// Lightness (CIE L*) a far or mid layer keeps from the sky behind it, so it reads at night too.
+const LAYER_FLOOR = 8
+const WIDTH = 130
+
+describe('hd scenery against the sky', () => {
+  it('keeps the far and mid layers legibly apart from the sky in every scene, phase and light', () => {
+    for (const scene of SCENES_UNDER_TEST) {
+      for (const phase of Object.keys(scene.looks) as ScenePhase[]) {
+        for (const hour of [12, 18, 0]) {
+          const frame = hdFrameOf({
+            look: scene.looks[phase],
+            width: WIDTH,
+            rows: 9,
+            tick: 41,
+            scroll: 41,
+            light: daylightAt(hour)
+          })
+          let closest = { far: 100, mid: 100 }
+          // Why short of the sun: its glow is not the sky a layer stands against.
+          for (let x = 0; x < WIDTH - 40; x += 1) {
+            for (let y = 0; y < frame.ground; y += 1) {
+              const sky = lightnessOf(hdSkyBaseOf(frame, x, y))
+              const far = hdFarPixel(frame, x, y)
+              const mid = hdMidPixel(frame, x, y)
+              closest = {
+                far:
+                  far === undefined
+                    ? closest.far
+                    : Math.min(closest.far, Math.abs(lightnessOf(far) - sky)),
+                mid:
+                  mid === undefined
+                    ? closest.mid
+                    : Math.min(closest.mid, Math.abs(lightnessOf(mid) - sky))
+              }
+            }
+          }
+          expect([
+            scene.id,
+            phase,
+            hour,
+            closest.far >= LAYER_FLOOR,
+            closest.mid >= LAYER_FLOOR
+          ]).toEqual([scene.id, phase, hour, true, true])
+        }
       }
     }
   })

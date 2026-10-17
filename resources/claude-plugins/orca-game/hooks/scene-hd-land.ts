@@ -1,11 +1,19 @@
-import type { Daylight } from './hd-daylight'
+import { dayLiftOf, landInLight, type Daylight } from './hd-daylight'
+import {
+  accentApartFromSky,
+  apartFromSky,
+  layerContrastOf,
+  type LayerContrast
+} from './hd-layer-contrast'
+import { lightnessOf } from './hd-lightness'
 import { hash, mix, mod } from './pixel-canvas'
-import { hdSkyOf, hdSkyPixel, type HdSky } from './scene-hd-sky'
+import { hdSkyOf, hdSkyPixel, skyRowOf, type HdSky } from './scene-hd-sky'
 import type { Look } from './scenes/index'
 
 export { hdSkyBaseOf, hdSkyPixel } from './scene-hd-sky'
 
 // hd's land, back to front: far scenery fogged toward the sky, a mid layer of hills, near props, the ground.
+// Far and mid come out lit for the hour and kept legible against the sky; props and ground are lit by the caller.
 
 const GROUND_ROWS = 3
 const PLANT_EVERY = 19
@@ -19,6 +27,10 @@ export type HdFrame = HdSky & {
   scroll: number
   farTops: Float64Array
   midTops: Float64Array
+  /** The look's `dayLiftOf`. */
+  dayLift: number
+  far: LayerContrast
+  mid: LayerContrast
 }
 
 const farHeight = (look: Look, pixels: number, x: number): number => {
@@ -83,6 +95,40 @@ const silhouettesOf = (sky: HdSky, scroll: number) => {
   return made
 }
 
+type Contrasts = { dayLift: number; far: LayerContrast; mid: LayerContrast }
+
+const contrasts = new WeakMap<Look, Map<string, Contrasts>>()
+
+// Why cached: the sides and row floors change only with the size and the quantized hour.
+const contrastsOf = (sky: HdSky): Contrasts => {
+  const { look, ground, pixels, light } = sky
+  const key = `${sky.width}x${pixels}@${ground}:${light.night}:${light.dusk}`
+  const own = contrasts.get(look) ?? new Map<string, Contrasts>()
+  contrasts.set(look, own)
+  const kept = own.get(key)
+  if (kept !== undefined) {
+    return kept
+  }
+  const dayLift = dayLiftOf(look)
+  const rows = Float64Array.from({ length: ground }, (_, y) => lightnessOf(skyRowOf(sky, y)))
+  const lit = (color: number): number => landInLight(color, light, dayLift, look.isNight)
+  const middle = skyRowOf(sky, Math.floor(ground * 0.6))
+  const made = {
+    dayLift,
+    far: layerContrastOf(rows, lit(mix(look.far, middle, 0.33)), Math.floor(ground - pixels * 0.6)),
+    mid: layerContrastOf(
+      rows,
+      lit(mix(look.near, look.far, 0.35)),
+      Math.floor(ground - pixels * 0.21)
+    )
+  }
+  if (own.size >= MAX_KEPT) {
+    own.clear()
+  }
+  own.set(key, made)
+  return made
+}
+
 export const hdFrameOf = (args: {
   look: Look
   width: number
@@ -94,8 +140,11 @@ export const hdFrameOf = (args: {
   const pixels = args.rows * 2
   const sky = hdSkyOf({ ...args, pixels, ground: pixels - GROUND_ROWS })
   const tops = silhouettesOf(sky, args.scroll)
-  return { ...sky, scroll: args.scroll, farTops: tops.far, midTops: tops.mid }
+  return { ...sky, scroll: args.scroll, farTops: tops.far, midTops: tops.mid, ...contrastsOf(sky) }
 }
+
+const litOf = (frame: HdFrame, color: number): number =>
+  landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
 const skyAt = (frame: HdFrame, y: number): number =>
   mix(frame.look.skyTop, frame.look.skyBottom, Math.min(1, y / Math.max(1, frame.ground - 1)))
@@ -111,26 +160,30 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   if (y < top) {
     return undefined
   }
-  const base = mix(look.far, skyAt(frame, y), 0.42 - ((y - top) / Math.max(1, height)) * 0.18)
+  const fogged = mix(look.far, skyAt(frame, y), 0.42 - ((y - top) / Math.max(1, height)) * 0.18)
+  const base = litOf(frame, fogged)
+  const snow = litOf(frame, look.snow)
+  const layer = (color: number): number => apartFromSky(color, frame.far, y)
+  const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
   const isLitSide = farHeightAt(frame, x + 1) < height
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
       if (y - top < 1.6 && height > pixels * 0.45) {
-        return mix(look.snow, skyAt(frame, y), 0.15)
+        return accent(litOf(frame, mix(look.snow, skyAt(frame, y), 0.15)))
       }
-      return isLitSide ? mix(base, 0xffffff, 0.08) : base
+      return layer(isLitSide ? mix(base, 0xffffff, 0.08) : base)
     case 'skyline': {
       const isWindow = mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 2) === 0 && y > top + 1
       const isLit = isWindow && (hash(fx, y) + Math.floor(tick / 40)) % 3 === 0
-      return isLit ? mix(look.snow, base, 0.15) : base
+      return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
     }
     case 'crystals':
       if (y - top < 1 || (hash(fx, y) + Math.floor(tick / 8)) % 23 === 0) {
-        return mix(look.snow, base, 0.2)
+        return accent(mix(snow, base, 0.2))
       }
-      return isLitSide ? mix(base, look.snow, 0.18) : base
+      return layer(isLitSide ? mix(base, snow, 0.18) : base)
     case 'meadow':
-      return base
+      return layer(base)
   }
 }
 
@@ -141,7 +194,8 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
     return undefined
   }
   const fleck = hash(mx, y) % 7 === 0 ? 0.08 : 0
-  return mix(mix(frame.look.near, frame.look.far, 0.35), 0x000000, fleck + (y - top) * 0.03)
+  const hill = mix(mix(frame.look.near, frame.look.far, 0.35), 0x000000, fleck + (y - top) * 0.03)
+  return apartFromSky(litOf(frame, hill), frame.mid, y)
 }
 
 export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
