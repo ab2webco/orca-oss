@@ -98,9 +98,10 @@ are the only ways to keep a scene out of the repo:
   `contributes.gameScenes` lists the scene (`{ "id": "<scene>", "path": "scenes/<scene>.json" }`),
   added under Settings → Plugins (the plugin system must be on); add the folder under
   **Development** to have edits picked up without reinstalling. Select it as
-  `<publisher>.<id>/<scene>` under Settings → Agents → **Agent Teams game** → **Scene** (globally
-  or per project). It follows you into every project and worktree on this machine and never
-  touches a repo. See `docs/reference/plugin-development.md` (Game scenes) for the manifest.
+  `<publisher>.<id>/<scene>` in the **Scene** list of Settings → Agents → **Agent Teams game**
+  (every project) or of Settings → the project → **Agent Teams game** (that project), where it is
+  listed under the plugin's name. It follows you into every project and worktree on this machine
+  and never touches a repo. See `docs/reference/plugin-development.md` (Game scenes) for the manifest.
 
 `orca game scene validate` takes any path, so validate a plugin's scene file the same way.
 
@@ -351,7 +352,8 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
 - Give every costume, pet and advisor one dark color (eyes, hair, boots): hd inks its outline
   from it, and without one the figure blurs into a light sky.
 - In hd a narrow pane closes the party up behind the hero, and only the teammates that fit whole
-  are drawn (at 60 columns with a pet and an advisor, usually two). That is the layout, not your scene.
+  are drawn: at 60 columns with an advisor, usually two walking (with a pet) and one sitting by
+  the fire. That is the layout, not your scene.
 - Before reporting, validate, then look at it with `/quest demo` in a pane, in classic and in
   `/quest render hd` (or, without a pane, at the [captures](#looking-at-it-without-a-pane)),
   and describe what you saw. A file that validates can still be ugly; the check is looking at it.
