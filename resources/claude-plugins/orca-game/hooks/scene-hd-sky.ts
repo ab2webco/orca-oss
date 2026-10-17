@@ -28,7 +28,7 @@ export type HdSky = {
   sky: SkyLayer
 }
 
-const gradientOf = (frame: Omit<HdSky, 'sky'>, y: number): number =>
+const gradientOf = (frame: Pick<HdSky, 'look' | 'ground'>, y: number): number =>
   mix(frame.look.skyTop, frame.look.skyBottom, Math.min(1, y / Math.max(1, frame.ground - 1)))
 
 /** The sky's gradient row in this light, without the sun, clouds or stars. */

@@ -14,6 +14,8 @@
     "../resources/claude-plugins/orca-game/hooks/hd-cast.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-daylight.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-fx.ts",
+    "../resources/claude-plugins/orca-game/hooks/hd-layer-contrast.ts",
+    "../resources/claude-plugins/orca-game/hooks/hd-lightness.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-overlay.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-party.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-sprite.ts",
