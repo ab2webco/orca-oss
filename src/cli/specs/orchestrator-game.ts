@@ -73,6 +73,20 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game fleet', 'orca game fleet --json']
   },
   {
+    path: ['game', 'accounts'],
+    summary:
+      "List every managed account per agent with its 5h and 7d use and the lead's members on it",
+    usage: 'orca game accounts [--refresh] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'refresh'],
+    notes: [
+      'Standing: free, near (90% or more of its 5h or 7d window), limited (100%), or unknown (no usage reading yet).',
+      'usableAt is when a near or limited account is usable again; nextUsableAt is set when every account of an agent is near or limited.',
+      'Members are the tickets of this lead running on each account. autoPick says whether orchestrator.accounts: auto may pick it.',
+      '--refresh asks the providers for fresh usage first; without it Orca answers from its cached reading. No credentials are printed.'
+    ],
+    examples: ['orca game accounts', 'orca game accounts --refresh --json']
+  },
+  {
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:

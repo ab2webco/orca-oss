@@ -31,7 +31,7 @@ export type GamePushResult = {
   members: (GamePushEntry & { sent: boolean; refusedReason?: string; error?: string })[]
 }
 
-function tableOf(rows: string[][]): string {
+export function tableOf(rows: string[][]): string {
   const widths =
     rows[0]?.map((_, column) => Math.max(...rows.map((row) => row[column]?.length ?? 0))) ?? []
   return rows
