@@ -96,7 +96,8 @@ describe('orca game launch', () => {
       'terminal.show',
       'orchestration.runCurrent',
       'orchestration.taskCreate',
-      'orchestration.workerStart'
+      'orchestration.workerStart',
+      'game.eventPost'
     ])
     expect(calls[3]?.[1]).toEqual({
       spec: 'Implement CIN-12: Cartelera page',

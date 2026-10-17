@@ -11,6 +11,8 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { postGameEvents } from './orchestrator-game-board-call'
+import { refuseWhileStopped } from './orchestrator-game-hold'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
@@ -182,7 +184,7 @@ export async function launchGameMember(args: {
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
   )
-  return {
+  const launched: GameLaunchResult = {
     ticket,
     agent: choice.agent,
     ...(memberAccount.account
@@ -190,6 +192,14 @@ export async function launchGameMember(args: {
       : {}),
     ...worker.result
   }
+  await postGameEvents(client, [
+    {
+      kind: 'claimed',
+      ticket,
+      text: `member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}`
+    }
+  ])
+  return launched
 }
 
 export const formatGameLaunch = (launched: GameLaunchResult): string =>
@@ -203,6 +213,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const response = await readCallerGameState(client)
+    refuseWhileStopped(response.result, ticket)
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
     const { cap, running } = gameFleetReportOf(response.result)
     if (running >= cap) {

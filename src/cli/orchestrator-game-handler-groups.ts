@@ -44,6 +44,24 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-history.js')).ORCHESTRATOR_GAME_HISTORY_HANDLERS
   },
   {
+    name: 'orchestrator-game-events',
+    keys: ['game events', 'game event'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-events.js')).ORCHESTRATOR_GAME_EVENT_HANDLERS
+  },
+  {
+    name: 'orchestrator-game-hold',
+    keys: ['game resume'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-hold.js')).ORCHESTRATOR_GAME_HOLD_HANDLERS
+  },
+  {
+    name: 'orchestrator-game-inbox',
+    keys: ['game inbox'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-inbox.js')).ORCHESTRATOR_GAME_INBOX_HANDLERS
+  },
+  {
     name: 'orchestrator-game-scenes',
     keys: ['game scene new', 'game scene validate', 'game scene list'],
     load: async () =>

@@ -15,6 +15,7 @@ import { launchGameMember, readCallerGameState } from './orchestrator-game-launc
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
+import { formatHeldStop } from './orchestrator-game-fleet-format'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 import {
   gameFleetReportOf,
@@ -24,6 +25,15 @@ import {
   type GameSweepEntry
 } from '../../shared/orchestrator-game-fleet-verbs'
 import type { RuntimeTerminalSend } from '../../shared/runtime-types'
+import { observedGameEventsOf } from '../../shared/orchestrator-game-observed-events'
+import { postGameEvents } from './orchestrator-game-board-call'
+import {
+  holdGameStop,
+  readStopNow,
+  refuseWhileStopped,
+  tellStillRunning
+} from './orchestrator-game-hold'
+import { gameStopRefusal } from '../../shared/orchestrator-game-stop-state'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -104,6 +114,7 @@ async function closeFinished(
 export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = {
   'game fleet': async ({ client, json }) => {
     const response = await readCallerGameState(client)
+    await postGameEvents(client, observedGameEventsOf(response.result.agents))
     printResult({ ...response, result: gameFleetReportOf(response.result) }, json, formatFleet)
   },
   'game wave': async ({ flags, client, cwd, json }) => {
@@ -114,6 +125,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     const overrides = parseGameLaunchFlags(flags)
     const response = await readCallerGameState(client)
     const state = response.result
+    refuseWhileStopped(state, 'the wave')
     gameLaunchChoiceOf(overrides, state.lead ?? DEFAULT_GAME_LEAD)
     const { cap, free } = gameFleetReportOf(state)
     const wave: GameWaveResult = {
@@ -126,6 +138,13 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     }
     const launchedOnAccount = new Map<string, string[]>()
     for (const ticket of dryRun ? [] : wave.launch) {
+      // Why re-read: STOP set while this wave runs refuses every ticket not yet launched.
+      const stopped = await readStopNow(client)
+      if (stopped) {
+        wave.failed.push({ ticket, error: gameStopRefusal(stopped, ticket) })
+        process.exitCode = 1
+        continue
+      }
       try {
         const launched = await launchGameMember({
           client,
@@ -157,6 +176,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game sweep': async ({ flags, client, json }) => {
     const close = flags.get('close') === true
     const response = await readCallerGameState(client)
+    await postGameEvents(client, observedGameEventsOf(response.result.agents))
     const entries = gameSweepOf(response.result)
     const sweep: GameSweepResult = { closed: close, finished: entries }
     if (close && entries.some((entry) => entry.row.terminalHandle)) {
@@ -185,6 +205,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game push': async ({ flags, client, json }) => {
     const dryRun = flags.get('dry-run') === true
     const response = await readCallerGameState(client)
+    refuseWhileStopped(response.result, 'the push')
     const push: GamePushResult = { dryRun, members: [] }
     for (const entry of gamePushPlanOf(response.result)) {
       const handle = entry.row.terminalHandle
@@ -215,11 +236,34 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game stop': async ({ flags, client, json }) => {
     const tickets = ticketsOf(flags)
     const all = flags.get('all') === true
+    const holdFlag = flags.get('hold') === true
     if (tickets.length === 0 && !all) {
       throw new RuntimeClientError('invalid_argument', 'Name the tickets to stop, or pass --all.')
     }
+    if (holdFlag && !all) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--hold stops the whole project: pass --all, not tickets.'
+      )
+    }
     const response = await readCallerGameState(client)
+    const hold = holdFlag ? await holdGameStop(client) : null
     const stop = await stopGameMembers(client, response.result, all ? 'all' : tickets)
-    printResult({ ...response, result: stop }, json, formatStop)
+    if (!hold) {
+      printResult({ ...response, result: stop }, json, formatStop)
+      return
+    }
+    const handles = new Map(
+      gameFleetReportOf(response.result).rows.map((row) => [
+        row.ticket ?? row.name,
+        row.terminalHandle
+      ])
+    )
+    const told = await tellStillRunning(
+      client,
+      stop,
+      (ticket, name) => handles.get(ticket ?? name) ?? null
+    )
+    printResult({ ...response, result: { ...stop, hold, told } }, json, formatHeldStop)
   }
 }

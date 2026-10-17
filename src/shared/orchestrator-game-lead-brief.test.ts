@@ -25,12 +25,21 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('`orca game push`')
   })
 
-  it('stops every member at once when the person says stop, and never relaunches on its own', () => {
+  it('holds a persistent STOP when the person stops everyone, and lifts it only when told', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
-    expect(brief).toContain('stop/detener')
-    expect(brief).toContain('`orca game stop --all` at once')
+    expect(brief).toContain('"detén todo y que no sigan"')
+    expect(brief).toContain('`orca game stop --all --hold` at once')
+    expect(brief).toContain('confirm what stopped and that STOP holds')
+    expect(brief).toContain('`orca game resume` only when the person says to resume')
     expect(brief).toContain("don't relaunch or re-arm watchers until asked")
+  })
+
+  it('reads the events and inbox before saying what happened', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('"qué pasó"')
+    expect(brief).toContain('read `orca game events` and `orca game inbox` first')
   })
 
   it('reads and relays its orchestration messages when Orca says it has some, never echoing the line', () => {

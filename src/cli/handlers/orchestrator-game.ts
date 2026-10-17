@@ -4,6 +4,7 @@ import { RuntimeClientError } from '../runtime-client'
 import { DEFAULT_GAME_LEAD, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
 
 type GameLeadResult = {
   role: 'lead' | 'member'
@@ -37,6 +38,14 @@ function formatGameState(state: OrchestratorGameState): string {
     lines.push(
       `Work item: ${state.workItem.identifier} ${state.workItem.status || state.workItem.statusGroup}`
     )
+  }
+  if (state.stopped) {
+    lines.push(`${gameStopLabel(state.stopped)}: \`orca game resume\` lifts it`)
+  }
+  const [mine, ...tickets] = state.inboxes ?? []
+  if (mine) {
+    const others = tickets.filter((one) => one.unread > 0).map((one) => `${one.key} ${one.unread}`)
+    lines.push(`Inbox: ${mine.unread} unread${others.length > 0 ? `; ${others.join(', ')}` : ''}`)
   }
   return [...lines, ...state.warnings.map((warning) => `Warning: ${warning}`)].join('\n')
 }

@@ -6,7 +6,8 @@ import {
   gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
-  memberPhaseOf
+  memberPhaseOf,
+  ticketInText
 } from './orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
@@ -365,5 +366,14 @@ describe('gameStopTargetsOf', () => {
 
     expect(targets.map((target) => target.row.ticket)).toEqual(['CIN-2'])
     expect(missing).toEqual(['CIN-7'])
+  })
+})
+
+describe('ticketInText', () => {
+  it('finds the ticket a task title or branch names, or none', () => {
+    expect(ticketInText('CIN-12 Cartelera')).toBe('CIN-12')
+    expect(ticketInText('feat/cin-7-seats')).toBe('CIN-7')
+    expect(ticketInText('Cartelera')).toBeNull()
+    expect(ticketInText(undefined)).toBeNull()
   })
 })

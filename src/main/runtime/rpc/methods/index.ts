@@ -44,6 +44,7 @@ import { AGENT_SESSION_METHODS } from './agent-session'
 import { ARTIFACT_METHODS } from './artifacts'
 import { DASHBOARD_POPOUT_METHODS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
+import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -54,6 +55,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ARTIFACT_METHODS,
   ...DASHBOARD_POPOUT_METHODS,
   ...ORCHESTRATOR_GAME_METHODS,
+  ...ORCHESTRATOR_GAME_BOARD_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,
   ...WORKTREE_METHODS,

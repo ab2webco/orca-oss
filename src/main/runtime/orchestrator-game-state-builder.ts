@@ -52,6 +52,8 @@ import type {
   OrchestratorGameTodoSource
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
+import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
+import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
@@ -90,6 +92,10 @@ export type OrchestratorGameStateInput = {
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
+  /** The project's STOP; absent leaves `stopped` out, as from an older host. */
+  readStop?: () => Promise<GameStop | null>
+  /** The project's inboxes; read only for a lead. */
+  readInboxes?: () => Promise<GameInboxSummary[]>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -150,12 +156,15 @@ export async function buildOrchestratorGameState(
   const integrations = resolveOrchestratorGameIntegrations(layers)
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
-  const [review, plane, linear, sceneSources, sceneFile] = await Promise.all([
+  const { readStop, readInboxes } = input
+  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
     tracker ? settle(input.readLinear) : Promise.resolve(null),
     readScenes ? settle(readScenes) : Promise.resolve(null),
-    readSceneFile(resolved, input.worktree)
+    readSceneFile(resolved, input.worktree),
+    readStop ? settleGameStop(readStop) : Promise.resolve(null),
+    readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config =
@@ -248,6 +257,7 @@ export async function buildOrchestratorGameState(
     warnings: [
       ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),
       ...(sceneFile?.notes ?? []),
+      ...(stop?.warning ? [stop.warning] : []),
       ...(project?.orchestratorGameWarnings ?? []),
       ...resolved.warnings,
       ...scenes.warnings,
@@ -273,6 +283,8 @@ export async function buildOrchestratorGameState(
       extra: [...projectLinks, ...activityGameLinksOf(agents)]
     }),
     ...(leaderActivity ? { activity: leaderActivity } : {}),
+    ...(stop ? { stopped: stop.stopped } : {}),
+    ...(inboxes ? { inboxes } : {}),
     ...(projectState ? { project: projectState } : {}),
     ...(actions.length > 0 ? { actions } : {})
   }

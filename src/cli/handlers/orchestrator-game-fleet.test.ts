@@ -68,6 +68,7 @@ function fakeClient(state: unknown, overrides: Record<string, unknown> = {}) {
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },
+    'game.stopSwitch': { stopped: null },
     'orchestration.workerStart': {
       runId: 'run_1',
       taskId: 'task_1',
@@ -101,10 +102,14 @@ const run = (
     json: true
   })
 
-const methods = (calls: [string, unknown][]) => calls.map(([method]) => method)
+// Why: event posts and STOP reads are checked on their own (event-posts and hold tests).
+const BOARD_CALLS = new Set(['game.eventPost', 'game.stopSwitch'])
+const methods = (calls: [string, unknown][]) =>
+  calls.map(([method]) => method).filter((method) => !BOARD_CALLS.has(method))
 
 // Why: freeing a member first records it; these reads and the write are checked on their own.
 const HISTORY_CALLS = new Set([
+  ...BOARD_CALLS,
   'game.historyRecord',
   'orchestration.inbox',
   'orchestration.workerShow'

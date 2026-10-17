@@ -70,12 +70,17 @@ export function ticketOfMember(agent: GameAgent): string | null {
     return agent.workItem.identifier.toUpperCase()
   }
   for (const text of [agent.displayName, agent.worktree?.displayName, agent.worktree?.branch]) {
-    const match = text?.toUpperCase().match(TICKET)
-    if (match?.[1]) {
-      return match[1]
+    const ticket = ticketInText(text)
+    if (ticket) {
+      return ticket
     }
   }
   return null
+}
+
+/** The first ticket id like CIN-12 a title, name or branch carries. */
+export function ticketInText(text: string | null | undefined): string | null {
+  return text?.toUpperCase().match(TICKET)?.[1] ?? null
 }
 
 function nextOf(agent: GameAgent, phase: GameMemberPhase): string {

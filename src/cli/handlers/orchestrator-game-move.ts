@@ -4,6 +4,7 @@ import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { switchClaudeTerminalAccount } from './account-switch'
 import { readCallerGameState } from './orchestrator-game-launch'
+import { refuseWhileStopped } from './orchestrator-game-hold'
 import {
   GAME_ACCOUNTS_LIMITED,
   resolveGameMemberAccount,
@@ -171,6 +172,7 @@ export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
     const selector = typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : 'auto'
     const response = await readCallerGameState(client)
     const state = response.result
+    refuseWhileStopped(state, `moving ${ticket}`)
     const member = memberOf(state, ticket)
     const from = member.account?.email ?? null
     if (
