@@ -13975,7 +13975,8 @@
             "4a9568f773": "Atrás",
             "4f86e2a10b": "Saltar recorrido",
             "d974f32a83": "Descartar recorrido",
-            "ffa4412b66": "próximo"
+            "ffa4412b66": "próximo",
+            "complete": "Listo"
           },
           "ContextualTourProgressDots": {
             "7734cb8ad3": "de",
@@ -13985,7 +13986,17 @@
             "tour": {
               "overlay": {
                 "measurement": {
-                  "38b3155418": "Próximo"
+                  "38b3155418": "Próximo",
+                  "automations": {
+                    "intro": {
+                      "title": "¿Qué es una automatización?",
+                      "body": "Las automatizaciones ejecutan trabajo de agentes según una programación. Añade una automatización haciendo clic en este botón."
+                    },
+                    "results": {
+                      "title": "Encuentra los resultados",
+                      "body": "Las ejecuciones muestran cuándo se ejecutaron las automatizaciones, qué ocurrió y dónde revisar su salida."
+                    }
+                  }
                 }
               }
             }

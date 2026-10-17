@@ -42,16 +42,7 @@ describe('Mission Control shortcut warnings', () => {
   })
 
   it.each([
-    ['es', 'Bloqueado por Mission Control. Reasigna aquí o cámbialo en Ajustes del Sistema.'],
-    [
-      'ja',
-      'Mission Control によってブロックされています。ここで再割り当てするか、システム設定で変更してください。'
-    ],
-    [
-      'ko',
-      'Mission Control에 의해 차단되었습니다. 여기에서 다시 매핑하거나 시스템 설정에서 변경하세요.'
-    ],
-    ['zh', '已被调度中心拦截。在此重新映射，或在系统设置中更改。']
+    ['es', 'Bloqueado por Mission Control. Reasigna aquí o cámbialo en Ajustes del Sistema.']
   ])('uses the shipped %s translation', async (locale, expected) => {
     await i18n.changeLanguage(locale)
 

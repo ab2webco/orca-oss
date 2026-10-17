@@ -25,10 +25,10 @@ describe('getUiRelativeTimeFormatter', () => {
 
   it('rebuilds the formatter after a runtime language switch', () => {
     const english = getUiRelativeTimeFormatter()
-    mockIntlLocale.value = 'ko'
-    const korean = getUiRelativeTimeFormatter()
-    expect(korean).not.toBe(english)
-    expect(korean.format(-1, 'day')).toBe('어제')
+    mockIntlLocale.value = 'es'
+    const spanish = getUiRelativeTimeFormatter()
+    expect(spanish).not.toBe(english)
+    expect(spanish.format(-1, 'day')).toBe('ayer')
   })
 
   // getIntlLocale() already maps the synthetic plugin<hex> resource language to a real BCP-47 tag,

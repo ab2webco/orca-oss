@@ -25,13 +25,17 @@ describe('task-page-localized-options', () => {
       'Projects'
     ])
 
-    await i18n.changeLanguage('ko')
+    await i18n.changeLanguage('es')
 
     expect(getGitHubTaskKindPresets('issues').map((preset) => preset.label)).toEqual([
-      '열기',
-      '나에게 할당됨'
+      'Abierto',
+      'Asignado a mí'
     ])
-    expect(getGitHubModeButtons().map((button) => button.label)).toEqual(['이슈', 'PR', '프로젝트'])
+    expect(getGitHubModeButtons().map((button) => button.label)).toEqual([
+      'Issues',
+      'PRs',
+      'Proyectos'
+    ])
 
     await i18n.changeLanguage('en')
 
@@ -49,9 +53,9 @@ describe('task-page-localized-options', () => {
   it('refreshes Linear priority labels when the UI language changes', async () => {
     expect(getLinearPriorityLabel(0)).toBe('No priority')
 
-    await i18n.changeLanguage('ko')
+    await i18n.changeLanguage('es')
 
-    expect(getLinearPriorityLabel(0)).toBe('우선순위 없음')
+    expect(getLinearPriorityLabel(0)).toBe('Sin prioridad')
 
     await i18n.changeLanguage('en')
 

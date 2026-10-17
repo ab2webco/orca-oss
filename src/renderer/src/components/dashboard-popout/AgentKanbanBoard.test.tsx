@@ -464,12 +464,12 @@ describe('AgentKanbanBoard', () => {
   })
 
   it('localizes the new board status and filter controls', async () => {
-    await i18n.changeLanguage('ja')
+    await i18n.changeLanguage('es')
     renderBoard([card({ bucket: 'done' })])
 
-    expect(screen.getByText('完了')).toBeInTheDocument()
-    expect(screen.getByLabelText('Agent を検索')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^フィルター/ })).toBeInTheDocument()
+    expect(screen.getByText('Finalizado')).toBeInTheDocument()
+    expect(screen.getByLabelText('Buscar agentes')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Filtrar/ })).toBeInTheDocument()
   })
 
   it('offers store-derived project and status filters without cards', async () => {

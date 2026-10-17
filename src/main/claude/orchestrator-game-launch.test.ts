@@ -17,7 +17,7 @@ describe('buildOrchestratorGameLaunch', () => {
       claudeVersion: '2.1.301',
       pluginDir: PLUGIN_DIR,
       orcaCli: '/app/bin/orca',
-      locale: 'ja'
+      locale: 'es'
     })
 
     expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
@@ -27,7 +27,7 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_SCENE: 'quest',
       ORCA_GAME_HUD: '1',
       ORCA_GAME_REWARDS: '0',
-      ORCA_GAME_LOCALE: 'ja',
+      ORCA_GAME_LOCALE: 'es',
       CLAUDE_CODE_NO_FLICKER: '1'
     })
   })
@@ -83,16 +83,17 @@ describe('buildOrchestratorGameLaunch', () => {
 
 describe('orchestratorGameLocaleOf', () => {
   it.each([
-    ['es', 'ja-JP', 'es'],
-    ['zh', 'en-US', 'zh'],
-    ['system', 'ko-KR', 'ko'],
+    ['es', 'en-US', 'es'],
+    ['en', 'es-ES', 'en'],
     ['system', 'es_CO', 'es'],
-    // Why: Orca has no Traditional Chinese catalog, so the renderer shows English too.
-    ['system', 'zh-TW', 'en'],
+    // Why: Orca Lab ships English and Spanish only, so these systems get English (ORCA-596).
+    ['system', 'zh-CN', 'en'],
+    ['system', 'ko-KR', 'en'],
+    ['system', 'ja-JP', 'en'],
     ['system', 'fr-FR', 'en'],
     ['plugin:acme.lang/es-MX', 'en-US', 'es'],
-    ['plugin:acme.lang/fr', 'ja-JP', 'en'],
-    [undefined, 'ja-JP', 'ja']
+    ['plugin:acme.lang/ja', 'es-ES', 'en'],
+    [undefined, 'es-ES', 'es']
   ] as const)('maps the UI language %s (system %s) to %s', (language, system, expected) => {
     expect(orchestratorGameLocaleOf(language, system)).toBe(expected)
   })

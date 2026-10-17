@@ -16,8 +16,8 @@ afterEach(async () => {
 })
 
 describe('contextual tour overlay measurement', () => {
-  it('renders the automation tour copy in Korean when the UI locale is Korean', async () => {
-    await setRendererUiLanguage('ko')
+  it('renders the automation tour copy in Spanish when the UI locale is Spanish', async () => {
+    await setRendererUiLanguage('es')
     const target = document.createElement('button')
     target.setAttribute('data-contextual-tour-target', 'automations-create')
     target.getBoundingClientRect = () => new DOMRect(0, 0, 20, 20)
@@ -35,14 +35,14 @@ describe('contextual tour overlay measurement', () => {
     if (result.kind !== 'render') {
       throw new Error(`Expected render result, received ${result.kind}`)
     }
-    expect(result.renderState.title).toBe('자동화란 무엇인가요?')
+    expect(result.renderState.title).toBe('¿Qué es una automatización?')
     expect(result.renderState.body).toBe(
-      '자동화는 일정에 따라 agent 작업을 실행합니다. 이 버튼을 눌러 자동화를 추가하세요.'
+      'Las automatizaciones ejecutan trabajo de agentes según una programación. Añade una automatización haciendo clic en este botón.'
     )
   })
 
-  it('renders the automation results step in Korean when the UI locale is Korean', async () => {
-    await setRendererUiLanguage('ko')
+  it('renders the automation results step in Spanish when the UI locale is Spanish', async () => {
+    await setRendererUiLanguage('es')
     const target = document.createElement('div')
     target.setAttribute('data-contextual-tour-target', 'automations-runs')
     target.getBoundingClientRect = () => new DOMRect(0, 0, 20, 20)
@@ -60,14 +60,14 @@ describe('contextual tour overlay measurement', () => {
     if (result.kind !== 'render') {
       throw new Error(`Expected render result, received ${result.kind}`)
     }
-    expect(result.renderState.title).toBe('결과 확인')
+    expect(result.renderState.title).toBe('Encuentra los resultados')
     expect(result.renderState.body).toBe(
-      '실행 내역에서 자동화가 언제 실행되었는지, 어떤 일이 발생했는지, 출력을 어디서 확인할 수 있는지 볼 수 있습니다.'
+      'Las ejecuciones muestran cuándo se ejecutaron las automatizaciones, qué ocurrió y dónde revisar su salida.'
     )
   })
 
   it('keeps localized copy on its own step when a step is inserted before it', async () => {
-    await setRendererUiLanguage('ko')
+    await setRendererUiLanguage('es')
     const target = document.createElement('button')
     target.setAttribute('data-contextual-tour-target', 'automations-create')
     target.getBoundingClientRect = () => new DOMRect(0, 0, 20, 20)
@@ -96,7 +96,7 @@ describe('contextual tour overlay measurement', () => {
     if (result.kind !== 'render') {
       throw new Error(`Expected render result, received ${result.kind}`)
     }
-    expect(result.renderState.title).toBe('자동화란 무엇인가요?')
+    expect(result.renderState.title).toBe('¿Qué es una automatización?')
   })
 
   it('shows all defined browser steps in progress even when step 3 is hidden', () => {
