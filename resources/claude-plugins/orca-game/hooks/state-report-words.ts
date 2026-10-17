@@ -1,6 +1,6 @@
 import type { GameCi, GameLocale, GameReview } from '../types'
 import { stringsOf } from './game-strings'
-import { ES_STATE_REPORT } from './locales/es-state-report'
+import { ES_STATE_REPORT } from './state-report-words-es'
 
 /** A member as the lead's fleet sees it, the way `orca game fleet` names the phases. */
 export type MemberPhase = 'needs-you' | 'limited' | 'working' | 'idle' | 'finished'

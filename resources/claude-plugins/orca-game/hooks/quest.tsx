@@ -252,7 +252,8 @@ const registerCards = (on: On) => {
 }
 
 export const registerQuest = (on: On): void => {
-  for (const command of [QUEST_ALIAS, ...GAME_COMMANDS]) {
+  const commands: readonly GameCommand[] = [QUEST_ALIAS, ...GAME_COMMANDS]
+  for (const command of commands) {
     registerCommand(on, command)
   }
   registerNotes(on)

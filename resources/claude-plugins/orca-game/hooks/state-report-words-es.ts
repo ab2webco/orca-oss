@@ -1,4 +1,4 @@
-import type { StateReportCatalog } from '../state-report-words'
+import type { StateReportCatalog } from './state-report-words'
 
 const onOff = (on: boolean): string => (on ? 'sí' : 'no')
 

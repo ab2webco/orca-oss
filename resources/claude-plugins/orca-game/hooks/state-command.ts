@@ -4,7 +4,7 @@ import { readGameStateOutput } from './fleet-sync'
 import { STATE_COMMAND } from './game-commands'
 import { gameLocale } from './game-strings'
 import { quest, ready } from './quest-runtime'
-import { stateReportOf } from './state-report'
+import { stateReportOf, type SessionOverrides } from './state-report'
 import { stateReportWordsOf } from './state-report-words'
 
 async function stateText($: EngineInterface): Promise<string> {
@@ -17,7 +17,10 @@ async function stateText($: EngineInterface): Promise<string> {
   if (out.kind === 'failed') {
     return words.failed(out.reason)
   }
-  const session = { mode: quest.isDemo ? 'demo' : quest.modeOverride, render: quest.renderOverride }
+  const session: SessionOverrides = {
+    mode: quest.isDemo ? 'demo' : quest.modeOverride,
+    render: quest.renderOverride
+  }
   return stateReportOf(out.stdout, session, words) ?? words.failed(words.notState)
 }
 
