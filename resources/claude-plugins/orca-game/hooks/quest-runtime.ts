@@ -4,6 +4,7 @@ import type { GameConfig } from '../types'
 import { isAdvisorCueEndingAt } from './advisor-state'
 import { DEMO_STEP_TICKS } from './demo'
 import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
+import { forgetFrames, isNewFrame } from './frame-gate'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
 import { raiseTeamEvent } from './hd-team'
 import { restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
@@ -82,6 +83,9 @@ export function questLiveConfig($: EngineInterface, live: Partial<GameConfig>): 
 async function blitAll($: EngineInterface): Promise<void> {
   for (const [requestId, stage] of quest.stages) {
     const cells = stageCellsOf(stage)
+    if (!isNewFrame(requestId, SCENE_KEY, cells)) {
+      continue
+    }
     const result = await $.ui
       .blit({ requestId, key: SCENE_KEY, cells, columns: stage.columns, rows: stage.rows })
       .catch(() => ({ deny: 'failed' }))
@@ -92,6 +96,9 @@ async function blitAll($: EngineInterface): Promise<void> {
   for (const [requestId, items] of quest.animations) {
     for (const item of items) {
       const cells = item.draw(quest.tick)
+      if (!isNewFrame(requestId, item.key, cells)) {
+        continue
+      }
       const result = await $.ui
         .blit({ requestId, key: item.key, cells, columns: item.columns, rows: item.rows })
         .catch(() => ({ deny: 'failed' }))
@@ -183,6 +190,7 @@ export function resetQuest(): void {
   quest.stages.clear()
   quest.animations.clear()
   quest.cardPhases.clear()
+  forgetFrames()
   Object.assign(quest, {
     phase: undefined,
     fleetPhase: undefined,

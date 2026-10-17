@@ -16,6 +16,7 @@ import {
 } from './quest-runtime'
 import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
+import { rememberFrame } from './frame-gate'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 
@@ -37,15 +38,14 @@ export async function animate(
   quest.animations.set(e.requestId, items)
   const { Raster } = $.ui.resolve(e)
   return new Map(
-    items.map((item) => [
-      item.key,
-      <Raster
-        key={item.key}
-        columns={item.columns}
-        rows={item.rows}
-        cells={item.draw(quest.tick)}
-      />
-    ])
+    items.map((item) => {
+      const cells = item.draw(quest.tick)
+      rememberFrame(e.requestId, item.key, cells)
+      return [
+        item.key,
+        <Raster key={item.key} columns={item.columns} rows={item.rows} cells={cells} />
+      ]
+    })
   )
 }
 
@@ -149,16 +149,13 @@ const registerSpinner = (on: On) => {
     }
     const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)
     quest.stages.set(e.requestId, stage)
+    const cells = stageCellsOf(stage)
+    rememberFrame(e.requestId, SCENE_KEY, cells)
     const spinner = await next(e)
     const { Box, Raster } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
-        <Raster
-          key={SCENE_KEY}
-          columns={stage.columns}
-          rows={stage.rows}
-          cells={stageCellsOf(stage)}
-        />
+        <Raster key={SCENE_KEY} columns={stage.columns} rows={stage.rows} cells={cells} />
         {spinner}
       </Box>
     )

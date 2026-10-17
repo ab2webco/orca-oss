@@ -10,6 +10,19 @@ const spinnerOf = (rows: number) =>
     viewport: { columns: 130, rows, isFullscreen: true },
     props: { word: 'Working', message: null, suffix: '', mode: 'thinking' }
   }) as const
+const BAND = {
+  component: 'AbovePrompt',
+  viewport: { columns: 170, rows: 40, isFullscreen: true },
+  props: {
+    hasSurvey: false,
+    isWorking: false,
+    maxRows: 8,
+    bodyColumns: 160,
+    scroll: { offset: 0, bodyRows: 7 },
+    view: {}
+  }
+} as const
+const TICK_MS = 120
 const ORCA_CLI = '/opt/orca/bin/orca'
 const GAME_STATE = [ORCA_CLI, 'game', 'state', '--json']
 const POLL_MS = 30000
@@ -210,5 +223,27 @@ describe('the hd scene above the spinner', () => {
     world.review = { ...world.review, state: 'merged' }
     await clock.advance(POLL_MS)
     expect(textOf(await sceneOf($))).toContain('#42 merged!')
+  })
+})
+
+describe('frame cost', () => {
+  test('sends a Raster nothing on a tick that draws the frame it already shows', async ($, on) => {
+    const clock = mock.clock(on)
+    const world = worldOf({ agents: [agent('lead', 'idle', true), agent('ana', 'idle')] })
+    engine(on, {}, world)
+    const blits: string[] = []
+    on('ui.blit', ($s, e) => {
+      blits.push(e.key)
+      return { value: {} }
+    })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+    const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    blits.length = 0
+    await clock.advance(TICK_MS * 30)
+    const hud = blits.filter((key) => key === 'orca-game-hud').length
+    expect(hud).toBeGreaterThan(0)
+    expect(hud).toBeLessThan(16)
+    await band.unmount()
   })
 })
