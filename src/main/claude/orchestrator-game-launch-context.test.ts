@@ -53,6 +53,19 @@ describe('prepareOrchestratorGameLaunch', () => {
     })
   })
 
+  it('hands a Windows pane the Orca CLI with forward slashes for Git Bash', async () => {
+    const launch = await prepareOrchestratorGameLaunch({
+      ...base,
+      orcaCli: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+      platform: 'win32',
+      settings: undefined,
+      repoId: null,
+      worktreePath: null
+    })
+
+    expect(launch.env.ORCA_GAME_CLI).toBe('C:/Program Files/Orca/resources/bin/orca.exe')
+  })
+
   // Why: app-launched panes and `orca claude-teams` both resolve here, so both get the language.
   it("passes Orca's UI language, resolving the system choice from the OS locale", async () => {
     const chosen = await prepareOrchestratorGameLaunch({

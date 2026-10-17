@@ -5,6 +5,7 @@ import {
   buildOrchestratorGameLaunch,
   orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
+  orchestratorGameCliPathOf,
   withOrchestratorGameArgs
 } from './orchestrator-game-launch'
 
@@ -106,6 +107,20 @@ describe('resolveOrchestratorGamePluginDir', () => {
     expect(
       resolveOrchestratorGamePluginDir({ isPackaged: false, resourcesPath: '/r', appPath: '/a' })
     ).toBe(join('/a', 'resources', 'claude-plugins', 'orca-game'))
+  })
+})
+
+describe('orchestratorGameCliPathOf', () => {
+  // Why: the skills run "$ORCA_GAME_CLI" in Git Bash, which runs a word with a slash as a path.
+  it('hands Windows panes the CLI with forward slashes', () => {
+    expect(
+      orchestratorGameCliPathOf('C:\\Program Files\\Orca\\resources\\bin\\orca.exe', 'win32')
+    ).toBe('C:/Program Files/Orca/resources/bin/orca.exe')
+  })
+
+  it('leaves POSIX paths and a missing CLI alone', () => {
+    expect(orchestratorGameCliPathOf('/opt/orca a\\b', 'linux')).toBe('/opt/orca a\\b')
+    expect(orchestratorGameCliPathOf(null, 'win32')).toBeNull()
   })
 })
 

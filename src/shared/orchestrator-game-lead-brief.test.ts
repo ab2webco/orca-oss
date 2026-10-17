@@ -60,6 +60,28 @@ describe('gameLeadBriefOf', () => {
     expect(brief).not.toMatch(/`orca /)
   })
 
+  // Why: Claude Code's Bash tool is Git Bash on Windows, where a backslash path or a space breaks the word.
+  it('writes the CLI as one Bash word, a Windows path with forward slashes', () => {
+    const windows = gameLeadBriefOf(
+      DEFAULT_GAME_LEAD,
+      'cineco',
+      "C:\\Program Files\\Orca Lab (x86)\\it's\\orca.exe"
+    )
+    expect(windows).toContain(
+      "`'C:/Program Files/Orca Lab (x86)/it'\\''s/orca.exe' game launch <ticket>`"
+    )
+    expect(windows).not.toContain('C:\\')
+
+    const devMac = gameLeadBriefOf(
+      DEFAULT_GAME_LEAD,
+      'cineco',
+      '/Users/me/Library/Application Support/orca-dev/cli/bin/orca-dev'
+    )
+    expect(devMac).toContain(
+      "`'/Users/me/Library/Application Support/orca-dev/cli/bin/orca-dev' game fleet`"
+    )
+  })
+
   it("names the lead with the project's label and appends the project's rules", () => {
     const brief = gameLeadBriefOf(
       { ...DEFAULT_GAME_LEAD, label: 'orquestador', rules: 'Members report TERMINADO CIN-NNN.' },

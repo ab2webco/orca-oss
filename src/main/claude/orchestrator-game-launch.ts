@@ -26,6 +26,14 @@ export function resolveOrchestratorGamePluginDir(options: {
     : join(options.appPath, 'resources', 'claude-plugins', 'orca-game')
 }
 
+/** The CLI path the game pane gets; Windows gets forward slashes, so Git Bash runs it as a path. */
+export function orchestratorGameCliPathOf(
+  cli: string | null,
+  platform: NodeJS.Platform
+): string | null {
+  return cli !== null && platform === 'win32' ? cli.replaceAll('\\', '/') : cli
+}
+
 /** The game's language: Orca's UI language as the renderer resolves it, else English. */
 export function orchestratorGameLocaleOf(
   language: UiLanguage | undefined,

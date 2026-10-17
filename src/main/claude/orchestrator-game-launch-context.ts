@@ -9,6 +9,7 @@ import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { parseClaudeCodeVersion } from './hook-event-versions'
 import {
   buildOrchestratorGameLaunch,
+  orchestratorGameCliPathOf,
   orchestratorGameLocaleOf,
   resolveOrchestratorGamePluginDir,
   type OrchestratorGameLaunch
@@ -62,6 +63,7 @@ export async function prepareOrchestratorGameLaunch(args: {
   /** The OS locale behind a `system` UI language; defaults to Electron's. */
   systemLocale?: string
   detectClaudeVersion?: () => Promise<string | null>
+  platform?: NodeJS.Platform
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
   const [claudeVersion, project] = await Promise.all([
@@ -78,8 +80,10 @@ export async function prepareOrchestratorGameLaunch(args: {
     claudeVersion,
     pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir,
     // Why: the same absolute CLI the Agent Teams tmux shim runs, so Linux never hits the screen reader.
-    orcaCli:
+    orcaCli: orchestratorGameCliPathOf(
       args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli,
+      args.platform ?? process.platform
+    ),
     locale: orchestratorGameLocaleOf(
       args.settings?.uiLanguage,
       args.systemLocale ?? getPreferredSystemLocale()
