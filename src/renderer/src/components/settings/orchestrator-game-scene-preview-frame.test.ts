@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setGameLocale } from '../../../../../resources/claude-plugins/orca-game/hooks/game-strings'
 import { sceneGridOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scene'
+import {
+  HD_ROWS,
+  hdSceneGridOf
+} from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd'
 import { SCENES } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import {
   PREVIEW_COLUMNS,
@@ -70,5 +74,28 @@ describe('scenePreviewPixelsOf', () => {
     expect(pixels.height).toBe(2)
     expect(pixels.colors).toEqual(['#112233', '#000000', '#445566', '#000000'])
     expect(pixels.glyphs).toEqual([{ column: 1, row: 0, text: 'A', color: '#ffffff' }])
+  })
+})
+
+describe('the hd preview', () => {
+  it('paints the hd grid the mod draws when the render is hd, and classic otherwise', () => {
+    const quest = SCENES.quest!
+    const hd = scenePreviewFrameOf(quest, 0, 'en', 'hd')
+    expect(hd.rows).toBe(HD_ROWS)
+    expect(hd.cells).toEqual(
+      hdSceneGridOf({
+        scene: quest,
+        phase: undefined,
+        columns: PREVIEW_COLUMNS,
+        rows: HD_ROWS,
+        tick: 0,
+        caption: '',
+        since: 0
+      })
+    )
+    expect(scenePreviewFrameOf(quest, 0, 'en', 'classic').rows).toBe(5)
+    expect(scenePreviewFrameOf(quest, 0, 'en').cells).toEqual(
+      sceneGridOf(quest, undefined, PREVIEW_COLUMNS, 0)
+    )
   })
 })

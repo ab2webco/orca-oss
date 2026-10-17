@@ -16,7 +16,7 @@ import {
 } from './quest-runtime'
 import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
-import { rememberFrame } from './frame-gate'
+import { forgetFrames, rememberFrame } from './frame-gate'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 
@@ -33,6 +33,7 @@ export async function animate(
   await ready($)
   if (isOff() || e.surface !== 'terminal' || items.length === 0) {
     quest.animations.delete(e.requestId)
+    forgetFrames(e.requestId)
     return new Map()
   }
   quest.animations.set(e.requestId, items)
@@ -92,6 +93,7 @@ const registerCommand = (on: On) => {
     quest.modeOverride = asked.mode
     if (asked.mode === 'off') {
       quest.stages.clear()
+      forgetFrames()
     }
     $.ui.invalidate('ui.render')
     await publishAbsorbing($)
@@ -145,6 +147,7 @@ const registerSpinner = (on: On) => {
     await ready($)
     if (isOff() || e.surface !== 'terminal') {
       quest.stages.delete(e.requestId)
+      forgetFrames(e.requestId)
       return next(e)
     }
     const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)

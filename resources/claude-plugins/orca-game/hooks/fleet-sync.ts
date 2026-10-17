@@ -12,7 +12,8 @@ import {
 import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
 import { raiseTeamEvent, syncHdTeam } from './hd-team'
-import { fleetPhaseOf, needsOf, partyOf } from './party'
+import { fleetPhaseOf, partyOf } from './party'
+import { teamEventsOf } from './team-events'
 import {
   clawdReact,
   demoNow,
@@ -104,12 +105,6 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
   return ledger.total
 }
 
-// Why counted: a CI that turns red plays once, not on every poll it stays red.
-const redCiCountOf = (state: GameState | null): number =>
-  state === null
-    ? 0
-    : needsOf(state).filter((one) => one.text === gameStrings().text.ciFailingNeed).length
-
 export async function refresh($: EngineInterface): Promise<void> {
   const before = await readFleet($)
   const startedAt = await $.clock.now()
@@ -139,8 +134,8 @@ export async function refresh($: EngineInterface): Promise<void> {
   quest.clockMs = doneAt
   if (next !== undefined) {
     syncHdTeam(next, config.rewards)
-    if (redCiCountOf(next) > redCiCountOf(before.state)) {
-      raiseTeamEvent($, 'fail', gameStrings().art.ciIsRed)
+    for (const one of teamEventsOf(before.state, next)) {
+      raiseTeamEvent($, one.kind, one.text)
     }
     await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')

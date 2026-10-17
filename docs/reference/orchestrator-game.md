@@ -58,7 +58,8 @@ Both Settings pages group the game's controls (mode, scene, teammate HUD, reward
 tracking, where links open, render and time zone) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
 panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
-imports `hooks/scene.ts`, `scenery.ts` and `scenes/`), so it cannot drift from what a pane draws:
+imports `hooks/scene.ts`, `scenery.ts`, `scenes/` and, for `render: hd`, `scene-hd.ts`), so it
+cannot drift from what a pane draws in the effective render:
 the spinner scene walking through the six phases with the phase's character under it, or one still
 frame when the system asks for reduced motion. `zen` notes what it hides, `off` says the pane starts
 as plain Claude, an uninstalled id shows `quest` (what the mod falls back to), and a plugin scene
@@ -490,10 +491,12 @@ the runtime does not know is dropped with a warning (Settings refuses such a zon
 
 On top of that hd adds:
 
-- **Day and night** from the clock in `timezone` (`local` is the machine's), sampled at start, on
+- **Day and night** from the clock in `timezone`, sampled at start, on
   every refresh and about every 30 seconds: dark from 19:00 to 05:00, light from 07:00 to 17:00, an
   orange tint around 06:00 and 18:00, stars and the moon at night. A look that is already a night
-  sky keeps it.
+  sky keeps it. `local` means the desktop's zone: Orca hands the pane its own IANA zone at launch and
+  in `game state` (`sources` still says where `local` came from), so a pane on an SSH host, whose
+  clock is usually UTC, turns to night when the person's evening does.
 - **Light and particles**: shafts from the sun, bloom around bright pixels, a vignette and softened
   top and bottom rows (the characters are spared both); dust by day, fireflies at night, snow in
   Night Watch, glitter in Crystal Saga and embers over the campfire the hero rests by.
@@ -506,8 +509,10 @@ On top of that hd adds:
 - **Team reactions**, from what each refresh already reads: a reward floats `+N XP` with a gold
   flash, a teammate starting to wait floats `<name> needs you!` in red, a merged review floats
   `#N merged!` with a white flash, and CI turning red flashes red, shakes the scene a column for a
-  few ticks and rains from a grey cloud. A floating text wider than the scene is skipped, and one
-  that would cover a cloud rises beside it.
+  few ticks and rains from a grey cloud. The first refresh of a session plays nothing (a CI red for
+  hours is not news), `/quest demo` draws its party but no floats or marches, and a floating text
+  wider than the scene is skipped while one that would cover a cloud rises beside it
+  ([`team-events.ts`](../../resources/claude-plugins/orca-game/hooks/team-events.ts)).
 - **The thought cloud** carries what the hero says: puffs along its top, a highlight and a shadow, a
   1-px outline and a trail of two bubbles that bobs toward the hero's head. The petted pet speaks
   from it, and Jev's advisor says its words in a cloud of its own at the right edge, which the

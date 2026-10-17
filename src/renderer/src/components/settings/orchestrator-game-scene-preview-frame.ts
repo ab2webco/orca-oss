@@ -15,6 +15,11 @@ import {
   type SceneDefinition,
   type ScenePhase
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
+import {
+  HD_ROWS,
+  hdSceneGridOf
+} from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd'
+import type { OrchestratorGameRender } from '../../../../shared/orchestrator-game-render'
 import type { OrchestratorGameSceneOption } from './orchestrator-game-scene-options'
 
 // Why the mod's own modules: the preview must stay the art Agent Teams panes draw, not a copy.
@@ -54,17 +59,30 @@ export function previewSceneOf(option: OrchestratorGameSceneOption): SceneDefini
 export function scenePreviewFrameOf(
   scene: SceneDefinition,
   tick: number,
-  locale: string
+  locale: string,
+  render: OrchestratorGameRender = 'classic'
 ): ScenePreviewFrame {
   const gameLocale = gameLocaleOf(locale)
   // Why: the thought bubble reads the mod's active locale, as ORCA_GAME_LOCALE sets it in a pane.
   setGameLocale(gameLocale)
   const phase = PHASES[Math.floor(tick / PREVIEW_PHASE_TICKS) % PHASES.length] ?? 'working'
   const card = scene.cards[phase]
+  const flowPhase = phase === 'working' ? undefined : phase
+  const isHd = render === 'hd'
   return {
     columns: PREVIEW_COLUMNS,
-    rows: SCENE_ROWS,
-    cells: sceneGridOf(scene, phase === 'working' ? undefined : phase, PREVIEW_COLUMNS, tick),
+    rows: isHd ? HD_ROWS : SCENE_ROWS,
+    cells: isHd
+      ? hdSceneGridOf({
+          scene,
+          phase: flowPhase,
+          columns: PREVIEW_COLUMNS,
+          rows: HD_ROWS,
+          tick,
+          caption: '',
+          since: 0
+        })
+      : sceneGridOf(scene, flowPhase, PREVIEW_COLUMNS, tick),
     phase,
     caption: `${card.icon} ${localizedNameOf(card.name, gameLocale)}`
   }

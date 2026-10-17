@@ -215,7 +215,7 @@ describe('the hd scene above the spinner', () => {
     })
     engine(on, { ORCA_GAME_RENDER: 'hd' }, world)
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
-    await clock.settle()
+    await clock.advance(POLL_MS)
     world.agents = [agent('lead', 'working', true), agent('ana', 'waiting')]
     await clock.advance(POLL_MS)
     const floated = (await sceneOf($)).filter((one) => one[1] === 0xff4a4a && one[0] !== 0x2580)
@@ -245,5 +245,29 @@ describe('frame cost', () => {
     expect(hud).toBeGreaterThan(0)
     expect(hud).toBeLessThan(16)
     await band.unmount()
+  })
+})
+
+describe('team reactions at session start', () => {
+  test('a CI already red and a teammate already waiting play nothing on the first refresh', async ($, on) => {
+    const clock = mock.clock(on, { now: HOUR_MS * 12 })
+    const world = worldOf({
+      agents: [agent('lead', 'working', true), agent('ana', 'waiting')],
+      review: {
+        provider: 'github',
+        number: 42,
+        title: 't',
+        url: 'https://x/42',
+        state: 'open',
+        ci: 'failure'
+      }
+    })
+    engine(on, { ORCA_GAME_RENDER: 'hd' }, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+    const cells = await sceneOf($)
+    const floated = cells.filter((one) => one[1] === 0xff4a4a && one[0] !== 0x2580)
+    expect(textOf(floated)).not.toContain('needs you!')
+    expect(pixelsOf(cells).has(0xb9bdc8)).toBe(false)
   })
 })

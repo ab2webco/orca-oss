@@ -30,6 +30,12 @@ export const isOrchestratorGameTimezone = (value: unknown): value is string => {
   }
 }
 
+/** The zone handed to the mod: `local` becomes this desktop's own, since an SSH host's clock is not the person's. */
+export const desktopGameTimezoneOf = (
+  timezone: string,
+  desktopZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+): string => (timezone === ORCHESTRATOR_GAME_LOCAL_TIMEZONE && desktopZone ? desktopZone : timezone)
+
 type LookKey = 'render' | 'timezone'
 
 /** Checks one look key of a layer; an invalid value is dropped with its warning. */

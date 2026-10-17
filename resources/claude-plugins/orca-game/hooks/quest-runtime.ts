@@ -6,7 +6,6 @@ import { DEMO_STEP_TICKS } from './demo'
 import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
 import { forgetFrames, isNewFrame } from './frame-gate'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
-import { raiseTeamEvent } from './hd-team'
 import { restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
 import { demoNow, gameConfig, quest } from './quest-state'
 import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene'
@@ -63,9 +62,6 @@ export function questFleet(
   if (aggregate === quest.fleetPhase && alert === quest.alert) {
     return
   }
-  if (alert !== '' && alert !== quest.alert) {
-    raiseTeamEvent($, 'needs', alert)
-  }
   quest.fleetPhase = aggregate
   quest.alert = alert
   $.ui.invalidate('ui.render')
@@ -91,6 +87,7 @@ async function blitAll($: EngineInterface): Promise<void> {
       .catch(() => ({ deny: 'failed' }))
     if (result.deny !== undefined && quest.stages.get(requestId) === stage) {
       quest.stages.delete(requestId)
+      forgetFrames(requestId)
     }
   }
   for (const [requestId, items] of quest.animations) {
@@ -104,6 +101,7 @@ async function blitAll($: EngineInterface): Promise<void> {
         .catch(() => ({ deny: 'failed' }))
       if (result.deny !== undefined && quest.animations.get(requestId) === items) {
         quest.animations.delete(requestId)
+        forgetFrames(requestId)
         break
       }
     }

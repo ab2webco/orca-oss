@@ -28,7 +28,8 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_HUD: '1',
       ORCA_GAME_REWARDS: '0',
       ORCA_GAME_RENDER: 'classic',
-      ORCA_GAME_TIMEZONE: 'local',
+      // Why the desktop's zone: an SSH pane's mod would otherwise read the host's clock.
+      ORCA_GAME_TIMEZONE: Intl.DateTimeFormat().resolvedOptions().timeZone,
       ORCA_GAME_LOCALE: 'ja',
       CLAUDE_CODE_NO_FLICKER: '1'
     })

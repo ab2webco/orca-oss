@@ -399,3 +399,28 @@ describe('render and time zone', () => {
     view.unmount()
   })
 })
+
+describe('the preview follows the render', () => {
+  it('previews hd globally and per project when the render resolves to hd', () => {
+    const global = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { render: 'hd' } }}
+        updateSettings={() => undefined}
+      />
+    )
+    const preview = (container: HTMLElement) =>
+      container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
+    expect(preview(global.container)?.dataset.render).toBe('hd')
+    global.unmount()
+    const project = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{ orchestratorGame: { render: 'hd' } }}
+        projectLayer={{ render: 'classic' }}
+        updateSettings={() => undefined}
+      />
+    )
+    expect(preview(project.container)?.dataset.render).toBe('classic')
+    project.unmount()
+  })
+})

@@ -172,7 +172,7 @@ export function OrchestratorGameSetting({
             />
           }
         />
-        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
+        <OrchestratorGameScenePreview config={config} />
         {toggles().map((toggle) => (
           <SettingsSwitchRow
             key={toggle.key}
@@ -388,11 +388,7 @@ export function ProjectOrchestratorGameSetting({
         ) : (
           <OrchestratorGameSceneFileStatus read={file.state} />
         )}
-        <OrchestratorGameScenePreview
-          scene={config.scene}
-          mode={config.mode}
-          fileScene={file.state}
-        />
+        <OrchestratorGameScenePreview config={config} fileScene={file.state} />
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}
           settings={settings}
