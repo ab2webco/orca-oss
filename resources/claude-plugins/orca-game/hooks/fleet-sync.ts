@@ -120,7 +120,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     if (setContributedScenes(next.extensions.scenes.map((one) => one.definition))) {
       $.ui.invalidate('ui.render')
     }
-    questLiveConfig($, next.config)
+    questLiveConfig($, next.config, next.sources)
   }
   const config = gameConfig()
   const xp =

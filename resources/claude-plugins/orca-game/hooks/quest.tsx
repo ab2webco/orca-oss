@@ -2,6 +2,7 @@ import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-cod
 
 import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey, questCommandOf } from './quest-policy'
 import {
+  configuredConfig,
   currentScene,
   gameConfig,
   publishAbsorbing,
@@ -19,6 +20,15 @@ import { SCENE_KEY, sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
+
+// Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
+const shownSetting = (key: 'mode' | 'render'): string => {
+  const value = gameConfig()[key]
+  const configured = configuredConfig()[key]
+  return value === configured
+    ? value
+    : gameStrings().text.sessionOverride(value, configured, quest.liveSources[key])
+}
 
 function hidden($: EngineInterface, e: RenderInput) {
   const { Box } = $.ui.resolve(e)
@@ -74,14 +84,14 @@ const registerCommand = (on: On) => {
       return { text: asked.error }
     }
     if ('show' in asked) {
-      const mode = quest.isDemo ? 'demo' : gameConfig().mode
-      const render = text.questRenderShown(gameConfig().render)
+      const mode = quest.isDemo ? 'demo' : shownSetting('mode')
+      const render = text.questRenderShown(shownSetting('render'))
       return { text: `${text.questShown(mode)} ${render} ${text.questModesHelp}` }
     }
     if ('render' in asked) {
       quest.renderOverride = asked.render
       $.ui.invalidate('ui.render')
-      return { text: text.questRenderShown(asked.render) }
+      return { text: text.questRenderShown(shownSetting('render')) }
     }
     if ('demo' in asked) {
       startDemo()
@@ -97,7 +107,7 @@ const registerCommand = (on: On) => {
     }
     $.ui.invalidate('ui.render')
     await publishAbsorbing($)
-    return { text: text.questShown(asked.mode) }
+    return { text: text.questShown(shownSetting('mode')) }
   })
 }
 

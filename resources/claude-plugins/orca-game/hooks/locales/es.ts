@@ -59,6 +59,8 @@ export const ES: GameCatalog = {
     unknownMode: (asked) =>
       `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
     questRenderShown: (render) => `Render: ${render}.`,
+    sessionOverride: (value, configured, source) =>
+      `${value} (solo esta sesión; la configuración del proyecto es ${configured}${source ? `, de ${source}` : ''})`,
     unknownRender: (asked) =>
       `Render desconocido "${asked}". Usa /quest render classic o /quest render hd.`,
     moreAllies: (count) => `+${count} más`,

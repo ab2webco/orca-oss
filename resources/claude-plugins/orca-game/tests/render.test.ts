@@ -39,6 +39,7 @@ const agent = (name: string, state: string, isLeader = false): Agent => ({
 
 type World = {
   config: Record<string, unknown>
+  sources: Record<string, string>
   agents: Agent[]
   review: Record<string, unknown> | null
   extra: Record<string, unknown>
@@ -46,6 +47,7 @@ type World = {
 
 const worldOf = (patch: Partial<World> = {}): World => ({
   config: {},
+  sources: {},
   agents: [agent('lead', 'working', true)],
   review: null,
   extra: {},
@@ -54,7 +56,7 @@ const worldOf = (patch: Partial<World> = {}): World => ({
 
 const stateOf = (world: World) => ({
   config: world.config,
-  sources: {},
+  sources: world.sources,
   warnings: [],
   worktree: { id: 'wt-1', path: '/w', branch: 'feat/game', displayName: 'game' },
   agents: world.agents.map((one) => ({ agentType: 'claude', toolName: null, ...one })),
@@ -145,13 +147,46 @@ describe('/quest render', () => {
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
-    expect(await quest($, 'render hd')).toBe('Render: hd.')
-    expect(await quest($, '')).toMatch(/^Quest: on\. Render: hd\. /)
+    expect(await quest($, 'render hd')).toBe(
+      "Render: hd (this session; the project's setting is classic)."
+    )
+    expect(await quest($, '')).toMatch(
+      /^Quest: on\. Render: hd \(this session; the project's setting is classic\)\. /
+    )
     expect(await quest($, 'render neon')).toBe(
       'Unknown render "neon". Use /quest render classic or /quest render hd.'
     )
     expect(await quest($, 'render classic')).toBe('Render: classic.')
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
+  })
+
+  // Why: `game state` reports the config layers only, so a pane override must say it is one.
+  test('names the configured value and its layer beside a session override', async ($, on) => {
+    const clock = mock.clock(on)
+    const world = worldOf({
+      config: { mode: 'on', render: 'classic' },
+      sources: { mode: 'project', render: 'default' }
+    })
+    engine(on, {}, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+    const render = "hd (this session; the project's setting is classic, from default)"
+    expect(await quest($, 'render hd')).toBe(`Render: ${render}.`)
+    const mode = "zen (this session; the project's setting is on, from project)"
+    expect(await quest($, 'zen')).toBe(`Quest: ${mode}.`)
+    expect(await quest($, '')).toContain(`Quest: ${mode}. Render: ${render}. /quest off`)
+    expect(await quest($, 'on')).toBe('Quest: on.')
+    expect(await quest($, 'render classic')).toBe('Render: classic.')
+  })
+
+  test('says it in Spanish', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { ORCA_GAME_LOCALE: 'es' }, worldOf({ sources: { render: 'default' } }))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+    expect(await quest($, 'render hd')).toBe(
+      'Render: hd (solo esta sesión; la configuración del proyecto es classic, de default).'
+    )
   })
 
   test('starts from the launch env and follows Orca’s live config', async ($, on) => {

@@ -50,6 +50,8 @@ export type TextStrings = {
   questDemo: string
   unknownMode: (asked: string) => string
   questRenderShown: (render: string) => string
+  /** A /quest value that differs from the config, with the configured one and its layer when known. */
+  sessionOverride: (value: string, configured: string, source?: string) => string
   unknownRender: (asked: string) => string
   moreAllies: (count: number) => string
   /** `kind` is PR or MR, after the project's host. */
@@ -165,6 +167,8 @@ const EN: GameStrings = {
     unknownMode: (asked) =>
       `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
     questRenderShown: (render) => `Render: ${render}.`,
+    sessionOverride: (value, configured, source) =>
+      `${value} (this session; the project's setting is ${configured}${source ? `, from ${source}` : ''})`,
     unknownRender: (asked) =>
       `Unknown render "${asked}". Use /quest render classic or /quest render hd.`,
     moreAllies: (count) => `+${count} more`,
