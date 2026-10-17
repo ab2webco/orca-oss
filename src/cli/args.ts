@@ -228,6 +228,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
         'agent',
         'environment',
         'diagnostics',
+        'game',
         'linear',
         'plane',
         'skills',
@@ -235,6 +236,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
         'vm'
       ].includes(commandPath[0])) ||
     (commandPath.length === 2 && commandPath[0] === 'agent' && commandPath[1] === 'hooks') ||
+    (commandPath.length === 2 && commandPath[0] === 'game' && commandPath[1] === 'scene') ||
     (commandPath.length === 2 && commandPath[0] === 'speech' && commandPath[1] === 'models') ||
     (commandPath.length === 2 &&
       commandPath[0] === 'storage' &&
