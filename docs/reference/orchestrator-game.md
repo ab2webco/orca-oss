@@ -370,10 +370,28 @@ The lead's verbs, run from the lead's terminal
   in progress, QA, to do, so the To Do past the in-progress ones is known to it; the Panel draws 3
   per status heading and counts the rest in "+N more".
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
-  ticket not yet done). `--close` releases each one's dispatch, or closes its terminal when no
+  ticket not yet done). `--close` records each in `game history`, then releases each one's dispatch, or closes its terminal when no
   dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
+- `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn
+  ([`orchestrator-game-member-report.ts`](../../src/shared/orchestrator-game-member-report.ts)).
+  **Now**: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines
+  without escape codes. **Since launch**: every dispatch of its task (retries included), the last 10
+  messages between it and the lead (questions, answers, `worker_done` bodies, 600 characters each),
+  its last 10 commits since the base, PR, CI and ticket status. A part Orca cannot read this time is
+  listed under `notes` and the rest still prints. The lead's rules have it read this before telling
+  the person anything about a member.
+- `orca game history [--ticket <id>] [--since <date>]` — the project's members already freed, newest
+  first: ticket, repo, branch, agent, account, launch and end time, outcome (`merged`, `qa`,
+  `stopped`, `failed`, `limited`), PR and last report. `game sweep --close` and `game stop` write a
+  member's record before freeing it; if the host cannot take it (an Orca without history), the
+  member is freed anyway and the result says `history not recorded: …`. The records live on the Orca
+  host that runs the lead, one file per project (the lead worktree's repo, so SSH and folder projects
+  too) under the app's data folder, `orchestrator-game-history/`, keeping the last 200
+  ([`orchestrator-game-history-store.ts`](../../src/main/runtime/orchestrator-game-history-store.ts)).
+  They are written through `game.historyRecord` and read through `game.history`, two RPC methods a
+  host older than this does not have; `game history` then says to update Orca.
 - `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
   reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
   usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
