@@ -58,6 +58,7 @@ import {
   OrchestratorGameLookRows,
   orchestratorGameRenderLabels
 } from './OrchestratorGameRenderSetting'
+import { OrchestratorGameScenesSkillCard } from './OrchestratorGameScenesSkillCard'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -196,6 +197,7 @@ export function OrchestratorGameSetting({
           }
         />
       </SearchableSetting>
+      <OrchestratorGameScenesSkillCard />
     </section>
   )
 }

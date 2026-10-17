@@ -20,6 +20,7 @@ import {
   getClaudeStatusLineTitle
 } from './claude-statusline-items-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
+import { getOrcaGameScenesSkillSearchEntries } from './orca-game-scenes-skill-search'
 import { translate } from '@/i18n/i18n'
 import { searchKeywords, translateSearchKeyword, uniqueKeywords } from './settings-search-keywords'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
@@ -150,6 +151,7 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.agents.search.checks', 'checks')
     ]
   },
+  ...getOrcaGameScenesSkillSearchEntries(),
   ...getAgentCacheTimerSearchEntries()
 ])
 

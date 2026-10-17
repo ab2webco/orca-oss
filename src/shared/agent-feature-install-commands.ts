@@ -17,6 +17,7 @@ export const PLANE_AGENT_SKILL_NAMES = [ORCA_PLANE_SKILL_NAME] as const
 export const SWITCH_ACCOUNT_SKILL_NAME = 'switch-account'
 export const SWITCH_ACCOUNT_AGENT_SKILL_NAMES = [SWITCH_ACCOUNT_SKILL_NAME] as const
 export const ORCA_GAME_SCENES_SKILL_NAME = 'orca-game-scenes'
+export const ORCA_GAME_SCENES_AGENT_SKILL_NAMES = [ORCA_GAME_SCENES_SKILL_NAME] as const
 
 // Why: `skills add` resolves names against the repo it is given, so a fork-only
 // skill asked for from upstream comes back "No matching skills found" — every
@@ -230,3 +231,13 @@ export const SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstal
 
 export const SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(SWITCH_ACCOUNT_SKILL_NAME)
+
+// Why the fork URL: the Agent Teams game and its scene format ship only in this lab fork.
+export const ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand(
+  [ORCA_GAME_SCENES_SKILL_NAME],
+  { repositoryUrl: ORCA_LAB_SKILLS_REPOSITORY_URL }
+)
+
+export const ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND = buildAgentFeatureSkillUpdateCommand(
+  ORCA_GAME_SCENES_SKILL_NAME
+)
