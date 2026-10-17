@@ -3,6 +3,8 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
 import { syncActionCommands } from './action-commands'
+import { ADVISOR_REPORT_ENV, advisorReportOf, isPinnedValue } from './advisor-report'
+import { readJevAdvisor } from './advisor-state'
 import { cliInvocationOf } from './cli-invocation'
 import {
   gameStateArgvOf,
@@ -42,7 +44,11 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
 }
 
 /** Runs the Orca CLI, through cmd.exe when Orca handed a Windows batch file; undefined when it could not. */
-async function runCli($: EngineInterface, argv: readonly string[] | undefined) {
+async function runCli(
+  $: EngineInterface,
+  argv: readonly string[] | undefined,
+  extraEnv: Record<string, string> = {}
+) {
   if (argv === undefined) {
     return undefined
   }
@@ -51,15 +57,33 @@ async function runCli($: EngineInterface, argv: readonly string[] | undefined) {
   if (invocation === undefined) {
     return undefined
   }
-  const init = invocation.env
-    ? { timeoutMs: CLI_TIMEOUT_MS, env: invocation.env }
-    : { timeoutMs: CLI_TIMEOUT_MS }
+  const env = { ...invocation.env, ...extraEnv }
+  const init =
+    Object.keys(env).length > 0 ? { timeoutMs: CLI_TIMEOUT_MS, env } : { timeoutMs: CLI_TIMEOUT_MS }
   return await $.process.run(invocation.argv, init).catch(() => undefined)
+}
+
+// Module state: whether Orca holds a report from this pane that a Jev gone quiet must take back.
+let hasReportedAdvisor = false
+
+/** Jev's model, effort and Orca's pins for this pane's lead; nothing while Jev never published. */
+async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>> {
+  const advisor = await readJevAdvisor($, quest.tick).catch(() => null)
+  if (advisor === null && !hasReportedAdvisor) {
+    return {}
+  }
+  const [model, effort] = await Promise.all([
+    $.env.get('ORCA_AGENT_MODEL_PINNED').catch(() => undefined),
+    $.env.get('ORCA_AGENT_EFFORT_PINNED').catch(() => undefined)
+  ])
+  hasReportedAdvisor = advisor !== null
+  const pins = { model: isPinnedValue(model), effort: isPinnedValue(effort) }
+  return { [ADVISOR_REPORT_ENV]: advisorReportOf(advisor, pins) }
 }
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
   const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
-  const out = await runCli($, argv)
+  const out = await runCli($, argv, await advisorEnvOf($))
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 
