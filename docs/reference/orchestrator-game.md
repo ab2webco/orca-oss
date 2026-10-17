@@ -532,6 +532,14 @@ counts it once. A member pane (`role: member`) earns only its own work. Toasts n
 of it off. The board's `claimed` event is not in `game state`, so a launch is read from the member
 appearing there instead.
 
+**Lead subagents.** In a lead session the mod refuses Claude Code's `Agent` and `Task` tools
+(`classic.PreToolUse`, [`lead-subagent-guard.ts`](../../resources/claude-plugins/orca-game/hooks/lead-subagent-guard.ts)),
+and the refusal names `orca game launch`. Until the first `game state` arrives the call runs, since
+the role is unknown. A subagent that runs anyway counts as a working teammate in the band and the
+Fleet pane until its turn completes or it makes no call for ten minutes
+([`lead-subagents.ts`](../../resources/claude-plugins/orca-game/hooks/lead-subagents.ts)). Members
+and sessions outside the game are not refused.
+
 ## The shared board: events, STOP and inboxes
 
 What one member did or asked outlives its tab and its account, so the lead can answer from it

@@ -12,6 +12,9 @@ import { registerStateCommand } from './state-command'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
 import { clawdReact } from './quest-runtime'
+import { leadSubagentDenyOf } from './lead-subagent-guard'
+import { noteSubagentCall, noteSubagentDone, runningLeadSubagents } from './lead-subagents'
+import { viewOf } from './fleet-sync'
 import { questToolCall, questTurnComplete } from './quest-turns'
 
 export const register: Register = (on) => {
@@ -42,13 +45,28 @@ export const register: Register = (on) => {
     if (e.agentId === undefined) {
       void refreshSoon($).catch(() => undefined)
       void syncLeadName($).catch(() => undefined)
+    } else {
+      noteSubagentDone(runningLeadSubagents, e.agentId)
     }
     return next(e)
   })
 
-  on('tool.call', ($, e, next) => {
+  on('tool.call', async ($, e, next) => {
     questToolCall(String(e.tool), e, e.agentId)
+    if (e.agentId !== undefined) {
+      noteSubagentCall(runningLeadSubagents, e.agentId, String(e.tool), await $.clock.now())
+    }
     return next(e)
+  })
+
+  on('classic.PreToolUse', async ($, e, next) => {
+    const { state } = await viewOf($)
+    const reason = leadSubagentDenyOf({
+      role: state?.role,
+      tool: String(e.tool),
+      cli: (await $.env.get('ORCA_GAME_CLI').catch(() => undefined)) ?? 'orca'
+    })
+    return reason === null ? next(e) : { deny: reason }
   })
 
   on('prompt.submit', ($, e, next) => {

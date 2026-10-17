@@ -15,6 +15,13 @@ describe('gameLeadBriefOf', () => {
     expect(brief).not.toContain('Project rules')
   })
 
+  it('forbids Claude Code subagents and points the lead to a member launch', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('Never use the Agent or Task tool')
+    expect(brief).toContain('`orca game launch <ticket> --prompt <task>`')
+  })
+
   it('names the fleet verbs: status, a wave from the To Do, a verified sweep and a push', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
