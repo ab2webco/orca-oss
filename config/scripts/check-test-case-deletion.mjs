@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url'
 
 // An empty argv slot reaches here as '' from `pnpm run … -- "$SHA"` when the SHA is
 // missing, and git then answers with its usage text rather than an error.
-const requestedRef = (process.argv[2] ?? '').trim()
+// pnpm also passes the `--` itself through, so it is not the ref.
+const args = process.argv.slice(2)
+const requestedRef = ((args[0] === '--' ? args[1] : args[0]) ?? '').trim()
 const baseRef = requestedRef === '' ? 'origin/main' : requestedRef
 
 const allowlistPath = fileURLToPath(new URL('../deleted-test-cases.txt', import.meta.url))

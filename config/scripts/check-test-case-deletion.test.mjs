@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // The gate's whole job is counting cases in a source file, so that is what is worth
@@ -33,5 +35,14 @@ describe('test case deletion gate', () => {
     const before = "it('a', () => {})\nit('b', () => {})"
     const after = "it('a', () => {})"
     expect(countCases(after)).toBeLessThan(countCases(before))
+  })
+
+  // Why: `pnpm run check:test-case-deletion -- "$SHA"` (pr.yml) hands the script a literal `--`.
+  it('takes the base ref after the `--` pnpm passes through', () => {
+    const script = fileURLToPath(new URL('./check-test-case-deletion.mjs', import.meta.url))
+    const output = execFileSync('node', [script, '--', 'no-such-ref-for-this-test'], {
+      encoding: 'utf8'
+    })
+    expect(output).toContain('no-such-ref-for-this-test is not present')
   })
 })
