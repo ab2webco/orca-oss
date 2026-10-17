@@ -83,6 +83,17 @@ scripts), asks what to integrate one question at a time, shows the YAML, writes 
 and clears every `orca game state` warning. Its key summary is
 [`skills/setup/reference.md`](../../resources/claude-plugins/orca-game/skills/setup/reference.md).
 
+To read what a pane resolved, run `/orca-game:state` there: the mod runs `game state --json` through
+the CLI Orca handed the pane (`ORCA_GAME_CLI`, through `cmd.exe` for a Windows `.cmd`, so no pane
+shell is involved) and prints each setting with the layer that set it, the mode and render
+this session set itself, the lead and its members with their slots, a held STOP, warnings and links
+([`state-report.ts`](../../resources/claude-plugins/orca-game/hooks/state-report.ts)). In a session
+Orca did not start with its game it says so instead. Every game command lives under `/orca-game:`
+(`state`, `mode`, `render`, `demo`, `quest`, `setup`, `lead`), each a plugin skill the mod answers
+without a model turn, because the engine refuses a `:` in a name a mod registers; `/quest` stays as
+the mod-registered short form that runs mid-turn. Project buttons (`actions[].command`) keep the
+names the project chose.
+
 Each field resolves on its own; a later layer wins
 ([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)):
 
@@ -305,7 +316,7 @@ Where the To Do comes from, first match wins:
 4. Issues assigned to me on the repo's GitHub or GitLab.
 
 The Fleet pane lists both, each item a link colored by its CI or status, with hotkeys `g` (my PRs
-list) and `t` (To Do list). `/quest demo` shows them with fake data. A provider that fails costs
+list) and `t` (To Do list). `/orca-game:demo` shows them with fake data. A provider that fails costs
 only its own chip.
 
 ## Actions: buttons and slash commands
@@ -619,8 +630,11 @@ so Pet hearts Clawd, the hero, as before.
 `timezone`; the mod mirrors both in
 [`game-render.ts`](../../resources/claude-plugins/orca-game/hooks/game-render.ts)). It resolves per
 key like the rest, reaches the pane as `ORCA_GAME_RENDER` and `ORCA_GAME_TIMEZONE` at launch and
-through `game state` afterwards, and `/quest render classic|hd` overrides it for the session the way
-`/quest on|zen|off` overrides the mode; `/quest` alone prints both. `orca game state` prints
+through `game state` afterwards, and `/orca-game:render classic|hd` overrides it for this pane's
+session the way `/orca-game:mode on|zen|off` overrides the mode; either alone prints both. The host
+never learns of an override, so `game state` keeps reporting the configured value, and both commands
+say which is which: `Render: hd (this session; the project's setting is classic, from default).`
+`orca game state` prints
 `Render: hd (from project), timezone America/Bogota (from global)`, and an unknown render or a zone
 the runtime does not know is dropped with a warning (Settings refuses such a zone on entry).
 
@@ -665,7 +679,7 @@ On top of that hd adds:
   flash, a teammate starting to wait floats `<name> needs you!` in red, a merged review floats
   `#N merged!` with a white flash, and CI turning red flashes red, shakes the scene a column for a
   few ticks and rains from a grey cloud. The first refresh of a session plays nothing (a CI red for
-  hours is not news), `/quest demo` draws its party but no floats or marches, and a floating text
+  hours is not news), `/orca-game:demo` draws its party but no floats or marches, and a floating text
   wider than the scene is skipped while one that would cover a cloud rises beside it
   ([`team-events.ts`](../../resources/claude-plugins/orca-game/hooks/team-events.ts)).
 - **The thought cloud** carries what the hero says: puffs along its top, a highlight and a shadow, a
@@ -825,7 +839,7 @@ same block in a project's scene file, a plugin's scene and a built-in one.
 
 Other `why` values (`kept-pointer`, `teammate`, `no-jev`…) play nothing but still reach the Panel.
 The bubble keeps only width-1 characters, so an arrow or CJK text in Jev's words is left out. In
-`/quest zen` the routine `chosen` and `same` decisions play their gesture without a bubble.
+`/orca-game:mode zen` the routine `chosen` and `same` decisions play their gesture without a bubble.
 
 - **The Panel card** names the advisor, its main `model·effort` and Jev's line, and lists Jev's
   last five decisions with their verdict, colored by gesture; before the first one it lists the
@@ -880,9 +894,9 @@ paint its own
   in the Panel ([The cast](#the-cast-a-pet-and-jevs-advisor)).
 - **Following the game.** The game publishes `{ plugin: 'orca-game', key: 'absorbing' }`, a
   `boolean` true exactly while it draws other plugins' lines (mode not `off`, HUD on), at load and
-  on every change: the env, Orca's live config and `/quest`. Jev reads it, so a pane where the game
-  stops drawing (`/quest off`, the HUD turned off in Settings) shows Jev's own line again, and one
-  where it starts never shows Jev twice. `/quest off` keeps the band (the HUD is its own switch) and
+  on every change: the env, Orca's live config and `/orca-game:mode`. Jev reads it, so a pane where the game
+  stops drawing (`/orca-game:mode off`, the HUD turned off in Settings) shows Jev's own line again, and one
+  where it starts never shows Jev twice. `/orca-game:mode off` keeps the band (the HUD is its own switch) and
   drops the strip, since the other plugins then draw for themselves.
 - **One bad row.** An advisor value Jev extends with a row the strip cannot read loses that row
   only; the rest of Jev still draws. Any other `version` draws no Jev row.

@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { GameConfig } from '../types'
+import type { GameConfig, GameSources } from '../types'
 import { isAdvisorCueEndingAt } from './advisor-state'
 import { DEMO_STEP_TICKS } from './demo'
 import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
@@ -12,6 +12,7 @@ import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene
 import { stageCellsOf } from './scene-frame'
 
 export {
+  configuredConfig,
   currentScene,
   demoNow,
   gameConfig,
@@ -67,7 +68,12 @@ export function questFleet(
   $.ui.invalidate('ui.render')
 }
 
-export function questLiveConfig($: EngineInterface, live: Partial<GameConfig>): void {
+export function questLiveConfig(
+  $: EngineInterface,
+  live: Partial<GameConfig>,
+  sources: GameSources = {}
+): void {
+  quest.liveSources = sources
   if (JSON.stringify(live) === JSON.stringify(quest.liveConfig)) {
     return
   }

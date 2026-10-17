@@ -12,6 +12,12 @@ export type GameConfig = {
   timezone: string
 }
 
+/** The config layer a key's value came from, as `orca game state` names it. */
+export type GameSource = 'default' | 'global' | 'project' | 'local'
+
+/** Each config key's layer; `tracker` is Orca's own key the mod does not draw. */
+export type GameSources = Partial<Record<keyof GameConfig | 'tracker', GameSource>>
+
 /** The 5-row pixel art, or the 9 to 10-row 2D-HD scene. */
 export type GameRender = 'classic' | 'hd'
 
@@ -257,6 +263,8 @@ export type GameSceneExtension = { id: string; pluginId: string; definition: Sce
 
 export type GameState = {
   config: Partial<GameConfig>
+  /** Absent from a host that sends no layers. */
+  sources?: GameSources
   warnings: string[]
   worktree: GameWorktree | null
   agents: GameAgent[]

@@ -14,6 +14,7 @@ import type {
 } from '../types'
 import { gameActionsOf, gamePromptOf } from './game-action-shape'
 import { gameLeadOf } from './game-lead'
+import { gameSourcesOf } from './game-sources'
 import { isTerminalHandle } from './game-config'
 import { lookConfigOf } from './game-render'
 import { httpUrlOf } from './http-url'
@@ -282,6 +283,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
   const warnings = Array.isArray(body.warnings) ? body.warnings : []
   return {
     config: configOf(body.config),
+    ...gameSourcesOf(body.sources),
     warnings: warnings.filter((one): one is string => typeof one === 'string'),
     worktree: worktreeOf(body.worktree),
     agents: Array.isArray(body.agents) ? body.agents.flatMap(agentOf) : [],

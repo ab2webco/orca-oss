@@ -1,7 +1,9 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
-import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey, questCommandOf } from './quest-policy'
+import { GAME_COMMANDS, QUEST_ALIAS, gameCommandOf, type GameCommand } from './game-commands'
+import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
+  configuredConfig,
   currentScene,
   gameConfig,
   publishAbsorbing,
@@ -19,6 +21,15 @@ import { SCENE_KEY, sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
+
+// Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
+const shownSetting = (key: 'mode' | 'render'): string => {
+  const value = gameConfig()[key]
+  const configured = configuredConfig()[key]
+  return value === configured
+    ? value
+    : gameStrings().text.sessionOverride(value, configured, quest.liveSources[key])
+}
 
 function hidden($: EngineInterface, e: RenderInput) {
   const { Box } = $.ui.resolve(e)
@@ -57,7 +68,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
   await ready($)
   await $.command
     .register({
-      name: 'quest',
+      name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
       argumentHint: '[off|on|zen|demo|render classic|hd]',
       immediate: true
@@ -65,23 +76,23 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .catch(() => undefined)
 }
 
-const registerCommand = (on: On) => {
-  on('command.run', { command: 'quest' }, async ($, e) => {
+const registerCommand = (on: On, command: GameCommand) => {
+  on('command.run', { command }, async ($, e) => {
     await ready($)
-    const asked = questCommandOf(e.args)
+    const asked = gameCommandOf(command, e.args)
     const text = gameStrings().text
     if ('error' in asked) {
       return { text: asked.error }
     }
     if ('show' in asked) {
-      const mode = quest.isDemo ? 'demo' : gameConfig().mode
-      const render = text.questRenderShown(gameConfig().render)
+      const mode = quest.isDemo ? 'demo' : shownSetting('mode')
+      const render = text.questRenderShown(shownSetting('render'))
       return { text: `${text.questShown(mode)} ${render} ${text.questModesHelp}` }
     }
     if ('render' in asked) {
       quest.renderOverride = asked.render
       $.ui.invalidate('ui.render')
-      return { text: text.questRenderShown(asked.render) }
+      return { text: text.questRenderShown(shownSetting('render')) }
     }
     if ('demo' in asked) {
       startDemo()
@@ -97,7 +108,7 @@ const registerCommand = (on: On) => {
     }
     $.ui.invalidate('ui.render')
     await publishAbsorbing($)
-    return { text: text.questShown(asked.mode) }
+    return { text: text.questShown(shownSetting('mode')) }
   })
 }
 
@@ -241,7 +252,10 @@ const registerCards = (on: On) => {
 }
 
 export const registerQuest = (on: On): void => {
-  registerCommand(on)
+  const commands: readonly GameCommand[] = [QUEST_ALIAS, ...GAME_COMMANDS]
+  for (const command of commands) {
+    registerCommand(on, command)
+  }
   registerNotes(on)
   registerSpinner(on)
   registerQuietRows(on)

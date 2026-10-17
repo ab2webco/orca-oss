@@ -88,6 +88,28 @@ async function readState($: EngineInterface): Promise<GameState | undefined> {
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 
+/** What a fresh `orca game state --json` answered, for a report the person asked for. */
+export type GameStateOutput =
+  | { kind: 'missing' }
+  | { kind: 'failed'; reason: string }
+  | { kind: 'ok'; stdout: string }
+
+export async function readGameStateOutput($: EngineInterface): Promise<GameStateOutput> {
+  const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
+  if (argv === undefined) {
+    return { kind: 'missing' }
+  }
+  const out = await runCli($, argv)
+  if (out === undefined) {
+    return { kind: 'failed', reason: `${argv[0]} could not be started` }
+  }
+  if (out.exitCode !== 0) {
+    const line = (out.stderr.trim() || out.stdout.trim()).split('\n')[0]?.trim() ?? ''
+    return { kind: 'failed', reason: `exit ${out.exitCode}${line === '' ? '' : `: ${line}`}` }
+  }
+  return { kind: 'ok', stdout: out.stdout }
+}
+
 /** Brings a teammate's Orca pane forward; false when Orca could not. */
 export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
@@ -147,7 +169,7 @@ export async function refresh($: EngineInterface): Promise<void> {
     if (setContributedScenes(next.extensions.scenes.map((one) => one.definition))) {
       $.ui.invalidate('ui.render')
     }
-    questLiveConfig($, next.config)
+    questLiveConfig($, next.config, next.sources)
   }
   const config = gameConfig()
   const xp =

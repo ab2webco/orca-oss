@@ -303,7 +303,7 @@ describe('quest mode', () => {
     expect(await off.find({ type: 'Raster' })).toBeUndefined()
     await off.unmount()
     const zen = await $.command.run({ command: 'quest', args: 'zen' } as never)
-    expect(zen).toMatchObject({ text: 'Quest: zen.' })
+    expect(zen).toMatchObject({ text: "Quest: zen (this session; the project's setting is off)." })
     const loud = await $.command.run({ command: 'quest', args: 'loud' } as never)
     expect(loud).toMatchObject({ text: expect.stringMatching(/^Unknown mode/) })
     const on2 = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })

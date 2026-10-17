@@ -1,4 +1,4 @@
-import type { GameConfig, GameRender } from '../types'
+import type { GameConfig, GameRender, GameSources } from '../types'
 import { advisorSpriteOf } from './advisor-art'
 import { advisorPoseAt, isAdvisorActingAt } from './advisor-state'
 import { demoFrameOf, type DemoFrame } from './demo'
@@ -23,6 +23,7 @@ export type Stage = { columns: number; rows: number; render: GameRender }
 type QuestRuntime = {
   envConfig: GameConfig
   liveConfig: Partial<GameConfig>
+  liveSources: GameSources
   modeOverride: GameConfig['mode'] | undefined
   renderOverride: GameRender | undefined
   tick: number
@@ -56,6 +57,7 @@ type QuestRuntime = {
 export const quest: QuestRuntime = {
   envConfig: DEFAULT_GAME_CONFIG,
   liveConfig: {},
+  liveSources: {},
   modeOverride: undefined,
   renderOverride: undefined,
   tick: 0,
@@ -86,6 +88,10 @@ export const quest: QuestRuntime = {
 
 export const gameConfig = (): GameConfig =>
   effectiveConfigOf(quest.envConfig, quest.liveConfig, quest.modeOverride, quest.renderOverride)
+
+/** The config without this session's /quest overrides: what Orca's layers and the launch env say. */
+export const configuredConfig = (): GameConfig =>
+  effectiveConfigOf(quest.envConfig, quest.liveConfig, undefined)
 
 export const currentScene = (): SceneDefinition => sceneOf(gameConfig().scene)
 

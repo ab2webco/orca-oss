@@ -48,10 +48,10 @@ describe('the render and the clock in the mod', () => {
     expect(questCommandOf('render hd')).toEqual({ render: 'hd' })
     expect(questCommandOf(' RENDER Classic ')).toEqual({ render: 'classic' })
     expect(questCommandOf('render neon')).toEqual({
-      error: 'Unknown render "neon". Use /quest render classic or /quest render hd.'
+      error: 'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
     })
     expect(questCommandOf('render')).toEqual({
-      error: 'Unknown render "". Use /quest render classic or /quest render hd.'
+      error: 'Unknown render "". Use /orca-game:render classic or /orca-game:render hd.'
     })
   })
 

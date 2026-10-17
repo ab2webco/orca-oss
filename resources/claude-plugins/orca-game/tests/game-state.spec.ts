@@ -55,6 +55,24 @@ describe('parseGameState', () => {
     expect(parsed?.workItem).toEqual(STATE.workItem)
   })
 
+  it('keeps the layer of each config key Orca names, dropping unknown keys and layers', () => {
+    const sources = {
+      mode: 'project',
+      render: 'default',
+      tracker: 'local',
+      hud: 'env',
+      extra: 'global'
+    }
+    expect(parseGameState(JSON.stringify({ ...STATE, sources }))?.sources).toEqual({
+      mode: 'project',
+      render: 'default',
+      tracker: 'local'
+    })
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, sources: 'project' }))?.sources
+    ).toBeUndefined()
+  })
+
   it('unwraps the CLI result envelope', () => {
     const parsed = parseGameState(JSON.stringify({ id: 'x', ok: true, result: STATE }))
     expect(parsed?.agents).toHaveLength(2)
