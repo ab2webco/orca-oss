@@ -61,7 +61,7 @@ const modelEffortOf = (model: string | null, effort: string | number | null): st
 const agentKeyOf = (agent: AdvisorAgent): string =>
   [agent.id, agent.why, agent.model, agent.effort].map(String).join('|')
 
-const decisionOf = (agent: AdvisorAgent): AdvisorDecision => ({
+export const decisionOf = (agent: AdvisorAgent): AdvisorDecision => ({
   key: agentKeyOf(agent),
   title: agent.title,
   model: agent.model,

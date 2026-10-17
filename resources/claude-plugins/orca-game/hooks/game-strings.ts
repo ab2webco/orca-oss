@@ -16,6 +16,11 @@ export type TextStrings = {
   pet: string
   /** Pet with the scene pet's name, as in "Pet Steve". */
   petNamed: (name: string) => string
+  /** The Panel card's name for an advisor a scene left unnamed. */
+  advisor: string
+  /** The main conversation's model change, in the advisor card. */
+  advisorMain: string
+  advisorEmpty: string
   close: string
   view: string
   fleet: string
@@ -112,6 +117,9 @@ const EN: GameStrings = {
     refresh: 'Refresh',
     pet: 'Pet',
     petNamed: (name) => `Pet ${name}`,
+    advisor: 'Advisor',
+    advisorMain: 'main conversation',
+    advisorEmpty: 'No decisions yet',
     close: 'Close',
     view: 'View',
     fleet: 'Fleet',

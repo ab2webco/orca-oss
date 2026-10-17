@@ -251,4 +251,44 @@ describe('Jev’s advisor', () => {
     await clock.settle()
     expect(await spinnerCells($)).toBe(before)
   })
+
+  test(
+    'has a Panel card with its name, the main model and its last decisions',
+    WITH_JEV,
+    async ($, on) => {
+      const clock = mock.clock(on)
+      engine(
+        on,
+        { TEST_ADVISOR: FIRST, TEST_ADVISOR_NEXT: LOWERED, ORCA_GAME_LOCALE: 'es' },
+        undefined
+      )
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      await $.turn.complete(TURN)
+      await clock.settle()
+      const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+      const card = await pane.find({ type: 'Box', key: 'advisor-card' })
+      expect(card).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: /Árbitro/ })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: /^Opus 5\.5·high$/ })).toBeDefined()
+      expect(
+        await pane.find({ type: 'Text', text: /Task a2 · Sonnet 5·medium · Sonnet basta/ })
+      ).toBeDefined()
+      expect(
+        await pane.find({ type: 'Text', text: /Task a1 · Opus 5\.5·medium · igual/ })
+      ).toBeDefined()
+      await pane.unmount()
+    }
+  )
+
+  test('has no Panel card without Jev', WITH_JEV, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, {}, undefined)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    expect(await pane.find({ type: 'Text', text: /^ ♥ Pet $/ })).toBeDefined()
+    expect(await pane.find({ type: 'Box', key: 'advisor-card' })).toBeUndefined()
+    await pane.unmount()
+  })
 })

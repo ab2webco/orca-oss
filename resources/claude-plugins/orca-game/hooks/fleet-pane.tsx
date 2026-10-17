@@ -1,6 +1,7 @@
 import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { GameAgent } from '../types'
+import { advisorCard } from './advisor-card'
 import { petLabelOf } from './band-chips'
 import { fitCells } from './cell-width'
 import {
@@ -81,10 +82,12 @@ export const registerFleetPane = (on: On): void => {
         {menu('quit', 'q', `✕ ${text.close}`, close)}
       </Box>
     )
+    const advisor = await advisorCard($, e, palette)
     if (v.state === null) {
       return (
         <Box flexDirection="column">
           <Text dimColor>{`${text.fleet} · ${v.note === '' ? text.loading : v.note}`}</Text>
+          {advisor}
           {menuRow}
         </Box>
       )
@@ -254,6 +257,7 @@ export const registerFleetPane = (on: On): void => {
             </Box>
           </Box>
         ))}
+        {advisor}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={10}>
