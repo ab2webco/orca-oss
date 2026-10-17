@@ -832,6 +832,24 @@ The bubble keeps only width-1 characters, so an arrow or CJK text in Jev's words
   agents running now. The decisions live in the game's own `$.state`
   `{ plugin: 'orca-game', key: 'advisor' }` (`{ decisions: [...] }`), written when Jev writes its
   value.
+- **Each member's Jev, on the lead's Panel.** Pane state does not cross panes, so a member pane's
+  mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
+  Jev switches the main model or effort): `ORCA_GAME_ADVISOR` in the CLI's env, JSON
+  `{ version: 1, model, effort, pinned: { model, effort } }`, with `pinned` read from
+  `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, or `null` once Jev stops after a report. A pane
+  where Jev never published sends nothing. The CLI passes it to `game.state` as an optional
+  `advisor` param, the host keeps it per pane in memory (a restart refills it within one poll, a
+  report not renewed for 3 minutes expires) and puts it on that member's row of its lead's state as
+  an optional `advisor` (`{ model, effort, pinned, previous? }`, `previous` being what Jev had it on
+  before its latest switch)
+  ([`orchestrator-game-member-advisors.ts`](../../src/main/runtime/orchestrator-game-member-advisors.ts)).
+  The member card draws `◆ Jev Sonnet 5.5·high · model pinned` (Jev's name, then the pin, dropped
+  on a narrow card, never the model) and, after a switch, `↳ Opus 5.5 → Sonnet 5.5`, naming only
+  what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not
+  a flag, because an older CLI ignores it where an unknown flag could fail the poll and a Windows `.cmd` CLI refuses `"` in its arguments; an
+  older host strips the param and an older mod ignores the field, so any mix of versions just shows
+  no Jev row. A member gets the mod only where it runs in Agent Teams (today local), so an SSH member
+  reports nothing.
 
 ## Scenes from plugins
 

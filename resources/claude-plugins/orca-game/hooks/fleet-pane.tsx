@@ -26,6 +26,7 @@ import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './que
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
 import { agentTagOf, cardTagRoomOf, limitTagOf } from './member-tags'
+import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
@@ -124,8 +125,17 @@ export const registerFleetPane = (on: On): void => {
       ...advisorTiles
     ])
     const counts = countsOf(state.agents)
+    const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
+    const advisorRowsOf = (agent: GameAgent) =>
+      (agent.advisor === undefined ? [] : memberAdvisorLinesOf(agent.advisor, cardRoom)).map(
+        (line, row) => (
+          <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
+            {line}
+          </Text>
+        )
+      )
     const worktreeId = state.worktree?.id ?? ''
     const link = (key: string, url: string, label: string, child: RenderElement) =>
       gameLinkOf($, e, { key, url, worktreeId, label }, child)
@@ -164,6 +174,7 @@ export const registerFleetPane = (on: On): void => {
           </Text>
           {v.note !== '' && <Text color="yellow">{v.note}</Text>}
           {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
+          {fleetModels !== null && <Text color={palette.gold}>{fleetModels}</Text>}
         </Box>
         {needs.map((need) => (
           <Text key={`need-${need.name}`} color="red" wrap="truncate-end">
@@ -215,6 +226,7 @@ export const registerFleetPane = (on: On): void => {
                   {limitTagOf(agent.limit, Date.now())}
                 </Text>
               )}
+              {advisorRowsOf(agent)}
               <Text wrap="truncate-end">{member.says}</Text>
               {(agent.review !== undefined || agent.workItem !== undefined) && (
                 <Box flexDirection="row" gap={1}>

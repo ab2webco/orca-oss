@@ -42,6 +42,17 @@ export type GameAgent = {
   limit?: GameMemberLimit
   /** The managed account a member's agent runs on; absent when Orca's own selection applies. */
   account?: GameMemberAccount
+  /** What Jev in the member's own pane has it on; absent without Jev there or from an older Orca. */
+  advisor?: GameMemberAdvisor
+}
+
+/** A model and effort as Jev names them; null where Jev set none. */
+export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
+
+/** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
+export type GameMemberAdvisor = GameMemberAdvisorPick & {
+  pinned: { model: boolean; effort: boolean }
+  previous?: GameMemberAdvisorPick
 }
 
 export type GameMemberLimit = { resetsAt: number | null }

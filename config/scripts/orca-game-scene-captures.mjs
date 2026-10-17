@@ -28,6 +28,7 @@ import { advisorTileGridOf } from './advisor-tile'
 import { advisorOf } from './allies'
 import { TILE_COLUMNS, tileGridOf } from './fleet-tiles'
 import { gameStrings, setGameLocale } from './game-strings'
+import { memberAdvisorLinesOf } from './member-advisor'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 export const SCENE_IDS = Object.keys(SCENES)
 export const sceneOfFile = (text) => {
@@ -62,6 +63,17 @@ export const cardsOf = ({ scene, isLogged }) => {
   return { card, tileColumns: TILE_COLUMNS, palette: definition.band,
     tile: advisorTileGridOf(sprite, card.pose, 0), member: tileGridOf(definition, 'working', 'working', 0),
     empty: gameStrings().text.advisorEmpty }
+}
+const MEMBER_JEV = { model: 'Sonnet 5.5', effort: 'high', pinned: { model: true, effort: false },
+  previous: { model: 'Opus 5.5', effort: 'high' } }
+// A member card of the lead's Panel, with the row its own Jev reports or without one.
+export const memberCardOf = ({ scene, withJev, columns }) => {
+  setGameLocale('es')
+  const definition = typeof scene === 'string' ? SCENES[scene] : scene
+  const jev = withJev ? memberAdvisorLinesOf(MEMBER_JEV, columns - TILE_COLUMNS - 3) : []
+  return { tileColumns: TILE_COLUMNS, tile: tileGridOf(definition, 'working', 'working', 0),
+    lines: [[['CIN-5', 'cyan'], ['trabajando', 'cyan']], ...jev.map((line) => [[line, definition.band.gold]]),
+      [['editando fleet-pane.tsx', '#dddddd']]] }
 }
 `
 
@@ -165,7 +177,9 @@ const main = async () => {
     outfile: bundle,
     logLevel: 'warning'
   })
-  const { SCENE_IDS, gridOf, cardsOf, sceneOfFile } = await import(pathToFileURL(bundle).href)
+  const { SCENE_IDS, gridOf, cardsOf, memberCardOf, sceneOfFile } = await import(
+    pathToFileURL(bundle).href
+  )
   const custom = sceneFile === undefined ? [] : [sceneOfFile(await readFile(sceneFile, 'utf8'))]
   const browser = await chromium.launch()
   const page = await browser.newPage({ deviceScaleFactor: 1 })
@@ -226,6 +240,21 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
   await sheetOf(
     'cards',
     shots.slice(cardShots).map((path) => path.slice(out.length + 1, -'.png'.length))
+  )
+  const memberShots = shots.length
+  for (const scene of [...SCENE_IDS, ...custom]) {
+    const id = typeof scene === 'string' ? scene : 'scene-file'
+    for (const columns of [60, 40]) {
+      for (const withJev of [true, false]) {
+        const card = memberCardOf({ scene, withJev, columns })
+        const grid = cardGridOf(columns, card.tile, card.tileColumns, card.lines, colorOf('cyan'))
+        await shoot(`member-${id}-${withJev ? 'jev' : 'no-jev'}-${columns}`, grid, columns)
+      }
+    }
+  }
+  await sheetOf(
+    'members',
+    shots.slice(memberShots).map((path) => path.slice(out.length + 1, -'.png'.length))
   )
   await browser.close()
   await rm(bundle)

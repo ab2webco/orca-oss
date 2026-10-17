@@ -55,6 +55,7 @@ import type {
 import type { GlobalSettings } from '../../shared/types'
 import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
+import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
@@ -90,6 +91,7 @@ export type OrchestratorGameStateInput = {
   readLinkedStatus?: ReadLinkedStatus
   accountOf?: GameMemberAccountOf
   limitOf?: GameMemberLimitOf
+  advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
@@ -249,6 +251,7 @@ export async function buildOrchestratorGameState(
     readLinkedStatus: input.readLinkedStatus,
     accountOf: input.accountOf,
     limitOf: input.limitOf,
+    advisorOf: input.advisorOf,
     leadWorktreeId: input.worktree?.id ?? null
   })
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null

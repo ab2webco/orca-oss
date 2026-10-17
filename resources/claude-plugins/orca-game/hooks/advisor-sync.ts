@@ -1,6 +1,7 @@
 import type { On } from 'claude-code'
 
 import { logDecisions, observeAdvisor } from './advisor-state'
+import { refreshSoon } from './fleet-sync'
 import { quest } from './quest-runtime'
 
 export const registerAdvisor = (on: On): void => {
@@ -11,6 +12,10 @@ export const registerAdvisor = (on: On): void => {
     // Why: a gesture that starts while the lead is idle needs the band to mount the scene.
     $.ui.invalidate('ui.render')
     await logDecisions($, decisions, await $.clock.now())
+    // Why: a new main model or effort reaches the lead's Panel without waiting for the poll.
+    if (decisions.some((one) => one.title === null)) {
+      void refreshSoon($).catch(() => undefined)
+    }
     return written
   })
 }

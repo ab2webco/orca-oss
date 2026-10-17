@@ -10,6 +10,7 @@ import {
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
 import type { GameMemberLimit } from '../../shared/orchestrator-game-member-limit'
+import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
@@ -91,6 +92,8 @@ export async function gameFleetOf(args: {
   readLinkedStatus: ReadLinkedStatus | undefined
   accountOf?: GameMemberAccountOf
   limitOf?: GameMemberLimitOf
+  /** What a member pane's own Jev last reported; read only for members. */
+  advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** The lead's worktree, where a member without one of its own runs. */
   leadWorktreeId?: string | null
 }): Promise<GameAgent[]> {
@@ -141,6 +144,7 @@ export async function gameFleetOf(args: {
               })
             )
           : null
+      const advisor = isMember ? (args.advisorOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,
         ...(isMember ? { isMember: true } : {}),
@@ -149,7 +153,8 @@ export async function gameFleetOf(args: {
         ...(workItem ? { workItem } : {}),
         ...(activity ? { activity } : {}),
         ...(account ? { account } : {}),
-        ...(limit ? { limit } : {})
+        ...(limit ? { limit } : {}),
+        ...(advisor ? { advisor } : {})
       }
     })
   )

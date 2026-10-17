@@ -21,6 +21,7 @@ import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
 import { memberAccountOf, memberLimitOf } from './member-tags'
+import { memberAdvisorOf } from './member-advisor'
 
 const parseJson = (text: string): unknown => {
   try {
@@ -205,6 +206,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const workItem = worktree ? workItemOf(value.workItem) : null
   const limit = memberLimitOf(value.limit)
   const account = memberAccountOf(value.account)
+  const advisor = memberAdvisorOf(value.advisor)
   return [
     {
       paneKey,
@@ -220,7 +222,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(review === null ? {} : { review }),
       ...(workItem === null ? {} : { workItem }),
       ...(limit === undefined ? {} : { limit }),
-      ...(account === undefined ? {} : { account })
+      ...(account === undefined ? {} : { account }),
+      ...(advisor === undefined ? {} : { advisor })
     }
   ]
 }

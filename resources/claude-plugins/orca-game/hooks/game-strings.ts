@@ -74,6 +74,10 @@ export type TextStrings = {
   actionCommandGone: (command: string) => string
   /** A member stopped by its account's usage limit; `backIn` like "1h 30m", null when unknown. */
   limited: (backIn: string | null) => string
+  /** Which of a member's model and effort Orca pinned at launch; empty for neither. */
+  advisorPinned: (pinned: { model: boolean; effort: boolean }) => string
+  /** One model in the fleet's summary of what Jev has the members on. */
+  membersOn: (count: number, model: string) => string
 }
 
 export type LeadActionKey = 'wave' | 'status' | 'push' | 'sweep' | 'stop'
@@ -191,7 +195,16 @@ const EN: GameStrings = {
     actionCommandRefused: (command) =>
       `/${command} is taken by another command; use its button in the band or the Panel`,
     actionCommandGone: (command) => `/${command} is no longer one of this project's actions`,
-    limited: (backIn) => (backIn === null ? 'limited' : `limited · back in ${backIn}`)
+    limited: (backIn) => (backIn === null ? 'limited' : `limited · back in ${backIn}`),
+    advisorPinned: ({ model, effort }) =>
+      model && effort
+        ? 'model and effort pinned'
+        : model
+          ? 'model pinned'
+          : effort
+            ? 'effort pinned'
+            : '',
+    membersOn: (count, model) => `${count} on ${model}`
   },
   art: {
     needsYou: 'needs you!',

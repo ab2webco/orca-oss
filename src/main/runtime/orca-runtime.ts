@@ -665,6 +665,7 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
+import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
@@ -3602,6 +3603,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameMemberAdvisors = new GameMemberAdvisors()
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(90_000)
   private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
@@ -30341,7 +30343,12 @@ export class OrcaRuntimeService {
     worktreeId?: string
     terminalHandle?: string
     paneKey?: string
+    /** The calling member pane's Jev report, kept for its lead's state. */
+    advisor?: unknown
   }): Promise<OrchestratorGameState> {
+    if (args.paneKey && args.advisor !== undefined) {
+      this.gameMemberAdvisors.noteReport(args.paneKey, args.advisor, Date.now())
+    }
     const worktreesById = await this.getResolvedWorktreeMap()
     let worktreeId = args.worktreeId
     if (!worktreeId && args.terminalHandle) {
@@ -30400,6 +30407,7 @@ export class OrcaRuntimeService {
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
       limitOf: (member) => this.gameMemberLimitFor(member),
+      advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       leaderPaneKey: args.paneKey ?? null,
       callerParentPaneKey: args.paneKey
         ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
