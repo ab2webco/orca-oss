@@ -15,10 +15,12 @@ allowed-tools: Bash
 
 # /lead — make this session the project's lead
 
-1. **Rules.** Run the Orca CLI this session was started with:
+1. **Rules.** Run the Orca CLI this session was started with. If `ORCA_GAME_CLI` is empty, Orca
+   did not start this session with its game: say so and stop. Never fall back to a bare `orca`,
+   which on Linux is usually the GNOME screen reader.
 
    ```bash
-   "${ORCA_GAME_CLI:-orca}" game lead
+   "$ORCA_GAME_CLI" game lead
    ```
 
    If it says a lead launched this session, stop here and tell the person this is a member
@@ -30,6 +32,6 @@ allowed-tools: Bash
    talking to you. When the watch ends or times out, start it again, silently.
 
 3. **Fleet.** Finish with one short status in the person's language, from
-   `"${ORCA_GAME_CLI:-orca}" game state --json`: each member (`isMember`) with its ticket, state,
+   `"$ORCA_GAME_CLI" game state --json`: each member (`isMember`) with its ticket, state,
    PR and CI, and what needs the person. With no members yet, say you are ready and ask which
    ticket to start.

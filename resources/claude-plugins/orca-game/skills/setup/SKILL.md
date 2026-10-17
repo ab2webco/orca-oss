@@ -15,7 +15,9 @@ allowed-tools: Bash, Read, Edit, Write, AskUserQuestion
 
 Talk in the person's language. Ask **one question at a time** (AskUserQuestion when available,
 with the detected option first), and never write a value they did not confirm.
-`CLI` below is `"${ORCA_GAME_CLI:-orca}"`.
+`CLI` below is `"$ORCA_GAME_CLI"`, the absolute path Orca sets in its game panes. If it is empty,
+say this session was not started by Orca's game and stop; never run a bare `orca` (on Linux it is
+usually the GNOME screen reader).
 
 ## 1. Read what is there
 
