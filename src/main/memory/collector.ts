@@ -374,6 +374,7 @@ async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> 
   for (const pty of ptys) {
     let sessionCpu = 0
     let sessionMemory = 0
+    const sessionPids: number[] = []
 
     if (pty.pid != null) {
       for (const pid of collectSubtree(processIndex, pty.pid)) {
@@ -385,6 +386,7 @@ async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> 
           continue
         }
         claimed.add(pid)
+        sessionPids.push(pid)
         sessionCpu += row.cpu
         sessionMemory += row.memory
       }
@@ -395,7 +397,8 @@ async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> 
       paneKey: pty.paneKey,
       pid: pty.pid ?? 0,
       cpu: clampNumber(sessionCpu),
-      memory: clampNumber(sessionMemory)
+      memory: clampNumber(sessionMemory),
+      ...(footprintByPid ? { footprint: sumFootprint(footprintByPid, sessionPids) } : {})
     }
 
     let bucket: WorktreeBucket

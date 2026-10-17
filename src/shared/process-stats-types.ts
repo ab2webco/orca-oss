@@ -42,6 +42,8 @@ export type SessionMemory = UsageValues & {
   sessionId: string
   paneKey: string | null
   pid: number
+  /** Subtree phys_footprint (macOS). Absent where unavailable; optional for older hosts on the wire. */
+  footprint?: number | null
 }
 
 /** The top-level cpu/memory are the sum of sessions. */
