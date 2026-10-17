@@ -242,8 +242,9 @@ describe("the lead's Panel", () => {
     }
     await start($, on, {}, [], leadState(advisor))
     const ui = await pane($)
-    const row = '◆ Jev Opus 5.5·high → Sonnet 5.5·high · model pinned'
-    expect(await ui.find({ type: 'Text', text: row })).toBeDefined()
+    const head = '◆ Jev Sonnet 5.5·high · model pinned'
+    expect(await ui.find({ type: 'Text', text: head })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '↳ Opus 5.5 → Sonnet 5.5' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '◆ 1 on Sonnet 5.5' })).toBeDefined()
     await ui.unmount()
   })

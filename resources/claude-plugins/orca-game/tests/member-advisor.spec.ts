@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
-import { fleetAdvisorSummaryOf, memberAdvisorTextOf } from '../hooks/member-advisor'
+import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from '../hooks/member-advisor'
 import type { GameMemberAdvisor } from '../types'
 
 afterEach(() => setGameLocale('en'))
@@ -45,36 +45,47 @@ describe("a member's Jev on its card", () => {
     expect(parseGameState(stateWith({}))?.agents[0]?.advisor).toBeUndefined()
   })
 
-  it('names the model and effort, the latest switch and the pin when the card has room', () => {
-    expect(memberAdvisorTextOf(SWITCHED, 80)).toBe(
-      '◆ Jev Opus 5.5·high → Sonnet 5.5·high · model pinned'
-    )
-    expect(memberAdvisorTextOf({ ...SWITCHED, previous: undefined }, 80)).toBe(
+  it('names the model, the effort and the pin, then the latest switch on its own line', () => {
+    expect(memberAdvisorLinesOf(SWITCHED, 80)).toEqual([
+      '◆ Jev Sonnet 5.5·high · model pinned',
+      '↳ Opus 5.5 → Sonnet 5.5'
+    ])
+    expect(memberAdvisorLinesOf({ ...SWITCHED, previous: undefined }, 80)).toEqual([
       '◆ Jev Sonnet 5.5·high · model pinned'
-    )
-    expect(memberAdvisorTextOf({ ...SWITCHED, pinned: { model: false, effort: false } }, 80)).toBe(
-      '◆ Jev Opus 5.5·high → Sonnet 5.5·high'
-    )
+    ])
+    expect(
+      memberAdvisorLinesOf({ ...SWITCHED, pinned: { model: false, effort: false } }, 80)
+    ).toEqual(['◆ Jev Sonnet 5.5·high', '↳ Opus 5.5 → Sonnet 5.5'])
   })
 
-  it('drops the pin, then its name, then the switch, never the model it is on now', () => {
-    expect(memberAdvisorTextOf(SWITCHED, 40)).toBe('◆ Jev Opus 5.5·high → Sonnet 5.5·high')
-    expect(memberAdvisorTextOf(SWITCHED, 34)).toBe('◆ Opus 5.5·high → Sonnet 5.5·high')
-    expect(memberAdvisorTextOf(SWITCHED, 32)).toBe('◆ Sonnet 5.5·high · model pinned')
-    expect(memberAdvisorTextOf(SWITCHED, 20)).toBe('◆ Sonnet 5.5·high')
-    expect(memberAdvisorTextOf(SWITCHED, 10)).toBe('◆ Sonnet …')
+  it('a switch names only what changed', () => {
+    const effort = { ...SWITCHED, effort: 'low', previous: { model: 'Sonnet 5.5', effort: 'high' } }
+    expect(memberAdvisorLinesOf(effort, 80)[1]).toBe('↳ high → low')
+    const both = { ...SWITCHED, previous: { model: 'Opus 5.5', effort: 'max' } }
+    expect(memberAdvisorLinesOf(both, 80)[1]).toBe('↳ Opus 5.5·max → Sonnet 5.5·high')
+    const same = { ...SWITCHED, previous: { model: 'Sonnet 5.5', effort: 'high' } }
+    expect(memberAdvisorLinesOf(same, 80)).toHaveLength(1)
+  })
+
+  it('drops Jev’s name, then the pin, never the model it is on now', () => {
+    expect(memberAdvisorLinesOf(SWITCHED, 34)[0]).toBe('◆ Sonnet 5.5·high · model pinned')
+    expect(memberAdvisorLinesOf(SWITCHED, 20)).toEqual([
+      '◆ Sonnet 5.5·high',
+      '↳ Opus 5.5 → Sonnet…'
+    ])
+    expect(memberAdvisorLinesOf(SWITCHED, 10)).toEqual(['◆ Sonnet …', '↳ Opus 5.…'])
   })
 
   it('says nothing for a Jev that names neither a model nor an effort', () => {
     const quiet = { model: null, effort: null, pinned: { model: true, effort: true } }
-    expect(memberAdvisorTextOf(quiet, 80)).toBeNull()
+    expect(memberAdvisorLinesOf(quiet, 80)).toEqual([])
   })
 
   it('speaks the session language', () => {
     setGameLocale('es')
-    expect(memberAdvisorTextOf({ ...SWITCHED, pinned: { model: true, effort: true } }, 80)).toBe(
-      '◆ Jev Opus 5.5·high → Sonnet 5.5·high · modelo y esfuerzo fijados'
-    )
+    expect(
+      memberAdvisorLinesOf({ ...SWITCHED, pinned: { model: true, effort: true } }, 80)[0]
+    ).toBe('◆ Jev Sonnet 5.5·high · modelo y esfuerzo fijados')
     expect(fleetAdvisorSummaryOf([{ advisor: SWITCHED }])).toBe('◆ 1 con Sonnet 5.5')
   })
 

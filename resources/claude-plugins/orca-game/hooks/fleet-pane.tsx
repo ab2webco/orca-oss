@@ -26,7 +26,7 @@ import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './que
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
 import { agentTagOf, cardTagRoomOf, limitTagOf } from './member-tags'
-import { fleetAdvisorSummaryOf, memberAdvisorTextOf } from './member-advisor'
+import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
@@ -128,14 +128,14 @@ export const registerFleetPane = (on: On): void => {
     const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
-    const advisorRowOf = (agent: GameAgent) => {
-      const said = agent.advisor === undefined ? null : memberAdvisorTextOf(agent.advisor, cardRoom)
-      return said === null ? null : (
-        <Text color={palette.gold} wrap="truncate-end">
-          {said}
-        </Text>
+    const advisorRowsOf = (agent: GameAgent) =>
+      (agent.advisor === undefined ? [] : memberAdvisorLinesOf(agent.advisor, cardRoom)).map(
+        (line, row) => (
+          <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
+            {line}
+          </Text>
+        )
       )
-    }
     const worktreeId = state.worktree?.id ?? ''
     const link = (key: string, url: string, label: string, child: RenderElement) =>
       gameLinkOf($, e, { key, url, worktreeId, label }, child)
@@ -226,7 +226,7 @@ export const registerFleetPane = (on: On): void => {
                   {limitTagOf(agent.limit, Date.now())}
                 </Text>
               )}
-              {advisorRowOf(agent)}
+              {advisorRowsOf(agent)}
               <Text wrap="truncate-end">{member.says}</Text>
               {(agent.review !== undefined || agent.workItem !== undefined) && (
                 <Box flexDirection="row" gap={1}>

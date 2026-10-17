@@ -29,24 +29,32 @@ export const memberAdvisorOf = (value: unknown): GameMemberAdvisor | undefined =
 const pickText = (pick: GameMemberAdvisorPick): string =>
   [pick.model ?? '', pick.effort ?? ''].filter((one) => one !== '').join('·')
 
-/** The card's Jev row cut to `room` cells: the pin goes first, then Jev's name, then the switch. */
-export const memberAdvisorTextOf = (advisor: GameMemberAdvisor, room: number): string | null => {
+const fitted = (tries: readonly string[], room: number): string =>
+  tries.find((one) => cellWidthOf(one) <= room) ?? fitCells(tries.at(-1) ?? '', room)
+
+// Why only what changed: "Opus 5.5 → Sonnet 5.5" reads at a glance where the full pair would not fit.
+const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): string => {
+  const isModelSame = before.model === now.model
+  const isEffortSame = before.effort === now.effort
+  if (isModelSame && isEffortSame) {
+    return ''
+  }
+  const side = (pick: GameMemberAdvisorPick) =>
+    isModelSame ? (pick.effort ?? '') : isEffortSame ? (pick.model ?? '') : pickText(pick)
+  return `↳ ${side(before) || '?'} → ${side(now) || '?'}`
+}
+
+/** The card's Jev rows cut to `room` cells: Jev's name goes first, then the pin, never the model. */
+export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): string[] => {
   const now = pickText(advisor)
   if (now === '') {
-    return null
+    return []
   }
-  const before = advisor.previous === undefined ? '' : pickText(advisor.previous)
   const pins = gameStrings().text.advisorPinned(advisor.pinned)
-  const moved = before === '' ? now : `${before} → ${now}`
   const pinned = pins === '' ? '' : ` · ${pins}`
-  const tries = [
-    `◆ Jev ${moved}${pinned}`,
-    `◆ Jev ${moved}`,
-    `◆ ${moved}`,
-    `◆ ${now}${pinned}`,
-    `◆ ${now}`
-  ]
-  return tries.find((one) => cellWidthOf(one) <= room) ?? fitCells(`◆ ${now}`, room)
+  const head = fitted([`◆ Jev ${now}${pinned}`, `◆ ${now}${pinned}`, `◆ ${now}`], room)
+  const moved = advisor.previous === undefined ? '' : switchOf(advisor.previous, advisor)
+  return moved === '' ? [head] : [head, fitCells(moved, room)]
 }
 
 /** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev names a model; null for none. */
