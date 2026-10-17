@@ -51,7 +51,7 @@ const WITH_JEV = { plugins: [JEV] }
 
 type Run = { argv: string[]; env: Record<string, string> | undefined }
 
-const engine = (on: On, env: Record<string, string>, runs: Run[]) => {
+const engine = (on: On, env: Record<string, string>, runs: Run[], state: unknown = STATE) => {
   mock.env(on, { ORCA_GAME_CLI: '/opt/orca/bin/orca', ComSpec: COMSPEC, ...env })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
@@ -68,7 +68,7 @@ const engine = (on: On, env: Record<string, string>, runs: Run[]) => {
     return {
       value: {
         exitCode: 0,
-        stdout: JSON.stringify(STATE),
+        stdout: JSON.stringify(state),
         stderr: '',
         isStdoutTruncated: false,
         isStderrTruncated: false
@@ -77,9 +77,15 @@ const engine = (on: On, env: Record<string, string>, runs: Run[]) => {
   })
 }
 
-const start = async ($: Engine, on: On, env: Record<string, string>, runs: Run[]) => {
+const start = async (
+  $: Engine,
+  on: On,
+  env: Record<string, string>,
+  runs: Run[],
+  state: unknown = STATE
+) => {
   const clock = mock.clock(on)
-  engine(on, env, runs)
+  engine(on, env, runs, state)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
   return clock
@@ -186,5 +192,66 @@ describe("a member pane's Jev report", () => {
         pinned: { model: false, effort: true }
       })
     })
+  })
+})
+
+const member = (advisor?: unknown) => ({
+  paneKey: 'tab-4:m',
+  displayName: 'CIN-5',
+  agentType: 'claude',
+  state: 'working',
+  toolName: null,
+  isLeader: false,
+  isMember: true,
+  ...(advisor === undefined ? {} : { advisor })
+})
+
+const leadState = (advisor?: unknown) => ({
+  ...STATE,
+  role: 'lead',
+  agents: [
+    { ...member(), paneKey: 'tab-1:lead', displayName: 'lead', isLeader: true, isMember: false },
+    member(advisor)
+  ]
+})
+
+const pane = ($: Engine) =>
+  $.ui.mount({
+    plugin: 'orca-game',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'orca-game-fleet',
+    viewport: { columns: 124, rows: 60, isFullscreen: true },
+    props: {
+      title: 'Fleet',
+      isFocused: true,
+      bodyColumns: 120,
+      placement: 'dock',
+      scroll: { offset: 0, bodyRows: 50 },
+      view: {}
+    }
+  })
+
+describe("the lead's Panel", () => {
+  test("shows on a member's card what its Jev has it on, and sums up the fleet", async ($, on) => {
+    const advisor = {
+      model: 'Sonnet 5.5',
+      effort: 'high',
+      pinned: { model: true, effort: false },
+      previous: { model: 'Opus 5.5', effort: 'high' }
+    }
+    await start($, on, {}, [], leadState(advisor))
+    const ui = await pane($)
+    const row = '◆ Jev Opus 5.5·high → Sonnet 5.5·high · model pinned'
+    expect(await ui.find({ type: 'Text', text: row })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '◆ 1 on Sonnet 5.5' })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('draws no Jev row for a member whose Orca or Jev sends none', async ($, on) => {
+    await start($, on, {}, [], leadState())
+    const ui = await pane($)
+    expect(await ui.find({ type: 'Text', text: /◆/ })).toBeUndefined()
+    await ui.unmount()
   })
 })

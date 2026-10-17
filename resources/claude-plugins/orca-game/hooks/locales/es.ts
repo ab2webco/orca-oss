@@ -89,7 +89,16 @@ export const ES: GameCatalog = {
     actionCommandRefused: (command) =>
       `/${command} ya lo usa otro comando; usa su botón en la banda o en el Panel`,
     actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`,
-    limited: (backIn) => (backIn === null ? 'limitado' : `limitado · vuelve en ${backIn}`)
+    limited: (backIn) => (backIn === null ? 'limitado' : `limitado · vuelve en ${backIn}`),
+    advisorPinned: ({ model, effort }) =>
+      model && effort
+        ? 'modelo y esfuerzo fijados'
+        : model
+          ? 'modelo fijado'
+          : effort
+            ? 'esfuerzo fijado'
+            : '',
+    membersOn: (count, model) => `${count} con ${model}`
   },
   art: {
     needsYou: '¡te necesita!',
