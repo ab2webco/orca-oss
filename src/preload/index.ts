@@ -125,6 +125,7 @@ import type {
   WorktreeRemoteBranchConflictEvent,
   WorktreeSetupLaunch
 } from '../shared/types'
+import type { MemoryPressureState } from '../shared/memory-pressure-types'
 import type { PtyModelRestoreNeededEvent } from '../shared/pty-model-restore-marker'
 import type { PtyListedSession } from '../shared/pty-listed-session'
 import type {
@@ -4576,7 +4577,19 @@ const api = {
   },
 
   memory: {
-    getSnapshot: (): Promise<MemorySnapshot> => ipcRenderer.invoke('memory:getSnapshot')
+    getSnapshot: (): Promise<MemorySnapshot> => ipcRenderer.invoke('memory:getSnapshot'),
+    getPressureWarning: (): Promise<MemoryPressureState> =>
+      ipcRenderer.invoke('memory:pressure:get'),
+    refreshPressureWarning: (): Promise<MemoryPressureState> =>
+      ipcRenderer.invoke('memory:pressure:refresh'),
+    dismissPressureWarning: (episodeId: number): Promise<void> =>
+      ipcRenderer.invoke('memory:pressure:dismiss', episodeId),
+    onPressureWarning: (callback: (state: MemoryPressureState) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: MemoryPressureState): void =>
+        callback(state)
+      ipcRenderer.on('memory:pressure:changed', listener)
+      return () => ipcRenderer.removeListener('memory:pressure:changed', listener)
+    }
   },
 
   claudeUsage: createUsageProviderApi(ipcRenderer, 'claudeUsage'),

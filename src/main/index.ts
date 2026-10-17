@@ -296,6 +296,8 @@ import {
 import { registerLiveTranscriptPathsProvider } from './claude-accounts/shared-transcript-store'
 import { publishStatuslineResetCountdown } from './claude/statusline-reset-countdown'
 import { StarNagService } from './star-nag/service'
+import { createMemoryPressureService } from './memory/memory-pressure-service'
+import { registerMemoryPressureHandlers } from './ipc/memory-pressure'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
 import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provider-session-invalidation'
 import { createHookStatusSessionTabsInvalidator } from './agent-hooks/hook-status-session-tabs-invalidation'
@@ -424,6 +426,7 @@ let pendingUnpairedDeviceAuthFailure = false
 let headlessBrowserDisplayAvailable = false
 
 let starNag: StarNagService | null = null
+let memoryPressure: ReturnType<typeof createMemoryPressureService> | null = null
 let agentAwakeService: AgentAwakeService | null = null
 let crashReports: CrashReportStore | null = null
 let unsubscribeAgentAwakeStatusChanges: (() => void) | null = null
@@ -3080,6 +3083,9 @@ void app.whenReady().then(async () => {
   starNag = new StarNagService(store, stats)
   starNag.start()
   starNag.registerIpcHandlers()
+  memoryPressure = createMemoryPressureService(store, runtimeService)
+  registerMemoryPressureHandlers(memoryPressure.monitor)
+  memoryPressure.monitor.start()
   runtimeService.setAgentBrowserBridge(
     new AgentBrowserBridge(browserManager, {
       onTabsChanged: (worktreeId) => runtimeService.notifyMobileSessionTabsChanged(worktreeId)
@@ -3506,6 +3512,7 @@ app.on('will-quit', (e) => {
   destroySystemTray()
   // Why: stats.flushAsync() must precede killAllPty() so still-running agents emit synthetic agent_stop events (killAllPty skips runtime.onPtyExit()). It closes them out synchronously and only defers the write.
   starNag?.stop()
+  memoryPressure?.dispose()
   automations?.stop()
   // Why: plugin hosts are forked children; dispose sends shutdown and
   // escalates to SIGKILL so they cannot outlive the app. The promise joins

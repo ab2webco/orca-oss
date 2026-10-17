@@ -892,7 +892,12 @@ function createWebPreloadApi(): Partial<PreloadApi> {
         }))
     },
     memory: {
-      getSnapshot: () => Promise.resolve(createEmptyMemorySnapshot())
+      getSnapshot: () => Promise.resolve(createEmptyMemorySnapshot()),
+      // Why: the web client has no local terminals to measure; the host warns on its own screen.
+      getPressureWarning: () => Promise.resolve({ warning: null }),
+      refreshPressureWarning: () => Promise.resolve({ warning: null }),
+      dismissPressureWarning: () => Promise.resolve(),
+      onPressureWarning: () => () => {}
     },
     aiVault: createAiVaultApi(),
     preflight: createPreflightApi(),

@@ -11512,6 +11512,11 @@ export class OrcaRuntimeService {
     return this.ptyOutputSequenceById.get(ptyId) ?? 0
   }
 
+  /** Null until the PTY prints in this app session (restored PTYs start unknown). */
+  getPtyLastOutputAt(ptyId: string): number | null {
+    return this.ptysById.get(ptyId)?.lastOutputAt ?? null
+  }
+
   private getPtyLifecycleGeneration(ptyId: string): number {
     const existing = this.ptyLifecycleGenerationById.get(ptyId)
     if (existing !== undefined) {
