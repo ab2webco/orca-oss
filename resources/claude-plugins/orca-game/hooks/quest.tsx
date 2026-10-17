@@ -4,6 +4,7 @@ import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey, questCommandOf } from
 import {
   currentScene,
   gameConfig,
+  publishAbsorbing,
   quest,
   ready,
   resetQuest,
@@ -77,6 +78,7 @@ const registerCommand = (on: On) => {
     if ('demo' in asked) {
       startDemo()
       $.ui.invalidate('ui.render')
+      await publishAbsorbing($)
       return { text: text.questDemo }
     }
     quest.isDemo = false
@@ -85,6 +87,7 @@ const registerCommand = (on: On) => {
       quest.stages.clear()
     }
     $.ui.invalidate('ui.render')
+    await publishAbsorbing($)
     return { text: text.questShown(asked.mode) }
   })
 }

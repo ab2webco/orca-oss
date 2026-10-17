@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
-import { registerAllies } from './allies-strip'
+import { clearAllies, registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
@@ -20,6 +20,7 @@ export const register: Register = (on) => {
   registerActionCommands(on)
 
   on('session.start', async ($, e, next) => {
+    await clearAllies($)
     const started = await next(e)
     await questSessionStart($).catch(() => undefined)
     $.clock.every(POLL_EVERY_MS, () => {

@@ -10,6 +10,7 @@ import {
   type AllyRow,
   type AllyTone
 } from './allies'
+import { isAbsorbingConfig } from './game-config'
 import { gameStrings } from './game-strings'
 import { currentScene, gameConfig, ready } from './quest-runtime'
 import type { BandPalette } from './scenes/scene-definition'
@@ -18,11 +19,7 @@ const ALLIES = { plugin: 'orca-game', key: 'allies' } as const
 const JEV_ADVISOR = { plugin: 'orca-jev-mod-skills', key: 'advisor' } as const
 const MAX_ALLY_ROWS = 6
 
-/** The game draws what other plugins show only while it is on screen: a mode and its band. */
-export const isAbsorbing = (): boolean => {
-  const config = gameConfig()
-  return config.mode !== 'off' && config.hud
-}
+export const isAbsorbing = (): boolean => isAbsorbingConfig(gameConfig())
 
 // A tone left out reads in the scene's parchment.
 const TONE_COLORS: Readonly<Partial<Record<AllyTone, string>>> = {
@@ -83,6 +80,11 @@ export async function alliesStrip(
       {rows.map(rowOf)}
     </Box>
   ]
+}
+
+// Why: a plugin disabled, reloaded or crashed never clears its line; each session starts with none.
+export async function clearAllies($: EngineInterface): Promise<void> {
+  await $.state.set(ALLIES, { statuses: [] }).catch(() => undefined)
 }
 
 export const registerAllies = (on: On): void => {

@@ -234,7 +234,13 @@ export type AlliesState = { statuses: AllyStatus[] }
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
-    'orca-game': { fleet: FleetState; allies: AlliesState; actions: ActionRuns }
+    'orca-game': {
+      fleet: FleetState
+      allies: AlliesState
+      actions: ActionRuns
+      /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */
+      absorbing: boolean
+    }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
     'orca-jev-mod-skills': { advisor: unknown }
   }

@@ -2,7 +2,12 @@ import type { EngineInterface } from 'claude-code'
 
 import type { GameConfig } from '../types'
 import { DEMO_STEP_TICKS, demoFrameOf, type DemoFrame } from './demo'
-import { DEFAULT_GAME_CONFIG, effectiveConfigOf, gameConfigOfEnv } from './game-config'
+import {
+  DEFAULT_GAME_CONFIG,
+  effectiveConfigOf,
+  gameConfigOfEnv,
+  isAbsorbingConfig
+} from './game-config'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
 import {
   actionOf,
@@ -80,10 +85,25 @@ export const quest: QuestRuntime = {
 }
 
 let loading: Promise<void> | undefined
+let publishedAbsorbing: boolean | undefined
 let ticker: { cancel(): void } | undefined
 
 export const gameConfig = (): GameConfig =>
   effectiveConfigOf(quest.envConfig, quest.liveConfig, quest.modeOverride)
+
+const ABSORBING = { plugin: 'orca-game', key: 'absorbing' } as const
+
+// Why: Jev reads the env once; this follows /quest and Orca's live config so it never draws twice or not at all.
+export async function publishAbsorbing($: EngineInterface): Promise<void> {
+  const absorbing = isAbsorbingConfig(gameConfig())
+  if (absorbing === publishedAbsorbing) {
+    return
+  }
+  publishedAbsorbing = absorbing
+  await $.state.set(ABSORBING, absorbing).catch(() => {
+    publishedAbsorbing = undefined
+  })
+}
 
 export const currentScene = (): SceneDefinition => sceneOf(gameConfig().scene)
 
@@ -174,6 +194,7 @@ export function questLiveConfig($: EngineInterface, live: Partial<GameConfig>): 
   }
   quest.liveConfig = live
   $.ui.invalidate('ui.render')
+  void publishAbsorbing($)
 }
 
 async function blitAll($: EngineInterface): Promise<void> {
@@ -234,6 +255,7 @@ async function load($: EngineInterface): Promise<void> {
     ORCA_GAME_HUD: hud,
     ORCA_GAME_REWARDS: rewards
   })
+  await publishAbsorbing($)
   const rows = (await $.session.messages().catch(() => [])) as readonly StoredRow[]
   const restored = restoredNotesOf(rows)
   for (const key of restored.notes) {
@@ -262,6 +284,7 @@ export function startDemo(): void {
 
 export function resetQuest(): void {
   loading = undefined
+  publishedAbsorbing = undefined
   for (const store of [quest.notes, quest.replies]) {
     store.clear()
   }

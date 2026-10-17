@@ -51,6 +51,10 @@ export const effectiveConfigOf = (
   ...(modeOverride === undefined ? {} : { mode: modeOverride })
 })
 
+/** The game draws other plugins' lines only while it is on screen: a mode and its band. */
+export const isAbsorbingConfig = (config: GameConfig): boolean =>
+  config.mode !== 'off' && config.hud
+
 const ABSOLUTE_PATH = /^(?:\/|[A-Za-z]:[\\/])/
 
 // Why: on Linux a bare `orca` is the GNOME screen reader; only the absolute path Orca hands over is run.

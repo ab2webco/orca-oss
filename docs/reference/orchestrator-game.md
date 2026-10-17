@@ -456,9 +456,19 @@ paint its own
   user's own `statusLine` is not a plugin call and is never touched.
 - **Jev.** The strip reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
   `AdvisorState`, `version: 1`) without depending on Jev: its line with model·effort, one row per
-  running subagent (title, model, verdict), its CI rows and its latest notice. Any other version or
-  shape is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
+  running subagent (title, model, verdict), its CI rows and its latest notice. Any other version, or
+  a value that is not an advisor, is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
   value is written; nothing polls it.
+- **Following the game.** The game publishes `{ plugin: 'orca-game', key: 'absorbing' }`, a
+  `boolean` true exactly while it draws other plugins' lines (mode not `off`, HUD on), at load and
+  on every change: the env, Orca's live config and `/quest`. Jev reads it, so a pane where the game
+  stops drawing (`/quest off`, the HUD turned off in Settings) shows Jev's own line again, and one
+  where it starts never shows Jev twice. `/quest off` keeps the band (the HUD is its own switch) and
+  drops the strip, since the other plugins then draw for themselves.
+- **One bad row.** An advisor value Jev extends with a row the strip cannot read loses that row
+  only; the rest of Jev still draws. Any other `version` draws no Jev row.
+- **Stale lines.** Each session starts with no held status, so a plugin that was disabled, reloaded
+  or crashed without clearing its line leaves nothing behind.
 - **Zen** keeps one row: Jev's line, or else the latest status.
 - **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, drawn under
   the strip, and a `ui.resolve` hook paints every other plugin's `Text` in the scene palette (a
