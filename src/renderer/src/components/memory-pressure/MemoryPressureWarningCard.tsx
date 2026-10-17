@@ -75,6 +75,8 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
   const enabled = useAppStore((s) => resolveMemoryPressureWarningSettings(s.settings ?? {}).enabled)
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
+  const terminalLayoutsByTabId = useAppStore((s) => s.terminalLayoutsByTabId)
+  const deferredSshSessionIdsByTabId = useAppStore((s) => s.deferredSshSessionIdsByTabId)
   const agentStatusByPaneKey = useAppStore((s) => s.agentStatusByPaneKey)
   const repos = useAppStore((s) => s.repos)
   const setActiveView = useAppStore((s) => s.setActiveView)
@@ -95,10 +97,19 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
     () => ({
       tabsByWorktree,
       ptyIdsByTabId,
+      terminalLayoutsByTabId,
+      deferredSshSessionIdsByTabId,
       agentStatusByPaneKey,
       repoConnectionIdById: new Map(repos.map((repo) => [repo.id, repo.connectionId ?? null]))
     }),
-    [tabsByWorktree, ptyIdsByTabId, agentStatusByPaneKey, repos]
+    [
+      tabsByWorktree,
+      ptyIdsByTabId,
+      terminalLayoutsByTabId,
+      deferredSshSessionIdsByTabId,
+      agentStatusByPaneKey,
+      repos
+    ]
   )
   const rows = useMemo(
     () => (warning ? buildMemoryPressureRows(warning.panes, ctx, Date.now()) : []),
@@ -133,7 +144,7 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
     }
     setClosing(true)
     try {
-      await window.api.pty.kill(closeTarget.sessionId)
+      await window.api.pty.kill(closeTarget.ptyId)
       notifyDaemonSessionInventoryInvalidated()
       const next = await window.api.memory.refreshPressureWarning()
       if (mountedRef.current) {
@@ -215,7 +226,7 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
           ) : (
             <ul className="flex flex-col divide-y divide-border/60 rounded-md border border-border/60">
               {rows.map((row) => (
-                <li key={row.sessionId} className="flex flex-col gap-0.5 px-2.5 py-2">
+                <li key={row.ptyId} className="flex flex-col gap-0.5 px-2.5 py-2">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium">
                       {row.title ?? untitledLabel()}

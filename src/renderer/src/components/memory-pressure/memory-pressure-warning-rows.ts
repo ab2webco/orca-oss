@@ -1,21 +1,25 @@
 import type { MemoryPressurePane } from '../../../../shared/memory-pressure-types'
 import type { AgentStatusEntry, AgentType } from '../../../../shared/agent-status-types'
-import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
+import {
+  buildResourceSessionBindingIndex,
+  type ResourceSessionBindingIndex
+} from '../status-bar/resource-session-bindings'
 
 export type MemoryPressureRowContext = {
-  tabsByWorktree: Record<
-    string,
-    readonly Pick<TerminalTab, 'id' | 'title' | 'defaultTitle' | 'customTitle'>[]
-  >
-  ptyIdsByTabId: Record<string, readonly string[]>
+  tabsByWorktree: Record<string, TerminalTab[]>
+  ptyIdsByTabId: Record<string, string[]>
+  terminalLayoutsByTabId: Record<string, TerminalLayoutSnapshot>
+  deferredSshSessionIdsByTabId: Record<string, string>
   agentStatusByPaneKey: Record<string, Pick<AgentStatusEntry, 'paneKey' | 'agentType'>>
   repoConnectionIdById: ReadonlyMap<string, string | null>
 }
 
 export type MemoryPressureRow = {
-  sessionId: string
+  /** Live PTY id: Close kills this. */
+  ptyId: string
   /** Null when no tab in this window owns the session; it can still be closed. */
   tabId: string | null
   paneKey: string | null
@@ -27,24 +31,25 @@ export type MemoryPressureRow = {
   idleMs: number | null
 }
 
+// Why the Resource Manager's index: restored background tabs are bound only by layout and
+// deferred-reattach wake hints until their pane mounts.
+function bindingIndex(ctx: MemoryPressureRowContext): ResourceSessionBindingIndex {
+  return buildResourceSessionBindingIndex({ ...ctx, workspaceSessionReady: true })
+}
+
 function findTab(
   pane: MemoryPressurePane,
-  ctx: MemoryPressureRowContext
-): Pick<TerminalTab, 'id' | 'title' | 'defaultTitle' | 'customTitle'> | null {
-  // Why both paths: warm-reattached daemon sessions are registered without a pane key.
+  ctx: MemoryPressureRowContext,
+  index: ResourceSessionBindingIndex
+): TerminalTab | null {
   const tabId =
     (pane.paneKey ? parsePaneKey(pane.paneKey)?.tabId : undefined) ??
-    Object.entries(ctx.ptyIdsByTabId).find(([, ptyIds]) => ptyIds.includes(pane.sessionId))?.[0]
-  if (!tabId) {
+    index.ptyIdToTabId.get(pane.ptyId)
+  const worktreeId = tabId ? index.tabIdToWorktreeId.get(tabId) : undefined
+  if (!tabId || !worktreeId) {
     return null
   }
-  for (const tabs of Object.values(ctx.tabsByWorktree)) {
-    const tab = tabs.find((candidate) => candidate.id === tabId)
-    if (tab) {
-      return tab
-    }
-  }
-  return null
+  return ctx.tabsByWorktree[worktreeId]?.find((candidate) => candidate.id === tabId) ?? null
 }
 
 function findAgentType(
@@ -71,13 +76,14 @@ export function buildMemoryPressureRows(
   ctx: MemoryPressureRowContext,
   now: number
 ): MemoryPressureRow[] {
+  const index = bindingIndex(ctx)
   return panes.map((pane) => {
-    const tab = findTab(pane, ctx)
+    const tab = findTab(pane, ctx, index)
     const tabId = tab?.id ?? null
     const title =
       tab?.customTitle?.trim() || tab?.title?.trim() || tab?.defaultTitle?.trim() || null
     return {
-      sessionId: pane.sessionId,
+      ptyId: pane.ptyId,
       tabId,
       paneKey: pane.paneKey,
       title,
@@ -92,14 +98,16 @@ export function buildMemoryPressureRows(
   })
 }
 
-/** Live terminal tabs in SSH-backed repos: their processes are remote and never measured. */
+/** Bound terminal tabs in SSH-backed repos: their processes are remote and never measured. */
 export function countRemoteTerminals(ctx: MemoryPressureRowContext): number {
+  const index = bindingIndex(ctx)
+  const boundTabIds = new Set(index.ptyIdToTabId.values())
   let count = 0
-  for (const [worktreeId, tabs] of Object.entries(ctx.tabsByWorktree)) {
-    if (!ctx.repoConnectionIdById.get(getRepoIdFromWorktreeId(worktreeId))) {
-      continue
+  for (const tabId of boundTabIds) {
+    const worktreeId = index.tabIdToWorktreeId.get(tabId)
+    if (worktreeId && ctx.repoConnectionIdById.get(getRepoIdFromWorktreeId(worktreeId))) {
+      count += 1
     }
-    count += tabs.filter((tab) => (ctx.ptyIdsByTabId[tab.id]?.length ?? 0) > 0).length
   }
   return count
 }

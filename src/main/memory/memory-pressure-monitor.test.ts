@@ -22,6 +22,7 @@ function reading(availablePercent: number, readAt = 0): MemoryPressureReading {
 
 const PANE: MemoryPressurePane = {
   sessionId: 'pty-1',
+  ptyId: 'pty-1',
   paneKey: 'tab-1:leaf-1',
   worktreeId: 'repo::/w',
   worktreeName: 'w',

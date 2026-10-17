@@ -73,7 +73,7 @@ describe('rankMemoryPressurePanes', () => {
           session('b', 950 * MIB, 300 * MIB)
         ])
       ]),
-      () => null,
+      (id) => ({ ptyId: id, lastOutputAt: null }),
       5
     )
 
@@ -93,13 +93,15 @@ describe('rankMemoryPressurePanes', () => {
         ],
         'working-set'
       ),
-      (id) => (id === 'b' ? 1_700 : null),
+      // Why a distinct pty id: the registry's session id and the live PTY id can differ.
+      (id) => ({ ptyId: `pty-${id}`, lastOutputAt: id === 'b' ? 1_700 : null }),
       5
     )
 
     expect(ranked).toEqual([
       {
         sessionId: 'b',
+        ptyId: 'pty-b',
         paneKey: 'tab-b:leaf-b',
         worktreeId: 'folder::/Users/me/notes',
         worktreeName: 'folder::/Users/me/notes-name',
@@ -118,7 +120,7 @@ describe('rankMemoryPressurePanes', () => {
         worktree(ORPHAN_WORKTREE_ID, 'Other', [session('o', 50 * MIB), session('zero', 0)]),
         worktree('wt-a', 'cineco', [session('a', 70 * MIB), session('c', 60 * MIB)])
       ]),
-      () => null,
+      (id) => ({ ptyId: id, lastOutputAt: null }),
       2
     )
 
@@ -126,7 +128,7 @@ describe('rankMemoryPressurePanes', () => {
     expect(
       rankMemoryPressurePanes(
         snapshot([worktree(ORPHAN_WORKTREE_ID, 'Other', [session('o', 5)])]),
-        () => null,
+        (id) => ({ ptyId: id, lastOutputAt: null }),
         5
       )[0].worktreeId
     ).toBeNull()

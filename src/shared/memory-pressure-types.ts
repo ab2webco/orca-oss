@@ -15,8 +15,10 @@ export type MemoryPressureReading = {
 export type MemoryPressurePaneMetric = 'phys-footprint' | 'rss' | 'working-set'
 
 export type MemoryPressurePane = {
-  /** The PTY id the Resource Manager kills and the renderer binds to a tab. */
+  /** The collector's session key (registry session id, else PTY id). */
   sessionId: string
+  /** Live PTY id: what a tab binds, idle time is keyed by, and Close kills. */
+  ptyId: string
   paneKey: string | null
   /** Null for terminals the collector could not attribute to a worktree. */
   worktreeId: string | null

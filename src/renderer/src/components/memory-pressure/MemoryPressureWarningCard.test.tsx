@@ -24,7 +24,8 @@ const STATE: MemoryPressureState = {
     },
     panes: [
       {
-        sessionId: 'pty-1',
+        sessionId: 'sess-1',
+        ptyId: 'pty-1',
         paneKey: null,
         worktreeId: 'repo::/w',
         worktreeName: 'w',

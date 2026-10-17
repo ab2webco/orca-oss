@@ -87,7 +87,8 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
       },
       panes: [
         {
-          sessionId: terminal.ptyId,
+          sessionId: `registry-${terminal.ptyId}`,
+          ptyId: terminal.ptyId,
           paneKey: null,
           worktreeId,
           worktreeName: 'feature-memory-warning-with-a-long-name',
@@ -98,6 +99,7 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
         },
         {
           sessionId: 'memory-e2e-background-1',
+          ptyId: 'memory-e2e-background-1',
           paneKey: null,
           worktreeId: null,
           worktreeName: 'Unattributed terminals',
@@ -108,6 +110,7 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
         },
         {
           sessionId: 'memory-e2e-background-2',
+          ptyId: 'memory-e2e-background-2',
           paneKey: null,
           worktreeId: 'helpdesk::/srv/helpdesk',
           worktreeName: 'helpdesk',

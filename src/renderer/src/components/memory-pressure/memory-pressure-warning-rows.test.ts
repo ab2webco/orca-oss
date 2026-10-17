@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MemoryPressurePane } from '../../../../shared/memory-pressure-types'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import {
   buildMemoryPressureRows,
   countRemoteTerminals,
@@ -11,6 +12,7 @@ const GIB = 1024 ** 3
 function pane(overrides: Partial<MemoryPressurePane>): MemoryPressurePane {
   return {
     sessionId: 'pty-1',
+    ptyId: 'pty-1',
     paneKey: null,
     worktreeId: 'repo-a::/w/feat',
     worktreeName: 'feat',
@@ -22,16 +24,43 @@ function pane(overrides: Partial<MemoryPressurePane>): MemoryPressurePane {
   }
 }
 
+function tab(
+  overrides: Partial<TerminalTab> & Pick<TerminalTab, 'id' | 'worktreeId'>
+): TerminalTab {
+  return {
+    ptyId: null,
+    title: 'zsh',
+    customTitle: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: 0,
+    ...overrides
+  }
+}
+
 function context(overrides: Partial<MemoryPressureRowContext> = {}): MemoryPressureRowContext {
   return {
     tabsByWorktree: {
       'repo-a::/w/feat': [
-        { id: 'tab-1', title: 'zsh', defaultTitle: 'Terminal 1', customTitle: null },
-        { id: 'tab-2', title: 'claude', customTitle: 'Lead' }
+        tab({ id: 'tab-1', worktreeId: 'repo-a::/w/feat', defaultTitle: 'Terminal 1' }),
+        tab({ id: 'tab-2', worktreeId: 'repo-a::/w/feat', title: 'claude', customTitle: 'Lead' }),
+        tab({ id: 'tab-3', worktreeId: 'repo-a::/w/feat', title: 'codex', customTitle: 'Reviewer' })
       ],
-      'ssh-repo::/srv/app': [{ id: 'tab-9', title: 'ssh', customTitle: null }]
+      'ssh-repo::/srv/app': [
+        tab({ id: 'tab-9', worktreeId: 'ssh-repo::/srv/app', title: 'ssh' }),
+        tab({ id: 'tab-10', worktreeId: 'ssh-repo::/srv/app', title: 'ssh 2' })
+      ]
     },
     ptyIdsByTabId: { 'tab-1': ['pty-1'], 'tab-2': ['pty-2'], 'tab-9': ['pty-9'] },
+    terminalLayoutsByTabId: {
+      'tab-3': {
+        root: null,
+        activeLeafId: null,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { 'leaf-3': 'pty-3' }
+      }
+    },
+    deferredSshSessionIdsByTabId: { 'tab-10': 'pty-10' },
     agentStatusByPaneKey: {
       'tab-2:leaf-2': { paneKey: 'tab-2:leaf-2', agentType: 'claude' }
     },
@@ -48,7 +77,7 @@ describe('buildMemoryPressureRows', () => {
     const [row] = buildMemoryPressureRows([pane({})], context(), 10_000)
 
     expect(row).toEqual({
-      sessionId: 'pty-1',
+      ptyId: 'pty-1',
       tabId: 'tab-1',
       paneKey: null,
       title: 'zsh',
@@ -59,9 +88,21 @@ describe('buildMemoryPressureRows', () => {
     })
   })
 
-  it('prefers a custom title, carries the agent and measures idle from the last output', () => {
+  // Why: restored background tabs stay out of ptyIdsByTabId until their pane mounts, which is
+  // where days-old agent sessions live; only the layout wake hint binds them.
+  it('binds a restored background session through its layout wake hint', () => {
     const [row] = buildMemoryPressureRows(
-      [pane({ sessionId: 'pty-2', paneKey: 'tab-2:leaf-2', lastOutputAt: 4_000 })],
+      [pane({ sessionId: 'sess-3', ptyId: 'pty-3' })],
+      context(),
+      0
+    )
+
+    expect(row).toMatchObject({ ptyId: 'pty-3', tabId: 'tab-3', title: 'Reviewer' })
+  })
+
+  it('binds through the live PTY id, not the registry session id', () => {
+    const [row] = buildMemoryPressureRows(
+      [pane({ sessionId: 'sess-2', ptyId: 'pty-2', lastOutputAt: 4_000 })],
       context(),
       10_000
     )
@@ -69,15 +110,17 @@ describe('buildMemoryPressureRows', () => {
     expect(row).toMatchObject({ tabId: 'tab-2', title: 'Lead', agentType: 'claude', idleMs: 6_000 })
   })
 
-  it('finds the agent from any pane of the tab when the session has no pane key', () => {
-    const [row] = buildMemoryPressureRows([pane({ sessionId: 'pty-2' })], context(), 0)
-
-    expect(row.agentType).toBe('claude')
-  })
-
   it('keeps a session with no tab in this window, untitled and unopenable', () => {
     const [row] = buildMemoryPressureRows(
-      [pane({ sessionId: 'pty-x', worktreeId: null, repoName: 'Other', worktreeName: 'Other' })],
+      [
+        pane({
+          sessionId: 'x',
+          ptyId: 'pty-x',
+          worktreeId: null,
+          repoName: 'Other',
+          worktreeName: 'Other'
+        })
+      ],
       context(),
       0
     )
@@ -87,8 +130,10 @@ describe('buildMemoryPressureRows', () => {
 })
 
 describe('countRemoteTerminals', () => {
-  it('counts live terminal tabs in SSH-backed repos, which the local sweep cannot measure', () => {
-    expect(countRemoteTerminals(context())).toBe(1)
-    expect(countRemoteTerminals(context({ ptyIdsByTabId: { 'tab-9': [] } }))).toBe(0)
+  it('counts bound terminal tabs in SSH-backed repos, deferred reattaches included', () => {
+    expect(countRemoteTerminals(context())).toBe(2)
+    expect(
+      countRemoteTerminals(context({ ptyIdsByTabId: {}, deferredSshSessionIdsByTabId: {} }))
+    ).toBe(0)
   })
 })

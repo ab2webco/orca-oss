@@ -4,10 +4,15 @@ import { ORPHAN_WORKTREE_ID } from '../../shared/constants'
 
 export const MEMORY_PRESSURE_PANE_LIMIT = 5
 
+export type MemoryPressureSessionLookup = (sessionId: string) => {
+  ptyId: string
+  lastOutputAt: number | null
+}
+
 /** The heaviest local terminal subtrees, footprint first where the platform reports it. */
 export function rankMemoryPressurePanes(
   snapshot: MemorySnapshot,
-  lastOutputAtFor: (sessionId: string) => number | null,
+  lookupSession: MemoryPressureSessionLookup,
   limit: number = MEMORY_PRESSURE_PANE_LIMIT
 ): MemoryPressurePane[] {
   const panes: MemoryPressurePane[] = []
@@ -18,15 +23,17 @@ export function rankMemoryPressurePanes(
       if (!(memory > 0)) {
         continue
       }
+      const { ptyId, lastOutputAt } = lookupSession(session.sessionId)
       panes.push({
         sessionId: session.sessionId,
+        ptyId,
         paneKey: session.paneKey,
         worktreeId: worktree.worktreeId === ORPHAN_WORKTREE_ID ? null : worktree.worktreeId,
         worktreeName: worktree.worktreeName,
         repoName: worktree.repoName,
         memory,
         metric: hasFootprint ? 'phys-footprint' : snapshot.processMemoryMetric,
-        lastOutputAt: lastOutputAtFor(session.sessionId)
+        lastOutputAt
       })
     }
   }
