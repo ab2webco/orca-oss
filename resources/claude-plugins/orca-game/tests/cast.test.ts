@@ -1,5 +1,6 @@
-// Runs under `claude plugin test`: the scene's pet in the band and the Panel.
+// Runs under `claude plugin test`: the scene's pet, and Jev's advisor acting out its decisions.
 import { describe, expect, mock, test } from 'claude-code/testing'
+import type { Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { QUEST_SCENE } from '../hooks/scenes/quest'
@@ -29,6 +30,18 @@ const PANE = {
     scroll: { offset: 0, bodyRows: 30 },
     view: {}
   }
+} as const
+const SPINNER = {
+  component: 'Spinner',
+  viewport: VIEWPORT,
+  props: { word: 'Working', message: null, suffix: '', mode: 'thinking' }
+} as const
+const TURN = {
+  reason: 'answer',
+  answer: 'ok',
+  durationMs: 1,
+  isAborted: false,
+  turnId: 't1'
 } as const
 const ORCA_CLI = '/opt/orca/bin/orca'
 const GAME_STATE = [ORCA_CLI, 'game', 'state', '--json']
@@ -120,5 +133,122 @@ describe('the scene pet', () => {
     const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
     expect(await band.find({ type: 'Text', text: /^ ♥ Pet $/ })).toBeDefined()
     await band.unmount()
+  })
+})
+
+const subagent = (id: string, why: string, model: string, verdict: string) => ({
+  id,
+  type: 'general-purpose',
+  title: `Task ${id}`,
+  branch: null,
+  worktree: null,
+  model,
+  effort: 'medium',
+  status: 'running',
+  why,
+  verdict
+})
+
+const advisorWith = (subagents: unknown[]) => ({
+  version: 1,
+  locale: 'es',
+  line: 'jev · agentes',
+  model: 'Opus 5.5',
+  modelId: 'claude-opus-5-5',
+  effort: 'high',
+  subagents,
+  ci: [],
+  notices: []
+})
+
+// Publishes TEST_ADVISOR at start and TEST_ADVISOR_NEXT after a turn, as Jev does in game mode.
+const JEV: Plugin = {
+  name: 'orca-jev-mod-skills',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      const raw = await $.env.get('TEST_ADVISOR')
+      if (raw !== undefined && raw !== null && raw !== '') {
+        await $.state.set({ plugin: 'orca-jev-mod-skills', key: 'advisor' }, JSON.parse(raw))
+      }
+      return next(e)
+    })
+    on('turn.complete', async ($, e, next) => {
+      const raw = await $.env.get('TEST_ADVISOR_NEXT')
+      if (raw !== undefined && raw !== null && raw !== '') {
+        await $.state.set({ plugin: 'orca-jev-mod-skills', key: 'advisor' }, JSON.parse(raw))
+      }
+      return next(e)
+    })
+  }
+}
+
+// Reads the game's advisor log back, as another plugin could.
+const READER: Plugin = {
+  name: 'reader',
+  register(on) {
+    on('command.run', { command: 'advisor-log' }, async ($) => {
+      const read = await $.state.get({ plugin: 'orca-game', key: 'advisor' })
+      return { text: JSON.stringify(read.value?.decisions ?? []) }
+    })
+  }
+}
+
+const WITH_JEV = { plugins: [JEV, READER] }
+
+const FIRST = JSON.stringify(advisorWith([subagent('a1', 'inherited', 'Opus 5.5', 'igual')]))
+const LOWERED = JSON.stringify(
+  advisorWith([
+    subagent('a1', 'inherited', 'Opus 5.5', 'igual'),
+    subagent('a2', 'lowered', 'Sonnet 5', 'Sonnet basta')
+  ])
+)
+
+const spinnerCells = async ($: Parameters<Parameters<typeof test>[2]>[0]) => {
+  const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
+  const raster = await spinner.find({ type: 'Raster' })
+  await spinner.unmount()
+  return raster?.props.cells
+}
+
+describe('Jev’s advisor', () => {
+  test('stands in the scene only while Jev’s value is there to read', WITH_JEV, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { TEST_ADVISOR: FIRST, TEST_ADVISOR_NEXT: '{"version":2}' }, undefined)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const withJev = await spinnerCells($)
+    expect(withJev).toBeDefined()
+    expect(await spinnerCells($)).toBe(withJev)
+    await $.turn.complete(TURN)
+    await clock.settle()
+    const without = await spinnerCells($)
+    expect(without).toBeDefined()
+    expect(without).not.toBe(withJev)
+  })
+
+  test('acts out a lowered model and logs it for the Panel', WITH_JEV, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { TEST_ADVISOR: FIRST, TEST_ADVISOR_NEXT: LOWERED }, undefined)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const idle = await spinnerCells($)
+    await $.turn.complete(TURN)
+    await clock.settle()
+    expect(await spinnerCells($)).not.toBe(idle)
+    const said = await $.command.run({ command: 'advisor-log', args: '' } as never)
+    const log = JSON.parse(said.text ?? '[]') as { verdict: string; gesture: string | null }[]
+    expect(log.map((one) => one.verdict)).toEqual(['igual', 'Sonnet basta'])
+    expect(log.at(-1)?.gesture).toBe('lowered')
+  })
+
+  test('is not drawn while the game leaves Jev its own band', WITH_JEV, async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { TEST_ADVISOR: '', TEST_ADVISOR_NEXT: LOWERED, ORCA_GAME_HUD: '0' }, undefined)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const before = await spinnerCells($)
+    await $.turn.complete(TURN)
+    await clock.settle()
+    expect(await spinnerCells($)).toBe(before)
   })
 })

@@ -1,8 +1,8 @@
 import { update } from 'claude-code'
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
+import { readJevAdvisor } from './advisor-state'
 import {
-  advisorOf,
   allyPartsOf,
   allyRowsOf,
   restyledTextOf,
@@ -12,11 +12,10 @@ import {
 } from './allies'
 import { isAbsorbingConfig } from './game-config'
 import { gameStrings } from './game-strings'
-import { currentScene, gameConfig, ready } from './quest-runtime'
+import { currentScene, gameConfig, quest, ready } from './quest-runtime'
 import type { BandPalette } from './scenes/scene-definition'
 
 const ALLIES = { plugin: 'orca-game', key: 'allies' } as const
-const JEV_ADVISOR = { plugin: 'orca-jev-mod-skills', key: 'advisor' } as const
 const MAX_ALLY_ROWS = 6
 
 export const isAbsorbing = (): boolean => isAbsorbingConfig(gameConfig())
@@ -40,11 +39,11 @@ export async function alliesStrip(
   if (!isAbsorbing()) {
     return []
   }
-  const [jev, held] = await Promise.all([
-    $.state.get(JEV_ADVISOR).catch(() => ({ value: undefined })),
+  const [advisor, held] = await Promise.all([
+    readJevAdvisor($, quest.tick),
     $.state.get(ALLIES).catch(() => ({ value: undefined }))
   ])
-  const rows = allyRowsOf(advisorOf(jev.value), held.value?.statuses ?? [], {
+  const rows = allyRowsOf(advisor, held.value?.statuses ?? [], {
     isZen: gameConfig().mode === 'zen',
     maxRows: MAX_ALLY_ROWS,
     more: gameStrings().text.moreAllies

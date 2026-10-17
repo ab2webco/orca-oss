@@ -1,8 +1,9 @@
+import { ADVISOR_PROP_WIDTH, advisorPropPixel } from './advisor-art'
 import { GROUND } from './scenery'
-import type { CastFrame, ScenePet } from './scenes/index'
+import type { AdvisorGesture, CastFrame, SceneAdvisor, ScenePet } from './scenes/index'
 import { restColumnOf, SPRITE_WIDTH, walkColumn } from './walk-path'
 
-// The scene's cast beside the hero: its pet, which trails it, and is what Pet hearts.
+// The scene's cast beside the hero: the pet that trails it, and Jev's advisor at the right edge.
 
 /** How far behind the hero the pet walks, in ticks of the hero's own path. */
 export const PET_TRAIL_TICKS = 16
@@ -47,4 +48,46 @@ export const petFrameOf = (
   }
   const walking = pet.frames[Math.floor(tick / 3) % pet.frames.length]
   return (isResting ? pet.frames[0] : walking) ?? pet.happy
+}
+
+/** Jev's advisor as the scene draws it now: its sprite, the gesture playing and its words. */
+export type AdvisorPose = {
+  sprite: SceneAdvisor
+  gesture?: AdvisorGesture
+  /** Ticks since the gesture started. */
+  age: number
+  /** '' draws no bubble. */
+  bubble: string
+}
+
+/** The columns the hero walks: all of them without Jev, else up to the advisor and its props. */
+export const advisorStageOf = (columns: number, pose: AdvisorPose | undefined): number =>
+  pose === undefined
+    ? columns
+    : Math.max(
+        SPRITE_WIDTH + 1,
+        columns - castWidthOf(pose.sprite.frames[0]) - ADVISOR_PROP_WIDTH - 1
+      )
+
+const advisorFrameOf = (pose: AdvisorPose, tick: number): CastFrame => {
+  const gestured = pose.gesture === undefined ? undefined : pose.sprite.gestures?.[pose.gesture]
+  const frames = pose.sprite.frames
+  return gestured ?? frames[Math.floor(tick / 8) % frames.length] ?? []
+}
+
+/** The advisor at the right edge with its gesture's prop held out in front of it. */
+export const advisorPixel = (
+  pose: AdvisorPose,
+  columns: number,
+  x: number,
+  y: number,
+  tick: number
+): number | undefined => {
+  const frame = advisorFrameOf(pose, tick)
+  const left = columns - 1 - castWidthOf(frame)
+  const body = castPixel(frame, pose.sprite.colors, x, y, left)
+  if (body !== undefined || pose.gesture === undefined) {
+    return body
+  }
+  return advisorPropPixel(pose.gesture, x - (left - ADVISOR_PROP_WIDTH), y, pose.age)
 }

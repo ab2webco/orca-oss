@@ -1,6 +1,8 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { GameConfig } from '../types'
+import { advisorSpriteOf } from './advisor-art'
+import { advisorPoseAt } from './advisor-state'
 import { DEMO_STEP_TICKS, demoFrameOf, type DemoFrame } from './demo'
 import {
   DEFAULT_GAME_CONFIG,
@@ -9,16 +11,7 @@ import {
   isAbsorbingConfig
 } from './game-config'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
-import {
-  actionOf,
-  activityOf,
-  isFinishingCall,
-  phaseOf,
-  restoredNotesOf,
-  type Action,
-  type FlowPhase,
-  type StoredRow
-} from './quest-policy'
+import { restoredNotesOf, type Action, type FlowPhase, type StoredRow } from './quest-policy'
 import {
   REACTION_TICKS,
   SCENE_KEY,
@@ -139,6 +132,12 @@ export function clawdReact($: EngineInterface, kind: Reaction['kind']): void {
   }
 }
 
+// Why absorbing: while the game is not drawing Jev's lines, Jev draws its own and the scene has no advisor.
+const advisorShownAt = (tick: number) =>
+  isAbsorbingConfig(gameConfig())
+    ? advisorPoseAt(tick, advisorSpriteOf(currentScene()), gameConfig().mode === 'zen')
+    : undefined
+
 export const spinnerCellsOf = (columns: number) =>
   sceneCellsOf(
     currentScene(),
@@ -149,7 +148,8 @@ export const spinnerCellsOf = (columns: number) =>
     quest.isDemo ? quest.demoAt : quest.captionAt,
     reactionNow(),
     shownResting(),
-    shownAction()
+    shownAction(),
+    advisorShownAt(quest.tick)
   )
 
 export const petScene = (key: string, columns: number): Animated => ({
@@ -169,7 +169,8 @@ export const petScene = (key: string, columns: number): Animated => ({
       -Infinity,
       age,
       shownResting(),
-      shownAction()
+      shownAction(),
+      advisorShownAt(at)
     ).cells
   }
 })
@@ -300,28 +301,4 @@ export function resetQuest(): void {
     isDemo: false,
     caption: ''
   })
-}
-
-export function questToolCall(tool: string, input: unknown, agentId: string | undefined): void {
-  if (agentId !== undefined) {
-    return
-  }
-  quest.phase = phaseOf(tool, input) ?? quest.phase
-  if (isFinishingCall(tool, input)) {
-    quest.isDone = true
-  }
-  quest.action = actionOf(tool, input) ?? quest.action
-  const said = activityOf(tool, input)
-  if (said !== quest.caption) {
-    quest.captionAt = quest.tick
-  }
-  quest.caption = said
-}
-
-export function questTurnComplete(agentId: string | undefined): void {
-  if (agentId !== undefined) {
-    return
-  }
-  quest.caption = ''
-  quest.action = undefined
 }

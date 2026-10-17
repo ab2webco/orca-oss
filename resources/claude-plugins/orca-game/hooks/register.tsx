@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
+import { registerAdvisor } from './advisor-sync'
 import { clearAllies, registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
@@ -9,12 +10,14 @@ import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
-import { clawdReact, questToolCall, questTurnComplete } from './quest-runtime'
+import { clawdReact } from './quest-runtime'
+import { questToolCall, questTurnComplete } from './quest-turns'
 
 export const register: Register = (on) => {
   registerQuest(on)
   registerBand(on)
   registerAllies(on)
+  registerAdvisor(on)
   registerFleetPane(on)
   registerLeadName(on)
   registerActionCommands(on)

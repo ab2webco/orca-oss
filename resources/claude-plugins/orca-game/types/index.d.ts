@@ -277,12 +277,27 @@ export type AllyStatus = { plugin: string; text: string }
 
 export type AlliesState = { statuses: AllyStatus[] }
 
+/** One of Jev's decisions as the Panel lists it; `title` null is the main conversation's model. */
+export type AdvisorLogEntry = {
+  key: string
+  title: string | null
+  model: string | null
+  effort: string | number | null
+  verdict: string
+  gesture: AdvisorGesture | null
+  at: number
+}
+
+/** Jev's latest decisions in this pane, oldest first, a few at most. */
+export type AdvisorLog = { decisions: AdvisorLogEntry[] }
+
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
     'orca-game': {
       fleet: FleetState
       allies: AlliesState
+      advisor: AdvisorLog
       actions: ActionRuns
       /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */
       absorbing: boolean

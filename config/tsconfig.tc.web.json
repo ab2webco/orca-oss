@@ -9,6 +9,7 @@
     "../src/shared/**/*",
     "../resources/claude-plugins/orca-game/types/index.d.ts",
     "../resources/claude-plugins/orca-game/hooks/action-props.ts",
+    "../resources/claude-plugins/orca-game/hooks/advisor-art.ts",
     "../resources/claude-plugins/orca-game/hooks/game-strings.ts",
     "../resources/claude-plugins/orca-game/hooks/locales/*.ts",
     "../resources/claude-plugins/orca-game/hooks/pixel-canvas.ts",

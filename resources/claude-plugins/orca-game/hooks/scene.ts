@@ -3,7 +3,15 @@ import { gameStrings, localizedNameOf } from './game-strings'
 import { cellsOf, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import { farPixel, GROUND, nearTopOf, plantPixel, sunPixel } from './scenery'
-import { castPixel, castWidthOf, petColumnOf, petFrameOf } from './scene-cast'
+import {
+  advisorPixel,
+  advisorStageOf,
+  castPixel,
+  castWidthOf,
+  petColumnOf,
+  petFrameOf,
+  type AdvisorPose
+} from './scene-cast'
 import type { Costume, Look, SceneDefinition } from './scenes/index'
 import { CLAWD_TOP, restColumnOf, SPRITE_WIDTH, walkColumn } from './walk-path'
 
@@ -19,6 +27,7 @@ const BUBBLE_TEXT = 0x23232b
 const HEART = 0xff5a8a
 const FINALE_TEXT = 0xffffff
 const FINALE_PANEL = 0x1a1a24
+const ADVISOR_BUBBLE_MAX = 28
 
 export const sceneColumnsOf = (viewport: number | undefined): number =>
   Math.max(1, Math.min(MAX_COLUMNS, (viewport ?? 80) - MARGIN))
@@ -81,6 +90,16 @@ const landscapePixel = (
   )
 }
 
+const paintBubble = (grid: number[][], left: number, text: string): void => {
+  const right = left + text.length + 1
+  const skyAt = (x: number) => grid[x]?.[1] ?? 0
+  grid[left] = [0x2590, BUBBLE, skyAt(left)]
+  Array.from(text).forEach((glyph, index) => {
+    grid[left + 1 + index] = [glyph.codePointAt(0) ?? 0x20, BUBBLE_TEXT, BUBBLE]
+  })
+  grid[right] = [0x258c, BUBBLE, skyAt(right)]
+}
+
 const DOTS = ['.  ', '.. ', '...'] as const
 
 export const REACTION_TICKS = 24
@@ -139,7 +158,8 @@ export const sceneGridOf = (
   since = -Infinity,
   reaction?: Reaction,
   isResting = false,
-  action?: Action
+  action?: Action,
+  advisor?: AdvisorPose
 ): number[][] => {
   const reacting = isReacting(reaction)
   const resting = isResting && !reacting
@@ -150,9 +170,11 @@ export const sceneGridOf = (
   const look = scene.looks[phase ?? 'working']
   const costume = scene.costumes[phase ?? 'working']
   const grid: number[][] = []
-  const walk = resting ? restColumnOf(columns) : walkColumn(columns, tick)
+  // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
+  const stage = advisorStageOf(columns, advisor)
+  const walk = resting ? restColumnOf(stage) : walkColumn(stage, tick)
   const shown = resting ? undefined : action
-  const petAt = pet === undefined ? 0 : petColumnOf(pet, columns, tick, resting)
+  const petAt = pet === undefined ? 0 : petColumnOf(pet, stage, tick, resting)
   const petFrame = pet === undefined ? undefined : petFrameOf(pet, tick, resting, isPetted)
   const at = (x: number, y: number) =>
     actionPixel(shown, x - walk - SPRITE_WIDTH, y, tick) ??
@@ -160,6 +182,7 @@ export const sceneGridOf = (
     (pet === undefined || petFrame === undefined
       ? undefined
       : castPixel(petFrame, pet.colors, x, y, petAt, isPetted ? hop : 0)) ??
+    (advisor === undefined ? undefined : advisorPixel(advisor, columns, x, y, tick)) ??
     landscapePixel(look, columns, x, y, tick, resting)
   for (let row = 0; row < SCENE_ROWS; row += 1) {
     for (let x = 0; x < columns; x += 1) {
@@ -172,15 +195,16 @@ export const sceneGridOf = (
     : { at: walk, width: SPRITE_WIDTH }
   const said = reacting ? reactionSaysOf(reaction.kind) : resting ? snoreOf(tick) : caption
   const typedSince = reacting ? tick - reaction.age : resting ? -Infinity : since
-  const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, columns - 8))} `
+  const advisorText = advisorSaysOf(advisor, tick, columns)
+  // The hero's bubble ends where the advisor's begins.
+  const limit = advisorText === '' ? columns : columns - advisorText.length - 2
+  const text = ` ${bubbleTextOf(said, tick, typedSince, Math.max(1, Math.min(columns - 8, limit - 4)))} `
   const width = text.length + 2
-  const left = Math.max(0, Math.min(columns - width, speaker.at + speaker.width - 1))
-  const skyAt = (x: number) => grid[x]?.[1] ?? 0
-  grid[left] = [0x2590, BUBBLE, skyAt(left)]
-  Array.from(text).forEach((glyph, index) => {
-    grid[left + 1 + index] = [glyph.codePointAt(0) ?? 0x20, BUBBLE_TEXT, BUBBLE]
-  })
-  grid[left + width - 1] = [0x258c, BUBBLE, skyAt(left + width - 1)]
+  const left = Math.max(0, Math.min(limit - width, speaker.at + speaker.width - 1))
+  paintBubble(grid, left, text)
+  if (advisorText !== '') {
+    paintBubble(grid, limit, advisorText)
+  }
   const puff = speaker.at + speaker.width
   if (puff < columns && puff < left + 1 && Math.floor(tick / 6) % 2 === 0) {
     grid[columns + puff] = [UPPER_HALF, BUBBLE, grid[columns + puff]?.[2] ?? 0]
@@ -212,6 +236,15 @@ export const sceneGridOf = (
     paintFinale(grid, columns, localizedNameOf(scene.finale))
   }
   return grid
+}
+
+// The advisor's words type in from the moment its gesture starts, cut to half the scene at most.
+const advisorSaysOf = (advisor: AdvisorPose | undefined, tick: number, columns: number): string => {
+  if (advisor === undefined || advisor.bubble === '') {
+    return ''
+  }
+  const room = Math.max(1, Math.min(ADVISOR_BUBBLE_MAX, Math.floor(columns / 2) - 4))
+  return ` ${bubbleTextOf(advisor.bubble, tick, tick - advisor.age, room)} `
 }
 
 // Bottom-right of the ground row, as PR #32 draws it, while a merge runs.
