@@ -10797,6 +10797,15 @@
           "system": "시스템 브라우저",
           "label": "링크 열기 위치",
           "description": "밴드와 패널의 PR, CI, 티켓, 목록 링크입니다. 시스템 브라우저에는 GitHub와 Jira 로그인이 있습니다."
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "클래식",
+          "hd": "HD",
+          "label": "렌더링",
+          "description": "클래식은 5행 픽셀 아트입니다. HD는 빛, 날씨, 낮과 밤이 있는 9~10행 장면을 그립니다.",
+          "timezone": "시간대",
+          "timezoneDescription": "HD에서 밤이 되는 기준입니다. 비우거나 local이면 이 기기의 시계를 따릅니다.",
+          "timezoneInvalid": "local 또는 America/Bogota 같은 IANA 시간대를 입력하세요."
         }
       },
       "right": {

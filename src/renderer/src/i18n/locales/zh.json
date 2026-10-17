@@ -10806,6 +10806,15 @@
           "system": "系统浏览器",
           "label": "在何处打开链接",
           "description": "横栏和面板中的 PR、CI、工单和列表链接。系统浏览器保留了你的 GitHub 和 Jira 登录。"
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "经典",
+          "hd": "HD",
+          "label": "渲染",
+          "description": "经典为 5 行像素画。HD 绘制 9 到 10 行的场景，带有光影、天气和昼夜变化。",
+          "timezone": "时区",
+          "timezoneDescription": "HD 何时进入夜晚。留空或填 local 则跟随本机时钟。",
+          "timezoneInvalid": "请使用 local 或 IANA 时区，例如 America/Bogota。"
         }
       },
       "right": {

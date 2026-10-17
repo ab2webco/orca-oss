@@ -10786,6 +10786,15 @@
           "system": "システムのブラウザー",
           "label": "リンクを開く場所",
           "description": "バンドとパネルの PR、CI、チケット、リストのリンク。システムのブラウザーには GitHub と Jira のサインインがあります。"
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "クラシック",
+          "hd": "HD",
+          "label": "描画",
+          "description": "クラシックは 5 行のピクセルアートです。HD は光、天気、昼夜のある 9〜10 行のシーンを描きます。",
+          "timezone": "タイムゾーン",
+          "timezoneDescription": "HD が夜になる時刻の基準です。空欄または local でこのマシンの時計に従います。",
+          "timezoneInvalid": "local または America/Bogota のような IANA タイムゾーンを入力してください。"
         }
       },
       "right": {

@@ -327,3 +327,75 @@ describe('game scene picker', () => {
     view.unmount()
   })
 })
+
+function typeAndLeave(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  act(() => {
+    setter?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  act(() => {
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })
+}
+
+const timezoneField = (container: HTMLElement): HTMLInputElement => {
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Time zone"]')
+  expect(input).toBeTruthy()
+  return input as HTMLInputElement
+}
+
+describe('render and time zone', () => {
+  it('writes the render and a valid time zone globally, refusing a zone that does not exist', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+    )
+    click(view.container, '[aria-label="Render"] button', 'HD')
+    typeAndLeave(timezoneField(view.container), 'Mars/Olympus')
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
+      'Use local or an IANA time zone such as America/Bogota.'
+    )
+    typeAndLeave(timezoneField(view.container), ' America/Bogota ')
+    expect(updates).toEqual([
+      { orchestratorGame: { render: 'hd' } },
+      { orchestratorGame: { timezone: 'America/Bogota' } }
+    ])
+    view.unmount()
+  })
+
+  it('goes back to the local clock when the global zone is cleared', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { timezone: 'Asia/Tokyo' } }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(timezoneField(view.container).value).toBe('Asia/Tokyo')
+    typeAndLeave(timezoneField(view.container), '')
+    expect(updates).toEqual([{ orchestratorGame: {} }])
+    view.unmount()
+  })
+
+  it('shows the project its effective render and zone with their source and overrides or inherits them', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{ orchestratorGame: { timezone: 'America/Bogota' } }}
+        projectLayer={{ render: 'hd' }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+    expect(view.container.textContent).toContain('HD · from orca.yaml')
+    expect(view.container.textContent).toContain('America/Bogota · global setting')
+    click(view.container, '[aria-label="Render"] button', 'Classic')
+    typeAndLeave(timezoneField(view.container), 'Europe/Madrid')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { render: 'classic' } } },
+      { orchestratorGameProjects: { repo1: { timezone: 'Europe/Madrid' } } }
+    ])
+    view.unmount()
+  })
+})

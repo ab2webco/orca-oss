@@ -9,7 +9,8 @@ import {
   ready,
   resetQuest,
   shownPhase,
-  spinnerCellsOf,
+  stageCellsOf,
+  stageOf,
   startDemo,
   type Animated
 } from './quest-runtime'
@@ -57,7 +58,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .register({
       name: 'quest',
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|demo]',
+      argumentHint: '[off|on|zen|demo|render classic|hd]',
       immediate: true
     })
     .catch(() => undefined)
@@ -73,7 +74,13 @@ const registerCommand = (on: On) => {
     }
     if ('show' in asked) {
       const mode = quest.isDemo ? 'demo' : gameConfig().mode
-      return { text: `${text.questShown(mode)} ${text.questModesHelp}` }
+      const render = text.questRenderShown(gameConfig().render)
+      return { text: `${text.questShown(mode)} ${render} ${text.questModesHelp}` }
+    }
+    if ('render' in asked) {
+      quest.renderOverride = asked.render
+      $.ui.invalidate('ui.render')
+      return { text: text.questRenderShown(asked.render) }
     }
     if ('demo' in asked) {
       startDemo()
@@ -140,14 +147,18 @@ const registerSpinner = (on: On) => {
       quest.stages.delete(e.requestId)
       return next(e)
     }
-    const columns = sceneColumnsOf(e.viewport?.columns)
-    const packed = spinnerCellsOf(columns)
-    quest.stages.set(e.requestId, { columns, rows: packed.rows })
+    const stage = stageOf(sceneColumnsOf(e.viewport?.columns))
+    quest.stages.set(e.requestId, stage)
     const spinner = await next(e)
     const { Box, Raster } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
-        <Raster key={SCENE_KEY} columns={columns} rows={packed.rows} cells={packed.cells} />
+        <Raster
+          key={SCENE_KEY}
+          columns={stage.columns}
+          rows={stage.rows}
+          cells={stageCellsOf(stage)}
+        />
         {spinner}
       </Box>
     )

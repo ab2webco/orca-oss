@@ -54,6 +54,10 @@ import {
   OrchestratorGameOpenLinksRow,
   orchestratorGameOpenLinksLabels
 } from './OrchestratorGameOpenLinksSetting'
+import {
+  OrchestratorGameLookRows,
+  orchestratorGameRenderLabels
+} from './OrchestratorGameRenderSetting'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -183,6 +187,13 @@ export function OrchestratorGameSetting({
           value={config.openLinks}
           disabled={config.mode === 'off'}
           onChange={(next) => set('openLinks', next)}
+        />
+        <OrchestratorGameLookRows
+          layer={layer}
+          disabled={config.mode === 'off'}
+          onChange={(key, value) =>
+            updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
+          }
         />
       </SearchableSetting>
     </section>
@@ -336,6 +347,14 @@ export function ProjectOrchestratorGameSetting({
           value={local?.openLinks ?? 'inherit'}
           effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
           onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
+        />
+        <OrchestratorGameLookRows
+          layer={local}
+          effective={{
+            render: effective('render', orchestratorGameRenderLabels()[config.render]),
+            timezone: effective('timezone', config.timezone)
+          }}
+          onChange={set}
         />
         <SettingsRow
           label={sceneTitle()}

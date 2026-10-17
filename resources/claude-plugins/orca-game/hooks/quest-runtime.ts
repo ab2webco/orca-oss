@@ -1,88 +1,32 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { GameConfig } from '../types'
-import { advisorSpriteOf } from './advisor-art'
-import { advisorPoseAt, isAdvisorActingAt, isAdvisorCueEndingAt } from './advisor-state'
-import { DEMO_STEP_TICKS, demoFrameOf, type DemoFrame } from './demo'
-import {
-  DEFAULT_GAME_CONFIG,
-  effectiveConfigOf,
-  gameConfigOfEnv,
-  isAbsorbingConfig
-} from './game-config'
+import { isAdvisorCueEndingAt } from './advisor-state'
+import { DEMO_STEP_TICKS } from './demo'
+import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
-import { restoredNotesOf, type Action, type FlowPhase, type StoredRow } from './quest-policy'
-import {
-  REACTION_TICKS,
-  SCENE_KEY,
-  SCENE_ROWS,
-  SCENE_TICK_MS,
-  isReacting,
-  sceneCellsOf,
-  type Reaction
-} from './scene'
-import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
+import { restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
+import { demoNow, gameConfig, quest } from './quest-state'
+import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene'
+import { stageCellsOf } from './scene-frame'
 
-export type Animated = {
-  key: string
-  columns: number
-  rows: number
-  draw: (tick: number) => string
-}
-
-type QuestRuntime = {
-  envConfig: GameConfig
-  liveConfig: Partial<GameConfig>
-  modeOverride: GameConfig['mode'] | undefined
-  tick: number
-  phase: FlowPhase | undefined
-  fleetPhase: FlowPhase | undefined
-  alert: string
-  isDone: boolean
-  action: Action | undefined
-  isDemo: boolean
-  demoStep: number
-  demoAt: number
-  caption: string
-  captionAt: number
-  reaction: { kind: Reaction['kind']; at: number } | undefined
-  notes: Set<string>
-  replies: Set<string>
-  stages: Map<string, { columns: number; rows: number }>
-  animations: Map<string, readonly Animated[]>
-  cardPhases: Map<string, ScenePhase>
-}
-
-// Module state: a hot reload starts it over, which only costs the scene its current pose.
-export const quest: QuestRuntime = {
-  envConfig: DEFAULT_GAME_CONFIG,
-  liveConfig: {},
-  modeOverride: undefined,
-  tick: 0,
-  phase: undefined,
-  fleetPhase: undefined,
-  alert: '',
-  isDone: false,
-  action: undefined,
-  isDemo: false,
-  demoStep: 0,
-  demoAt: 0,
-  caption: '',
-  captionAt: 0,
-  reaction: undefined,
-  notes: new Set<string>(),
-  replies: new Set<string>(),
-  stages: new Map<string, { columns: number; rows: number }>(),
-  animations: new Map<string, readonly Animated[]>(),
-  cardPhases: new Map<string, ScenePhase>()
-}
+export {
+  currentScene,
+  demoNow,
+  gameConfig,
+  isAdvisorActing,
+  isClawdReacting,
+  isSceneShown,
+  quest,
+  shownPhase,
+  type Animated,
+  type Stage
+} from './quest-state'
+export { petScene, stageCellsOf, stageOf } from './scene-frame'
 
 let loading: Promise<void> | undefined
 let publishedAbsorbing: boolean | undefined
 let ticker: { cancel(): void } | undefined
-
-export const gameConfig = (): GameConfig =>
-  effectiveConfigOf(quest.envConfig, quest.liveConfig, quest.modeOverride)
 
 const ABSORBING = { plugin: 'orca-game', key: 'absorbing' } as const
 
@@ -98,86 +42,12 @@ export async function publishAbsorbing($: EngineInterface): Promise<void> {
   })
 }
 
-export const currentScene = (): SceneDefinition => sceneOf(gameConfig().scene)
-
-export const demoNow = (): DemoFrame => demoFrameOf(quest.demoStep)
-
-export const shownPhase = (): FlowPhase | undefined =>
-  quest.isDemo ? demoNow().phase : (quest.phase ?? quest.fleetPhase)
-
-const shownCaption = (): string => {
-  if (quest.isDemo) {
-    return demoNow().caption
-  }
-  return quest.caption === '' ? quest.alert : quest.caption
-}
-
-const shownResting = (): boolean => (quest.isDemo ? demoNow().isResting : quest.isDone)
-
-const shownAction = (): Action | undefined => (quest.isDemo ? demoNow().action : quest.action)
-
-const reactionNow = (): Reaction | undefined =>
-  quest.reaction === undefined
-    ? undefined
-    : { kind: quest.reaction.kind, age: quest.tick - quest.reaction.at }
-
-export const isSceneShown = (): boolean => quest.stages.size > 0
-
-export const isClawdReacting = (): boolean => isReacting(reactionNow())
-
-/** Jev's advisor acts something out now, so the band shows the scene when no spinner does. */
-export const isAdvisorActing = (): boolean =>
-  isAbsorbingConfig(gameConfig()) && isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen')
-
 export function clawdReact($: EngineInterface, kind: Reaction['kind']): void {
   quest.reaction = { kind, at: quest.tick }
   if (kind !== 'hello') {
     $.ui.invalidate('ui.render')
   }
 }
-
-// Why absorbing: while the game is not drawing Jev's lines, Jev draws its own and the scene has no advisor.
-const advisorShownAt = (tick: number) =>
-  isAbsorbingConfig(gameConfig())
-    ? advisorPoseAt(tick, advisorSpriteOf(currentScene()), gameConfig().mode === 'zen')
-    : undefined
-
-export const spinnerCellsOf = (columns: number) =>
-  sceneCellsOf(
-    currentScene(),
-    shownPhase(),
-    columns,
-    quest.tick,
-    shownCaption(),
-    quest.isDemo ? quest.demoAt : quest.captionAt,
-    reactionNow(),
-    shownResting(),
-    shownAction(),
-    advisorShownAt(quest.tick)
-  )
-
-export const petScene = (key: string, columns: number): Animated => ({
-  key,
-  columns,
-  rows: SCENE_ROWS,
-  draw: (at) => {
-    const reaction = quest.reaction
-    const age = reaction === undefined ? undefined : { kind: reaction.kind, age: at - reaction.at }
-    const scene = currentScene()
-    return sceneCellsOf(
-      scene,
-      shownPhase(),
-      columns,
-      at,
-      '',
-      -Infinity,
-      age,
-      shownResting(),
-      shownAction(),
-      advisorShownAt(at)
-    ).cells
-  }
-})
 
 export function questFleet(
   $: EngineInterface,
@@ -204,7 +74,7 @@ export function questLiveConfig($: EngineInterface, live: Partial<GameConfig>): 
 
 async function blitAll($: EngineInterface): Promise<void> {
   for (const [requestId, stage] of quest.stages) {
-    const { cells } = spinnerCellsOf(stage.columns)
+    const cells = stageCellsOf(stage)
     const result = await $.ui
       .blit({ requestId, key: SCENE_KEY, cells, columns: stage.columns, rows: stage.rows })
       .catch(() => ({ deny: 'failed' }))
@@ -248,11 +118,13 @@ async function repaint($: EngineInterface): Promise<void> {
 
 async function load($: EngineInterface): Promise<void> {
   // The engine lists what a mod reads only from literal names.
-  const [mode, scene, hud, rewards, locale] = await Promise.all([
+  const [mode, scene, hud, rewards, render, timezone, locale] = await Promise.all([
     $.env.get('ORCA_GAME_MODE').catch(() => undefined),
     $.env.get('ORCA_GAME_SCENE').catch(() => undefined),
     $.env.get('ORCA_GAME_HUD').catch(() => undefined),
     $.env.get('ORCA_GAME_REWARDS').catch(() => undefined),
+    $.env.get('ORCA_GAME_RENDER').catch(() => undefined),
+    $.env.get('ORCA_GAME_TIMEZONE').catch(() => undefined),
     $.env.get('ORCA_GAME_LOCALE').catch(() => undefined)
   ])
   setGameLocale(gameLocaleOf(locale))
@@ -260,7 +132,9 @@ async function load($: EngineInterface): Promise<void> {
     ORCA_GAME_MODE: mode,
     ORCA_GAME_SCENE: scene,
     ORCA_GAME_HUD: hud,
-    ORCA_GAME_REWARDS: rewards
+    ORCA_GAME_REWARDS: rewards,
+    ORCA_GAME_RENDER: render,
+    ORCA_GAME_TIMEZONE: timezone
   })
   await publishAbsorbing($)
   const rows = (await $.session.messages().catch(() => [])) as readonly StoredRow[]

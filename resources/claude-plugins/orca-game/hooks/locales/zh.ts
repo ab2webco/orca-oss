@@ -44,6 +44,9 @@ export const ZH: GameCatalog = {
       'Quest：demo。预设的虚拟队伍会播放所有反应，不读取也不写入任何内容。/quest on 返回真实数据。',
     unknownMode: (asked) =>
       `未知模式“${asked}”。请使用 /quest off、/quest on、/quest zen 或 /quest demo。`,
+    questRenderShown: (render) => `渲染：${render}。`,
+    unknownRender: (asked) =>
+      `未知渲染“${asked}”。请使用 /quest render classic 或 /quest render hd。`,
     moreAllies: (count) => `另有 ${count} 项`,
     myReviews: (kind, count) => `我的${kind} ${count}`,
     todo: (count) => `待办 ${count}`,

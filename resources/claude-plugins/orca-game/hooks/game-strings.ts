@@ -52,6 +52,8 @@ export type TextStrings = {
   questShown: (mode: string) => string
   questDemo: string
   unknownMode: (asked: string) => string
+  questRenderShown: (render: string) => string
+  unknownRender: (asked: string) => string
   moreAllies: (count: number) => string
   /** `kind` is PR or MR, after the project's host. */
   myReviews: (kind: string, count: number) => string
@@ -155,12 +157,15 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party.',
+      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party, /quest render classic|hd picks the look.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.',
     unknownMode: (asked) =>
       `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
+    questRenderShown: (render) => `Render: ${render}.`,
+    unknownRender: (asked) =>
+      `Unknown render "${asked}". Use /quest render classic or /quest render hd.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
     todo: (count) => `To Do ${count}`,

@@ -26,6 +26,12 @@ const callerParams = () => ({
 function formatGameState(state: OrchestratorGameState): string {
   const lines = [
     `Game: ${state.config.mode} (scene ${state.config.scene}, mode from ${state.sources.mode})`,
+    // Why optional: an older host sends neither key.
+    ...(state.config.render === undefined
+      ? []
+      : [
+          `Render: ${state.config.render} (from ${state.sources.render}), timezone ${state.config.timezone} (from ${state.sources.timezone})`
+        ]),
     `Agents: ${state.agents.length}`
   ]
   if (state.review) {
