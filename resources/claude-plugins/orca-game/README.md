@@ -10,16 +10,21 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
 - **The band** above the prompt: a HUD with the lead as the hero and every teammate in the party
   (walking while it works, hopping with `needs you!` while it waits, hurt while CI is red), counts,
   the review, its CI, the work item, agent activity and project links as clickable chips, a
-  `Needs you:` line, and **Panel**, **Refresh** and **Pet Clawd**.
+  `Needs you:` line, and **Panel**, **Refresh** and **Pet** (`♥ Pet <name>` when the scene has a
+  pet of its own, which it hearts; Clawd otherwise).
 - **The Fleet pane** (Panel): the HUD at full width and one card per agent with its own animated
   tile and activity link, then the review and the work item as links. **Open** takes `i` (work
   item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
-  tab. `r` refreshes, `p` pets Clawd, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
+  tab. `r` refreshes, `p` pets, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
   that teammate's Orca pane.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
 - **Allies.** Other plugins keep running: their `$.ui.status` lines, and Jev's advisor state when
   Jev is installed, become rows of a strip under the band, and their band elements take the scene
   palette. See `docs/reference/orchestrator-game.md` (Other plugins in a game pane).
+- **The cast.** A scene's `cast` adds a pet beside the hero and the character that stands for Jev:
+  while Jev publishes, it acts out each new decision and CI state at the scene's edge (a referee
+  unless the scene dresses it), and the Panel lists its latest decisions. See
+  `docs/reference/orchestrator-game.md` (The cast).
 
 ## Origin
 

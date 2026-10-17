@@ -283,10 +283,21 @@ test("a project's scene file previews when valid, says why when not, and renders
   expect(repo, 'the harness seeds one repo').not.toBeNull()
   const { id: repoId, path: repoPath } = repo as { id: string; path: string }
   // Why a magenta sky: a preview that paints it can only be drawing the file, never Quest.
+  // Why a spring-green pet: the preview draws the file's cast with the game's own code.
   mkdirSync(join(repoPath, '.orca', 'scenes'), { recursive: true })
+  const pet = {
+    name: 'Sprout',
+    frames: [['PPPP', 'P..P']],
+    happy: ['PPPP', 'PPPP'],
+    colors: { P: '#00ff7f' }
+  }
   writeFileSync(
     join(repoPath, '.orca', 'scenes', 'space.json'),
-    JSON.stringify(sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }) }), null, 2)
+    JSON.stringify(
+      sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }), cast: { pet } }),
+      null,
+      2
+    )
   )
   writeFileSync(
     join(repoPath, '.orca', 'scenes', 'broken.json'),
@@ -316,23 +327,20 @@ test("a project's scene file previews when valid, says why when not, and renders
 
   const preview = orcaPage.getByRole('img', { name: 'Preview of space (custom)' })
   await expect(preview).toBeVisible()
-  await expect
-    .poll(async () =>
-      preview.evaluate((canvas) => {
-        const element = canvas as HTMLCanvasElement
-        const data = element
-          .getContext('2d')
-          ?.getImageData(0, 0, element.width, element.height).data
-        let magenta = 0
-        for (let index = 0; data && index < data.length; index += 4) {
-          if (data[index] === 255 && data[index + 1] === 0 && data[index + 2] === 255) {
-            magenta += 1
-          }
+  const pixelsOf = (rgb: readonly [number, number, number]) =>
+    preview.evaluate((canvas, [red, green, blue]) => {
+      const element = canvas as HTMLCanvasElement
+      const data = element.getContext('2d')?.getImageData(0, 0, element.width, element.height).data
+      let count = 0
+      for (let index = 0; data && index < data.length; index += 4) {
+        if (data[index] === red && data[index + 1] === green && data[index + 2] === blue) {
+          count += 1
         }
-        return magenta
-      })
-    )
-    .toBeGreaterThan(0)
+      }
+      return count
+    }, rgb)
+  await expect.poll(async () => pixelsOf([255, 0, 255])).toBeGreaterThan(0)
+  await expect.poll(async () => pixelsOf([0, 255, 127])).toBeGreaterThan(0)
   await expect(orcaPage.getByText('.orca/scenes/space.json · this machine')).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-valid', path)
 

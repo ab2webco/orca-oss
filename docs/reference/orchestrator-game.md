@@ -206,7 +206,7 @@ popover.
   my To Do. Each runs
   `orca tab create --url <url> --worktree id:<worktree> --json`, so it opens in an Orca browser
   tab of the worktree on every platform, and a toast says when Orca could not. The menu keeps `r`
-  (Refresh) and `q` (Close); Pet Clawd is `p`.
+  (Refresh) and `q` (Close); Pet is `p`.
 
 ## My PRs and To Do
 
@@ -459,6 +459,10 @@ the finale is pixel art, so it is English or Spanish. PR #32's per-game HUD word
 Crystal Saga ATB bar, Beast Tamer evolution, the wild encounter while waiting, and each game's
 handed-off tile animation are not ported: they need logic beyond what a scene's data can describe.
 
+Each also dresses Jev's advisor ([The cast](#the-cast-a-pet-and-jevs-advisor)): Quest a wizard,
+Night Watch the commissioner, Crystal Saga an oracle and Beast Tamer the professor. None has a pet,
+so Pet hearts Clawd, the hero, as before.
+
 ## A project's own scene file
 
 A project can draw its own scene without writing a plugin: `orchestratorGame.sceneFile` is a scene
@@ -493,7 +497,8 @@ orchestratorGame:
   `warnings`, which the mod shows as its note. A mod older than this drops the `file:` scene and
   draws `quest`.
 - **Format.** The same JSON as a plugin scene ([Game scenes](./plugin-development.md#game-scenes)):
-  every phase in `looks`, `costumes` and `cards`, plus `teller` and `band`. Colors are `#rrggbb`
+  every phase in `looks`, `costumes` and `cards`, plus `teller` and `band`, and optionally a
+  [`cast`](#the-cast-a-pet-and-jevs-advisor) with its own pet and advisor. Colors are `#rrggbb`
   strings or integers; the mod's own validator
   ([`scene-shape.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-shape.ts)) takes
   both, as Orca's does.
@@ -518,6 +523,82 @@ The preview under the picker paints the file with the mod's drawing code and rea
 window regains focus; an unreadable or invalid file shows the parser's reason and the preview draws
 Quest, as the pane would. A `sceneFile` inherited from `orca.yaml` shows the same reason under the
 row.
+
+## The cast: a pet and Jev's advisor
+
+A scene's optional `cast` adds two characters beside its hero
+([`cast-shape.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/cast-shape.ts),
+[`orchestrator-game-scene-cast.ts`](../../src/shared/orchestrator-game-scene-cast.ts)). It is the
+same block in a project's scene file, a plugin's scene and a built-in one.
+
+```jsonc
+"cast": {
+  "pet": {                                   // optional: what Pet hearts
+    "name": { "en": "Wolf", "es": "Lobo" },  // optional; names the button
+    "frames": [                              // 1 to 4 walking frames
+      ["W...W", "WWWWW", "WEWEW", ".WWW.", ".W.W."],
+      ["W...W", "WWWWW", "WEWEW", ".WWW.", "W...W"]
+    ],
+    "happy": ["W...W", "WWWWW", "WHWHW", ".WWW.", ".W.W."],  // while it is petted
+    "colors": { "W": "#d8d8d8", "E": "#1a1a1a", "H": "#ff5a8a" }
+  },
+  "advisor": {                               // optional: who stands for Jev; the referee otherwise
+    "name": "Golem",
+    "frames": [[".GGG.", "GEGEG", "GGGGG", "G.G.G", ".G.G."]],  // 1 to 4 idle frames
+    "gestures": {                            // optional: its body while one gesture plays
+      "escalated": [".GGG.", "GRGRG", "GGGGG", "GGG.G", ".G.G."]
+    },
+    "colors": { "G": "#b8b8b0", "E": "#d83a2e", "R": "#ff3b3b" }
+  }
+}
+```
+
+- **Sprites.** A frame is 1 to 7 rows of one width from 1 to 10 printable ASCII glyphs, standing on
+  the ground; `.` is transparent and every other glyph needs a color (`#rrggbb` or an integer).
+  Every frame of one member, `happy` and each gesture body included, is the size of the first.
+  Names follow the card rules (a string or one per language, at most 32 characters).
+- **A bad member is left out, not the scene.** Orca drops only the invalid `pet` or `advisor` and
+  says why in `warnings` (`Scene file <path>: cast.pet.frames: …; drawn without it`, or
+  `game scene <id>: …; drawn without it` for a plugin scene), so a typo never takes the scene and
+  its hero away. `orca game scene validate` lists those problems like any other. A gesture key the
+  game does not know is ignored, so a scene written for a newer game still loads.
+- **The pet** walks behind the hero along its path and sits beside it when the hero rests. The
+  button reads `♥ Pet <name>` (Spanish `♥ Mimar a <name>`), or `♥ Pet` (`♥ Mimar`) when the pet or
+  the scene has no name, in the band and the Panel (`p`). Pet shows its `happy` frame, makes it hop
+  and sprinkles the hearts on it; the hero stays on the ground. A scene with no pet hearts the hero,
+  Clawd, as before.
+- **The advisor** stands at the right edge of the scene, and the hero and its pet walk only the
+  stage left of it. It is there only while Jev's `AdvisorState` (`version: 1`) is readable in that
+  pane and the game draws other plugins' lines (`absorbing`: mode not `off`, HUD on); without Jev
+  there is no advisor and no gap. It acts out what changed, never every frame: a new decision, CI
+  state or block notice plays its gesture and bubble for about five seconds (a red card about
+  eight), then it goes idle. While the lead is idle and no spinner draws the scene, a gesture brings
+  the scene up above the band for as long as it plays (in zen, not for a routine one), as Pet does.
+  The first value it sees is where things stand and plays nothing, and a value already acted out
+  never plays again, even if a later read brings it back. When
+  several changes arrive at once the most important plays: escalation, CI failure, CI success,
+  lowered or raised, unsure, CI running, then approved.
+
+| Jev                                             | Gesture                 | The advisor holds                | Bubble                    |
+| ----------------------------------------------- | ----------------------- | -------------------------------- | ------------------------- |
+| subagent `why: lowered`                         | `lowered`               | an arrow pointing down           | its model · Jev's verdict |
+| subagent `why: raised`                          | `raised`                | an arrow pointing up             | its model · Jev's verdict |
+| `chosen`, `same`, `explicit`, `inherited`       | `approved`              | a thumbs-up and a whistle's toot | its model · Jev's verdict |
+| `kept-unsure`, `measuring`                      | `unsure`                | a yellow card and a magnifier    | its model · Jev's verdict |
+| a new `block` notice                            | `escalated`             | a red card and a long whistle    | the notice                |
+| a CI run `watching`                             | `ciRunning`             | a stopwatch                      | the run's line            |
+| a CI run `success` / `failure`                  | `ciPassed` / `ciFailed` | a green / red flag               | the run's line            |
+| the main conversation's model or effort changes | `approved`              | a thumbs-up                      | `model·effort`            |
+
+Other `why` values (`kept-pointer`, `teammate`, `no-jev`…) play nothing but still reach the Panel.
+The bubble keeps only width-1 characters, so an arrow or CJK text in Jev's words is left out. In
+`/quest zen` the routine `chosen` and `same` decisions play their gesture without a bubble.
+
+- **The Panel card** names the advisor, its main `model·effort` and Jev's line, and lists Jev's
+  last five decisions with their verdict, colored by gesture; before the first one it lists the
+  agents running now. The decisions live in the game's own `$.state`
+  `{ plugin: 'orca-game', key: 'advisor' }` (`{ decisions: [...] }`), written when Jev writes its
+  value.
 
 ## Scenes from plugins
 
@@ -544,7 +625,8 @@ paint its own
   `AdvisorState`, `version: 1`) without depending on Jev: its line with model·effort, one row per
   running subagent (title, model, verdict), its CI rows and its latest notice. Any other version, or
   a value that is not an advisor, is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
-  value is written; nothing polls it.
+  value is written; nothing polls it. The same value puts Jev's advisor in the scene and its card
+  in the Panel ([The cast](#the-cast-a-pet-and-jevs-advisor)).
 - **Following the game.** The game publishes `{ plugin: 'orca-game', key: 'absorbing' }`, a
   `boolean` true exactly while it draws other plugins' lines (mode not `off`, HUD on), at load and
   on every change: the env, Orca's live config and `/quest`. Jev reads it, so a pane where the game
@@ -569,7 +651,7 @@ the band's width (the label to a third of it, the text next, the badge dropped f
 The band lays itself out for the pane's width
 ([`chip-rows.ts`](../../resources/claude-plugins/orca-game/hooks/chip-rows.ts)): the status chips
 fill at most two rows and the menu one, whole chips only. When they do not fit, the least important
-labels shorten first (`2 working` to `• 2`, the review to `#42 ✗`, Refresh and Pet Clawd to their
+labels shorten first (`2 working` to `• 2`, the review to `#42 ✗`, Refresh and Pet to their
 icon), then chips drop and a `+N` counts them. Below 37 columns the HUD frame has no room for a
 teammate, so it becomes one line of text (`Lv 2 · • builder  ! scribe`); above that, teammates the
 frame cannot seat are counted as `+N` on its top edge. Widths are measured in terminal cells, so

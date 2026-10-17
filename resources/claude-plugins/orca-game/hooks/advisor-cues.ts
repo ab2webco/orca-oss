@@ -16,8 +16,11 @@ export type AdvisorDecision = {
   gesture: AdvisorGesture | null
 }
 
-/** What was already acted out; a value whose keys are all here plays nothing. */
+/** What was already acted out, kept across values; a value whose keys are all here plays nothing. */
 export type AdvisorSeen = { keys: ReadonlySet<string>; main: string }
+
+// Why bounded: a long session must not grow it forever; the oldest keys are long gone from Jev.
+const SEEN_MAX = 256
 
 const WHY_GESTURES: Readonly<Record<string, AdvisorGesture>> = {
   lowered: 'lowered',
@@ -80,7 +83,8 @@ export function advisorCuesOf(
   const blocks = advisor.notices
     .filter((one) => one.level === 'block')
     .map((one) => ({ notice: one, key: `notice|${one.id}` }))
-  const keys = new Set([...agents, ...runs, ...blocks].map((one) => one.key))
+  const current = [...agents, ...runs, ...blocks].map((one) => one.key)
+  const keys = new Set([...(seen?.keys ?? []), ...current].slice(-SEEN_MAX))
   if (seen === null) {
     return { seen: { keys, main }, cues: [], decisions: advisor.subagents.map(decisionOf) }
   }

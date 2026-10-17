@@ -122,6 +122,32 @@ describe('the advisor in the scene', () => {
     expect(text.indexOf('▌')).toBeLessThan(advisorLeft)
   })
 
+  it('keeps its words whole while the pet’s hearts fly next to them', () => {
+    const pet = {
+      frames: [['WWWWW', 'W.W.W']],
+      happy: ['WWWWW', 'W.W.W'],
+      colors: { W: 0xd8d8d8 }
+    }
+    const withPet = { ...SCENE, cast: { pet } }
+    for (let tick = 0; tick < 120; tick += 3) {
+      for (let age = 0; age < 24; age += 1) {
+        const grid = sceneGridOf(
+          withPet,
+          undefined,
+          COLUMNS,
+          tick,
+          '',
+          0,
+          { kind: 'pet', age },
+          false,
+          undefined,
+          pose({ gesture: 'lowered', age: 30, bubble: 'Sonnet 5 · baja' })
+        )
+        expect(row0(grid)).toContain('▐ Sonnet 5 · baja ▌')
+      }
+    }
+  })
+
   it('draws no bubble of its own when it has nothing to say', () => {
     const grid = sceneGridOf(
       SCENE,

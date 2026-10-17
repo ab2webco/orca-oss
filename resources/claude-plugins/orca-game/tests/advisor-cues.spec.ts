@@ -134,6 +134,18 @@ describe('advisorCuesOf', () => {
     expect(gestures(red.cues)).toEqual(['ciFailed'])
   })
 
+  // Why: a drawing can read a value older than the one already acted out; it must not replay it.
+  it('never replays a decision or CI state it already acted out', () => {
+    const first = advisorCuesOf(null, jev())
+    const failed = advisorCuesOf(first.seen, jev({ ci: [run('c1', 'failure', 'CI lint')] }))
+    expect(gestures(failed.cues)).toEqual(['ciFailed'])
+    const cleared = advisorCuesOf(failed.seen, jev())
+    expect(cleared.cues).toEqual([])
+    expect(
+      advisorCuesOf(cleared.seen, jev({ ci: [run('c1', 'failure', 'CI lint')] })).cues
+    ).toEqual([])
+  })
+
   it('whistles when the main conversation changes model or effort', () => {
     const next = after({ model: 'Sonnet 5', effort: 'medium' })
     expect(next.cues).toEqual([{ gesture: 'approved', text: 'Sonnet 5·medium', isRoutine: false }])

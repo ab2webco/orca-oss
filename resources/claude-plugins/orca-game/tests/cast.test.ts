@@ -291,4 +291,45 @@ describe('Jev’s advisor', () => {
     expect(await pane.find({ type: 'Box', key: 'advisor-card' })).toBeUndefined()
     await pane.unmount()
   })
+
+  test(
+    'shows the scene above the band to act out CI while the lead is idle, then leaves',
+    WITH_JEV,
+    async ($, on) => {
+      const failed = JSON.stringify({
+        ...JSON.parse(FIRST),
+        ci: [
+          {
+            id: 'c1',
+            sha7: 'abc1234',
+            branch: null,
+            status: 'failure',
+            done: 5,
+            total: 5,
+            failed: ['lint'],
+            running: [],
+            text: 'CI abc1234 failed: lint',
+            startedAtMs: 1,
+            finishedAtMs: 2
+          }
+        ]
+      })
+      const clock = mock.clock(on)
+      engine(on, { TEST_ADVISOR: FIRST, TEST_ADVISOR_NEXT: failed }, undefined)
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      const sceneInBand = async () => {
+        const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+        const raster = await band.find({ type: 'Raster', key: 'band-pet-scene' })
+        await band.unmount()
+        return raster
+      }
+      expect(await sceneInBand()).toBeUndefined()
+      await $.turn.complete(TURN)
+      await clock.settle()
+      expect(await sceneInBand()).toBeDefined()
+      await clock.advance(10_000)
+      expect(await sceneInBand()).toBeUndefined()
+    }
+  )
 })

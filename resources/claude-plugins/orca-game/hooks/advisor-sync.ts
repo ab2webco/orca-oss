@@ -8,6 +8,8 @@ export const registerAdvisor = (on: On): void => {
   on('state.set', { plugin: 'orca-jev-mod-skills', key: 'advisor' }, async ($, e, next) => {
     const written = await next(e)
     const decisions = observeAdvisor(e.value, quest.tick)
+    // Why: a gesture that starts while the lead is idle needs the band to mount the scene.
+    $.ui.invalidate('ui.render')
     await logDecisions($, decisions, await $.clock.now())
     return written
   })

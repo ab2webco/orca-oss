@@ -65,7 +65,7 @@ Run every step; skipping validation is the usual way scenes ship broken.
 5. **Check it live.** In a Claude Agent Teams pane, `/quest demo` plays a scripted party
    through every phase with the scene (nothing is read or written); `/quest on` returns to
    real data. Look at: the characters in each phase, the cards' names and colors, the chips
-   under the band, the team band's frame and sky, and the foe.
+   under the band, the team band's frame and sky, the foe, and the cast's pet (press Pet).
 
 6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed.
    A private scene (licensed characters, personal jokes) stays uncommitted: add `.orca/` to
@@ -88,6 +88,7 @@ Top level, all required unless marked optional:
 | `foe`     | Optional. The costume a teammate with red CI trades turns with                 |
 | `finale`  | Optional. Caption painted while a merge runs                                   |
 | `hud`     | Optional. The team band's frame, sky and text colors                          |
+| `cast`    | Optional. The scene's pet (what Pet hearts) and who stands for Jev            |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
 The file must be at most 64 KB.
@@ -201,6 +202,44 @@ against the sky. Teammate names keep the game's state colors (working, idle, wai
 and accents, digits, punctuation, box drawing and block characters, `★` and card suits.
 Japanese, Korean, Chinese and emoji are refused. A plain string or per-language object.
 
+### `cast` (optional)
+
+```json
+{
+  "pet": {
+    "name": { "en": "Wolf", "es": "Lobo" },
+    "frames": [
+      ["W...W", "WWWWW", "WEWEW", ".WWW.", ".W.W."],
+      ["W...W", "WWWWW", "WEWEW", ".WWW.", "W...W"]
+    ],
+    "happy": ["W...W", "WWWWW", "WHWHW", ".WWW.", ".W.W."],
+    "colors": { "W": "#d8d8d8", "E": "#1a1a1a", "H": "#ff5a8a" }
+  },
+  "advisor": {
+    "name": "Golem",
+    "frames": [[".GGG.", "GEGEG", "GGGGG", "G.G.G", ".G.G."]],
+    "gestures": { "escalated": [".GGG.", "GRGRG", "GGGGG", "GGG.G", ".G.G."] },
+    "colors": { "G": "#b8b8b0", "E": "#d83a2e", "R": "#ff3b3b" }
+  }
+}
+```
+
+- `pet` walks behind the lead and is what **♥ Pet** hearts; its `name` labels the button
+  (`♥ Pet Wolf`). Without a pet, Pet hearts the lead's own character, so a scene whose lead is
+  not Clawd (a licensed hero, a mascot) should bring one. `frames` are 1 to 4 walking frames,
+  `happy` the frame shown while petted.
+- `advisor` stands at the right edge and acts out Jev's decisions while Jev runs in the pane:
+  arrows for a lowered or raised model, a yellow card for doubt, a red card for an escalation,
+  a stopwatch and flags for CI. The game draws those props; the scene only dresses the body.
+  `frames` are 1 to 4 idle frames; optional `gestures` replaces the body for one gesture
+  (`lowered`, `raised`, `approved`, `unsure`, `escalated`, `ciRunning`, `ciPassed`,
+  `ciFailed`). Without an advisor the game draws a referee.
+- A frame is 1 to 7 rows, every row the same width, 1 to 10 printable ASCII glyphs; every
+  frame of one member is the size of the first. `.` is transparent; every other glyph needs a
+  color. Draw them facing left, toward the lead.
+- An invalid `pet` or `advisor` is left out with a warning and the rest of the scene still
+  draws, but `validate` reports it: fix it before you report.
+
 ## Common problems
 
 | Validate says                                            | Fix                                                              |
@@ -212,6 +251,8 @@ Japanese, Korean, Chinese and emoji are refused. A plain string or per-language 
 | `looks.<phase>: Invalid input: expected object…`         | A phase is missing: all six of `working docs build verify pr handoff` |
 | `…name: Too big: expected string to have <=32 characters`| Shorten it (each language separately)                            |
 | `finale…: must be width-1 characters…`                   | Remove emoji and CJK characters from the finale                  |
+| `cast.<member>…: every row of a frame must be the same width` | Pad the short rows with `.`                                 |
+| `cast.<member>.frames: every frame must be the size of the first` | Same width and height for every frame, `happy` and gesture |
 | `not valid JSON`                                         | Trailing comma, missing quote or comment: JSON allows none       |
 
 If the game still draws Quest after `validate` passes: check the path in Settings or
@@ -223,6 +264,7 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
 - Every phase should be recognizably different (costume colors and the world) so the user
   can tell at a glance what each teammate is doing.
 - Name cards in the scene's own voice, short enough to read on a narrow pane.
-- Include `hud`, `foe` and `finale`: a scene without them only half changes the game.
+- Include `hud`, `foe` and `finale`: a scene without them only half changes the game. Add a
+  `cast` pet whenever the lead is not Clawd, or Pet hearts the lead.
 - Before reporting, validate, then look at it with `/quest demo` in a pane and describe what
   you saw. A file that validates can still be ugly; the check is looking at it.

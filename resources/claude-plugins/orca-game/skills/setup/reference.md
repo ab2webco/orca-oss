@@ -62,3 +62,6 @@ orchestratorGame:
 - A placeholder in a prompt or link with no value in a worktree drops that link, or leaves the
   value empty in a prompt.
 - Braces are placeholders everywhere: write `~/.local/state/x`, not `${XDG_STATE_HOME}/x`.
+- A scene file's optional `cast` gives it a pet that `♥ Pet <name>` hearts (Clawd without one) and
+  the character that acts out Jev's decisions (a referee without one); see "The cast" in
+  `docs/reference/orchestrator-game.md`.

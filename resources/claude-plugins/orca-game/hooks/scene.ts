@@ -139,11 +139,11 @@ const sprinkle = (
   span: number,
   glyph: number,
   color: number,
-  bubble: { left: number; width: number }
+  isFree: (x: number) => boolean
 ) => {
   for (const offset of offsets) {
     const x = from + (offset % span)
-    if (x < bubble.left || x >= bubble.left + bubble.width) {
+    if (isFree(x)) {
       grid[x] = [glyph, color, grid[x]?.[1] ?? 0]
     }
   }
@@ -209,7 +209,8 @@ export const sceneGridOf = (
   if (puff < columns && puff < left + 1 && Math.floor(tick / 6) % 2 === 0) {
     grid[columns + puff] = [UPPER_HALF, BUBBLE, grid[columns + puff]?.[2] ?? 0]
   }
-  const bubble = { left, width }
+  // Hearts and stars land on neither bubble, nor past the scene's edge.
+  const isFree = (x: number) => (x < left || x >= left + width) && x < limit
   if (reacting && reaction.kind === 'level') {
     sprinkle(
       grid,
@@ -218,7 +219,7 @@ export const sceneGridOf = (
       10,
       0x2605,
       0xffd84a,
-      bubble
+      isFree
     )
   }
   if (reacting && reaction.kind === 'pet') {
@@ -229,7 +230,7 @@ export const sceneGridOf = (
       Math.max(1, speaker.width - 1),
       0x2665,
       HEART,
-      bubble
+      isFree
     )
   }
   if (shown === 'merge' && scene.finale !== undefined) {

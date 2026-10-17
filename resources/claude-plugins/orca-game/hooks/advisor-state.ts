@@ -54,8 +54,13 @@ export function observeAdvisor(value: unknown, tick: number): AdvisorDecision[] 
 /** Jev's value as this pane reads it; a drawing that calls this redraws on Jev's writes. */
 export async function readJevAdvisor($: EngineInterface, tick: number): Promise<Advisor | null> {
   const held = await $.state.get(JEV_ADVISOR).catch(() => ({ value: undefined }))
-  observeAdvisor(held.value, tick)
-  return runtime.advisor
+  const advisor = advisorOf(held.value)
+  // Why no gesture here: a drawing may read a value older than the write just acted out.
+  if (advisor === null || runtime.seen === null) {
+    observeAdvisor(held.value, tick)
+  }
+  runtime.advisor = advisor
+  return advisor
 }
 
 export const advisorNow = (): Advisor | null => runtime.advisor
@@ -76,6 +81,26 @@ export const advisorPoseAt = (
   }
   return { sprite, gesture: playing.cue.gesture, age, bubble: advisorBubbleOf(playing.cue, isZen) }
 }
+
+const playingAt = (tick: number): AdvisorCue | undefined => {
+  const playing = runtime.cue
+  const age = playing === undefined ? -1 : tick - playing.at
+  return playing !== undefined &&
+    runtime.advisor !== null &&
+    age >= 0 &&
+    age < cueTicksOf(playing.cue.gesture)
+    ? playing.cue
+    : undefined
+}
+
+/** A gesture plays at `tick` worth showing the scene for; zen keeps the routine ones quiet. */
+export const isAdvisorActingAt = (tick: number, isZen: boolean): boolean => {
+  const cue = playingAt(tick)
+  return cue !== undefined && !(isZen && cue.isRoutine)
+}
+
+export const isAdvisorCueEndingAt = (tick: number): boolean =>
+  runtime.cue !== undefined && tick - runtime.cue.at === cueTicksOf(runtime.cue.cue.gesture)
 
 const entryOf = (decision: AdvisorDecision, at: number): AdvisorLogEntry => ({ ...decision, at })
 

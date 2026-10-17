@@ -785,7 +785,12 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   "foe": { "rows": ["…six rows…"], "legs": ["…", "…"], "colors": { } },   // optional
   "finale": { "en": "◆ CASE CLOSED", "es": "◆ CASO CERRADO" },          // optional
   "hud": { "skyTop": "#0d1330", "skyBottom": "#1f2748", "frame": "#f2c14e",
-           "text": "#e8e4ff", "dim": "#9aa6c8", "star": "#ffffff" }        // optional, team band
+           "text": "#e8e4ff", "dim": "#9aa6c8", "star": "#ffffff" },       // optional, team band
+  "cast": {                                                              // optional
+    "pet": { "name": "Owl", "frames": [["O.O", "OOO", ".O."]], "happy": ["O.O", "OHO", ".O."],
+             "colors": { "O": "#8fa3d9", "H": "#ff5a8a" } },
+    "advisor": { "name": "Watchman", "frames": [[".K.", "KKK", "K.K"]], "colors": { "K": "#1a1a1a" } }
+  }
 }
 ```
 
@@ -812,6 +817,10 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
 - An Orca or mod older than these fields ignores `scenery`, `isSignal`, `foe` and `finale`; one
   that predates the `antenna`, `crystal` and `flower` plants drops a scene that uses them and draws
   `quest`.
+- Optional `cast` gives the scene a `pet` (what Pet hearts, trailing the hero) and Jev's
+  `advisor` (the referee otherwise), each sprite frames of 1 to 7 rows by 1 to 10 glyphs. An
+  invalid member is left out with a warning and the scene still draws; the rules and the advisor's
+  gestures are in [The cast](./orchestrator-game.md#the-cast-a-pet-and-jevs-advisor).
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the

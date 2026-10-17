@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { GameConfig } from '../types'
 import { advisorSpriteOf } from './advisor-art'
-import { advisorPoseAt } from './advisor-state'
+import { advisorPoseAt, isAdvisorActingAt, isAdvisorCueEndingAt } from './advisor-state'
 import { DEMO_STEP_TICKS, demoFrameOf, type DemoFrame } from './demo'
 import {
   DEFAULT_GAME_CONFIG,
@@ -125,6 +125,10 @@ export const isSceneShown = (): boolean => quest.stages.size > 0
 
 export const isClawdReacting = (): boolean => isReacting(reactionNow())
 
+/** Jev's advisor acts something out now, so the band shows the scene when no spinner does. */
+export const isAdvisorActing = (): boolean =>
+  isAbsorbingConfig(gameConfig()) && isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen')
+
 export function clawdReact($: EngineInterface, kind: Reaction['kind']): void {
   quest.reaction = { kind, at: quest.tick }
   if (kind !== 'hello') {
@@ -223,7 +227,9 @@ async function blitAll($: EngineInterface): Promise<void> {
 }
 
 async function repaint($: EngineInterface): Promise<void> {
-  if (quest.reaction !== undefined && quest.tick - quest.reaction.at === REACTION_TICKS) {
+  const isReactionOver =
+    quest.reaction !== undefined && quest.tick - quest.reaction.at === REACTION_TICKS
+  if (isReactionOver || isAdvisorCueEndingAt(quest.tick)) {
     $.ui.invalidate('ui.render')
   }
   quest.tick += 1

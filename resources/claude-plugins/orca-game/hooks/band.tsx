@@ -18,6 +18,7 @@ import {
   clawdReact,
   currentScene,
   gameConfig,
+  isAdvisorActing,
   isClawdReacting,
   isSceneShown,
   petScene,
@@ -57,7 +58,8 @@ export const registerBand = (on: On): void => {
     ])
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
-    const showPet = isClawdReacting() && !isSceneShown()
+    // Why Jev too: CI often lands while the lead is idle, when no spinner draws the scene.
+    const showPet = (isClawdReacting() || isAdvisorActing()) && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
     const rowsOf = (
       prefix: string,
