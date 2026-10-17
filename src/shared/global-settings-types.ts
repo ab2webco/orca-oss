@@ -418,6 +418,10 @@ export type GlobalSettings = {
   tabAutoGenerateTitle: boolean
   /** Why: pinned tabs can still be closed via keyboard/native-menu; this gates that behind a confirmation. Defaults on. */
   confirmClosePinnedTab: boolean
+  /** Warn about low memory and name the heaviest terminal panes. Missing means on. */
+  memoryPressureWarningEnabled?: boolean
+  /** Available-memory percent under which the warning shows; one of 5/10/15/20. */
+  memoryPressureWarningThresholdPercent?: number
   /** When true, Orca requests local awake assertions while hook-reported agents are working. */
   keepComputerAwakeWhileAgentsRun: boolean
   /** Optional for mixed-version compatibility; the legacy boolean maps true to Auto. */
