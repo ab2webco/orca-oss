@@ -7,7 +7,13 @@ export type GameConfig = {
   hud: boolean
   rewards: boolean
   openLinks: 'orca' | 'system'
+  render: GameRender
+  /** An IANA zone hd's day and night follow, or `local` for the machine's clock. */
+  timezone: string
 }
+
+/** The 5-row pixel art, or the 9 to 10-row 2D-HD scene. */
+export type GameRender = 'classic' | 'hd'
 
 export type GameAgentState = 'working' | 'waiting' | 'idle' | 'done'
 

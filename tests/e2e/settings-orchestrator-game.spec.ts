@@ -568,3 +568,51 @@ test("the project's Actions editor saves this machine's list and renders at ever
     expect(box?.width ?? 0, `editor fits ${width}`).toBeLessThanOrEqual(width)
   }
 })
+
+test('the render and time zone rows persist globally and per project and render at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const render = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
+  await expect(render).toBeVisible({ timeout: 15_000 })
+  await render.getByRole('radio', { name: 'HD' }).click()
+  const zone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
+  await zone.fill('Mars/Olympus')
+  await zone.press('Enter')
+  await expect(orcaPage.getByRole('alert').filter({ hasText: 'IANA time zone' })).toBeVisible()
+  await zone.fill('America/Bogota')
+  await zone.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ render: 'hd', timezone: 'America/Bogota' })
+  await shootAll(electronApp, orcaPage, testInfo, 'render-global', zone)
+
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? null)
+  expect(repoId, 'the harness seeds one repo').not.toBeNull()
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.openSettingsTarget({ pane: 'repo', repoId: id })
+    state.openSettingsPage()
+  }, repoId)
+  const projectRender = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
+  await expect(projectRender).toBeVisible({ timeout: 15_000 })
+  await expect(orcaPage.getByText('HD · global setting')).toBeVisible()
+  await expect(orcaPage.getByText('America/Bogota · global setting')).toBeVisible()
+  await projectRender.getByRole('radio', { name: 'Classic' }).click()
+  const projectZone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
+  await projectZone.fill('Europe/Madrid')
+  await projectZone.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId as string]: { render: 'classic', timezone: 'Europe/Madrid' } })
+  await expect(orcaPage.getByText('Classic · this machine')).toBeVisible()
+  await shootAll(electronApp, orcaPage, testInfo, 'render-project', projectZone)
+})

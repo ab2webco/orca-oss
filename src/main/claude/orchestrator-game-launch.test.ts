@@ -28,8 +28,26 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_SCENE: 'quest',
       ORCA_GAME_HUD: '1',
       ORCA_GAME_REWARDS: '0',
+      ORCA_GAME_RENDER: 'classic',
+      // Why the desktop's zone: an SSH pane's mod would otherwise read the host's clock.
+      ORCA_GAME_TIMEZONE: Intl.DateTimeFormat().resolvedOptions().timeZone,
       ORCA_GAME_LOCALE: 'es',
       CLAUDE_CODE_NO_FLICKER: '1'
+    })
+  })
+
+  it('hands the game its render and the timezone its day and night follow', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({
+        project: { render: 'hd', timezone: 'America/Bogota' }
+      }),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR
+    })
+
+    expect(launch.env).toMatchObject({
+      ORCA_GAME_RENDER: 'hd',
+      ORCA_GAME_TIMEZONE: 'America/Bogota'
     })
   })
 

@@ -49,6 +49,8 @@ export type TextStrings = {
   questShown: (mode: string) => string
   questDemo: string
   unknownMode: (asked: string) => string
+  questRenderShown: (render: string) => string
+  unknownRender: (asked: string) => string
   moreAllies: (count: number) => string
   /** `kind` is PR or MR, after the project's host. */
   myReviews: (kind: string, count: number) => string
@@ -80,6 +82,10 @@ export type ArtStrings = {
   needsYou: string
   alert: (name: string) => string
   ciIsRed: string
+  /** hd's floating text when a review merges; `review` is like `#42`. */
+  mergedFloat: (review: string) => string
+  /** The crowned hero's label in hd when the project names no lead. */
+  lead: string
   noParty: string
   teammatesJoin: string
   level: string
@@ -152,12 +158,15 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party.',
+      '/quest off shows everything, /quest on hides tool rows, /quest zen also hides working notes, /quest demo plays a scripted fake party, /quest render classic|hd picks the look.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /quest on returns to real data.',
     unknownMode: (asked) =>
       `Unknown mode "${asked}". Use /quest off, /quest on, /quest zen or /quest demo.`,
+    questRenderShown: (render) => `Render: ${render}.`,
+    unknownRender: (asked) =>
+      `Unknown render "${asked}". Use /quest render classic or /quest render hd.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
     todo: (count) => `To Do ${count}`,
@@ -186,6 +195,8 @@ const EN: GameStrings = {
     needsYou: 'needs you!',
     alert: (name) => `${name} needs you!`,
     ciIsRed: 'CI is red',
+    mergedFloat: (review) => `${review} merged!`,
+    lead: 'Lead',
     noParty: 'No party yet.',
     teammatesJoin: 'Teammates join when the lead spawns them.',
     level: 'Lv',
@@ -236,6 +247,14 @@ const isRasterCode = (code: number): boolean =>
 
 export const isRasterText = (text: string): boolean =>
   [...text].every((one) => isRasterCode(one.codePointAt(0) ?? 0))
+
+const INVISIBLE = /[\p{M}\p{Cc}\p{Cf}︀-️]/u
+
+/** Text as a Raster can draw it: invisible marks dropped, anything wider or unknown shown as `?`. */
+export const rasterGlyphsOf = (text: string): string[] =>
+  [...text.normalize('NFC')].flatMap((one) =>
+    INVISIBLE.test(one) ? [] : isRasterCode(one.codePointAt(0) ?? 0) ? [one] : ['?']
+  )
 
 let activeLocale: GameLocale = 'en'
 let active: GameStrings = EN

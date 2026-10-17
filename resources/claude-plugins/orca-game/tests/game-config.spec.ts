@@ -17,7 +17,9 @@ describe('gameConfigOfEnv', () => {
       scene: 'quest',
       hud: true,
       rewards: true,
-      openLinks: 'orca'
+      openLinks: 'orca',
+      render: 'classic',
+      timezone: 'local'
     })
     expect(DEFAULT_GAME_CONFIG).toEqual(gameConfigOfEnv({}))
   })
@@ -43,7 +45,15 @@ describe('gameConfigOfEnv', () => {
         ORCA_GAME_HUD: '0',
         ORCA_GAME_REWARDS: 'false'
       })
-    ).toEqual({ mode: 'zen', scene: 'space', hud: false, rewards: false, openLinks: 'orca' })
+    ).toEqual({
+      mode: 'zen',
+      scene: 'space',
+      hud: false,
+      rewards: false,
+      openLinks: 'orca',
+      render: 'classic',
+      timezone: 'local'
+    })
     expect(gameConfigOfEnv({ ORCA_GAME_HUD: '1', ORCA_GAME_REWARDS: 'true' })).toMatchObject({
       hud: true,
       rewards: true

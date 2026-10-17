@@ -66,6 +66,10 @@ Run every step; skipping validation is the usual way scenes ship broken.
    through every phase with the scene (nothing is read or written); `/quest on` returns to
    real data. Look at: the characters in each phase, the cards' names and colors, the chips
    under the band, the team band's frame and sky, the foe, and the cast's pet (press Pet).
+   Then `/quest render hd` and look again: hd draws the same file as a 9 to 10-row scene, with
+   every character outlined in ink taken from the darkest color of its own `colors` and shaded
+   from them, so a costume whose colors are all pale gets a pale outline. `/quest render classic`
+   returns (or set `orchestratorGame.render` for the project).
 
 6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed.
    A private scene (licensed characters, personal jokes) stays uncommitted: add `.orca/` to
@@ -288,5 +292,7 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
 - Name cards in the scene's own voice, short enough to read on a narrow pane.
 - Include `hud`, `foe` and `finale`: a scene without them only half changes the game. Add a
   `cast` pet whenever the lead is not Clawd, or Pet hearts the lead.
-- Before reporting, validate, then look at it with `/quest demo` in a pane and describe what
-  you saw. A file that validates can still be ugly; the check is looking at it.
+- Give every costume, pet and advisor one dark color (eyes, hair, boots): hd inks its outline
+  from it, and without one the figure blurs into a light sky.
+- Before reporting, validate, then look at it with `/quest demo` in a pane, in classic and in
+  `/quest render hd`, and describe what you saw. A file that validates can still be ugly; the check is looking at it.

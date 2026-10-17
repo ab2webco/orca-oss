@@ -20,5 +20,6 @@ describe('the /orca-game:setup key summary', () => {
     expect(parsed?.orchestratorGame?.orchestrator).toEqual(
       expect.objectContaining({ accounts: 'auto', cap: 4, agent: 'claude' })
     )
+    expect(parsed?.orchestratorGame).toMatchObject({ render: 'hd', timezone: 'America/Bogota' })
   })
 })

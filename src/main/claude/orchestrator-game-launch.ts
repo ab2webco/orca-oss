@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { compareAppVersions } from '../../shared/app-version'
 import type { ResolvedOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
+import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import { isPluginUiLanguage, normalizeUiLanguage, type UiLanguage } from '../../shared/ui-language'
 import {
   DEFAULT_UI_LOCALE,
@@ -73,6 +74,8 @@ export function buildOrchestratorGameLaunch(args: {
       ORCA_GAME_SCENE: config.scene,
       ORCA_GAME_HUD: config.hud ? '1' : '0',
       ORCA_GAME_REWARDS: config.rewards ? '1' : '0',
+      ORCA_GAME_RENDER: config.render,
+      ORCA_GAME_TIMEZONE: desktopGameTimezoneOf(config.timezone),
       ORCA_GAME_LOCALE: args.locale ?? DEFAULT_UI_LOCALE,
       // Why: Team panes carry TMUX, which keeps Claude on the main screen, where the terminal
       // reports no clicks; the fullscreen layout is the only one where the game's buttons click.

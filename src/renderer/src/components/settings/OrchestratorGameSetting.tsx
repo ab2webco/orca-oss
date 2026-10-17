@@ -54,6 +54,10 @@ import {
   OrchestratorGameOpenLinksRow,
   orchestratorGameOpenLinksLabels
 } from './OrchestratorGameOpenLinksSetting'
+import {
+  OrchestratorGameLookRows,
+  orchestratorGameRenderLabels
+} from './OrchestratorGameRenderSetting'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -168,7 +172,7 @@ export function OrchestratorGameSetting({
             />
           }
         />
-        <OrchestratorGameScenePreview scene={config.scene} mode={config.mode} />
+        <OrchestratorGameScenePreview config={config} />
         {toggles().map((toggle) => (
           <SettingsSwitchRow
             key={toggle.key}
@@ -183,6 +187,13 @@ export function OrchestratorGameSetting({
           value={config.openLinks}
           disabled={config.mode === 'off'}
           onChange={(next) => set('openLinks', next)}
+        />
+        <OrchestratorGameLookRows
+          layer={layer}
+          disabled={config.mode === 'off'}
+          onChange={(key, value) =>
+            updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
+          }
         />
       </SearchableSetting>
     </section>
@@ -337,6 +348,14 @@ export function ProjectOrchestratorGameSetting({
           effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
           onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
         />
+        <OrchestratorGameLookRows
+          layer={local}
+          effective={{
+            render: effective('render', orchestratorGameRenderLabels()[config.render]),
+            timezone: effective('timezone', config.timezone)
+          }}
+          onChange={set}
+        />
         <SettingsRow
           label={sceneTitle()}
           description={effective('scene', sceneFile ?? config.scene)}
@@ -369,11 +388,7 @@ export function ProjectOrchestratorGameSetting({
         ) : (
           <OrchestratorGameSceneFileStatus read={file.state} />
         )}
-        <OrchestratorGameScenePreview
-          scene={config.scene}
-          mode={config.mode}
-          fileScene={file.state}
-        />
+        <OrchestratorGameScenePreview config={config} fileScene={file.state} />
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}
           settings={settings}

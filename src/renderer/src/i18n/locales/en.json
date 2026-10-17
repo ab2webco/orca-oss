@@ -11422,6 +11422,15 @@
           "system": "System browser",
           "label": "Open links in",
           "description": "PR, CI, ticket and list links from the band and the Panel. The system browser has your GitHub and Jira sign-ins."
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "Classic",
+          "hd": "HD",
+          "label": "Render",
+          "description": "Classic is the 5-row pixel art. HD draws a 9 to 10-row scene with light, weather and day and night.",
+          "timezone": "Time zone",
+          "timezoneDescription": "When HD turns to night. Empty or local follows this machine's clock.",
+          "timezoneInvalid": "Use local or an IANA time zone such as America/Bogota."
         }
       },
       "right": {

@@ -18,6 +18,12 @@ import {
   type OrchestratorGameTodoSource
 } from './orchestrator-game-project-work'
 import {
+  isLookKey,
+  lookFieldOf,
+  ORCHESTRATOR_GAME_LOCAL_TIMEZONE,
+  type OrchestratorGameRender
+} from './orchestrator-game-render'
+import {
   orchestratorGameSceneFileErrorText,
   orchestratorGameSceneFileId,
   parseOrchestratorGameSceneFile
@@ -39,6 +45,9 @@ export type OrchestratorGameConfig = {
   rewards: boolean
   tracker: boolean
   openLinks: OrchestratorGameOpenLinks
+  render: OrchestratorGameRender
+  /** An IANA zone for the hd scene's day and night, or `local` for the machine's clock. */
+  timezone: string
 }
 
 /** Lists that a later layer replaces whole; kept out of the config so Settings and the env stay scalar. */
@@ -84,7 +93,9 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   hud: true,
   rewards: true,
   tracker: true,
-  openLinks: 'orca'
+  openLinks: 'orca',
+  render: 'classic',
+  timezone: ORCHESTRATOR_GAME_LOCAL_TIMEZONE
 }
 
 const KEYS = Object.keys(DEFAULT_ORCHESTRATOR_GAME_CONFIG) as (keyof OrchestratorGameConfig)[]
@@ -112,10 +123,19 @@ export function resolveOrchestratorGameConfig(
       continue
     }
     for (const key of KEYS) {
-      if (layer[key] !== undefined) {
-        Object.assign(config, { [key]: layer[key] })
-        sources[key] = source
+      if (layer[key] === undefined) {
+        continue
       }
+      // Why: a hand-edited Settings value is not parsed on the way in, so it is checked here.
+      const checked = isLookKey(key)
+        ? lookFieldOf(key, layer[key])
+        : { value: layer[key], warning: undefined }
+      if (checked.warning !== undefined) {
+        warnings.push(checked.warning)
+        continue
+      }
+      Object.assign(config, { [key]: checked.value })
+      sources[key] = source
     }
     if (layer.scene !== undefined) {
       sceneFile = null
@@ -243,6 +263,13 @@ export function parseOrchestratorGameLayer(raw: unknown): {
         layer.openLinks = value
       } else {
         warnings.push('orchestratorGame.openLinks must be orca or system')
+      }
+    } else if (isLookKey(key)) {
+      const checked = lookFieldOf(key, value)
+      if (checked.warning === undefined) {
+        Object.assign(layer, { [key]: checked.value })
+      } else {
+        warnings.push(checked.warning)
       }
     } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {

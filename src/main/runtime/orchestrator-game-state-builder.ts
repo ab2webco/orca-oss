@@ -38,6 +38,7 @@ import {
   type OrchestratorGameSceneSource
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
+import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import {
   gameReviewOf,
   statusGroupOfName,
@@ -167,10 +168,11 @@ export async function buildOrchestratorGameState(
     readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
-  const config =
-    sceneFile?.warning === undefined
-      ? resolved.config
-      : { ...resolved.config, scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }
+  const config = {
+    ...resolved.config,
+    ...(sceneFile?.warning === undefined ? {} : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
+    timezone: desktopGameTimezoneOf(resolved.config.timezone)
+  }
   let workItem: GameWorkItem | null = null
   if (plane) {
     workItem = {

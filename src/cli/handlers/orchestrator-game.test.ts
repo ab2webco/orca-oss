@@ -154,4 +154,29 @@ describe('orca game state', () => {
       })
     ).rejects.toThrow(/url/i)
   })
+
+  it('says how the scene draws and on whose clock, with where each comes from', async () => {
+    const state = {
+      config: { mode: 'on', scene: 'quest', render: 'hd', timezone: 'America/Bogota' },
+      sources: { mode: 'default', render: 'project', timezone: 'global' },
+      agents: [],
+      review: null,
+      workItem: null,
+      warnings: ['orchestratorGame.render must be classic or hd']
+    }
+    const client = {
+      call: async () => ({ ok: true, result: state })
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game state']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain('Render: hd (from project), timezone America/Bogota (from global)')
+    expect(text).toContain('Warning: orchestratorGame.render must be classic or hd')
+  })
 })

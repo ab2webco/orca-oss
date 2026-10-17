@@ -15,6 +15,7 @@ import type {
 import { gameActionsOf, gamePromptOf } from './game-action-shape'
 import { gameLeadOf } from './game-lead'
 import { isTerminalHandle } from './game-config'
+import { lookConfigOf } from './game-render'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
@@ -157,7 +158,8 @@ const configOf = (value: unknown): Partial<GameConfig> => {
     ...(scene === '' ? {} : { scene }),
     ...(typeof raw.hud === 'boolean' ? { hud: raw.hud } : {}),
     ...(typeof raw.rewards === 'boolean' ? { rewards: raw.rewards } : {}),
-    ...(raw.openLinks === 'orca' || raw.openLinks === 'system' ? { openLinks: raw.openLinks } : {})
+    ...(raw.openLinks === 'orca' || raw.openLinks === 'system' ? { openLinks: raw.openLinks } : {}),
+    ...lookConfigOf(raw)
   }
 }
 

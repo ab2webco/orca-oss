@@ -52,12 +52,15 @@ export const ES: GameCatalog = {
     questDescription:
       'Modo quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:
-      '/quest off lo muestra todo, /quest on oculta las filas de herramientas, /quest zen también oculta las notas de trabajo y /quest demo reproduce un grupo ficticio con guion.',
+      '/quest off lo muestra todo, /quest on oculta las filas de herramientas, /quest zen también oculta las notas de trabajo, /quest demo reproduce un grupo ficticio con guion y /quest render classic|hd elige el aspecto.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /quest on vuelve a los datos reales.',
     unknownMode: (asked) =>
       `Modo desconocido "${asked}". Usa /quest off, /quest on, /quest zen o /quest demo.`,
+    questRenderShown: (render) => `Render: ${render}.`,
+    unknownRender: (asked) =>
+      `Render desconocido "${asked}". Usa /quest render classic o /quest render hd.`,
     moreAllies: (count) => `+${count} más`,
     myReviews: (kind, count) => `Mis ${kind}s ${count}`,
     todo: (count) => `Por hacer ${count}`,
@@ -92,6 +95,8 @@ export const ES: GameCatalog = {
     needsYou: '¡te necesita!',
     alert: (name) => `¡${name} te necesita!`,
     ciIsRed: 'CI en rojo',
+    mergedFloat: (review) => `¡${review} mergeado!`,
+    lead: 'Líder',
     noParty: 'Aún no hay grupo.',
     teammatesJoin: 'Los compañeros llegan cuando el líder los crea.',
     level: 'Nv',

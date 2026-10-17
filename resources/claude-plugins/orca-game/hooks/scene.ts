@@ -90,7 +90,7 @@ const landscapePixel = (
   )
 }
 
-const paintBubble = (grid: number[][], left: number, text: string): void => {
+export const paintBubble = (grid: number[][], left: number, text: string): void => {
   const right = left + text.length + 1
   const skyAt = (x: number) => grid[x]?.[1] ?? 0
   grid[left] = [0x2590, BUBBLE, skyAt(left)]
@@ -106,7 +106,7 @@ export const REACTION_TICKS = 24
 
 export type Reaction = { kind: 'pet' | 'hello' | 'level'; age: number }
 
-const reactionSaysOf = (kind: Reaction['kind']): string => {
+export const reactionSaysOf = (kind: Reaction['kind']): string => {
   const art = gameStrings().art
   return kind === 'pet' ? art.thanks : kind === 'hello' ? art.onIt : art.levelUp
 }
@@ -240,7 +240,11 @@ export const sceneGridOf = (
 }
 
 // The advisor's words type in from the moment its gesture starts, cut to half the scene at most.
-const advisorSaysOf = (advisor: AdvisorPose | undefined, tick: number, columns: number): string => {
+export const advisorSaysOf = (
+  advisor: AdvisorPose | undefined,
+  tick: number,
+  columns: number
+): string => {
   if (advisor === undefined || advisor.bubble === '') {
     return ''
   }
@@ -249,12 +253,17 @@ const advisorSaysOf = (advisor: AdvisorPose | undefined, tick: number, columns: 
 }
 
 // Bottom-right of the ground row, as PR #32 draws it, while a merge runs.
-const paintFinale = (grid: number[][], columns: number, finale: string): void => {
+export const paintFinale = (
+  grid: number[][],
+  columns: number,
+  finale: string,
+  rows = SCENE_ROWS
+): void => {
   const glyphs = Array.from(` ${finale} `)
   if (glyphs.length >= columns) {
     return
   }
-  const from = (SCENE_ROWS - 1) * columns + columns - glyphs.length - 1
+  const from = (rows - 1) * columns + columns - glyphs.length - 1
   glyphs.forEach((glyph, index) => {
     grid[from + index] = glyphCell(glyph, FINALE_TEXT, FINALE_PANEL)
   })

@@ -10794,6 +10794,15 @@
           "system": "Navegador del sistema",
           "label": "Abrir enlaces en",
           "description": "Enlaces de PR, CI, tickets y listas de la banda y el Panel. El navegador del sistema tiene tus sesiones de GitHub y Jira."
+        },
+        "OrchestratorGameRenderSetting": {
+          "classic": "Clásico",
+          "hd": "HD",
+          "label": "Render",
+          "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 10 filas con luz, clima y día y noche.",
+          "timezone": "Zona horaria",
+          "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
+          "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."
         }
       },
       "right": {
