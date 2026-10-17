@@ -49,7 +49,7 @@ const state = (stopped: unknown, agents: unknown[] = [LEAD]) => ({
   stopped
 })
 
-type Answer = unknown | ((params: Record<string, unknown>) => unknown)
+type Answer = object | ((params: Record<string, unknown>) => unknown)
 
 function fakeClient(answers: Record<string, Answer>) {
   const calls: [string, Record<string, unknown>][] = []

@@ -3,6 +3,7 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import {
   formatFleet,
+  formatHeldStop,
   formatPush,
   formatSweep,
   formatWave,
@@ -15,7 +16,6 @@ import { launchGameMember, readCallerGameState } from './orchestrator-game-launc
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
-import { formatHeldStop } from './orchestrator-game-fleet-format'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 import {
   gameFleetReportOf,
