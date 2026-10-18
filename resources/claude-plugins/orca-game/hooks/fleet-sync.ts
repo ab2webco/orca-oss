@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState } from '../types'
 import { syncActionCommands } from './action-commands'
-import { ADVISOR_REPORT_ENV, advisorReportOf, isPinnedValue } from './advisor-report'
+import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
 import { readJevAdvisor } from './advisor-state'
 import { cliInvocationOf } from './cli-invocation'
 import {
@@ -75,12 +75,8 @@ async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>>
   if (advisor === null && !hasReportedAdvisor) {
     return {}
   }
-  const [model, effort] = await Promise.all([
-    $.env.get('ORCA_AGENT_MODEL_PINNED').catch(() => undefined),
-    $.env.get('ORCA_AGENT_EFFORT_PINNED').catch(() => undefined)
-  ])
+  const pins = await advisorPinsOf($)
   hasReportedAdvisor = advisor !== null
-  const pins = { model: isPinnedValue(model), effort: isPinnedValue(effort) }
   return { [ADVISOR_REPORT_ENV]: advisorReportOf(advisor, pins) }
 }
 

@@ -270,6 +270,49 @@ describe("the lead's Panel", () => {
     await ui.unmount()
   })
 
+  test(
+    "names the lead's own row and model, and wraps Jev's line instead of cutting it",
+    WITH_JEV,
+    async ($, on) => {
+      const line = 'jev · herramienta: PushNotification (aplicada) · modelo: Opus 5.5 se mantiene'
+      const env = {
+        TEST_ADVISOR: JSON.stringify({ ...advisorOn('Opus 5.5', 'high'), line }),
+        ORCA_AGENT_MODEL_PINNED: '1'
+      }
+      await start($, on, env, [], leadState())
+      const ui = await pane($)
+      expect(
+        await ui.find({ type: 'Text', text: '◆ Jev Opus 5.5·high · model pinned' })
+      ).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '★ lead · Opus 5.5·high' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /main conversation/ })).toBeUndefined()
+      // Why `?? 'wrap'`: the engine leaves its default out of the props it reports.
+      const wrapOf = async (text: string) => {
+        const found = await ui.find({ type: 'Text', text })
+        return found === undefined ? undefined : (found.props.wrap ?? 'wrap')
+      }
+      expect(await wrapOf('◆ Wizard')).toBe('wrap')
+      expect(await wrapOf(line)).toBe('wrap')
+      expect(await wrapOf('★ lead · Opus 5.5·high')).toBe('wrap')
+      await ui.unmount()
+    }
+  )
+
+  test(
+    "a member pane's card names its own main conversation, not the lead",
+    WITH_JEV,
+    async ($, on) => {
+      const env = { TEST_ADVISOR: JSON.stringify(advisorOn('Sonnet 5.5', 'high')) }
+      await start($, on, env, [], { ...leadState(), role: 'member' })
+      const ui = await pane($)
+      expect(
+        await ui.find({ type: 'Text', text: '★ main conversation · Sonnet 5.5·high' })
+      ).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^◆ Jev / })).toBeUndefined()
+      await ui.unmount()
+    }
+  )
+
   test('draws no Jev row for a member whose Orca or Jev sends none', async ($, on) => {
     await start($, on, {}, [], leadState())
     const ui = await pane($)

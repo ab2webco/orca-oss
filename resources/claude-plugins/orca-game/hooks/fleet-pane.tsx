@@ -2,6 +2,8 @@ import type { EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { GameAgent } from '../types'
 import { advisorCard, advisorCardViewOf } from './advisor-card'
+import { advisorPinsOf, ownAdvisorOf } from './advisor-report'
+import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { petLabelOf } from './band-chips'
 import { CI_COLORS, memberHeadingOf, reviewTextOf, workItemTextOf } from './fleet-labels'
@@ -121,7 +123,10 @@ export const registerFleetPane = (on: On): void => {
         {menuItems.map((one) => menu(one.key, one.hotkey, one.label, one.onPress))}
       </Box>
     )
-    const advisorView = await advisorCardViewOf($)
+    const isLead = v.state?.role === 'lead'
+    const advisorView = await advisorCardViewOf($, { isLead })
+    const ownJev = isLead ? advisorNow() : null
+    const ownAdvisor = ownJev === null ? undefined : ownAdvisorOf(ownJev, await advisorPinsOf($))
     const advisorTiles = advisorView === null ? [] : [advisorView.tile]
     const advisorOf = (art: Map<string, RenderElement>) =>
       advisorView === null
@@ -164,14 +169,16 @@ export const registerFleetPane = (on: On): void => {
     const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
-    const advisorRowsOf = (agent: GameAgent) =>
-      (agent.advisor === undefined ? [] : memberAdvisorLinesOf(agent.advisor, cardRoom)).map(
+    const advisorRowsOf = (agent: GameAgent) => {
+      const advisor = agent.isLeader ? (agent.advisor ?? ownAdvisor) : agent.advisor
+      return (advisor === undefined ? [] : memberAdvisorLinesOf(advisor, cardRoom)).map(
         (line, row) => (
           <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
             {line}
           </Text>
         )
       )
+    }
     const worktreeId = state.worktree?.id ?? ''
     const link = (key: string, url: string, label: string, child: RenderElement) =>
       gameLinkOf($, e, { key, url, worktreeId, label }, child)

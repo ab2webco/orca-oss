@@ -864,11 +864,15 @@ Other `why` values (`kept-pointer`, `teammate`, `no-jev`…) play nothing but st
 The bubble keeps only width-1 characters, so an arrow or CJK text in Jev's words is left out. In
 `/orca-game:mode zen` the routine `chosen` and `same` decisions play their gesture without a bubble.
 
-- **The Panel card** names the advisor, its main `model·effort` and Jev's line, and lists Jev's
-  last five decisions with their verdict, colored by gesture; before the first one it lists the
-  agents running now. The decisions live in the game's own `$.state`
-  `{ plugin: 'orca-game', key: 'advisor' }` (`{ decisions: [...] }`), written when Jev writes its
-  value.
+- **The Panel card** names the advisor and Jev's line, wrapped over as many rows as they need,
+  then one `★` row for this pane's main conversation on the model it runs now (`★ lead · Opus
+  5.5·high` in the lead's pane, `★ main conversation · …` elsewhere), then Jev's latest subagent
+  decisions with their verdict, colored by gesture; before the first one it lists the agents
+  running now. A switch of the main model is the same conversation, so it never adds a second `★`
+  row: when Jev's router lowers one turn to Haiku and goes back, the row just follows the value.
+  The decisions live in the game's own `$.state` `{ plugin: 'orca-game', key: 'advisor' }`
+  (`{ decisions: [...] }`), written when Jev writes its value. The lead's own card draws this
+  pane's Jev as a member card draws a member's (`◆ Jev Opus 5.5·high · model pinned`).
 - **Each member's Jev, on the lead's Panel.** Pane state does not cross panes, so a member pane's
   mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
   Jev switches the main model or effort): `ORCA_GAME_ADVISOR` in the CLI's env, JSON

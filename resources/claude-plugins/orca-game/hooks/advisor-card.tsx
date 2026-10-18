@@ -1,7 +1,7 @@
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import { advisorSpriteOf } from './advisor-art'
-import { advisorCardOf, type AdvisorCard } from './advisor-card-rows'
+import { advisorCardOf, type AdvisorCard, type AdvisorCardContext } from './advisor-card-rows'
 import { advisorLogOf, readJevAdvisor } from './advisor-state'
 import { ADVISOR_TILE_KEY, advisorTileCellsOf } from './advisor-tile'
 import { TILE_COLUMNS, TILE_ROWS } from './fleet-tiles'
@@ -24,7 +24,10 @@ const GESTURE_COLORS: Readonly<Partial<Record<AdvisorGesture, string>>> = {
 export type AdvisorCardView = { card: AdvisorCard; tile: Animated }
 
 /** What the Panel's advisor card shows; none while Jev publishes nothing or draws its own band. */
-export async function advisorCardViewOf($: EngineInterface): Promise<AdvisorCardView | null> {
+export async function advisorCardViewOf(
+  $: EngineInterface,
+  context: AdvisorCardContext
+): Promise<AdvisorCardView | null> {
   if (!isAbsorbingConfig(gameConfig())) {
     return null
   }
@@ -33,7 +36,7 @@ export async function advisorCardViewOf($: EngineInterface): Promise<AdvisorCard
     return null
   }
   const sprite = advisorSpriteOf(currentScene())
-  const card = advisorCardOf(sprite, advisor, log.decisions)
+  const card = advisorCardOf(sprite, advisor, log.decisions, context)
   const tile: Animated = {
     key: ADVISOR_TILE_KEY,
     columns: TILE_COLUMNS,
@@ -43,7 +46,7 @@ export async function advisorCardViewOf($: EngineInterface): Promise<AdvisorCard
   return { card, tile }
 }
 
-/** The card itself, laid out as a member card: the tile on the left, the text beside it. */
+/** The card itself, laid out as a member card: the tile on the left, the text beside it, wrapped. */
 export function advisorCard(
   $: EngineInterface,
   e: RenderInput,
@@ -56,23 +59,14 @@ export function advisorCard(
     <Box key="advisor-card" flexDirection="row" borderStyle="round" borderColor={palette.gold}>
       {tile ?? <Box width={TILE_COLUMNS} />}
       <Box flexDirection="column" paddingLeft={1} flexGrow={1} flexShrink={1}>
-        <Box flexDirection="row" gap={1}>
-          <Text color={palette.gold} bold wrap="truncate-end">{`◆ ${card.name}`}</Text>
-          {card.badge === '' ? (
-            <Box />
-          ) : (
-            <Text color={palette.parchment} wrap="truncate-end">
-              {card.badge}
-            </Text>
-          )}
-          {card.line === null ? (
-            <Box />
-          ) : (
-            <Text dimColor wrap="truncate-end">
-              {card.line}
-            </Text>
-          )}
-        </Box>
+        <Text color={palette.gold} bold wrap="wrap">{`◆ ${card.name}`}</Text>
+        {card.line === null ? (
+          <Box />
+        ) : (
+          <Text dimColor wrap="wrap">
+            {card.line}
+          </Text>
+        )}
         {card.rows.length === 0 ? (
           <Text dimColor>{gameStrings().text.advisorEmpty}</Text>
         ) : (
@@ -83,7 +77,7 @@ export function advisorCard(
                 (row.gesture === null ? undefined : GESTURE_COLORS[row.gesture]) ??
                 palette.parchment
               }
-              wrap="truncate-end"
+              wrap="wrap"
             >
               {row.text}
             </Text>
