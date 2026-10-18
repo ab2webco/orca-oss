@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
@@ -14,16 +15,58 @@ const verifyStep = prWorkflow.jobs.verify.steps.find(
   (step) => step.name === 'Require successful checks'
 )
 
+// Jobs verify checks after the strict loop, because `skipped` is a pass for them.
+const SCOPED_JOBS = ['e2e-paths', 'e2e']
+
+function verifyExitCode(overrides) {
+  const env = { ...process.env, DRAFT: 'false' }
+  for (const job of prWorkflow.jobs.verify.needs) {
+    env[job.toUpperCase().replaceAll('-', '_')] = 'success'
+  }
+  return spawnSync('bash', ['-c', verifyStep.run], { env: { ...env, ...overrides } }).status
+}
+
 describe('PR E2E gate contract', () => {
-  it('keeps E2E advisory while the suite is red on main', () => {
-    // Why: pin the deliberate choice so it reads as intentional rather than as
-    // the "forgot to wire the gate" bug this file originally caught. Gating on a
-    // suite that fails every scheduled run would block the PRs that fix it.
-    // Flipping to blocking means updating this expectation too — see the comment
-    // on verify's Require-successful-checks step for the exact wiring.
-    expect(prWorkflow.jobs.verify.needs).not.toContain('e2e')
-    expect(verifyStep.env.E2E).toBeUndefined()
-    expect(verifyStep.run).not.toContain('$E2E')
+  // ORCA-566: verify is the check GitHub requires on main, so E2E has to gate it.
+  it('makes E2E part of the required verify check', () => {
+    expect(prWorkflow.jobs.verify.needs).toEqual(expect.arrayContaining(SCOPED_JOBS))
+    expect(verifyStep.env.E2E).toBe('${{ needs.e2e.result }}')
+    expect(verifyStep.env.E2E_PATHS).toBe("${{ needs['e2e-paths'].result }}")
+    expect(verifyStep.env.DRAFT).toBe('${{ github.event.pull_request.draft }}')
+  })
+
+  describe.skipIf(process.platform === 'win32')('verify verdict', () => {
+    it.each([
+      [{ E2E: 'success' }, 0, 'E2E ran green'],
+      [{ E2E: 'skipped' }, 0, 'E2E scoped out (`e2e (none)`)'],
+      [{ E2E: 'failure' }, 1, 'E2E red'],
+      [{ E2E: 'cancelled' }, 1, 'E2E cancelled'],
+      [{ E2E_PATHS: 'failure', E2E: 'skipped' }, 1, 'scope detector failed, so E2E was skipped'],
+      [{ E2E_PATHS: 'skipped', E2E: 'skipped' }, 1, 'scope detector skipped on a ready PR'],
+      [{ E2E_PATHS: 'skipped', E2E: 'skipped', DRAFT: 'true' }, 0, 'draft PR'],
+      [{ TEST: 'failure', E2E: 'skipped' }, 1, 'a strict job failed while E2E was skipped']
+    ])('%j exits %i (%s)', (overrides, expected) => {
+      expect(verifyExitCode(overrides)).toBe(expected)
+    })
+  })
+
+  it('keeps `verify` the only pull request check with that name', () => {
+    // Why: Mobile Checks also exposed `verify`, and a required context matches by
+    // name, so either workflow's result could stand in for the other.
+    const owners = []
+    const dir = join(projectDir, '.github/workflows')
+    for (const file of readdirSync(dir).filter((f) => /\.ya?ml$/.test(f))) {
+      const workflow = parse(readFileSync(join(dir, file), 'utf8'))
+      if (!workflow?.on?.pull_request) {
+        continue
+      }
+      for (const [id, job] of Object.entries(workflow.jobs ?? {})) {
+        if ((job.name ?? id) === 'verify') {
+          owners.push(`${file}:${id}`)
+        }
+      }
+    }
+    expect(owners).toEqual(['pr.yml:verify'])
   })
 
   it('passes the selected scope to the reusable E2E workflow', () => {
@@ -67,7 +110,7 @@ describe('PR E2E gate contract', () => {
     // leaving that job unenforced. This is what caught GIT_COMPATIBILITY and
     // SHELL_CONTRACTS being absent from an earlier hardcoded list.
     const strictLoop = verifyStep.run.slice(0, verifyStep.run.indexOf('done'))
-    for (const job of prWorkflow.jobs.verify.needs) {
+    for (const job of prWorkflow.jobs.verify.needs.filter((j) => !SCOPED_JOBS.includes(j))) {
       // A job name may contain a dash (verify-windows); env vars may not.
       const envVar = job.toUpperCase().replaceAll('-', '_')
       expect(verifyStep.env[envVar]).toBe(`\${{ needs.${job}.result }}`)

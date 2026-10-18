@@ -95,7 +95,7 @@ if [ "${1:-}" = "--once" ]; then
     hookSpecificOutput: {
       hookEventName: "SessionStart",
       additionalContext: ("Estado de coordinación al iniciar:\n" + $line +
-        "\n\nArmá el monitor de barrido con la herramienta Monitor: comando `bash .claude/hooks/coordinator-sweep.sh`, persistent, para que reporte cada 30 minutos. Mergeá lo que esté verde después de verificarlo, retomá lo rojo, abrí el PR de lo unshipped, y borrá worktrees y ramas sobrantes.")
+        "\n\nArma el monitor de barrido con la herramienta Monitor: comando `bash .claude/hooks/coordinator-sweep.sh`, persistent, para que reporte cada 30 minutos. Al PR que verificaste, actívale `gh pr merge <n> --auto --squash`: GitHub lo integra cuando el check requerido `verify` esté verde. No le pidas el merge al dueño. Retoma lo rojo, abre el PR de lo unshipped y borra worktrees y ramas sobrantes.")
     }
   }'
   exit 0

@@ -15,6 +15,9 @@ on:
 
 jobs:
   verify:
+    # Why: PR Checks' `verify` is the context main requires; a second check with
+    # that name could stand in for it (ORCA-566).
+    name: mobile verify
     runs-on: ubuntu-latest
 
     defaults:
