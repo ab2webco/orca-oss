@@ -671,7 +671,7 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
-import { GameLeadSessions } from './orchestrator-game-lead-sessions'
+import { GameLeadSessions, leadResumeArgsOf } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -3626,12 +3626,11 @@ export class OrcaRuntimeService {
       return pane.ok && pane.providerSession && pane.worktreeId
         ? {
             sessionId: pane.providerSession.id,
-            agentArgs: pane.launchConfig?.agentArgs ?? null,
+            agentArgs: leadResumeArgsOf(pane.launchConfig),
             worktreeId: pane.worktreeId
           }
         : null
     },
-    // Why the lead's own args: they carry --teammate-mode auto, which is what loads the game again.
     resume: async (session) =>
       (
         await this.ensureAgentSession({

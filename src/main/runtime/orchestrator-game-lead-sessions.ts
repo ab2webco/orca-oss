@@ -16,6 +16,21 @@ const sessionOf = (value: unknown): GameLeadSession | null => {
     : null
 }
 
+const TEAMMATE_MODE = /(?:^|\s)--teammate-mode(?:=|\s+)(auto|in-process)(?=\s|$)/
+
+/**
+ * The args that reopen a lead with its game. Why the teammate mode: a `--resume` launch without one
+ * starts as plain Claude, and the game only loads into an Agent Teams pane.
+ */
+export const leadResumeArgsOf = (
+  launch: { agentCommand?: string; agentArgs: string } | null
+): string | null => {
+  const args = launch?.agentArgs.trim() ?? ''
+  const mode = TEAMMATE_MODE.exec(launch?.agentCommand ?? '')?.[1]
+  const resumeArgs = mode && !TEAMMATE_MODE.test(args) ? `--teammate-mode ${mode} ${args}` : args
+  return resumeArgs.trim() || null
+}
+
 /** Each project's last lead conversation, one file per project, so it survives a restart of Orca. */
 export class GameLeadSessions {
   constructor(private readonly dirOf: () => string) {}

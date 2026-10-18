@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { GameLeadSessions } from './orchestrator-game-lead-sessions'
+import { GameLeadSessions, leadResumeArgsOf } from './orchestrator-game-lead-sessions'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -43,5 +43,28 @@ describe('GameLeadSessions', () => {
     writeFileSync(join(dir, 'leads', file ?? ''), '{"sessionId": 3}')
 
     expect(await store.read('repo:a')).toBeNull()
+  })
+})
+
+describe('leadResumeArgsOf', () => {
+  it("keeps the lead's teammate mode, which a resume launch would otherwise drop with the game", () => {
+    expect(
+      leadResumeArgsOf({
+        agentCommand:
+          "claude --teammate-mode auto --plugin-dir '/opt/orca/game' '--dangerously-skip-permissions'",
+        agentArgs: '--dangerously-skip-permissions'
+      })
+    ).toBe('--teammate-mode auto --dangerously-skip-permissions')
+    expect(
+      leadResumeArgsOf({ agentCommand: 'claude --teammate-mode in-process', agentArgs: '' })
+    ).toBe('--teammate-mode in-process')
+  })
+
+  it('leaves args that already name a teammate mode, and has none for a plain pane', () => {
+    expect(
+      leadResumeArgsOf({ agentCommand: 'claude', agentArgs: '--teammate-mode=auto --verbose' })
+    ).toBe('--teammate-mode=auto --verbose')
+    expect(leadResumeArgsOf({ agentCommand: 'claude', agentArgs: '' })).toBeNull()
+    expect(leadResumeArgsOf(null)).toBeNull()
   })
 })
