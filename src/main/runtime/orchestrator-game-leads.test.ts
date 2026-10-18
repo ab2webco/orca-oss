@@ -251,3 +251,31 @@ describe('GameLeads claim', () => {
     expect(resumed).toEqual(['sess-old'])
   })
 })
+
+describe('GameLeads leadElsewhere', () => {
+  it("names the project's live lead to any other pane, and nothing to the lead itself", async () => {
+    let caller = 'term_a'
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    await expect(game.leadElsewhere({})).resolves.toBeNull()
+    caller = 'term_b'
+    await expect(game.leadElsewhere({})).resolves.toBe('term_a')
+  })
+
+  it('names no lead for a member or a caller Orca cannot place', async () => {
+    const member = leads({ ...LEAD, isMember: true })
+    const unplaced = leads({
+      ...LEAD,
+      key: 'no-project',
+      lead: { handle: 'term_b', paneKey: null }
+    })
+    await unplaced.register({ project: 'x', label: '' })
+
+    await expect(member.leadElsewhere({})).resolves.toBeNull()
+    await expect(unplaced.leadElsewhere({})).resolves.toBeNull()
+  })
+})

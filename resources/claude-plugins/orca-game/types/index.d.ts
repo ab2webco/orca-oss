@@ -290,6 +290,8 @@ export type GameState = {
   lead?: GameLead
   /** Whether this pane leads or a lead launched it; absent from an older host. */
   role?: GameRole
+  /** The project's live lead when it is another pane; absent from an older host. */
+  leadElsewhere?: { handle: string }
   /** Orca's UI language now; absent from an older host, which keeps the launch language. */
   locale?: GameLocale
 }

@@ -12,9 +12,9 @@ import { registerStateCommand } from './state-command'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
 import { clawdReact } from './quest-runtime'
-import { markLeadStarted } from './lead-autostart'
+import { markLeadStarted, unmarkLeadStarted } from './lead-autostart'
 import { isSubagentTool, isTeammateSpawnOf, leadSubagentDenyOf } from './lead-subagent-guard'
-import { isGameLeadCommand, isLeadStarted } from './lead-started'
+import { isGameLeadCommand, isLeadStarted, isMadeLeadOutput } from './lead-started'
 import { noteSubagentCall, noteSubagentDone, runningLeadSubagents } from './lead-subagents'
 import { viewOf } from './fleet-sync'
 import { questLeadActive, questToolCall, questTurnComplete } from './quest-turns'
@@ -60,7 +60,12 @@ export const register: Register = (on) => {
     } else if (String(e.tool) === 'Bash') {
       const command: unknown = Reflect.get(e, 'command')
       if (isGameLeadCommand(command)) {
-        await markLeadStarted($).catch(() => undefined)
+        // Why after the call: only its output says whether this session or another pane leads.
+        const answered = await next(e)
+        await (isMadeLeadOutput(answered.result) ? markLeadStarted($) : unmarkLeadStarted($)).catch(
+          () => undefined
+        )
+        return answered
       }
     }
     return next(e)

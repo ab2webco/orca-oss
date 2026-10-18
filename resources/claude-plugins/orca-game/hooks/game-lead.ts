@@ -27,14 +27,21 @@ const leadOf = (value: Shape): GameLead => {
 }
 
 /** The project's lead and the calling pane's role; each absent when the host sends none. */
-export const gameLeadOf = (body: Shape): { lead?: GameLead; role?: GameRole } => ({
+export const gameLeadOf = (
+  body: Shape
+): { lead?: GameLead; role?: GameRole; leadElsewhere?: { handle: string } } => ({
   ...(isShape(body.lead) ? { lead: leadOf(body.lead) } : {}),
-  ...(body.role === 'lead' || body.role === 'member' ? { role: body.role } : {})
+  ...(body.role === 'lead' || body.role === 'member' ? { role: body.role } : {}),
+  ...(isShape(body.leadElsewhere) && typeof body.leadElsewhere.handle === 'string'
+    ? { leadElsewhere: { handle: body.leadElsewhere.handle } }
+    : {})
 })
 
-/** Only the lead of a project that asks for it; a member reports to its lead and never leads. */
-export const isLeadAutostart = (state: Pick<GameState, 'lead' | 'role'>): boolean =>
-  state.role === 'lead' && state.lead?.autostart === true
+/** Only the lead of a project that asks for it, and none while another pane leads it. */
+export const isLeadAutostart = (
+  state: Pick<GameState, 'lead' | 'role' | 'leadElsewhere'>
+): boolean =>
+  state.role === 'lead' && state.lead?.autostart === true && state.leadElsewhere === undefined
 
 /** The crown's name in the Panel: the project's label, else the plain word. */
 export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): string =>

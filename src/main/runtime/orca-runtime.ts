@@ -30550,6 +30550,11 @@ export class OrcaRuntimeService {
           worktreeId: worktree?.id,
           terminalHandle: callerHandle ?? undefined
         }),
+      readLeadElsewhere: () =>
+        this.gameLeads.leadElsewhere({
+          worktreeId: worktree?.id,
+          terminalHandle: callerHandle ?? undefined
+        }),
       readStop: async () =>
         (
           await this.gameBoard.stopState({

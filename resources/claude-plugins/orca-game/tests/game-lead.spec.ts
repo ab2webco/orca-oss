@@ -28,6 +28,14 @@ describe('gameLeadOf', () => {
     })
   })
 
+  it("keeps the project's live lead when it is another pane", () => {
+    expect(gameLeadOf({ role: 'lead', leadElsewhere: { handle: 'term_a' } })).toEqual({
+      role: 'lead',
+      leadElsewhere: { handle: 'term_a' }
+    })
+    expect(gameLeadOf({ leadElsewhere: { handle: 3 } })).toEqual({})
+  })
+
   it('rides along in the parsed game state', () => {
     const state = parseGameState(
       JSON.stringify({ ...BASE, lead: { autostart: true, cap: 2 }, role: 'member' })
@@ -49,6 +57,10 @@ describe('isLeadAutostart', () => {
     expect(isLeadAutostart({ lead: { ...lead, autostart: false }, role: 'lead' })).toBe(false)
     expect(isLeadAutostart({ lead })).toBe(false)
     expect(isLeadAutostart({})).toBe(false)
+  })
+
+  it('does not start a second lead while the project lead is live in another pane', () => {
+    expect(isLeadAutostart({ lead, role: 'lead', leadElsewhere: { handle: 'term_a' } })).toBe(false)
   })
 
   it('runs the plugin skill that loads the lead rules', () => {
