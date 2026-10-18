@@ -48,6 +48,8 @@ describe('release push token contract', () => {
       const steps = job.steps
       const mintIndex = steps.findIndex((s) => APP_TOKEN_ACTION.test(s.uses ?? ''))
       expect(mintIndex, 'create-github-app-token pinned by full SHA').toBeGreaterThanOrEqual(0)
+      // Why: repo secrets reach any branch's workflow, so the bypass key must stay in a main-only environment.
+      expect(job.environment).toBe('lab-release')
       const mint = steps[mintIndex]
       expect(mint.with['client-id']).toBe('${{ secrets.RELEASE_APP_CLIENT_ID }}')
       expect(mint.with['private-key']).toBe('${{ secrets.RELEASE_APP_PRIVATE_KEY }}')

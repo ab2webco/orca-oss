@@ -236,6 +236,8 @@ jobs:
       title: ${{ steps.next.outputs.title }}
       build_ref: ${{ steps.push.outputs.build_ref }}
       prev: ${{ steps.push.outputs.prev }}
+    # Why: repo secrets reach any branch's workflow; this environment limits the bypass key to main.
+    environment: lab-release
     env:
       RELEASE_APP_CLIENT_ID: ${{ secrets.RELEASE_APP_CLIENT_ID }}
     steps:
@@ -555,6 +557,7 @@ jobs:
     if: inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: lab-release
     env:
       RELEASE_APP_CLIENT_ID: ${{ secrets.RELEASE_APP_CLIENT_ID }}
     steps:
