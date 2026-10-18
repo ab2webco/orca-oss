@@ -65,7 +65,8 @@ export function memberCard(
   const head = memberHeadOf(
     heading.name,
     text.agentStates[parts.cardState],
-    parts.room - viewCells - crownCells
+    parts.room - viewCells - crownCells,
+    parts.room
   )
   // Both cut to one row, the ticket before the review, since a wrapped link reads as two.
   const review = agent.review === undefined ? '' : fitCells(reviewTextOf(agent.review), parts.room)
