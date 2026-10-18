@@ -208,6 +208,7 @@ export function resetQuest(): void {
     leavers: [],
     marches: new Map(),
     lead: undefined,
+    leadState: undefined,
     event: undefined
   })
 }

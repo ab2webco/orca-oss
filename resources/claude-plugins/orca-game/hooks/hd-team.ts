@@ -3,13 +3,14 @@ import type { EngineInterface } from 'claude-code'
 import type { GameState } from '../types'
 import { leadTitleOf } from './game-lead'
 import { gameStrings } from './game-strings'
+import { leadStateOf } from './lead-state'
 import { marchesOf, MARCH_TICKS, type HdMember } from './hd-party'
 import type { TeamEvent } from './hd-overlay'
 import { partyOf } from './party'
 import { quest } from './quest-state'
 
-// What the hd scene learns from each refresh: the party it draws, who marched in or out, the crown, and
-// the team events (a reward, a teammate waiting, a merge, CI turning red) it acts out.
+// What the scene learns from each refresh: the party it draws, who marched in or out, the crown, the
+// lead's own state, and the team events (a reward, a teammate waiting, a merge, CI turning red) it acts out.
 
 const memberOf = (one: { key: string; phase: HdMember['phase']; state: HdMember['state'] }) => ({
   key: one.key,
@@ -41,6 +42,7 @@ export function syncHdTeam(state: GameState, hasRewards: boolean): void {
   quest.hdParty = party
   quest.isHdPartySeen = true
   quest.lead = state.role === 'lead' ? leadTitleOf(state, gameStrings().art.lead) : undefined
+  quest.leadState = state.role === 'lead' ? leadStateOf(state) : undefined
 }
 
 /** Plays a team event in the hd scene from this tick. */

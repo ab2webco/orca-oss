@@ -149,6 +149,12 @@ describe('member card labels', () => {
     expect(memberHeadOf('ORCA-601', 'trabajando', 4).state).toBe('trabajando')
   })
 
+  it('cuts a state wider than the whole card line instead of letting it break mid-word', () => {
+    expect(memberHeadOf('claude', 'orchestrating', 1, 11).state).toBe('orchestrat…')
+    expect(memberHeadOf('claude', 'orquestando', 1, 11).state).toBe('orquestando')
+    expect(memberHeadOf('claude', 'orchestrating', 1, 40).state).toBe('orchestrating')
+  })
+
   it('puts the agent, its account and the branch on one dim line that fits', () => {
     const agent = {
       agentType: 'claude',

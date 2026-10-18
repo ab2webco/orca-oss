@@ -7,6 +7,7 @@ export function questToolCall(tool: string, input: unknown, agentId: string | un
   if (agentId !== undefined) {
     return
   }
+  questLeadActive()
   quest.phase = phaseOf(tool, input) ?? quest.phase
   if (isFinishingCall(tool, input)) {
     quest.isDone = true
@@ -17,6 +18,13 @@ export function questToolCall(tool: string, input: unknown, agentId: string | un
     quest.captionAt = quest.tick
   }
   quest.caption = said
+}
+
+// Why: the next refresh can be 30 s away, and a lead running a tool is working now.
+export function questLeadActive(): void {
+  if (quest.leadState !== undefined) {
+    quest.leadState = 'working'
+  }
 }
 
 export function questTurnComplete(agentId: string | undefined): void {
