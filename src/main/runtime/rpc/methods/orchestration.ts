@@ -834,7 +834,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           db.getOrCreateRunDelivery({
             runId: run.id,
             consumerGeneration: generation,
-            wakeTypes
+            wakeTypes,
+            keepHeartbeats: typeFilter?.includes('heartbeat') === true
           })
         let current = readDelivery(params.wait ? typeFilter : undefined)
         if (current) {

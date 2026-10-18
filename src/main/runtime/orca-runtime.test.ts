@@ -35548,6 +35548,24 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  it('keeps an untyped Run waiter blocked through heartbeats it would never be delivered (ORCA-637)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    setInMemoryOrchestrationMessages(runtime, new InMemoryOrchestrationMessages())
+    let outcome: string | null = null
+    const wait = runtime
+      .waitForMessage('run:run_untyped', { timeoutMs: 60_000 })
+      .then((result) => (outcome = result))
+
+    runtime.notifyMessageArrived('run:run_untyped', 'heartbeat')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(outcome).toBeNull()
+
+    runtime.notifyMessageArrived('run:run_untyped', 'worker_done')
+    await wait
+    expect(outcome).toBe('notified')
+  })
+
   it('repoints worker_done when a stale waiter wakes without consuming it', async () => {
     vi.useFakeTimers()
     try {

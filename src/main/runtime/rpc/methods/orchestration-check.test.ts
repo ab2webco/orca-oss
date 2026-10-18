@@ -504,6 +504,37 @@ describe('orchestration RPC methods', () => {
       expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBe(msg.created_at)
     })
 
+    it('returns the worker_done, not an unacked heartbeat batch, to --wait --types (ORCA-637)', async () => {
+      setup()
+      db.insertMessage({
+        from: 'term_worker',
+        to: `run:${activeRunId}`,
+        subject: 'alive',
+        type: 'heartbeat',
+        runId: activeRunId
+      })
+      const plain = (await call('orchestration.check', { terminal: 'term_coord' })) as {
+        count: number
+      }
+      expect(plain.count).toBe(0)
+
+      db.insertMessage({
+        from: 'term_worker',
+        to: `run:${activeRunId}`,
+        subject: 'done',
+        type: 'worker_done',
+        runId: activeRunId
+      })
+      const typed = (await call('orchestration.check', {
+        terminal: 'term_coord',
+        wait: true,
+        types: 'worker_done,question,escalation',
+        timeoutMs: 10
+      })) as { messages: { type: string }[] }
+
+      expect(typed.messages.map((message) => message.type)).toEqual(['worker_done'])
+    })
+
     it('rejects invalid type filters', async () => {
       setup()
       await expect(
