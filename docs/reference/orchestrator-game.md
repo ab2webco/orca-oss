@@ -907,8 +907,8 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   before its latest switch)
   ([`orchestrator-game-member-advisors.ts`](../../src/main/runtime/orchestrator-game-member-advisors.ts)).
   The member card draws `◆ Jev Sonnet 5.5·high · model pinned` (Jev's name, then the pin, dropped
-  on a narrow card, never the model) and, after a switch, `↳ Opus 5.5 → Sonnet 5.5`, naming only
-  what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not
+  on a narrow card; what still does not fit wraps, so the model is never cut) and, after a switch,
+  `↳ Opus 5.5 → Sonnet 5.5`, naming only what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not
   a flag, because an older CLI ignores it where an unknown flag could fail the poll and a Windows `.cmd` CLI refuses `"` in its arguments; an
   older host strips the param and an older mod ignores the field, so any mix of versions just shows
   no Jev row. A member gets the mod only where it runs in Agent Teams (today local), so an SSH member
@@ -920,7 +920,8 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   (`claude-opus-5-5` → `Opus 5.5`). The member card draws it as `◇ Opus 5.5·high`, hollow because
   Orca chose it, not Jev; a Jev report wins over it. The lead's advisor card lists every member
   under its `★ lead` row (`◇ ORCA-609 · Opus 5.5·high`, or `◆` for a Jev report), and the Fleet
-  heading counts either.
+  heading counts either. The card's rows without a gesture take the terminal's own foreground, not
+  the scene's parchment, which a light theme's near-white panel would hide.
 
 ## Scenes from plugins
 

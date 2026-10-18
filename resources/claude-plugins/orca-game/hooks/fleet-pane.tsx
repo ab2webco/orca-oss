@@ -222,7 +222,7 @@ export const registerFleetPane = (on: On): void => {
     const advisorRowsOf = (agent: GameAgent) => {
       const advisor = agent.isLeader ? (agent.advisor ?? ownAdvisor) : agent.advisor
       return memberModelLinesOf({ advisor, launch: agent.launch }, cardRoom).map((line, row) => (
-        <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
+        <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="wrap">
           {line}
         </Text>
       ))

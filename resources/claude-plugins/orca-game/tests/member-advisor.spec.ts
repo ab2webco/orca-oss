@@ -106,13 +106,19 @@ describe("a member's Jev on its card", () => {
     expect(memberAdvisorLinesOf(same, 80)).toHaveLength(1)
   })
 
-  it('drops Jev’s name, then the pin, never the model it is on now', () => {
+  it('drops Jev’s name, then the pin, and leaves the model whole for the card to wrap', () => {
     expect(memberAdvisorLinesOf(SWITCHED, 34)[0]).toBe('◆ Sonnet 5.5·high · model pinned')
     expect(memberAdvisorLinesOf(SWITCHED, 20)).toEqual([
       '◆ Sonnet 5.5·high',
-      '↳ Opus 5.5 → Sonnet…'
+      '↳ Opus 5.5 → Sonnet 5.5'
     ])
-    expect(memberAdvisorLinesOf(SWITCHED, 10)).toEqual(['◆ Sonnet …', '↳ Opus 5.…'])
+    expect(memberAdvisorLinesOf(SWITCHED, 10)).toEqual([
+      '◆ Sonnet 5.5·high',
+      '↳ Opus 5.5 → Sonnet 5.5'
+    ])
+    expect(memberModelLinesOf({ launch: { model: 'Opus 5.5', effort: 'high' } }, 10)).toEqual([
+      '◇ Opus 5.5·high'
+    ])
   })
 
   it('says nothing for a Jev that names neither a model nor an effort', () => {

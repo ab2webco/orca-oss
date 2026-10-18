@@ -1,5 +1,5 @@
 import type { GameMemberAdvisor, GameMemberAdvisorPick, GameMemberLaunch } from '../types'
-import { cellWidthOf, fitCells } from './cell-width'
+import { cellWidthOf } from './cell-width'
 import { gameStrings } from './game-strings'
 
 // What a member card says about the model and effort Jev has that member on.
@@ -40,8 +40,9 @@ export const memberLaunchOf = (value: unknown): GameMemberLaunch | undefined => 
 const pickText = (pick: GameMemberAdvisorPick): string =>
   [pick.model ?? '', pick.effort ?? ''].filter((one) => one !== '').join('·')
 
+// Why whole when nothing fits: the card wraps it, so the model is never cut.
 const fitted = (tries: readonly string[], room: number): string =>
-  tries.find((one) => cellWidthOf(one) <= room) ?? fitCells(tries.at(-1) ?? '', room)
+  tries.find((one) => cellWidthOf(one) <= room) ?? tries.at(-1) ?? ''
 
 // Why only what changed: "Opus 5.5 → Sonnet 5.5" reads at a glance where the full pair would not fit.
 const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): string => {
@@ -55,7 +56,7 @@ const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): st
   return `↳ ${side(before) || '?'} → ${side(now) || '?'}`
 }
 
-/** The card's Jev rows cut to `room` cells: Jev's name goes first, then the pin, never the model. */
+/** The card's Jev rows fit to `room` cells: Jev's name goes first, then the pin; the rest wraps. */
 export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): string[] => {
   const now = pickText(advisor)
   if (now === '') {
@@ -65,7 +66,7 @@ export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): 
   const pinned = pins === '' ? '' : ` · ${pins}`
   const head = fitted([`◆ Jev ${now}${pinned}`, `◆ ${now}${pinned}`, `◆ ${now}`], room)
   const moved = advisor.previous === undefined ? '' : switchOf(advisor.previous, advisor)
-  return moved === '' ? [head] : [head, fitCells(moved, room)]
+  return moved === '' ? [head] : [head, moved]
 }
 
 type MemberModels = { advisor?: GameMemberAdvisor; launch?: GameMemberLaunch }
@@ -87,7 +88,7 @@ export const memberModelLinesOf = (agent: MemberModels, room: number): string[] 
     return memberAdvisorLinesOf(agent.advisor, room)
   }
   const launch = agent.launch === undefined ? '' : pickText(agent.launch)
-  return launch === '' ? [] : [fitCells(`◇ ${launch}`, room)]
+  return launch === '' ? [] : [`◇ ${launch}`]
 }
 
 /** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev or launch names a model; null for none. */
