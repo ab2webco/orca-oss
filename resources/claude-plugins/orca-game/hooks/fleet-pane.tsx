@@ -22,7 +22,7 @@ import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
-import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
+import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
 import { isTapLayout } from './tap-layout'
 
@@ -136,7 +136,15 @@ export const registerFleetPane = (on: On): void => {
       </Box>
     )
     const isLead = v.state?.role === 'lead'
-    const advisorView = await advisorCardViewOf($, { isLead })
+    const cardMembers = (v.state?.agents ?? [])
+      .filter((agent) => agent.isMember === true)
+      .map((agent) => ({
+        key: agent.paneKey,
+        name: memberHeadingOf(agent).name,
+        model: memberModelOf(agent),
+        isJev: Boolean(agent.advisor?.model)
+      }))
+    const advisorView = await advisorCardViewOf($, { isLead, members: cardMembers })
     const ownJev = isLead ? advisorNow() : null
     const ownAdvisor = ownJev === null ? undefined : ownAdvisorOf(ownJev, await advisorPinsOf($))
     const advisorTiles = advisorView === null ? [] : [advisorView.tile]
@@ -213,13 +221,11 @@ export const registerFleetPane = (on: On): void => {
     const cardRoom = Math.max(1, columns - CARD_CHROME)
     const advisorRowsOf = (agent: GameAgent) => {
       const advisor = agent.isLeader ? (agent.advisor ?? ownAdvisor) : agent.advisor
-      return (advisor === undefined ? [] : memberAdvisorLinesOf(advisor, cardRoom)).map(
-        (line, row) => (
-          <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
-            {line}
-          </Text>
-        )
-      )
+      return memberModelLinesOf({ advisor, launch: agent.launch }, cardRoom).map((line, row) => (
+        <Text key={`jev-${agent.paneKey}-${row}`} color={palette.gold} wrap="truncate-end">
+          {line}
+        </Text>
+      ))
     }
     const worktreeId = state.worktree?.id ?? ''
     const link = (key: string, url: string, label: string, child: RenderElement) =>

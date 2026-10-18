@@ -313,6 +313,22 @@ describe("the lead's Panel", () => {
     }
   )
 
+  test(
+    'names the model Orca launched a member on, on its card and under the lead',
+    WITH_JEV,
+    async ($, on) => {
+      const env = { TEST_ADVISOR: JSON.stringify(advisorOn('Opus 5.5', 'high')) }
+      const state = leadState()
+      const launched = { ...state.agents[1], launch: { model: 'Opus 5.5', effort: 'high' } }
+      await start($, on, env, [], { ...state, agents: [state.agents[0], launched] })
+      const ui = await pane($)
+      expect(await ui.find({ type: 'Text', text: '◇ Opus 5.5·high' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '◇ CIN-5 · Opus 5.5·high' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '◆ 1 on Opus 5.5' })).toBeDefined()
+      await ui.unmount()
+    }
+  )
+
   test('draws no Jev row for a member whose Orca or Jev sends none', async ($, on) => {
     await start($, on, {}, [], leadState())
     const ui = await pane($)

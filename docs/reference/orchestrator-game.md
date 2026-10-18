@@ -913,6 +913,14 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   older host strips the param and an older mod ignores the field, so any mix of versions just shows
   no Jev row. A member gets the mod only where it runs in Agent Teams (today local), so an SSH member
   reports nothing.
+- **The model a member was launched on.** A member a coordinator dispatched runs no game mod, so it
+  never reports a Jev. Its row then carries an optional `launch` (`{ model, effort }`), read from
+  the `effective` launch receipt of the newest dispatch that chose a model or effort for its
+  terminal (`worker_dispatches.start_options`), with the CLI id read as a person reads it
+  (`claude-opus-5-5` → `Opus 5.5`). The member card draws it as `◇ Opus 5.5·high`, hollow because
+  Orca chose it, not Jev; a Jev report wins over it. The lead's advisor card lists every member
+  under its `★ lead` row (`◇ ORCA-609 · Opus 5.5·high`, or `◆` for a Jev report), and the Fleet
+  heading counts either.
 
 ## Scenes from plugins
 

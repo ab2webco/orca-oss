@@ -1,4 +1,4 @@
-import type { GameMemberAdvisor, GameMemberAdvisorPick } from '../types'
+import type { GameMemberAdvisor, GameMemberAdvisorPick, GameMemberLaunch } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
 
@@ -24,6 +24,17 @@ export const memberAdvisorOf = (value: unknown): GameMemberAdvisor | undefined =
     pinned: { model: pinned.model === true, effort: pinned.effort === true },
     ...(isShape(value.previous) ? { previous: pickOf(value.previous) } : {})
   }
+}
+
+export const memberLaunchOf = (value: unknown): GameMemberLaunch | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const launch = pickOf(value)
+  const isText = (one: unknown) => one === undefined || one === null || typeof one === 'string'
+  return isText(value.model) && isText(value.effort) && (launch.model ?? launch.effort) !== null
+    ? launch
+    : undefined
 }
 
 const pickText = (pick: GameMemberAdvisorPick): string =>
@@ -57,13 +68,33 @@ export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): 
   return moved === '' ? [head] : [head, fitCells(moved, room)]
 }
 
-/** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev names a model; null for none. */
-export const fleetAdvisorSummaryOf = (
-  agents: readonly { advisor?: GameMemberAdvisor }[]
-): string | null => {
+type MemberModels = { advisor?: GameMemberAdvisor; launch?: GameMemberLaunch }
+
+// Why Jev first: it may have moved the member off the model Orca launched it on.
+const pickNowOf = (agent: MemberModels): GameMemberAdvisorPick | undefined =>
+  agent.advisor?.model ? agent.advisor : (agent.launch ?? agent.advisor)
+
+/** What the member runs now as `model·effort`; null when neither Jev nor its launch names one. */
+export const memberModelOf = (agent: MemberModels): string | null => {
+  const pick = pickNowOf(agent)
+  const text = pick === undefined ? '' : pickText(pick)
+  return text === '' ? null : text
+}
+
+/** A card's model rows: its Jev's when it reports one, else `◇` and the model Orca launched it on. */
+export const memberModelLinesOf = (agent: MemberModels, room: number): string[] => {
+  if (agent.advisor !== undefined && pickText(agent.advisor) !== '') {
+    return memberAdvisorLinesOf(agent.advisor, room)
+  }
+  const launch = agent.launch === undefined ? '' : pickText(agent.launch)
+  return launch === '' ? [] : [fitCells(`◇ ${launch}`, room)]
+}
+
+/** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev or launch names a model; null for none. */
+export const fleetAdvisorSummaryOf = (agents: readonly MemberModels[]): string | null => {
   const counts = new Map<string, number>()
   for (const agent of agents) {
-    const model = agent.advisor?.model
+    const model = pickNowOf(agent)?.model
     if (model !== undefined && model !== null && model !== '') {
       counts.set(model, (counts.get(model) ?? 0) + 1)
     }

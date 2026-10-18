@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
-import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from '../hooks/member-advisor'
+import {
+  fleetAdvisorSummaryOf,
+  memberAdvisorLinesOf,
+  memberModelLinesOf,
+  memberModelOf
+} from '../hooks/member-advisor'
 import type { GameMemberAdvisor } from '../types'
 
 afterEach(() => setGameLocale('en'))
@@ -43,6 +48,40 @@ describe("a member's Jev on its card", () => {
       expect(parseGameState(stateWith({ advisor }))?.agents[0]?.advisor).toBeUndefined()
     }
     expect(parseGameState(stateWith({}))?.agents[0]?.advisor).toBeUndefined()
+  })
+
+  it('keeps the model and effort Orca launched the member on, and drops a malformed one', () => {
+    const launch = { model: 'Opus 5.5', effort: 'high' }
+    expect(parseGameState(stateWith({ launch }))?.agents[0]?.launch).toEqual(launch)
+    expect(parseGameState(stateWith({ launch: { model: 'Opus 5.5' } }))?.agents[0]?.launch).toEqual(
+      { model: 'Opus 5.5', effort: null }
+    )
+    for (const odd of ['opus', { model: 7 }, { model: null, effort: null }, null]) {
+      expect(parseGameState(stateWith({ launch: odd }))?.agents[0]?.launch).toBeUndefined()
+    }
+  })
+
+  it("names the launch model where the member's Jev reports none, and Jev's where it does", () => {
+    const launch = { model: 'Opus 5.5', effort: 'high' }
+    expect(memberModelLinesOf({ launch }, 80)).toEqual(['◇ Opus 5.5·high'])
+    expect(memberModelLinesOf({ launch, advisor: SWITCHED }, 80)).toEqual([
+      '◆ Jev Sonnet 5.5·high · model pinned',
+      '↳ Opus 5.5 → Sonnet 5.5'
+    ])
+    expect(memberModelLinesOf({}, 80)).toEqual([])
+    expect(memberModelOf({ launch })).toBe('Opus 5.5·high')
+    expect(memberModelOf({ launch, advisor: SWITCHED })).toBe('Sonnet 5.5·high')
+    expect(memberModelOf({})).toBeNull()
+  })
+
+  it('sums up the fleet from the launch model where no Jev reports', () => {
+    expect(
+      fleetAdvisorSummaryOf([
+        { launch: { model: 'Opus 5.5', effort: 'high' } },
+        { launch: { model: 'Opus 5.5', effort: 'high' } },
+        { advisor: SWITCHED, launch: { model: 'Opus 5.5', effort: 'high' } }
+      ])
+    ).toBe('◆ 2 on Opus 5.5, 1 on Sonnet 5.5')
   })
 
   it('names the model, the effort and the pin, then the latest switch on its own line', () => {
