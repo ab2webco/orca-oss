@@ -17,7 +17,7 @@ import { isSubagentTool, isTeammateSpawnOf, leadSubagentDenyOf } from './lead-su
 import { isGameLeadCommand, isLeadStarted } from './lead-started'
 import { noteSubagentCall, noteSubagentDone, runningLeadSubagents } from './lead-subagents'
 import { viewOf } from './fleet-sync'
-import { questToolCall, questTurnComplete } from './quest-turns'
+import { questLeadActive, questToolCall, questTurnComplete } from './quest-turns'
 
 export const register: Register = (on) => {
   registerQuest(on)
@@ -86,6 +86,7 @@ export const register: Register = (on) => {
 
   on('prompt.submit', ($, e, next) => {
     if (isHumanOrigin(e.origin.kind)) {
+      questLeadActive()
       clawdReact($, 'hello')
     }
     return next(e)

@@ -14,6 +14,7 @@ import { projectRowsOf } from './fleet-project'
 import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
+import { cardStateOf, leadStateOf } from './lead-state'
 import { runAction } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
@@ -160,7 +161,9 @@ export const registerFleetPane = (on: On): void => {
     }))
     const party = members.filter((one) => !one.agent.isLeader).map((one) => one.member)
     const level = config.rewards ? levelOf(v.xp) : undefined
-    const extras = { isHeroWorking: isSceneShown(), level, isDemo: v.isDemo }
+    const lead = leadStateOf(state)
+    const isLeadAwake = lead !== undefined && lead !== 'sleeping'
+    const extras = { isHeroWorking: isSceneShown() || isLeadAwake, level, isDemo: v.isDemo }
     const art = await animate($, e, [
       {
         key: HUD_KEY,
@@ -305,6 +308,7 @@ export const registerFleetPane = (on: On): void => {
             scene,
             room: cardRoom,
             leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
+            cardState: cardStateOf(agent, state),
             tile: art.get(`tile-${member.key}`),
             view:
               agent.terminalHandle === undefined || isTap

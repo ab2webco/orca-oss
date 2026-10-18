@@ -1,6 +1,5 @@
 import type {
   GameAgent,
-  GameAgentState,
   GameCi,
   GameLink,
   GameLinkKind,
@@ -11,6 +10,7 @@ import type {
 } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import type { CardState } from './lead-state'
 import { NAMED_TICKET } from './member-character'
 import { agentTagOf } from './member-tags'
 import type { Need } from './party'
@@ -24,8 +24,9 @@ export const CI_COLORS: Readonly<Record<GameCi, string>> = {
   none: 'gray'
 }
 
-export const AGENT_COLORS: Readonly<Record<GameAgentState, string>> = {
+export const AGENT_COLORS: Readonly<Record<CardState, string>> = {
   working: 'cyan',
+  orchestrating: 'cyan',
   idle: 'gray',
   waiting: 'red',
   done: 'green'
@@ -202,13 +203,15 @@ export const branchLabelOf = (branch: string, room: number): string => {
 }
 
 /** A card's first row: the state is never cut, the name gives way to it. */
+// Why lineRoom: a state that wraps to its own row still breaks mid-word when it outgrows the whole line.
 export const memberHeadOf = (
   name: string,
   state: string,
-  room: number
+  room: number,
+  lineRoom = Infinity
 ): { name: string; state: string } => ({
   name: fitCells(name, room - cellWidthOf(state) - 1),
-  state
+  state: cellWidthOf(state) > lineRoom ? fitCells(state, lineRoom) : state
 })
 
 const META_GAP = ' · '
