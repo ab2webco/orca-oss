@@ -51,6 +51,20 @@ describe('parseGameLead', () => {
     })
   })
 
+  it('takes memberNames as a roster and warns with the first bad name', () => {
+    expect(parseGameLead({ memberNames: ['Mario', { en: 'Peach', es: 'Melocotón' }] })).toEqual({
+      value: { memberNames: ['Mario', { en: 'Peach', es: 'Melocotón' }] },
+      warnings: []
+    })
+    expect(parseGameLead({ memberNames: ['Mario', 'K-9'] })).toEqual({
+      value: {},
+      warnings: ['orchestratorGame.orchestrator.memberNames.1 must not look like a ticket id']
+    })
+    expect(parseGameLead({ memberNames: [] }).warnings).toEqual([
+      'orchestratorGame.orchestrator.memberNames must list 1 to 24 names'
+    ])
+  })
+
   it('resolves accounts key by key, Settings over orca.yaml', () => {
     expect(resolveGameLead([undefined, { accounts: 'auto' }, undefined]).accounts).toBe('auto')
     expect(

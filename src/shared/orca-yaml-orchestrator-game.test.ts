@@ -9,6 +9,21 @@ describe('parseOrcaYaml orchestratorGame', () => {
     expect(parsed?.orchestratorGameWarnings).toBeUndefined()
   })
 
+  it("reads the lead's memberNames, plain or per language", () => {
+    const parsed = parseOrcaYaml(`orchestratorGame:
+  orchestrator:
+    memberNames:
+      - Mario
+      - en: Peach
+        es: Melocotón
+`)
+
+    expect(parsed?.orchestratorGame).toEqual({
+      orchestrator: { memberNames: ['Mario', { en: 'Peach', es: 'Melocotón' }] }
+    })
+    expect(parsed?.orchestratorGameWarnings).toBeUndefined()
+  })
+
   it('keeps the valid fields and reports the invalid ones', () => {
     const parsed = parseOrcaYaml('orchestratorGame:\n  mode: loud\n  hud: false\n')
 

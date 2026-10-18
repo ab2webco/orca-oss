@@ -10754,6 +10754,11 @@
           "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
           "sceneFileNotText": "no es un archivo de texto"
         },
+        "OrchestratorGameMemberNamesRow": {
+          "label": "Nombres de los miembros",
+          "sceneNames": "Los nombres de la escena",
+          "invalid": "Usa de 1 a 24 nombres separados por comas, cada uno de hasta 32 caracteres y ninguno con forma de ticket."
+        },
         "OrchestratorGameLeadSetting": {
           "cap": "Límite de miembros",
           "capInvalid": "Escribe un número entero del 1 al {{value0}}.",

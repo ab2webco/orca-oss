@@ -383,9 +383,18 @@ orchestratorGame:
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
+
+Each member `game launch`/`game wave` starts is named after the first roster name no live member
+holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead
+pane's `ORCA_GAME_LOCALE`. The name goes before the ticket (`Merlin · CIN-12 Cartelera`), so it
+reaches the tab title, `game fleet`, the HUD and the member card. It is freed when the member is
+released, and a member gets its ticket alone once every name is taken or the scene has none
+([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
+The project Settings' **Member names** takes plain names separated by commas.
 
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):

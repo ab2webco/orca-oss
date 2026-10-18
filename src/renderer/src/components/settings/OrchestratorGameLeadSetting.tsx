@@ -12,6 +12,7 @@ import {
 } from '../../../../shared/orchestrator-game-lead'
 import { withOrchestratorGameProjectLead } from '../../../../shared/orchestrator-game-settings-updates'
 import { Input } from '../ui/input'
+import { OrchestratorGameMemberNamesRow } from './OrchestratorGameMemberNamesRow'
 import {
   SettingsRow,
   SettingsSegmentedControl,
@@ -298,6 +299,13 @@ export function ProjectOrchestratorGameLeadSetting({
           />
         )
       })}
+      <OrchestratorGameMemberNamesRow
+        key={`memberNames:${JSON.stringify(stored?.memberNames ?? null)}`}
+        stored={stored?.memberNames}
+        inherited={inherited.memberNames}
+        sourceLabel={orchestratorGameSourceLabel(gameLeadSourceOf(layers, 'memberNames'))}
+        onCommit={(next) => set('memberNames', next)}
+      />
       <p className="text-xs text-muted-foreground">
         {translate(
           'auto.components.settings.OrchestratorGameLeadSetting.yamlOnly',

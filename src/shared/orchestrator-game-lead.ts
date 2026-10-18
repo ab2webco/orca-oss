@@ -4,6 +4,7 @@ import {
   renderGameWorkPrompt,
   unknownPlaceholderOf
 } from './orchestrator-game-actions'
+import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
 
 /** How the project's lead orchestrates: what it launches, how many at once, and its own rules. */
 export type OrchestratorGameLead = {
@@ -28,6 +29,8 @@ export type OrchestratorGameLead = {
   actions?: boolean
   /** `auto` puts each member on the managed account of its agent with the most free quota. */
   accounts?: OrchestratorGameAccounts
+  /** Names members take in order, in place of the scene's roster. */
+  memberNames?: GameMemberName[]
 }
 
 export type OrchestratorGameAccounts = 'default' | 'auto'
@@ -109,7 +112,15 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   label: textKey('label', GAME_LEAD_LABEL_MAX),
   rules: textKey('rules', GAME_LEAD_RULES_MAX),
   launchPrompt: promptKey('launchPrompt'),
-  pushPrompt: promptKey('pushPrompt')
+  pushPrompt: promptKey('pushPrompt'),
+  memberNames: (value) => {
+    const { roster, problems } = parseMemberRoster(value)
+    if (roster !== undefined) {
+      return { memberNames: roster }
+    }
+    const first = problems[0]
+    return `${at('memberNames')}${first?.path ? `.${first.path}` : ''} ${first?.message ?? 'must be a list of names'}`
+  }
 }
 
 const isLeadKey = (key: string): key is keyof OrchestratorGameLead => key in KEY_PARSERS
