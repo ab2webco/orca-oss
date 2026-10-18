@@ -312,7 +312,7 @@ CJK characters and emoji are refused. A plain string or per-language object.
   `happy` the frame shown while petted.
 - `advisor` stands at the right edge and acts out Jev's decisions while Jev runs in the pane:
   arrows for a lowered or raised model, a yellow card for doubt, a red card for an escalation,
-  a stopwatch and flags for CI, a raised palm when the gate stops a command. The game draws
+  a stopwatch and flags for CI, a stop sign when the gate stops a command. The game draws
   those props; the scene only dresses the body. `frames` are 1 to 4 idle frames; optional
   `gestures` replaces the body for one gesture (`lowered`, `raised`, `approved`, `unsure`,
   `escalated`, `ciRunning`, `ciPassed`, `ciFailed`, `stopped`). A `stopped` body that raises a

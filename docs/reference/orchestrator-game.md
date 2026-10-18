@@ -868,7 +868,7 @@ same block in a project's scene file, a plugin's scene and a built-in one.
 | a CI run `watching`                             | `ciRunning`             | a stopwatch                      | the run's line             |
 | a CI run `success` / `failure`                  | `ciPassed` / `ciFailed` | a green / red flag               | the run's line             |
 | the main conversation's model or effort changes | `approved`              | a thumbs-up                      | `model·effort`             |
-| the gate denies a Bash command                  | `stopped`               | a raised palm, pushing           | `jev ·` / `clef ·` command |
+| the gate denies a Bash command                  | `stopped`               | a stop sign, pushing             | `jev ·` / `clef ·` command |
 | the gate allows a Bash command it judged        | `approved`              | a thumbs-up                      | the command                |
 
 Other `why` values (`kept-pointer`, `teammate`, `no-jev`…) play nothing but still reach the Panel.

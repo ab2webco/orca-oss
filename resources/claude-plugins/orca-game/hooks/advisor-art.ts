@@ -92,8 +92,8 @@ const FLAG: readonly Prop[] = [
   ['.....', '.....', '.FFFP', 'FFFFP', '.FFFP', '....P', '....S', '.....', '.....'],
   ['.....', '.....', 'FFF.P', '.FFFP', 'FFF.P', '....P', '....S', '.....', '.....']
 ]
-// A gloved palm held up to halt the play, on a red cuff.
-const HALT: Prop = ['.....', '.....', 'W.W.W', 'WWWWW', 'WWWWW', '.WWW.', '..R..', '..R..', '.....']
+// A stop sign held up on its post; a white palm vanished against clouds.
+const HALT: Prop = ['.....', '.....', '.RRR.', 'RRRRR', 'RWWWR', 'RRRRR', '.RRR.', '..MSS', '..M..']
 const HAND_OF_WATCH: readonly (readonly [number, number])[] = [
   [2, 5],
   [3, 6],
@@ -135,7 +135,7 @@ export const advisorPropPixel = (
       // A long whistle: its blast streams out the whole time the card is up.
       return y === 4 && dx < 3 && (dx + beat) % 3 !== 0 ? WHITE : propPixel(RED_CARD, dx, y)
     case 'stopped':
-      // The palm pushes toward the lead and back, a column at a time.
+      // The sign pushes toward the lead and back, a column at a time.
       return propPixel(HALT, dx + (beat % 2), y)
     case 'ciRunning': {
       const hand = HAND_OF_WATCH[beat % HAND_OF_WATCH.length]
