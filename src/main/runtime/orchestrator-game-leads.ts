@@ -104,7 +104,7 @@ export class GameLeads {
     if (project.isMember || !project.lead || project.key === UNPLACED_PROJECT) {
       return null
     }
-    const live = this.directory.leadOf(project.key, this.deps.isLive)
+    const live = await this.leadOf(project.key)
     return live && live.handle !== project.lead.handle ? live.handle : null
   }
 

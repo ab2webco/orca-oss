@@ -218,6 +218,7 @@ describe('GameLeads claim', () => {
     await game.register({ project: 'cineco', label: 'Ana', claim: true })
 
     caller = 'term_b'
+    await expect(game.leadElsewhere({})).resolves.toBeNull()
     await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
       registered: true
     })
