@@ -998,7 +998,12 @@ function registryEntryMatchesStatus(args: {
     return false
   }
   const identity = entry.identity
-  if (identity.agentType !== undefined && identity.agentType !== args.agentType) {
+  if (
+    identity.agentType !== undefined &&
+    identity.agentType !== args.agentType &&
+    // Why: an `orca claude-teams` pane's hooks report `claude`; dropping its launch would relaunch it without the game.
+    !(identity.agentType === 'claude-agent-teams' && args.agentType === 'claude')
+  ) {
     return false
   }
   if (identity.tabId !== undefined && identity.tabId !== args.tabId) {
