@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setGameLocale } from '../../../../../resources/claude-plugins/orca-game/hooks/game-strings'
+import { daylightAt } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import { sceneGridOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scene'
 import {
   HD_ROWS,
@@ -9,6 +10,7 @@ import { SCENES } from '../../../../../resources/claude-plugins/orca-game/hooks/
 import {
   PREVIEW_COLUMNS,
   PREVIEW_PHASE_TICKS,
+  previewLightOf,
   previewSceneOf,
   scenePreviewFrameOf,
   scenePreviewPixelsOf
@@ -97,5 +99,19 @@ describe('the hd preview', () => {
     expect(scenePreviewFrameOf(quest, 0, 'en').cells).toEqual(
       sceneGridOf(quest, undefined, PREVIEW_COLUMNS, 0)
     )
+  })
+
+  it('lights the hd grid by the hour it is given, not always at noon', () => {
+    const quest = SCENES.quest!
+    const at = (hour: number): ReturnType<typeof scenePreviewFrameOf>['cells'] =>
+      scenePreviewFrameOf(quest, 0, 'en', 'hd', daylightAt(hour)).cells
+    expect(at(23)).not.toEqual(at(12))
+    expect(at(12)).toEqual(scenePreviewFrameOf(quest, 0, 'en', 'hd', daylightAt(12)).cells)
+  })
+
+  it('reads the hour in the project timezone', () => {
+    const instant = Date.UTC(2026, 9, 18, 4, 0)
+    expect(previewLightOf(instant, 'America/Bogota')).toEqual(daylightAt(23))
+    expect(previewLightOf(instant, 'UTC')).toEqual(daylightAt(4))
   })
 })

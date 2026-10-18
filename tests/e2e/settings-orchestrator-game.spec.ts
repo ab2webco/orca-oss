@@ -13,6 +13,13 @@ import {
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
+// Zones spread across the day, so their hours differ in light whatever time the run starts.
+const HD_HOUR_ZONES = [
+  'Australia/Brisbane',
+  'Pacific/Pitcairn',
+  'America/Noronha',
+  'Europe/Istanbul'
+] as const
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate(async (next) => {
@@ -616,6 +623,75 @@ test('the render and time zone rows persist globally and per project and render 
     .toEqual({ [repoId as string]: { render: 'classic', timezone: 'Europe/Madrid' } })
   await expect(orcaPage.getByText('Classic · this machine')).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'render-project', projectZone)
+})
+
+test('the hd preview is lit by the hour in the chosen time zone and renders at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'agents', repoId: null })
+    state.openSettingsPage()
+  })
+  const render = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
+  await expect(render).toBeVisible({ timeout: 15_000 })
+  await render.getByRole('radio', { name: 'HD' }).click()
+  const zone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
+  const preview = orcaPage.locator('[data-slot="game-scene-preview"]').first()
+  const brightnessOf = (): Promise<number> =>
+    preview.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height)
+      let sum = 0
+      for (let i = 0; i < data.length; i += 4) {
+        sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3
+      }
+      return sum / (data.length / 4)
+    })
+  const hourIn = (timeZone: string): number =>
+    Number(
+      new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hourCycle: 'h23' }).format(
+        new Date()
+      )
+    )
+
+  const lit: { zone: string; hour: number; brightness: number }[] = []
+  for (const name of HD_HOUR_ZONES) {
+    await zone.fill(name)
+    await zone.press('Enter')
+    await expect
+      .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame?.timezone)
+      .toBe(name)
+    lit.push({ zone: name, hour: hourIn(name), brightness: await brightnessOf() })
+    for (const theme of THEMES) {
+      await setTheme(orcaPage, theme)
+      await preview.screenshot({
+        path: testInfo.outputPath(`hd-hour-${hourIn(name)}-${theme}-1440.png`)
+      })
+    }
+  }
+
+  const brightest = Math.max(...lit.map((one) => one.brightness))
+  const darkest = Math.min(...lit.map((one) => one.brightness))
+  expect(brightest - darkest, JSON.stringify(lit)).toBeGreaterThan(20)
+
+  await setTheme(orcaPage, 'light')
+  for (const name of [HD_HOUR_ZONES[1], HD_HOUR_ZONES[3]]) {
+    await zone.fill(name)
+    await zone.press('Enter')
+    await expect
+      .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame?.timezone)
+      .toBe(name)
+    for (const width of [768, 390, 320] as const) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await preview.screenshot({
+        path: testInfo.outputPath(`hd-hour-${hourIn(name)}-light-${width}.png`)
+      })
+    }
+    await setWindowWidth(electronApp, orcaPage, 1440)
+  }
 })
 
 type SkillDiscoveryMockGlobal = typeof globalThis & {

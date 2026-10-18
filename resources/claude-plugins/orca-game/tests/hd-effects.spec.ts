@@ -1,15 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { daylightAt, duskOf, hourOf, nightnessOf } from '../hooks/hd-daylight'
-import {
-  bloomInto,
-  flashInto,
-  flashOf,
-  floatingRowOf,
-  particleKindOf,
-  particlesInto,
-  vignetteInto
-} from '../hooks/hd-fx'
+import { flashInto, flashOf, floatingRowOf, particleKindOf, particlesInto } from '../hooks/hd-fx'
 import { marchesOf, marchShiftOf, MARCH_TICKS } from '../hooks/hd-party'
 import { hdHeroPoseOf } from '../hooks/scene-hd'
 
@@ -31,7 +23,7 @@ describe('day and night', () => {
     expect(nightnessOf(18)).toBe(0.5)
     expect(duskOf(18)).toBe(1)
     expect(duskOf(12)).toBe(0)
-    expect(daylightAt(22)).toEqual({ night: 1, dusk: 0 })
+    expect(daylightAt(22)).toEqual({ night: 1, dusk: 0, hour: 22 })
   })
 })
 
@@ -52,30 +44,13 @@ describe('light and particles', () => {
     expect(snow.some((color) => color === 0xf2f5ff)).toBe(true)
   })
 
-  it('blooms bright pixels, darkens the edges, and flashes a reaction', () => {
-    const buf = new Uint32Array(9 * 3).fill(0x202020)
-    buf[13] = 0xffffff
-    bloomInto(buf, 9, 3)
-    expect(buf[12]).not.toBe(0x202020)
-    const lit = new Uint32Array(40 * 4).fill(0x808080)
-    vignetteInto(lit, 40, 4)
-    expect(lit[40]).toBeLessThan(lit[60] ?? 0)
+  it('flashes a reaction', () => {
     const flash = new Uint32Array(4).fill(0x000000)
     flashInto(flash, 0xffffff, flashOf('merged', 0))
     expect(flash[0]).not.toBe(0)
     expect(flashOf('merged', 9)).toBe(0)
     expect(floatingRowOf(4, 0)).toBe(4)
     expect(floatingRowOf(4, 9)).toBe(2)
-  })
-
-  it('blooms the same whichever way it walks the buffer', () => {
-    const a = new Uint32Array(5).fill(0x202020)
-    a[1] = 0xffffff
-    a[3] = 0xffffff
-    const b = a.toReversed()
-    bloomInto(a, 5, 1)
-    bloomInto(b, 5, 1)
-    expect(Array.from(a)).toEqual(Array.from(b.toReversed()))
   })
 })
 

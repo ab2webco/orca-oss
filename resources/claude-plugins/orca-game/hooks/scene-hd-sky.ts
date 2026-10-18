@@ -2,7 +2,7 @@ import { cloudInLight, MIDNIGHT, NOON, skyInLight, type Daylight } from './hd-da
 import { hash, mix } from './pixel-canvas'
 import type { Look } from './scenes/index'
 
-// hd's sky: a cached gradient with the sun or moon and its glow, then drifting clouds, light shafts and stars.
+// hd's sky: a cached gradient with the sun or moon on its arc for the hour, then drifting clouds and stars.
 
 const STAR = 0xf5f3c8
 const MOON = 0xe8ecff
@@ -57,14 +57,19 @@ const staticSkyOf = (frame: Omit<HdSky, 'sky'>, x: number, y: number) => {
     const isEmblem = isSignal && Math.abs(x - sunX) <= 1 && Math.abs(y - sunY) <= 0.6
     return { color: isEmblem ? SIGNAL_EMBLEM : light, isDisc: true }
   }
-  const glow = d <= sunR * 2.8 ? (1 - (d - sunR) / (sunR * 1.8)) ** 2 * 0.42 : 0
-  return { color: glow > 0 ? mix(beamed, light, glow) : beamed, isDisc: false }
+  return { color: beamed, isDisc: false }
 }
 
 const layers = new WeakMap<Look, Map<string, SkyLayer>>()
 
 // Why quantized: a fractional nightness at dawn would miss the cache on every frame.
 const quantize = (value: number): number => Math.round(value * 8) / 8
+
+/** 0 rising (left) to 1 setting (right): the sun from 5 to 19, the moon from 18 to 6. */
+const arcOf = (light: Daylight): number => {
+  const span = light.night > 0.5 ? ((light.hour - 18 + 24) % 24) / 12 : (light.hour - 5) / 14
+  return Math.max(0, Math.min(1, span))
+}
 
 export const hdSkyOf = (args: {
   look: Look
@@ -75,16 +80,23 @@ export const hdSkyOf = (args: {
   light?: Daylight
 }): HdSky => {
   const light = args.light ?? (args.look.isNight ? MIDNIGHT : NOON)
-  const steady = { night: quantize(light.night), dusk: quantize(light.dusk) }
+  const steady = {
+    night: quantize(light.night),
+    dusk: quantize(light.dusk),
+    hour: Math.round(light.hour * 4) / 4
+  }
+  const arc = arcOf(steady)
+  const lowest = args.ground * 0.62
   const base = {
     ...args,
     light: steady,
     cloud: cloudInLight(args.look.cloud, steady, args.look.isNight),
-    sunX: args.width - 16,
-    sunY: args.pixels * 0.24,
+    // Why the right half: the thought clouds over the hero and its party fill the left and middle.
+    sunX: Math.round(args.width * (0.5 + 0.44 * arc)),
+    sunY: lowest - Math.sin(Math.PI * arc) * (lowest - args.pixels * 0.24),
     sunR: Math.max(2.2, args.pixels * 0.11)
   }
-  const key = `${args.width}x${args.pixels}@${args.ground}:${steady.night}:${steady.dusk}`
+  const key = `${args.width}x${args.pixels}@${args.ground}:${steady.night}:${steady.dusk}:${steady.hour}`
   const own = layers.get(args.look) ?? new Map<string, SkyLayer>()
   layers.set(args.look, own)
   const kept = own.get(key)
@@ -108,7 +120,7 @@ export const hdSkyOf = (args: {
   return { ...base, sky }
 }
 
-/** The sky without anything that moves: gradient, sun or moon and glow. */
+/** The sky without anything that moves: gradient and sun or moon. */
 export const hdSkyBaseOf = (frame: HdSky, x: number, y: number): number => {
   const inside = x >= 0 && x < frame.width && y >= 0 && y < frame.pixels
   return inside ? (frame.sky.color[y * frame.width + x] ?? 0) : staticSkyOf(frame, x, y).color
@@ -122,22 +134,13 @@ const smooth = (x: number, seed: number, every: number): number => {
   return a + (b - a) * t * t * (3 - 2 * t)
 }
 
-/** A slanted band of sunlight, 0 to 1. */
-export const shaftOf = (x: number, y: number, sunX: number, tick: number): number => {
-  const band = (((x - sunX + y * 1.15 - tick * 0.04) % 19) + 19) % 19
-  return band < 2.5 ? 1 - band / 2.5 : 0
-}
-
 export const hdSkyPixel = (frame: HdSky, x: number, y: number): number => {
   const inside = x >= 0 && x < frame.width && y >= 0 && y < frame.pixels
   if (inside && frame.sky.isDisc[y * frame.width + x] === 1) {
     return frame.sky.color[y * frame.width + x] ?? 0
   }
-  const { look, tick, pixels } = frame
+  const { tick, pixels } = frame
   let color = hdSkyBaseOf(frame, x, y)
-  if (!isNightOf(frame)) {
-    color = mix(color, look.sun, shaftOf(x, y, frame.sunX, tick) * 0.1)
-  }
   const band = (centre: number, every: number, seed: number, drift: number): number => {
     const lump = smooth(x + Math.floor(tick / drift), seed, every)
     const thick = lump > 0.55 ? (lump - 0.55) * 7 : 0

@@ -668,7 +668,10 @@ On top of that hd adds:
 
 - **Day and night** from the clock in `timezone`, sampled at start, on
   every refresh and about every 30 seconds: dark from 19:00 to 05:00, light from 07:00 to 17:00, an
-  orange tint around 06:00 and 18:00, stars and the moon at night, clouds dimmed with the sky. A
+  orange tint around 06:00 and 18:00, stars and the moon at night, clouds dimmed with the sky. The
+  sun crosses the right half of the sky, rising mid-band at dawn and setting at the right edge at
+  dusk, highest at noon (the left half is where the hero's and party's thought clouds sit), and the
+  moon does the same from 18:00 to 06:00, so dawn and dusk differ by where the disc stands. A
   look authored as night (every Night Watch phase but the handoff) is its own midnight; by day it is
   lifted toward an overcast sky with a sun and lighter scenery, and a dark day look (a red alert, a
   dusk) is lifted just enough that noon still reads as day. Costume colours never change with the
@@ -676,9 +679,10 @@ On top of that hd adds:
   `local` means the desktop's zone: Orca hands the pane its own IANA zone at launch and
   in `game state` (`sources` still says where `local` came from), so a pane on an SSH host, whose
   clock is usually UTC, turns to night when the person's evening does.
-- **Light and particles**: shafts from the sun, bloom around bright pixels, a vignette and softened
-  top and bottom rows (the characters are spared both); dust by day, fireflies at night, snow in
-  Night Watch, glitter in Crystal Saga and embers over the campfire the hero rests by.
+- **Particles**: dust by day, fireflies at night, snow in Night Watch, glitter in Crystal Saga and
+  embers over the campfire the hero rests by. Nothing blends a pixel into its neighbours (no bloom,
+  vignette, sun glow, light shafts or haze on the far scenery), so every edge stays as hard as
+  koombea-quest's: both draw `▀` half blocks in truecolor, and those passes were the difference.
 - **Motion**: a four-frame walk with a body bob, breathing at rest, and the party following the hero
   (or sitting by the fire). Walking, the pet goes right behind the hero and the party behind the
   pet, always on the hero's left since no figure is mirrored, and the hero's path starts where all
@@ -721,7 +725,7 @@ buffers are reused per size, and a tick that draws the frame a Raster already sh
 
 `pnpm run capture:orca-game-scenes -- [--out <dir>] [--scene-file <json>] [--phases <all|a,b>]`
 ([`orca-game-scene-captures.mjs`](../../config/scripts/orca-game-scene-captures.mjs)) renders every
-built-in scene, and a scene file, in classic and hd, day and night, at 130 and 60 columns to PNGs
+built-in scene, and a scene file, in classic and hd at 06:00, 12:00, 18:00 and 23:00, at 130 and 60 columns to PNGs
 through Playwright, with one labelled sheet per scene and phase. A scene file is drawn in every
 phase and the built-ins in `build`, unless `--phases` names others. They draw the cells the mod hands its Raster in a browser: not terminal
 screenshots, since a terminal's font and gamma differ.

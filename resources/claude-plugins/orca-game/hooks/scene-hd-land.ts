@@ -146,9 +146,6 @@ export const hdFrameOf = (args: {
 const litOf = (frame: HdFrame, color: number): number =>
   landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
-const skyAt = (frame: HdFrame, y: number): number =>
-  mix(frame.look.skyTop, frame.look.skyBottom, Math.min(1, y / Math.max(1, frame.ground - 1)))
-
 const farHeightAt = (frame: HdFrame, x: number): number =>
   frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + Math.floor(frame.scroll / 6))
 
@@ -160,8 +157,7 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   if (y < top) {
     return undefined
   }
-  const fogged = mix(look.far, skyAt(frame, y), 0.42 - ((y - top) / Math.max(1, height)) * 0.18)
-  const base = litOf(frame, fogged)
+  const base = litOf(frame, look.far)
   const snow = litOf(frame, look.snow)
   const layer = (color: number): number => apartFromSky(color, frame.far, y)
   const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
@@ -169,7 +165,7 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
       if (y - top < 1.6 && height > pixels * 0.45) {
-        return accent(litOf(frame, mix(look.snow, skyAt(frame, y), 0.15)))
+        return accent(litOf(frame, look.snow))
       }
       return layer(isLitSide ? mix(base, 0xffffff, 0.08) : base)
     case 'skyline': {

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import { costumeSpriteOf, outlineOf } from '../hooks/hd-sprite'
+import { daylightAt } from '../hooks/hd-daylight'
+import { accentApartFromSky, apartFromSky } from '../hooks/hd-layer-contrast'
 import { mix, UPPER_HALF } from '../hooks/pixel-canvas'
 import { HD_ROWS, hdRowsOf, hdSceneGridOf, type HdSceneInput } from '../hooks/scene-hd'
 import {
   hdFarPixel,
   hdFrameOf,
   hdGroundPixel,
+  hdMidPixel,
   hdPlantPixel,
   hdSkyBaseOf,
   hdSkyPixel
@@ -74,12 +77,82 @@ describe('hd layers', () => {
     expect(distance(low, LOOK.skyBottom)).toBeLessThan(distance(top, LOOK.skyBottom))
   })
 
-  it('puts a sun disc with a glow around it', () => {
+  it('puts a sun disc with no glow around it, so its edge is hard', () => {
     const sunY = Math.round(frame.sunY)
     expect(hdSkyBaseOf(frame, frame.sunX, sunY)).toBe(LOOK.sun)
-    const glow = hdSkyBaseOf(frame, frame.sunX + Math.ceil(frame.sunR * 1.6), sunY)
-    const plain = mix(LOOK.skyTop, LOOK.skyBottom, sunY / (frame.ground - 1))
-    expect(distance(glow, LOOK.sun)).toBeLessThan(distance(plain, LOOK.sun))
+    const beside = hdSkyBaseOf(frame, frame.sunX + Math.ceil(frame.sunR * 1.6), sunY)
+    expect(beside).toBe(hdSkyBaseOf(frame, 2, sunY))
+  })
+
+  it('moves the sun east to west through the day, highest at noon', () => {
+    const sunAt = (hour: number) => {
+      const one = hdFrameOf({
+        look: LOOK,
+        width: 130,
+        rows: 9,
+        tick: 0,
+        scroll: 0,
+        light: daylightAt(hour)
+      })
+      return { x: one.sunX, y: one.sunY }
+    }
+    expect(sunAt(9).x).toBeLessThan(sunAt(12).x)
+    expect(sunAt(12).x).toBeLessThan(sunAt(15).x)
+    expect(sunAt(12).y).toBeLessThan(sunAt(9).y)
+    expect(sunAt(7).y).toBeGreaterThan(sunAt(9).y)
+  })
+
+  it('lays no light shafts over the sky: a clear pixel is the bare gradient', () => {
+    for (let y = 0; y < frame.ground; y += 1) {
+      for (let x = 0; x < frame.width; x += 1) {
+        const base = hdSkyBaseOf(frame, x, y)
+        const clouded = [mix(base, frame.cloud, 0.92), mix(base, frame.cloud, 0.6)]
+        const pixel = hdSkyPixel(frame, x, y)
+        expect(pixel === base || clouded.includes(pixel), `${x},${y}`).toBe(true)
+      }
+    }
+  })
+
+  it('paints far scenery in its own colours, not hazed toward the sky', () => {
+    let checked = 0
+    for (let y = 0; y < frame.ground; y += 1) {
+      const own = [
+        apartFromSky(LOOK.far, frame.far, y),
+        apartFromSky(mix(LOOK.far, 0xffffff, 0.08), frame.far, y),
+        accentApartFromSky(LOOK.snow, frame.far, y)
+      ]
+      for (let x = 0; x < frame.width; x += 1) {
+        const far = hdFarPixel(frame, x, y)
+        if (far !== undefined) {
+          expect(own, `${x},${y}`).toContain(far)
+          checked += 1
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20)
+  })
+
+  it('leaves the edge columns the colour of the sky behind them, with no vignette', () => {
+    const columns = 130
+    const grid = hdSceneGridOf(input({ columns, light: daylightAt(12) }))
+    const lit = hdFrameOf({
+      look: QUEST.looks.build,
+      width: columns,
+      rows: HD_ROWS,
+      tick: 41,
+      scroll: 41,
+      light: daylightAt(12)
+    })
+    const kept: boolean[] = []
+    for (const x of [0, 1, columns - 2, columns - 1]) {
+      for (let y = 0; y < lit.ground; y += 1) {
+        if (hdFarPixel(lit, x, y) === undefined && hdMidPixel(lit, x, y) === undefined) {
+          kept.push(pixelOf(grid, columns, x, y) === hdSkyPixel(lit, x, y))
+        }
+      }
+    }
+    expect(kept.length).toBeGreaterThan(8)
+    expect(kept.filter(Boolean).length).toBeGreaterThan(kept.length * 0.9)
   })
 
   it('drifts two cloud layers at different heights', () => {
@@ -96,22 +169,6 @@ describe('hd layers', () => {
     const split = wide.pixels * 0.22
     expect([...ys].some((y) => y < split)).toBe(true)
     expect([...ys].some((y) => y >= split)).toBe(true)
-  })
-
-  it('fogs the far scenery toward the sky', () => {
-    let checked = 0
-    for (let x = 0; x < 130; x += 1) {
-      for (let y = 0; y < frame.ground; y += 1) {
-        const far = hdFarPixel(frame, x, y)
-        if (far === undefined || distance(far, LOOK.snow) < 40) {
-          continue
-        }
-        const sky = mix(LOOK.skyTop, LOOK.skyBottom, y / (frame.ground - 1))
-        expect(distance(far, sky)).toBeLessThan(distance(LOOK.far, sky))
-        checked += 1
-      }
-    }
-    expect(checked).toBeGreaterThan(20)
   })
 
   it('grows near props to the characters’ size', () => {

@@ -18,10 +18,11 @@ const DAY_FLOOR = 56
 const MAX_LIFT = 0.5
 const LAND_LIFT = 0.6
 
-export type Daylight = { night: number; dusk: number }
+/** `hour` places the sun or moon on its arc; 0 to 24 on the project's clock. */
+export type Daylight = { night: number; dusk: number; hour: number }
 
-export const NOON: Daylight = { night: 0, dusk: 0 }
-export const MIDNIGHT: Daylight = { night: 1, dusk: 0 }
+export const NOON: Daylight = { night: 0, dusk: 0, hour: 12 }
+export const MIDNIGHT: Daylight = { night: 1, dusk: 0, hour: 0 }
 
 const lifts = new WeakMap<Look, number>()
 
@@ -125,5 +126,6 @@ export const duskOf = (hour: number): number =>
 
 export const daylightAt = (hour: number): Daylight => ({
   night: nightnessOf(hour),
-  dusk: duskOf(hour)
+  dusk: duskOf(hour),
+  hour
 })
