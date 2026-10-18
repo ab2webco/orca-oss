@@ -228,6 +228,9 @@ jobs:
 
   version:
     needs: [resolve, gate]
+    # Why !cancelled(): the implicit success() is false over the gate jobs a dry
+    # run or skip_gate skips; a refused verdict still fails gate and stops here.
+    if: ${{ !cancelled() && needs.resolve.result == 'success' && needs.gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -370,6 +373,7 @@ jobs:
 
   mac:
     needs: version
+    if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: macos-latest
     timeout-minutes: 90
     # Why: real releases sign + notarize with the ANTAKARANA Developer ID (repo
@@ -462,6 +466,7 @@ jobs:
 
   linux:
     needs: version
+    if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -503,6 +508,7 @@ jobs:
 
   windows:
     needs: version
+    if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -554,7 +560,11 @@ jobs:
 
   finalize:
     needs: [resolve, gate, version, mac, linux, windows]
-    if: inputs.dry_run != true
+    if: >-
+      ${{ !cancelled() && inputs.dry_run != true
+      && needs.resolve.result == 'success' && needs.gate.result == 'success'
+      && needs.version.result == 'success' && needs.mac.result == 'success'
+      && needs.linux.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: lab-release
