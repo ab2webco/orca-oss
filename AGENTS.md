@@ -53,6 +53,14 @@ sin pipe, o `set -o pipefail`, cuando lo que estás midiendo es el exit code
 ([detalle](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status));
 y un test que pasa igual contra el código viejo no prueba nada.
 
+## Rotar la sesión del lead
+
+Tras la segunda compactación en una sesión de lead o coordinador, se actualiza `tmp/handoff.md`
+(workers vivos, PRs abiertos, decisiones pendientes) y se avisa al dueño de que toca abrir un lead
+nuevo desde ese handoff. Nadie sigue coordinando después de la tercera compactación: cada resumen
+pierde detalle, y las correcciones más fuertes de la ventana de 65 días cayeron al final de las dos
+sesiones que llegaron a 11 y 21 compactaciones.
+
 ## Atribución en los commits
 
 Los mensajes acreditan personas, no herramientas: nada de `Co-Authored-By` de un asistente ni
