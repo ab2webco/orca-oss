@@ -50,12 +50,13 @@ export const resumedPaneStateOf = (foreground: string | null): 'running' | 'shel
 
 /**
  * Whether a reopened lead took. Why wait: the terminal spawns before Claude reads the conversation, and
- * a missing one makes Claude exit to the shell. The pane starts at its shell too, so only a shell after
- * Claude ran, or one still there at the deadline, is a failure.
+ * a missing one makes Claude exit to the shell within seconds. The pane starts at its shell too, so only
+ * a shell after Claude ran is a failure; Claude still up after `settleMs`, or at the deadline, counts.
  */
 export const awaitResumedLead = async (args: {
   read: () => Promise<'session' | 'running' | 'shell' | 'starting'>
   timeoutMs: number
+  settleMs: number
   intervalMs: number
   now?: () => number
   sleep?: (ms: number) => Promise<void>
@@ -63,18 +64,23 @@ export const awaitResumedLead = async (args: {
   const now = args.now ?? Date.now
   const sleep = args.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)))
   const deadline = now() + args.timeoutMs
-  let hasRun = false
+  let ranSince: number | null = null
   for (;;) {
     const seen = await args.read()
     if (seen === 'session') {
       return 'resumed'
     }
-    if (seen === 'shell' && hasRun) {
+    if (seen === 'shell' && ranSince !== null) {
       return 'exited'
     }
-    hasRun ||= seen === 'running'
+    if (seen === 'running') {
+      ranSince ??= now()
+    }
+    if (ranSince !== null && now() - ranSince >= args.settleMs) {
+      return 'resumed'
+    }
     if (now() >= deadline) {
-      return seen === 'running' ? 'resumed' : 'exited'
+      return ranSince === null ? 'exited' : 'resumed'
     }
     await sleep(args.intervalMs)
   }

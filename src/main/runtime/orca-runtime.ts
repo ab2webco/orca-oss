@@ -3661,6 +3661,7 @@ export class OrcaRuntimeService {
           return resumedPaneStateOf(pane?.foregroundProcess ?? null)
         },
         timeoutMs: 20_000,
+        settleMs: 5_000,
         intervalMs: 500
       })
       if (outcome === 'exited') {

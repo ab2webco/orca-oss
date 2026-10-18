@@ -93,6 +93,7 @@ describe('awaitResumedLead', () => {
     return awaitResumedLead({
       read: async () => reads[Math.min(at++, reads.length - 1)] ?? 'shell',
       timeoutMs: 3000,
+      settleMs: 1000,
       intervalMs: 500,
       now: () => clock,
       sleep: async (ms) => {
@@ -117,6 +118,14 @@ describe('awaitResumedLead', () => {
     await expect(run(['starting', 'shell', 'starting', 'running', 'session'])).resolves.toBe(
       'resumed'
     )
+  })
+
+  it('counts Claude that kept running past the settle time without waiting for the deadline', async () => {
+    await expect(run(['shell', 'running', 'running', 'running', 'shell'])).resolves.toBe('resumed')
+  })
+
+  it('keeps Claude that ran when its title reads as its version at the deadline', async () => {
+    await expect(run(['shell', 'running', 'starting'])).resolves.toBe('resumed')
   })
 
   it('fails a pane that never left its shell by the deadline', async () => {
