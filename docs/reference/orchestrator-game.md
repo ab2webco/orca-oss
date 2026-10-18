@@ -852,11 +852,12 @@ same block in a project's scene file, a plugin's scene and a built-in one.
 - **Jev's gate** answers every Bash command from a settings `PreToolUse` hook (orca-supervisor's
   `gate-bash.ts`), beneath the game's `classic.PreToolUse`, so the game reads its verdict from
   `next(e)`. The `advisor` value carries no verdict. Jev or Clef may have judged it (Clef first in
-  Both mode, since orca-supervisor 0.13.4); both are acted out alike, and neither touches the
-  advisor's value. A deny whose reason is the gate's own (`REFUSED: …` or
-  `Jev advice (not a refusal)` / `Clef advice …`) plays `stopped`; an `allow` plays `approved` as a
-  routine decision. Another hook's deny, an `ask`, and an obviously safe command the gate passes
-  without a verdict play nothing.
+  Both mode since orca-supervisor 0.13.0, policy commands too since 0.13.4); both are acted out
+  alike, and neither touches the advisor's value. A deny whose reason is the gate's own
+  (`REFUSED: …` or `Jev advice (not a refusal)` / `Clef advice …`) plays `stopped`; an `allow` plays
+  `approved` as a routine decision. The engine drops an allow's reason, so another hook's `allow`
+  on Bash plays it too. Another hook's deny, an `ask`, and an obviously safe command the gate
+  passes without a verdict play nothing.
 
 | Jev                                             | Gesture                 | The advisor holds                | Bubble                     |
 | ----------------------------------------------- | ----------------------- | -------------------------------- | -------------------------- |
