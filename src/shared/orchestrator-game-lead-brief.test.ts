@@ -139,4 +139,24 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('"what did CIN-1 do", yesterday\'s work')
     expect(brief).toContain('cite its record')
   })
+
+  it("lets a lead ask another project's lead to launch work, only when the person asks", () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('`orca game leads`')
+    expect(brief).toContain(
+      '`orca orchestration send --to <lead handle> --subject <subject> --body <request>`'
+    )
+    expect(brief).toContain('only when the person asks')
+    expect(brief).toContain('never to yourself')
+  })
+
+  it("acts on a peer lead's request and reports back once, never to acknowledge", () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain("A peer lead's request to launch work")
+    expect(brief).toContain('as if the person asked')
+    expect(brief).toContain('report back to that lead once')
+    expect(brief).toContain('never reply just to acknowledge')
+  })
 })

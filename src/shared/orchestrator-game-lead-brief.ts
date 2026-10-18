@@ -79,6 +79,11 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `- A member in phase \`limited\` hit its account's usage limit: ${run('game move <ticket>')} moves it to`,
     '  another account of its agent. When every account is limited, tell the person when the first account is back',
     '  and wait; then push it. A launch that fails on the network is retried by Orca; say so only if it still fails.',
+    `- ${run('game leads')} lists the live leads of the other projects on this Orca host. You may, only when the person asks,`,
+    `  ask one to launch work: ${run('orchestration send --to <lead handle> --subject <subject> --body <request>')},`,
+    '  never to yourself; leads on other paired hosts are not listed.',
+    "- A peer lead's request to launch work is the person's request: act on it as if the person asked, and",
+    '  report back to that lead once, with the result. and never reply just to acknowledge: two leads would answer each other forever.',
     `- ${run('game state --json')} lists every member (\`isMember\`) with its state, PR, CI and ticket.`,
     `- For anything else about members, load ${run('skills get orchestration')}.`
   ]

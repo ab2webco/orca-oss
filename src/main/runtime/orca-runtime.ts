@@ -669,6 +669,7 @@ import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameLeads } from './orchestrator-game-leads'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -3610,11 +3611,16 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  private readonly gameLeads = new GameLeads({
+    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    isLive: (handle) => this.resolveLeafForHandle(handle) !== null
+  })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
     stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
     projectOf: (caller) => this.gameBoardProjectOf(caller),
-    inboxSourceOf: (lead) => gameInboxSourceOf(this.getOrchestrationDb(), lead)
+    inboxSourceOf: (lead) =>
+      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels())
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
@@ -30225,6 +30231,10 @@ export class OrcaRuntimeService {
 
   getGameBoard(): GameBoard {
     return this.gameBoard
+  }
+
+  getGameLeads(): GameLeads {
+    return this.gameLeads
   }
 
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.

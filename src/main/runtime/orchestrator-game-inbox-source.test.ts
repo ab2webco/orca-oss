@@ -67,4 +67,14 @@ describe('gameInboxSourceOf', () => {
     expect(source.leadAddresses).toEqual(['term_lead'])
     expect(source.members).toEqual([])
   })
+
+  it("carries the peer leads' labels so mail from one is named", () => {
+    const { db } = fakeDb()
+    const source = gameInboxSourceOf(
+      db,
+      { handle: 'term_lead', paneKey: null },
+      { term_peer: 'Bo' }
+    )
+    expect(source.peerLeads).toEqual({ term_peer: 'Bo' })
+  })
 })

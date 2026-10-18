@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_HANDLERS } from './orchestrator-game'
-import type { RuntimeClient } from '../runtime-client'
+import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 
 describe('orca game state', () => {
   const saved = { ...process.env }
@@ -138,6 +138,74 @@ describe('orca game state', () => {
     expect(text).toContain('You are the lead of cineco-orchestrator')
     expect(text).toContain('At most 3 members run at once')
     expect(text).toContain('Use Jira CIN.')
+  })
+
+  it('registers the lead with the host under its project name and label', async () => {
+    const calls: [string, unknown][] = []
+    const client = {
+      call: async (method: string, params: unknown) => {
+        calls.push([method, params])
+        return {
+          ok: true,
+          result: {
+            config: { mode: 'on' },
+            agents: [],
+            worktree: { id: 'wt1', path: '/Users/me/cineco', branch: 'main', displayName: 'main' },
+            lead: { autostart: true, cap: 3, agent: 'claude', label: 'Ana' },
+            role: 'lead'
+          }
+        }
+      }
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: true
+    })
+
+    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    expect(calls[1]?.[1]).toEqual({
+      worktreeId: 'wt1',
+      terminalHandle: 'h1',
+      project: 'cineco',
+      label: 'Ana'
+    })
+  })
+
+  it('does not register a member, and prints the brief when the host cannot register', async () => {
+    const calls: string[] = []
+    const member = {
+      call: async (method: string) => {
+        calls.push(method)
+        return { ok: true, result: { config: { mode: 'on' }, agents: [], role: 'member' } }
+      }
+    } as unknown as RuntimeClient
+    const oldHost = {
+      call: async (method: string) => {
+        if (method === 'game.leadRegister') {
+          throw new RuntimeClientError('method_not_found', 'Unknown method: game.leadRegister')
+        }
+        return { ok: true, result: { config: { mode: 'on' }, agents: [], role: 'lead' } }
+      }
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client: member,
+      cwd: '/tmp',
+      json: true
+    })
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client: oldHost,
+      cwd: '/tmp',
+      json: false
+    })
+
+    expect(calls).toEqual(['game.state'])
+    expect(output.join('\n')).toContain('You are the lead of')
   })
 
   it('tells a member it is not the lead instead of handing it the lead rules', async () => {

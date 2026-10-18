@@ -19,7 +19,8 @@ const MAIL_PER_ADDRESS = 100
 /** The lead's addresses and every ticket's, from the lead's current run, with their mail. */
 export function gameInboxSourceOf(
   db: GameInboxDb,
-  lead: { handle: string; paneKey: string | null }
+  lead: { handle: string; paneKey: string | null },
+  peerLeads: Readonly<Record<string, string>> = {}
 ): GameInboxSource {
   const run = lead.paneKey ? db.getCurrentRunForPane(lead.paneKey) : undefined
   const leadAddresses = [
@@ -48,5 +49,5 @@ export function gameInboxSourceOf(
   const mail = [...leadAddresses, ...members.flatMap((member) => member.addresses)].flatMap(
     (address) => db.getAllMessagesForHandle(address, MAIL_PER_ADDRESS)
   )
-  return { leadAddresses, members, mail }
+  return { leadAddresses, members, mail, peerLeads }
 }

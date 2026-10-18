@@ -91,10 +91,20 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     const state = response.result
     const lead = state.lead ?? DEFAULT_GAME_LEAD
     const role = state.role ?? 'lead'
+    const project = projectNameOf(state.worktree)
     const brief =
-      role === 'member'
-        ? null
-        : gameLeadBriefOf(lead, projectNameOf(state.worktree), process.env.ORCA_GAME_CLI || 'orca')
+      role === 'member' ? null : gameLeadBriefOf(lead, project, process.env.ORCA_GAME_CLI || 'orca')
+    if (role !== 'member') {
+      // Why quiet: an older host has no directory, and the brief must still print.
+      await client
+        .call('game.leadRegister', {
+          worktreeId: process.env.ORCA_WORKTREE_ID,
+          terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
+          project,
+          label: lead.label ?? ''
+        })
+        .catch(() => undefined)
+    }
     printResult<GameLeadResult>(
       { ...response, result: { role, lead, brief } },
       json,

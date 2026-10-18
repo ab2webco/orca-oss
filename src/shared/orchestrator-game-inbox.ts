@@ -21,6 +21,8 @@ export type GameInboxSource = {
   /** Each ticket's terminals and dispatch mailboxes, closed ones included. */
   members: readonly { ticket: string; addresses: readonly string[] }[]
   mail: readonly GameInboxMail[]
+  /** Other projects' lead handles to their labels, for mail a peer lead sent. */
+  peerLeads?: Readonly<Record<string, string>>
 }
 
 export type GameInboxMessage = {
@@ -90,6 +92,9 @@ export function gameInboxesOf(
   cursors: Readonly<Record<string, number>>
 ): GameInbox[] {
   const labelOf = new Map<string, string>()
+  for (const [handle, label] of Object.entries(source.peerLeads ?? {})) {
+    labelOf.set(handle, `lead ${label}`)
+  }
   for (const member of source.members) {
     for (const address of member.addresses) {
       labelOf.set(address, member.ticket)

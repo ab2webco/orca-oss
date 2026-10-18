@@ -56,6 +56,28 @@ describe('gameInboxesOf', () => {
     expect(cin2).toMatchObject({ key: 'CIN-2', unread: 0, messages: [] })
   })
 
+  it("names a peer project's lead by its label instead of its raw handle", () => {
+    sequence = 0
+    const rows = [mail('term_lead', 'term_peer', { type: 'request' }), mail('term_lead', 'term_x')]
+
+    const [lead] = gameInboxesOf({ ...source(rows), peerLeads: { term_peer: 'Bo' } }, {})
+
+    expect(lead?.messages.map((one) => one.from)).toEqual(['term_x', 'lead Bo'])
+  })
+
+  it('keeps naming this lead and its members first when a peer shares their handle', () => {
+    sequence = 0
+    const rows = [mail('term_lead', 'term_1'), mail('term_1', 'term_lead')]
+
+    const [lead, cin1] = gameInboxesOf(
+      { ...source(rows), peerLeads: { term_1: 'Bo', term_lead: 'Bo' } },
+      {}
+    )
+
+    expect(lead?.messages.map((one) => one.from)).toEqual(['CIN-1'])
+    expect(cin1?.messages.map((one) => one.from)).toEqual(['lead'])
+  })
+
   it("keeps a member's worker_done once per dispatch, even when it lands twice", () => {
     sequence = 0
     const done = { type: 'worker_done', payload: JSON.stringify({ dispatchId: 'd1' }) }
