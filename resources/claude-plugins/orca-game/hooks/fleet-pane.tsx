@@ -5,8 +5,9 @@ import { advisorCard, advisorCardViewOf } from './advisor-card'
 import { advisorPinsOf, ownAdvisorOf } from './advisor-report'
 import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
-import { petLabelOf } from './band-chips'
-import { CI_COLORS, memberHeadingOf, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { countChipsOf, petLabelOf } from './band-chips'
+import { chipRowsOf, type PlacedChip } from './chip-rows'
+import { CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
@@ -30,6 +31,11 @@ export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
 // A card's text column: the pane less the tile, the round border and the padding on each side.
 const CARD_CHROME = TILE_COLUMNS + 4
+const FLEET_CHIP_COLORS: Readonly<Record<string, string>> = {
+  'fleet-working': 'cyan',
+  'fleet-idle': 'gray',
+  'fleet-done': 'green'
+}
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -84,7 +90,7 @@ export const registerFleetPane = (on: On): void => {
         </Text>
       </Button>
     )
-    // On a phone View leaves the card's narrow text column for a full-width button under it.
+    // On a phone View leaves the card's narrow text column for a chip under it.
     const tapView = (agent: GameAgent, handle: string, index: number) =>
       tapButtonsOf(
         $,
@@ -94,7 +100,7 @@ export const registerFleetPane = (on: On): void => {
           {
             ...tapOf({
               key: `view-${agent.paneKey}`,
-              label: `▸ ${text.view} · ${memberHeadingOf(agent).name || agent.displayName}`,
+              labels: [`▸ ${text.view}`],
               hotkey: viewHotkeyOf(index),
               onPress: viewPressOf(agent, handle)
             }),
@@ -119,8 +125,8 @@ export const registerFleetPane = (on: On): void => {
         e,
         'pane-menu-tap',
         // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
-        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map((one) => ({
-          ...tapOf(one),
+        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map(({ label, ...one }) => ({
+          ...tapOf({ ...one, labels: [label] }),
           bold: true
         })),
         columns
@@ -175,6 +181,36 @@ export const registerFleetPane = (on: On): void => {
       ...advisorTiles
     ])
     const counts = countsOf(state.agents)
+    const fleetChipOf = (chip: PlacedChip): RenderElement => {
+      const isTeam = chip.key === 'fleet-team'
+      const color = FLEET_CHIP_COLORS[chip.key] ?? (counts.waiting > 0 ? 'red' : 'gray')
+      return (
+        <Text
+          key={chip.key}
+          backgroundColor={isTeam ? palette.gold : palette.panel}
+          color={isTeam ? palette.ink : color}
+          bold={isTeam || (chip.key === 'fleet-waiting' && counts.waiting > 0)}
+        >
+          {` ${chip.label} `}
+        </Text>
+      )
+    }
+    // On a phone the counts shorten to the band's marks so they keep to one row.
+    const fleetChips = (
+      <Box key="pane-fleet-chips" flexDirection="column" marginTop={1}>
+        {chipRowsOf(
+          [
+            { key: 'team', priority: 0, labels: [`⚑ ${text.fleet}`, '⚑'] as const },
+            ...countChipsOf(counts)
+          ].map((chip) => ({ ...chip, key: `fleet-${chip.key}` })),
+          { columns, maxRows: 1 }
+        ).map((row) => (
+          <Box key={`pane-fleet-${row[0]?.key ?? 'empty'}`} flexDirection="row" columnGap={1}>
+            {row.map(fleetChipOf)}
+          </Box>
+        ))}
+      </Box>
+    )
     const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
     const cardRoom = Math.max(1, columns - CARD_CHROME)
@@ -213,7 +249,12 @@ export const registerFleetPane = (on: On): void => {
           e,
           'pane-links-tap',
           links.map((one) =>
-            tapOf({ key: one.key, hotkey: one.hotkey, label: one.label, onPress: linkPressOf(one) })
+            tapOf({
+              key: one.key,
+              hotkey: one.hotkey,
+              labels: [one.label],
+              onPress: linkPressOf(one)
+            })
           ),
           columns
         )}
@@ -230,15 +271,29 @@ export const registerFleetPane = (on: On): void => {
         {art.get(HUD_KEY)}
         {isTap && menuRow}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-          <Text backgroundColor={palette.gold} color={palette.ink} bold>
-            {` ⚑ ${text.fleet} `}
-          </Text>
-          <Text color="cyan">{text.working(counts.working)}</Text>
-          <Text color="gray">{text.idle(counts.idle)}</Text>
-          <Text color="green">{text.done(counts.done)}</Text>
-          <Text color={counts.waiting > 0 ? 'red' : 'gray'} bold={counts.waiting > 0}>
-            {text.waiting(counts.waiting)}
-          </Text>
+          {isTap
+            ? fleetChips
+            : [
+                <Text key="fleet" backgroundColor={palette.gold} color={palette.ink} bold>
+                  {` ⚑ ${text.fleet} `}
+                </Text>,
+                <Text key="working" color="cyan">
+                  {text.working(counts.working)}
+                </Text>,
+                <Text key="idle" color="gray">
+                  {text.idle(counts.idle)}
+                </Text>,
+                <Text key="done" color="green">
+                  {text.done(counts.done)}
+                </Text>,
+                <Text
+                  key="waiting"
+                  color={counts.waiting > 0 ? 'red' : 'gray'}
+                  bold={counts.waiting > 0}
+                >
+                  {text.waiting(counts.waiting)}
+                </Text>
+              ]}
           {v.note !== '' && <Text color="yellow">{v.note}</Text>}
           {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
           {fleetModels !== null && <Text color={palette.gold}>{fleetModels}</Text>}

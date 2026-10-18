@@ -1,10 +1,10 @@
-// Runs under `claude plugin test`: on a phone-width body every action is a full-width, two-row button.
+// Runs under `claude plugin test`: on a phone-width body every action is a compact chip, three rows tall.
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
-import { HOTKEY_CELLS, TAP_LAYOUT_COLUMNS, TAP_ROWS } from '../hooks/tap-layout'
+import { HOTKEY_CELLS, TAP_LAYOUT_COLUMNS, TAP_MIN_CELLS, TAP_ROWS } from '../hooks/tap-layout'
 
 const agent = (name: string, isLeader: boolean, handle?: string) => ({
   paneKey: `t:${name}`,
@@ -126,57 +126,87 @@ const pane = ($: Engine, columns: number) =>
     }
   })
 
-type Mounted = Awaited<ReturnType<typeof band>>
+type Mounted = Pick<Awaited<ReturnType<typeof band>>, 'find' | 'findAll'>
 
-/** Each button of a tap group: two rows, each as wide as the body less its hotkey. */
-const expectTapGroup = async (ui: Mounted, key: string, columns: number, buttons: string[]) => {
+const childrenOf = (one: unknown): Drawn[] =>
+  isDrawn(one) && Array.isArray(one.children) ? one.children.filter(isDrawn) : []
+
+// A child as drawn carries its key in its props, a found element on itself too.
+const keyOf = (one: Drawn | undefined): string => String(one?.key ?? one?.props?.key)
+
+/**
+ * A tap group's rows of chips: each chip three rows as wide as its label (row one less its
+ * hotkey), at least six cells, and each row within the body.
+ */
+const expectTapGroup = async (
+  ui: Mounted,
+  key: string,
+  columns: number,
+  buttons: string[],
+  maxRows = Number.MAX_SAFE_INTEGER
+): Promise<Drawn[][]> => {
   const group = await ui.find({ type: 'Box', key })
   expect(group, key).toBeDefined()
-  // A blank row between two buttons, and above the group so two groups in a row keep one too.
+  // A blank row between two rows of chips, and above the group so two groups in a row keep one too.
   expect(group?.props).toMatchObject({ flexDirection: 'column', rowGap: 1, marginTop: 1 })
-  const drawn = (await ui.findAll({ type: 'Button' })).filter((one) =>
-    buttons.includes(String(one.key))
-  )
-  expect(drawn.map((one) => one.key).sort()).toEqual([...buttons].sort())
-  for (const button of drawn) {
-    // A hotkey's `q: ` takes the first row's start; the second row starts at the left edge.
-    const room = columns - (button.props?.hotkey === undefined ? 0 : HOTKEY_CELLS)
-    const lines = shownOf(button).split('\n')
-    expect(lines, String(button.key)).toHaveLength(TAP_ROWS)
-    expect(lines.map(cellWidthOf), String(button.key)).toEqual([room, columns])
+  const rows = childrenOf(group).map(childrenOf)
+  expect(rows.length, key).toBeLessThanOrEqual(maxRows)
+  expect(rows.flat().map(keyOf).sort()).toEqual([...buttons].sort())
+  for (const row of rows) {
+    let width = Math.max(0, row.length - 1)
+    for (const button of row) {
+      const prefix = button.props?.hotkey === undefined ? 0 : HOTKEY_CELLS
+      const lines = shownOf(button).split('\n')
+      expect(lines, keyOf(button)).toHaveLength(TAP_ROWS)
+      const chip = cellWidthOf(lines[1] ?? '')
+      expect(lines.map(cellWidthOf), keyOf(button)).toEqual([chip - prefix, chip, chip])
+      expect(chip, keyOf(button)).toBeGreaterThanOrEqual(TAP_MIN_CELLS)
+      // Compact: the label and its padding, never the body's width.
+      expect(chip, keyOf(button)).toBeLessThanOrEqual(
+        Math.max(TAP_MIN_CELLS, cellWidthOf(lines[1]?.trim() ?? '') + 2)
+      )
+      width += chip
+    }
+    expect(width, key).toBeLessThanOrEqual(columns)
   }
+  return rows
 }
 
 const tapGroupsOf = async (ui: Mounted) =>
   (await ui.findAll({ type: 'Box' })).filter((one) => String(one.key).endsWith('-tap'))
 
+const BAND_MENU = ['band-panel', 'band-refresh', 'band-pet']
+
 describe('the band on a phone', () => {
-  for (const columns of [40, TAP_LAYOUT_COLUMNS - 1]) {
-    test(`at ${columns} columns the menu and the actions are tap buttons`, async ($, on) => {
+  for (const columns of [36, 45, TAP_LAYOUT_COLUMNS - 1]) {
+    test(`at ${columns} columns the menu and the actions share one row of chips`, async ($, on) => {
       await start($, on)
       const ui = await band($, columns)
-      await expectTapGroup(ui, 'band-menu-tap', columns, ['band-panel', 'band-refresh', 'band-pet'])
-      await expectTapGroup(ui, 'band-actions-tap', columns, [
-        'band-action-lead:wave',
-        'band-actions-more'
-      ])
-      expect(shownOf(await ui.find({ type: 'Button', key: 'band-actions-more' }))).toContain(
-        '+3 more'
-      )
-      // Why the menu first: a short phone scrolls the band, and Panel is what reaches the rest.
-      const groups = (await tapGroupsOf(ui)).map((one) => one.key)
-      expect(groups).toEqual(['band-menu-tap', 'band-actions-tap'])
+      const keys = (await ui.findAll({ type: 'Button' }))
+        .map((one) => String(one.key))
+        .filter((one) => one.startsWith('band-action') || BAND_MENU.includes(one))
+      const [row] = await expectTapGroup(ui, 'band-tap', columns, keys, 1)
+      const shown = (row ?? []).map(keyOf)
+      expect(shown.slice(0, 3)).toEqual(BAND_MENU)
+      const actions = shown.filter((one) => one.startsWith('band-action-'))
+      const more = (row ?? []).find((one) => keyOf(one) === 'band-actions-more')
+      // Every action is a chip or counted in the +N, which opens the Panel's full row.
+      expect(actions.length + Number(shownOf(more).trim().replace('+', '') || 0)).toBe(4)
+      expect(await tapGroupsOf(ui)).toHaveLength(1)
       await ui.unmount()
     })
   }
 
-  test('two actions both stay, with no +N', async ($, on) => {
+  test('two actions that fit both stay, with no +N', async ($, on) => {
     await start($, on, { ...STATE, actions: STATE.actions.slice(0, 2) })
-    const ui = await band($, 40)
-    await expectTapGroup(ui, 'band-actions-tap', 40, [
-      'band-action-lead:wave',
-      'band-action-lead:status'
-    ])
+    const ui = await band($, TAP_LAYOUT_COLUMNS - 1)
+    await expectTapGroup(
+      ui,
+      'band-tap',
+      TAP_LAYOUT_COLUMNS - 1,
+      [...BAND_MENU, 'band-action-lead:wave', 'band-action-lead:status'],
+      1
+    )
     await ui.unmount()
   })
 
@@ -196,12 +226,14 @@ describe('the band on a phone', () => {
 })
 
 describe('the Fleet pane on a phone', () => {
-  test('at 41 columns Close, the menu, View, the links and the actions are tap buttons', async ($, on) => {
+  test('at 41 columns Close, the menu, View, the links and the actions are chips', async ($, on) => {
     await start($, on)
     const ui = await pane($, 41)
-    await expectTapGroup(ui, 'pane-menu-tap', 41, ['refresh', 'pet', 'quit'])
-    await expectTapGroup(ui, 'view-tap-t:builder', 41, ['view-t:builder'])
-    await expectTapGroup(ui, 'view-tap-t:tester', 41, ['view-t:tester'])
+    const [menu] = await expectTapGroup(ui, 'pane-menu-tap', 41, ['refresh', 'pet', 'quit'], 1)
+    // Close leads: a phone shows the pane's top rows, and Close is how it leaves.
+    expect(keyOf(menu?.[0])).toBe('quit')
+    await expectTapGroup(ui, 'view-tap-t:builder', 41, ['view-t:builder'], 1)
+    await expectTapGroup(ui, 'view-tap-t:tester', 41, ['view-t:tester'], 1)
     await expectTapGroup(ui, 'pane-links-tap', 41, ['open-work-item', 'open-review'])
     await expectTapGroup(ui, 'project-actions-tap', 41, [
       'action-lead:wave',
@@ -213,20 +245,43 @@ describe('the Fleet pane on a phone', () => {
       props: { hotkey: '2' }
     })
     expect(shownOf(await ui.find({ type: 'Button', key: 'quit' }))).toContain('✕ Close')
-    // Why first, Close leading: a phone shows the pane's top rows, and Close is how it leaves.
     const drawn = (await ui.findAll({ type: 'Box' }))
       .map(shownOf)
       .reduce((all, one) => (one.length > all.length ? one : all), '')
     expect(drawn.indexOf('✕ Close')).toBeGreaterThan(-1)
     expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('2 working'))
-    expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('↻ Refresh'))
     await ui.unmount()
   })
+
+  for (const columns of [36, 41, 50]) {
+    test(`at ${columns} columns the Fleet counts are one row of one-line chips`, async ($, on) => {
+      await start($, on)
+      const ui = await pane($, columns)
+      const group = await ui.find({ type: 'Box', key: 'pane-fleet-chips' })
+      // A blank row above, or the counts read as one more row of the menu chips over them.
+      expect(group?.props).toMatchObject({ marginTop: 1 })
+      const rows = childrenOf(group).map(childrenOf)
+      expect(rows).toHaveLength(1)
+      const chips = rows[0] ?? []
+      const labels = chips.map(shownOf)
+      // A drawn Text keeps no key: each chip is its full label or the band's mark for it.
+      const expected = [/^⚑/, /^(2 working|• 2)$/, /^(0 idle|z 0)$/, /^(0 waiting on you|! 0)$/]
+      expect(labels).toHaveLength(expected.length)
+      labels.forEach((label, at) => expect(label.trim()).toMatch(expected[at] ?? /^$/))
+      for (const label of labels) {
+        expect(label).not.toContain('\n')
+      }
+      const width = labels.reduce((all, one) => all + cellWidthOf(one), chips.length - 1)
+      expect(width).toBeLessThanOrEqual(columns)
+      await ui.unmount()
+    })
+  }
 
   test('at 84 columns, a docked pane, every button keeps its one-row chip', async ($, on) => {
     await start($, on)
     const ui = await pane($, 84)
     expect(await tapGroupsOf(ui)).toEqual([])
+    expect(await ui.find({ type: 'Box', key: 'pane-fleet-chips' })).toBeUndefined()
     for (const key of ['quit', 'view-t:builder', 'open-work-item', 'action-action-0']) {
       expect(shownOf(await ui.find({ type: 'Button', key })), key).not.toContain('\n')
     }
