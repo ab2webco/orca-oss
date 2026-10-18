@@ -35,7 +35,21 @@ export async function openPane($: EngineInterface): Promise<void> {
   await $.ui.open({ id: PANE_ID, title, closeOnEscape: true, focus: true })
 }
 
+/** True while the Panel is placed and is the tab its surface shows. */
+export async function isPaneShown($: EngineInterface): Promise<boolean> {
+  const panes = await $.ui.panes().catch(() => [])
+  return panes.some((one) => one.id === PANE_ID && one.isShown && one.isPlaced)
+}
+
 export const registerFleetPane = (on: On): void => {
+  // Why: the band drops its team scene while the Panel shows, so a close by Escape redraws it.
+  on('ui.close', async ($, e, next) => {
+    const closed = await next(e)
+    if (e.id === PANE_ID) {
+      $.ui.invalidate('ui.render')
+    }
+    return closed
+  })
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e) => {
     await ready($)
     const v = await viewOf($)
