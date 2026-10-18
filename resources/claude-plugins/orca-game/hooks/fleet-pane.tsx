@@ -6,7 +6,7 @@ import { advisorPinsOf, ownAdvisorOf } from './advisor-report'
 import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { petLabelOf } from './band-chips'
-import { CI_COLORS, memberHeadingOf, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
@@ -83,7 +83,7 @@ export const registerFleetPane = (on: On): void => {
         </Text>
       </Button>
     )
-    // On a phone View leaves the card's narrow text column for a full-width button under it.
+    // On a phone View leaves the card's narrow text column for a chip under it.
     const tapView = (agent: GameAgent, handle: string, index: number) =>
       tapButtonsOf(
         $,
@@ -93,7 +93,7 @@ export const registerFleetPane = (on: On): void => {
           {
             ...tapOf({
               key: `view-${agent.paneKey}`,
-              label: `▸ ${text.view} · ${memberHeadingOf(agent).name || agent.displayName}`,
+              labels: [`▸ ${text.view}`],
               hotkey: viewHotkeyOf(index),
               onPress: viewPressOf(agent, handle)
             }),
@@ -118,8 +118,8 @@ export const registerFleetPane = (on: On): void => {
         e,
         'pane-menu-tap',
         // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
-        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map((one) => ({
-          ...tapOf(one),
+        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map(({ label, ...one }) => ({
+          ...tapOf({ ...one, labels: [label] }),
           bold: true
         })),
         columns
@@ -210,7 +210,12 @@ export const registerFleetPane = (on: On): void => {
           e,
           'pane-links-tap',
           links.map((one) =>
-            tapOf({ key: one.key, hotkey: one.hotkey, label: one.label, onPress: linkPressOf(one) })
+            tapOf({
+              key: one.key,
+              hotkey: one.hotkey,
+              labels: [one.label],
+              onPress: linkPressOf(one)
+            })
           ),
           columns
         )}

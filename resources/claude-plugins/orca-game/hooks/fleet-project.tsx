@@ -183,10 +183,11 @@ export async function projectRowsOf(
                 'project-actions-tap',
                 actions.map((action) => ({
                   key: `action-${action.id}`,
-                  label:
+                  labels: [
                     'mcp' in action
                       ? `${actionLabelOf(action)} ${mcpCallTextOf(action.mcp)}`
-                      : actionLabelOf(action),
+                      : actionLabelOf(action)
+                  ],
                   hotkey: hotkeys.get(action.id),
                   onPress: () => void runAction($, action, isDemo).catch(() => undefined),
                   color: palette.parchment,

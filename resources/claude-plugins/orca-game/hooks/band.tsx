@@ -26,12 +26,13 @@ import {
 } from './quest-runtime'
 import { levelOf } from './rewards'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
-import { isTapLayout, tapActionsOf } from './tap-layout'
+import { isTapLayout } from './tap-layout'
 
 const PET_KEY = 'band-pet-scene'
 const ACTION_ROWS = 1
-// A phone's band keeps two tap buttons for actions: both, or the first and a `+N` opening the Panel.
-const TAP_ACTIONS = 2
+// A phone's band is one row of chips: the menu, then the actions that fit and a `+N` opening the Panel.
+const TAP_KEY = 'band-tap'
+const TAP_ROWS_MAX = 1
 
 // Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
 const beneathOf = (drawn: RenderElement): RenderElement[] =>
@@ -85,23 +86,17 @@ export const registerBand = (on: On): void => {
     }
     const isTap = isTapLayout(columns)
     const menuChips = menuChipsOf(currentScene())
+    const menuTaps: TapButton[] = menuChips.map((chip) => ({
+      key: chip.key,
+      // Why Panel keeps its word: actions drop into its +N before it turns into a bare icon.
+      labels: chip.key === 'band-panel' ? [chip.labels[0]] : chip.labels,
+      onPress: menuActions[chip.key] ?? (() => undefined),
+      backgroundColor: chip.key === 'band-panel' ? palette.gold : palette.panel,
+      color: chip.key === 'band-panel' ? palette.ink : palette.parchment,
+      bold: true
+    }))
     const menuRows = isTap
-      ? [
-          tapButtonsOf(
-            $,
-            e,
-            'band-menu-tap',
-            menuChips.map((chip) => ({
-              key: chip.key,
-              label: chip.labels[0],
-              onPress: menuActions[chip.key] ?? (() => undefined),
-              backgroundColor: chip.key === 'band-panel' ? palette.gold : palette.panel,
-              color: chip.key === 'band-panel' ? palette.ink : palette.parchment,
-              bold: true
-            })),
-            columns
-          )
-        ]
+      ? [tapButtonsOf($, e, TAP_KEY, menuTaps, columns, { maxRows: TAP_ROWS_MAX })]
       : rowsOf('band-menu', menuChips, MENU_ROWS, (chip) => (
           <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
             <Text
@@ -219,62 +214,56 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'gray')
       }
     }
-    const tapActions = tapActionsOf(actionChipsOf([...actions.values()]), TAP_ACTIONS)
-    const tapActionButtons: TapButton[] = [
-      ...tapActions.shown.map((chip) => {
-        const action = actions.get(chip.key)
-        return {
-          key: chip.key,
-          label: chip.labels[0],
-          onPress: () =>
-            action === undefined
-              ? openFleet($)
-              : void runAction($, action, v.isDemo).catch(() => undefined),
-          backgroundColor: palette.panel,
-          color: palette.parchment
-        }
-      }),
-      ...(tapActions.hidden === 0
-        ? []
-        : [
-            {
+    const actionPressOf = (key: string) => () => {
+      const action = actions.get(key)
+      if (action === undefined) {
+        openFleet($)
+        return
+      }
+      void runAction($, action, v.isDemo).catch(() => undefined)
+    }
+    const tapRow = isTap
+      ? tapButtonsOf(
+          $,
+          e,
+          TAP_KEY,
+          [
+            ...menuTaps,
+            ...actionChipsOf([...actions.values()]).map((chip) => ({
+              key: chip.key,
+              labels: chip.labels,
+              onPress: actionPressOf(chip.key),
+              backgroundColor: palette.panel,
+              color: palette.parchment
+            }))
+          ],
+          columns,
+          {
+            maxRows: TAP_ROWS_MAX,
+            more: {
               key: 'band-actions-more',
-              label: text.moreAllies(tapActions.hidden),
+              labelOf: (count) => `+${count}`,
               onPress: () => openFleet($),
               backgroundColor: palette.panel,
               color: palette.parchment
             }
-          ])
-    ]
-    // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
-    const actionRows = isTap
-      ? tapActionButtons.length === 0
-        ? []
-        : [tapButtonsOf($, e, 'band-actions-tap', tapActionButtons, columns)]
-      : rowsOf(
-          'band-actions',
-          actionChipsOf([...actions.values()]),
-          ACTION_ROWS,
-          (chip) => {
-            const action = actions.get(chip.key)
-            return (
-              <Button
-                key={chip.key}
-                plain
-                onPress={() =>
-                  action === undefined
-                    ? openFleet($)
-                    : void runAction($, action, v.isDemo).catch(() => undefined)
-                }
-              >
-                <Text backgroundColor={palette.panel} color={palette.parchment}>
-                  {` ${chip.label} `}
-                </Text>
-              </Button>
-            )
-          },
-          (count) => `+${count}`
+          }
         )
+      : null
+    // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
+    const actionRows = rowsOf(
+      'band-actions',
+      actionChipsOf([...actions.values()]),
+      ACTION_ROWS,
+      (chip) => (
+        <Button key={chip.key} plain onPress={actionPressOf(chip.key)}>
+          <Text backgroundColor={palette.panel} color={palette.parchment}>
+            {` ${chip.label} `}
+          </Text>
+        </Button>
+      ),
+      (count) => `+${count}`
+    )
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
@@ -325,9 +314,7 @@ export const registerBand = (on: On): void => {
             )}
           </Box>
         )}
-        {/* Why menu first on a phone: a short screen scrolls the band, and Panel reaches the rest. */}
-        {isTap ? menuRows : actionRows}
-        {isTap ? actionRows : menuRows}
+        {isTap ? tapRow : [...actionRows, ...menuRows]}
         {allies}
         {beneath}
       </Box>
