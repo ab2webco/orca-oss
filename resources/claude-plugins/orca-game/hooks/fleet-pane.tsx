@@ -109,7 +109,11 @@ export const registerFleetPane = (on: On): void => {
         $,
         e,
         'pane-menu-tap',
-        menuItems.map((one) => ({ ...tapOf(one), bold: true })),
+        // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
+        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map((one) => ({
+          ...tapOf(one),
+          bold: true
+        })),
         columns
       )
     ) : (
@@ -208,6 +212,7 @@ export const registerFleetPane = (on: On): void => {
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
+        {isTap && menuRow}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           <Text backgroundColor={palette.gold} color={palette.ink} bold>
             {` ⚑ ${text.fleet} `}
@@ -285,7 +290,7 @@ export const registerFleetPane = (on: On): void => {
         )}
         {projectRows}
         {links.length > 0 && linksRow}
-        {menuRow}
+        {!isTap && menuRow}
       </Box>
     )
   })

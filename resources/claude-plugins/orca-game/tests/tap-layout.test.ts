@@ -213,6 +213,13 @@ describe('the Fleet pane on a phone', () => {
       props: { hotkey: '2' }
     })
     expect(shownOf(await ui.find({ type: 'Button', key: 'quit' }))).toContain('✕ Close')
+    // Why first, Close leading: a phone shows the pane's top rows, and Close is how it leaves.
+    const drawn = (await ui.findAll({ type: 'Box' }))
+      .map(shownOf)
+      .reduce((all, one) => (one.length > all.length ? one : all), '')
+    expect(drawn.indexOf('✕ Close')).toBeGreaterThan(-1)
+    expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('2 working'))
+    expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('↻ Refresh'))
     await ui.unmount()
   })
 
