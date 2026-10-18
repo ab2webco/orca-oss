@@ -236,12 +236,32 @@ jobs:
       title: ${{ steps.next.outputs.title }}
       build_ref: ${{ steps.push.outputs.build_ref }}
       prev: ${{ steps.push.outputs.prev }}
+    env:
+      RELEASE_APP_CLIENT_ID: ${{ secrets.RELEASE_APP_CLIENT_ID }}
     steps:
+      # Why an app token: main's required-checks ruleset refuses GITHUB_TOKEN pushes,
+      # and the release app is that ruleset's only bypass actor (ORCA-635).
+      - name: Mint release push token
+        id: app-token
+        if: env.RELEASE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      # Why fall back: until the ruleset is live GITHUB_TOKEN still pushes; after, this
+      # job's push is refused before any build starts, so nothing half-ships.
+      - name: Warn that the release app is not configured
+        if: env.RELEASE_APP_CLIENT_ID == ''
+        run: echo "::warning::RELEASE_APP_CLIENT_ID is not set; pushing to main with GITHUB_TOKEN, which main's required-checks ruleset refuses."
+
       - name: Checkout main
         uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
 
       # Why: `concurrency` serializes releases but does not stop a human push, and
       # a bump built on top of an unverified commit would ship one.
@@ -535,11 +555,28 @@ jobs:
     if: inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      RELEASE_APP_CLIENT_ID: ${{ secrets.RELEASE_APP_CLIENT_ID }}
     steps:
+      # Why: the nudge commit below pushes to main too (see the version job).
+      - name: Mint release push token
+        id: app-token
+        if: env.RELEASE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Warn that the release app is not configured
+        if: env.RELEASE_APP_CLIENT_ID == ''
+        run: echo "::warning::RELEASE_APP_CLIENT_ID is not set; pushing to main with GITHUB_TOKEN, which main's required-checks ruleset refuses."
+
       - name: Checkout main
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
 
       # Why it re-reads the release instead of trusting the platform jobs: a job
       # can go green having uploaded only part of its output, and what breaks
