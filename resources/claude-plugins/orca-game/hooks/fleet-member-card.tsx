@@ -15,6 +15,7 @@ import {
 } from './fleet-labels'
 import { TILE_COLUMNS } from './fleet-tiles'
 import { gameStrings, localizedNameOf } from './game-strings'
+import type { CardState } from './lead-state'
 import { limitTagOf } from './member-tags'
 import type { PartyMember } from './party'
 import { activityOf } from './quest-policy'
@@ -25,6 +26,7 @@ export type MemberCardParts = {
   scene: SceneDefinition
   room: number
   leadTitle: string | null
+  cardState: CardState
   tile?: RenderElement
   view?: RenderElement
   advisorRows: RenderElement[]
@@ -55,14 +57,14 @@ export function memberCard(
 ): RenderElement {
   const { Box, Text } = $.ui.resolve(e)
   const text = gameStrings().text
-  const color = AGENT_COLORS[agent.state]
+  const color = AGENT_COLORS[parts.cardState]
   const heading = memberHeadingOf(agent)
   const crown = parts.leadTitle === null ? '' : `♛ ${parts.leadTitle}`
   const viewCells = parts.view === undefined ? 0 : cellWidthOf(` ${text.view} `) + HOTKEY_CELLS + 1
   const crownCells = crown === '' ? 0 : cellWidthOf(crown) + 1
   const head = memberHeadOf(
     heading.name,
-    text.agentStates[agent.state],
+    text.agentStates[parts.cardState],
     parts.room - viewCells - crownCells
   )
   // Both cut to one row, the ticket before the review, since a wrapped link reads as two.
