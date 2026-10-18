@@ -60,6 +60,18 @@ describe('leadResumeArgsOf', () => {
     ).toBe('--teammate-mode in-process')
   })
 
+  it('reads the Agent Teams wrapper as teammate mode auto, as it launches Claude', () => {
+    expect(
+      leadResumeArgsOf({
+        agentCommand: 'orca claude-teams',
+        agentArgs: '--dangerously-skip-permissions'
+      })
+    ).toBe('--teammate-mode auto --dangerously-skip-permissions')
+    expect(
+      leadResumeArgsOf({ agentCommand: "'/opt/orca dev/orca-dev' claude-teams", agentArgs: '' })
+    ).toBe('--teammate-mode auto')
+  })
+
   it('leaves args that already name a teammate mode, and has none for a plain pane', () => {
     expect(
       leadResumeArgsOf({ agentCommand: 'claude', agentArgs: '--teammate-mode=auto --verbose' })

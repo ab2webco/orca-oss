@@ -16,6 +16,7 @@ const sessionOf = (value: unknown): GameLeadSession | null => {
     : null
 }
 
+const AGENT_TEAMS_WRAPPER = /(?:^|[\s'"])claude-teams(?=[\s'"]|$)/
 const TEAMMATE_MODE = /(?:^|\s)--teammate-mode(?:=|\s+)(auto|in-process)(?=\s|$)/
 
 /**
@@ -26,7 +27,10 @@ export const leadResumeArgsOf = (
   launch: { agentCommand?: string; agentArgs: string } | null
 ): string | null => {
   const args = launch?.agentArgs.trim() ?? ''
-  const mode = TEAMMATE_MODE.exec(launch?.agentCommand ?? '')?.[1]
+  const command = launch?.agentCommand ?? ''
+  // Why the wrapper: `orca claude-teams` adds `--teammate-mode auto` itself, so its command never shows it.
+  const mode =
+    TEAMMATE_MODE.exec(command)?.[1] ?? (AGENT_TEAMS_WRAPPER.test(command) ? 'auto' : undefined)
   const resumeArgs = mode && !TEAMMATE_MODE.test(args) ? `--teammate-mode ${mode} ${args}` : args
   return resumeArgs.trim() || null
 }
