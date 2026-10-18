@@ -11,6 +11,7 @@ import type {
 } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import { NAMED_TICKET } from './member-character'
 import { agentTagOf } from './member-tags'
 import type { Need } from './party'
 import { reviewLabelOf } from './rewards'
@@ -139,8 +140,7 @@ export const teammatesOf = (count: number): string => gameStrings().text.teammat
 
 export type MemberHeading = { name: string; title: string }
 
-// `orca game launch` puts the scene character first: `Merlin · ORCA-12 Title`.
-const TICKET = /^(?:(.+?) · )?([A-Za-z][A-Za-z0-9]*-\d+)\s+(.*)$/
+const TICKET = NAMED_TICKET
 // Orca's own fixed-length cut of a long task name.
 const ORCA_CUT = '...'
 
