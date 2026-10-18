@@ -430,6 +430,38 @@ describe('language', () => {
     await spinner.unmount()
   })
 
+  // Why: the env is fixed at launch, so a UI language change reaches a running pane only through the state.
+  test("follows Orca's UI language from the state on the next poll", async ($, on) => {
+    const served = (locale: string) => JSON.stringify({ ...STATE, locale })
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'en' }, stdout: served('es') })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const teamLine = async () => {
+      const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+      const found = await ui.find({ type: 'Text', text: /^(Team|Equipo)/ })
+      await ui.unmount()
+      return found?.children
+    }
+    expect(await teamLine()).toEqual(['Equipo: 2 compañeros'])
+    world.stdout = served('en')
+    await clock.advance(30000)
+    expect(await teamLine()).toEqual(['Team 2 teammates'])
+  })
+
+  test('keeps the launch language when an older Orca sends no locale', async ($, on) => {
+    const world = worldOf({ env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    await clock.advance(30000)
+    const ui = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+    expect(await ui.find({ type: 'Text', text: /^Equipo: 2 compañeros$/ })).toBeDefined()
+    await ui.unmount()
+  })
+
   test('an unknown ORCA_GAME_LOCALE falls back to English', async ($, on) => {
     const world = worldOf({ env: { ORCA_GAME_LOCALE: 'fr' } })
     const clock = mock.clock(on)

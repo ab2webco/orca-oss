@@ -159,6 +159,16 @@ describe('parseGameState', () => {
     expect(parsed?.workItem).toBeNull()
   })
 
+  it("keeps Orca's UI locale only when the game ships it", () => {
+    const localeOf = (locale: unknown) =>
+      parseGameState(JSON.stringify({ ...STATE, locale }))?.locale
+    expect(localeOf('es')).toBe('es')
+    expect(localeOf('en')).toBe('en')
+    expect(localeOf('fr')).toBeUndefined()
+    expect(localeOf(7)).toBeUndefined()
+    expect(parseGameState(JSON.stringify(STATE))).not.toHaveProperty('locale')
+  })
+
   it('reads an unknown CI status as none, a missing title as empty, and missing lists as empty', () => {
     const parsed = parseGameState(
       JSON.stringify({

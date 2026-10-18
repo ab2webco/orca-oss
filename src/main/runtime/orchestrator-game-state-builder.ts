@@ -39,6 +39,7 @@ import {
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
+import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
   statusGroupOfName,
@@ -61,7 +62,11 @@ import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
 
 export type OrchestratorGameStateInput = {
-  settings: Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'> | undefined
+  settings:
+    | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects' | 'uiLanguage'>>
+    | undefined
+  /** The OS locale behind a `system` UI language. */
+  systemLocale?: string
   worktree: {
     id: string
     repoId: string | null
@@ -291,6 +296,7 @@ export async function buildOrchestratorGameState(
     ...(stop ? { stopped: stop.stopped } : {}),
     ...(inboxes ? { inboxes } : {}),
     ...(projectState ? { project: projectState } : {}),
-    ...(actions.length > 0 ? { actions } : {})
+    ...(actions.length > 0 ? { actions } : {}),
+    locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }
 }

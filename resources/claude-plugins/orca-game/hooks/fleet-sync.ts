@@ -13,7 +13,7 @@ import {
   terminalFocusArgvOf
 } from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
-import { gameStrings } from './game-strings'
+import { gameLocale, gameStrings, setGameLocale } from './game-strings'
 import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
 import { isLeadStarted } from './lead-started'
@@ -169,6 +169,11 @@ export async function refresh($: EngineInterface): Promise<void> {
   const next = await readState($)
   if (next !== undefined) {
     if (setContributedScenes(next.extensions.scenes.map((one) => one.definition))) {
+      $.ui.invalidate('ui.render')
+    }
+    // Why: ORCA_GAME_LOCALE is fixed at launch; the state carries a UI language changed since.
+    if (next.locale !== undefined && next.locale !== gameLocale()) {
+      setGameLocale(next.locale)
       $.ui.invalidate('ui.render')
     }
     questLiveConfig($, next.config, next.sources)

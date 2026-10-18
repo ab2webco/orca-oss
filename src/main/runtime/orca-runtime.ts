@@ -647,6 +647,7 @@ import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
+import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import {
   withOrchestratorGameArgs,
   type OrchestratorGameLaunch
@@ -30418,6 +30419,7 @@ export class OrcaRuntimeService {
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
     return await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
+      systemLocale: getPreferredSystemLocale(),
       worktree: worktree
         ? {
             id: worktree.id,
