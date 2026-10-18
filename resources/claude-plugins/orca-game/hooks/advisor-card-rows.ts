@@ -22,10 +22,11 @@ export type AdvisorCard = {
 const modelEffortOf = (model: string | null, effort: string | number | null): string =>
   [model ?? '', effort === null ? '' : String(effort)].filter((one) => one !== '').join('·')
 
+// Why id: a subagent may lack a title; only the main conversation has no id.
 const rowOf = (decision: AdvisorDecision): AdvisorCardRow => {
-  const isMain = decision.title === null
+  const isMain = (decision.id ?? null) === null
   const parts = [
-    isMain ? gameStrings().text.advisorMain : (decision.title ?? ''),
+    isMain ? gameStrings().text.advisorMain : (decision.title ?? decision.id ?? ''),
     modelEffortOf(decision.model, decision.effort),
     decision.verdict
   ].filter((one) => one.trim() !== '')
