@@ -90,7 +90,11 @@ export function advisorCuesOf(
   }
   const isNew = (key: string) => !seen.keys.has(key)
   const freshAgents = agents.filter((one) => isNew(one.key)).map((one) => one.agent)
-  const isMainNew = main !== seen.main && main !== ''
+  // Why: a fresh subagent on the new model is the decision; a main row beside it names the wrong agent.
+  const isMainNew =
+    main !== seen.main &&
+    main !== '' &&
+    !freshAgents.some((agent) => agent.model !== null && agent.model === advisor.model)
   const decisions: AdvisorDecision[] = [
     ...(isMainNew
       ? [
