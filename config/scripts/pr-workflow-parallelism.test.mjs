@@ -231,7 +231,10 @@ describe('PR workflow parallelism', () => {
       // Why: the lab added Windows platform tests (nothing ran there before), so verify
       // aggregates one more job than upstream's workflow does.
       'verify-windows',
-      'package_windows'
+      'package_windows',
+      // Why: verify is the check main requires, so E2E gates it where it applies (ORCA-566).
+      'e2e-paths',
+      'e2e'
     ])
     const verifyStep = workflow.jobs.verify.steps.find(
       (step) => step.name === 'Require successful checks'
