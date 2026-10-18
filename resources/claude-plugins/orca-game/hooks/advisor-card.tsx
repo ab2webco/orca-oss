@@ -10,7 +10,7 @@ import { gameStrings } from './game-strings'
 import { currentScene, gameConfig, quest, type Animated } from './quest-runtime'
 import type { AdvisorGesture, BandPalette } from './scenes/scene-definition'
 
-// A gesture left out reads in the scene's parchment.
+// A gesture left out reads in the terminal's own color: a light theme paints the card near-white.
 const GESTURE_COLORS: Readonly<Partial<Record<AdvisorGesture, string>>> = {
   lowered: 'green',
   raised: 'yellow',
@@ -74,10 +74,7 @@ export function advisorCard(
           card.rows.map((row) => (
             <Text
               key={`advisor-${row.key}`}
-              color={
-                (row.gesture === null ? undefined : GESTURE_COLORS[row.gesture]) ??
-                palette.parchment
-              }
+              color={row.gesture === null ? undefined : GESTURE_COLORS[row.gesture]}
               wrap="wrap"
             >
               {row.text}

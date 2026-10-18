@@ -121,6 +121,23 @@ describe('advisorCardOf', () => {
     expect(card.rows.map((one) => one.text)).toEqual(['★ lead · Opus 5.5·high'])
   })
 
+  it("lists each live member under the lead with what it runs, Jev's when it reports", () => {
+    const card = advisorCardOf(REFEREE, jev(), [], {
+      isLead: true,
+      members: [
+        { key: 'tab-2:a', name: 'ORCA-609', model: 'Opus 5.5·high', isJev: false },
+        { key: 'tab-3:b', name: 'ORCA-626', model: 'Sonnet 5.5·high', isJev: true },
+        { key: 'tab-4:c', name: 'ORCA-625', model: null, isJev: false }
+      ]
+    })
+    expect(card.rows.map((one) => one.text)).toEqual([
+      '★ lead · Opus 5.5·high',
+      '◇ ORCA-609 · Opus 5.5·high',
+      '◆ ORCA-626 · Sonnet 5.5·high',
+      '◇ ORCA-625'
+    ])
+  })
+
   it('names the main row the main conversation outside a lead pane', () => {
     const card = advisorCardOf(REFEREE, jev(), [], MEMBER)
     expect(card.rows.map((one) => one.text)).toEqual(['★ main conversation · Opus 5.5·high'])

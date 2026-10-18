@@ -677,6 +677,10 @@ import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
+  gameMemberLaunchOf,
+  type GameMemberLaunch
+} from '../../shared/orchestrator-game-member-launch'
+import {
   accountLimitsOf,
   gameMemberLimitOf,
   type GameMemberLimit
@@ -30352,6 +30356,19 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** The model and effort a member's dispatch launched its terminal on; none for a pane no dispatch made. */
+  private gameMemberLaunchFor(paneKey: string): GameMemberLaunch | null {
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    if (!handle) {
+      return null
+    }
+    try {
+      return gameMemberLaunchOf(this.getOrchestrationDb().workerLaunchForTerminal(handle))
+    } catch {
+      return null
+    }
+  }
+
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
   private async gameMemberLimitFor(member: {
     paneKey: string
@@ -30459,6 +30476,7 @@ export class OrcaRuntimeService {
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
       limitOf: (member) => this.gameMemberLimitFor(member),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
+      launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
       callerParentPaneKey: args.paneKey
         ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
