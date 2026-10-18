@@ -25,9 +25,13 @@ import {
   ready
 } from './quest-runtime'
 import { levelOf } from './rewards'
+import { tapButtonsOf, type TapButton } from './tap-buttons'
+import { isTapLayout, tapActionsOf } from './tap-layout'
 
 const PET_KEY = 'band-pet-scene'
 const ACTION_ROWS = 1
+// A phone's band keeps two tap buttons for actions: both, or the first and a `+N` opening the Panel.
+const TAP_ACTIONS = 2
 
 // Core's own band is left out as before; a plugin drawn beneath keeps its place under the game's.
 const beneathOf = (drawn: RenderElement): RenderElement[] =>
@@ -78,15 +82,34 @@ export const registerBand = (on: On): void => {
       'band-refresh': () => void refreshSoon($).catch(() => undefined),
       'band-pet': () => clawdReact($, 'pet')
     }
-    const menuRows = rowsOf('band-menu', menuChipsOf(currentScene()), MENU_ROWS, (chip) => (
-      <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
-        <Text
-          backgroundColor={chip.key === 'band-panel' ? palette.gold : palette.panel}
-          color={chip.key === 'band-panel' ? palette.ink : palette.parchment}
-          bold
-        >{` ${chip.label} `}</Text>
-      </Button>
-    ))
+    const isTap = isTapLayout(columns)
+    const menuChips = menuChipsOf(currentScene())
+    const menuRows = isTap
+      ? [
+          tapButtonsOf(
+            $,
+            e,
+            'band-menu-tap',
+            menuChips.map((chip) => ({
+              key: chip.key,
+              label: chip.labels[0],
+              onPress: menuActions[chip.key] ?? (() => undefined),
+              backgroundColor: chip.key === 'band-panel' ? palette.gold : palette.panel,
+              color: chip.key === 'band-panel' ? palette.ink : palette.parchment,
+              bold: true
+            })),
+            columns
+          )
+        ]
+      : rowsOf('band-menu', menuChips, MENU_ROWS, (chip) => (
+          <Button key={chip.key} plain onPress={menuActions[chip.key] ?? (() => undefined)}>
+            <Text
+              backgroundColor={chip.key === 'band-panel' ? palette.gold : palette.panel}
+              color={chip.key === 'band-panel' ? palette.ink : palette.parchment}
+              bold
+            >{` ${chip.label} `}</Text>
+          </Button>
+        ))
     if (v.state === null) {
       const art = await animate($, e, pet)
       return (
@@ -195,31 +218,62 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'gray')
       }
     }
-    // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
-    const actionRows = rowsOf(
-      'band-actions',
-      actionChipsOf([...actions.values()]),
-      ACTION_ROWS,
-      (chip) => {
+    const tapActions = tapActionsOf(actionChipsOf([...actions.values()]), TAP_ACTIONS)
+    const tapActionButtons: TapButton[] = [
+      ...tapActions.shown.map((chip) => {
         const action = actions.get(chip.key)
-        return (
-          <Button
-            key={chip.key}
-            plain
-            onPress={() =>
-              action === undefined
-                ? openFleet($)
-                : void runAction($, action, v.isDemo).catch(() => undefined)
+        return {
+          key: chip.key,
+          label: chip.labels[0],
+          onPress: () =>
+            action === undefined
+              ? openFleet($)
+              : void runAction($, action, v.isDemo).catch(() => undefined),
+          backgroundColor: palette.panel,
+          color: palette.parchment
+        }
+      }),
+      ...(tapActions.hidden === 0
+        ? []
+        : [
+            {
+              key: 'band-actions-more',
+              label: text.moreAllies(tapActions.hidden),
+              onPress: () => openFleet($),
+              backgroundColor: palette.panel,
+              color: palette.parchment
             }
-          >
-            <Text backgroundColor={palette.panel} color={palette.parchment}>
-              {` ${chip.label} `}
-            </Text>
-          </Button>
+          ])
+    ]
+    // The lead's and the project's buttons; the +N that hides the rest opens the Panel's full row.
+    const actionRows = isTap
+      ? tapActionButtons.length === 0
+        ? []
+        : [tapButtonsOf($, e, 'band-actions-tap', tapActionButtons, columns)]
+      : rowsOf(
+          'band-actions',
+          actionChipsOf([...actions.values()]),
+          ACTION_ROWS,
+          (chip) => {
+            const action = actions.get(chip.key)
+            return (
+              <Button
+                key={chip.key}
+                plain
+                onPress={() =>
+                  action === undefined
+                    ? openFleet($)
+                    : void runAction($, action, v.isDemo).catch(() => undefined)
+                }
+              >
+                <Text backgroundColor={palette.panel} color={palette.parchment}>
+                  {` ${chip.label} `}
+                </Text>
+              </Button>
+            )
+          },
+          (count) => `+${count}`
         )
-      },
-      (count) => `+${count}`
-    )
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
@@ -261,8 +315,9 @@ export const registerBand = (on: On): void => {
             )}
           </Box>
         )}
-        {actionRows}
-        {menuRows}
+        {/* Why menu first on a phone: a short screen scrolls the band, and Panel reaches the rest. */}
+        {isTap ? menuRows : actionRows}
+        {isTap ? actionRows : menuRows}
         {allies}
         {beneath}
       </Box>

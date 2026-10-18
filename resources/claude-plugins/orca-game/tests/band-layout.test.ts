@@ -5,6 +5,7 @@ import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
 import { HUD_KEY } from '../hooks/fleet-hud'
+import { isTapLayout, TAP_LAYOUT_COLUMNS } from '../hooks/tap-layout'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -243,13 +244,31 @@ describe('band layout', () => {
           (one) => one.key !== undefined && /^band-(chips|menu|actions)-/.test(one.key)
         )
         expect(rows.some((one) => one.key === 'band-chips-band-team')).toBe(true)
-        expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toHaveLength(1)
-        expect(rows.some((one) => one.key === 'band-menu-band-panel')).toBe(true)
         expect(rows.filter((one) => one.key?.startsWith('band-chips-')).length).toBeLessThanOrEqual(
           2
         )
-        for (const row of rows) {
-          expect(rowWidthOf(row)).toBeLessThanOrEqual(columns)
+        if (isTapLayout(columns)) {
+          // A phone stacks the actions and the menu as tap buttons, each line the band's width.
+          expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toEqual([
+            expect.objectContaining({ key: 'band-actions-tap' })
+          ])
+          expect(rows.filter((one) => one.key?.startsWith('band-menu-'))).toEqual([
+            expect.objectContaining({ key: 'band-menu-tap' })
+          ])
+          for (const row of rows.filter((one) => !one.key?.endsWith('-tap'))) {
+            expect(rowWidthOf(row)).toBeLessThanOrEqual(columns)
+          }
+          for (const button of await ui.findAll({ type: 'Button' })) {
+            if (/^band-(panel|refresh|pet|action-|actions-more)/.test(String(button.key))) {
+              expect(shownOf(button).split('\n').map(cellWidthOf)).toEqual([columns, columns])
+            }
+          }
+        } else {
+          expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toHaveLength(1)
+          expect(rows.some((one) => one.key === 'band-menu-band-panel')).toBe(true)
+          for (const row of rows) {
+            expect(rowWidthOf(row)).toBeLessThanOrEqual(columns)
+          }
         }
         const strip = await ui.find({ type: 'Box', key: 'allies-strip' })
         expect(elementsOf(strip).length).toBeGreaterThan(0)
@@ -297,19 +316,31 @@ describe('band layout', () => {
   )
 
   test(
-    'at 40 columns the least important chips shorten and the menu keeps one row',
+    'at 40 columns the least important chips shorten and the menu stacks its three buttons',
     ALL,
     async ($, on) => {
       const ui = await mount($, on, 40, { ORCA_GAME_LOCALE: 'es' })
-      const menuRows = (await ui.findAll({ type: 'Box' })).filter((one) =>
-        one.key?.startsWith('band-menu-')
-      )
-      expect(menuRows).toHaveLength(1)
+      const menu = shownOf(await ui.find({ type: 'Box', key: 'band-menu-tap' }))
+      expect(menu.split('\n').map((line) => line.trim())).toEqual([
+        '▤ Panel',
+        '↻ Actualizar',
+        '♥ Mimar',
+        ''
+      ])
       const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-band-team' }))
       expect(chips).toContain('⚑')
       await ui.unmount()
     }
   )
+
+  test(`at ${TAP_LAYOUT_COLUMNS} columns the menu keeps one row`, ALL, async ($, on) => {
+    const ui = await mount($, on, TAP_LAYOUT_COLUMNS, { ORCA_GAME_LOCALE: 'es' })
+    const menuRows = (await ui.findAll({ type: 'Box' })).filter((one) =>
+      one.key?.startsWith('band-menu-')
+    )
+    expect(menuRows.map((one) => one.key)).toEqual(['band-menu-band-panel'])
+    await ui.unmount()
+  })
 
   test('zen keeps the same fitted rows', ALL, async ($, on) => {
     const ui = await mount($, on, 32, { ORCA_GAME_MODE: 'zen' })

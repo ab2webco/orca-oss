@@ -14,6 +14,8 @@ import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
 import { actionLabelOf, listActionOf } from './lead-actions'
+import { tapButtonsOf } from './tap-buttons'
+import { isTapLayout } from './tap-layout'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
 const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
@@ -29,7 +31,8 @@ export async function projectRowsOf(
   e: RenderInput,
   state: GameState,
   palette: BandPalette,
-  isDemo: boolean
+  isDemo: boolean,
+  columns: number
 ): Promise<RenderElement[]> {
   const { Box, Text, Button } = $.ui.resolve(e)
   const worktreeId = state.worktree?.id ?? ''
@@ -171,10 +174,33 @@ export async function projectRowsOf(
     ...(actions.length === 0
       ? []
       : [
-          <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
-            <Text dimColor>{text.actionsHeading}</Text>
-            {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
-          </Box>,
+          isTapLayout(columns) ? (
+            <Box key="project-actions" flexDirection="column">
+              <Text dimColor>{text.actionsHeading}</Text>
+              {tapButtonsOf(
+                $,
+                e,
+                'project-actions-tap',
+                actions.map((action) => ({
+                  key: `action-${action.id}`,
+                  label:
+                    'mcp' in action
+                      ? `${actionLabelOf(action)} ${mcpCallTextOf(action.mcp)}`
+                      : actionLabelOf(action),
+                  hotkey: hotkeys.get(action.id),
+                  onPress: () => void runAction($, action, isDemo).catch(() => undefined),
+                  color: palette.parchment,
+                  backgroundColor: palette.panel
+                })),
+                columns
+              )}
+            </Box>
+          ) : (
+            <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
+              <Text dimColor>{text.actionsHeading}</Text>
+              {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
+            </Box>
+          ),
           ...actions.flatMap(resultRows)
         ])
   ]

@@ -19,9 +19,7 @@ import { limitTagOf } from './member-tags'
 import type { PartyMember } from './party'
 import { activityOf } from './quest-policy'
 import type { SceneDefinition } from './scenes/scene-definition'
-
-// The engine draws a Button's hotkey as `2: ` before its label.
-const HOTKEY_CELLS = 3
+import { HOTKEY_CELLS } from './tap-layout'
 
 export type MemberCardParts = {
   scene: SceneDefinition
@@ -85,7 +83,8 @@ export function memberCard(
     >
       {parts.tile ?? <Box width={TILE_COLUMNS} />}
       <Box flexDirection="column" paddingX={1} flexGrow={1} flexShrink={1}>
-        <Box flexDirection="row" gap={1}>
+        {/* Why wrap: on a phone the crown and state move down whole instead of splitting mid-word. */}
+        <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           {head.name !== '' && (
             <Box flexShrink={0}>
               <Text color={color} bold>
