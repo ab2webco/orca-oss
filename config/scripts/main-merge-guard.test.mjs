@@ -40,20 +40,23 @@ function makeRepo(origin = 'git@example.com:owner/repo.git') {
 
 // Why: `gh pr merge` resolve la base con una llamada de red. El guard se prueba
 // contra un `gh` falso en el PATH para fijar la base sin depender de GitHub.
-function makeFakeGhBin(baseRefName) {
+// `requiredChecks` es lo que contesta la ruleset de main; undefined = la consulta falla.
+function makeFakeGhBin(baseRefName, requiredChecks) {
   const bin = mkdtempSync(join(tmpdir(), 'orca-main-merge-guard-bin-'))
   tempDirs.push(bin)
   const script = join(bin, 'gh')
-  const body =
-    baseRefName === null
-      ? '#!/bin/sh\nexit 1\n'
-      : `#!/bin/sh\ncase "$*" in *baseRefName*) echo "${baseRefName}";; *) exit 1;; esac\n`
+  const base = baseRefName === null ? 'exit 1' : `echo "${baseRefName}"`
+  const rules =
+    requiredChecks === undefined
+      ? 'exit 1'
+      : `printf '%s\\n' ${requiredChecks.map((c) => `"${c}"`).join(' ')}`
+  const body = `#!/bin/sh\ncase "$*" in *baseRefName*) ${base};; *rules/branches/main*) ${rules};; *) exit 1;; esac\n`
   writeFileSync(script, body)
   chmodSync(script, 0o755)
   return bin
 }
 
-function runGuard(command, { cwd, ghBase, workspacePath } = {}) {
+function runGuard(command, { cwd, ghBase, requiredChecks, workspacePath } = {}) {
   const repo = cwd ?? makeRepo()
   const env = { ...process.env }
   delete env.ORCA_WORKTREE_ID
@@ -61,7 +64,7 @@ function runGuard(command, { cwd, ghBase, workspacePath } = {}) {
     env.ORCA_WORKTREE_ID = `repo-id::${workspacePath}`
   }
   if (ghBase !== undefined) {
-    env.PATH = `${makeFakeGhBin(ghBase)}:${env.PATH}`
+    env.PATH = `${makeFakeGhBin(ghBase, requiredChecks)}:${env.PATH}`
   }
   const result = spawnSync('python3', [hookScript], {
     cwd: repo,
@@ -251,13 +254,62 @@ describe.skipIf(process.platform === 'win32')('main merge guard', () => {
     })
   })
 
+  // ORCA-566: el gate vive en GitHub. `--auto` sólo deja que GitHub mergee cuando
+  // los checks requeridos de main están verdes; el guard lo admite sólo si existen.
+  describe('auto-merge once main requires the PR checks', () => {
+    const gated = { ghBase: 'main', requiredChecks: ['verify'] }
+
+    it.each([
+      'gh pr merge 73 --auto --squash',
+      'gh pr merge 73 --squash --auto',
+      'gh pr merge --auto --squash 73',
+      'gh pr merge 73 --auto --squash --match-head-commit 0123abc',
+      'gh pr merge 73 --auto --squash --match-head-commit=0123abc'
+    ])('allows `%s`', (command) => {
+      expect(runGuard(command, gated).denied).toBe(false)
+    })
+
+    it.each([
+      ['gh pr merge 73 --squash', 'plain merge'],
+      ['gh pr merge 73 --auto --squash --admin', 'admin override'],
+      ['gh pr merge 73 --auto --merge', 'merge commit'],
+      ['gh pr merge 73 --auto --rebase', 'rebase'],
+      ['gh pr merge 73 --auto', 'no merge method'],
+      ['gh pr merge 73 --auto -s', 'short squash flag'],
+      ['gh pr merge --auto --squash', 'no PR number'],
+      ['gh pr merge feature --auto --squash', 'branch selector'],
+      ['gh pr merge 73 --auto --squash --delete-branch', 'branch deletion closes stacked PRs'],
+      ['gh pr merge 73 --auto --squash --repo other/repo', 'another repository'],
+      ['gh pr merge 73 --auto --squash && gh pr merge 74', 'plain merge chained after']
+    ])('refuses `%s` (%s)', (command) => {
+      expect(runGuard(command, gated).denied).toBe(true)
+    })
+
+    it.each([
+      [[], 'no required check'],
+      [['static analysis'], 'a different required check'],
+      [undefined, 'the ruleset query failed']
+    ])('refuses `--auto` when main has %j (%s)', (requiredChecks) => {
+      const { denied, reason } = runGuard('gh pr merge 73 --auto --squash', {
+        ghBase: 'main',
+        requiredChecks
+      })
+      expect(denied).toBe(true)
+      expect(reason).toContain('`verify`')
+    })
+
+    it('still refuses a push to main when the checks are required', () => {
+      expect(runGuard('git push origin main', gated).denied).toBe(true)
+    })
+  })
+
   describe('the refusal explains itself', () => {
-    it('names the guard, the reason and the coordinator path, and offers no bypass', () => {
+    it('names the guard, the reason and the auto-merge path, and offers no bypass', () => {
       const { reason } = runGuard('git push origin main')
       expect(reason).toContain('main-merge-guard')
       expect(reason).toContain('.claude/hooks/main-merge-guard.py')
-      expect(reason).toContain('ORCA-196')
-      expect(reason).toContain('coordinador')
+      expect(reason).toContain('gh pr merge <n> --auto --squash')
+      expect(reason).not.toContain('ORCA-196')
       // Why: el brief lo pide explícito — un mensaje que enseñe cómo saltear la guarda
       // convierte la guarda en un trámite. No hay flag, ni variable, ni archivo de bypass.
       expect(reason).not.toMatch(/bypass|override|--no-verify|export |touch /i)

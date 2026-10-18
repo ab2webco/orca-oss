@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Rechaza merges a `main` fuera de la sesión del workspace primario."""
+"""Rechaza merges a `main` fuera de la sesión del workspace primario, salvo el auto-merge
+que GitHub sólo completa con los checks requeridos en verde."""
 
 import json
 import os
@@ -40,16 +41,22 @@ MUTATING_API = re.compile(
     re.IGNORECASE,
 )
 
+# Why: el check agregado de PR Checks. Lead y workers comparten la identidad de gh, así
+# que lo único que no se puede saltear es que GitHub exija este check en `main` (ORCA-566).
+REQUIRED_CHECK = "verify"
+AUTO_MERGE_FLAGS = {"--auto", "--squash"}
+
 REFUSAL = (
     "main-merge-guard (.claude/hooks/main-merge-guard.py) rechaza este merge a "
     "`{branch}`.\n\n"
     "{detail}\n\n"
-    "Ningún agente mergea a `{branch}` desde la Bash tool, sin importar lo que diga su "
-    "brief: el PR #73 se mergeó solo teniendo escrito lo contrario. Verde en PR Checks "
-    "tampoco alcanza — E2E no corre en PRs (ORCA-196) y hoy es lo único que caza "
-    "regresiones de runtime.\n\n"
-    "Qué hacer en su lugar: pushear la rama, abrir o actualizar el PR, y avisar al "
-    "coordinador con el número. El merge lo hace él, después de verificar."
+    "Ningún agente mergea a `{branch}` directo desde la Bash tool: el PR #73 se mergeó "
+    "solo teniendo escrito lo contrario. La única vía es `gh pr merge <n> --auto --squash`, "
+    "que deja el merge en manos de GitHub hasta que el check requerido "
+    f"`{REQUIRED_CHECK}` (tests y E2E cuando aplica) esté verde.\n\n"
+    "Qué hacer en su lugar: un worker pushea la rama, abre o actualiza el PR y avisa al "
+    "coordinador con el número. El lead verifica el PR y activa el auto-merge; no le "
+    "pide el merge al dueño."
 )
 
 
@@ -224,6 +231,40 @@ def pr_base_ref(args: list[str], cwd: str | None) -> str | None:
     return base if code == 0 and base else None
 
 
+def is_auto_squash_merge(args: list[str]) -> bool:
+    """Exactamente `<n> --auto --squash`, con `--match-head-commit <sha>` opcional."""
+    flags: set[str] = set()
+    selectors: list[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--match-head-commit" and index + 1 < len(args):
+            index += 2
+            continue
+        if arg.startswith("--match-head-commit="):
+            pass
+        elif arg.startswith("-"):
+            flags.add(arg)
+        else:
+            selectors.append(arg)
+        index += 1
+    # Why: sin `--delete-branch`, que cierra los PRs apilados sobre esta rama.
+    return flags == AUTO_MERGE_FLAGS and len(selectors) == 1 and selectors[0].isdigit()
+
+
+def main_requires_check(cwd: str | None) -> bool:
+    """La ruleset activa de `main` exige `REQUIRED_CHECK`. Ante un error, no."""
+    code, contexts = run(
+        [
+            "gh", "api", f"repos/{{owner}}/{{repo}}/rules/branches/{PROTECTED_BRANCH}",
+            "--jq", '.[] | select(.type == "required_status_checks")'
+            " | .parameters.required_status_checks[].context",
+        ],
+        cwd,
+    )
+    return code == 0 and REQUIRED_CHECK in contexts.splitlines()
+
+
 def check_gh(args: list[str], cwd: str | None, raw: str) -> None:
     if args[:2] == ["pr", "merge"]:
         base = pr_base_ref(args[2:], cwd)
@@ -233,8 +274,16 @@ def check_gh(args: list[str], cwd: str | None, raw: str) -> None:
                 "No se pudo resolver la rama base de este PR, así que no hay forma de "
                 f"descartar que sea `{PROTECTED_BRANCH}`."
             )
-        if base == PROTECTED_BRANCH:
-            deny(f"Este PR tiene base `{base}`.")
+        if base != PROTECTED_BRANCH:
+            return
+        if not is_auto_squash_merge(args[2:]):
+            deny(f"Este PR tiene base `{base}` y el comando no es `gh pr merge <n> --auto --squash`.")
+        # Why: sin el check requerido, `--auto` sobre un PR limpio mergea en el acto.
+        if not main_requires_check(cwd):
+            deny(
+                f"`{PROTECTED_BRANCH}` todavía no exige el check `{REQUIRED_CHECK}` en GitHub "
+                "(o no se pudo leer su ruleset), así que `--auto` no esperaría a los tests."
+            )
         return
 
     if args and args[0] == "api":
