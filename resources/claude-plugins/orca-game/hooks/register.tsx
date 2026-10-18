@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
-import { registerAdvisor } from './advisor-sync'
+import { actOutGate, registerAdvisor } from './advisor-sync'
 import { clearAllies, registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
@@ -69,7 +69,9 @@ export const register: Register = (on) => {
   on('classic.PreToolUse', async ($, e, next) => {
     const tool = String(e.tool)
     if (!isSubagentTool(tool)) {
-      return next(e)
+      const verdict = await next(e)
+      actOutGate($, tool, Reflect.get(e, 'command'), verdict)
+      return verdict
     }
     const { state } = await viewOf($)
     const reason = leadSubagentDenyOf({

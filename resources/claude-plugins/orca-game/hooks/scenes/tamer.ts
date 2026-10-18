@@ -177,6 +177,17 @@ export const TAMER_SCENE: SceneDefinition = {
       frames: [
         ['..HHHH..', '.HSSSS..', '.SESSS..', '..SSS...', '.WWWWWW.', 'SWWBWWWS', '..K..K..']
       ],
+      gestures: {
+        stopped: [
+          '..HHHH..',
+          '.HSSSS..',
+          '.SESSS..',
+          'S.SSS...',
+          'WWWWWWW.',
+          '.WWBWWWS',
+          '..K..K..'
+        ]
+      },
       colors: { H: 0x8a8a8a, S: FACE, E: EYES, W: 0xf4f4f4, B: 0x3a7bd6, K: 0x5a3a20 }
     }
   }

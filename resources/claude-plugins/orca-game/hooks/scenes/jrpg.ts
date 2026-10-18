@@ -181,6 +181,17 @@ export const JRPG_SCENE: SceneDefinition = {
         ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'OBBBBBB.', '.BBBBBB.', '.BB..BB.'],
         ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'QBBBBBB.', '.BBBBBB.', '.BB..BB.']
       ],
+      gestures: {
+        stopped: [
+          '...BB...',
+          '..BBBB..',
+          '.BBSEB..',
+          'SBBSSB..',
+          'BBBBBBB.',
+          '.BBBBBB.',
+          '.BB..BB.'
+        ]
+      },
       colors: { B: NAVY, S: FACE, E: EYES, O: 0x9fe0ff, Q: 0xe8ecff }
     }
   }

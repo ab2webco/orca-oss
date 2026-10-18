@@ -1,6 +1,7 @@
-import type { On } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
 
-import { logDecisions, observeAdvisor } from './advisor-state'
+import { gateCueOf, type GateVerdict } from './advisor-cues'
+import { logDecisions, observeAdvisor, playAdvisorCue } from './advisor-state'
 import { refreshSoon } from './fleet-sync'
 import { quest } from './quest-runtime'
 
@@ -18,4 +19,18 @@ export const registerAdvisor = (on: On): void => {
     }
     return written
   })
+}
+
+/** Acts out the verdict Jev's gate (a settings hook beneath the game) returned for a tool call. */
+export function actOutGate(
+  $: EngineInterface,
+  tool: string,
+  command: unknown,
+  verdict: GateVerdict
+): void {
+  const cue = gateCueOf(tool, command, verdict)
+  if (cue !== undefined) {
+    playAdvisorCue(cue, quest.tick)
+    $.ui.invalidate('ui.render')
+  }
 }

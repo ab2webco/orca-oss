@@ -230,6 +230,7 @@ export type AdvisorGesture =
   | 'ciRunning'
   | 'ciPassed'
   | 'ciFailed'
+  | 'stopped'
 
 /** Who stands for Jev in the scene; the gesture props are the game's, the body the scene's. */
 export type SceneAdvisor = {

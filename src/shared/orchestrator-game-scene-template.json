@@ -275,6 +275,17 @@
         ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.T", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"],
         ["...PP...", "..PPYP..", ".PPPPPP.", "..SESS.G", ".WWWWRRT", ".RWWRRRT", ".RRRRRRT"]
       ],
+      "gestures": {
+        "stopped": [
+          "...PP...",
+          "..PPYP..",
+          ".PPPPPP.",
+          "S.SESS.T",
+          "WWWWWRRT",
+          ".RWWRRRT",
+          ".RRRRRRT"
+        ]
+      },
       "colors": {
         "P": "#3e2a78",
         "Y": "#ffd84a",

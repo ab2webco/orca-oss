@@ -195,6 +195,15 @@ export const VIGILANTE_SCENE: SceneDefinition = {
           'SCCWWCC.',
           '.CCRWCCS',
           '.CC..CC.'
+        ],
+        stopped: [
+          '..HHHH..',
+          '.HSSSSH.',
+          '.SGSGS..',
+          'S.MMMS..',
+          'CCCWWCC.',
+          '.CCRWCCS',
+          '.CC..CC.'
         ]
       },
       colors: {

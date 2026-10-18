@@ -358,4 +358,65 @@ describe('Jev’s advisor', () => {
       expect(await sceneInBand()).toBeUndefined()
     }
   )
+
+  // The gate is a settings hook beneath the game's classic.PreToolUse; this test's hook stands in for it.
+  const gateTest =
+    (verdict: Record<string, unknown>, env: Record<string, string> = {}) =>
+    async ($: Parameters<TestBody>[0], on: On) => {
+      const clock = mock.clock(on)
+      engine(on, { TEST_ADVISOR: FIRST, ...env }, undefined)
+      on('classic.PreToolUse', () => verdict as never)
+      on('tool.call', () => ({ result: 'ok', text: 'ok' }) as never)
+      await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+      await clock.settle()
+      const sceneInBand = async () => {
+        const band = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...BAND })
+        const raster = await band.find({ type: 'Raster', key: 'band-pet-scene' })
+        await band.unmount()
+        return raster
+      }
+      const before = await sceneInBand()
+      await $.tool.call({ tool: 'Bash', command: 'rm -rf build-output' })
+      await clock.settle()
+      return { before, after: await sceneInBand() }
+    }
+  const advice = (judge: string) =>
+    `PreToolUse:Bash hook error: ${judge} advice (not a refusal): this command would affect something worth a second look before it runs.`
+
+  test('stops in the scene when Jev’s gate denies a command', WITH_JEV, async ($, on) => {
+    const seen = await gateTest({ deny: advice('Jev') })($, on)
+    expect(seen.before).toBeUndefined()
+    expect(seen.after).toBeDefined()
+  })
+
+  test(
+    'stops in the scene when Clef’s gate denies a command, and keeps Jev’s advisor',
+    WITH_JEV,
+    async ($, on) => {
+      const clef = JSON.stringify({
+        ...JSON.parse(FIRST),
+        line: 'clef · herramienta: Bash (aplicada)'
+      })
+      const seen = await gateTest({ deny: advice('Clef') }, { TEST_ADVISOR: clef })($, on)
+      expect(seen.before).toBeUndefined()
+      expect(seen.after).toBeDefined()
+    }
+  )
+
+  test('acts out no other hook’s deny', WITH_JEV, async ($, on) => {
+    const seen = await gateTest({
+      deny: 'PreToolUse:Bash hook error: merging is the owner’s call'
+    })($, on)
+    expect(seen.after).toBeUndefined()
+  })
+
+  test('shows an accepted command outside zen', WITH_JEV, async ($, on) => {
+    expect((await gateTest({ allow: true })($, on)).after).toBeDefined()
+  })
+
+  test('keeps zen quiet about an accepted command', WITH_JEV, async ($, on) => {
+    expect(
+      (await gateTest({ allow: true }, { ORCA_GAME_MODE: 'zen' })($, on)).after
+    ).toBeUndefined()
+  })
 })

@@ -18,6 +18,7 @@ const GESTURE_COLORS: Readonly<Partial<Record<AdvisorGesture, string>>> = {
   escalated: 'red',
   ciPassed: 'green',
   ciFailed: 'red',
+  stopped: 'red',
   ciRunning: 'cyan'
 }
 

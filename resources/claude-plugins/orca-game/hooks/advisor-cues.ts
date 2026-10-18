@@ -2,9 +2,12 @@ import type { Advisor, AdvisorAgent } from './allies'
 import { isRasterText } from './game-strings'
 import type { AdvisorGesture } from './scenes/index'
 
-// Which of Jev's changes the advisor acts out: a new decision, CI state or escalation, never a redraw.
+// Which of Jev's changes the advisor acts out: a new decision, CI state, escalation or gate verdict, never a redraw.
 
 export type AdvisorCue = { gesture: AdvisorGesture; text: string; isRoutine: boolean }
+
+/** The cue the advisor plays and the tick it started on. */
+export type PlayingCue = { cue: AdvisorCue; at: number }
 
 /** One decision for the Panel: a subagent's, or the main conversation's when `id` is null. */
 export type AdvisorDecision = {
@@ -44,6 +47,7 @@ const CI_GESTURES = {
 
 const RANK: Readonly<Record<AdvisorGesture, number>> = {
   escalated: 7,
+  stopped: 6,
   ciFailed: 6,
   ciPassed: 5,
   lowered: 4,
@@ -133,6 +137,47 @@ export function advisorCuesOf(
       .map((one) => ({ gesture: 'escalated' as const, text: one.notice.text, isRoutine: false }))
   ]
   return { seen: { keys, main }, cues, decisions }
+}
+
+/** `cue` from `tick`, unless the gesture still playing is stronger. */
+export const playingCueOf = (
+  playing: PlayingCue | undefined,
+  cue: AdvisorCue,
+  tick: number
+): PlayingCue => {
+  const isPlaying = playing !== undefined && tick - playing.at < cueTicksOf(playing.cue.gesture)
+  return isPlaying && RANK[playing.cue.gesture] > RANK[cue.gesture] ? playing : { cue, at: tick }
+}
+
+/** A `classic.PreToolUse` verdict as the hooks beneath the game return it. */
+export type GateVerdict = { allow?: true; ask?: string; deny?: string }
+
+// Why the text: the gate's verdict names no judge, but its own wording does (orca-supervisor i18n_gate.ts).
+const HOOK_ERROR = /^PreToolUse:\S+ hook error: /
+const GATE_ADVICE = /^(Jev|Clef) advice \(not a refusal\)/
+const GATE_REFUSED = /^REFUSED: /
+
+/** What Jev's gate decided about a Bash command, whichever of Jev or Clef judged it; another hook's verdict is none. */
+export const gateCueOf = (
+  tool: string,
+  command: unknown,
+  verdict: GateVerdict
+): AdvisorCue | undefined => {
+  if (tool !== 'Bash' || typeof command !== 'string') {
+    return undefined
+  }
+  const line = command.trim().split('\n')[0]?.trim() ?? ''
+  if (verdict.allow === true) {
+    return { gesture: 'approved', text: line, isRoutine: true }
+  }
+  const reason = verdict.deny?.replace(HOOK_ERROR, '') ?? ''
+  const judge = GATE_ADVICE.exec(reason)?.[1]
+  if (judge !== undefined) {
+    return { gesture: 'stopped', text: `${judge.toLowerCase()} · ${line}`, isRoutine: false }
+  }
+  return GATE_REFUSED.test(reason)
+    ? { gesture: 'stopped', text: line, isRoutine: false }
+    : undefined
 }
 
 export const strongestCueOf = (cues: readonly AdvisorCue[]): AdvisorCue | undefined =>

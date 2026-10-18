@@ -846,23 +846,35 @@ same block in a project's scene file, a plugin's scene and a built-in one.
   the scene up above the band for as long as it plays (in zen, not for a routine one), as Pet does.
   The first value it sees is where things stand and plays nothing, and a value already acted out
   never plays again, even if a later read brings it back. When
-  several changes arrive at once the most important plays: escalation, CI failure, CI success,
-  lowered or raised, unsure, CI running, then approved.
+  several changes arrive at once the most important plays: escalation, a stop or CI failure, CI
+  success, lowered or raised, unsure, CI running, then approved; a weaker gesture never cuts one
+  still playing.
+- **Jev's gate** answers every Bash command from a settings `PreToolUse` hook (orca-supervisor's
+  `gate-bash.ts`), beneath the game's `classic.PreToolUse`, so the game reads its verdict from
+  `next(e)`. The `advisor` value carries no verdict. Jev or Clef may have judged it (Clef first in
+  Both mode, since orca-supervisor 0.13.4); both are acted out alike, and neither touches the
+  advisor's value. A deny whose reason is the gate's own (`REFUSED: …` or
+  `Jev advice (not a refusal)` / `Clef advice …`) plays `stopped`; an `allow` plays `approved` as a
+  routine decision. Another hook's deny, an `ask`, and an obviously safe command the gate passes
+  without a verdict play nothing.
 
-| Jev                                             | Gesture                 | The advisor holds                | Bubble                    |
-| ----------------------------------------------- | ----------------------- | -------------------------------- | ------------------------- |
-| subagent `why: lowered`                         | `lowered`               | an arrow pointing down           | its model · Jev's verdict |
-| subagent `why: raised`                          | `raised`                | an arrow pointing up             | its model · Jev's verdict |
-| `chosen`, `same`, `explicit`, `inherited`       | `approved`              | a thumbs-up and a whistle's toot | its model · Jev's verdict |
-| `kept-unsure`, `measuring`                      | `unsure`                | a yellow card and a magnifier    | its model · Jev's verdict |
-| a new `block` notice                            | `escalated`             | a red card and a long whistle    | the notice                |
-| a CI run `watching`                             | `ciRunning`             | a stopwatch                      | the run's line            |
-| a CI run `success` / `failure`                  | `ciPassed` / `ciFailed` | a green / red flag               | the run's line            |
-| the main conversation's model or effort changes | `approved`              | a thumbs-up                      | `model·effort`            |
+| Jev                                             | Gesture                 | The advisor holds                | Bubble                     |
+| ----------------------------------------------- | ----------------------- | -------------------------------- | -------------------------- |
+| subagent `why: lowered`                         | `lowered`               | an arrow pointing down           | its model · Jev's verdict  |
+| subagent `why: raised`                          | `raised`                | an arrow pointing up             | its model · Jev's verdict  |
+| `chosen`, `same`, `explicit`, `inherited`       | `approved`              | a thumbs-up and a whistle's toot | its model · Jev's verdict  |
+| `kept-unsure`, `measuring`                      | `unsure`                | a yellow card and a magnifier    | its model · Jev's verdict  |
+| a new `block` notice                            | `escalated`             | a red card and a long whistle    | the notice                 |
+| a CI run `watching`                             | `ciRunning`             | a stopwatch                      | the run's line             |
+| a CI run `success` / `failure`                  | `ciPassed` / `ciFailed` | a green / red flag               | the run's line             |
+| the main conversation's model or effort changes | `approved`              | a thumbs-up                      | `model·effort`             |
+| the gate denies a Bash command                  | `stopped`               | a raised palm, pushing           | `jev ·` / `clef ·` command |
+| the gate allows a Bash command it judged        | `approved`              | a thumbs-up                      | the command                |
 
 Other `why` values (`kept-pointer`, `teammate`, `no-jev`…) play nothing but still reach the Panel.
 The bubble keeps only width-1 characters, so an arrow or CJK text in Jev's words is left out. In
-`/orca-game:mode zen` the routine `chosen` and `same` decisions play their gesture without a bubble.
+`/orca-game:mode zen` the routine `chosen` and `same` decisions and the gate's allows play their
+gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the command alone.
 
 - **The Panel card** names the advisor and Jev's line, wrapped over as many rows as they need,
   then one `★` row for this pane's main conversation on the model it runs now (`★ lead · Opus
