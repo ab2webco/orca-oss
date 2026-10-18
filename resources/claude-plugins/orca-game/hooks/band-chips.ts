@@ -199,7 +199,26 @@ const linkChipsOf = (state: GameState): BandChip[] => {
     .map((chip) => ({ ...chip, isLink: true }))
 }
 
-/** The band's status chips, full labels first; the marks match the narrow HUD line's. */
+/** Working, idle, done when any, and waiting, full labels first; the marks match the narrow HUD line's. */
+export const countChipsOf = (counts: Counts): Chip[] => {
+  const text = gameStrings().text
+  const done: Chip[] =
+    counts.done > 0
+      ? [{ key: 'done', priority: 4, labels: [text.done(counts.done), `✓ ${counts.done}`] }]
+      : []
+  return [
+    { key: 'working', priority: 2, labels: [text.working(counts.working), `• ${counts.working}`] },
+    { key: 'idle', priority: 4, labels: [text.idle(counts.idle), `z ${counts.idle}`] },
+    ...done,
+    {
+      key: 'waiting',
+      priority: counts.waiting > 0 ? 1 : 5,
+      labels: [text.waiting(counts.waiting), `! ${counts.waiting}`]
+    }
+  ]
+}
+
+/** The band's status chips, full labels first. */
 export const stateChipsOf = (
   state: GameState,
   counts: Counts,
@@ -214,17 +233,8 @@ export const stateChipsOf = (
       priority: 0,
       labels: [`⚑ ${teammatesOf(teammates)}`, `⚑ ${text.team} ${teammates}`, `⚑ ${teammates}`]
     },
-    { key: 'working', priority: 2, labels: [text.working(counts.working), `• ${counts.working}`] },
-    { key: 'idle', priority: 4, labels: [text.idle(counts.idle), `z ${counts.idle}`] }
+    ...countChipsOf(counts)
   ]
-  if (counts.done > 0) {
-    chips.push({ key: 'done', priority: 4, labels: [text.done(counts.done), `✓ ${counts.done}`] })
-  }
-  chips.push({
-    key: 'waiting',
-    priority: counts.waiting > 0 ? 1 : 5,
-    labels: [text.waiting(counts.waiting), `! ${counts.waiting}`]
-  })
   chips.push(...linkChipsOf(state))
   if (note !== '') {
     chips.push({ key: 'note', priority: 6, labels: [note] })
