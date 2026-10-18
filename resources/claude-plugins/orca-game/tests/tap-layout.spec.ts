@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import { cellWidthOf } from '../hooks/cell-width'
+import { MORE_CHIP_KEY } from '../hooks/chip-rows'
 import {
   isTapLayout,
   TAP_LAYOUT_COLUMNS,
+  TAP_MIN_CELLS,
   TAP_ROWS,
-  tapActionsOf,
-  tapLabelOf
+  tapChipOf,
+  tapRowsOf
 } from '../hooks/tap-layout'
+
+const rowWidthOf = (row: readonly { width: number }[]): number =>
+  row.reduce((sum, chip) => sum + chip.width, 0) + Math.max(0, row.length - 1)
 
 describe('tap layout', () => {
   it('switches on below 60 body columns, a phone, and stays off from there up', () => {
@@ -19,29 +24,61 @@ describe('tap layout', () => {
     expect(isTapLayout(156)).toBe(false)
   })
 
-  it('draws a label as two rows that each span the width', () => {
-    const lines = tapLabelOf('✕ Close', 40).split('\n')
+  // The phone's xterm cell is 7.8 x 15 px at 13 px: 3 rows are 45 px and 6 cells 47 px, over 44 pt.
+  it('sizes a chip to the 44 pt touch minimum and no wider than its label', () => {
+    expect(TAP_ROWS).toBe(3)
+    expect(TAP_MIN_CELLS).toBe(6)
+  })
+
+  it('draws a chip as its label on the middle of three rows, each as wide as the chip', () => {
+    const lines = tapChipOf('✕ Close', 9).split('\n')
     expect(lines).toHaveLength(TAP_ROWS)
-    expect(lines[0]).toBe(` ✕ Close${' '.repeat(32)}`)
-    expect(lines.map(cellWidthOf)).toEqual([40, 40])
-    expect(lines[1]?.trim()).toBe('')
+    expect(lines[1]).toBe(' ✕ Close ')
+    expect(lines.map(cellWidthOf)).toEqual([9, 9, 9])
+    expect(lines[0]?.trim()).toBe('')
+    expect(lines[2]?.trim()).toBe('')
   })
 
-  it('starts the first row after a hotkey prefix and the second at the left edge', () => {
-    const lines = tapLabelOf('✕ Close', 40, 3).split('\n')
-    expect(lines.map(cellWidthOf)).toEqual([37, 40])
+  it('starts the first row after a hotkey prefix, the other two at the chip edge', () => {
+    expect(tapChipOf('✕ Close', 9, 3).split('\n').map(cellWidthOf)).toEqual([6, 9, 9])
   })
 
-  it('cuts a label wider than the width, wide glyphs counted as two cells', () => {
-    const lines = tapLabelOf('▸ View · ORCA-601 The game lead delegates to members', 24).split('\n')
-    expect(lines[0]).toMatch(/…\s*$/)
-    expect(lines.map(cellWidthOf)).toEqual([24, 24])
-    expect(tapLabelOf('▸ ゲーム画面を開く', 11).split('\n').map(cellWidthOf)).toEqual([11, 11])
+  it('keeps a short label at least six cells wide, centred', () => {
+    const [row] = tapRowsOf([{ key: 'r', priority: 0, labels: ['↻'] }], { columns: 40 })
+    expect(row?.[0]?.width).toBe(TAP_MIN_CELLS)
+    expect(tapChipOf(row?.[0]?.label ?? '', TAP_MIN_CELLS).split('\n')[1]).toBe('  ↻   ')
   })
 
-  it('keeps every action up to the cap, else one less and counts the rest', () => {
-    expect(tapActionsOf(['a', 'b'], 2)).toEqual({ shown: ['a', 'b'], hidden: 0 })
-    expect(tapActionsOf(['a', 'b', 'c', 'd'], 2)).toEqual({ shown: ['a'], hidden: 3 })
-    expect(tapActionsOf([], 2)).toEqual({ shown: [], hidden: 0 })
+  it('wraps chips into rows that fit, one cell between two', () => {
+    const chips = ['▸ Wave', '▸ Status', '▸ Stop', '▸ Sweep', '▸ Release', '▸ Board'].map(
+      (label, at) => ({ key: `a${at}`, priority: at, labels: [label] as const })
+    )
+    const rows = tapRowsOf(chips, { columns: 36 })
+    expect(rows.length).toBeGreaterThan(1)
+    expect(rows.flat().map((one) => one.key)).toEqual(chips.map((one) => one.key))
+    for (const row of rows) {
+      expect(rowWidthOf(row)).toBeLessThanOrEqual(36)
+    }
+  })
+
+  it('in one row shortens labels first, then counts the dropped chips in a +N', () => {
+    const chips = [
+      { key: 'panel', priority: 0, labels: ['▤ Panel'] as const },
+      { key: 'refresh', priority: 1, labels: ['↻ Refresh', '↻'] as const },
+      ...['▸ Wave', '▸ Status', '▸ Stop'].map((label, at) => ({
+        key: `a${at}`,
+        priority: 10 + at,
+        labels: [label] as const
+      }))
+    ]
+    const rows = tapRowsOf(chips, { columns: 36, maxRows: 1, more: (count) => `+${count}` })
+    expect(rows).toHaveLength(1)
+    const row = rows[0] ?? []
+    expect(rowWidthOf(row)).toBeLessThanOrEqual(36)
+    expect(row.map((one) => one.key).slice(0, 2)).toEqual(['panel', 'refresh'])
+    const more = row.find((one) => one.key === MORE_CHIP_KEY)
+    const kept = row.filter((one) => /^a\d$/.test(one.key)).length
+    expect(more?.label.trim()).toBe(`+${3 - kept}`)
+    expect(more?.width).toBeGreaterThanOrEqual(TAP_MIN_CELLS)
   })
 })

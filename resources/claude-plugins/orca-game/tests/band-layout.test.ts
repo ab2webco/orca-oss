@@ -5,7 +5,7 @@ import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
 import { HUD_KEY } from '../hooks/fleet-hud'
-import { isTapLayout, TAP_LAYOUT_COLUMNS } from '../hooks/tap-layout'
+import { isTapLayout, TAP_LAYOUT_COLUMNS, TAP_ROWS } from '../hooks/tap-layout'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -248,20 +248,19 @@ describe('band layout', () => {
           2
         )
         if (isTapLayout(columns)) {
-          // A phone stacks the actions and the menu as tap buttons, each line the band's width.
-          expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toEqual([
-            expect.objectContaining({ key: 'band-actions-tap' })
-          ])
-          expect(rows.filter((one) => one.key?.startsWith('band-menu-'))).toEqual([
-            expect.objectContaining({ key: 'band-menu-tap' })
-          ])
-          for (const row of rows.filter((one) => !one.key?.endsWith('-tap'))) {
+          // A phone draws the menu and the actions as one row of chips, each three rows tall.
+          expect(rows.filter((one) => /^band-(menu|actions)-/.test(one.key ?? ''))).toEqual([])
+          const tap = elementsOf(await ui.find({ type: 'Box', key: 'band-tap' }))
+          expect(tap).toHaveLength(1)
+          for (const row of rows) {
             expect(rowWidthOf(row)).toBeLessThanOrEqual(columns)
           }
-          for (const button of await ui.findAll({ type: 'Button' })) {
-            if (/^band-(panel|refresh|pet|action-|actions-more)/.test(String(button.key))) {
-              expect(shownOf(button).split('\n').map(cellWidthOf)).toEqual([columns, columns])
-            }
+          const chips = elementsOf(tap[0])
+          const lines = chips.map((chip) => shownOf(chip).split('\n'))
+          const width = lines.reduce((sum, chip) => sum + cellWidthOf(chip[1] ?? ''), 0)
+          expect(width + chips.length - 1).toBeLessThanOrEqual(columns)
+          for (const chip of lines) {
+            expect(chip).toHaveLength(TAP_ROWS)
           }
         } else {
           expect(rows.filter((one) => one.key?.startsWith('band-actions-'))).toHaveLength(1)
@@ -316,17 +315,13 @@ describe('band layout', () => {
   )
 
   test(
-    'at 40 columns the least important chips shorten and the menu stacks its three buttons',
+    'at 40 columns the least important chips shorten and the menu leads the row of chips',
     ALL,
     async ($, on) => {
       const ui = await mount($, on, 40, { ORCA_GAME_LOCALE: 'es' })
-      const menu = shownOf(await ui.find({ type: 'Box', key: 'band-menu-tap' }))
-      expect(menu.split('\n').map((line) => line.trim())).toEqual([
-        '▤ Panel',
-        '↻ Actualizar',
-        '♥ Mimar',
-        ''
-      ])
+      const [row] = elementsOf(await ui.find({ type: 'Box', key: 'band-tap' }))
+      const labels = elementsOf(row).map((chip) => shownOf(chip).split('\n')[1]?.trim())
+      expect(labels.slice(0, 3)).toEqual(['▤ Panel', '↻', '♥'])
       const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-band-team' }))
       expect(chips).toContain('⚑')
       await ui.unmount()
