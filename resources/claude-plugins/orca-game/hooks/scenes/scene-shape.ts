@@ -90,6 +90,16 @@ const finaleOf = (value: unknown): LocalizedName | undefined => {
 const optionalOf = <T>(value: unknown, of: (one: unknown) => T | undefined): T | null | undefined =>
   value === undefined ? undefined : (of(value) ?? null)
 
+// Mirrors Orca's GAME_MEMBER_ROSTER_MAX; a bad roster is dropped, as Orca drops it, never the scene.
+const ROSTER_MAX = 24
+const rosterOf = (value: unknown): LocalizedName[] | undefined => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > ROSTER_MAX) {
+    return undefined
+  }
+  const names = value.map((one) => nameOf(one))
+  return names.every((one) => one !== undefined) ? names : undefined
+}
+
 const cardOf = (value: unknown): Card | undefined => {
   if (!isShape(value)) {
     return undefined
@@ -150,6 +160,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const finale = optionalOf(value.finale, finaleOf)
     const hud = optionalOf(value.hud, hudOf)
     const cast = castOf(value.cast)
+    const roster = rosterOf(value.roster)
     if (
       !looks ||
       !costumes ||
@@ -172,7 +183,8 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       ...(foe === undefined ? {} : { foe }),
       ...(finale === undefined ? {} : { finale }),
       ...(hud === undefined ? {} : { hud }),
-      ...(cast === undefined ? {} : { cast })
+      ...(cast === undefined ? {} : { cast }),
+      ...(roster === undefined ? {} : { roster })
     }
   } catch {
     return undefined

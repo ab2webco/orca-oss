@@ -257,6 +257,8 @@ export type SceneDefinition = {
   hud?: HudPalette
   /** The pet and Jev's advisor; either left out keeps Clawd or the referee. */
   cast?: SceneCast
+  /** Names Orca gives a lead's members, in order. */
+  roster?: readonly LocalizedName[]
 }
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }

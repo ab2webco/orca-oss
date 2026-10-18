@@ -19,6 +19,7 @@ describe('orchestratorGameSceneIssues', () => {
     expect(definition?.hud).toBeDefined()
     expect(definition?.cast?.pet).toBeDefined()
     expect(definition?.cast?.advisor).toBeDefined()
+    expect(definition?.roster?.length).toBeGreaterThan(0)
   })
 
   it('lists every problem with the path that has it, not only the first', () => {

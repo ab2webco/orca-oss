@@ -11,6 +11,7 @@ import {
   localizedSceneName,
   uncoloredGlyphOf
 } from './orchestrator-game-scene-values'
+import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
 
 /** Scenes a plugin contributes to the Agent Teams game: inert JSON the bundled mod draws. */
 
@@ -119,6 +120,8 @@ const sceneFileSchema = z.object({
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & {
   id: string
   cast?: OrchestratorGameSceneCast
+  /** Names a lead's members take, in order. */
+  roster?: GameMemberName[]
 }
 
 type SceneParse =
@@ -127,6 +130,15 @@ type SceneParse =
 
 const rawCastOf = (raw: unknown): unknown =>
   typeof raw === 'object' && raw !== null && 'cast' in raw ? raw.cast : undefined
+
+// Why apart, like the cast: a bad roster only costs the names, never the scene.
+function rosterOf(raw: unknown): { roster?: GameMemberName[]; issues: string[] } {
+  if (typeof raw !== 'object' || raw === null || !('roster' in raw)) {
+    return { issues: [] }
+  }
+  const { roster, issues } = parseMemberRoster(raw.roster)
+  return { roster, issues: issues.map((one) => `roster.${one}`) }
+}
 
 export type OrchestratorGameSceneExtension = {
   id: string
@@ -154,7 +166,8 @@ export function orchestratorGameSceneIssues(text: string): string[] {
       : parsed.error.issues.map(
           (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
         )),
-    ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues
+    ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
+    ...rosterOf(raw).issues
   ]
 }
 
@@ -175,10 +188,16 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   }
   // Why apart: a bad pet or advisor is left out with a warning; the scene and its hero still draw.
   const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
+  const { roster, issues: rosterIssues } = rosterOf(raw)
   return {
     ok: true,
-    definition: { ...parsed.data, ...(cast === undefined ? {} : { cast }), id },
-    warnings: issues
+    definition: {
+      ...parsed.data,
+      ...(cast === undefined ? {} : { cast }),
+      ...(roster === undefined ? {} : { roster }),
+      id
+    },
+    warnings: [...issues, ...rosterIssues]
   }
 }
 

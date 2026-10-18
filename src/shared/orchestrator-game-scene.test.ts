@@ -78,6 +78,17 @@ describe('parseOrchestratorGameScene', () => {
     expect(plain.ok && 'scenery' in plain.definition.looks.pr).toBe(false)
   })
 
+  it('takes an optional member roster, and leaves a bad one out with a warning', () => {
+    const named = parse(scene({ roster: ['Mario', { en: 'Peach', es: 'Melocotón' }] }))
+    expect(named.ok && named.definition.roster).toEqual(['Mario', { en: 'Peach', es: 'Melocotón' }])
+    expect(named.ok && named.warnings).toEqual([])
+
+    const bad = parse(scene({ roster: ['K-9'] }))
+    expect(bad.ok).toBe(true)
+    expect(bad.ok && bad.definition.roster).toBeUndefined()
+    expect(bad.ok && bad.warnings).toEqual(['roster.0: must not look like a ticket id'])
+  })
+
   it('ignores an id inside the file so a plugin cannot claim another namespace', () => {
     const parsed = parse(scene({ id: 'quest' }))
     expect(parsed.ok && parsed.definition.id).toBe('acme.pack/space')
