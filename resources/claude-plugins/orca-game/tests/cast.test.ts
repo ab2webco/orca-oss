@@ -291,7 +291,9 @@ describe('Jev’s advisor', () => {
       const card = await pane.find({ type: 'Box', key: 'advisor-card' })
       expect(card).toBeDefined()
       expect(await pane.find({ type: 'Text', text: /Árbitro/ })).toBeDefined()
-      expect(await pane.find({ type: 'Text', text: /^Opus 5\.5·high$/ })).toBeDefined()
+      expect(
+        await pane.find({ type: 'Text', text: '★ conversación principal · Opus 5.5·high' })
+      ).toBeDefined()
       expect(
         await pane.find({ type: 'Text', text: /Task a2 · Sonnet 5·medium · Sonnet basta/ })
       ).toBeDefined()
