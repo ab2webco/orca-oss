@@ -202,6 +202,29 @@ describe('GameLeads claim', () => {
     expect(stored.get('no-project')?.sessionId).toBe('sess-other')
   })
 
+  it('does not count a lead pane that fell back to a shell as the live lead', async () => {
+    let caller = 'term_a'
+    const focused: string[] = []
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true,
+      isRunning: async (handle) => handle !== 'term_a',
+      sessions: { read: async () => null, write: async () => undefined },
+      sessionOf: async () => null,
+      focus: async (handle) => {
+        focused.push(handle)
+      }
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    caller = 'term_b'
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: true
+    })
+    expect(focused).toEqual([])
+    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_b'])
+  })
+
   it('resumes once when two panes claim a closed lead at the same time', async () => {
     let caller = 'term_a'
     const resumed: string[] = []

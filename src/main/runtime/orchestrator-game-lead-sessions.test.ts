@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { GameLeadSessions, leadResumeArgsOf } from './orchestrator-game-lead-sessions'
+import {
+  GameLeadSessions,
+  awaitResumedLead,
+  leadResumeArgsOf
+} from './orchestrator-game-lead-sessions'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -78,5 +82,37 @@ describe('leadResumeArgsOf', () => {
     ).toBe('--teammate-mode=auto --verbose')
     expect(leadResumeArgsOf({ agentCommand: 'claude', agentArgs: '' })).toBeNull()
     expect(leadResumeArgsOf(null)).toBeNull()
+  })
+})
+
+describe('awaitResumedLead', () => {
+  const run = (reads: ('session' | 'running' | 'shell')[]) => {
+    let at = 0
+    let clock = 0
+    return awaitResumedLead({
+      read: async () => reads[Math.min(at++, reads.length - 1)] ?? 'shell',
+      timeoutMs: 3000,
+      intervalMs: 500,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms
+      }
+    })
+  }
+
+  it('confirms once the reopened pane reports the stored session', async () => {
+    await expect(run(['shell', 'running', 'session'])).resolves.toBe('resumed')
+  })
+
+  it('fails when Claude exits back to the shell, as it does for a missing conversation', async () => {
+    await expect(run(['shell', 'running', 'shell'])).resolves.toBe('exited')
+  })
+
+  it('keeps a pane still running Claude when the session is not reported in time', async () => {
+    await expect(run(['shell', 'running'])).resolves.toBe('resumed')
+  })
+
+  it('fails a pane that never left its shell by the deadline', async () => {
+    await expect(run(['shell'])).resolves.toBe('exited')
   })
 })

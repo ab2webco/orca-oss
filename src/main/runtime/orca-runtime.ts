@@ -671,7 +671,11 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
-import { GameLeadSessions, leadResumeArgsOf } from './orchestrator-game-lead-sessions'
+import {
+  GameLeadSessions,
+  awaitResumedLead,
+  leadResumeArgsOf
+} from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -3631,8 +3635,9 @@ export class OrcaRuntimeService {
           }
         : null
     },
-    resume: async (session) =>
-      (
+    isRunning: (handle) => this.isGameLeadPaneRunning(handle),
+    resume: async (session) => {
+      const { handle } = (
         await this.ensureAgentSession({
           kind: 'explicit',
           worktree: `id:${session.worktreeId}`,
@@ -3641,7 +3646,27 @@ export class OrcaRuntimeService {
           ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
           presentation: 'focused'
         })
-      ).terminal.handle,
+      ).terminal
+      // Why bounded: the CLI waits on this RPC, and Claude refuses a missing conversation within seconds.
+      const outcome = await awaitResumedLead({
+        read: async () => {
+          if (
+            this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
+            session.sessionId
+          ) {
+            return 'session'
+          }
+          return (await this.isGameLeadPaneRunning(handle)) ? 'running' : 'shell'
+        },
+        timeoutMs: 10_000,
+        intervalMs: 500
+      })
+      if (outcome === 'exited') {
+        await this.closeTerminal(handle).catch(() => undefined)
+        throw new Error('Claude exited instead of reopening the conversation')
+      }
+      return handle
+    },
     focus: async (handle) => {
       await this.focusTerminal(handle)
     }
@@ -30294,6 +30319,12 @@ export class OrcaRuntimeService {
 
   getGameLeads(): GameLeads {
     return this.gameLeads
+  }
+
+  // Why a host without a process read counts as running: refusing a second lead is the safe side.
+  private async isGameLeadPaneRunning(handle: string): Promise<boolean> {
+    const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+    return !pane?.foregroundProcess || !isShellProcess(pane.foregroundProcess)
   }
 
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.

@@ -27,6 +27,8 @@ export class GameLeads {
     private readonly deps: {
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       isLive: (handle: string) => boolean
+      /** False once the pane is back at its shell: a lead that ran /exit, or a resume Claude refused. */
+      isRunning?: (handle: string) => Promise<boolean>
       now?: () => Date
       sessions?: {
         read: (projectKey: string) => Promise<GameLeadSession | null>
@@ -63,7 +65,7 @@ export class GameLeads {
       return { registered: true }
     }
     return this.queued(project.key, async () => {
-      const live = this.directory.leadOf(project.key, this.deps.isLive)
+      const live = await this.leadOf(project.key)
       if (live && live.handle !== caller) {
         await this.deps.focus?.(live.handle).catch(() => undefined)
         return { registered: false, live: { handle: live.handle } }
@@ -86,6 +88,14 @@ export class GameLeads {
       }
       return { registered: true, ...(resumeError === undefined ? {} : { resumeError }) }
     })
+  }
+
+  private async leadOf(projectKey: string): Promise<{ handle: string } | null> {
+    const live = this.directory.leadOf(projectKey, this.deps.isLive)
+    if (!live || !this.deps.isRunning) {
+      return live
+    }
+    return (await this.deps.isRunning(live.handle).catch(() => true)) ? live : null
   }
 
   list(): { leads: GameLeadListing[] } {

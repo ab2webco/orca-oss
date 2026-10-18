@@ -35,6 +35,38 @@ export const leadResumeArgsOf = (
   return resumeArgs.trim() || null
 }
 
+/**
+ * Whether a reopened lead took. Why wait: the terminal spawns before Claude reads the conversation, and
+ * a missing one makes Claude exit to the shell. The pane starts at its shell too, so only a shell after
+ * Claude ran, or one still there at the deadline, is a failure.
+ */
+export const awaitResumedLead = async (args: {
+  read: () => Promise<'session' | 'running' | 'shell'>
+  timeoutMs: number
+  intervalMs: number
+  now?: () => number
+  sleep?: (ms: number) => Promise<void>
+}): Promise<'resumed' | 'exited'> => {
+  const now = args.now ?? Date.now
+  const sleep = args.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)))
+  const deadline = now() + args.timeoutMs
+  let hasRun = false
+  for (;;) {
+    const seen = await args.read()
+    if (seen === 'session') {
+      return 'resumed'
+    }
+    if (seen === 'shell' && hasRun) {
+      return 'exited'
+    }
+    hasRun ||= seen === 'running'
+    if (now() >= deadline) {
+      return seen === 'running' ? 'resumed' : 'exited'
+    }
+    await sleep(args.intervalMs)
+  }
+}
+
 /** Each project's last lead conversation, one file per project, so it survives a restart of Orca. */
 export class GameLeadSessions {
   constructor(private readonly dirOf: () => string) {}
