@@ -4,6 +4,9 @@ import {
   renderGameLaunchPrompt
 } from './orchestrator-game-lead'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
+import { ticketInText } from './orchestrator-game-ticket-id'
+
+export { ticketInText }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -41,8 +44,6 @@ export type GameFleet = {
 
 type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'>
 
-const TICKET = /(?:^|[^A-Z0-9])([A-Z][A-Z0-9_]*-\d+)(?![A-Z0-9])/
-
 export function isFinishedMember(agent: GameAgent): boolean {
   const group = agent.workItem?.statusGroup
   return (
@@ -76,11 +77,6 @@ export function ticketOfMember(agent: GameAgent): string | null {
     }
   }
   return null
-}
-
-/** The first ticket id like CIN-12 a title, name or branch carries. */
-export function ticketInText(text: string | null | undefined): string | null {
-  return text?.toUpperCase().match(TICKET)?.[1] ?? null
 }
 
 function nextOf(agent: GameAgent, phase: GameMemberPhase): string {

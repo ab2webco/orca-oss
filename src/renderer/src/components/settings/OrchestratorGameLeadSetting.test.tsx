@@ -151,6 +151,43 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     view.unmount()
   })
 
+  it("saves member names typed with commas over the scene's, and inherits when cleared", () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      { orchestratorGameProjects: { repo1: { orchestrator: { memberNames: ['Ann'] } } } },
+      { orchestrator: { memberNames: ['Mario', { en: 'Peach', es: 'Melocotón' }] } },
+      updates
+    )
+
+    const names = field(view.container, 'Member names')
+    expect(names.value).toBe('Ann')
+    expect(names.placeholder).toBe('Mario, Peach')
+    commit(names, ' Mario,  Luigi , ')
+    commit(field(view.container, 'Member names'), '')
+    expect(updates).toEqual([
+      {
+        orchestratorGameProjects: { repo1: { orchestrator: { memberNames: ['Mario', 'Luigi'] } } }
+      },
+      { orchestratorGameProjects: {} }
+    ])
+    view.unmount()
+  })
+
+  it("says members take the scene's names when no layer sets them, and refuses a ticket-like name", () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+
+    expect(view.container.textContent).toContain("The scene's names")
+    commit(field(view.container, 'Member names'), 'Mario, K-9')
+    expect(updates).toEqual([])
+    expect(
+      Array.from(view.container.querySelectorAll('[role="alert"]')).map((one) => one.textContent)
+    ).toEqual([
+      'Use 1 to 24 names separated by commas, each up to 32 characters and none like a ticket id.'
+    ])
+    view.unmount()
+  })
+
   it('refuses a value the lead would drop and says why', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({}, undefined, updates)

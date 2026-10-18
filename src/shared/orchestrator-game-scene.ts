@@ -136,8 +136,11 @@ function rosterOf(raw: unknown): { roster?: GameMemberName[]; issues: string[] }
   if (typeof raw !== 'object' || raw === null || !('roster' in raw)) {
     return { issues: [] }
   }
-  const { roster, issues } = parseMemberRoster(raw.roster)
-  return { roster, issues: issues.map((one) => `roster.${one}`) }
+  const { roster, problems } = parseMemberRoster(raw.roster)
+  return {
+    roster,
+    issues: problems.map(({ path, message }) => `roster${path ? `.${path}` : ''}: ${message}`)
+  }
 }
 
 export type OrchestratorGameSceneExtension = {

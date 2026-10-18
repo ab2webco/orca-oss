@@ -72,6 +72,11 @@ describe('memberRosterOf', () => {
     expect(memberRosterOf({ config: {} })).toBe(ORCHESTRATOR_GAME_BUILT_IN_ROSTERS.quest)
   })
 
+  it("lets the project's memberNames replace any scene's roster", () => {
+    const lead = { autostart: false, cap: 4, agent: 'claude', memberNames: ['Mario', 'Luigi'] }
+    expect(memberRosterOf({ config: { scene: 'jrpg' }, lead })).toEqual(['Mario', 'Luigi'])
+  })
+
   it('gives no names for a custom scene without a roster', () => {
     const bare = { id: 'me/bare', pluginId: 'me', definition: {} }
     expect(

@@ -156,6 +156,20 @@ describe('orca game launch', () => {
     )
   })
 
+  it("names the member from the project's memberNames over the scene's roster", async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', memberNames: ['Mario', 'Luigi'] }
+    const holder = { paneKey: 'm', state: 'idle', displayName: 'Mario · CIN-1 Home' }
+    const { client, calls } = fakeClient(
+      stateWith({ config: { mode: 'on', scene: 'quest' }, lead, agents: [holder] })
+    )
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'Luigi · CIN-12 Cartelera page' })
+    )
+  })
+
   it('names the member after its ticket alone when the scene has no roster', async () => {
     const bare = { id: 'me/bare', pluginId: 'me', definition: {} }
     const { client, calls } = fakeClient(

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { OrchestratorGameBuiltInScene } from './orchestrator-game-config'
-import { ticketInText } from './orchestrator-game-fleet-verbs'
+import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import { ticketInText } from './orchestrator-game-ticket-id'
 import { isSafeDisplayCharacter } from './skill-display-text'
 
 /** The character names a lead's members take, from the active scene's roster. */
@@ -32,8 +33,8 @@ function variantIssueOf(variant: string): string | null {
 
 export const memberRosterSchema = z
   .array(nameSchema)
-  .min(1)
-  .max(GAME_MEMBER_ROSTER_MAX)
+  .min(1, `must list 1 to ${GAME_MEMBER_ROSTER_MAX} names`)
+  .max(GAME_MEMBER_ROSTER_MAX, `must list 1 to ${GAME_MEMBER_ROSTER_MAX} names`)
   .superRefine((roster, ctx) => {
     const seen = new Set<string>()
     roster.forEach((name, index) => {
@@ -56,19 +57,26 @@ export const memberRosterSchema = z
     })
   })
 
-/** The roster, or every reason Orca refuses it, each as `path: message`. */
-export function parseMemberRoster(raw: unknown): { roster?: GameMemberName[]; issues: string[] } {
+export type MemberRosterProblem = { path: string; message: string }
+
+/** The roster, or every reason Orca refuses it; `path` is the index, empty for the list itself. */
+export function parseMemberRoster(raw: unknown): {
+  roster?: GameMemberName[]
+  problems: MemberRosterProblem[]
+} {
   const parsed = memberRosterSchema.safeParse(raw)
   return parsed.success
-    ? { roster: parsed.data, issues: [] }
+    ? { roster: parsed.data, problems: [] }
     : {
-        issues: parsed.error.issues.map(
-          (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
-        )
+        problems: parsed.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message
+        }))
       }
 }
 
-export const memberRosterIssues = (raw: unknown): string[] => parseMemberRoster(raw).issues
+export const memberRosterIssues = (raw: unknown): string[] =>
+  parseMemberRoster(raw).problems.map(({ path, message }) => `${path || '(root)'}: ${message}`)
 
 // Why public-domain and original names: built-in scenes ship in Orca, so no franchise characters.
 export const ORCHESTRATOR_GAME_BUILT_IN_ROSTERS: Readonly<
@@ -137,13 +145,17 @@ const isBuiltIn = (scene: string): scene is OrchestratorGameBuiltInScene =>
 
 type RosterSource = {
   config: { scene?: string }
+  lead?: Pick<OrchestratorGameLead, 'memberNames'>
   extensions?: {
     scenes: readonly { id: string; definition: { roster?: readonly GameMemberName[] } }[]
   }
 }
 
-/** The active scene's roster; a scene the host does not list falls back to Quest, as the mod draws it. */
+/** The project's memberNames, else the active scene's roster; an unlisted scene falls back to Quest, as the mod draws it. */
 export function memberRosterOf(state: RosterSource): readonly GameMemberName[] {
+  if (state.lead?.memberNames !== undefined) {
+    return state.lead.memberNames
+  }
   const scene = state.config.scene ?? 'quest'
   if (isBuiltIn(scene)) {
     return ORCHESTRATOR_GAME_BUILT_IN_ROSTERS[scene]

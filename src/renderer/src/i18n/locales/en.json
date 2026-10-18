@@ -11482,6 +11482,11 @@
           "description": "Agents, MCP servers and builds running in terminals can exhaust memory. Orca never closes a terminal on its own.",
           "thresholdLabel": "Warn below",
           "thresholdDescription": "Show the warning when free memory falls under this share of physical memory. On macOS it also shows when the system reports memory pressure. Terminals on SSH hosts are not measured."
+        },
+        "OrchestratorGameMemberNamesRow": {
+          "label": "Member names",
+          "sceneNames": "The scene's names",
+          "invalid": "Use 1 to 24 names separated by commas, each up to 32 characters and none like a ticket id."
         }
       },
       "right": {

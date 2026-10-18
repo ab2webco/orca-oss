@@ -335,7 +335,8 @@ CJK characters and emoji are refused. A plain string or per-language object.
 lead launches takes the first name no live member holds and keeps it until it is released;
 the ticket stays next to it (`Mario · CIN-12 Cartelera`). Once every name is taken, members
 are named after their ticket only. A name must not look like a ticket id (`K-9`), contain
-`·`, or repeat. An invalid roster is left out with a warning and the scene still draws.
+`·`, or repeat. An invalid roster is left out with a warning and the scene still draws; the
+project's `orchestratorGame.orchestrator.memberNames` replaces it.
 
 ## Common problems
 
