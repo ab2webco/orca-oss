@@ -34,6 +34,25 @@ describe('buildClaudeTerminalSwitchLaunchCommand', () => {
     expect(built).toEqual({ ok: false, reason: 'missing-launch-config' })
   })
 
+  it('resumes an Agent Teams pane through orca claude-teams, which reloads the game (ORCA-617)', () => {
+    const built = buildClaudeTerminalSwitchLaunchCommand({
+      sessionId: SESSION_ID,
+      launchConfig: {
+        agentCommand: 'orca claude-teams --dangerously-skip-permissions',
+        agentArgs: '--dangerously-skip-permissions',
+        agentEnv: {}
+      },
+      shell: 'posix',
+      platform: 'darwin',
+      configDir: '/vault/account-target/auth'
+    })
+    expect(built.ok && built.command).toMatch(
+      new RegExp(
+        `CLAUDE_CONFIG_DIR='/vault/account-target/auth'.*orca claude-teams --dangerously-skip-permissions '--resume' '${SESSION_ID}'$`
+      )
+    )
+  })
+
   it('omits the config-dir export when the shell already exports the universe', () => {
     const built = buildClaudeTerminalSwitchLaunchCommand({
       sessionId: SESSION_ID,
