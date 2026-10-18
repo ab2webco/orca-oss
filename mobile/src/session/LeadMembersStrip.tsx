@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { ChevronRight, Users } from 'lucide-react-native'
+import { Users } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import type { LeadMember } from './lead-members'
 import { styles } from './mobile-session-styles'
@@ -47,7 +47,6 @@ export function LeadMembersStrip({
               <Text style={styles.tabText} numberOfLines={1}>
                 {member.label}
               </Text>
-              <ChevronRight size={12} color={colors.textMuted} strokeWidth={2.1} />
             </View>
           </Pressable>
         ))}
