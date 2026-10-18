@@ -50,7 +50,11 @@ export type GameAgent = {
   account?: GameMemberAccount
   /** What Jev in the member's own pane has it on; absent without Jev there or from an older Orca. */
   advisor?: GameMemberAdvisor
+  /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older Orca. */
+  launch?: GameMemberLaunch
 }
+
+export type GameMemberLaunch = { model: string | null; effort: string | null }
 
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }

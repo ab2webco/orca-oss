@@ -11,6 +11,7 @@ import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
+import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -55,6 +56,8 @@ export type GameAgent = {
   limit?: { resetsAt: number | null }
   /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
   advisor?: GameMemberAdvisor
+  /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
+  launch?: GameMemberLaunch
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
