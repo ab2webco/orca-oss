@@ -11,7 +11,8 @@ export async function resolveGenerationTarget(
   worktreePath: string,
   agentId: string,
   provider: SshGitProvider | null,
-  deps: { getAgentEnvResolvers: () => CommitMessageAgentEnvironmentResolvers | undefined }
+  deps: { getAgentEnvResolvers: () => CommitMessageAgentEnvironmentResolvers | undefined },
+  claudeAccountId?: string | null
 ): Promise<CommitMessageGenerationTarget | null> {
   if (provider) {
     return {
@@ -22,7 +23,11 @@ export async function resolveGenerationTarget(
       missingBinaryLocation: 'remote PATH'
     }
   }
-  const localEnv = await prepareLocalCommitMessageAgentEnv(agentId, deps.getAgentEnvResolvers())
+  const localEnv = await prepareLocalCommitMessageAgentEnv(
+    agentId,
+    deps.getAgentEnvResolvers(),
+    claudeAccountId ? { claudeAccountId } : undefined
+  )
   if (!localEnv.ok) {
     return null
   }

@@ -27,6 +27,7 @@ import {
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import type { AgentGenerationFailureOutput } from '../text-generation/agent-failure-output'
 import { resolveGenerationTarget } from './first-work-generation-target'
+import { isClaudeUsageLimitFailure } from './claude-usage-limit-failure'
 import { runFolderWorkspaceTitleAutoRename } from './first-work-workspace-title-rename'
 
 export type FirstWorkBranchRenameEvent = {
@@ -62,6 +63,13 @@ export type FirstWorkBranchRenameDeps = {
     error: string | null,
     failureOutput?: AgentGenerationFailureOutput | null
   ) => void
+  /** Claude account the worktree's terminals are pinned to; null = the global selection. */
+  getPinnedClaudeAccountId: (worktreeId: string) => string | null
+  /** Another managed Claude account with quota left, skipping the ones already tried. */
+  pickClaudeFallbackAccountId: (tried: {
+    excludedAccountIds: readonly string[]
+    triedGlobal: boolean
+  }) => string | null
   /** Authoritative tab→worktree resolution from the session's tab map. */
   resolveWorktreeIdForTab: (tabId: string) => string | undefined
   /** Invalidate caches + notify the renderer so the new branch name surfaces. */
@@ -217,17 +225,50 @@ async function runAutoRename(
   }
   const params = resolvedParams.params
 
-  const target = await resolveGenerationTarget(worktreePath, params.agentId, provider, deps)
-  if (!target) {
-    deps.setRenameError(worktreeId, 'Could not prepare the branch-name generation environment.')
-    return retry('could not prepare generation environment')
+  // Run as the terminal's own account; on a usage limit move to another account with quota.
+  const triedAccountIds: string[] = []
+  let triedGlobal = false
+  let accountId = params.agentId === 'claude' ? deps.getPinnedClaudeAccountId(worktreeId) : null
+  let generated: Awaited<ReturnType<typeof generateBranchNameFromContext>>
+  for (;;) {
+    const target = await resolveGenerationTarget(
+      worktreePath,
+      params.agentId,
+      provider,
+      deps,
+      accountId
+    )
+    if (!target) {
+      deps.setRenameError(worktreeId, 'Could not prepare the branch-name generation environment.')
+      return retry('could not prepare generation environment')
+    }
+    generated = await generateBranchNameFromContext(
+      { firstPrompt: prompt, assistantMessage },
+      params,
+      target
+    )
+    if (
+      generated.success ||
+      generated.canceled ||
+      params.agentId !== 'claude' ||
+      !isClaudeUsageLimitFailure(generated.error, generated.failureOutput)
+    ) {
+      break
+    }
+    if (accountId) {
+      triedAccountIds.push(accountId)
+    } else {
+      triedGlobal = true
+    }
+    const fallbackId = deps.pickClaudeFallbackAccountId({
+      excludedAccountIds: triedAccountIds,
+      triedGlobal
+    })
+    if (!fallbackId) {
+      break
+    }
+    accountId = fallbackId
   }
-
-  const generated = await generateBranchNameFromContext(
-    { firstPrompt: prompt, assistantMessage },
-    params,
-    target
-  )
   if (!generated.success) {
     // Transient failure: retry on a later event; skip the badge for a user-canceled generation.
     if (!generated.canceled) {

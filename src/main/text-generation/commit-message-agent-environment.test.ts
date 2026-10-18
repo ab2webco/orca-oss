@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { prepareLocalCommitMessageAgentEnv } from './commit-message-agent-environment'
 import { ManagedCodexHomeTemporarilyUnavailableError } from '../codex-accounts/host-codex-managed-home-ownership'
 
@@ -213,5 +213,26 @@ describe('prepareLocalCommitMessageAgentEnv', () => {
     })
 
     expect(result).toEqual({ ok: true })
+  })
+
+  it('launches Claude as the requested managed account and never hands that id to Codex', async () => {
+    const prepareForClaudeLaunch = vi.fn(async () => ({
+      configDir: '/claude',
+      provenance: 'test',
+      envPatch: {},
+      stripAuthEnv: false
+    }))
+    const prepareForCodexLaunch = vi.fn(() => null)
+    const resolvers = { prepareForClaudeLaunch, prepareForCodexLaunch }
+
+    await prepareLocalCommitMessageAgentEnv('claude', resolvers, { claudeAccountId: 'acct-1' })
+    expect(prepareForClaudeLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ overrideAccountId: 'acct-1' })
+    )
+
+    await prepareLocalCommitMessageAgentEnv('codex', resolvers, { claudeAccountId: 'acct-1' })
+    expect(prepareForCodexLaunch).toHaveBeenCalledWith(
+      expect.not.objectContaining({ overrideAccountId: 'acct-1' })
+    )
   })
 })
