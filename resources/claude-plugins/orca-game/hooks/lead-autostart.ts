@@ -2,12 +2,9 @@ import type { EngineInterface } from 'claude-code'
 
 import { refresh, viewOf } from './fleet-sync'
 import { LEAD_SKILL, isLeadAutostart } from './game-lead'
+import { STARTED_KEY, startedOf } from './lead-started'
 
-export const STARTED_KEY = 'lead-started-sessions'
 const STARTED_MAX = 50
-
-export const startedOf = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((one): one is string => typeof one === 'string') : []
 
 /** Records that this session runs the lead rules; true when it already did. */
 export async function markLeadStarted($: EngineInterface): Promise<boolean> {

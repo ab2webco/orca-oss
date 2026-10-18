@@ -28,6 +28,8 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `  At most ${lead.cap} members run at once; when they are all busy, say which ticket waits.`,
     '- "Work on <ticket>", from the person or from the game Panel, means launch a member for it.',
     '- For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.',
+    '- Never use the Agent or Task tool: Orca refuses it here, and a subagent has no worktree, report or tracking.',
+    `  Every investigation, audit or test goes to a member: ${run('game launch <ticket> --prompt <task>')}.`,
     '- Wait for reports with',
     `  ${run('orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json')},`,
     '  in the background when your agent can (Claude Code: the Monitor tool), so the person can keep',
