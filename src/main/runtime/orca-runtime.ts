@@ -36039,8 +36039,10 @@ export class OrcaRuntimeService {
         this.pointedMessageIdsByHandle.delete(mailboxHandle)
       }
     }
+    // Why: heartbeats feed liveness, not the recipient's to-do list; pointing at them nudges an idle lead for nothing.
     const unread = pending.filter(
       (message) =>
+        message.type !== 'heartbeat' &&
         !options.reservedTypes?.has(message.type) &&
         !messageTypeHasLiveWaiter(waiters, message.type)
     )
