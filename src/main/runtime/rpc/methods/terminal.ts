@@ -840,7 +840,8 @@ const TerminalHandle = z.object({
 })
 
 const TerminalFocus = TerminalHandle.extend({
-  navigation: z.enum(['caller', 'host']).optional()
+  navigation: z.enum(['caller', 'host']).optional(),
+  source: z.string().max(256).optional()
 })
 
 const TerminalListParams = z.object({
@@ -1614,13 +1615,17 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'terminal.focus',
     params: TerminalFocus,
-    handler: async (params, { runtime, clientKind }) => ({
-      focus: await runtime.focusTerminal(params.terminal, {
-        navigateHost: navigationTargetsHost(
-          resolveRuntimeNavigationTarget({ navigation: params.navigation, clientKind })
-        )
-      })
-    })
+    handler: async (params, { runtime, clientKind }) => {
+      const navigateHost = navigationTargetsHost(
+        resolveRuntimeNavigationTarget({ navigation: params.navigation, clientKind })
+      )
+      const focus = await runtime.focusTerminal(params.terminal, { navigateHost })
+      // Why: a phone's own tab switch also focuses the host; only a terminal-sent focus is news to it.
+      if (navigateHost && params.source && clientKind !== 'mobile') {
+        await runtime.requestMobileTerminalOpen(focus, params.source)
+      }
+      return { focus }
+    }
   }),
   defineMethod({
     name: 'terminal.close',

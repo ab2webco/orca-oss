@@ -3190,6 +3190,7 @@ export class OrcaRuntimeService {
     (event: RuntimeClientEvent) => void,
     Map<string, string>
   >()
+  private mobileNavigationClientEventListeners = new Set<(event: RuntimeClientEvent) => void>()
   private nativeChatLaunchDraftResolutionByTabId = new Map<
     string,
     NativeChatLaunchDraftResolutionTombstone
@@ -5566,9 +5567,12 @@ export class OrcaRuntimeService {
 
   onClientEvent(
     listener: (event: RuntimeClientEvent) => void,
-    options?: { consumesTerminalSideEffects?: boolean }
+    options?: { consumesTerminalSideEffects?: boolean; consumesMobileNavigation?: boolean }
   ): () => void {
     this.clientEventListeners.add(listener)
+    if (options?.consumesMobileNavigation === true) {
+      this.mobileNavigationClientEventListeners.add(listener)
+    }
     if (options?.consumesTerminalSideEffects === false) {
       this.terminalSideEffectExcludedClientEventListeners.add(listener)
     } else {
@@ -5577,6 +5581,7 @@ export class OrcaRuntimeService {
     this.refreshTerminalSideEffectConsumerAvailability()
     return () => {
       this.clientEventListeners.delete(listener)
+      this.mobileNavigationClientEventListeners.delete(listener)
       this.terminalSideEffectExcludedClientEventListeners.delete(listener)
       this.terminalSideEffectTitleGateKeysByClientEventListener.delete(listener)
       this.refreshTerminalSideEffectConsumerAvailability()
@@ -5656,12 +5661,36 @@ export class OrcaRuntimeService {
           if (filtered) {
             listener(filtered)
           }
-        } else {
+        } else if (
+          event.type !== 'openTerminal' ||
+          this.mobileNavigationClientEventListeners.has(listener)
+        ) {
           listener(event)
         }
       },
       'client-event'
     )
+  }
+
+  async requestMobileTerminalOpen(
+    focus: RuntimeTerminalFocus,
+    sourceHandle: string
+  ): Promise<void> {
+    if (sourceHandle === focus.handle) {
+      return
+    }
+    // Why: resolved like game.state's caller, so a source the game can read is one a phone can follow.
+    const sourceWorktreeId = (await this.showTerminal(sourceHandle).catch(() => null))?.worktreeId
+    if (!sourceWorktreeId) {
+      return
+    }
+    this.emitClientEvent({
+      type: 'openTerminal',
+      worktreeId: focus.worktreeId,
+      terminal: focus.handle,
+      tabId: focus.tabId,
+      sourceWorktreeId
+    })
   }
 
   private filterTerminalSideEffectEventForClient(

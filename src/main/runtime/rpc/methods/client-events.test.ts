@@ -18,7 +18,7 @@ function makeRuntime(): {
   const onClientEvent = vi.fn(
     (
       _listener: (event: RuntimeClientEvent) => void,
-      _options?: { consumesTerminalSideEffects?: boolean }
+      _options?: { consumesTerminalSideEffects?: boolean; consumesMobileNavigation?: boolean }
     ) =>
       () => {}
   )
@@ -32,7 +32,7 @@ function makeRuntime(): {
 }
 
 describe('runtime.clientEvents.subscribe', () => {
-  it('registers mobile subscriptions as non-consumers of terminal side effects', async () => {
+  it('registers mobile subscriptions for navigation but not terminal side effects', async () => {
     const { runtime, onClientEvent, cleanups } = makeRuntime()
 
     const done = subscribeMethod.handler(
@@ -42,7 +42,8 @@ describe('runtime.clientEvents.subscribe', () => {
     )
 
     expect(onClientEvent).toHaveBeenCalledWith(expect.any(Function), {
-      consumesTerminalSideEffects: false
+      consumesTerminalSideEffects: false,
+      consumesMobileNavigation: true
     })
     cleanups.forEach((cleanup) => cleanup())
     await done
@@ -58,7 +59,8 @@ describe('runtime.clientEvents.subscribe', () => {
     )
 
     expect(onClientEvent).toHaveBeenCalledWith(expect.any(Function), {
-      consumesTerminalSideEffects: true
+      consumesTerminalSideEffects: true,
+      consumesMobileNavigation: false
     })
     cleanups.forEach((cleanup) => cleanup())
     await done

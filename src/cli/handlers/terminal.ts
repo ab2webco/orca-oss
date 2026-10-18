@@ -77,9 +77,12 @@ function getRequestedTuiAgent(
 }
 
 const terminalFocusHandler: CommandHandler = async ({ flags, client, cwd, json }) => {
+  // Why: the caller's own pane lets the host tell a phone watching it to follow (ORCA-611).
+  const source = process.env.ORCA_TERMINAL_HANDLE?.trim()
   const result = await client.call<{ focus: RuntimeTerminalFocus }>('terminal.focus', {
     terminal: await getTerminalHandle(flags, cwd, client),
-    navigation: 'host'
+    navigation: 'host',
+    ...(source ? { source } : {})
   })
   printResult(result, json, formatTerminalFocus)
 }

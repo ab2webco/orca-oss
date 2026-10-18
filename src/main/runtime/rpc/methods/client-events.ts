@@ -24,7 +24,10 @@ export const CLIENT_EVENT_METHODS: readonly RpcAnyMethod[] = [
           (event) => {
             emit(event)
           },
-          { consumesTerminalSideEffects: clientKind !== 'mobile' }
+          {
+            consumesTerminalSideEffects: clientKind !== 'mobile',
+            consumesMobileNavigation: clientKind === 'mobile'
+          }
         )
 
         const seq = ++clientEventSubscriptionSeq
