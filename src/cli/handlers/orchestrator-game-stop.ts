@@ -1,4 +1,5 @@
 import type { CommandHandler } from '../dispatch'
+import { RuntimeClientError } from '../runtime-client'
 import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-fleet-verbs'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 
@@ -21,6 +22,8 @@ export type GameStopEntry = {
   dispatchId?: string
   dispatchState?: string
   closedTerminal?: string
+  /** Its tab was gone before the close; nothing was left to close. */
+  alreadyClosedTerminal?: string
   reason?: string
   /** Why its history record was not written; it is stopped anyway. */
   history?: string
@@ -39,6 +42,10 @@ const STOPPABLE: ReadonlySet<string> = new Set([
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
+
+// Why: the runtime has no wire code for this; it arrives as runtime_error carrying the bare message.
+const isTabGone = (error: unknown): boolean =>
+  error instanceof RuntimeClientError && error.message === 'tab_not_found'
 
 /** The member's live dispatch: the one on its terminal, else the one in its worktree. */
 export function dispatchOf(
@@ -91,8 +98,13 @@ async function stopOne(
       entry.closedTerminal = handle
       entry.outcome = 'stopped'
     } catch (error) {
-      entry.outcome = 'failed'
-      entry.reason = `closing ${handle} failed: ${errorText(error)}`
+      if (isTabGone(error)) {
+        entry.alreadyClosedTerminal = handle
+        entry.outcome = 'stopped'
+      } else {
+        entry.outcome = 'failed'
+        entry.reason = `closing ${handle} failed: ${errorText(error)}`
+      }
     }
   } else if (dispatch && entry.dispatchState === undefined) {
     entry.outcome = 'failed'
@@ -144,7 +156,8 @@ export function formatStop(stop: GameStopResult): string {
     .map((member) => {
       const done = [
         member.dispatchId ? `dispatch ${member.dispatchId} ${member.dispatchState ?? '?'}` : '',
-        member.closedTerminal ? `closed ${member.closedTerminal}` : ''
+        member.closedTerminal ? `closed ${member.closedTerminal}` : '',
+        member.alreadyClosedTerminal ? `${member.alreadyClosedTerminal} tab already closed` : ''
       ].filter(Boolean)
       return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}${member.history ? `\n  history ${member.history}` : ''}`
     })

@@ -413,6 +413,23 @@ describe('terminal close and handle incarnation continuity', () => {
     })
   })
 
+  it('still tears down the PTY when its published tab is already gone', async () => {
+    const harness = createPtyBackedPublishedSurfaceHarness()
+    vi.spyOn(harness.runtime, 'closeMobileSessionTab').mockRejectedValueOnce(
+      new Error('tab_not_found')
+    )
+    const [{ handle }] = (await harness.runtime.listTerminals(`id:${WORKTREE_ID}`)).terminals
+
+    await expect(harness.runtime.closeTerminal(handle)).resolves.toMatchObject({
+      handle,
+      tabId: TAB_ID
+    })
+    expect(harness.stopAndWait).toHaveBeenCalledWith(RUNTIME_OWNED_PTY_ID, {
+      deadlineMs: expect.any(Number)
+    })
+    expect(harness.kill).toHaveBeenCalledWith(RUNTIME_OWNED_PTY_ID)
+  })
+
   it('does not tear down a published PTY when retirement fails before acknowledgement', async () => {
     const harness = createPtyBackedPublishedSurfaceHarness()
     harness.rejectTerminalTabClose(new Error('terminal_tab_pinned'))
