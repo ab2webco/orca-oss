@@ -116,6 +116,11 @@ describe('useFollowHostTerminalOpen', () => {
     expect(selectTab).toHaveBeenCalledWith(memberTab)
   })
 
+  it('selects a quick-switched member by its tab when no handle was sent', () => {
+    render({ worktreeId: 'wt-member', routeTab: 'tab-member', sessionTabs: [memberTab] })
+    expect(selectTab).toHaveBeenCalledWith(memberTab)
+  })
+
   it('selects the pushed terminal once its tab arrives, and only once', () => {
     render({ worktreeId: 'wt-member', routeTerminal: 'term_member', routeTab: 'tab-member' })
     expect(selectTab).not.toHaveBeenCalled()

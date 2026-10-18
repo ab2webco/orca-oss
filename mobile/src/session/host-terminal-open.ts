@@ -45,10 +45,12 @@ export function hostTerminalOpenRoute(
 /** By handle first; the host's tab id covers a handle reminted since the request was sent. */
 export function sessionTabForHostOpen(
   tabs: readonly MobileSessionTab[],
-  request: Pick<HostTerminalOpenRequest, 'terminal' | 'tabId'>
+  request: { terminal: string | undefined; tabId: string }
 ): MobileSessionTab | null {
   return (
-    tabs.find((tab) => tab.type === 'terminal' && tab.terminal === request.terminal) ??
+    (request.terminal
+      ? tabs.find((tab) => tab.type === 'terminal' && tab.terminal === request.terminal)
+      : undefined) ??
     tabs.find(
       (tab) =>
         tab.type === 'terminal' && (tab.id === request.tabId || tab.parentTabId === request.tabId)

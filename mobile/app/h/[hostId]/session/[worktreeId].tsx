@@ -280,6 +280,9 @@ import { colors } from '../../../../src/theme/mobile-theme'
 import { QuickCommandsTabButton } from '../../../../src/session/QuickCommandsTabButton'
 import { styles } from '../../../../src/session/mobile-session-styles'
 import { useFollowHostTerminalOpen } from '../../../../src/session/use-follow-host-terminal-open'
+import { leadMemberRoute, leadPaneKeyOf } from '../../../../src/session/lead-members'
+import { LeadMembersStrip } from '../../../../src/session/LeadMembersStrip'
+import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
 import type { TerminalQuickCommand } from '../../../../../src/shared/terminal-quick-command-types'
 import type {
@@ -2867,6 +2870,12 @@ export default function SessionScreen() {
     sessionTabs,
     selectTab: switchSessionTab
   })
+  const leadMembers = useLeadMembers({
+    client,
+    hostId,
+    worktreeId,
+    leadPaneKey: leadPaneKeyOf(sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null)
+  })
 
   // Why: only store the ref; subscribe on web-ready to avoid the blank-terminal race (init queued before xterm.js loaded).
   const setTerminalWebViewRef = useCallback((handle: string, ref: TerminalWebViewHandle | null) => {
@@ -4489,6 +4498,10 @@ export default function SessionScreen() {
               />
             </View>
           )}
+          <LeadMembersStrip
+            members={leadMembers}
+            onOpen={(member) => router.push(leadMemberRoute(hostId, member))}
+          />
         </SafeAreaView>
 
         {/* Content-row host (KTD2): on wide, content shares this row with the docked panel as the flex-1 left child. */}
