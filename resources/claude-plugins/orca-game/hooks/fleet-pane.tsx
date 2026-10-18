@@ -4,7 +4,7 @@ import type { GameAgent } from '../types'
 import { advisorCard, advisorCardViewOf } from './advisor-card'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { petLabelOf } from './band-chips'
-import { CI_COLORS, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { CI_COLORS, memberHeadingOf, reviewTextOf, workItemTextOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
@@ -20,6 +20,8 @@ import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './que
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberAdvisorLinesOf } from './member-advisor'
+import { tapButtonsOf, type TapButton } from './tap-buttons'
+import { isTapLayout } from './tap-layout'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
@@ -41,40 +43,78 @@ export const registerFleetPane = (on: On): void => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
+    const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
+    const isTap = isTapLayout(columns)
+    const tapOf = (one: Omit<TapButton, 'color' | 'backgroundColor'>): TapButton => ({
+      ...one,
+      color: palette.parchment,
+      backgroundColor: palette.panel
+    })
     const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
       <Button key={key} plain hotkey={hotkey} onPress={onPress}>
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
     )
     // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
+    const viewPressOf = (agent: GameAgent, handle: string) => () =>
+      void focusTerminal($, handle).then((isFocused) => {
+        if (!isFocused) {
+          $.ui.toast(text.couldNotOpen(agent.displayName))
+        }
+      })
+    const viewHotkeyOf = (index: number) => (index < 9 ? String(index + 1) : undefined)
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
         key={`view-${agent.paneKey}`}
         plain
-        hotkey={index < 9 ? String(index + 1) : undefined}
-        onPress={() =>
-          void focusTerminal($, handle).then((isFocused) => {
-            if (!isFocused) {
-              $.ui.toast(text.couldNotOpen(agent.displayName))
-            }
-          })
-        }
+        hotkey={viewHotkeyOf(index)}
+        onPress={viewPressOf(agent, handle)}
       >
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>
           {` ${text.view} `}
         </Text>
       </Button>
     )
-    const menuRow = (
+    // On a phone View leaves the card's narrow text column for a full-width button under it.
+    const tapView = (agent: GameAgent, handle: string, index: number) =>
+      tapButtonsOf(
+        $,
+        e,
+        `view-tap-${agent.paneKey}`,
+        [
+          {
+            ...tapOf({
+              key: `view-${agent.paneKey}`,
+              label: `▸ ${text.view} · ${memberHeadingOf(agent).name || agent.displayName}`,
+              hotkey: viewHotkeyOf(index),
+              onPress: viewPressOf(agent, handle)
+            }),
+            bold: true
+          }
+        ],
+        columns
+      )
+    const menuItems = [
+      {
+        key: 'refresh',
+        hotkey: 'r',
+        label: `↻ ${text.refresh}`,
+        onPress: () => void refreshSoon($).catch(() => undefined)
+      },
+      { key: 'pet', hotkey: 'p', label: petLabelOf(scene), onPress: () => clawdReact($, 'pet') },
+      { key: 'quit', hotkey: 'q', label: `✕ ${text.close}`, onPress: close }
+    ]
+    const menuRow = isTap ? (
+      tapButtonsOf(
+        $,
+        e,
+        'pane-menu-tap',
+        menuItems.map((one) => ({ ...tapOf(one), bold: true })),
+        columns
+      )
+    ) : (
       <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-        {menu(
-          'refresh',
-          'r',
-          `↻ ${text.refresh}`,
-          () => void refreshSoon($).catch(() => undefined)
-        )}
-        {menu('pet', 'p', petLabelOf(scene), () => clawdReact($, 'pet'))}
-        {menu('quit', 'q', `✕ ${text.close}`, close)}
+        {menuItems.map((one) => menu(one.key, one.hotkey, one.label, one.onPress))}
       </Box>
     )
     const advisorView = await advisorCardViewOf($)
@@ -98,7 +138,6 @@ export const registerFleetPane = (on: On): void => {
       member: memberOf(agent, state, config.rewards)
     }))
     const party = members.filter((one) => !one.agent.isLeader).map((one) => one.member)
-    const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
     const level = config.rewards ? levelOf(v.xp) : undefined
     const extras = { isHeroWorking: isSceneShown(), level, isDemo: v.isDemo }
     const art = await animate($, e, [
@@ -132,26 +171,40 @@ export const registerFleetPane = (on: On): void => {
     const worktreeId = state.worktree?.id ?? ''
     const link = (key: string, url: string, label: string, child: RenderElement) =>
       gameLinkOf($, e, { key, url, worktreeId, label }, child)
+    const linkPressOf = (one: PaneLink) => () =>
+      one.action === undefined
+        ? void openGameLink($, one.url, worktreeId).then((isOpen) => {
+            if (!isOpen) {
+              $.ui.toast(text.couldNotOpenLink(one.label))
+            }
+          })
+        : void runAction($, one.action, v.isDemo).catch(() => undefined)
     const linkButton = (one: PaneLink) => (
-      <Button
-        key={one.key}
-        plain
-        hotkey={one.hotkey}
-        onPress={() =>
-          one.action === undefined
-            ? void openGameLink($, one.url, worktreeId).then((isOpen) => {
-                if (!isOpen) {
-                  $.ui.toast(text.couldNotOpenLink(one.label))
-                }
-              })
-            : void runAction($, one.action, v.isDemo).catch(() => undefined)
-        }
-      >
+      <Button key={one.key} plain hotkey={one.hotkey} onPress={linkPressOf(one)}>
         <Text backgroundColor={palette.panel} color={palette.parchment}>{` ${one.label} `}</Text>
       </Button>
     )
     const links = paneLinksOf(state)
-    const projectRows = await projectRowsOf($, e, state, palette, v.isDemo)
+    const linksRow = isTap ? (
+      <Box key="pane-links" flexDirection="column">
+        <Text dimColor>{text.openHeading}</Text>
+        {tapButtonsOf(
+          $,
+          e,
+          'pane-links-tap',
+          links.map((one) =>
+            tapOf({ key: one.key, hotkey: one.hotkey, label: one.label, onPress: linkPressOf(one) })
+          ),
+          columns
+        )}
+      </Box>
+    ) : (
+      <Box key="pane-links" flexDirection="row" columnGap={1} flexWrap="wrap">
+        <Text dimColor>{text.openHeading}</Text>
+        {links.map(linkButton)}
+      </Box>
+    )
+    const projectRows = await projectRowsOf($, e, state, palette, v.isDemo, columns)
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
@@ -174,20 +227,23 @@ export const registerFleetPane = (on: On): void => {
             {` ! ${need.name}  ${need.text}`}
           </Text>
         ))}
-        {members.map(({ agent, member }, index) =>
+        {members.flatMap(({ agent, member }, index) => [
           memberCard($, e, agent, member, {
             scene,
             room: cardRoom,
             leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
             tile: art.get(`tile-${member.key}`),
             view:
-              agent.terminalHandle === undefined
+              agent.terminalHandle === undefined || isTap
                 ? undefined
                 : view(agent, agent.terminalHandle, index),
             advisorRows: advisorRowsOf(agent),
             link
-          })
-        )}
+          }),
+          ...(agent.terminalHandle === undefined || !isTap
+            ? []
+            : [tapView(agent, agent.terminalHandle, index)])
+        ])}
         {advisorOf(art)}
         {state.review !== null && (
           <Box flexDirection="row" gap={1}>
@@ -228,12 +284,7 @@ export const registerFleetPane = (on: On): void => {
           </Box>
         )}
         {projectRows}
-        {links.length > 0 && (
-          <Box key="pane-links" flexDirection="row" columnGap={1} flexWrap="wrap">
-            <Text dimColor>{text.openHeading}</Text>
-            {links.map(linkButton)}
-          </Box>
-        )}
+        {links.length > 0 && linksRow}
         {menuRow}
       </Box>
     )
