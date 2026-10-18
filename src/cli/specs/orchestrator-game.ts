@@ -28,6 +28,18 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game lead']
   },
   {
+    path: ['game', 'leads'],
+    summary: 'List the project leads that are live on this Orca host',
+    usage: 'orca game leads [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      'Prints project, label, lead handle and state. A session is listed once `orca game lead` ran in it and while its terminal exists.',
+      'Only leads on this Orca host appear: leads on other paired hosts are not listed.',
+      'Message a lead with `orca orchestration send --to <lead handle> --subject <subject> --body <request>`; a host older than this prints that it does not support game leads.'
+    ],
+    examples: ['orca game leads', 'orca game leads --json']
+  },
+  {
     path: ['game', 'open-link'],
     summary: "Open a game link in the system browser of Orca Lab's desktop",
     usage: 'orca game open-link <url> [--json]',
