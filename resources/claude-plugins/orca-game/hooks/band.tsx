@@ -5,12 +5,12 @@ import { CHIP_ROWS, MENU_ROWS, menuChipsOf, stateChipsOf } from './band-chips'
 import { fitCells } from './cell-width'
 import { chipRowsOf, MORE_CHIP_KEY, type Chip, type PlacedChip } from './chip-rows'
 import { needPartsOf } from './fleet-labels'
-import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf } from './fleet-hud'
+import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf, xpTextOf } from './fleet-hud'
 import { runAction } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { ACTION_CHIP_PREFIX, actionChipsOf } from './lead-actions'
-import { openPane } from './fleet-pane'
+import { isPaneShown, openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
 import { countsOf, needsOf, partyOf } from './party'
 import { animate } from './quest'
@@ -56,9 +56,10 @@ export const registerBand = (on: On): void => {
     const v = await viewOf($)
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
-    const [beneath, allies] = await Promise.all([
+    const [beneath, allies, isPanelShown] = await Promise.all([
       next(e).then(beneathOf),
-      alliesStrip($, e, palette, columns)
+      alliesStrip($, e, palette, columns),
+      isPaneShown($)
     ])
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
@@ -142,7 +143,7 @@ export const registerBand = (on: On): void => {
     }
     const isFramed = columns >= HUD_MIN_COLUMNS
     const isArtShown = config.mode !== 'off' && e.surface === 'terminal'
-    const art = await animate($, e, isFramed ? [...pet, hud] : pet)
+    const art = await animate($, e, isFramed && !isPanelShown ? [...pet, hud] : pet)
     const worktreeId = state.worktree?.id ?? ''
     const linkOf = (key: string, url: string, label: string, child: RenderElement) =>
       url === '' ? child : gameLinkOf($, e, { key, url, worktreeId, label }, child)
@@ -277,7 +278,16 @@ export const registerBand = (on: On): void => {
     return (
       <Box flexDirection="column">
         {art.get(PET_KEY)}
-        {isFramed || !isArtShown ? (
+        {/* Why: the shown Panel draws the same team; the band keeps the cloud's scene and progress. */}
+        {isPanelShown ? (
+          level !== undefined && (
+            <Box key="band-progress" flexDirection="row" overflow="hidden">
+              <Text color={palette.parchment} backgroundColor={palette.panel} wrap="truncate-end">
+                {fitCells([...(v.isDemo ? ['DEMO'] : []), xpTextOf(level)].join(' · '), columns)}
+              </Text>
+            </Box>
+          )
+        ) : isFramed || !isArtShown ? (
           art.get(HUD_KEY)
         ) : (
           <Box key="band-hud-line" flexDirection="row" overflow="hidden">
