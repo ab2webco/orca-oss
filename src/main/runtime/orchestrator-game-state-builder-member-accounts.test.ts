@@ -117,4 +117,33 @@ describe('buildOrchestratorGameState member accounts', () => {
       ['tab-5:quiet', undefined]
     ])
   })
+
+  it('carries the model and effort Orca launched each member on, asking only for members', async () => {
+    const asked: string[] = []
+    const launch = { model: 'Opus 5.5', effort: 'high' }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-5:typed', parentPaneKey: 'tab-1:lead' }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      launchOf: (paneKey) => {
+        asked.push(paneKey)
+        return paneKey === 'tab-4:here' ? launch : null
+      },
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(asked).toEqual(['tab-4:here', 'tab-5:typed'])
+    expect(state.agents.map((agent) => [agent.paneKey, agent.launch])).toEqual([
+      ['tab-1:lead', undefined],
+      ['tab-4:here', launch],
+      ['tab-5:typed', undefined]
+    ])
+  })
 })

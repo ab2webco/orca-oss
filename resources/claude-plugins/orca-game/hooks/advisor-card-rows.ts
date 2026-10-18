@@ -18,8 +18,17 @@ export type AdvisorCard = {
   pose: AdvisorGesture | null
 }
 
-/** Whether this pane is the lead's, so its main conversation is named the lead. */
-export type AdvisorCardContext = { isLead: boolean }
+/** A live member as the lead's card lists it; `isJev` when its own Jev reported the model. */
+export type AdvisorCardMember = { key: string; name: string; model: string | null; isJev: boolean }
+
+/** Whether this pane is the lead's, so its main conversation is named the lead, and its members. */
+export type AdvisorCardContext = { isLead: boolean; members?: readonly AdvisorCardMember[] }
+
+const memberRowOf = (member: AdvisorCardMember): AdvisorCardRow => ({
+  key: `member|${member.key}`,
+  text: `${member.isJev ? '◆' : '◇'} ${[member.name, member.model ?? ''].filter((one) => one !== '').join(' · ')}`,
+  gesture: null
+})
 
 const modelEffortOf = (model: string | null, effort: string | number | null): string =>
   [model ?? '', effort === null ? '' : String(effort)].filter((one) => one !== '').join('·')
@@ -64,6 +73,7 @@ export const advisorCardOf = (
   const subagents = decisions.filter((one) => !isMainOf(one))
   const rows = [
     ...(main === null ? [] : [main]),
+    ...(context.isLead ? (context.members ?? []).map(memberRowOf) : []),
     ...subagents.slice(-(main === null ? CARD_ROWS : CARD_ROWS - 1)).map(subagentRowOf)
   ]
   return {

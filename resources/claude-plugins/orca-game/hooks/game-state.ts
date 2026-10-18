@@ -23,7 +23,7 @@ import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
 import { memberAccountOf, memberLimitOf } from './member-tags'
-import { memberAdvisorOf } from './member-advisor'
+import { memberAdvisorOf, memberLaunchOf } from './member-advisor'
 import { GAME_LOCALES } from './game-strings'
 
 const parseJson = (text: string): unknown => {
@@ -210,6 +210,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const limit = memberLimitOf(value.limit)
   const account = memberAccountOf(value.account)
   const advisor = memberAdvisorOf(value.advisor)
+  const launch = memberLaunchOf(value.launch)
   return [
     {
       paneKey,
@@ -226,7 +227,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(workItem === null ? {} : { workItem }),
       ...(limit === undefined ? {} : { limit }),
       ...(account === undefined ? {} : { account }),
-      ...(advisor === undefined ? {} : { advisor })
+      ...(advisor === undefined ? {} : { advisor }),
+      ...(launch === undefined ? {} : { launch })
     }
   ]
 }

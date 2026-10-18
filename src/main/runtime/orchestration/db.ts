@@ -92,6 +92,25 @@ function parseWorkerTerminalPriorOwnerIds(value: string): string[] | null {
   }
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** A dispatch's `launch.effective` selection, only when it chose a model or an effort. */
+function chosenLaunchSelectionOf(startOptions: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(startOptions)
+    const launch = isRecord(parsed) ? parsed.launch : undefined
+    const effective = isRecord(launch) ? launch.effective : undefined
+    if (!isRecord(effective)) {
+      return null
+    }
+    const isChosen = (value: unknown) => value !== null && value !== undefined
+    return isChosen(effective.model) || isChosen(effective.effort) ? effective : null
+  } catch {
+    return null
+  }
+}
+
 // Why: indexable pre-filter for isEquivalentPaneKey — equal strings and equal leaves both share the
 // text after the first ':', so this narrows candidates without deciding equivalence itself.
 const RUN_PANE_KEY_MATCH_SUFFIX_SQL =
@@ -4691,6 +4710,23 @@ export class OrchestrationDb {
     return this.db
       .prepare('SELECT * FROM worker_dispatches WHERE dispatch_id = ?')
       .get(dispatchId) as WorkerDispatchRow | undefined
+  }
+
+  /** The newest launch that chose a model or effort for this terminal; a reuse dispatch chooses neither. */
+  workerLaunchForTerminal(terminalHandle: string): Record<string, unknown> | null {
+    const rows = this.db
+      .prepare(
+        `SELECT start_options FROM worker_dispatches
+         WHERE agent_terminal_handle = ? ORDER BY rowid DESC`
+      )
+      .all(terminalHandle) as { start_options: string }[]
+    for (const row of rows) {
+      const effective = chosenLaunchSelectionOf(row.start_options)
+      if (effective) {
+        return effective
+      }
+    }
+    return null
   }
 
   listLegacyWorkerTerminalRecoveryRows(): LegacyWorkerTerminalRecoveryRow[] {

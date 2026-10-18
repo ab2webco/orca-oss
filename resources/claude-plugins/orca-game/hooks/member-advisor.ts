@@ -1,5 +1,5 @@
-import type { GameMemberAdvisor, GameMemberAdvisorPick } from '../types'
-import { cellWidthOf, fitCells } from './cell-width'
+import type { GameMemberAdvisor, GameMemberAdvisorPick, GameMemberLaunch } from '../types'
+import { cellWidthOf } from './cell-width'
 import { gameStrings } from './game-strings'
 
 // What a member card says about the model and effort Jev has that member on.
@@ -26,11 +26,23 @@ export const memberAdvisorOf = (value: unknown): GameMemberAdvisor | undefined =
   }
 }
 
+export const memberLaunchOf = (value: unknown): GameMemberLaunch | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const launch = pickOf(value)
+  const isText = (one: unknown) => one === undefined || one === null || typeof one === 'string'
+  return isText(value.model) && isText(value.effort) && (launch.model ?? launch.effort) !== null
+    ? launch
+    : undefined
+}
+
 const pickText = (pick: GameMemberAdvisorPick): string =>
   [pick.model ?? '', pick.effort ?? ''].filter((one) => one !== '').join('·')
 
+// Why whole when nothing fits: the card wraps it, so the model is never cut.
 const fitted = (tries: readonly string[], room: number): string =>
-  tries.find((one) => cellWidthOf(one) <= room) ?? fitCells(tries.at(-1) ?? '', room)
+  tries.find((one) => cellWidthOf(one) <= room) ?? tries.at(-1) ?? ''
 
 // Why only what changed: "Opus 5.5 → Sonnet 5.5" reads at a glance where the full pair would not fit.
 const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): string => {
@@ -44,7 +56,7 @@ const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): st
   return `↳ ${side(before) || '?'} → ${side(now) || '?'}`
 }
 
-/** The card's Jev rows cut to `room` cells: Jev's name goes first, then the pin, never the model. */
+/** The card's Jev rows fit to `room` cells: Jev's name goes first, then the pin; the rest wraps. */
 export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): string[] => {
   const now = pickText(advisor)
   if (now === '') {
@@ -54,16 +66,36 @@ export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): 
   const pinned = pins === '' ? '' : ` · ${pins}`
   const head = fitted([`◆ Jev ${now}${pinned}`, `◆ ${now}${pinned}`, `◆ ${now}`], room)
   const moved = advisor.previous === undefined ? '' : switchOf(advisor.previous, advisor)
-  return moved === '' ? [head] : [head, fitCells(moved, room)]
+  return moved === '' ? [head] : [head, moved]
 }
 
-/** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev names a model; null for none. */
-export const fleetAdvisorSummaryOf = (
-  agents: readonly { advisor?: GameMemberAdvisor }[]
-): string | null => {
+type MemberModels = { advisor?: GameMemberAdvisor; launch?: GameMemberLaunch }
+
+// Why Jev first: it may have moved the member off the model Orca launched it on.
+const pickNowOf = (agent: MemberModels): GameMemberAdvisorPick | undefined =>
+  agent.advisor?.model ? agent.advisor : (agent.launch ?? agent.advisor)
+
+/** What the member runs now as `model·effort`; null when neither Jev nor its launch names one. */
+export const memberModelOf = (agent: MemberModels): string | null => {
+  const pick = pickNowOf(agent)
+  const text = pick === undefined ? '' : pickText(pick)
+  return text === '' ? null : text
+}
+
+/** A card's model rows: its Jev's when it reports one, else `◇` and the model Orca launched it on. */
+export const memberModelLinesOf = (agent: MemberModels, room: number): string[] => {
+  if (agent.advisor !== undefined && pickText(agent.advisor) !== '') {
+    return memberAdvisorLinesOf(agent.advisor, room)
+  }
+  const launch = agent.launch === undefined ? '' : pickText(agent.launch)
+  return launch === '' ? [] : [`◇ ${launch}`]
+}
+
+/** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev or launch names a model; null for none. */
+export const fleetAdvisorSummaryOf = (agents: readonly MemberModels[]): string | null => {
   const counts = new Map<string, number>()
   for (const agent of agents) {
-    const model = agent.advisor?.model
+    const model = pickNowOf(agent)?.model
     if (model !== undefined && model !== null && model !== '') {
       counts.set(model, (counts.get(model) ?? 0) + 1)
     }
