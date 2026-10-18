@@ -37,6 +37,24 @@ describe('the lab release signal gate', () => {
     }
   )
 
+  // The implicit success() is false over a skipped ancestor, so a dry run or
+  // skip_gate (gate_static/gate_tests skipped) would skip every build behind it.
+  it.each(['version', 'mac', 'linux', 'windows', 'finalize'])(
+    'runs %s past a skipped gate job, but only when each direct need succeeded',
+    (jobKey) => {
+      const job = release.jobs[jobKey]
+      expect(job.if).toContain('!cancelled()')
+      expect(job.if).not.toContain('always()')
+      for (const dependency of [job.needs].flat()) {
+        expect(job.if).toContain(`needs.${dependency}.result == 'success'`)
+      }
+    }
+  )
+
+  it('never finalizes a dry run', () => {
+    expect(release.jobs.finalize.if).toContain('inputs.dry_run != true')
+  })
+
   it('reaches a verdict even when a gate job failed, was cancelled or was skipped', () => {
     expect(verdict.if).toContain('always()')
   })
