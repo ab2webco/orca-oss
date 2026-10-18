@@ -33,9 +33,11 @@ export function useFollowHostTerminalOpen({
   const router = useRouter()
   const focusedRef = useRef(false)
   const sessionTabsRef = useRef(sessionTabs)
-  sessionTabsRef.current = sessionTabs
   const selectTabRef = useRef(selectTab)
-  selectTabRef.current = selectTab
+  useEffect(() => {
+    sessionTabsRef.current = sessionTabs
+    selectTabRef.current = selectTab
+  }, [selectTab, sessionTabs])
 
   useFocusEffect(
     useCallback(() => {
