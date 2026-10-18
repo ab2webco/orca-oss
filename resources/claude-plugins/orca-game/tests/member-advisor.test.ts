@@ -313,6 +313,53 @@ describe("the lead's Panel", () => {
     }
   )
 
+  test(
+    'names the model Orca launched a member on, on its card and under the lead',
+    WITH_JEV,
+    async ($, on) => {
+      const env = { TEST_ADVISOR: JSON.stringify(advisorOn('Opus 5.5', 'high')) }
+      const state = leadState()
+      const launched = { ...state.agents[1], launch: { model: 'Opus 5.5', effort: 'high' } }
+      await start($, on, env, [], { ...state, agents: [state.agents[0], launched] })
+      const ui = await pane($)
+      expect(await ui.find({ type: 'Text', text: '◇ Opus 5.5·high' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '◇ CIN-5 · Opus 5.5·high' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '◆ 1 on Opus 5.5' })).toBeDefined()
+      await ui.unmount()
+    }
+  )
+
+  // Why: a light theme paints the Panel near-white, where the scene's parchment cannot be read.
+  test(
+    "draws the advisor card's lead and member rows in the terminal's own color",
+    WITH_JEV,
+    async ($, on) => {
+      const env = { TEST_ADVISOR: JSON.stringify(advisorOn('Opus 5.5', 'high')) }
+      const state = leadState()
+      const launched = { ...state.agents[1], launch: { model: 'Opus 5.5', effort: 'high' } }
+      await start($, on, env, [], { ...state, agents: [state.agents[0], launched] })
+      const ui = await pane($)
+      const lead = await ui.find({ type: 'Text', text: '★ lead · Opus 5.5·high' })
+      const row = await ui.find({ type: 'Text', text: '◇ CIN-5 · Opus 5.5·high' })
+      expect(lead).toBeDefined()
+      expect(row).toBeDefined()
+      expect(lead?.props.color).toBeUndefined()
+      expect(row?.props.color).toBeUndefined()
+      await ui.unmount()
+    }
+  )
+
+  test("wraps a member card's model line instead of cutting it", WITH_JEV, async ($, on) => {
+    const state = leadState()
+    const launched = { ...state.agents[1], launch: { model: 'Opus 5.5', effort: 'high' } }
+    await start($, on, {}, [], { ...state, agents: [state.agents[0], launched] })
+    const ui = await pane($)
+    const line = await ui.find({ type: 'Text', text: '◇ Opus 5.5·high' })
+    expect(line).toBeDefined()
+    expect(line?.props.wrap ?? 'wrap').toBe('wrap')
+    await ui.unmount()
+  })
+
   test('draws no Jev row for a member whose Orca or Jev sends none', async ($, on) => {
     await start($, on, {}, [], leadState())
     const ui = await pane($)
