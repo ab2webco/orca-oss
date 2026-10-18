@@ -34,7 +34,8 @@ export const ES: GameCatalog = {
       working: 'trabajando',
       idle: 'inactivo',
       done: 'terminado',
-      waiting: '! esperando'
+      waiting: '! esperando',
+      orchestrating: 'orquestando'
     },
     reviewStates: { open: 'abierto', draft: 'borrador', merged: 'mergeado', closed: 'cerrado' },
     ciWords: {

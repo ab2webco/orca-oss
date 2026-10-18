@@ -2,6 +2,7 @@ import type { GameAgent, GameState } from '../types'
 import type { HudMember } from './fleet-hud'
 import { linkOfKind } from './fleet-labels'
 import { gameStrings } from './game-strings'
+import { leadStateOf } from './lead-state'
 import type { MemberState, Mood } from './party-sprites'
 import { actionOf, activityOf, phaseOf, type FlowPhase } from './quest-policy'
 import { isCiRed, reviewLabelOf } from './rewards'
@@ -50,7 +51,31 @@ const saysOf = (agent: GameAgent): string => {
   return tool === '' ? says[agent.state] : (activityOf(tool, {}).split(' ')[0] ?? tool)
 }
 
+// A lead still at work never rests: no finished costume, and no cheer, which the sprites draw asleep.
+const awakeLeadOf = (agent: GameAgent, state: GameState): PartyMember | undefined => {
+  const lead = agent.isLeader ? leadStateOf(state) : undefined
+  if (lead === undefined || lead === 'sleeping') {
+    return undefined
+  }
+  const tool = lead === 'working' ? (agent.toolName ?? '') : ''
+  const shared = worktreePhaseOf(state)
+  return {
+    key: agent.paneKey,
+    name: agent.displayName,
+    phase: phaseOf(tool, {}) ?? (shared === 'handoff' ? undefined : shared) ?? 'working',
+    state: lead === 'waiting' ? 'waiting' : 'working',
+    mood: isCiRed(state.review) ? 'hurt' : 'none',
+    action: lead === 'working' ? actionOf(tool, {}) : undefined,
+    says: lead === 'orchestrating' ? gameStrings().text.agentStates.orchestrating : saysOf(agent),
+    isDone: false
+  }
+}
+
 export const memberOf = (agent: GameAgent, state: GameState, hasRewards: boolean): PartyMember => {
+  const awake = awakeLeadOf(agent, state)
+  if (awake !== undefined) {
+    return awake
+  }
   const tool = agent.toolName ?? ''
   const isDone = agent.state === 'done'
   const work = workOf(agent, state)

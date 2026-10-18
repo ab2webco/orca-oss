@@ -1,5 +1,6 @@
 import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
 import type { TodoHeading } from './todo-sections'
+import type { CardState } from './lead-state'
 import { ES } from './locales/es'
 
 // Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same two.
@@ -36,7 +37,7 @@ export type TextStrings = {
   idle: (count: number) => string
   done: (count: number) => string
   waiting: (count: number) => string
-  agentStates: Readonly<Record<GameAgentState, string>>
+  agentStates: Readonly<Record<CardState, string>>
   reviewStates: Readonly<Record<GameReview['state'], string>>
   ciWords: Readonly<Record<GameCi, string>>
   couldNotOpen: (name: string) => string
@@ -148,7 +149,13 @@ const EN: GameStrings = {
     idle: (count) => `${count} idle`,
     done: (count) => `${count} done`,
     waiting: (count) => `${count} waiting on you`,
-    agentStates: { working: 'working', idle: 'idle', done: 'done', waiting: '! waiting' },
+    agentStates: {
+      working: 'working',
+      idle: 'idle',
+      done: 'done',
+      waiting: '! waiting',
+      orchestrating: 'orchestrating'
+    },
     reviewStates: { open: 'open', draft: 'draft', merged: 'merged', closed: 'closed' },
     ciWords: {
       success: 'green',

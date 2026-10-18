@@ -6,6 +6,7 @@ import { DEFAULT_GAME_CONFIG, effectiveConfigOf, isAbsorbingConfig } from './gam
 import { daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
 import type { HdMember, March } from './hd-party'
+import type { LeadState } from './lead-state'
 import type { Action, FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
@@ -50,6 +51,8 @@ type QuestRuntime = {
   leavers: readonly HdMember[]
   marches: ReadonlyMap<string, March>
   lead: string | undefined
+  /** This pane's own state as the lead; undefined in a member's pane or before the first refresh. */
+  leadState: LeadState | undefined
   event: { kind: TeamEvent['kind']; text: string; at: number } | undefined
 }
 
@@ -83,6 +86,7 @@ export const quest: QuestRuntime = {
   leavers: [],
   marches: new Map<string, March>(),
   lead: undefined,
+  leadState: undefined,
   event: undefined
 }
 
@@ -107,7 +111,13 @@ export const shownCaption = (): string => {
   return quest.caption === '' ? quest.alert : quest.caption
 }
 
-export const shownResting = (): boolean => (quest.isDemo ? demoNow().isResting : quest.isDone)
+// Why not isDone for a lead: moving tickets and merging is how it orchestrates, not a finish.
+export const shownResting = (): boolean => {
+  if (quest.isDemo) {
+    return demoNow().isResting
+  }
+  return quest.leadState === undefined ? quest.isDone : quest.leadState === 'sleeping'
+}
 
 export const shownAction = (): Action | undefined =>
   quest.isDemo ? demoNow().action : quest.action
