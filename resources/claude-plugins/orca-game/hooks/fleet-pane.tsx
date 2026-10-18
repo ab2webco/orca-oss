@@ -42,14 +42,6 @@ export async function isPaneShown($: EngineInterface): Promise<boolean> {
 }
 
 export const registerFleetPane = (on: On): void => {
-  // Why: the band drops its team scene while the Panel shows, so a close by Escape redraws it.
-  on('ui.close', async ($, e, next) => {
-    const closed = await next(e)
-    if (e.id === PANE_ID) {
-      $.ui.invalidate('ui.render')
-    }
-    return closed
-  })
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e) => {
     await ready($)
     const v = await viewOf($)
