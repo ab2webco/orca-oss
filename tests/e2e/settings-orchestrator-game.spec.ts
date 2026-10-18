@@ -434,7 +434,7 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
   const { id: repoId, path: repoPath } = repo as { id: string; path: string }
   writeFileSync(
     join(repoPath, 'orca.yaml'),
-    'orchestratorGame:\n  orchestrator:\n    autostart: true\n    cap: 6\n'
+    'orchestratorGame:\n  orchestrator:\n    autostart: true\n    cap: 6\n    memberNames: [Mario, Luigi]\n'
   )
 
   await orcaPage.evaluate((id) => {
@@ -480,6 +480,24 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
     [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'auto' } }
   })
 
+  await expect(lead.getByText('Mario, Luigi · from orca.yaml')).toBeVisible()
+  const names = lead.getByRole('textbox', { name: 'Member names' })
+  await names.fill('Arthur, Merlin, Morgana')
+  await names.press('Enter')
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({
+      [repoId]: {
+        orchestrator: {
+          autostart: false,
+          model: 'opus',
+          accounts: 'auto',
+          memberNames: ['Arthur', 'Merlin', 'Morgana']
+        }
+      }
+    })
+  await expect(lead.getByText('Arthur, Merlin, Morgana · this machine')).toBeVisible()
+
   const yamlOnly = lead.getByText('The launch prompt and the project', { exact: false })
   for (const theme of THEMES) {
     await setTheme(orcaPage, theme)
@@ -497,6 +515,8 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
       await orcaPage.screenshot({ path: testInfo.outputPath(`lead-top-${theme}-${width}.png`) })
       await yamlOnly.evaluate((element) => element.scrollIntoView({ block: 'end' }))
       await orcaPage.screenshot({ path: testInfo.outputPath(`lead-end-${theme}-${width}.png`) })
+      await names.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-names-${theme}-${width}.png`) })
     }
   }
 })
