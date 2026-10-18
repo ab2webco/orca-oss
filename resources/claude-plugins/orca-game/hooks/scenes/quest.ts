@@ -165,6 +165,17 @@ export const QUEST_SCENE: SceneDefinition = {
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.G', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT']
       ],
+      gestures: {
+        stopped: [
+          '...PP...',
+          '..PPYP..',
+          '.PPPPPP.',
+          'S.SESS.T',
+          'WWWWWRRT',
+          '.RWWRRRT',
+          '.RRRRRRT'
+        ]
+      },
       colors: {
         P: 0x3e2a78,
         Y: 0xffd84a,

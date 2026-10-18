@@ -188,4 +188,15 @@ describe('built-in casts', () => {
       expect(castOf(JSON.parse(JSON.stringify(one.cast)))).toEqual(one.cast)
     }
   })
+
+  it('give every advisor, the referee too, a body that raises a hand to stop a command', () => {
+    for (const advisor of [...advisors, REFEREE]) {
+      const idle = advisor?.frames[0] ?? []
+      const stopped = advisor?.gestures?.stopped ?? []
+      expect(stopped).toHaveLength(idle.length)
+      expect(stopped.every((row) => row.length === idle[0]?.length)).toBe(true)
+      expect(stopped).not.toEqual(idle)
+    }
+    expect(castOf(JSON.parse(JSON.stringify({ advisor: REFEREE })))?.advisor).toEqual(REFEREE)
+  })
 })

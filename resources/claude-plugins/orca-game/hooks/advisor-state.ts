@@ -6,10 +6,12 @@ import {
   advisorBubbleOf,
   advisorCuesOf,
   cueTicksOf,
+  playingCueOf,
   strongestCueOf,
   type AdvisorCue,
   type AdvisorDecision,
-  type AdvisorSeen
+  type AdvisorSeen,
+  type PlayingCue
 } from './advisor-cues'
 import { advisorOf, type Advisor } from './allies'
 import type { AdvisorPose } from './scene-cast'
@@ -26,7 +28,7 @@ const advisorLog = atom({ plugin: 'orca-game', key: 'advisor' } as const, EMPTY)
 type AdvisorRuntime = {
   advisor: Advisor | null
   seen: AdvisorSeen | null
-  cue: { cue: AdvisorCue; at: number } | undefined
+  cue: PlayingCue | undefined
 }
 
 // Module state: a hot reload starts it over, which only takes the gesture playing.
@@ -46,9 +48,14 @@ export function observeAdvisor(value: unknown, tick: number): AdvisorDecision[] 
   runtime.seen = next.seen
   const cue = strongestCueOf(next.cues)
   if (cue !== undefined) {
-    runtime.cue = { cue, at: tick }
+    playAdvisorCue(cue, tick)
   }
   return next.decisions
+}
+
+/** Plays `cue` from `tick` unless a stronger gesture is still playing; any source of cues comes here. */
+export const playAdvisorCue = (cue: AdvisorCue, tick: number): void => {
+  runtime.cue = playingCueOf(runtime.cue, cue, tick)
 }
 
 /** Jev's value as this pane reads it; a drawing that calls this redraws on Jev's writes. */

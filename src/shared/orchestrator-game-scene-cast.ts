@@ -55,7 +55,8 @@ const gesturesSchema = z.object({
   escalated: castFrame.optional(),
   ciRunning: castFrame.optional(),
   ciPassed: castFrame.optional(),
-  ciFailed: castFrame.optional()
+  ciFailed: castFrame.optional(),
+  stopped: castFrame.optional()
 })
 
 const advisorSchema = z.object({

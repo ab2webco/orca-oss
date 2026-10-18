@@ -44,7 +44,8 @@ const ADVISOR_GESTURE_SET: Readonly<Record<AdvisorGesture, true>> = {
   escalated: true,
   ciRunning: true,
   ciPassed: true,
-  ciFailed: true
+  ciFailed: true,
+  stopped: true
 }
 export const ADVISOR_GESTURES = Object.keys(ADVISOR_GESTURE_SET) as readonly AdvisorGesture[]
 

@@ -2,6 +2,7 @@
 // Renders the game mod's scene grids (the cells its Raster receives) to PNGs, so a render can be looked at.
 // These are cell-grid renders in a browser, not terminal screenshots: a terminal's font and gamma differ.
 // Usage: node config/scripts/orca-game-scene-captures.mjs [--out <dir>] [--scene-file <json>] [--phases <all|a,b>]
+//   [--gesture <advisor gesture>] [--columns <a,b>]
 // A scene file is drawn in every phase and the built-ins in build, unless --phases says otherwise.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -12,7 +13,7 @@ import { captureOptionsOf, scenePhasesOf, sceneShotsOf } from './orca-game-scene
 
 const root = resolve(import.meta.dirname, '../..')
 const mod = join(root, 'resources/claude-plugins/orca-game/hooks')
-const { out, sceneFile, phases } = captureOptionsOf(process.argv.slice(2), root)
+const { out, sceneFile, phases, gesture, columns } = captureOptionsOf(process.argv.slice(2), root)
 
 const ENTRY = `
 import { sceneGridOf } from './scene'
@@ -37,9 +38,10 @@ const PARTY = [
   { key: 'a', phase: 'verify', state: 'working' },
   { key: 'b', phase: 'docs', state: 'waiting' }
 ]
-export const gridOf = ({ scene, phase, render, columns, tick, hour, caption }) => {
+const BUBBLES = { approved: 'kept Opus', stopped: 'clef · rm -rf build' }
+export const gridOf = ({ scene, phase, render, columns, tick, hour, caption, gesture }) => {
   const definition = typeof scene === 'string' ? SCENES[scene] : scene
-  const advisor = { sprite: advisorSpriteOf(definition), gesture: 'approved', age: 30, bubble: 'kept Opus' }
+  const advisor = { sprite: advisorSpriteOf(definition), gesture, age: 30, bubble: BUBBLES[gesture] ?? gesture }
   return render === 'hd'
     ? hdSceneGridOf({ scene: definition, phase, columns, rows: 9, tick, caption, since: 0,
         action: 'edit', light: daylightAt(hour), party: PARTY, lead: 'Lead', advisor })
@@ -208,9 +210,9 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
     // One sheet per phase: six captures stay readable, thirty-six in one image do not.
     for (const phase of scenePhasesOf(phases, typeof scene !== 'string')) {
       const before = shots.length
-      for (const shot of sceneShotsOf(id, [phase])) {
+      for (const shot of sceneShotsOf(id, [phase], columns)) {
         const caption = 'Editing scene-hd.ts'
-        await shoot(shot.name, gridOf({ scene, ...shot, tick: 41, caption }), shot.columns)
+        await shoot(shot.name, gridOf({ scene, ...shot, tick: 41, caption, gesture }), shot.columns)
       }
       const names = shots.slice(before).map((path) => path.slice(out.length + 1, -'.png'.length))
       await sheetOf(`${id}-${phase}`, names)

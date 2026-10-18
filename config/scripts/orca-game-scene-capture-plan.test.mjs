@@ -7,13 +7,32 @@ describe('orca-game scene capture plan', () => {
   it('reads --out, --scene-file and --phases', () => {
     expect(
       captureOptionsOf(['--out', '/tmp/x', '--scene-file', 'a.json', '--phases', 'pr,docs'], '/r')
-    ).toEqual({ out: '/tmp/x', sceneFile: 'a.json', phases: ['pr', 'docs'] })
+    ).toMatchObject({ out: '/tmp/x', sceneFile: 'a.json', phases: ['pr', 'docs'] })
     expect(captureOptionsOf([], '/r')).toEqual({
       out: '/r/out/orca-game-captures',
       sceneFile: undefined,
-      phases: undefined
+      phases: undefined,
+      gesture: 'approved',
+      columns: [130, 60]
     })
     expect(captureOptionsOf(['--phases', 'all'], '/r').phases).toEqual(ALL)
+  })
+
+  it('reads the advisor --gesture and the --columns to draw at', () => {
+    expect(
+      captureOptionsOf(['--gesture', 'stopped', '--columns', '45, 80,160'], '/r')
+    ).toMatchObject({ gesture: 'stopped', columns: [45, 80, 160] })
+    expect(() => captureOptionsOf(['--columns', '80,wide'], '/r')).toThrow(
+      'Unknown width "wide"; use whole columns such as 45,80,160'
+    )
+    const shots = sceneShotsOf('quest', ['build'], [45])
+    expect(shots.map((shot) => shot.name)).toEqual([
+      'quest-build-classic-45',
+      'quest-build-hd-dawn-45',
+      'quest-build-hd-day-45',
+      'quest-build-hd-dusk-45',
+      'quest-build-hd-night-45'
+    ])
   })
 
   it('refuses a phase the game does not have, naming the ones it does', () => {

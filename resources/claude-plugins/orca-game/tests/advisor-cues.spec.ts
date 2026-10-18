@@ -4,6 +4,8 @@ import {
   advisorBubbleOf,
   advisorCuesOf,
   cueTicksOf,
+  gateCueOf,
+  playingCueOf,
   strongestCueOf,
   type AdvisorCue
 } from '../hooks/advisor-cues'
@@ -205,5 +207,81 @@ describe('advisorBubbleOf', () => {
     expect(advisorBubbleOf({ gesture: 'lowered', text: 'baja', isRoutine: false }, true)).toBe(
       'baja'
     )
+  })
+})
+
+// Captured live on 2026-10-18 from the classic.PreToolUse chain beneath the game (orca-supervisor 0.13.6).
+const HOOK_ERROR = 'PreToolUse:Bash hook error: '
+const REFUSED = `${HOOK_ERROR}REFUSED: force push: rewrites the remote — anyone who already pulled breaks. You cannot run this command.`
+const adviceOf = (judge: string) =>
+  `${HOOK_ERROR}${judge} advice (not a refusal): this command would affect something worth a second look before it runs.\nIt would run: \`rm -rf build-output\`.`
+
+describe('gateCueOf', () => {
+  it('stops a command Jev advises against, naming Jev', () => {
+    expect(gateCueOf('Bash', 'rm -rf build-output', { deny: adviceOf('Jev') })).toEqual({
+      gesture: 'stopped',
+      text: 'jev · rm -rf build-output',
+      isRoutine: false
+    })
+  })
+
+  it('stops a command Clef advises against, naming Clef', () => {
+    expect(gateCueOf('Bash', 'rm -rf build-output', { deny: adviceOf('Clef') })).toEqual({
+      gesture: 'stopped',
+      text: 'clef · rm -rf build-output',
+      isRoutine: false
+    })
+  })
+
+  it('stops a command the gate refuses outright, whoever judged it', () => {
+    expect(gateCueOf('Bash', 'git push --force origin main', { deny: REFUSED })).toEqual({
+      gesture: 'stopped',
+      text: 'git push --force origin main',
+      isRoutine: false
+    })
+  })
+
+  it('approves a command the gate judged and let through, as a routine decision', () => {
+    expect(gateCueOf('Bash', 'curl -X POST https://x', { allow: true })).toEqual({
+      gesture: 'approved',
+      text: 'curl -X POST https://x',
+      isRoutine: true
+    })
+  })
+
+  it('acts out nothing the gate did not decide', () => {
+    expect(gateCueOf('Bash', 'ls', {})).toBeUndefined()
+    expect(
+      gateCueOf('Bash', 'gh pr merge 1', { deny: `${HOOK_ERROR}Merging is the owner's call.` })
+    ).toBeUndefined()
+    expect(gateCueOf('Bash', 'gh pr merge 1', { ask: 'Merge?' })).toBeUndefined()
+    expect(gateCueOf('Edit', undefined, { allow: true })).toBeUndefined()
+  })
+
+  it('speaks the first line of a long command only', () => {
+    expect(gateCueOf('Bash', 'cat <<EOF\nx\nEOF', { allow: true })?.text).toBe('cat <<EOF')
+  })
+})
+
+describe('playingCueOf', () => {
+  const stop = { gesture: 'stopped', text: 'stop', isRoutine: false } as const
+  const accept = { gesture: 'approved', text: 'ok', isRoutine: true } as const
+
+  it('keeps a stronger gesture playing over a weaker one that comes during it', () => {
+    const playing = playingCueOf(undefined, stop, 10)
+    expect(playingCueOf(playing, accept, 20)).toBe(playing)
+  })
+
+  it('lets any gesture take over once the one playing has ended', () => {
+    const playing = playingCueOf(undefined, stop, 10)
+    expect(playingCueOf(playing, accept, 10 + cueTicksOf('stopped'))).toEqual({
+      cue: accept,
+      at: 50
+    })
+  })
+
+  it('lets an equal or stronger gesture cut in', () => {
+    const playing = playingCueOf(undefined, accept, 10)
+    expect(playingCueOf(playing, stop, 11)).toEqual({ cue: stop, at: 11 })
   })
 })
