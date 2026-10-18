@@ -279,6 +279,7 @@ import {
 import { colors } from '../../../../src/theme/mobile-theme'
 import { QuickCommandsTabButton } from '../../../../src/session/QuickCommandsTabButton'
 import { styles } from '../../../../src/session/mobile-session-styles'
+import { useFollowHostTerminalOpen } from '../../../../src/session/use-follow-host-terminal-open'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
 import type { TerminalQuickCommand } from '../../../../../src/shared/terminal-quick-command-types'
 import type {
@@ -720,13 +721,17 @@ export default function SessionScreen() {
     worktreeId,
     name: routeWorktreeName,
     created,
-    warning: createdWarning
+    warning: createdWarning,
+    terminal: routeTerminal,
+    tab: routeTab
   } = useLocalSearchParams<{
     hostId: string
     worktreeId: string
     name?: string
     created?: string
     warning?: string
+    terminal?: string
+    tab?: string
   }>()
   const isFolderWorkspaceRoute = worktreeId.startsWith('folder:') // Synthetic ids have no repo scope.
   // Why: the floating sentinel has no repo/worktree, so repo-backed surfaces hide.
@@ -2853,6 +2858,15 @@ export default function SessionScreen() {
   )
   // Ref to latest switchSessionTab so fetchSessionTabs can activate a synced browser tab without a dependency cycle.
   switchSessionTabRef.current = switchSessionTab
+  useFollowHostTerminalOpen({
+    client,
+    hostId,
+    worktreeId,
+    routeTerminal,
+    routeTab,
+    sessionTabs,
+    selectTab: switchSessionTab
+  })
 
   // Why: only store the ref; subscribe on web-ready to avoid the blank-terminal race (init queued before xterm.js loaded).
   const setTerminalWebViewRef = useCallback((handle: string, ref: TerminalWebViewHandle | null) => {
