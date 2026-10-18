@@ -87,7 +87,9 @@ describe('the lab release signal gate', () => {
     expect(release.jobs.gate_tests.steps[0].with.ref).toBe(pinned)
     // Concurrency serializes releases but does not stop a human push, so the
     // build refuses rather than bumping on top of an unverified commit.
-    const guard = release.jobs.version.steps[1]
+    const guard = release.jobs.version.steps.find(
+      (step) => step.name === 'Refuse to release past the verified commit'
+    )
     expect(guard.env.VERIFIED_SHA).toBe(pinned)
     expect(guard.run).toContain('git rev-parse HEAD')
     expect(guard.run).toContain('exit 1')
