@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   GameLeadSessions,
   awaitResumedLead,
-  leadResumeArgsOf
+  leadResumeArgsOf,
+  resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 
 const dirs: string[] = []
@@ -86,7 +87,7 @@ describe('leadResumeArgsOf', () => {
 })
 
 describe('awaitResumedLead', () => {
-  const run = (reads: ('session' | 'running' | 'shell')[]) => {
+  const run = (reads: ('session' | 'running' | 'shell' | 'starting')[]) => {
     let at = 0
     let clock = 0
     return awaitResumedLead({
@@ -112,7 +113,27 @@ describe('awaitResumedLead', () => {
     await expect(run(['shell', 'running'])).resolves.toBe('resumed')
   })
 
+  it('waits through the login and shell a pane passes before Claude starts', async () => {
+    await expect(run(['starting', 'shell', 'starting', 'running', 'session'])).resolves.toBe(
+      'resumed'
+    )
+  })
+
   it('fails a pane that never left its shell by the deadline', async () => {
     await expect(run(['shell'])).resolves.toBe('exited')
+  })
+})
+
+describe('resumedPaneStateOf', () => {
+  it('counts only Claude itself as running, and a shell as the shell', () => {
+    expect(resumedPaneStateOf('claude')).toBe('running')
+    expect(resumedPaneStateOf('zsh')).toBe('shell')
+    expect(resumedPaneStateOf('bash.exe')).toBe('shell')
+  })
+
+  it('reads what a pane shows while it starts as neither', () => {
+    expect(resumedPaneStateOf('login')).toBe('starting')
+    expect(resumedPaneStateOf('2.1.302')).toBe('starting')
+    expect(resumedPaneStateOf(null)).toBe('starting')
   })
 })

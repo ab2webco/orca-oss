@@ -674,7 +674,8 @@ import { GameLeads } from './orchestrator-game-leads'
 import {
   GameLeadSessions,
   awaitResumedLead,
-  leadResumeArgsOf
+  leadResumeArgsOf,
+  resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
@@ -3656,9 +3657,10 @@ export class OrcaRuntimeService {
           ) {
             return 'session'
           }
-          return (await this.isGameLeadPaneRunning(handle)) ? 'running' : 'shell'
+          const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+          return resumedPaneStateOf(pane?.foregroundProcess ?? null)
         },
-        timeoutMs: 10_000,
+        timeoutMs: 20_000,
         intervalMs: 500
       })
       if (outcome === 'exited') {

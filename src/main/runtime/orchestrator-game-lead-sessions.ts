@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { recognizeAgentProcess } from '../../shared/agent-process-recognition'
+import { isShellProcess } from '../../shared/shell-process-detection'
 import type { GameLeadSession } from './orchestrator-game-leads'
 
 const sessionOf = (value: unknown): GameLeadSession | null => {
@@ -35,13 +37,24 @@ export const leadResumeArgsOf = (
   return resumeArgs.trim() || null
 }
 
+/** What a reopened lead's pane runs. Why `starting`: a new pane shows `login`, then its shell, then Claude. */
+export const resumedPaneStateOf = (foreground: string | null): 'running' | 'shell' | 'starting' => {
+  if (foreground === null) {
+    return 'starting'
+  }
+  if (recognizeAgentProcess(foreground)?.agent === 'claude') {
+    return 'running'
+  }
+  return isShellProcess(foreground) ? 'shell' : 'starting'
+}
+
 /**
  * Whether a reopened lead took. Why wait: the terminal spawns before Claude reads the conversation, and
  * a missing one makes Claude exit to the shell. The pane starts at its shell too, so only a shell after
  * Claude ran, or one still there at the deadline, is a failure.
  */
 export const awaitResumedLead = async (args: {
-  read: () => Promise<'session' | 'running' | 'shell'>
+  read: () => Promise<'session' | 'running' | 'shell' | 'starting'>
   timeoutMs: number
   intervalMs: number
   now?: () => number
