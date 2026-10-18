@@ -677,6 +677,7 @@ test('the hd preview is lit by the hour in the chosen time zone and renders at e
   const darkest = Math.min(...lit.map((one) => one.brightness))
   expect(brightest - darkest, JSON.stringify(lit)).toBeGreaterThan(20)
 
+  await setTheme(orcaPage, 'light')
   for (const name of [HD_HOUR_ZONES[1], HD_HOUR_ZONES[3]]) {
     await zone.fill(name)
     await zone.press('Enter')
