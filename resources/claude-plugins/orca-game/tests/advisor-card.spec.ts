@@ -28,6 +28,7 @@ const jev = (subagents: unknown[] = []): Advisor => {
 
 const entry = (key: string, patch: Partial<AdvisorLogEntry> = {}): AdvisorLogEntry => ({
   key,
+  id: key,
   title: `Task ${key}`,
   model: 'Sonnet 5',
   effort: 'medium',
@@ -51,6 +52,7 @@ describe('advisorCardOf', () => {
       entry('a1', { gesture: 'approved', verdict: 'igual', model: null, effort: null }),
       entry('a2'),
       entry('main', {
+        id: null,
         title: null,
         model: 'Sonnet 5',
         effort: 'low',
@@ -64,6 +66,19 @@ describe('advisorCardOf', () => {
       '★ main conversation · Sonnet 5·low'
     ])
     expect(card.rows.map((one) => one.gesture)).toEqual(['approved', 'lowered', 'approved'])
+  })
+
+  it('names a subagent row by its id when its title is missing, never as the main conversation', () => {
+    const card = advisorCardOf(REFEREE, jev(), [
+      entry('a1', {
+        id: 'a1',
+        title: null,
+        model: 'Sonnet 5',
+        effort: 'medium',
+        verdict: 'Sonnet basta'
+      })
+    ])
+    expect(card.rows.map((one) => one.text)).toEqual(['↳ a1 · Sonnet 5·medium · Sonnet basta'])
   })
 
   it('poses as the latest decision, and idle with none or one without a gesture', () => {

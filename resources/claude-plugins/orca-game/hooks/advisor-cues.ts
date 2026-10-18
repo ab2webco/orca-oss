@@ -6,9 +6,10 @@ import type { AdvisorGesture } from './scenes/index'
 
 export type AdvisorCue = { gesture: AdvisorGesture; text: string; isRoutine: boolean }
 
-/** One decision for the Panel: a subagent's, or the main conversation's when `title` is null. */
+/** One decision for the Panel: a subagent's, or the main conversation's when `id` is null. */
 export type AdvisorDecision = {
   key: string
+  id: string | null
   title: string | null
   model: string | null
   effort: string | number | null
@@ -66,6 +67,7 @@ const agentKeyOf = (agent: AdvisorAgent): string =>
 
 export const decisionOf = (agent: AdvisorAgent): AdvisorDecision => ({
   key: agentKeyOf(agent),
+  id: agent.id,
   title: agent.title,
   model: agent.model,
   effort: agent.effort,
@@ -100,6 +102,7 @@ export function advisorCuesOf(
       ? [
           {
             key: `main|${main}`,
+            id: null,
             title: null,
             model: advisor.model,
             effort: advisor.effort,

@@ -160,6 +160,15 @@ describe('advisorCuesOf', () => {
     expect(next.cues).toEqual([{ gesture: 'lowered', text: 'Sonnet 5 · baja', isRoutine: false }])
   })
 
+  it('carries each subagent id on its decision, and none on the main conversation', () => {
+    const next = after({
+      model: 'Sonnet 5',
+      effort: 'medium',
+      subagents: [agent('a2', 'lowered', 'Haiku 5', 'baja')]
+    })
+    expect(next.decisions.map((one) => one.id)).toEqual([null, 'a2'])
+  })
+
   it('whistles when the main conversation changes model or effort', () => {
     const next = after({ model: 'Sonnet 5', effort: 'medium' })
     expect(next.cues).toEqual([{ gesture: 'approved', text: 'Sonnet 5·medium', isRoutine: false }])

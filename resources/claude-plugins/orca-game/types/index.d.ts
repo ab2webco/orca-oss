@@ -302,9 +302,10 @@ export type AllyStatus = { plugin: string; text: string }
 
 export type AlliesState = { statuses: AllyStatus[] }
 
-/** One of Jev's decisions as the Panel lists it; `title` null is the main conversation's model. */
+/** One of Jev's decisions as the Panel lists it; `id` null is the main conversation's model. */
 export type AdvisorLogEntry = {
   key: string
+  id: string | null
   title: string | null
   model: string | null
   effort: string | number | null
