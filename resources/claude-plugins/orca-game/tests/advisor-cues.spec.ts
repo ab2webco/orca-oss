@@ -146,6 +146,20 @@ describe('advisorCuesOf', () => {
     ).toEqual([])
   })
 
+  // Why: a subagent that got the model is the decision; a main row for the same model is the wrong attribution.
+  it('attributes a model change that came with a new subagent to that subagent, not the main conversation', () => {
+    const next = after({
+      model: 'Sonnet 5',
+      effort: 'medium',
+      subagents: [
+        agent('a1', 'inherited', null, 'igual'),
+        agent('a2', 'lowered', 'Sonnet 5', 'baja')
+      ]
+    })
+    expect(next.decisions.map((one) => one.title)).toEqual(['Task a2'])
+    expect(next.cues).toEqual([{ gesture: 'lowered', text: 'Sonnet 5 · baja', isRoutine: false }])
+  })
+
   it('whistles when the main conversation changes model or effort', () => {
     const next = after({ model: 'Sonnet 5', effort: 'medium' })
     expect(next.cues).toEqual([{ gesture: 'approved', text: 'Sonnet 5·medium', isRoutine: false }])
