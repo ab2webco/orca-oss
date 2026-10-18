@@ -42,6 +42,12 @@ describe('day and night in the hd scene', () => {
     expect(lit.has(0xf5f3c8) || lit.has(0xe8ecff)).toBe(true)
     expect(colorsOf(day).has(0xf5f3c8)).toBe(false)
   })
+
+  it('tells dawn from dusk by where the sun stands', () => {
+    expect(hdSceneGridOf(input({ light: daylightAt(6) }))).not.toEqual(
+      hdSceneGridOf(input({ light: daylightAt(18) }))
+    )
+  })
 })
 
 describe('the thought cloud', () => {

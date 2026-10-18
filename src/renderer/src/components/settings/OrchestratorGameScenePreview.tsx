@@ -6,6 +6,7 @@ import { usePluginPanelsStore } from '../../store/plugin-panels'
 import { orchestratorGameSceneOptions } from './orchestrator-game-scene-options'
 import {
   PREVIEW_TICK_MS,
+  previewLightOf,
   previewSceneOf,
   scenePreviewFrameOf,
   scenePreviewPixelsOf,
@@ -85,10 +86,10 @@ function fileSceneOf(read: SceneFileState | null | undefined): SceneDefinition |
 
 /** The scene an Agent Teams pane draws on its spinner, painted by the mod's own code. */
 export function OrchestratorGameScenePreview({
-  config: { scene, mode, render },
+  config: { scene, mode, render, timezone },
   fileScene
 }: {
-  config: Pick<OrchestratorGameConfig, 'scene' | 'mode' | 'render'>
+  config: Pick<OrchestratorGameConfig, 'scene' | 'mode' | 'render' | 'timezone'>
   /** The read of a project's scene file, when `scene` is a `file:` id. */
   fileScene?: SceneFileState | null
 }): React.JSX.Element {
@@ -111,7 +112,13 @@ export function OrchestratorGameScenePreview({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const locale = normalizeSupportedUiLocale(getIntlLocale())
   const frame = definition
-    ? scenePreviewFrameOf(definition, isAnimated ? tick : 0, locale, render)
+    ? scenePreviewFrameOf(
+        definition,
+        isAnimated ? tick : 0,
+        locale,
+        render,
+        previewLightOf(Date.now(), timezone)
+      )
     : null
 
   useEffect(() => {

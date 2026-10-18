@@ -1,15 +1,7 @@
 import { actionPixel, PROP_WIDTH } from './action-props'
 import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
-import {
-  bloomInto,
-  FLASH_COLOR,
-  flashInto,
-  flashOf,
-  particleKindOf,
-  particlesInto,
-  vignetteInto
-} from './hd-fx'
+import { FLASH_COLOR, flashInto, flashOf, particleKindOf, particlesInto } from './hd-fx'
 import { isTeamEventShown, quakeOf, shakeGrid, type TeamEvent } from './hd-overlay'
 import {
   crownAtOf,
@@ -171,9 +163,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   })
   const crown = input.lead === undefined ? undefined : crownAtOf(sprite.rows, walk, top)
   // Why NOON for a night look: its costumes are drawn for the dark and keep their own colours.
-  const figureLight = look.isNight
-    ? NOON
-    : { night: frame.light.night * 0.5, dusk: frame.light.dusk }
+  const figureLight = look.isNight ? NOON : { ...frame.light, night: frame.light.night * 0.5 }
   const glow = (x: number, y: number, color: number): number => {
     if (!resting) {
       return color
@@ -251,9 +241,6 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   }
   const particles = particleKindOf(scene.id, frame.light.night, resting)
   particlesInto(buffer, columns, pixels, ground, tick, particles, fireLeft)
-  // Why spared: the vignette and bloom would darken or tint the figures out of their own colours.
-  bloomInto(buffer, columns, pixels, figures)
-  vignetteInto(buffer, columns, pixels, figures)
   const flashKind = event?.kind ?? (reaction?.kind === 'level' ? 'level' : undefined)
   if (flashKind !== undefined) {
     const age = event?.age ?? reaction?.age ?? 0

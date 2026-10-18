@@ -5,8 +5,10 @@ export const SCENE_PHASES = ['working', 'docs', 'build', 'verify', 'pr', 'handof
 
 const COLUMNS = [130, 60]
 const TIMES = [
+  ['dawn', 6],
   ['day', 12],
-  ['night', 22]
+  ['dusk', 18],
+  ['night', 23]
 ]
 
 /** `--out <dir>`, `--scene-file <json>` and `--phases <all|a,b>`; phases stay undefined when not passed. */

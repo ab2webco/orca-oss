@@ -1,11 +1,8 @@
 import { hash, mix } from './pixel-canvas'
 
-// Effects over a finished hd frame: particles, bloom, a vignette with tilt-shift rows, and reaction flashes.
+// Effects over a finished hd frame: particles and reaction flashes.
 
 export type ParticleKind = 'dust' | 'fireflies' | 'snow' | 'embers' | 'glitter'
-
-const lumaOf = (color: number): number =>
-  0.299 * ((color >> 16) & 255) + 0.587 * ((color >> 8) & 255) + 0.114 * (color & 255)
 
 export const particleKindOf = (
   sceneId: string,
@@ -94,73 +91,6 @@ export const particlesInto = (
     }
     const at = one.y * columns + one.x
     buf[at] = kind === 'dust' ? mix(buf[at] ?? 0, one.color, 0.55) : one.color
-  }
-}
-
-const SPREAD: readonly (readonly [number, number, number])[] = [
-  [-1, 0, 0.14],
-  [1, 0, 0.14],
-  [0, -1, 0.14],
-  [0, 1, 0.14],
-  [-2, 0, 0.06],
-  [2, 0, 0.06]
-]
-
-/** Bright pixels (sun, moon, snow, flames, lit windows) bleed into their darker neighbours. */
-export const bloomInto = (
-  buf: Uint32Array,
-  columns: number,
-  pixels: number,
-  keep?: Uint8Array
-): void => {
-  const src = buf.slice()
-  for (let i = 0; i < src.length; i += 1) {
-    const color = src[i] ?? 0
-    if (lumaOf(color) <= 225) {
-      continue
-    }
-    const x = i % columns
-    const y = Math.floor(i / columns)
-    for (const [dx, dy, k] of SPREAD) {
-      const nx = x + dx
-      const ny = y + dy
-      const j = ny * columns + nx
-      const isInside = nx >= 0 && nx < columns && ny >= 0 && ny < pixels
-      if (isInside && keep?.[j] !== 1 && lumaOf(src[j] ?? 0) < 200) {
-        buf[j] = mix(buf[j] ?? 0, color, k)
-      }
-    }
-  }
-}
-
-/** Darker side edges, and the top and bottom two rows softened like a tilt-shift lens; `keep` is spared. */
-export const vignetteInto = (
-  buf: Uint32Array,
-  columns: number,
-  pixels: number,
-  keep?: Uint8Array
-): void => {
-  const reach = Math.max(6, Math.floor(columns / 14))
-  for (let y = 0; y < pixels; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
-      const edge = Math.min(x, columns - 1 - x)
-      const dark =
-        (edge < reach ? (1 - edge / reach) * 0.32 : 0) + (y === 0 || y === pixels - 1 ? 0.12 : 0)
-      if (dark > 0 && keep?.[y * columns + x] !== 1) {
-        buf[y * columns + x] = mix(buf[y * columns + x] ?? 0, 0x000000, dark)
-      }
-    }
-  }
-  for (const y of [0, 1, pixels - 2, pixels - 1]) {
-    if (y < 0 || y >= pixels) {
-      continue
-    }
-    const row = buf.slice(y * columns, (y + 1) * columns)
-    for (let x = 1; x < columns - 1; x += 1) {
-      if (keep?.[y * columns + x] !== 1) {
-        buf[y * columns + x] = mix(mix(row[x - 1] ?? 0, row[x + 1] ?? 0, 0.5), row[x] ?? 0, 0.5)
-      }
-    }
   }
 }
 

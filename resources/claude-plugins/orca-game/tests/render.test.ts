@@ -266,6 +266,15 @@ describe('the hd scene above the spinner', () => {
     expect(day.has(0xf5f3c8) || day.has(0xe8ecff)).toBe(false)
   })
 
+  test('stays day at noon in the project’s timezone', async ($, on) => {
+    const clock = mock.clock(on, { now: Date.UTC(2026, 9, 17, 17, 0) })
+    engine(on, { ORCA_GAME_RENDER: 'hd', ORCA_GAME_TIMEZONE: 'America/Bogota' }, worldOf())
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const noon = pixelsOf(await sceneOf($))
+    expect(noon.has(0xf5f3c8) || noon.has(0xe8ecff)).toBe(false)
+  })
+
   test('crowns the lead under its own label', async ($, on) => {
     const clock = mock.clock(on)
     const world = worldOf({

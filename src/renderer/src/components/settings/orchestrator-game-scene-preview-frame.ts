@@ -16,6 +16,11 @@ import {
   type ScenePhase
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import {
+  daylightAt,
+  hourOf,
+  type Daylight
+} from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
+import {
   HD_ROWS,
   hdSceneGridOf
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd'
@@ -56,11 +61,16 @@ export function previewSceneOf(option: OrchestratorGameSceneOption): SceneDefini
   return SCENES[id] ?? null
 }
 
+/** The hd light at an instant, read in the project's timezone, as a pane reads it. */
+export const previewLightOf = (epochMs: number, timezone: string): Daylight =>
+  daylightAt(hourOf(epochMs, timezone))
+
 export function scenePreviewFrameOf(
   scene: SceneDefinition,
   tick: number,
   locale: string,
-  render: OrchestratorGameRender = 'classic'
+  render: OrchestratorGameRender = 'classic',
+  light?: Daylight
 ): ScenePreviewFrame {
   const gameLocale = gameLocaleOf(locale)
   // Why: the thought bubble reads the mod's active locale, as ORCA_GAME_LOCALE sets it in a pane.
@@ -80,7 +90,8 @@ export function scenePreviewFrameOf(
           rows: HD_ROWS,
           tick,
           caption: '',
-          since: 0
+          since: 0,
+          light
         })
       : sceneGridOf(scene, flowPhase, PREVIEW_COLUMNS, tick),
     phase,

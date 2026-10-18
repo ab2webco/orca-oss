@@ -29,15 +29,17 @@ describe('orca-game scene capture plan', () => {
     expect(scenePhasesOf(ALL, false)).toEqual(ALL)
   })
 
-  it('shoots each phase in classic and in hd by day and night, at 130 and 60 columns', () => {
+  it('shoots each phase in classic and in hd at dawn, noon, dusk and night, at 130 and 60 columns', () => {
     const shots = sceneShotsOf('scene-file', ['docs', 'pr'])
-    expect(shots).toHaveLength(12)
-    expect(shots.slice(0, 3)).toEqual([
+    expect(shots).toHaveLength(20)
+    expect(shots.slice(0, 5)).toEqual([
       { name: 'scene-file-docs-classic-130', phase: 'docs', render: 'classic', columns: 130 },
+      { name: 'scene-file-docs-hd-dawn-130', phase: 'docs', render: 'hd', columns: 130, hour: 6 },
       { name: 'scene-file-docs-hd-day-130', phase: 'docs', render: 'hd', columns: 130, hour: 12 },
-      { name: 'scene-file-docs-hd-night-130', phase: 'docs', render: 'hd', columns: 130, hour: 22 }
+      { name: 'scene-file-docs-hd-dusk-130', phase: 'docs', render: 'hd', columns: 130, hour: 18 },
+      { name: 'scene-file-docs-hd-night-130', phase: 'docs', render: 'hd', columns: 130, hour: 23 }
     ])
-    expect(new Set(shots.map((shot) => shot.name)).size).toBe(12)
-    expect(shots.filter((shot) => shot.columns === 60)).toHaveLength(6)
+    expect(new Set(shots.map((shot) => shot.name)).size).toBe(20)
+    expect(shots.filter((shot) => shot.columns === 60)).toHaveLength(10)
   })
 })

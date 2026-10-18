@@ -44,7 +44,11 @@ let root: Root
 
 const show = (scene: string, mode: OrchestratorGameMode): void => {
   act(() => {
-    root.render(<OrchestratorGameScenePreview config={{ scene, mode, render: 'classic' }} />)
+    root.render(
+      <OrchestratorGameScenePreview
+        config={{ scene, mode, render: 'classic', timezone: 'local' }}
+      />
+    )
   })
 }
 
