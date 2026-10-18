@@ -283,6 +283,8 @@ export type GameState = {
   lead?: GameLead
   /** Whether this pane leads or a lead launched it; absent from an older host. */
   role?: GameRole
+  /** Orca's UI language now; absent from an older host, which keeps the launch language. */
+  locale?: GameLocale
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

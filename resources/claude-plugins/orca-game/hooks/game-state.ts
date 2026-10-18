@@ -4,6 +4,7 @@ import type {
   GameMemberWorktree,
   GameConfig,
   GameLink,
+  GameLocale,
   GameProjectItem,
   GameProjectList,
   GameProjectWork,
@@ -23,6 +24,7 @@ import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game
 import { sceneDefinitionOf } from './scenes/scene-shape'
 import { memberAccountOf, memberLimitOf } from './member-tags'
 import { memberAdvisorOf } from './member-advisor'
+import { GAME_LOCALES } from './game-strings'
 
 const parseJson = (text: string): unknown => {
   try {
@@ -266,6 +268,11 @@ const extensionsOf = (value: unknown): GameState['extensions'] => {
   return { scenes: scenes.slice(0, MAX_SCENES).flatMap(sceneOf) }
 }
 
+const localeOf = (value: unknown): { locale?: GameLocale } => {
+  const locale = GAME_LOCALES.find((one) => one === value)
+  return locale === undefined ? {} : { locale }
+}
+
 // Orca's CLI may answer the bare state or wrap it as { result }; anything else is no data.
 export const parseGameState = (stdout: string): GameState | undefined => {
   const parsed = parseJson(stdout)
@@ -294,6 +301,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     activity: activityOf(body.activity) ?? null,
     ...projectWorkOf(body.project),
     ...gameActionsOf(body.actions),
-    ...gameLeadOf(body)
+    ...gameLeadOf(body),
+    ...localeOf(body.locale)
   }
 }
