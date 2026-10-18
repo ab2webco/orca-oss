@@ -3865,17 +3865,45 @@ describe('updater', () => {
     let staged: StagedLinuxPackages
     let EXIT_127: string
 
-    // Why: the pre-install digest re-proof streams the package off real disk. Fake timers never
-    // advance libuv, so the quit timer needs fake time while the read needs real event-loop turns.
+    let reproofs: Promise<unknown>[]
+
+    // Why: the pre-install digest re-proof streams the package off real disk, which no fixed count
+    // of event-loop turns outlasts under suite load, so wait for the re-proof itself.
     const settleQuitAndInstall = async (): Promise<void> => {
       await vi.advanceTimersByTimeAsync(100)
-      for (let turn = 0; turn < 40; turn += 1) {
-        await new Promise((resolve) => realSetTimeout(resolve, 0))
-      }
+      let deadline: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([
+        Promise.allSettled(reproofs),
+        new Promise((_, reject) => {
+          deadline = realSetTimeout(
+            () => reject(new Error('digest re-proof did not settle within 10s')),
+            10_000
+          )
+        })
+      ]).finally(() => clearTimeout(deadline))
+      // A macrotask turn drains every microtask the verdict queued before fake time moves on.
+      await new Promise((resolve) => realSetTimeout(resolve, 0))
       await vi.advanceTimersByTimeAsync(0)
     }
 
     beforeEach(() => {
+      reproofs = []
+      // Records each real re-proof so settleQuitAndInstall can await it; holdRevalidation overrides.
+      vi.doMock('./linux-package-update-recovery', async () => {
+        const actual = await vi.importActual<typeof RecoveryModule>(
+          './linux-package-update-recovery'
+        )
+        return {
+          ...actual,
+          revalidateLinuxPackageForInstall: (
+            artifact: Parameters<typeof actual.revalidateLinuxPackageForInstall>[0]
+          ) => {
+            const reproof = actual.revalidateLinuxPackageForInstall(artifact)
+            reproofs.push(reproof)
+            return reproof
+          }
+        }
+      })
       staged = stageLinuxUpdateCache()
       vi.stubEnv('XDG_CACHE_HOME', staged.cacheRoot)
       EXIT_127 = `Command failed: /usr/bin/pkexec /usr/bin/dpkg -i ${staged.debPath}, exited with code 127`
