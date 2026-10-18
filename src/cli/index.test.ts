@@ -183,6 +183,30 @@ describe('command aliases dispatch to the canonical handler', () => {
     )
   })
 
+  it('names the calling terminal as the focus source so a phone can follow it', async () => {
+    vi.stubEnv('ORCA_TERMINAL_HANDLE', 'term_lead')
+    try {
+      queueFixtures(callMock, okFixture('req', { focus: { ok: true } }))
+      await main(['terminal', 'focus', '--terminal', 'term_member', '--json'], '/tmp/repo')
+      expect(callMock).toHaveBeenCalledWith('terminal.focus', {
+        terminal: 'term_member',
+        navigation: 'host',
+        source: 'term_lead'
+      })
+
+      callMock.mockReset()
+      vi.stubEnv('ORCA_TERMINAL_HANDLE', '')
+      queueFixtures(callMock, okFixture('req', { focus: { ok: true } }))
+      await main(['terminal', 'focus', '--terminal', 'term_member', '--json'], '/tmp/repo')
+      expect(callMock).toHaveBeenCalledWith('terminal.focus', {
+        terminal: 'term_member',
+        navigation: 'host'
+      })
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('serves `agent-context --json` without contacting the runtime', async () => {
     runtimeClientConstructorMock.mockClear()
     await main(['agent-context', '--json'], '/tmp/repo')

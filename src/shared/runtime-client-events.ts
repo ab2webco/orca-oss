@@ -39,6 +39,15 @@ export type RuntimeClientEvent =
       startup?: WorktreeStartupLaunch
       defaultTabs?: WorktreeDefaultTabsLaunch
     }
+  // Why: sent only to mobile listeners; a phone showing sourceWorktreeId follows a CLI focus
+  // (the game's View) that would otherwise move only the desktop. Old phones drop unknown types.
+  | {
+      type: 'openTerminal'
+      worktreeId: string
+      terminal: string
+      tabId: string
+      sourceWorktreeId: string
+    }
 
 export type RuntimeClientEventStreamMessage =
   | ({ type: 'ready'; subscriptionId: string } & {

@@ -1017,6 +1017,10 @@ export function useIpcEvents(): void {
           })
         return
       }
+      // Why: the host sends openTerminal to mobile listeners only; a desktop never follows it.
+      if (event.type === 'openTerminal') {
+        return
+      }
       void ensureRuntimeEventRepoKnown(environmentId, event.repoId)
         .then(() => activateNotifiedWorktree(event, { allowRuntimeEnvironment: true }))
         .catch((error) => {

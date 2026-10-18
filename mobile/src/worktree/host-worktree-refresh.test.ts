@@ -126,4 +126,22 @@ describe('startHostWorktreeRefresh', () => {
     expect(fetchWorktrees).toHaveBeenCalledTimes(2)
     expect(fetchRepoMetadata).toHaveBeenCalledWith({ force: true, queueIfInFlight: true })
   })
+
+  it('ignores an openTerminal request it does not handle, as an older build would', () => {
+    start()
+    fetchWorktrees.mockClear()
+    fetchRepoMetadata.mockClear()
+
+    eventListener?.({
+      type: 'openTerminal',
+      worktreeId: 'wt-member',
+      terminal: 'term_member',
+      tabId: 'tab-member',
+      sourceWorktreeId: 'wt-lead'
+    })
+    eventListener?.({ type: 'worktreesChanged', repoId: 'repo-1' })
+
+    expect(fetchRepoMetadata).not.toHaveBeenCalled()
+    expect(fetchWorktrees).toHaveBeenCalledTimes(1)
+  })
 })

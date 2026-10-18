@@ -17557,6 +17557,44 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('asks only mobile listeners to open a terminal focused from another terminal', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi
+        .fn()
+        .mockResolvedValueOnce({ id: 'pty-lead' })
+        .mockResolvedValueOnce({ id: 'pty-member' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const lead = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { title: 'lead' })
+    const member = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { title: 'member' })
+    const mobileEvents: RuntimeClientEvent[] = []
+    const desktopEvents: RuntimeClientEvent[] = []
+    runtime.onClientEvent((event) => mobileEvents.push(event), {
+      consumesTerminalSideEffects: false,
+      consumesMobileNavigation: true
+    })
+    runtime.onClientEvent((event) => desktopEvents.push(event))
+
+    const focus = await runtime.focusTerminal(member.handle, { navigateHost: false })
+    await runtime.requestMobileTerminalOpen(focus, lead.handle)
+    await runtime.requestMobileTerminalOpen(focus, 'term_unknown')
+    await runtime.requestMobileTerminalOpen(focus, member.handle)
+
+    expect(mobileEvents).toEqual([
+      {
+        type: 'openTerminal',
+        worktreeId: TEST_WORKTREE_ID,
+        terminal: member.handle,
+        tabId: focus.tabId,
+        sourceWorktreeId: TEST_WORKTREE_ID
+      }
+    ])
+    expect(desktopEvents).toEqual([])
+  })
+
   it('replays captured launch config when focusing a background agent session', async () => {
     const revealTerminalSession = vi.fn().mockResolvedValue({ tabId: 'tab-adopted' })
     const runtime = new OrcaRuntimeService(store)

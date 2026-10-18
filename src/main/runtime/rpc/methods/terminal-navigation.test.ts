@@ -54,6 +54,34 @@ describe('terminal focus navigation authority', () => {
     })
   })
 
+  it('asks phones to open a terminal only for a host focus sent from another terminal', async () => {
+    const focus = { handle: 'term_member', tabId: 'tab-1', worktreeId: 'wt-1', navigated: true }
+    const runtime = {
+      getRuntimeId: () => 'runtime-1',
+      focusTerminal: vi.fn().mockResolvedValue(focus),
+      requestMobileTerminalOpen: vi.fn()
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: TERMINAL_METHODS })
+
+    await dispatcher.dispatch(
+      request({ terminal: 'term_member', navigation: 'host', source: 'term_lead' })
+    )
+    await dispatcher.dispatch(request({ terminal: 'term_member', navigation: 'host' }))
+    await dispatcher.dispatchStreaming(
+      request({ terminal: 'term_member', source: 'term_lead' }),
+      () => {},
+      { clientKind: 'runtime', pairedDeviceId: 'device-b' }
+    )
+    await dispatcher.dispatchStreaming(
+      request({ terminal: 'term_member', navigation: 'host', source: 'term_lead' }),
+      () => {},
+      { clientKind: 'mobile', pairedDeviceId: 'device-a' }
+    )
+
+    expect(runtime.requestMobileTerminalOpen).toHaveBeenCalledTimes(1)
+    expect(runtime.requestMobileTerminalOpen).toHaveBeenCalledWith(focus, 'term_lead')
+  })
+
   it('rejects client fanout targets that terminal focus cannot honor', async () => {
     const runtime = {
       getRuntimeId: () => 'runtime-1',
