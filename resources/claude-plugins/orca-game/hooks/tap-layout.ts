@@ -8,10 +8,7 @@ export const HOTKEY_CELLS = 3
 
 export const isTapLayout = (columns: number): boolean => columns < TAP_LAYOUT_COLUMNS
 
-/**
- * The label and a blank row under it, padded so the whole block takes a press; `prefix` cells
- * (a hotkey's `q: `) come before the first row only, since the second wraps to the left edge.
- */
+/** The label over a blank row, padded to take a press; a hotkey's `prefix` cells start row one only. */
 export const tapLabelOf = (label: string, columns: number, prefix = 0): string => {
   const width = Math.max(1, columns)
   const room = Math.max(1, width - prefix)
