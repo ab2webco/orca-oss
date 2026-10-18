@@ -41,13 +41,14 @@ const rowOf = (agentId: string, one: LeadSubagent): GameAgent => ({
   isLeader: false
 })
 
-// Why: a lead's subagents count as working teammates, never as members.
+// Why: a lead's subagents count as working teammates, never as members; only the orchestrator lead refuses them.
 export function withLeadSubagents(
   state: GameState,
   running: LeadSubagents,
-  now: number
+  now: number,
+  isOrchestrator: boolean
 ): GameState {
-  if (state.role !== 'lead') {
+  if (state.role !== 'lead' || !isOrchestrator) {
     return state
   }
   const live = [...running].filter(([, one]) => now - one.at < STALE_MS)

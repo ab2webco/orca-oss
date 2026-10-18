@@ -41,7 +41,7 @@ describe('withLeadSubagents', () => {
     const running = leadSubagentsOf()
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
 
-    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW)
+    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW, true)
 
     expect(countsOf(state.agents).working).toBe(1)
     expect(partyOf(state, false)).toHaveLength(1)
@@ -52,7 +52,7 @@ describe('withLeadSubagents', () => {
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
     noteSubagentDone(running, 'sub-1')
 
-    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW)
+    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW, true)
 
     expect(countsOf(state.agents).working).toBe(0)
   })
@@ -61,9 +61,22 @@ describe('withLeadSubagents', () => {
     const running = leadSubagentsOf()
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
 
-    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW + STALE_MS)
+    const state = withLeadSubagents(
+      { ...STATE, agents: leadOnly() },
+      running,
+      NOW + STALE_MS,
+      true
+    )
 
     expect(countsOf(state.agents).working).toBe(0)
+  })
+
+  it('leaves a plain Agent Teams lead untouched, since its subagents are not refused there', () => {
+    const running = leadSubagentsOf()
+    noteSubagentCall(running, 'sub-1', 'Read', NOW)
+    const plain: GameState = { ...STATE, agents: leadOnly() }
+
+    expect(withLeadSubagents(plain, running, NOW, false)).toBe(plain)
   })
 
   it('leaves a member session untouched, since members run their own subagents', () => {
@@ -71,22 +84,22 @@ describe('withLeadSubagents', () => {
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
     const member: GameState = { ...STATE, role: 'member', agents: leadOnly() }
 
-    expect(withLeadSubagents(member, running, NOW)).toBe(member)
+    expect(withLeadSubagents(member, running, NOW, true)).toBe(member)
   })
 
-  it('leaves a plain session untouched, when the role is unknown', () => {
+  it('leaves a session untouched when the role is unknown', () => {
     const running = leadSubagentsOf()
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
     const plain: GameState = { ...STATE, role: undefined, agents: leadOnly() }
 
-    expect(withLeadSubagents(plain, running, NOW)).toBe(plain)
+    expect(withLeadSubagents(plain, running, NOW, true)).toBe(plain)
   })
 
   it('never lists a subagent as the lead or as a member with a terminal', () => {
     const running = leadSubagentsOf()
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
 
-    const row = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW).agents.find(
+    const row = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW, true).agents.find(
       (agent) => !agent.isLeader
     )
 

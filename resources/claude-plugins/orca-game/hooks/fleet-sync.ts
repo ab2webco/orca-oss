@@ -16,6 +16,7 @@ import { gameStateOf, parseGameState } from './game-state'
 import { gameStrings } from './game-strings'
 import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
+import { isLeadStarted } from './lead-started'
 import { runningLeadSubagents, withLeadSubagents } from './lead-subagents'
 import { teamEventsOf } from './team-events'
 import {
@@ -216,7 +217,8 @@ export async function viewOf($: EngineInterface): Promise<FleetView> {
   const v = await readFleet($)
   if (!quest.isDemo) {
     const now = await $.clock.now()
-    const state = v.state && withLeadSubagents(v.state, runningLeadSubagents, now)
+    const state =
+      v.state && withLeadSubagents(v.state, runningLeadSubagents, now, await isLeadStarted($))
     return { ...v, state, isDemo: false }
   }
   const frame = demoNow()

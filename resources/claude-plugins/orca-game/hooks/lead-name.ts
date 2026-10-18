@@ -2,7 +2,8 @@ import type { EngineInterface, On } from 'claude-code'
 
 import { viewOf } from './fleet-sync'
 import { LEAD_SKILL, leadRenameOf, type LeadNameRecord } from './game-lead'
-import { STARTED_KEY, markLeadStarted, startedOf } from './lead-autostart'
+import { markLeadStarted } from './lead-autostart'
+import { STARTED_KEY, startedOf } from './lead-started'
 
 const NAMES_KEY = 'lead-session-names'
 const NAMES_MAX = 50
