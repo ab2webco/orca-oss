@@ -13,7 +13,7 @@ type FollowHostTerminalOpenArgs = {
   client: RpcClient | null
   hostId: string
   worktreeId: string
-  /** The `terminal`/`tab` route params a followed request pushed this screen with. */
+  /** The `tab` (and `terminal`, when known) route params a followed request or member pushed. */
   routeTerminal: string | undefined
   routeTab: string | undefined
   sessionTabs: readonly MobileSessionTab[]
@@ -72,7 +72,7 @@ export function useFollowHostTerminalOpen({
 
   const appliedRouteTerminalRef = useRef(false)
   useEffect(() => {
-    if (appliedRouteTerminalRef.current || !routeTerminal || !routeTab) {
+    if (appliedRouteTerminalRef.current || !routeTab) {
       return
     }
     // Why: the member's tabs arrive after mount; select once they include the requested one.
