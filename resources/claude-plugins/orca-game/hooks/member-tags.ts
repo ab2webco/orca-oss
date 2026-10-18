@@ -64,16 +64,3 @@ export const agentTagOf = (
     : []
   return tags.find((tag) => cellWidthOf(tag) <= room) ?? agent.agentType
 }
-
-// Why 8: a branch keeps at least `⎇ feat/…` beside the tag.
-const BRANCH_MIN_CELLS = 8
-
-/** Cells left for the agent tag once a card's header shows the rest, each with its one-cell gap. */
-export const cardTagRoomOf = (
-  cardRoom: number,
-  shown: readonly string[],
-  hasBranch: boolean
-): number =>
-  cardRoom -
-  shown.reduce((sum, part) => sum + cellWidthOf(part) + 1, 0) -
-  (hasBranch ? BRANCH_MIN_CELLS + 1 : 0)
