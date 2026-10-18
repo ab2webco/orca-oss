@@ -101,7 +101,7 @@ describe('orca game launch', () => {
     ])
     expect(calls[3]?.[1]).toEqual({
       spec: 'Implement CIN-12: Cartelera page',
-      taskTitle: 'CIN-12 Cartelera page',
+      taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
     expect(calls[4]?.[1]).toEqual(
@@ -109,7 +109,7 @@ describe('orca game launch', () => {
         task: 'task_1',
         worktree: 'new-child',
         name: 'cin-12',
-        displayName: 'CIN-12 Cartelera page',
+        displayName: 'Arthur · CIN-12 Cartelera page',
         agent: 'claude',
         run: 'run_1',
         from: 'h1'
@@ -124,6 +124,50 @@ describe('orca game launch', () => {
         })
       })
     )
+  })
+
+  it("names the member after the scene's next free character, the ticket kept beside it", async () => {
+    const holder = { paneKey: 'm', state: 'idle', displayName: 'Arthur · CIN-1 Home' }
+    const { client, calls } = fakeClient(
+      stateWith({ config: { mode: 'on', scene: 'quest' }, agents: [holder] })
+    )
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
+      expect.objectContaining({ taskTitle: 'Merlin · CIN-12 Cartelera page' })
+    )
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ name: 'cin-12', displayName: 'Merlin · CIN-12 Cartelera page' })
+    )
+    expect(JSON.parse(output.join('')).result).toEqual(
+      expect.objectContaining({ ticket: 'CIN-12', name: 'Merlin' })
+    )
+  })
+
+  it("takes the character's name in the pane's UI language", async () => {
+    process.env.ORCA_GAME_LOCALE = 'es'
+    const { client, calls } = fakeClient(stateWith({ config: { mode: 'on', scene: 'quest' } }))
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'Arturo · CIN-12 Cartelera page' })
+    )
+  })
+
+  it('names the member after its ticket alone when the scene has no roster', async () => {
+    const bare = { id: 'me/bare', pluginId: 'me', definition: {} }
+    const { client, calls } = fakeClient(
+      stateWith({ config: { mode: 'on', scene: 'me/bare' }, extensions: { scenes: [bare] } })
+    )
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'CIN-12 Cartelera page' })
+    )
+    expect(JSON.parse(output.join('')).result.name).toBeUndefined()
   })
 
   it('binds a new Run named after the lead when the terminal has none', async () => {
@@ -181,7 +225,7 @@ describe('orca game launch', () => {
     await launch(client, 'CIN-99')
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
-      expect.objectContaining({ spec: 'Implement CIN-99:', taskTitle: 'CIN-99' })
+      expect.objectContaining({ spec: 'Implement CIN-99:', taskTitle: 'Arthur · CIN-99' })
     )
   })
 

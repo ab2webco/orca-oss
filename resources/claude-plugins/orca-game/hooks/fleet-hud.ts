@@ -1,6 +1,7 @@
 import { actionPixel } from './action-props'
 import { fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import { shortMemberNameOf } from './member-character'
 import {
   IDLE,
   isBlink,
@@ -182,7 +183,7 @@ export const hudGridOf = (
   shown.forEach((one, slot) => {
     const left = PARTY_AT + slot * SLOT + SPRITE_WIDTH + 1
     const color = one.state === 'waiting' ? WAITING : one.state === 'idle' ? IDLE : WORKING
-    hudWrite(grid, columns, 1, left, one.name, color, SLOT - SPRITE_WIDTH - 2)
+    hudWrite(grid, columns, 1, left, shortMemberNameOf(one.name), color, SLOT - SPRITE_WIDTH - 2)
     hudWrite(grid, columns, 2, left, memberLine(one), hud.dim, SLOT - SPRITE_WIDTH - 2)
     const mark = moodMarkOf(one.state, one.mood, tick)
     if (mark !== undefined) {
@@ -230,7 +231,7 @@ export const hudLineOf = (
   const party =
     members.length === 0
       ? art.noParty
-      : members.map((one) => `${markOf(one)} ${one.name}`).join('  ')
+      : members.map((one) => `${markOf(one)} ${shortMemberNameOf(one.name)}`).join('  ')
   const parts = [
     ...(extras.isDemo === true ? ['DEMO'] : []),
     ...(extras.level === undefined ? [] : [`${art.level} ${extras.level.level}`]),

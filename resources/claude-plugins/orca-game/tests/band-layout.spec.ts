@@ -119,6 +119,18 @@ const PARTY = [
   { name: 'scribe', phase: 'docs', state: 'waiting', says: 'waiting' }
 ] as const
 
+describe('hud member labels', () => {
+  // Why: a tile has ten cells, so `Merlin · ORCA-13 …` would cut to `Merlin · …`.
+  it('labels a member named after a scene character by the character alone', () => {
+    const named = [
+      { name: 'Merlin · ORCA-13 Write the docs', phase: 'docs', state: 'working', says: 'working' }
+    ] as const
+    expect(glyphs(hudGridOf(QUEST, named, 90, 4))).toContain('Merlin working')
+    expect(hudLineOf(named, 120)).toContain('• Merlin')
+    expect(hudLineOf(named, 120)).not.toContain('ORCA-13')
+  })
+})
+
 describe('hud at narrow widths', () => {
   it('never claims an empty party while teammates are there', () => {
     for (const columns of [30, 36, 40, 58]) {

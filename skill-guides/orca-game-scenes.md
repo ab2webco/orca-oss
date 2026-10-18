@@ -140,6 +140,7 @@ Top level, all required unless marked optional:
 | `finale`   | Optional. Caption painted while a merge runs                       |
 | `hud`      | Optional. The team band's frame, sky and text colors               |
 | `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
+| `roster`   | Optional. Names a lead's members take, in order                    |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
 The file must be at most 64 KB.
@@ -322,6 +323,18 @@ CJK characters and emoji are refused. A plain string or per-language object.
   lead (it stands at the right edge and holds its props out on its left).
 - An invalid `pet` or `advisor` is left out with a warning and the rest of the scene still
   draws, but `validate` reports it: fix it before you report.
+
+### `roster` (optional)
+
+```json
+["Mario", "Luigi", { "en": "Peach", "es": "Melocotón" }, "Toad"]
+```
+
+1 to 24 names, each 1 to 32 characters, a plain string or per-language object. Each member a
+lead launches takes the first name no live member holds and keeps it until it is released;
+the ticket stays next to it (`Mario · CIN-12 Cartelera`). Once every name is taken, members
+are named after their ticket only. A name must not look like a ticket id (`K-9`), contain
+`·`, or repeat. An invalid roster is left out with a warning and the scene still draws.
 
 ## Common problems
 

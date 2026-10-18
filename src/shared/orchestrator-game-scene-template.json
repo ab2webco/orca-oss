@@ -228,6 +228,12 @@
       "B": "#5a3a22"
     }
   },
+  "roster": [
+    { "en": "Arthur", "es": "Arturo" },
+    { "en": "Merlin", "es": "Merlín" },
+    "Morgana",
+    "Percival"
+  ],
   "finale": {
     "en": "★ QUEST COMPLETE ★",
     "es": "★ MISIÓN CUMPLIDA ★"
