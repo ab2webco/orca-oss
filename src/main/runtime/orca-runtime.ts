@@ -671,6 +671,7 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
+import { GameLeadSessions } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -3615,7 +3616,36 @@ export class OrcaRuntimeService {
   )
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
-    isLive: (handle) => this.resolveLeafForHandle(handle) !== null
+    isLive: (handle) => this.resolveLeafForHandle(handle) !== null,
+    sessions: new GameLeadSessions(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
+    sessionOf: async (handle) => {
+      const pane = await this.snapshotClaudeTerminalSwitchTarget({
+        kind: 'handle',
+        terminal: handle
+      })
+      return pane.ok && pane.providerSession && pane.worktreeId
+        ? {
+            sessionId: pane.providerSession.id,
+            agentArgs: pane.launchConfig?.agentArgs ?? null,
+            worktreeId: pane.worktreeId
+          }
+        : null
+    },
+    // Why the lead's own args: they carry --teammate-mode auto, which is what loads the game again.
+    resume: async (session) =>
+      (
+        await this.ensureAgentSession({
+          kind: 'explicit',
+          worktree: `id:${session.worktreeId}`,
+          agent: 'claude',
+          providerSession: { key: 'session_id', id: session.sessionId },
+          ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
+          presentation: 'focused'
+        })
+      ).terminal.handle,
+    focus: async (handle) => {
+      await this.focusTerminal(handle)
+    }
   })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
