@@ -89,6 +89,25 @@ describe('member card labels', () => {
     })
   })
 
+  it('keeps the scene character a member was named after beside its ticket', () => {
+    expect(memberHeadingOf({ displayName: 'Merlin · ORCA-601 Fix the card' })).toEqual({
+      name: 'Merlin · ORCA-601',
+      title: 'Fix the card'
+    })
+    const workItem = {
+      provider: 'plane',
+      identifier: 'ORCA-601',
+      title: 'Fix the member card',
+      url: '',
+      status: '',
+      statusGroup: 'unknown'
+    } as const
+    expect(memberHeadingOf({ displayName: 'Merlin · ORCA-601 Fix the card', workItem })).toEqual({
+      name: 'Merlin · ORCA-601',
+      title: 'Fix the member card'
+    })
+  })
+
   // Why: Orca cuts a long name at a fixed length, so its last word may be half a word.
   it('drops the last word of a name Orca already cut and marks the cut', () => {
     expect(memberHeadingOf({ displayName: ORCA_CUT }).title).toBe(

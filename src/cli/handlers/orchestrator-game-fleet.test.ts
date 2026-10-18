@@ -236,6 +236,24 @@ describe('orca game fleet verbs', () => {
     )
   })
 
+  it('wave names each member it launches after a different free character of the scene', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        config: { mode: 'on', scene: 'quest' },
+        agents: [LEAD, member({ displayName: 'Arthur · CIN-9 Older', isMember: true })],
+        lead: { autostart: false, cap: 3, agent: 'claude' }
+      })
+    )
+
+    await run('game wave', client, [['tickets', 'CIN-2,CIN-3']])
+
+    const starts = calls.filter(([method]) => method === 'orchestration.workerStart')
+    expect(starts.map(([, params]) => (params as { displayName: string }).displayName)).toEqual([
+      'Merlin · CIN-2 CIN-2 title',
+      'Lancelot · CIN-3 CIN-3 title'
+    ])
+  })
+
   it('wave gives every member it launches the same agent, model and effort overrides', async () => {
     const { client, calls } = fakeClient(stateWith(), {
       'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] }

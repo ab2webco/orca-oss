@@ -372,6 +372,7 @@ describe('gameStopTargetsOf', () => {
 describe('ticketInText', () => {
   it('finds the ticket a task title or branch names, or none', () => {
     expect(ticketInText('CIN-12 Cartelera')).toBe('CIN-12')
+    expect(ticketInText('Merlín · CIN-12 Cartelera')).toBe('CIN-12')
     expect(ticketInText('feat/cin-7-seats')).toBe('CIN-7')
     expect(ticketInText('Cartelera')).toBeNull()
     expect(ticketInText(undefined)).toBeNull()

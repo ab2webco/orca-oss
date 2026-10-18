@@ -20,6 +20,12 @@ import {
   unknownPlaceholderOf
 } from '../../shared/orchestrator-game-actions'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import {
+  memberDisplayNameOf,
+  memberNameOf,
+  memberRosterOf,
+  nextMemberName
+} from '../../shared/orchestrator-game-member-names'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 
@@ -27,6 +33,8 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameLaunchResult = {
   ticket: string
+  /** The scene character the member was named after; absent once the roster ran out. */
+  name?: string
   agent: string
   /** The managed account's email and id; absent when Orca's own account selection applies. */
   account?: string
@@ -127,12 +135,25 @@ export async function launchGameMember(args: {
   overrides?: GameLaunchFlags
   /** Members this same command launched, so `auto` spreads them before game.state shows them. */
   launched?: GameLaunchedOnAccount
+  /** Names this same command already gave, for the same reason. */
+  namesTaken?: readonly string[]
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
-  const title = item ? `${item.id} ${item.title}`.slice(0, DISPLAY_NAME_MAX) : ticket
+  const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
+  const name = nextMemberName(
+    memberRosterOf(state),
+    [...inUse, ...(args.namesTaken ?? [])],
+    process.env.ORCA_GAME_LOCALE ?? 'en'
+  )
+  const title = memberDisplayNameOf(
+    name,
+    item ? `${item.id} ${item.title}` : ticket,
+    DISPLAY_NAME_MAX,
+    item?.id ?? ticket
+  )
   const memberAccount = await resolveGameMemberAccount(client, choice, {
     agents: state.agents,
     launched: args.launched
@@ -186,6 +207,7 @@ export async function launchGameMember(args: {
   )
   const launched: GameLaunchResult = {
     ticket,
+    ...(name === null ? {} : { name }),
     agent: choice.agent,
     ...(memberAccount.account
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
@@ -203,7 +225,7 @@ export async function launchGameMember(args: {
 }
 
 export const formatGameLaunch = (launched: GameLaunchResult): string =>
-  `${launched.ticket}: member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}${launched.lastError ? `\n${launched.lastError}` : ''}`
 
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {

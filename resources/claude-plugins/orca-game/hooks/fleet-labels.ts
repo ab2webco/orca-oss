@@ -139,20 +139,24 @@ export const teammatesOf = (count: number): string => gameStrings().text.teammat
 
 export type MemberHeading = { name: string; title: string }
 
-const TICKET = /^([A-Za-z][A-Za-z0-9]*-\d+)\s+(.*)$/
+// `orca game launch` puts the scene character first: `Merlin · ORCA-12 Title`.
+const TICKET = /^(?:(.+?) · )?([A-Za-z][A-Za-z0-9]*-\d+)\s+(.*)$/
 // Orca's own fixed-length cut of a long task name.
 const ORCA_CUT = '...'
 
-/** A member's ticket id apart from its title; the work item's title is whole, the name's may be cut. */
+/** A member's ticket id, with its character, apart from its title; the work item's title is whole, the name's may be cut. */
 export const memberHeadingOf = (
   agent: Pick<GameAgent, 'displayName' | 'workItem'>
 ): MemberHeading => {
   const match = TICKET.exec(agent.displayName)
-  const name = agent.workItem?.identifier ?? match?.[1] ?? agent.displayName
+  const ticket = agent.workItem?.identifier ?? match?.[2]
+  const character = match?.[1]
+  const name =
+    ticket === undefined ? agent.displayName : character ? `${character} · ${ticket}` : ticket
   if (agent.workItem !== undefined && agent.workItem.title !== '') {
     return { name, title: agent.workItem.title }
   }
-  const rest = match?.[2] ?? ''
+  const rest = match?.[3] ?? ''
   if (!rest.endsWith(ORCA_CUT)) {
     return { name, title: rest }
   }

@@ -187,5 +187,5 @@ export function memberDisplayNameOf(
 const NAMED = /^(.+?) · (?=[A-Za-z][A-Za-z0-9_]*-\d+(?:\s|$))/
 
 /** The character a member was named after, read back from its display name. */
-export const memberNameOf = (displayName: string): string | null =>
-  NAMED.exec(displayName)?.[1] ?? null
+export const memberNameOf = (displayName: string | null | undefined): string | null =>
+  (displayName && NAMED.exec(displayName)?.[1]) || null
