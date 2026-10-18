@@ -79,6 +79,8 @@ export function makeBranchRenameDeps(
       renameWorktreeFolder,
       setRenameError,
       resolveWorktreeIdForTab: () => WORKTREE_ID,
+      getPinnedClaudeAccountId: () => null,
+      pickClaudeFallbackAccountId: () => null,
       onRenamed,
       ...overrides
     }

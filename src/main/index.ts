@@ -303,6 +303,7 @@ import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provide
 import { createHookStatusSessionTabsInvalidator } from './agent-hooks/hook-status-session-tabs-invalidation'
 import { wslHookRelayManager } from './agent-hooks/wsl-hook-relay-manager'
 import { maybeAutoRenameBranchOnFirstWork } from './agent-hooks/first-work-branch-rename'
+import { pickClaudeQuotaFallbackAccountId } from './agent-hooks/claude-quota-fallback-account'
 import { rememberBranchRenameFailureOutput } from './agent-hooks/branch-rename-failure-output'
 import { renameWorktreeFolderOnFirstWork } from './agent-hooks/first-work-folder-rename'
 import { moveWorktree } from './git/worktree'
@@ -683,6 +684,25 @@ function maybeAutoRenameBranchOnFirstWorkFromHook(event: {
         currentStore.setWorktreeMeta(worktreeId, { firstAgentMessageRenameError: error })
         // Why: the hook only knows the worktreeId, so derive the repoId notifyBranchRenamed expects.
         currentRuntime.notifyBranchRenamed(getRepoIdFromWorktreeId(worktreeId))
+      },
+      getPinnedClaudeAccountId: (worktreeId) =>
+        currentStore.getWorktreeMeta(worktreeId)?.claudeAccountId ?? null,
+      pickClaudeFallbackAccountId: ({ excludedAccountIds, triedGlobal }) => {
+        const settings = currentStore.getSettings()
+        const rateLimitState = rateLimits?.getState()
+        if (!rateLimitState) {
+          return null
+        }
+        const activeAccountId = settings.activeClaudeManagedAccountId
+        return pickClaudeQuotaFallbackAccountId({
+          accounts: settings.claudeManagedAccounts,
+          activeAccountId,
+          rateLimits: rateLimitState,
+          excludedAccountIds:
+            triedGlobal && activeAccountId
+              ? [...excludedAccountIds, activeAccountId]
+              : excludedAccountIds
+        })
       },
       resolveWorktreeIdForTab: (tabId) => currentStore.getWorktreeIdForTab(tabId),
       onRenamed: (repoIdOrWorktreeId) => {

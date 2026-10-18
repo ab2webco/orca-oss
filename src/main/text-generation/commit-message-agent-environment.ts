@@ -1,4 +1,5 @@
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
+import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import { applyClaudeEnvPatch } from '../claude-accounts/environment'
 import { readShellStartupEnvVar } from '../pty/shell-startup-env'
 import { parseWslUncPath } from '../../shared/wsl-paths'
@@ -6,13 +7,15 @@ import { parseWslUncPath } from '../../shared/wsl-paths'
 export type CommitMessageAgentEnvironmentResolvers = {
   prepareForCodexLaunch?: (target?: CommitMessageAgentRuntimeTarget) => string | null
   prepareForClaudeLaunch?: (
-    target?: CommitMessageAgentRuntimeTarget
+    target?: ClaudeAccountSelectionTarget
   ) => Promise<ClaudeRuntimeAuthPreparation>
 }
 
 export type CommitMessageAgentRuntimeTarget = {
   runtime?: 'host' | 'wsl'
   wslDistro?: string | null
+  /** Claude managed account to run as; null/undefined keeps the global selection. */
+  claudeAccountId?: string | null
 }
 
 function cloneProcessEnv(): Record<string, string> {
@@ -127,7 +130,9 @@ export async function prepareLocalCommitMessageAgentEnv(
     }
 
     if (agentId === 'claude' && resolvers.prepareForClaudeLaunch) {
-      const preparation = await resolvers.prepareForClaudeLaunch(target)
+      const preparation = await resolvers.prepareForClaudeLaunch(
+        target?.claudeAccountId ? { ...target, overrideAccountId: target.claudeAccountId } : target
+      )
       const env = applyClaudeEnvPatch(cloneProcessEnv(), preparation.envPatch, {
         stripAuthEnv: preparation.stripAuthEnv
       })
