@@ -59,11 +59,23 @@ export type GameMemberLaunch = { model: string | null; effort: string | null }
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
 
-/** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
-export type GameMemberAdvisor = GameMemberAdvisorPick & {
-  pinned: { model: boolean; effort: boolean }
-  previous?: GameMemberAdvisorPick
+/** Jev's optional detail from a newer report; a version 1 report carries none of it. */
+export type GameMemberAdvisorDetail = {
+  line?: string | null
+  skill?: string | null
+  tool?: string | null
+  hold?: string | null
+  confidence?: string | null
+  routedModel?: string | null
+  sessionModel?: string | null
 }
+
+/** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
+export type GameMemberAdvisor = GameMemberAdvisorPick &
+  GameMemberAdvisorDetail & {
+    pinned: { model: boolean; effort: boolean }
+    previous?: GameMemberAdvisorPick
+  }
 
 export type GameMemberLimit = { resetsAt: number | null }
 

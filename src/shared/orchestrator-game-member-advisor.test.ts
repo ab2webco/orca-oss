@@ -45,3 +45,49 @@ describe('parseGameMemberAdvisorReport', () => {
     expect(parsed?.effort).toBeNull()
   })
 })
+
+describe('parseGameMemberAdvisorReport detail fields', () => {
+  it('keeps the optional detail fields a newer Jev sends', () => {
+    const parsed = parseGameMemberAdvisorReport(
+      report({
+        line: 'Refactoring the parser',
+        skill: 'review',
+        tool: 'Edit',
+        hold: 'waiting on CI',
+        confidence: 0.82,
+        routedModel: 'Haiku 5.5',
+        sessionModel: 'Sonnet 5.5'
+      })
+    )
+
+    expect(parsed).toMatchObject({
+      model: 'Sonnet 5.5',
+      line: 'Refactoring the parser',
+      skill: 'review',
+      tool: 'Edit',
+      hold: 'waiting on CI',
+      confidence: '0.82',
+      routedModel: 'Haiku 5.5',
+      sessionModel: 'Sonnet 5.5'
+    })
+  })
+
+  it('reads a version 1 report without the detail fields exactly as before', () => {
+    expect(parseGameMemberAdvisorReport(report())).toEqual({
+      model: 'Sonnet 5.5',
+      effort: 'high',
+      pinned: { model: true, effort: false }
+    })
+  })
+
+  it('ignores a detail field of a type this build cannot read, and keeps the rest', () => {
+    const parsed = parseGameMemberAdvisorReport(report({ line: { text: 'x' }, tool: 'Bash' }))
+
+    expect(parsed).toMatchObject({ model: 'Sonnet 5.5', tool: 'Bash' })
+    expect(parsed).not.toHaveProperty('line')
+  })
+
+  it('keeps an explicit null detail field as null', () => {
+    expect(parseGameMemberAdvisorReport(report({ hold: null }))).toMatchObject({ hold: null })
+  })
+})

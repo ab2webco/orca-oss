@@ -3,10 +3,26 @@ import { stripTerminalControl } from './terminal-control-stripping'
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
 
+// Why optional: a newer Jev adds these; a version 1 report without them stays valid.
+export const GAME_MEMBER_ADVISOR_DETAIL_KEYS = [
+  'line',
+  'skill',
+  'tool',
+  'hold',
+  'confidence',
+  'routedModel',
+  'sessionModel'
+] as const
+
+export type GameMemberAdvisorDetailKey = (typeof GAME_MEMBER_ADVISOR_DETAIL_KEYS)[number]
+
+export type GameMemberAdvisorDetail = Partial<Record<GameMemberAdvisorDetailKey, string | null>>
+
 /** What a member pane says its Jev has it on, and which dimension Orca pinned at launch. */
-export type GameMemberAdvisorReport = GameMemberAdvisorPick & {
-  pinned: { model: boolean; effort: boolean }
-}
+export type GameMemberAdvisorReport = GameMemberAdvisorPick &
+  GameMemberAdvisorDetail & {
+    pinned: { model: boolean; effort: boolean }
+  }
 
 /** The report the lead's Panel reads, with what the member was on before Jev's latest switch. */
 export type GameMemberAdvisor = GameMemberAdvisorReport & { previous?: GameMemberAdvisorPick }
@@ -45,9 +61,17 @@ export function parseGameMemberAdvisorReport(
     return undefined
   }
   const pinned = isRecord(value.pinned) ? value.pinned : {}
+  const detail: GameMemberAdvisorDetail = {}
+  for (const key of GAME_MEMBER_ADVISOR_DETAIL_KEYS) {
+    const text = key in value ? wordsOf(value[key], key === 'confidence') : undefined
+    if (text !== undefined) {
+      detail[key] = text
+    }
+  }
   return {
     model,
     effort,
-    pinned: { model: pinned.model === true, effort: pinned.effort === true }
+    pinned: { model: pinned.model === true, effort: pinned.effort === true },
+    ...detail
   }
 }
