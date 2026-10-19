@@ -101,6 +101,17 @@ function pendingAskTranscript(args: { sessionId: string; userText: string }): st
   return `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`
 }
 
+// Why: in CI the tab title can already show the first prompt when the
+// transcript hydrates; pinning it makes that collision deterministic.
+async function setTerminalTabTitle(
+  page: Page,
+  args: { tabId: string; title: string }
+): Promise<void> {
+  await page.evaluate(({ tabId, title }) => {
+    window.__store?.getState().updateTabTitle(tabId, title)
+  }, args)
+}
+
 test.describe('Desktop chat AskUserQuestion card (#11761)', () => {
   test('renders the answerable question card from the transcript when live status carries no ask', async ({
     orcaPage
@@ -132,27 +143,31 @@ test.describe('Desktop chat AskUserQuestion card (#11761)', () => {
       })
       await toggleTerminalTabToChatView(orcaPage, { tabId, worktreeId: descriptor.worktreeId })
 
-      await expect(orcaPage.locator('[data-native-chat-root="true"]')).toBeVisible({
-        timeout: 15_000
-      })
-      await expect(orcaPage.getByText(userText)).toBeVisible({ timeout: 30_000 })
+      await setTerminalTabTitle(orcaPage, { tabId, title: userText })
+      await expect(orcaPage.getByTestId('sortable-tab').getByText(userText)).toBeVisible()
+
+      // Why: the tab strip and the worktree sidebar repeat the first prompt, so
+      // only the chat root can prove the transcript itself rendered.
+      const chatRoot = orcaPage.locator('[data-native-chat-root="true"]')
+      await expect(chatRoot).toBeVisible({ timeout: 15_000 })
+      await expect(chatRoot.getByText(userText)).toBeVisible({ timeout: 30_000 })
 
       // The pre-fix build leaves the composer mounted here and never renders a
       // card, so this assertion is what actually gates the regression.
-      await expect(orcaPage.getByText(QUESTION)).toBeVisible({ timeout: 10_000 })
-      await expect(orcaPage.getByRole('button', { name: /Spaces/ })).toBeVisible()
+      await expect(chatRoot.getByText(QUESTION)).toBeVisible({ timeout: 10_000 })
+      await expect(chatRoot.getByRole('button', { name: /Spaces/ })).toBeVisible()
       await orcaPage.screenshot({ path: path.join(screenshotDir, '01-question-card.png') })
 
       // The submit button reads "Skip" until an option is chosen; picking one is
       // what proves the card is answerable rather than merely rendered.
-      await orcaPage.getByRole('button', { name: /Spaces/ }).click()
-      await expect(orcaPage.getByRole('button', { name: 'Submit' })).toBeVisible()
+      await chatRoot.getByRole('button', { name: /Spaces/ }).click()
+      await expect(chatRoot.getByRole('button', { name: 'Submit' })).toBeVisible()
       await orcaPage.screenshot({ path: path.join(screenshotDir, '02-option-selected.png') })
 
-      await orcaPage.getByRole('button', { name: 'Submit' }).click()
+      await chatRoot.getByRole('button', { name: 'Submit' }).click()
       // The card owns the composer slot, so its disappearance is the visible
       // signal that the answer was accepted and chat input came back.
-      await expect(orcaPage.getByText(QUESTION)).toHaveCount(0, { timeout: 20_000 })
+      await expect(chatRoot.getByText(QUESTION)).toHaveCount(0, { timeout: 20_000 })
       await orcaPage.screenshot({ path: path.join(screenshotDir, '03-answered.png') })
     } finally {
       rmSync(scratchDir, { recursive: true, force: true })
