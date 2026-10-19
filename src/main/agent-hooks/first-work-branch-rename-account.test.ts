@@ -94,6 +94,39 @@ describe('first-work branch rename account selection', () => {
     expect(prepareLocalEnvMock).toHaveBeenCalledWith('claude', undefined, undefined)
   })
 
+  it('runs as the account the triggering pane runs on, ahead of the worktree pin', async () => {
+    const { deps } = makeDeps({
+      getPaneClaudeAccountId: () => 'acct-member',
+      getPinnedClaudeAccountId: () => 'acct-worktree'
+    })
+    await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
+    expect(prepareLocalEnvMock).toHaveBeenCalledWith('claude', undefined, {
+      claudeAccountId: 'acct-member'
+    })
+  })
+
+  it('uses the pane account when the worktree has no pin', async () => {
+    const { deps } = makeDeps({
+      getPaneClaudeAccountId: () => 'acct-member',
+      getPinnedClaudeAccountId: () => null
+    })
+    await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
+    expect(prepareLocalEnvMock).toHaveBeenCalledWith('claude', undefined, {
+      claudeAccountId: 'acct-member'
+    })
+  })
+
+  it('falls back to the worktree pin when the pane account is unknown', async () => {
+    const { deps } = makeDeps({
+      getPaneClaudeAccountId: () => null,
+      getPinnedClaudeAccountId: () => 'acct-worktree'
+    })
+    await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
+    expect(prepareLocalEnvMock).toHaveBeenCalledWith('claude', undefined, {
+      claudeAccountId: 'acct-worktree'
+    })
+  })
+
   it('falls back to another account with quota when the pinned one is limited', async () => {
     generateBranchNameMock
       .mockResolvedValueOnce(LIMIT_FAILURE)
