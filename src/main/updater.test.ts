@@ -3888,7 +3888,7 @@ describe('updater', () => {
 
     beforeEach(() => {
       reproofs = []
-      // Records each real re-proof so settleQuitAndInstall can await it; holdRevalidation overrides.
+      // Records each re-proof so settleQuitAndInstall can await its verdict.
       vi.doMock('./linux-package-update-recovery', async () => {
         const actual = await vi.importActual<typeof RecoveryModule>(
           './linux-package-update-recovery'
@@ -3919,7 +3919,9 @@ describe('updater', () => {
      * Holds the pre-install re-proof open so a verdict can be delivered at an exact point in the
      * cycle. Only that call is replaced — the artifact state stays real. Must precede startUpdater.
      */
-    const holdRevalidation = (): {
+    const holdRevalidation = (
+      verdictDelayMs = 0
+    ): {
       settle: (verdict: RevalidationVerdict) => void
       fail: (error: Error) => void
     } => {
@@ -3933,21 +3935,33 @@ describe('updater', () => {
         )
         return {
           ...actual,
-          revalidateLinuxPackageForInstall: vi.fn(
-            () =>
-              new Promise<RevalidationVerdict>((resolve, reject) => {
-                pending = { resolve, reject }
-              })
-          )
+          revalidateLinuxPackageForInstall: vi.fn(() => {
+            const reproof = new Promise<RevalidationVerdict>((resolve, reject) => {
+              pending = { resolve, reject }
+            })
+            reproofs.push(reproof)
+            return reproof
+          })
         }
       })
       return {
         settle: (verdict) => {
-          pending?.resolve(verdict)
+          if (!pending) {
+            throw new Error('No Linux package revalidation is waiting for a verdict')
+          }
+          const { resolve } = pending
+          if (verdictDelayMs) {
+            realSetTimeout(() => resolve(verdict), verdictDelayMs)
+          } else {
+            resolve(verdict)
+          }
           pending = null
         },
         fail: (error) => {
-          pending?.reject(error)
+          if (!pending) {
+            throw new Error('No Linux package revalidation is waiting for a verdict')
+          }
+          pending.reject(error)
           pending = null
         }
       }
@@ -4306,7 +4320,8 @@ describe('updater', () => {
     // Why: hashing 160 MB outlives the cycle it started in, and Check for Updates stays enabled
     // while it runs — a verdict from the old cycle must not replace the card that took over.
     it('drops an abort verdict once a newer check replaced the card', async () => {
-      const revalidation = holdRevalidation()
+      // The verdict can outlive a test turn under load; settlement must wait for it.
+      const revalidation = holdRevalidation(200)
       const { send, updater } = await startUpdater('deb')
       await reachDownloaded(updater, downloadedEvent())
 
