@@ -14,15 +14,25 @@ type Held = { advisor: GameMemberAdvisor; at: number }
 const isSamePick = (a: GameMemberAdvisorPick, b: GameMemberAdvisorPick): boolean =>
   a.model === b.model && a.effort === b.effort
 
-/** Each member pane's Jev report, in memory: a restart refills it within one poll. */
+/** A member's last report kept outside memory, so a finished or restarted member still shows its model. */
+export type GameMemberAdvisorKeeper = {
+  read(paneKey: string): GameMemberAdvisorReport | null
+  write(paneKey: string, report: GameMemberAdvisorReport | null): void
+}
+
+/** Each member pane's Jev report, in memory and in the keeper: a restart refills it within one poll. */
 export class GameMemberAdvisors {
   private readonly byPane = new Map<string, Held>()
 
-  constructor(private readonly maxPanes = GAME_MEMBER_ADVISOR_PANES_MAX) {}
+  constructor(
+    private readonly maxPanes = GAME_MEMBER_ADVISOR_PANES_MAX,
+    private readonly keeper?: GameMemberAdvisorKeeper
+  ) {}
 
   note(paneKey: string, report: GameMemberAdvisorReport | null, now: number): void {
     const kept = this.of(paneKey, now)
     this.byPane.delete(paneKey)
+    this.keeper?.write(paneKey, report)
     if (report === null) {
       return
     }
@@ -52,13 +62,18 @@ export class GameMemberAdvisors {
   of(paneKey: string, now: number): GameMemberAdvisor | null {
     const held = this.byPane.get(paneKey)
     if (!held) {
-      return null
+      return this.keptOf(paneKey)
     }
     if (now - held.at >= GAME_MEMBER_ADVISOR_TTL_MS) {
       this.byPane.delete(paneKey)
-      return null
+      return this.keptOf(paneKey)
     }
     return held.advisor
+  }
+
+  // Why: a finished member stopped polling, so its last report is the model it still runs on.
+  private keptOf(paneKey: string): GameMemberAdvisor | null {
+    return this.keeper?.read(paneKey) ?? null
   }
 }
 

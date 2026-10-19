@@ -683,6 +683,11 @@ import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
+  GAME_MEMBER_ADVISOR_VERSION,
+  parseGameMemberAdvisorReport,
+  type GameMemberAdvisorReport
+} from '../../shared/orchestrator-game-member-advisor'
+import {
   gameMemberLaunchOf,
   type GameMemberLaunch
 } from '../../shared/orchestrator-game-member-launch'
@@ -3621,7 +3626,10 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
-  private readonly gameMemberAdvisors = new GameMemberAdvisors()
+  private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
+    read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
+    write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
+  })
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(90_000)
   private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
@@ -30429,6 +30437,35 @@ export class OrcaRuntimeService {
       return gameMemberLaunchOf(this.getOrchestrationDb().workerLaunchForTerminal(handle))
     } catch {
       return null
+    }
+  }
+
+  /** The member's last Jev report, kept on its terminal's dispatch. */
+  private keptGameMemberAdvisorFor(paneKey: string): GameMemberAdvisorReport | null {
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    if (!handle) {
+      return null
+    }
+    try {
+      const kept = this.getOrchestrationDb().workerAdvisorForTerminal(handle)
+      return kept === null ? null : (parseGameMemberAdvisorReport(JSON.parse(kept)) ?? null)
+    } catch {
+      return null
+    }
+  }
+
+  private keepGameMemberAdvisorFor(paneKey: string, report: GameMemberAdvisorReport | null): void {
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    if (!handle) {
+      return
+    }
+    try {
+      this.getOrchestrationDb().noteWorkerAdvisorForTerminal(
+        handle,
+        report === null ? null : JSON.stringify({ version: GAME_MEMBER_ADVISOR_VERSION, ...report })
+      )
+    } catch {
+      // Why: the report still serves from memory; only a restart would lose it.
     }
   }
 

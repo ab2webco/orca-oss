@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { GameMemberAdvisorReport } from '../../shared/orchestrator-game-member-advisor'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 
 const MINUTE = 60_000
@@ -75,5 +76,47 @@ describe('GameMemberAdvisors', () => {
     expect(store.of('pane-a', 2)).toEqual(on('Opus 5.5'))
     store.noteReport('pane-a', null, 2)
     expect(store.of('pane-a', 3)).toBeNull()
+  })
+})
+
+describe('GameMemberAdvisors kept copy', () => {
+  const keptIn = () => {
+    const kept = new Map<string, GameMemberAdvisorReport>()
+    return {
+      kept,
+      durable: {
+        read: (paneKey: string) => kept.get(paneKey) ?? null,
+        write: (paneKey: string, report: GameMemberAdvisorReport | null) => {
+          if (report === null) {
+            kept.delete(paneKey)
+          } else {
+            kept.set(paneKey, report)
+          }
+        }
+      }
+    }
+  }
+
+  it('answers with the last report after it expired from memory', () => {
+    const { durable } = keptIn()
+    const store = new GameMemberAdvisors(undefined, durable)
+    store.note('pane-a', on('Opus 5.5'), 0)
+    expect(store.of('pane-a', 4 * MINUTE)).toEqual(on('Opus 5.5'))
+  })
+
+  it('answers with the last report after a restart, before the member reports again', () => {
+    const { durable } = keptIn()
+    new GameMemberAdvisors(undefined, durable).note('pane-a', on('Opus 5.5'), 0)
+    expect(new GameMemberAdvisors(undefined, durable).of('pane-a', 0)).toEqual(on('Opus 5.5'))
+  })
+
+  it('a null report clears the kept copy too', () => {
+    const { kept, durable } = keptIn()
+    const store = new GameMemberAdvisors(undefined, durable)
+    store.note('pane-a', on('Opus 5.5'), 0)
+    expect(kept.has('pane-a')).toBe(true)
+    store.note('pane-a', null, 1)
+    expect(kept.has('pane-a')).toBe(false)
+    expect(store.of('pane-a', 2)).toBeNull()
   })
 })
