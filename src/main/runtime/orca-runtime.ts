@@ -126,6 +126,7 @@ import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
+import type { WorkerObservedModel } from './orchestration/worker-observed-model'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
 import { ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS } from './orchestration/dispatch-lifecycle-deadline'
@@ -30427,17 +30428,46 @@ export class OrcaRuntimeService {
     }
   }
 
-  /** The model and effort a member's dispatch launched its terminal on; none for a pane no dispatch made. */
+  /** The model and effort a member runs on: what its own hooks named, else what its dispatch chose. */
   private gameMemberLaunchFor(paneKey: string): GameMemberLaunch | null {
     const handle = this.getTerminalHandleForPaneKey(paneKey)
     if (!handle) {
       return null
     }
     try {
-      return gameMemberLaunchOf(this.getOrchestrationDb().workerLaunchForTerminal(handle))
+      const db = this.getOrchestrationDb()
+      const launched = db.workerLaunchForTerminal(handle)
+      const seen = this.gameMemberSeenModelFor(paneKey, handle, db)
+      return gameMemberLaunchOf({
+        model: seen?.model ?? launched?.model ?? null,
+        effort: seen?.effort ?? launched?.effort ?? null
+      })
     } catch {
       return null
     }
+  }
+
+  // Why from hooks: the member pane runs no plugin, and a launch without --model records none.
+  private gameMemberSeenModelFor(
+    paneKey: string,
+    handle: string,
+    db: OrchestrationDb
+  ): WorkerObservedModel | null {
+    const live = this.getAgentStatusSnapshotFn?.().find(
+      (entry) => entry.paneKey === paneKey && (entry.model || entry.effort)
+    )
+    const kept = db.workerObservedModelForTerminal(handle)
+    if (!live) {
+      return kept
+    }
+    const seen = {
+      ...(live.model ? { model: live.model } : {}),
+      ...(live.effort ? { effort: live.effort } : {})
+    }
+    if (kept?.model !== seen.model || kept?.effort !== seen.effort) {
+      db.noteWorkerObservedModelForTerminal(handle, seen)
+    }
+    return seen
   }
 
   /** The member's last Jev report, kept on its terminal's dispatch. */
