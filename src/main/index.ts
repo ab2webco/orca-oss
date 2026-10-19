@@ -697,6 +697,15 @@ function maybeAutoRenameBranchOnFirstWorkFromHook(event: {
         // Why: the hook only knows the worktreeId, so derive the repoId notifyBranchRenamed expects.
         currentRuntime.notifyBranchRenamed(getRepoIdFromWorktreeId(worktreeId))
       },
+      getPaneClaudeAccountId: (paneKey) => {
+        const ptyId = getPtyIdForPaneKey(paneKey)
+        if (!ptyId) {
+          return null
+        }
+        // Why: an orchestration worker's PTY can run on an account the worktree pin never records.
+        const owner = currentRuntime.getManagedPtyAccountOwner(ptyId, 'claude')
+        return owner.known ? owner.accountId : null
+      },
       getPinnedClaudeAccountId: (worktreeId) =>
         currentStore.getWorktreeMeta(worktreeId)?.claudeAccountId ?? null,
       pickClaudeFallbackAccountId: ({ excludedAccountIds, triedGlobal }) => {

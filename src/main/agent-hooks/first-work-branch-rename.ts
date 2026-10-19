@@ -20,14 +20,10 @@ import {
   resolveUniqueBranchName,
   type GitExec
 } from '../git/branch-rename'
-import {
-  generateBranchNameFromContext,
-  resolveTextGenerationParams
-} from '../text-generation/commit-message-text-generation'
+import { resolveTextGenerationParams } from '../text-generation/commit-message-text-generation'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import type { AgentGenerationFailureOutput } from '../text-generation/agent-failure-output'
-import { resolveGenerationTarget } from './first-work-generation-target'
-import { isClaudeUsageLimitFailure } from './claude-usage-limit-failure'
+import { generateBranchNameAcrossClaudeAccounts } from './first-work-branch-name-generation'
 import { runFolderWorkspaceTitleAutoRename } from './first-work-workspace-title-rename'
 
 export type FirstWorkBranchRenameEvent = {
@@ -63,7 +59,9 @@ export type FirstWorkBranchRenameDeps = {
     error: string | null,
     failureOutput?: AgentGenerationFailureOutput | null
   ) => void
-  /** Claude account the worktree's terminals are pinned to; null = the global selection. */
+  /** Claude account the pane's live PTY runs on; null when unknown or on the shared login. */
+  getPaneClaudeAccountId: (paneKey: string) => string | null
+  /** Claude account pinned to the worktree; null = the global selection. */
   getPinnedClaudeAccountId: (worktreeId: string) => string | null
   /** Another managed Claude account with quota left, skipping the ones already tried. */
   pickClaudeFallbackAccountId: (tried: {
@@ -128,7 +126,13 @@ export async function maybeAutoRenameBranchOnFirstWork(
   inFlightWorktreeIds.add(worktreeId)
   try {
     // settled = definitive verdict (renamed/ineligible); false = transient bail to retry later.
-    const settled = await runAutoRename(worktreeId, prompt, event.assistantMessage, deps)
+    const settled = await runAutoRename(
+      worktreeId,
+      event.paneKey,
+      prompt,
+      event.assistantMessage,
+      deps
+    )
     if (settled) {
       rememberSettledWorktreeId(worktreeId)
     }
@@ -143,6 +147,7 @@ export async function maybeAutoRenameBranchOnFirstWork(
 /** Returns true for a definitive verdict (renamed or permanently ineligible → stop re-probing), false for a transient bail worth retrying. */
 async function runAutoRename(
   worktreeId: string,
+  paneKey: string,
   prompt: string,
   assistantMessage: string | undefined,
   deps: FirstWorkBranchRenameDeps
@@ -225,49 +230,24 @@ async function runAutoRename(
   }
   const params = resolvedParams.params
 
-  // Run as the terminal's own account; on a usage limit move to another account with quota.
-  const triedAccountIds: string[] = []
-  let triedGlobal = false
-  let accountId = params.agentId === 'claude' ? deps.getPinnedClaudeAccountId(worktreeId) : null
-  let generated: Awaited<ReturnType<typeof generateBranchNameFromContext>>
-  for (;;) {
-    const target = await resolveGenerationTarget(
+  // Run as the account the member's pane runs on; on a usage limit move to another account with quota.
+  const generated = await generateBranchNameAcrossClaudeAccounts(
+    {
       worktreePath,
-      params.agentId,
       provider,
-      deps,
-      accountId
-    )
-    if (!target) {
-      deps.setRenameError(worktreeId, 'Could not prepare the branch-name generation environment.')
-      return retry('could not prepare generation environment')
-    }
-    generated = await generateBranchNameFromContext(
-      { firstPrompt: prompt, assistantMessage },
       params,
-      target
-    )
-    if (
-      generated.success ||
-      generated.canceled ||
-      params.agentId !== 'claude' ||
-      !isClaudeUsageLimitFailure(generated.error, generated.failureOutput)
-    ) {
-      break
-    }
-    if (accountId) {
-      triedAccountIds.push(accountId)
-    } else {
-      triedGlobal = true
-    }
-    const fallbackId = deps.pickClaudeFallbackAccountId({
-      excludedAccountIds: triedAccountIds,
-      triedGlobal
-    })
-    if (!fallbackId) {
-      break
-    }
-    accountId = fallbackId
+      prompt,
+      assistantMessage,
+      initialAccountId:
+        params.agentId === 'claude'
+          ? (deps.getPaneClaudeAccountId(paneKey) ?? deps.getPinnedClaudeAccountId(worktreeId))
+          : null
+    },
+    deps
+  )
+  if (!generated) {
+    deps.setRenameError(worktreeId, 'Could not prepare the branch-name generation environment.')
+    return retry('could not prepare generation environment')
   }
   if (!generated.success) {
     // Transient failure: retry on a later event; skip the badge for a user-canceled generation.
