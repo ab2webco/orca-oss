@@ -538,6 +538,9 @@ function signalExitCode(signal) {
   if (signal === 'SIGTERM') {
     return 143
   }
+  if (signal === 'SIGHUP') {
+    return 129
+  }
   return 1
 }
 
@@ -583,6 +586,11 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
   beginShutdown('SIGTERM')
+})
+
+// Why: the child runs in its own process group, so a terminal hangup never reaches it.
+process.on('SIGHUP', () => {
+  beginShutdown('SIGHUP')
 })
 
 child.on('error', (error) => {
