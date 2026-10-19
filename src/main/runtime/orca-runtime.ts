@@ -671,6 +671,12 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
+import {
+  GameLeadSessions,
+  awaitResumedLead,
+  leadResumeArgsOf,
+  resumedPaneStateOf
+} from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -2142,6 +2148,11 @@ const MOBILE_TERMINAL_SURFACE_TIMEOUT_MS = 10_000
 // fallback kill is needed, so keep it short — an unreachable host must not stall the rejection.
 const REJECTED_SPLIT_PTY_STOP_TIMEOUT_MS = 2_000
 const EXPLICIT_TERMINAL_CLOSE_STOP_TIMEOUT_MS = 2_000
+// Why: neither leaves a tab to retire, but the PTY behind it can still be running.
+const TAB_ALREADY_RETIRED_CLOSE_ERRORS: ReadonlySet<string> = new Set([
+  'workspace_session_unavailable',
+  'tab_not_found'
+])
 const MOBILE_TERMINAL_READY_FALLBACK_MS = 1000
 const SSH_PANE_RECOVERY_GRACE_MS = 30_000
 // Why: long enough that a keystroke burst to a proven-dead leaf probes once,
@@ -3619,7 +3630,58 @@ export class OrcaRuntimeService {
   )
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
-    isLive: (handle) => this.resolveLeafForHandle(handle) !== null
+    isLive: (handle) => this.resolveLeafForHandle(handle) !== null,
+    sessions: new GameLeadSessions(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
+    sessionOf: async (handle) => {
+      const pane = await this.snapshotClaudeTerminalSwitchTarget({
+        kind: 'handle',
+        terminal: handle
+      })
+      return pane.ok && pane.providerSession && pane.worktreeId
+        ? {
+            sessionId: pane.providerSession.id,
+            agentArgs: leadResumeArgsOf(pane.launchConfig),
+            worktreeId: pane.worktreeId
+          }
+        : null
+    },
+    isRunning: (handle) => this.isGameLeadPaneRunning(handle),
+    resume: async (session) => {
+      const { handle } = (
+        await this.ensureAgentSession({
+          kind: 'explicit',
+          worktree: `id:${session.worktreeId}`,
+          agent: 'claude',
+          providerSession: { key: 'session_id', id: session.sessionId },
+          ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
+          presentation: 'focused'
+        })
+      ).terminal
+      // Why bounded: the CLI waits on this RPC, and Claude refuses a missing conversation within seconds.
+      const outcome = await awaitResumedLead({
+        read: async () => {
+          if (
+            this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
+            session.sessionId
+          ) {
+            return 'session'
+          }
+          const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+          return resumedPaneStateOf(pane?.foregroundProcess ?? null)
+        },
+        timeoutMs: 20_000,
+        settleMs: 5_000,
+        intervalMs: 500
+      })
+      if (outcome === 'exited') {
+        await this.closeTerminal(handle).catch(() => undefined)
+        throw new Error('Claude exited instead of reopening the conversation')
+      }
+      return handle
+    },
+    focus: async (handle) => {
+      await this.focusTerminal(handle)
+    }
   })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
@@ -29682,7 +29744,7 @@ export class OrcaRuntimeService {
             origin: 'runtime'
           })
         } catch (error) {
-          if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
+          if (!(error instanceof Error) || !TAB_ALREADY_RETIRED_CLOSE_ERRORS.has(error.message)) {
             throw error
           }
           this.notifier.closeTerminal?.(tabId)
@@ -29709,7 +29771,7 @@ export class OrcaRuntimeService {
               origin: 'runtime'
             })
           } catch (error) {
-            if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
+            if (!(error instanceof Error) || !TAB_ALREADY_RETIRED_CLOSE_ERRORS.has(error.message)) {
               throw error
             }
             this.notifier?.closeTerminal(tabId)
@@ -30271,6 +30333,12 @@ export class OrcaRuntimeService {
     return this.gameLeads
   }
 
+  // Why a host without a process read counts as running: refusing a second lead is the safe side.
+  private async isGameLeadPaneRunning(handle: string): Promise<boolean> {
+    const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+    return !pane?.foregroundProcess || !isShellProcess(pane.foregroundProcess)
+  }
+
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
   private async gameBoardProjectOf(args: {
     worktreeId?: string
@@ -30484,6 +30552,11 @@ export class OrcaRuntimeService {
       readScenes: () => readPluginGameSceneSources(),
       readInboxes: () =>
         this.gameBoard.inboxSummary({
+          worktreeId: worktree?.id,
+          terminalHandle: callerHandle ?? undefined
+        }),
+      readLeadElsewhere: () =>
+        this.gameLeads.leadElsewhere({
           worktreeId: worktree?.id,
           terminalHandle: callerHandle ?? undefined
         }),

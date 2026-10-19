@@ -84,6 +84,8 @@ export type OrchestratorGameStateInput = {
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
+  /** The handle of the project's live lead when it is not the caller. */
+  readLeadElsewhere?: () => Promise<string | null>
   terminalHandleOf?: (paneKey: string) => string | null
   /** The calling Team's terminals; when known, agents outside it are left out. */
   teamHandles?: ReadonlySet<string> | null
@@ -166,16 +168,18 @@ export async function buildOrchestratorGameState(
   const integrations = resolveOrchestratorGameIntegrations(layers)
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
-  const { readStop, readInboxes } = input
-  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes] = await Promise.all([
-    input.worktree ? settle(input.readReview) : Promise.resolve(null),
-    tracker ? settle(input.readPlane) : Promise.resolve(null),
-    tracker ? settle(input.readLinear) : Promise.resolve(null),
-    readScenes ? settle(readScenes) : Promise.resolve(null),
-    readSceneFile(resolved, input.worktree),
-    readStop ? settleGameStop(readStop) : Promise.resolve(null),
-    readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null)
-  ])
+  const { readStop, readInboxes, readLeadElsewhere } = input
+  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere] =
+    await Promise.all([
+      input.worktree ? settle(input.readReview) : Promise.resolve(null),
+      tracker ? settle(input.readPlane) : Promise.resolve(null),
+      tracker ? settle(input.readLinear) : Promise.resolve(null),
+      readScenes ? settle(readScenes) : Promise.resolve(null),
+      readSceneFile(resolved, input.worktree),
+      readStop ? settleGameStop(readStop) : Promise.resolve(null),
+      readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null),
+      readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null)
+    ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
     ...resolved.config,
@@ -287,6 +291,7 @@ export async function buildOrchestratorGameState(
     agents,
     lead,
     role,
+    ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
     review: gameReview,
     workItem,
     extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },

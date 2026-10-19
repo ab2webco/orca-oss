@@ -17,6 +17,18 @@ export async function markLeadStarted($: EngineInterface): Promise<boolean> {
   return false
 }
 
+/** Forgets this session as the lead: `game lead` named another pane instead. */
+export async function unmarkLeadStarted($: EngineInterface): Promise<void> {
+  const session = await $.session.id()
+  const started = startedOf(await $.store.get(STARTED_KEY).catch(() => undefined))
+  if (started.includes(session)) {
+    await $.store.set(
+      STARTED_KEY,
+      started.filter((one) => one !== session)
+    )
+  }
+}
+
 /** Loads the lead rules once per session, in a project whose orca.yaml asks for it. */
 export async function leadAutostart($: EngineInterface): Promise<void> {
   await refresh($)

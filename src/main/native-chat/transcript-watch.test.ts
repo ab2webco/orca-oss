@@ -1,7 +1,36 @@
-import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdtemp, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { createTranscriptWatchScheduler } from './transcript-watch-scheduler'
+
+const controlledScheduler = vi.hoisted(() => ({
+  enabled: false,
+  reconcile: null as null | (() => Promise<void>)
+}))
+
+vi.mock('./transcript-watch-scheduler', async (importOriginal) => {
+  const original = await importOriginal<{
+    createTranscriptWatchScheduler: typeof createTranscriptWatchScheduler
+  }>()
+  return {
+    ...original,
+    createTranscriptWatchScheduler: (
+      options: Parameters<typeof original.createTranscriptWatchScheduler>[0]
+    ) => {
+      if (!controlledScheduler.enabled) {
+        return original.createTranscriptWatchScheduler(options)
+      }
+      controlledScheduler.reconcile = options.reconcile
+      return {
+        scheduleEventDrain: () => {},
+        scheduleRetry: () => false,
+        startReconciliation: () => {},
+        dispose: () => {}
+      }
+    }
+  }
+})
 import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import {
   getActiveNativeChatWatcherCount,
@@ -16,6 +45,8 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  controlledScheduler.enabled = false
+  controlledScheduler.reconcile = null
   await Promise.all(tempRoots.map((root) => rm(root, { recursive: true, force: true })))
   tempRoots = []
 })
@@ -80,6 +111,71 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
 }
 
 describe('subscribeNativeChatTranscript', () => {
+  it.each([undefined, 40])(
+    'replays a same-size rewrite as a snapshot without onReplace (limit: %s)',
+    async (initialLimit) => {
+      const line = claudeLine('u-1', 'user', 'first')
+      const filePath = await tempFile(line)
+      const snapshots: string[][] = []
+      const appends: string[][] = []
+      controlledScheduler.enabled = true
+      const sub = await subscribeNativeChatTranscript({
+        agent: 'claude',
+        sessionId: 'ignored',
+        filePath,
+        initialLimit,
+        onInitialSnapshot: (messages) => snapshots.push(messages.map((message) => message.id)),
+        onAppend: (messages) => appends.push(messages.map((message) => message.id))
+      })
+
+      try {
+        expect(controlledScheduler.reconcile).not.toBeNull()
+        await controlledScheduler.reconcile!()
+        expect(snapshots).toEqual([['u-1']])
+        expect(appends).toEqual([])
+
+        const before = await stat(filePath)
+        await writeFile(filePath, line)
+        await utimes(filePath, before.atime, new Date(before.mtimeMs + 60_000))
+        await controlledScheduler.reconcile!()
+
+        expect(appends).toEqual([])
+        expect(snapshots).toEqual([['u-1'], ['u-1']])
+
+        await appendFile(filePath, claudeLine('a-1', 'assistant', 'reply'))
+        await controlledScheduler.reconcile!()
+        expect(appends).toEqual([['a-1']])
+      } finally {
+        sub.unsubscribe()
+      }
+    }
+  )
+
+  it('keeps append-only subscribers replaying a same-size replacement', async () => {
+    const filePath = await tempFile(claudeLine('u-1', 'user', 'first'))
+    const appends: string[][] = []
+    controlledScheduler.enabled = true
+    const sub = await subscribeNativeChatTranscript({
+      agent: 'claude',
+      sessionId: 'ignored',
+      filePath,
+      onAppend: (messages) => appends.push(messages.map((message) => message.id))
+    })
+
+    try {
+      await controlledScheduler.reconcile!()
+      expect(appends).toEqual([['u-1']])
+
+      const before = await stat(filePath)
+      await writeFile(filePath, claudeLine('u-2', 'user', 'first'))
+      await utimes(filePath, before.atime, new Date(before.mtimeMs + 60_000))
+      await controlledScheduler.reconcile!()
+      expect(appends).toEqual([['u-1'], ['u-2']])
+    } finally {
+      sub.unsubscribe()
+    }
+  })
+
   it('delivers the offset-0 drain as one initial snapshot, then only live appends', async () => {
     const filePath = await tempFile(claudeLine('u-1', 'user', 'first'))
     const snapshots: NativeChatMessage[][] = []

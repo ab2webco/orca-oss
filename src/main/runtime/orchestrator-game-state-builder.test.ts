@@ -463,6 +463,27 @@ describe('buildOrchestratorGameState', () => {
     ).toBe('member')
   })
 
+  it("names the project's live lead to a pane that is not it, so the mod does not start a second", async () => {
+    const base = {
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: 'tab:m',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+
+    expect(await buildOrchestratorGameState(base)).not.toHaveProperty('leadElsewhere')
+    expect(
+      (await buildOrchestratorGameState({ ...base, readLeadElsewhere: async () => 'term_a' }))
+        .leadElsewhere
+    ).toEqual({ handle: 'term_a' })
+    expect(
+      await buildOrchestratorGameState({ ...base, readLeadElsewhere: async () => null })
+    ).not.toHaveProperty('leadElsewhere')
+  })
+
   it("sends Orca's lead buttons only to the lead, unless the project turns them off", async () => {
     const base = {
       settings: undefined,
