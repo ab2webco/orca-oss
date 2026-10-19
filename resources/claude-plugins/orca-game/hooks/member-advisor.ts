@@ -1,5 +1,10 @@
-import type { GameMemberAdvisor, GameMemberAdvisorPick, GameMemberLaunch } from '../types'
-import { cellWidthOf } from './cell-width'
+import type {
+  GameMemberAdvisor,
+  GameMemberAdvisorDetail,
+  GameMemberAdvisorPick,
+  GameMemberLaunch
+} from '../types'
+import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
 
 // What a member card says about the model and effort Jev has that member on.
@@ -14,6 +19,28 @@ const pickOf = (value: Record<string, unknown>): GameMemberAdvisorPick => ({
   effort: textOrNull(value.effort)
 })
 
+const DETAIL_KEYS = [
+  'line',
+  'skill',
+  'tool',
+  'hold',
+  'confidence',
+  'routedModel',
+  'sessionModel'
+] as const
+
+// Why: a field of another type is dropped alone, so the rest of the report still shows.
+const detailOf = (value: Record<string, unknown>): GameMemberAdvisorDetail => {
+  const detail: GameMemberAdvisorDetail = {}
+  for (const key of DETAIL_KEYS) {
+    const one = value[key]
+    if (typeof one === 'string' || one === null) {
+      detail[key] = one
+    }
+  }
+  return detail
+}
+
 export const memberAdvisorOf = (value: unknown): GameMemberAdvisor | undefined => {
   if (!isShape(value) || (value.model !== null && typeof value.model !== 'string')) {
     return undefined
@@ -21,6 +48,7 @@ export const memberAdvisorOf = (value: unknown): GameMemberAdvisor | undefined =
   const pinned = isShape(value.pinned) ? value.pinned : {}
   return {
     ...pickOf(value),
+    ...detailOf(value),
     pinned: { model: pinned.model === true, effort: pinned.effort === true },
     ...(isShape(value.previous) ? { previous: pickOf(value.previous) } : {})
   }
@@ -56,6 +84,20 @@ const switchOf = (before: GameMemberAdvisorPick, now: GameMemberAdvisorPick): st
   return `↳ ${side(before) || '?'} → ${side(now) || '?'}`
 }
 
+// Why one row each: a detail line is cut to the card, never wrapped into the model row.
+const detailRowsOf = (advisor: GameMemberAdvisor): string[] => {
+  const doing = [advisor.skill, advisor.tool].filter((one) => one)
+  const rows = [
+    advisor.line ? `› ${advisor.line}` : '',
+    doing.length > 0 ? `⚙ ${doing.join(' · ')}` : '',
+    advisor.hold ? `⏸ ${advisor.hold}` : '',
+    advisor.confidence ? `confidence ${advisor.confidence}` : '',
+    advisor.routedModel ? `↝ routed ${advisor.routedModel}` : '',
+    advisor.sessionModel ? `session ${advisor.sessionModel}` : ''
+  ]
+  return rows.filter((row) => row !== '')
+}
+
 /** The card's Jev rows fit to `room` cells: Jev's name goes first, then the pin; the rest wraps. */
 export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): string[] => {
   const now = pickText(advisor)
@@ -66,7 +108,8 @@ export const memberAdvisorLinesOf = (advisor: GameMemberAdvisor, room: number): 
   const pinned = pins === '' ? '' : ` · ${pins}`
   const head = fitted([`◆ Jev ${now}${pinned}`, `◆ ${now}${pinned}`, `◆ ${now}`], room)
   const moved = advisor.previous === undefined ? '' : switchOf(advisor.previous, advisor)
-  return moved === '' ? [head] : [head, moved]
+  const rows = moved === '' ? [head] : [head, moved]
+  return [...rows, ...detailRowsOf(advisor).map((row) => fitCells(row, room))]
 }
 
 type MemberModels = { advisor?: GameMemberAdvisor; launch?: GameMemberLaunch }

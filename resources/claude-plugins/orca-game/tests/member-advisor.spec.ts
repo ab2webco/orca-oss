@@ -144,3 +144,46 @@ describe("a member's Jev on its card", () => {
     expect(fleetAdvisorSummaryOf([{}, on(null)])).toBeNull()
   })
 })
+
+describe('member card detail from a newer Jev report', () => {
+  const DETAILED: GameMemberAdvisor = {
+    model: 'Sonnet 5.5',
+    effort: 'high',
+    pinned: { model: false, effort: false },
+    line: 'Refactoring the parser',
+    skill: 'review',
+    tool: 'Edit',
+    hold: 'waiting on CI',
+    confidence: '0.82',
+    routedModel: 'Haiku 5.5',
+    sessionModel: 'Opus 5.5'
+  }
+
+  it('keeps the detail fields through the game state', () => {
+    expect(parseGameState(stateWith({ advisor: DETAILED }))?.agents[0]?.advisor).toEqual(DETAILED)
+  })
+
+  it("draws each detail field on the card, after Jev's model row", () => {
+    expect(memberAdvisorLinesOf(DETAILED, 80)).toEqual([
+      '◆ Jev Sonnet 5.5·high',
+      '› Refactoring the parser',
+      '⚙ review · Edit',
+      '⏸ waiting on CI',
+      'confidence 0.82',
+      '↝ routed Haiku 5.5',
+      'session Opus 5.5'
+    ])
+  })
+
+  it('draws no detail row for a version 1 report, and keeps the launch model without one', () => {
+    const v1: GameMemberAdvisor = {
+      model: 'Sonnet 5.5',
+      effort: 'high',
+      pinned: { model: false, effort: false }
+    }
+    expect(memberAdvisorLinesOf(v1, 80)).toEqual(['◆ Jev Sonnet 5.5·high'])
+    expect(memberModelLinesOf({ launch: { model: 'Opus 5.5', effort: 'high' } }, 80)).toEqual([
+      '◇ Opus 5.5·high'
+    ])
+  })
+})
