@@ -2,8 +2,10 @@ import type { SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const WHITE = 0xf4f4f4
-const COWL = 0x1c1f2b
-const CAPE = 0x2a2d40
+const COWL = 0x4b5580
+const CAPE = 0x3c4466
+const RIM = 0x9aa6c9
+const INK = 0x06070c
 const SUIT = 0x5d6475
 const BELT = 0xd8b23c
 const HERO_SKIN = 0xe2b48c
@@ -102,34 +104,34 @@ export const VIGILANTE_SCENE: SceneDefinition = {
   },
   costumes: {
     working: {
-      rows: ['..K...K...', '..KKKKK...', '..KWKWK...', '.CKSSSKC..', 'CCGGYGGCC.', 'CCGGGGGCC.'],
+      rows: ['.KK...KK..', '..KKKKK...', '..KIKIK...', '.RKSSSKR..', 'RCGGYGGCR.', 'RCGGGGGCR.'],
       legs: ['.CK.K.KC..', 'C.KK.KK.C.'],
-      colors: { K: COWL, C: CAPE, W: WHITE, S: HERO_SKIN, G: SUIT, Y: BELT }
+      colors: { K: COWL, C: CAPE, I: INK, R: RIM, S: HERO_SKIN, G: SUIT, Y: BELT }
     },
     docs: {
       rows: ['..........', '..FFFFF...', '.FFFFFFF..', '..SESSES..', '.TTTTTTTPP', '.TTTTTTT.P'],
       legs: ['..T.T.T...', '.T.T.T.T..'],
-      colors: { F: 0x3b3328, S: HERO_SKIN, E: EYES, T: 0xa8875a, P: 0xf1e9d2 }
+      colors: { F: 0x6a5a48, S: HERO_SKIN, E: EYES, T: 0xa8875a, P: 0xf1e9d2 }
     },
     build: {
-      rows: ['..........', '..HHHHH...', '.HQQHQQH..', '.SSSSSSS.W', 'OVVVVVVVOW', '.VVVVVVV.W'],
+      rows: ['..........', '..HHHHH...', '.HQQIQQH..', '.SSSSSSS.W', 'OVVVVVVVOW', '.VVVVVVV.W'],
       legs: ['.V.V.V.V..', 'V.V.V.V.V.'],
-      colors: { H: 0x3a2a1c, Q: 0x56c8d8, S: HERO_SKIN, W: 0x9aa3ab, O: BELT, V: 0x4a5a7a }
+      colors: { H: 0x7a5636, Q: 0x56c8d8, I: INK, S: HERO_SKIN, W: 0x9aa3ab, O: BELT, V: 0x4a5a7a }
     },
     verify: {
       rows: ['..........', '..GGGGG...', '.GSSSSSG..', '.SESSSMS..', 'KKKWRWKKK.', '.KKKWKKK..'],
       legs: ['.K.K.K.K..', 'K.K.K.K.K.'],
-      colors: { G: 0xc9ccd4, S: HERO_SKIN, E: EYES, M: BELT, K: 0x15161c, W: WHITE, R: 0xc0283a }
+      colors: { G: 0xc9ccd4, S: HERO_SKIN, E: EYES, M: BELT, K: 0x3d4150, W: WHITE, R: 0xc0283a }
     },
     pr: {
-      rows: ['L.K...K...', '.LKKKKK...', '..KWKWK...', '.CKSSSKC..', 'CCGGYGGCC.', 'CCGGGGGCC.'],
+      rows: ['LKK...KK..', '..KKKKK...', '..KIKIK...', '.RKSSSKR..', 'RCGGYGGCR.', 'RCGGGGGCR.'],
       legs: ['.CK.K.KC..', 'C.KK.KK.C.'],
-      colors: { K: COWL, C: CAPE, W: WHITE, S: HERO_SKIN, G: SUIT, Y: BELT, L: 0xd8d8d8 }
+      colors: { K: COWL, C: CAPE, I: INK, R: RIM, S: HERO_SKIN, G: SUIT, Y: BELT, L: 0xd8d8d8 }
     },
     handoff: {
       rows: ['..BBBBB...', '.BBBBBBB..', '..SSSSS...', '..SESSES..', 'UUSXXXSUU.', '.UUUYUUU..'],
       legs: ['.U.U.U.U..', 'U.U.U.U.U.'],
-      colors: { B: 0x23365e, S: HERO_SKIN, E: EYES, X: 0x8a6a4a, U: 0x2c3e66, Y: BELT }
+      colors: { B: 0x45628f, S: HERO_SKIN, E: EYES, X: 0x8a6a4a, U: 0x44608f, Y: BELT }
     }
   },
   cards: {

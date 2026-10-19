@@ -185,3 +185,24 @@ describe('hd scenery against the sky', () => {
     }
   })
 })
+
+// A hero body stands in front of the far and near layers; below this L* gap it sinks into them.
+const HERO_APART = 15
+
+describe('hero against the skyline', () => {
+  it('keeps every vigilante body colour but its ink clear of the far and near layers in every phase', () => {
+    const scene = SCENES.vigilante as SceneDefinition
+    for (const phase of Object.keys(scene.looks) as ScenePhase[]) {
+      const colors = Object.values(scene.costumes[phase].colors)
+      const ink = Math.min(...colors.map(luminanceOf))
+      const body = colors.filter((color) => luminanceOf(color) > ink)
+      const { far, near } = scene.looks[phase]
+      for (const color of body) {
+        for (const layer of [far, near]) {
+          const apart = Math.abs(lightnessOf(color) - lightnessOf(layer)) >= HERO_APART
+          expect([phase, color.toString(16), apart]).toEqual([phase, color.toString(16), true])
+        }
+      }
+    }
+  })
+})
