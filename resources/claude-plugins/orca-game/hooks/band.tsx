@@ -57,11 +57,8 @@ export const registerBand = (on: On): void => {
     const v = await viewOf($)
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
-    const [beneath, allies, isPanelShown] = await Promise.all([
-      next(e).then(beneathOf),
-      alliesStrip($, e, palette, columns),
-      isPaneShown($)
-    ])
+    const [beneath, isPanelShown] = await Promise.all([next(e).then(beneathOf), isPaneShown($)])
+    const allies = await alliesStrip($, e, palette, columns, isPanelShown)
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     // Why Jev too: CI often lands while the lead is idle, when no spinner draws the scene.

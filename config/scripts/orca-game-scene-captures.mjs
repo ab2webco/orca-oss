@@ -23,7 +23,7 @@ import { advisorSpriteOf } from './advisor-art'
 import { SCENES } from './scenes/index'
 import { advisorCardOf } from './advisor-card-rows'
 import { advisorTileGridOf } from './advisor-tile'
-import { advisorOf } from './allies'
+import { advisorOf, allyPartsOf, allyRowsOf } from './allies'
 import { TILE_COLUMNS, tileGridOf } from './fleet-tiles'
 import { gameStrings, setGameLocale } from './game-strings'
 import { memberAdvisorLinesOf } from './member-advisor'
@@ -53,7 +53,8 @@ export const gridOf = ({ scene, phase, render, columns, tick, hour, caption, ges
     : sceneGridOf(definition, phase, columns, tick, caption, 0, undefined, false, 'edit', advisor)
 }
 const JEV = { version: 1, locale: 'es', line: 'jev · 2 agentes', model: 'glm-5.3', modelId: 'glm-5.3',
-  effort: 'high', subagents: [], ci: [], notices: [] }
+  effort: 'high', subagents: [], ci: [{ id: 'c1', status: 'success', text: 'CI main (abc1234) paso en 22 min' }],
+  notices: [{ id: 'n1', level: 'warn', text: 'Ejecuta /clear pronto' }] }
 const LOG = [
   { key: 'a1', title: 'Fix CI', model: 'Opus 5.5', effort: 'high', verdict: 'igual', gesture: 'approved', at: 1 },
   { key: 'a2', title: 'Write docs', model: 'Haiku 4.5', effort: null, verdict: 'Haiku basta', gesture: 'lowered', at: 2 }
@@ -67,6 +68,14 @@ export const cardsOf = ({ scene, isLogged }) => {
   return { card, tileColumns: TILE_COLUMNS, palette: definition.band,
     tile: advisorTileGridOf(sprite, card.pose, 0), member: tileGridOf(definition, 'working', 'working', 0),
     empty: gameStrings().text.advisorEmpty }
+}
+// The band's strip under the terminal: Jev's rows while the Panel is closed, the other plugins' lines only while it is shown.
+export const stripOf = ({ scene, isPanelShown, columns }) => {
+  setGameLocale('es')
+  const definition = typeof scene === 'string' ? SCENES[scene] : scene
+  const rows = allyRowsOf(isPanelShown ? null : advisorOf(JEV), [{ plugin: 'scout', text: '3 exploradores fuera' }],
+    { isZen: false, maxRows: 6, more: gameStrings().text.moreAllies })
+  return { palette: definition.band, rows: rows.map((row) => ({ tone: row.tone, ...allyPartsOf(row, columns) })) }
 }
 const MEMBER_JEV = { model: 'Sonnet 5.5', effort: 'high', pinned: { model: true, effort: false },
   previous: { model: 'Opus 5.5', effort: 'high' } }
@@ -104,7 +113,38 @@ font-style:normal;text-align:center;overflow:hidden}
 const TERMINAL = 0x111111
 const NAMED = { green: 0x5fd75f, yellow: 0xffd75f, red: 0xff5f5f, cyan: 0x5fd7d7, dim: 0x808080 }
 const colorOf = (name) => NAMED[name] ?? Number.parseInt(name.slice(1), 16)
-const GESTURE_COLORS = { lowered: 'green', raised: 'yellow', unsure: 'yellow', escalated: 'red' }
+const GESTURE_COLORS = {
+  lowered: 'green',
+  raised: 'yellow',
+  unsure: 'yellow',
+  escalated: 'red',
+  ciPassed: 'green',
+  ciFailed: 'red',
+  ciRunning: 'cyan'
+}
+const TONE_COLORS = {
+  'ci-watching': 'cyan',
+  'ci-success': 'green',
+  'ci-failure': 'red',
+  block: 'red',
+  warn: 'yellow'
+}
+
+// Approximates the strip's rows: a label on the gold pill, the text on the panel, then the badge.
+const stripGridOf = (columns, { palette, rows }) => {
+  const panel = colorOf(palette.panel)
+  const cellsOf = (text, fg, bg) => [...text].map((glyph) => [glyph.codePointAt(0), fg, bg])
+  return rows.flatMap((row) => {
+    const cells = [
+      ...(row.label === undefined
+        ? []
+        : cellsOf(` ${row.label} `, colorOf(palette.ink), colorOf(palette.gold))),
+      ...cellsOf(` ${row.text}`, colorOf(TONE_COLORS[row.tone] ?? palette.parchment), panel),
+      ...(row.badge === undefined ? [] : cellsOf(` ${row.badge} `, colorOf(palette.gold), panel))
+    ]
+    return Array.from({ length: columns }, (_one, x) => cells[x] ?? [0x20, panel, panel])
+  })
+}
 
 // Approximates the card's Ink layout: round border, the tile, then text cut to the room left.
 const cardGridOf = (columns, tile, tileColumns, lines, border) => {
@@ -181,7 +221,7 @@ const main = async () => {
     outfile: bundle,
     logLevel: 'warning'
   })
-  const { SCENE_IDS, gridOf, cardsOf, memberCardOf, sceneOfFile } = await import(
+  const { SCENE_IDS, gridOf, cardsOf, memberCardOf, stripOf, sceneOfFile } = await import(
     pathToFileURL(bundle).href
   )
   const custom = sceneFile === undefined ? [] : [sceneOfFile(await readFile(sceneFile, 'utf8'))]
@@ -236,6 +276,20 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
   await sheetOf(
     'cards',
     shots.slice(cardShots).map((path) => path.slice(out.length + 1, -'.png'.length))
+  )
+  const stripShots = shots.length
+  for (const scene of SCENE_IDS) {
+    for (const isPanelShown of [false, true]) {
+      for (const columns of [60, 40]) {
+        const strip = stripOf({ scene, isPanelShown, columns })
+        const state = isPanelShown ? 'panel-shown' : 'panel-closed'
+        await shoot(`strip-${scene}-${state}-${columns}`, stripGridOf(columns, strip), columns)
+      }
+    }
+  }
+  await sheetOf(
+    'strips',
+    shots.slice(stripShots).map((path) => path.slice(out.length + 1, -'.png'.length))
   )
   const memberShots = shots.length
   for (const scene of [...SCENE_IDS, ...custom]) {

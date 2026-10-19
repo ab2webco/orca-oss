@@ -34,7 +34,8 @@ export async function alliesStrip(
   $: EngineInterface,
   e: RenderInput,
   palette: BandPalette,
-  columns: number
+  columns: number,
+  isPanelShown: boolean
 ): Promise<RenderElement[]> {
   if (!isAbsorbing()) {
     return []
@@ -43,7 +44,8 @@ export async function alliesStrip(
     readJevAdvisor($, quest.tick),
     $.state.get(ALLIES).catch(() => ({ value: undefined }))
   ])
-  const rows = allyRowsOf(advisor, held.value?.statuses ?? [], {
+  // Why no Jev: the shown Panel's advisor card draws Jev, so the strip keeps only the other plugins' lines.
+  const rows = allyRowsOf(isPanelShown ? null : advisor, held.value?.statuses ?? [], {
     isZen: gameConfig().mode === 'zen',
     maxRows: MAX_ALLY_ROWS,
     more: gameStrings().text.moreAllies

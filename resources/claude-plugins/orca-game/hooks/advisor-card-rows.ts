@@ -1,12 +1,19 @@
 import type { AdvisorLogEntry } from '../types'
-import { decisionOf, type AdvisorDecision } from './advisor-cues'
-import type { Advisor } from './allies'
+import { CI_GESTURES, decisionOf, type AdvisorDecision } from './advisor-cues'
+import { ciLineOf, noticeLineOf, type Advisor, type AdvisorCi, type AdvisorNotice } from './allies'
 import { gameStrings, localizedNameOf } from './game-strings'
 import type { AdvisorGesture, SceneAdvisor } from './scenes/index'
 
-// What the Panel's advisor card says: who stands for Jev, this pane's model now, and its latest decisions.
+// What the Panel's advisor card says: who stands for Jev, this pane's model now, its decisions, CI and the latest notice.
 
 const CARD_ROWS = 5
+
+// Why the same gestures as the strip's tones: a red CI run or block reads red in both places.
+const NOTICE_GESTURES: Readonly<Record<AdvisorNotice['level'], AdvisorGesture | null>> = {
+  info: null,
+  warn: 'unsure',
+  block: 'escalated'
+}
 
 export type AdvisorCardRow = { key: string; text: string; gesture: AdvisorGesture | null }
 
@@ -60,6 +67,31 @@ const mainRowOf = (
   return { key: `main|${now}`, text: `★ ${who} · ${now}`, gesture: latest?.gesture ?? null }
 }
 
+const ciRowOf = (run: AdvisorCi): AdvisorCardRow => ({
+  key: `ci|${run.id}`,
+  text: ciLineOf(run),
+  gesture: CI_GESTURES[run.status]
+})
+
+const noticeRowOf = (notice: AdvisorNotice): AdvisorCardRow => ({
+  key: `notice|${notice.id}`,
+  text: noticeLineOf(notice),
+  gesture: NOTICE_GESTURES[notice.level]
+})
+
+// Why every live subagent: the band listed them all, so the card never drops one the history cap cut.
+const subagentRowsOf = (
+  advisor: Advisor,
+  decisions: readonly AdvisorDecision[],
+  room: number
+): AdvisorCardRow[] => {
+  const live = advisor.subagents.map(decisionOf)
+  const liveKeys = new Set(live.map((one) => one.key))
+  const past = decisions.filter((one) => !isMainOf(one) && !liveKeys.has(one.key))
+  const kept = past.slice(Math.max(0, past.length - Math.max(0, room - live.length)))
+  return [...kept, ...live].map(subagentRowOf)
+}
+
 /** The log when it has any; before Jev's first logged decision, the agents running now. */
 export const advisorCardOf = (
   sprite: SceneAdvisor,
@@ -70,11 +102,13 @@ export const advisorCardOf = (
   const decisions = log.length > 0 ? log : advisor.subagents.map(decisionOf)
   const line = advisor.line?.trim().split('\n')[0]?.trim() ?? ''
   const main = mainRowOf(advisor, decisions.findLast(isMainOf), context)
-  const subagents = decisions.filter((one) => !isMainOf(one))
+  const latestNotice = advisor.notices.at(-1)
   const rows = [
     ...(main === null ? [] : [main]),
     ...(context.isLead ? (context.members ?? []).map(memberRowOf) : []),
-    ...subagents.slice(-(main === null ? CARD_ROWS : CARD_ROWS - 1)).map(subagentRowOf)
+    ...subagentRowsOf(advisor, decisions, main === null ? CARD_ROWS : CARD_ROWS - 1),
+    ...advisor.ci.map(ciRowOf),
+    ...(latestNotice === undefined ? [] : [noticeRowOf(latestNotice)])
   ]
   return {
     name: localizedNameOf(sprite.name ?? gameStrings().text.advisor),
