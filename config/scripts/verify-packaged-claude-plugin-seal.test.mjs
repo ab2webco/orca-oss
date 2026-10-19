@@ -66,6 +66,16 @@ describe('pluginDirsInsideApp', () => {
       pluginDirsInsideApp({ pluginDirs: [pluginDir], appRoot, platform: 'linux', realpath })
     ).toEqual([])
   })
+
+  it('reads Windows paths with win32 rules and folded case', () => {
+    const appRoot = 'D:\\a\\orca-oss\\dist\\win-unpacked'
+    const inside = 'd:\\A\\orca-oss\\dist\\WIN-UNPACKED\\resources\\claude-plugins\\orca-game'
+    const outside = 'C:\\Users\\runner\\AppData\\Roaming\\Orca\\claude-plugins\\orca-game-0123'
+    const realpath = (value) => value
+    expect(
+      pluginDirsInsideApp({ pluginDirs: [inside, outside], appRoot, platform: 'win32', realpath })
+    ).toEqual([inside])
+  })
 })
 
 describe('tree snapshots', () => {
