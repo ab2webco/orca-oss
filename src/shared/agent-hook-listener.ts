@@ -41,6 +41,11 @@ import {
 } from './claude-subagent-roster'
 import { readClaudeBackgroundAgentTasks } from './claude-background-task-inventory'
 import {
+  claudeSessionModelOfHook,
+  claudeSessionModelOfTranscriptLine,
+  type ClaudeSessionModel
+} from './claude-session-model'
+import {
   codexRosterEffectiveState,
   codexRosterToSnapshots,
   finishCodexSubagent,
@@ -147,6 +152,8 @@ export type HookListenerState = {
   codexSubagentTranscriptByPaneKey: Map<string, CodexSubagentTranscriptState>
   /** Root Codex state/model, kept separate from child hook traffic. */
   codexLeadStateByPaneKey: Map<string, CodexLeadTurnState>
+  /** The lead Claude session's model and effort; only SessionStart and Stop name them. */
+  claudeSessionModelByPaneKey: Map<string, ClaudeSessionModel>
 }
 
 export type ClaudeLeadTurnState = {
@@ -179,6 +186,7 @@ export function createHookListenerState(): HookListenerState {
     claudeUnconfirmedRestoredStatusPaneKeys: new Set(),
     claudeRunningNonAgentTaskPaneKeys: new Set(),
     claudeActiveSessionCronPaneKeys: new Set(),
+    claudeSessionModelByPaneKey: new Map(),
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
     codexLeadStateByPaneKey: new Map()
@@ -196,6 +204,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
   state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
   state.claudeActiveSessionCronPaneKeys.delete(paneKey)
+  state.claudeSessionModelByPaneKey.delete(paneKey)
   state.codexSubagentRosterByPaneKey.delete(paneKey)
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
   state.codexLeadStateByPaneKey.delete(paneKey)
@@ -243,6 +252,7 @@ export function movePaneCacheState(
   movePaneScopedSetEntries(state.claudeUnconfirmedRestoredStatusPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedSetEntries(state.claudeRunningNonAgentTaskPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedSetEntries(state.claudeActiveSessionCronPaneKeys, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.claudeSessionModelByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexLeadStateByPaneKey, fromPaneKey, toPaneKey)
@@ -288,6 +298,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.claudeUnconfirmedRestoredStatusPaneKeys.clear()
   state.claudeRunningNonAgentTaskPaneKeys.clear()
   state.claudeActiveSessionCronPaneKeys.clear()
+  state.claudeSessionModelByPaneKey.clear()
   state.codexSubagentRosterByPaneKey.clear()
   state.codexSubagentTranscriptByPaneKey.clear()
   state.codexLeadStateByPaneKey.clear()
@@ -1482,10 +1493,10 @@ function readLastAssistantFromTranscriptOnce(transcriptPath: string): string | u
   return readLastTextFromTranscriptOnce(transcriptPath, extractAssistantTextFromLine)
 }
 
-function readLastTextFromTranscriptOnce(
+function readLastTextFromTranscriptOnce<T = string>(
   transcriptPath: string,
-  extractLineText: (line: string) => string | undefined
-): string | undefined {
+  extractLineText: (line: string) => T | undefined
+): T | undefined {
   try {
     const stats = statSync(transcriptPath)
     const size = stats.size
@@ -1555,10 +1566,10 @@ function readLastTextFromTranscriptOnce(
   }
 }
 
-function findLastExtractedTranscriptLineText(
+function findLastExtractedTranscriptLineText<T>(
   text: string,
-  extractLineText: (line: string) => string | undefined
-): string | undefined {
+  extractLineText: (line: string) => T | undefined
+): T | undefined {
   let lineEnd = text.length
 
   for (let index = text.length - 1; index >= -1; index--) {
@@ -3062,6 +3073,19 @@ function buildClaudeStatusPayload(
         resetOnNewTurn: isNewTurnEvent('claude', eventName)
       })
     : (state.lastToolByPaneKey.get(paneKey) ?? {})
+  // Why: a child's hook names the child's session, never the lead's.
+  if (options.updateToolSnapshot && readString(hookPayload, 'agent_id') === undefined) {
+    state.claudeSessionModelByPaneKey.set(
+      paneKey,
+      claudeSessionModelOfHook(
+        eventName,
+        hookPayload,
+        state.claudeSessionModelByPaneKey.get(paneKey),
+        (path) => readLastTextFromTranscriptOnce(path, claudeSessionModelOfTranscriptLine)
+      )
+    )
+  }
+  const sessionModel = state.claudeSessionModelByPaneKey.get(paneKey)
 
   // Why: validate directly — the JSON stringify/parse round trip other normalizers use is pure overhead on this hot per-hook path.
   // The normalizer clamps `interrupted` to done payloads, so a gated 'working' emit drops it; claudeLeadStateByPaneKey preserves it for the eventual done.
@@ -3072,6 +3096,8 @@ function buildClaudeStatusPayload(
       resetOnNewTurn: options.updateToolSnapshot && isNewTurnEvent('claude', eventName)
     }),
     agentType: 'claude',
+    model: sessionModel?.model,
+    effort: sessionModel?.effort,
     toolName: snapshot.toolName,
     toolInput: snapshot.toolInput,
     interactivePrompt: snapshot.interactivePrompt,
