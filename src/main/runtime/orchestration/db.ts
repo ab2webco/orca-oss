@@ -4296,6 +4296,7 @@ export class OrchestrationDb {
            ) VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'), 1)`
         )
         .run(id, task.run_id, task.id, CURRENT_CONTRACT_VERSION, params.launchTokenHash ?? null)
+      this.hasAnyDispatchContextsCache = true
       this.db
         .prepare(
           `INSERT INTO worker_dispatches (
