@@ -56,7 +56,9 @@ const gesturesSchema = z.object({
   ciRunning: castFrame.optional(),
   ciPassed: castFrame.optional(),
   ciFailed: castFrame.optional(),
-  stopped: castFrame.optional()
+  stopped: castFrame.optional(),
+  consulting: castFrame.optional(),
+  advised: castFrame.optional()
 })
 
 const advisorSchema = z.object({

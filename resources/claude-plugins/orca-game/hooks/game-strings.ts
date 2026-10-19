@@ -99,6 +99,9 @@ export type ArtStrings = {
   level: string
   xp: string
   thinking: string
+  /** The advisor's bubble while Claude's advisor call is open, then when its advice is back. */
+  advisorConsulting: string
+  advisorAdvised: string
   thanks: string
   onIt: string
   levelUp: string
@@ -228,6 +231,8 @@ const EN: GameStrings = {
     level: 'Lv',
     xp: 'XP',
     thinking: 'thinking',
+    advisorConsulting: 'let me think...',
+    advisorAdvised: 'here is my advice',
     thanks: '♥ thanks!',
     onIt: 'on it!',
     levelUp: '★ level up!',

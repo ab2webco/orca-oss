@@ -94,6 +94,25 @@ const FLAG: readonly Prop[] = [
 ]
 // A stop sign held up on its post; a white palm vanished against clouds.
 const HALT: Prop = ['.....', '.....', '.RRR.', 'RRRRR', 'RWWWR', 'RRRRR', '.RRR.', '..MSS', '..M..']
+// A thought bubble trailing back to the advisor's head; inked, as a pale one vanished against the sky.
+const CLOUD: Prop = [
+  '.....',
+  '.....',
+  '.KKK.',
+  'KWWWK',
+  'KWWWK',
+  '.KKK.',
+  '...K.',
+  '....K',
+  '.....'
+]
+const BULB: Prop = ['.....', '.....', '.YYY.', 'YYWYY', 'YYYYY', '.YYY.', '.MMM.', '..MSS', '.....']
+const BULB_RAYS: readonly (readonly [number, number])[] = [
+  [0, 2],
+  [4, 2],
+  [0, 5],
+  [4, 5]
+]
 const HAND_OF_WATCH: readonly (readonly [number, number])[] = [
   [2, 5],
   [3, 6],
@@ -141,6 +160,18 @@ export const advisorPropPixel = (
       const hand = HAND_OF_WATCH[beat % HAND_OF_WATCH.length]
       return hand !== undefined && hand[0] === dx && hand[1] === y ? BLACK : propPixel(WATCH, dx, y)
     }
+    case 'consulting': {
+      // The bubble puffs up from the head first, then a mark ticks across it for as long as it thinks.
+      if (y < 7 - beat) {
+        return undefined
+      }
+      const isMark = beat > 5 && (y === 3 || y === 4) && dx === 1 + ((beat - 6) % 3)
+      return isMark ? BLACK : propPixel(CLOUD, dx, y)
+    }
+    case 'advised':
+      return beat % 2 === 0 && BULB_RAYS.some(([x, row]) => x === dx && row === y)
+        ? WHITE
+        : propPixel(BULB, dx, y)
     case 'ciPassed':
     case 'ciFailed': {
       const cloth = gesture === 'ciPassed' ? PROP_COLORS.F : PROP_COLORS.R

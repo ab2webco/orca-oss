@@ -1,7 +1,7 @@
 import type { EngineInterface, On } from 'claude-code'
 
 import { gateCueOf, type GateVerdict } from './advisor-cues'
-import { logDecisions, observeAdvisor, playAdvisorCue } from './advisor-state'
+import { logDecisions, noteAdvisorRow, observeAdvisor, playAdvisorCue } from './advisor-state'
 import { refreshSoon } from './fleet-sync'
 import { quest } from './quest-runtime'
 
@@ -18,6 +18,14 @@ export const registerAdvisor = (on: On): void => {
       void refreshSoon($).catch(() => undefined)
     }
     return written
+  })
+  // Why main only: the scene is this session's; a subagent's advisor call is not the lead consulting.
+  on('session.append', async ($, e, next) => {
+    const stored = await next(e)
+    if (e.agentId === undefined && noteAdvisorRow(e.message, quest.tick)) {
+      $.ui.invalidate('ui.render')
+    }
+    return stored
   })
 }
 
