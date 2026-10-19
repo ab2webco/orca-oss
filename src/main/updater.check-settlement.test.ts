@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
-  autoUpdaterMock,
+  autoUpdaterMock: initialAutoUpdaterMock,
   fetchChangelogMock,
   fetchNewerReleaseTagsMock,
   closeLocalBuildFeedMock,
   moduleFactories,
-  resetUpdaterMocks
+  resetUpdaterMocks,
+  rotateAutoUpdaterMock
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+let autoUpdaterMock = initialAutoUpdaterMock
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -25,6 +27,7 @@ vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBui
 
 describe('updater', () => {
   beforeEach(() => {
+    autoUpdaterMock = rotateAutoUpdaterMock()
     resetUpdaterMocks()
   })
 

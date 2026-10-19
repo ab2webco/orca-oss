@@ -56,13 +56,13 @@ const {
   appMock,
   browserWindowMock,
   nativeUpdaterMock,
-  autoUpdaterMock,
+  createAutoUpdaterMock,
+  resetAppEvents,
   isMock,
   killAllPtyMock,
   powerMonitorOnMock
 } = vi.hoisted(() => {
   const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
-  const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
 
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
     const handlers = appEventHandlers.get(event) ?? []
@@ -77,54 +77,35 @@ const {
     }
   }
 
-  const on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-    const handlers = eventHandlers.get(event) ?? []
-    handlers.push(handler)
-    eventHandlers.set(event, handlers)
-    return autoUpdaterMock
-  })
-
-  const emit = (event: string, ...args: unknown[]) => {
-    for (const handler of eventHandlers.get(event) ?? []) {
-      handler(...args)
+  const createAutoUpdaterMock = () => {
+    const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
+    const autoUpdaterMock = {
+      autoDownload: false,
+      autoInstallOnAppQuit: false,
+      autoRunAppAfterInstall: true,
+      allowPrerelease: false,
+      allowDowngrade: false,
+      disableDifferentialDownload: false,
+      // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
+      logger: undefined as { error: (message: unknown) => void } | undefined,
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        const handlers = eventHandlers.get(event) ?? []
+        handlers.push(handler)
+        eventHandlers.set(event, handlers)
+        return autoUpdaterMock
+      }),
+      checkForUpdates: vi.fn().mockResolvedValue(null),
+      downloadUpdate: vi.fn(),
+      quitAndInstall: vi.fn(),
+      setFeedURL: vi.fn(),
+      updateConfigPath: undefined as string | undefined,
+      emit: (event: string, ...args: unknown[]) => {
+        for (const handler of eventHandlers.get(event) ?? []) {
+          handler(...args)
+        }
+      }
     }
-  }
-
-  const reset = () => {
-    appEventHandlers.clear()
-    appOn.mockClear()
-    eventHandlers.clear()
-    on.mockClear()
-    autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(null)
-    autoUpdaterMock.downloadUpdate.mockReset()
-    autoUpdaterMock.quitAndInstall.mockReset()
-    autoUpdaterMock.setFeedURL.mockClear()
-    autoUpdaterMock.updateConfigPath = undefined
-    autoUpdaterMock.allowPrerelease = false
-    autoUpdaterMock.allowDowngrade = false
-    autoUpdaterMock.disableDifferentialDownload = false
-    autoUpdaterMock.autoRunAppAfterInstall = true
-    autoUpdaterMock.logger = undefined
-    delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
-  }
-
-  const autoUpdaterMock = {
-    autoDownload: false,
-    autoInstallOnAppQuit: false,
-    autoRunAppAfterInstall: true,
-    allowPrerelease: false,
-    allowDowngrade: false,
-    disableDifferentialDownload: false,
-    // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
-    logger: undefined as { error: (message: unknown) => void } | undefined,
-    on,
-    checkForUpdates: vi.fn(),
-    downloadUpdate: vi.fn(),
-    quitAndInstall: vi.fn(),
-    setFeedURL: vi.fn(),
-    updateConfigPath: undefined as string | undefined,
-    emit,
-    reset
+    return autoUpdaterMock
   }
 
   return {
@@ -141,12 +122,21 @@ const {
     nativeUpdaterMock: {
       on: vi.fn()
     },
-    autoUpdaterMock,
+    createAutoUpdaterMock,
+    resetAppEvents: () => {
+      appEventHandlers.clear()
+      appOn.mockClear()
+    },
     isMock: { dev: false },
     killAllPtyMock: vi.fn(),
     powerMonitorOnMock: vi.fn()
   }
 })
+let autoUpdaterMock = createAutoUpdaterMock()
+
+function rotateAutoUpdaterMock(): void {
+  autoUpdaterMock = createAutoUpdaterMock()
+}
 
 vi.mock('electron', () => ({
   app: appMock,
@@ -262,8 +252,9 @@ const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 describe('updater', () => {
   beforeEach(() => {
+    resetAppEvents()
+    rotateAutoUpdaterMock()
     vi.resetModules()
-    autoUpdaterMock.reset()
     nativeUpdaterMock.on.mockReset()
     browserWindowMock.getAllWindows.mockReset()
     browserWindowMock.getAllWindows.mockReturnValue([])
@@ -290,6 +281,28 @@ describe('updater', () => {
     })
     vi.unstubAllGlobals()
     vi.useRealTimers()
+  })
+
+  it('keeps a late old-module check off a fresh updater mock', async () => {
+    const { setupAutoUpdater } = await import('./updater')
+    const staleUpdaterMock = autoUpdaterMock
+    let lastCheckAt = Date.now()
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => lastCheckAt
+    })
+    const staleFocusHandler = appMock.on.mock.calls.find(
+      ([event]) => event === 'browser-window-focus'
+    )?.[1]
+    expect(staleFocusHandler).toBeTypeOf('function')
+
+    rotateAutoUpdaterMock()
+    vi.resetModules()
+    lastCheckAt = Date.now() - AUTO_UPDATE_CHECK_INTERVAL_MS - 1
+    staleFocusHandler?.()
+    await vi.waitFor(() => {
+      expect(staleUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
   })
 
   it('does not load or configure electron-updater during dev setup', async () => {

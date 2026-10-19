@@ -3,13 +3,15 @@ import { UPDATE_FEED_LATEST_DOWNLOAD_URL } from './update-feed-target'
 
 const {
   appMock,
-  autoUpdaterMock,
+  autoUpdaterMock: initialAutoUpdaterMock,
   fetchNudgeMock,
   shouldApplyNudgeMock,
   fetchNewerReleaseTagsMock,
   moduleFactories,
-  resetUpdaterMocks
+  resetUpdaterMocks,
+  rotateAutoUpdaterMock
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+let autoUpdaterMock = initialAutoUpdaterMock
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -27,6 +29,7 @@ vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBui
 
 describe('updater', () => {
   beforeEach(() => {
+    autoUpdaterMock = rotateAutoUpdaterMock()
     resetUpdaterMocks()
   })
 

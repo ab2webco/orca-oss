@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   appMock,
-  autoUpdaterMock,
+  autoUpdaterMock: initialAutoUpdaterMock,
   isMock,
   powerMonitorOnMock,
   fetchNudgeMock,
   shouldApplyNudgeMock,
   moduleFactories,
-  resetUpdaterMocks
+  resetUpdaterMocks,
+  rotateAutoUpdaterMock
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+let autoUpdaterMock = initialAutoUpdaterMock
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -27,7 +29,30 @@ vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBui
 
 describe('updater', () => {
   beforeEach(() => {
+    autoUpdaterMock = rotateAutoUpdaterMock()
     resetUpdaterMocks()
+  })
+
+  it('keeps a late old-module check off a fresh updater mock', async () => {
+    const { setupAutoUpdater } = await import('./updater')
+    const staleUpdaterMock = autoUpdaterMock
+    let lastCheckAt = Date.now()
+    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+      getLastUpdateCheckAt: () => lastCheckAt
+    })
+    const staleFocusHandler = appMock.on.mock.calls.find(
+      ([event]) => event === 'browser-window-focus'
+    )?.[1]
+    expect(staleFocusHandler).toBeTypeOf('function')
+
+    autoUpdaterMock = rotateAutoUpdaterMock()
+    vi.resetModules()
+    lastCheckAt = Date.now() - 24 * 60 * 60 * 1000 - 1
+    staleFocusHandler?.()
+    await vi.waitFor(() => {
+      expect(staleUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
   })
 
   it('does not load or configure electron-updater during dev setup', async () => {
