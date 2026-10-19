@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { resolveClaudeCommand } from '../codex-cli/command'
@@ -14,6 +15,7 @@ import {
   resolveOrchestratorGamePluginDir,
   type OrchestratorGameLaunch
 } from './orchestrator-game-launch'
+import { installOrchestratorGamePlugin } from './orchestrator-game-plugin-install'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import type { GlobalSettings } from '../../shared/types'
 
@@ -41,13 +43,38 @@ export async function detectClaudeCodeVersionCached(): Promise<string | null> {
   return value
 }
 
-export function bundledOrchestratorGamePluginDir(): string | null {
-  const dir = resolveOrchestratorGamePluginDir({
+let installedPlugin: {
+  sourceDir: string
+  installRoot: string
+  dir: Promise<string | null>
+} | null = null
+
+// Why: Claude Code writes .claude-plugin/types/ into the plugin dir; inside the signed bundle that
+// breaks the macOS code seal and Gatekeeper reports the app as damaged.
+export async function bundledOrchestratorGamePluginDir(): Promise<string | null> {
+  const sourceDir = resolveOrchestratorGamePluginDir({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath()
   })
-  return existsSync(dir) ? dir : null
+  if (!existsSync(sourceDir)) {
+    return null
+  }
+  if (!app.isPackaged) {
+    return sourceDir
+  }
+  const installRoot = join(app.getPath('userData'), 'claude-plugins')
+  const cached =
+    installedPlugin?.sourceDir === sourceDir && installedPlugin.installRoot === installRoot
+      ? await installedPlugin.dir
+      : null
+  if (cached !== null && existsSync(cached)) {
+    return cached
+  }
+  // Why null on failure: plain Claude beats handing it the bundle dir it would write into.
+  const dir = installOrchestratorGamePlugin({ sourceDir, installRoot }).catch(() => null)
+  installedPlugin = { sourceDir, installRoot, dir }
+  return dir
 }
 
 export async function prepareOrchestratorGameLaunch(args: {
@@ -78,7 +105,8 @@ export async function prepareOrchestratorGameLaunch(args: {
   return buildOrchestratorGameLaunch({
     resolved,
     claudeVersion,
-    pluginDir: args.pluginDir === undefined ? bundledOrchestratorGamePluginDir() : args.pluginDir,
+    pluginDir:
+      args.pluginDir === undefined ? await bundledOrchestratorGamePluginDir() : args.pluginDir,
     // Why: the same absolute CLI the Agent Teams tmux shim runs, so Linux never hits the screen reader.
     orcaCli: orchestratorGameCliPathOf(
       args.orcaCli === undefined ? resolveClaudeAgentTeamsShimBin(process.env) : args.orcaCli,
