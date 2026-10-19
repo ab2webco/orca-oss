@@ -149,9 +149,30 @@ jobs:
             --exclude=tests/e2e/cross-version-wire/** \
             --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
 
+  # Why: lab.102 shipped an app that Claude Code damaged by writing into its bundled plugin dir, and
+  # every source check passed (ORCA-662). Only the packaged app, launched, shows it (ORCA-663).
+  gate_plugin_seal:
+    name: release gate plugin seal ${{ matrix.os }}
+    needs: resolve
+    if: inputs.dry_run != true && inputs.skip_gate != true
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout the commit under release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/verify-packaged-plugin-seal
+
   gate:
     name: release gate verdict
-    needs: [resolve, gate_static, gate_tests]
+    needs: [resolve, gate_static, gate_tests, gate_plugin_seal]
     # Why always(): a skipped or failed gate job must reach the verdict, not
     # cascade past it. The verdict itself is what refuses to publish.
     if: always() && needs.resolve.result == 'success'
@@ -221,7 +242,8 @@ jobs:
             --verified-sha "$RELEASE_SHA" \
             --signal-job gate_static \
             --signal-job gate_tests \
-            --expected-jobs 17 \
+            --signal-job gate_plugin_seal \
+            --expected-jobs 20 \
             ${{ inputs.release_candidate && '--release-candidate' || '' }} \
             ${{ (inputs.dry_run || inputs.skip_gate) && '--skip-gate' || '' }} \
             --skip-reason "$SKIP_REASON"
