@@ -23,7 +23,9 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS],
     notes: [
       "Orca's rules plus the project's own from orchestratorGame.orchestrator.rules in orca.yaml.",
-      'A session a lead launched gets no rules: it reports to its lead.'
+      'A session a lead launched gets no rules: it reports to its lead.',
+      "One live lead per project: with the project's lead live in another pane, Orca focuses that pane and prints `Not the lead:` instead of the rules.",
+      "With the lead's pane closed, Orca reopens its last conversation in a new tab; when that fails, this session becomes a new lead and the output says why."
     ],
     examples: ['orca game lead']
   },

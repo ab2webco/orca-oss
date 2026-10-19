@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameLeads } from './orchestrator-game-leads'
+import { GameLeads, type GameLeadSession } from './orchestrator-game-leads'
 import type { GameBoardProject } from './orchestrator-game-board'
 
 const LEAD: GameBoardProject = {
@@ -61,5 +61,193 @@ describe('GameLeads', () => {
     await game.register({ project: 'cineco', label: '' })
 
     expect(game.labels()).toEqual({ term_a: 'cineco' })
+  })
+})
+
+describe('GameLeads claim', () => {
+  const SESSION: GameLeadSession = {
+    sessionId: 'sess-old',
+    agentArgs: '--teammate-mode auto',
+    worktreeId: 'wt1'
+  }
+
+  function claiming(args: {
+    project?: GameBoardProject
+    live: string[]
+    stored?: GameLeadSession | null
+    caller?: GameLeadSession | null
+    resume?: () => Promise<string>
+  }) {
+    const stored = new Map<string, GameLeadSession>()
+    if (args.stored) {
+      stored.set('repo:a', args.stored)
+    }
+    const focused: string[] = []
+    const resumed: GameLeadSession[] = []
+    const game = new GameLeads({
+      projectOf: async () => args.project ?? LEAD,
+      isLive: (handle) => args.live.includes(handle),
+      sessions: {
+        read: async (key) => stored.get(key) ?? null,
+        write: async (key, session) => {
+          stored.set(key, session)
+        }
+      },
+      sessionOf: async () => args.caller ?? null,
+      resume: async (session) => {
+        resumed.push(session)
+        return (args.resume ?? (async () => 'term_resumed'))()
+      },
+      focus: async (handle) => {
+        focused.push(handle)
+      }
+    })
+    return { game, stored, focused, resumed }
+  }
+
+  it('reuses the live lead: focuses it and does not register a second caller', async () => {
+    let caller = 'term_a'
+    const focused: string[] = []
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true,
+      sessions: { read: async () => null, write: async () => undefined },
+      sessionOf: async () => null,
+      resume: async () => 'never',
+      focus: async (handle) => {
+        focused.push(handle)
+      }
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    caller = 'term_b'
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: false,
+      live: { handle: 'term_a' }
+    })
+    expect(focused).toEqual(['term_a'])
+    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_a'])
+
+    caller = 'term_a'
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: true
+    })
+    expect(focused).toEqual(['term_a'])
+  })
+
+  it('resumes the stored conversation of a closed lead and lists the resumed pane', async () => {
+    const { game, resumed, focused } = claiming({
+      live: ['term_a', 'term_resumed'],
+      stored: SESSION,
+      caller: { ...SESSION, sessionId: 'sess-new' }
+    })
+
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: false,
+      resumed: { handle: 'term_resumed' }
+    })
+    expect(resumed).toEqual([SESSION])
+    expect(focused).toEqual([])
+    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_resumed'])
+  })
+
+  it('starts a new lead and says why when the resume fails', async () => {
+    const caller = { ...SESSION, sessionId: 'sess-new' }
+    const { game, stored } = claiming({
+      live: ['term_a'],
+      stored: SESSION,
+      caller,
+      resume: async () => {
+        throw new Error('agent_session_legacy_required')
+      }
+    })
+
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: true,
+      resumeError: 'agent_session_legacy_required'
+    })
+    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_a'])
+    expect(stored.get('repo:a')).toEqual(caller)
+  })
+
+  it('keeps a resumed lead that runs game lead again as the lead', async () => {
+    const { game, resumed } = claiming({ live: ['term_a'], stored: SESSION, caller: SESSION })
+
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: true
+    })
+    expect(resumed).toEqual([])
+  })
+
+  it('stores the session of a new lead for its project', async () => {
+    const { game, stored } = claiming({ live: ['term_a'], caller: SESSION })
+
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    expect(stored.get('repo:a')).toEqual(SESSION)
+  })
+
+  it('neither enforces nor resumes for a caller Orca cannot place in a project', async () => {
+    const { game, resumed, stored } = claiming({
+      project: { ...LEAD, key: 'no-project' },
+      live: ['term_a'],
+      caller: SESSION
+    })
+    stored.set('no-project', { ...SESSION, sessionId: 'sess-other' })
+
+    await expect(game.register({ project: 'x', label: '', claim: true })).resolves.toEqual({
+      registered: true
+    })
+    expect(resumed).toEqual([])
+    expect(stored.get('no-project')?.sessionId).toBe('sess-other')
+  })
+
+  it('does not count a lead pane that fell back to a shell as the live lead', async () => {
+    let caller = 'term_a'
+    const focused: string[] = []
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true,
+      isRunning: async (handle) => handle !== 'term_a',
+      sessions: { read: async () => null, write: async () => undefined },
+      sessionOf: async () => null,
+      focus: async (handle) => {
+        focused.push(handle)
+      }
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    caller = 'term_b'
+    await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
+      registered: true
+    })
+    expect(focused).toEqual([])
+    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_b'])
+  })
+
+  it('resumes once when two panes claim a closed lead at the same time', async () => {
+    let caller = 'term_a'
+    const resumed: string[] = []
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true,
+      sessions: { read: async () => SESSION, write: async () => undefined },
+      sessionOf: async () => null,
+      resume: async (session) => {
+        resumed.push(session.sessionId)
+        return 'term_resumed'
+      },
+      focus: async () => undefined
+    })
+
+    const first = game.register({ project: 'cineco', label: 'Ana', claim: true })
+    caller = 'term_b'
+    const second = game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { registered: false, resumed: { handle: 'term_resumed' } },
+      { registered: false, live: { handle: 'term_resumed' } }
+    ])
+    expect(resumed).toEqual(['sess-old'])
   })
 })

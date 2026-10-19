@@ -6,11 +6,34 @@ import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
 
+type GameLeadRegistration = {
+  registered?: boolean
+  live?: { handle: string }
+  resumed?: { handle: string }
+  resumeError?: string
+}
+
 type GameLeadResult = {
   role: 'lead' | 'member'
   lead: OrchestratorGameLead
-  /** Null for a member: it reports to its lead and never leads. */
+  /** Null for a member, and for a pane that is not the project's lead: another one is. */
   brief: string | null
+  outcome?: 'live' | 'resumed'
+  handle?: string
+  resumeError?: string
+}
+
+// Why the prefix: the game mod reads it to keep this session from counting as the lead.
+const NOT_LEAD = 'Not the lead:'
+
+function leadOutcomeText(result: GameLeadResult, project: string): string | null {
+  if (result.outcome === 'live') {
+    return `${NOT_LEAD} ${project}'s lead is live in another pane (${result.handle}), and Orca focused it. Keep working here as a plain session.`
+  }
+  if (result.outcome === 'resumed') {
+    return `${NOT_LEAD} Orca reopened ${project}'s lead conversation in a new tab (${result.handle}), with its context. Use that tab; this one is a plain session.`
+  }
+  return null
 }
 
 // Why the folder: a primary worktree's display name is its branch, and an SSH path may use either separator.
@@ -92,25 +115,45 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     const lead = state.lead ?? DEFAULT_GAME_LEAD
     const role = state.role ?? 'lead'
     const project = projectNameOf(state.worktree)
-    const brief =
-      role === 'member' ? null : gameLeadBriefOf(lead, project, process.env.ORCA_GAME_CLI || 'orca')
+    let registration: GameLeadRegistration = {}
     if (role !== 'member') {
       // Why quiet: an older host has no directory, and the brief must still print.
-      await client
-        .call('game.leadRegister', {
-          worktreeId: process.env.ORCA_WORKTREE_ID,
-          terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-          project,
-          label: lead.label ?? ''
-        })
-        .catch(() => undefined)
+      registration =
+        (await client
+          .call<GameLeadRegistration>('game.leadRegister', {
+            worktreeId: process.env.ORCA_WORKTREE_ID,
+            terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
+            project,
+            label: lead.label ?? '',
+            claim: true
+          })
+          .then((one) => one.result)
+          .catch(() => undefined)) ?? {}
     }
-    printResult<GameLeadResult>(
-      { ...response, result: { role, lead, brief } },
-      json,
-      (result) =>
-        result.brief ??
-        'This session was launched by a lead: work your ticket and report to it, never lead.'
-    )
+    const elsewhere = registration.live ?? registration.resumed
+    const result: GameLeadResult = {
+      role,
+      lead,
+      brief:
+        role === 'member' || elsewhere
+          ? null
+          : gameLeadBriefOf(lead, project, process.env.ORCA_GAME_CLI || 'orca'),
+      ...(elsewhere
+        ? { outcome: registration.live ? 'live' : 'resumed', handle: elsewhere.handle }
+        : {}),
+      ...(registration.resumeError ? { resumeError: registration.resumeError } : {})
+    }
+    printResult<GameLeadResult>({ ...response, result }, json, (one) => {
+      if (one.role === 'member') {
+        return 'This session was launched by a lead: work your ticket and report to it, never lead.'
+      }
+      const notLead = leadOutcomeText(one, project)
+      if (notLead !== null || one.brief === null) {
+        return notLead ?? ''
+      }
+      return one.resumeError
+        ? `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${one.brief}`
+        : one.brief
+    })
   }
 }
