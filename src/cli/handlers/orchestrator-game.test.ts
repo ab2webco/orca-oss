@@ -170,7 +170,8 @@ describe('orca game state', () => {
       worktreeId: 'wt1',
       terminalHandle: 'h1',
       project: 'cineco',
-      label: 'Ana'
+      label: 'Ana',
+      claim: true
     })
   })
 
@@ -206,6 +207,69 @@ describe('orca game state', () => {
 
     expect(calls).toEqual(['game.state'])
     expect(output.join('\n')).toContain('You are the lead of')
+  })
+
+  const leadHost = (registration: unknown) =>
+    ({
+      call: async (method: string) =>
+        method === 'game.leadRegister'
+          ? { ok: true, result: registration }
+          : {
+              ok: true,
+              result: {
+                config: { mode: 'on' },
+                agents: [],
+                worktree: {
+                  id: 'wt1',
+                  path: '/Users/me/cineco',
+                  branch: 'main',
+                  displayName: 'main'
+                },
+                lead: { autostart: true, cap: 3, agent: 'claude' },
+                role: 'lead'
+              }
+            }
+    }) as unknown as RuntimeClient
+
+  it('withholds the lead rules when the project lead is live in another pane', async () => {
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client: leadHost({ registered: false, live: { handle: 'term_a' } }),
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toMatch(/^Not the lead: cineco's lead is live in another pane \(term_a\)/)
+    expect(text).not.toContain('You are the lead of')
+  })
+
+  it('withholds the lead rules when Orca reopened the closed lead conversation', async () => {
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client: leadHost({ registered: false, resumed: { handle: 'term_r' } }),
+      cwd: '/tmp',
+      json: true
+    })
+
+    expect(JSON.parse(output.join(''))).toMatchObject({
+      result: { role: 'lead', brief: null, outcome: 'resumed', handle: 'term_r' }
+    })
+  })
+
+  it('says plainly that a failed resume started a new lead, then prints the rules', async () => {
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client: leadHost({ registered: true, resumeError: 'agent_session_legacy_required' }),
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toMatch(
+      /^Orca could not reopen cineco's previous lead conversation \(agent_session_legacy_required\), so this session is a new lead\./
+    )
+    expect(text).toContain('You are the lead of cineco')
   })
 
   it('tells a member it is not the lead instead of handing it the lead rules', async () => {

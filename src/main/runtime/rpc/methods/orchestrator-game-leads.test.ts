@@ -36,6 +36,38 @@ describe('game leads RPC', () => {
     await expect(send('game.leadRegister', { label: 'Ana' })).resolves.toMatchObject({ ok: false })
   })
 
+  it('passes a claim through and returns where the lead lives instead', async () => {
+    const seen: unknown[] = []
+    const send = dispatcherWith({
+      register: async (args) => {
+        seen.push(args)
+        return { registered: false, live: { handle: 'term_a' } }
+      },
+      list: () => ({ leads: [] })
+    })
+
+    await expect(
+      send('game.leadRegister', {
+        terminalHandle: 'term_b',
+        project: 'cineco',
+        label: 'Ana',
+        claim: true
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      result: { registered: false, live: { handle: 'term_a' } }
+    })
+    expect(seen).toEqual([
+      {
+        worktreeId: undefined,
+        terminalHandle: 'term_b',
+        project: 'cineco',
+        label: 'Ana',
+        claim: true
+      }
+    ])
+  })
+
   it('lists the live leads', async () => {
     const leads = [{ project: 'cineco', label: 'Ana', handle: 'term_a', since: 'x' }]
     const send = dispatcherWith({ register: async () => ({}), list: () => ({ leads }) })
