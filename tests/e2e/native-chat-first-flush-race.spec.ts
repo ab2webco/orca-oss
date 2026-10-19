@@ -64,6 +64,17 @@ async function toggleTerminalTabToChatView(
   }, args)
 }
 
+// Why: in CI the tab title can already show the first prompt when the
+// transcript hydrates; pinning it makes that collision deterministic.
+async function setTerminalTabTitle(
+  page: Page,
+  args: { tabId: string; title: string }
+): Promise<void> {
+  await page.evaluate(({ tabId, title }) => {
+    window.__store?.getState().updateTabTitle(tabId, title)
+  }, args)
+}
+
 function claudeTranscriptLines(args: {
   sessionId: string
   userText: string
@@ -132,11 +143,12 @@ test.describe('Native chat first-flush transcript race (#8401)', () => {
       })
       await toggleTerminalTabToChatView(orcaPage, { tabId, worktreeId: descriptor.worktreeId })
 
-      await expect(orcaPage.locator('[data-native-chat-root="true"]')).toBeVisible({
-        timeout: 15_000
-      })
-      await expect(orcaPage.getByText(LOADING_TITLE)).toBeVisible({ timeout: 10_000 })
-      await expect(orcaPage.getByText(ERROR_TITLE)).toHaveCount(0)
+      // Why: the tab strip and the worktree sidebar repeat the first prompt, so
+      // only the chat root can prove the transcript itself rendered.
+      const chatRoot = orcaPage.locator('[data-native-chat-root="true"]')
+      await expect(chatRoot).toBeVisible({ timeout: 15_000 })
+      await expect(chatRoot.getByText(LOADING_TITLE)).toBeVisible({ timeout: 10_000 })
+      await expect(chatRoot.getByText(ERROR_TITLE)).toHaveCount(0)
       await orcaPage.screenshot({
         path: path.join(screenshotDir, '01-loading-no-error.png')
       })
@@ -145,16 +157,18 @@ test.describe('Native chat first-flush transcript race (#8401)', () => {
       // hit the not-yet-flushed file (returning notFound) and the renderer's
       // backoff retry — not a lucky first read — is what picks it up below.
       await orcaPage.waitForTimeout(1_500)
-      await expect(orcaPage.getByText(ERROR_TITLE)).toHaveCount(0)
+      await expect(chatRoot.getByText(ERROR_TITLE)).toHaveCount(0)
 
       const userText = 'Explain the native chat first-flush race fix for #8401'
       const assistantText =
         'The main process now retries a not-yet-flushed transcript instead of caching a permanent miss.'
       writeFileSync(transcriptPath, claudeTranscriptLines({ sessionId, userText, assistantText }))
+      await setTerminalTabTitle(orcaPage, { tabId, title: userText })
+      await expect(orcaPage.getByTestId('sortable-tab').getByText(userText)).toBeVisible()
 
-      await expect(orcaPage.getByText(userText)).toBeVisible({ timeout: 30_000 })
-      await expect(orcaPage.getByText(assistantText)).toBeVisible({ timeout: 30_000 })
-      await expect(orcaPage.getByText(ERROR_TITLE)).toHaveCount(0)
+      await expect(chatRoot.getByText(userText)).toBeVisible({ timeout: 30_000 })
+      await expect(chatRoot.getByText(assistantText)).toBeVisible({ timeout: 30_000 })
+      await expect(chatRoot.getByText(ERROR_TITLE)).toHaveCount(0)
       await orcaPage.screenshot({
         path: path.join(screenshotDir, '02-hydrated.png')
       })
