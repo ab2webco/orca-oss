@@ -3879,6 +3879,8 @@ describe('updater', () => {
     let EXIT_127: string
 
     let reproofs: Promise<unknown>[]
+    // Why: two doMocks of one module race (Vitest resolves them in parallel), so holds plug in here.
+    let heldRevalidation: (() => Promise<RevalidationVerdict>) | null
 
     // Why: the pre-install digest re-proof streams the package off real disk, which no fixed count
     // of event-loop turns outlasts under suite load, so wait for the re-proof itself.
@@ -3901,6 +3903,7 @@ describe('updater', () => {
 
     beforeEach(() => {
       reproofs = []
+      heldRevalidation = null
       // Records each re-proof so settleQuitAndInstall can await its verdict.
       vi.doMock('./linux-package-update-recovery', async () => {
         const actual = await vi.importActual<typeof RecoveryModule>(
@@ -3911,7 +3914,8 @@ describe('updater', () => {
           revalidateLinuxPackageForInstall: (
             artifact: Parameters<typeof actual.revalidateLinuxPackageForInstall>[0]
           ) => {
-            const reproof = actual.revalidateLinuxPackageForInstall(artifact)
+            const reproof =
+              heldRevalidation?.() ?? actual.revalidateLinuxPackageForInstall(artifact)
             reproofs.push(reproof)
             return reproof
           }
@@ -3930,7 +3934,7 @@ describe('updater', () => {
 
     /**
      * Holds the pre-install re-proof open so a verdict can be delivered at an exact point in the
-     * cycle. Only that call is replaced — the artifact state stays real. Must precede startUpdater.
+     * cycle. Only that call is replaced — the artifact state stays real. Must precede quitAndInstall.
      */
     const holdRevalidation = (
       verdictDelayMs = 0
@@ -3942,21 +3946,10 @@ describe('updater', () => {
         resolve: (verdict: RevalidationVerdict) => void
         reject: (error: Error) => void
       } | null = null
-      vi.doMock('./linux-package-update-recovery', async () => {
-        const actual = await vi.importActual<typeof RecoveryModule>(
-          './linux-package-update-recovery'
-        )
-        return {
-          ...actual,
-          revalidateLinuxPackageForInstall: vi.fn(() => {
-            const reproof = new Promise<RevalidationVerdict>((resolve, reject) => {
-              pending = { resolve, reject }
-            })
-            reproofs.push(reproof)
-            return reproof
-          })
-        }
-      })
+      heldRevalidation = () =>
+        new Promise<RevalidationVerdict>((resolve, reject) => {
+          pending = { resolve, reject }
+        })
       return {
         settle: (verdict) => {
           if (!pending) {
