@@ -89,6 +89,27 @@ export function humanizeBranchSlug(slug: string): string {
   return joined.charAt(0).toUpperCase() + joined.slice(1)
 }
 
+/**
+ * Deterministic branch slug from the work text, used when generation fails:
+ * the ticket id (`ORCA-602`) and the words after it on the first line, else
+ * the first words of the prompt. '' when nothing usable remains.
+ */
+export function deriveBranchSlugFromWork(prompt: string): string {
+  const firstLine =
+    prompt
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? ''
+  const ticket = /\b([A-Za-z][A-Za-z0-9]*-\d+)\b/.exec(firstLine)
+  if (!ticket) {
+    return sanitizeBranchSlug(firstLine)
+  }
+  const title = sanitizeBranchSlug(firstLine.slice(ticket.index + ticket[0].length), 3)
+  return sanitizeBranchSlug(`${ticket[1]} ${title}`, 2 + 3)
+}
+
 export type BranchNameWorkContext = {
   /** The user's first prompt to the agent in this workspace. */
   firstPrompt: string
