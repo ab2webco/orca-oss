@@ -149,7 +149,7 @@ describe('first-work branch rename account selection', () => {
     )
   })
 
-  it('reports a failure only after every account with quota is spent', async () => {
+  it('names the branch from the work only after every account with quota is spent', async () => {
     generateBranchNameMock.mockResolvedValue(LIMIT_FAILURE)
     const pick = vi.fn().mockReturnValueOnce('acct-spare').mockReturnValue(null)
     const { deps, setRenameError, onRenamed } = makeDeps({
@@ -159,8 +159,16 @@ describe('first-work branch rename account selection', () => {
     await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
     expect(generateBranchNameMock).toHaveBeenCalledTimes(2)
     expect(pick).toHaveBeenLastCalledWith({ excludedAccountIds: ['acct-spare'], triedGlobal: true })
-    expect(onRenamed).not.toHaveBeenCalled()
-    expect(setRenameError).toHaveBeenCalledWith(WORKTREE_ID, LIMIT_FAILURE.error, null)
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
+      ['branch', '-m', 'you/fix-the-auth-bug'],
+      expect.objectContaining({ cwd: '/repo/wt' })
+    )
+    expect(onRenamed).toHaveBeenCalled()
+    expect(setRenameError).not.toHaveBeenCalledWith(
+      WORKTREE_ID,
+      LIMIT_FAILURE.error,
+      expect.anything()
+    )
   })
 
   it('does not switch accounts for a failure that is not a usage limit', async () => {

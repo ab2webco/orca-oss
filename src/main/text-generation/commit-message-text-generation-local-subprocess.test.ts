@@ -1,7 +1,11 @@
 import { spawn } from 'node:child_process'
 import type * as ChildProcess from 'node:child_process'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { generateCommitMessageFromContext } from './commit-message-text-generation'
+import { getClaudeHeadlessSettingsPath } from './claude-headless-settings'
 import {
   createChildTerminationExpectation,
   withPlatform
@@ -10,6 +14,10 @@ import {
 const { terminateWindowsProcessTreeMock } = vi.hoisted(() => ({
   terminateWindowsProcessTreeMock: vi.fn(async () => {})
 }))
+
+let testUserDataDir = ''
+
+vi.mock('electron', () => ({ app: { getPath: () => testUserDataDir } }))
 
 vi.mock('../windows-process-tree-kill', () => ({
   terminateWindowsProcessTree: terminateWindowsProcessTreeMock
@@ -27,6 +35,10 @@ const spawnMock = vi.mocked(spawn)
 
 const expectChildTerminated = createChildTerminationExpectation(terminateWindowsProcessTreeMock)
 
+beforeAll(() => {
+  testUserDataDir = mkdtempSync(join(tmpdir(), 'orca-claude-headless-test-'))
+})
+
 beforeEach(() => {
   terminateWindowsProcessTreeMock.mockClear()
   terminateWindowsProcessTreeMock.mockResolvedValue(undefined)
@@ -34,6 +46,34 @@ beforeEach(() => {
 })
 
 describe('generateCommitMessageFromContext', () => {
+  it('runs Claude generation with project hooks disabled so slow SessionStart hooks cannot time it out', async () => {
+    const listeners = new Map<string, (value: unknown) => void>()
+    const child = {
+      pid: 124,
+      kill: vi.fn(),
+      stdout: { on: vi.fn((event, callback) => listeners.set(`stdout:${event}`, callback)) },
+      stderr: { on: vi.fn((event, callback) => listeners.set(`stderr:${event}`, callback)) },
+      stdin: { end: vi.fn() },
+      on: vi.fn((event, callback) => listeners.set(event, callback))
+    }
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = generateCommitMessageFromContext(
+      { branch: 'main', stagedSummary: 'M\tREADME.md', stagedPatch: '+hello' },
+      { agentId: 'claude', model: 'haiku' },
+      { kind: 'local', cwd: '/repo' }
+    )
+    listeners.get('stdout:data')?.(Buffer.from('Add README note\n'))
+    listeners.get('close')?.(0)
+    await pending
+
+    const settingsPath = getClaudeHeadlessSettingsPath()
+    expect(spawnMock.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining(['--settings', settingsPath])
+    )
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8'))).toEqual({ disableAllHooks: true })
+  })
+
   it('caps local agent output before buffering unbounded data', async () => {
     const listeners = new Map<string, (value: unknown) => void>()
     const child = {

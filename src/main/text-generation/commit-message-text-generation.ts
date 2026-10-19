@@ -65,6 +65,7 @@ import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnost
 import { wslAwareSpawn } from '../git/runner'
 import { terminateWindowsProcessTree } from '../windows-process-tree-kill'
 import { isSshMuxRequestTimeoutError } from '../ssh/ssh-channel-multiplexer'
+import { getClaudeHeadlessSettingsPath } from './claude-headless-settings'
 
 const GENERATION_TIMEOUT_MS = 60_000
 const MAX_AGENT_OUTPUT_BYTES = 4 * 1024 * 1024
@@ -832,11 +833,16 @@ function runLocalPlanForAgent(
   emptyResultName: string,
   operation: TextGenerationOperation
 ): Promise<InternalTextGenerationResult> {
+  // Why: the one-shot run must not execute the project's own hooks before it answers.
+  const runnable =
+    agentId === 'claude'
+      ? { ...plan, args: [...plan.args, '--settings', getClaudeHeadlessSettingsPath()] }
+      : plan
   const start = (
     holdHomeLockUntilExit = false
   ): LocalProcessExecution<InternalTextGenerationResult> =>
     runLocalPlan(
-      plan,
+      runnable,
       target.cwd,
       target.env,
       emptyResultName,

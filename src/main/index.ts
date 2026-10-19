@@ -315,6 +315,7 @@ import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provide
 import { createHookStatusSessionTabsInvalidator } from './agent-hooks/hook-status-session-tabs-invalidation'
 import { wslHookRelayManager } from './agent-hooks/wsl-hook-relay-manager'
 import { maybeAutoRenameBranchOnFirstWork } from './agent-hooks/first-work-branch-rename'
+import { resolvePaneClaudeAccountId } from './agent-hooks/first-work-pane-claude-account'
 import { pickClaudeQuotaFallbackAccountId } from './agent-hooks/claude-quota-fallback-account'
 import { rememberBranchRenameFailureOutput } from './agent-hooks/branch-rename-failure-output'
 import { renameWorktreeFolderOnFirstWork } from './agent-hooks/first-work-folder-rename'
@@ -697,15 +698,12 @@ function maybeAutoRenameBranchOnFirstWorkFromHook(event: {
         // Why: the hook only knows the worktreeId, so derive the repoId notifyBranchRenamed expects.
         currentRuntime.notifyBranchRenamed(getRepoIdFromWorktreeId(worktreeId))
       },
-      getPaneClaudeAccountId: (paneKey) => {
-        const ptyId = getPtyIdForPaneKey(paneKey)
-        if (!ptyId) {
-          return null
-        }
-        // Why: an orchestration worker's PTY can run on an account the worktree pin never records.
-        const owner = currentRuntime.getManagedPtyAccountOwner(ptyId, 'claude')
-        return owner.known ? owner.accountId : null
-      },
+      getPaneClaudeAccountId: (paneKey) =>
+        resolvePaneClaudeAccountId(paneKey, {
+          getPtyIdForPaneKey,
+          getManagedPtyAccountOwner: (ptyId, agent) =>
+            currentRuntime.getManagedPtyAccountOwner(ptyId, agent)
+        }),
       getPinnedClaudeAccountId: (worktreeId) =>
         currentStore.getWorktreeMeta(worktreeId)?.claudeAccountId ?? null,
       pickClaudeFallbackAccountId: ({ excludedAccountIds, triedGlobal }) => {
