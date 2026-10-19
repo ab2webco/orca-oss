@@ -12,6 +12,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, FrameLocator, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import {
+  reportContextLifecycle,
+  startContextLifecycleRecording
+} from './helpers/execution-context-lifecycle'
 
 const PANEL_TITLE = 'Worklog'
 const AUTOMATION_COMMAND = "require('fs').appendFileSync('worklog-digest.log'"
@@ -58,6 +62,8 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
 }, testInfo) => {
   // 16 captures across four widths and two themes.
   test.setTimeout(300_000)
+  // ORCA-646: names the exact CDP context/frame event behind a page-context loss.
+  const lifecycle = await startContextLifecycleRecording(orcaPage)
   const tempRoot = await mkdtemp(join(tmpdir(), 'orca-worklog-example-e2e-'))
   const pluginRoot = join(tempRoot, 'worklog')
   await cp(join(process.cwd(), 'examples', 'plugins', 'worklog'), pluginRoot, { recursive: true })
@@ -267,6 +273,7 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
       }
     }
   } finally {
+    await reportContextLifecycle(lifecycle, testInfo)
     // The install itself needs no cleanup: the harness gives each run its own
     // userData, so it goes away with the profile.
     await rm(tempRoot, { recursive: true, force: true })
