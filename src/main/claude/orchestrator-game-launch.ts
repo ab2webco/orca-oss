@@ -35,6 +35,23 @@ export function orchestratorGameCliPathOf(
   return cli !== null && platform === 'win32' ? cli.replaceAll('\\', '/') : cli
 }
 
+/** The ORCA_GAME_CLI a member pane exports: the lead's CLI, or the name its shell resolves over SSH. */
+export function orchestratorGameMemberCliOf(args: {
+  connectionId: string | null
+  orchestrationCommand: 'orca' | 'orca-ide'
+  hostCli: string | null
+  platform: NodeJS.Platform
+}): string | null {
+  // Why: over SSH the relay shim answers as `orca`; a WSL pane cannot run the host's absolute path.
+  if (args.connectionId !== null) {
+    return 'orca'
+  }
+  if (args.orchestrationCommand === 'orca-ide') {
+    return null
+  }
+  return orchestratorGameCliPathOf(args.hostCli, args.platform)
+}
+
 /** The game's language: Orca's UI language as the renderer resolves it, else English. */
 export function orchestratorGameLocaleOf(
   language: UiLanguage | undefined,

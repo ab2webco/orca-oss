@@ -104,6 +104,7 @@ describe('orchestration RPC methods', () => {
       // the tab without scrolling the sidebar to the worker's workspace.
       expect(runtime.createTerminal).toHaveBeenCalledWith('id:repo::worktree', {
         startupAgent: 'codex',
+        orchestrationWorker: true,
         title: `worker-${task.id}`,
         surfaceOwner: false
       })

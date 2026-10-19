@@ -4,6 +4,7 @@ import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-co
 import {
   buildOrchestratorGameLaunch,
   orchestratorGameLocaleOf,
+  orchestratorGameMemberCliOf,
   resolveOrchestratorGamePluginDir,
   orchestratorGameCliPathOf,
   withOrchestratorGameArgs
@@ -178,5 +179,62 @@ describe('withOrchestratorGameArgs', () => {
     expect(withOrchestratorGameArgs('claude', game, 'posix')).toBe(
       "claude '--plugin-dir' 'C:\\Users\\Zoë (dev)\\a & b ^c %PATH% !x! it'\\''s\\orca-game'"
     )
+  })
+})
+
+describe('orchestratorGameMemberCliOf', () => {
+  it('exports the same absolute CLI the lead pane gets on a local pane', () => {
+    expect(
+      orchestratorGameMemberCliOf({
+        connectionId: null,
+        orchestrationCommand: 'orca',
+        hostCli: '/Applications/Orca.app/Contents/Resources/bin/orca',
+        platform: 'darwin'
+      })
+    ).toBe('/Applications/Orca.app/Contents/Resources/bin/orca')
+  })
+
+  it('forward-slashes a Windows CLI path the way the lead pane does', () => {
+    expect(
+      orchestratorGameMemberCliOf({
+        connectionId: null,
+        orchestrationCommand: 'orca',
+        hostCli: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+        platform: 'win32'
+      })
+    ).toBe('C:/Program Files/Orca/resources/bin/orca.exe')
+  })
+
+  it('exports the relay shim name over SSH, where the host path cannot run', () => {
+    expect(
+      orchestratorGameMemberCliOf({
+        connectionId: 'ssh-1',
+        orchestrationCommand: 'orca',
+        hostCli: '/Applications/Orca.app/Contents/Resources/bin/orca',
+        platform: 'darwin'
+      })
+    ).toBe('orca')
+  })
+
+  it('exports nothing in WSL, where neither the host path nor a name is verified', () => {
+    expect(
+      orchestratorGameMemberCliOf({
+        connectionId: null,
+        orchestrationCommand: 'orca-ide',
+        hostCli: 'C:\\Program Files\\Orca\\resources\\bin\\orca.exe',
+        platform: 'win32'
+      })
+    ).toBeNull()
+  })
+
+  it('exports nothing when the host CLI cannot be qualified', () => {
+    expect(
+      orchestratorGameMemberCliOf({
+        connectionId: null,
+        orchestrationCommand: 'orca',
+        hostCli: null,
+        platform: 'linux'
+      })
+    ).toBeNull()
   })
 })
