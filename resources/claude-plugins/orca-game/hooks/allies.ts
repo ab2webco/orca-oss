@@ -151,6 +151,13 @@ const NOTICE_MARK: Readonly<Record<AdvisorNotice['level'], string>> = {
   block: '✖'
 }
 
+/** A CI run's words, as the strip and the Panel's card both draw them. */
+export const ciLineOf = (run: AdvisorCi): string => oneLine(run.text)
+
+/** The latest notice's words behind its mark, as the strip and the Panel's card both draw them. */
+export const noticeLineOf = (notice: AdvisorNotice): string =>
+  `${NOTICE_MARK[notice.level]} ${oneLine(notice.text)}`
+
 const jevRowsOf = (advisor: Advisor): AllyRow[] => {
   const badge = [advisor.model, advisor.effort].filter((one) => one !== null).join('·')
   const head: AllyRow[] =
@@ -178,7 +185,7 @@ const jevRowsOf = (advisor: Advisor): AllyRow[] => {
     (run): AllyRow => ({
       key: `ally-jev-ci-${run.id}`,
       tone: `ci-${run.status}`,
-      text: oneLine(run.text)
+      text: ciLineOf(run)
     })
   )
   const notice = advisor.notices.at(-1)
@@ -189,7 +196,7 @@ const jevRowsOf = (advisor: Advisor): AllyRow[] => {
           {
             key: 'ally-jev-notice',
             tone: notice.level,
-            text: `${NOTICE_MARK[notice.level]} ${oneLine(notice.text)}`
+            text: noticeLineOf(notice)
           }
         ]
   return [...head, ...agents, ...ci, ...notices]

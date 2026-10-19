@@ -178,6 +178,54 @@ describe('advisorCardOf', () => {
     expect(card.rows[1]?.gesture).toBe('unsure')
   })
 
+  it('draws each CI run and the latest notice Jev publishes, as the band strip does', () => {
+    const advisor = advisorOf({
+      ...JEV_VALUE,
+      ci: [
+        { id: 'c1', status: 'success', text: 'CI main (abc1234) paso en 22 min' },
+        { id: 'c2', status: 'watching', text: 'CI feat/x (def5678) 3/5' }
+      ],
+      notices: [
+        { id: 'n1', level: 'info', text: 'old notice' },
+        { id: 'n2', level: 'warn', text: 'Run /clear soon' }
+      ]
+    })
+    if (advisor === null) {
+      throw new Error('not a Jev value')
+    }
+    const card = advisorCardOf(REFEREE, advisor, [], MEMBER)
+    expect(card.rows.map((one) => [one.text, one.gesture])).toEqual([
+      ['★ main conversation · Opus 5.5·high', null],
+      ['CI main (abc1234) paso en 22 min', 'ciPassed'],
+      ['CI feat/x (def5678) 3/5', 'ciRunning'],
+      ['! Run /clear soon', 'unsure']
+    ])
+  })
+
+  it('draws every subagent Jev publishes, not only the newest few', () => {
+    const agent = (id: string) => ({
+      id,
+      type: 'general-purpose',
+      title: `Task ${id}`,
+      branch: null,
+      worktree: null,
+      model: 'Haiku 4.5',
+      effort: null,
+      status: 'running',
+      why: 'measuring',
+      verdict: 'midiendo'
+    })
+    const card = advisorCardOf(REFEREE, jev(['a1', 'a2', 'a3', 'a4', 'a5'].map(agent)), [], MEMBER)
+    expect(card.rows.map((one) => one.text)).toEqual([
+      '★ main conversation · Opus 5.5·high',
+      '↳ Task a1 · Haiku 4.5 · midiendo',
+      '↳ Task a2 · Haiku 4.5 · midiendo',
+      '↳ Task a3 · Haiku 4.5 · midiendo',
+      '↳ Task a4 · Haiku 4.5 · midiendo',
+      '↳ Task a5 · Haiku 4.5 · midiendo'
+    ])
+  })
+
   it('keeps a few rows at most, and says when there is none', () => {
     const many = Array.from({ length: 9 }, (_one, index) => entry(`a${index}`))
     expect(advisorCardOf(REFEREE, jev(), many, MEMBER).rows.map((one) => one.key)).toEqual([

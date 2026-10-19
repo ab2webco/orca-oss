@@ -1,6 +1,6 @@
 // Runs under `claude plugin test`: with the Panel shown the band drops its team scene for the progress line.
 import { describe, expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
@@ -166,4 +166,78 @@ describe('the band with the Panel closed or behind another tab', () => {
       await phone.unmount()
     })
   }
+})
+
+const ADVISOR = {
+  version: 1,
+  locale: 'en',
+  line: 'jev · 2 agents',
+  model: 'Opus 5.5',
+  modelId: 'claude-opus-5-5',
+  effort: 'high',
+  subagents: [],
+  ci: [{ id: 'c1', status: 'success', text: 'CI main (abc1234) paso en 22 min' }],
+  notices: [{ id: 'n1', level: 'warn', text: 'Run /clear soon' }]
+}
+
+// Inline plugins close over nothing of this file, so they read what to do from the env.
+const JEV: Plugin = {
+  name: 'orca-jev-mod-skills',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      const raw = await $.env.get('TEST_ADVISOR')
+      if (raw !== undefined && raw !== null && raw !== '') {
+        await $.state.set({ plugin: 'orca-jev-mod-skills', key: 'advisor' }, JSON.parse(raw))
+      }
+      return next(e)
+    })
+  }
+}
+
+const SCOUT: Plugin = {
+  name: 'scout',
+  register(on) {
+    on('session.start', ($, e, next) => {
+      $.ui.status('3 scouts out')
+      return next(e)
+    })
+  }
+}
+
+const ADVISED = { plugins: [JEV, SCOUT] }
+const ADVICE_ENV = { TEST_ADVISOR: JSON.stringify(ADVISOR) }
+const JEV_LINE = /jev · 2 agents/
+const JEV_CI = /CI main \(abc1234\)/
+const JEV_NOTICE = /Run \/clear soon/
+
+describe('the band strip while the Panel is shown', () => {
+  test('draws no Jev row and keeps another plugin status', ADVISED, async ($, on) => {
+    await start($, on, SHOWN, ADVICE_ENV)
+    const ui = await band($, 160)
+    expect(await ui.find({ type: 'Text', text: JEV_LINE })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: JEV_CI })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: JEV_NOTICE })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /^ scout $/ })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('draws Jev again once the Panel is closed', ADVISED, async ($, on) => {
+    const panes = [{ ...FLEET, isShown: true }]
+    await start($, on, panes, ADVICE_ENV)
+    const ui = await band($, 160)
+    expect(await ui.find({ type: 'Text', text: JEV_LINE })).toBeUndefined()
+    panes.length = 0
+    await ui.redraw()
+    expect(await ui.find({ type: 'Text', text: JEV_LINE })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: JEV_CI })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: JEV_NOTICE })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('a Panel behind another tab keeps Jev in the strip', ADVISED, async ($, on) => {
+    await start($, on, [{ ...FLEET, isShown: false }], ADVICE_ENV)
+    const ui = await band($, 160)
+    expect(await ui.find({ type: 'Text', text: JEV_LINE })).toBeDefined()
+    await ui.unmount()
+  })
 })

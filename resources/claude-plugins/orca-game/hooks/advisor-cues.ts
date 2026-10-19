@@ -39,7 +39,7 @@ const WHY_GESTURES: Readonly<Record<string, AdvisorGesture>> = {
 // Why only these: the owner asked zen to keep quiet about the decisions Jev makes on every launch.
 const ROUTINE_WHYS: ReadonlySet<string> = new Set(['chosen', 'same'])
 
-const CI_GESTURES = {
+export const CI_GESTURES = {
   watching: 'ciRunning',
   success: 'ciPassed',
   failure: 'ciFailed'
