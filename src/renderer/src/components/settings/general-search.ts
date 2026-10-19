@@ -5,6 +5,7 @@ import { searchKeywords, translateSearchKeyword } from './settings-search-keywor
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { getGeneralProjectRuntimeSearchEntries } from './general-project-runtime-search'
 import { getGeneralSupportSearchEntries } from './general-support-search'
+import { getMobileUpdateInstallSearchEntries } from './mobile-update-install-search'
 
 export { getGeneralEditorSearchEntries } from './general-editor-search'
 export { getGeneralSupportSearchEntries } from './general-support-search'
@@ -209,7 +210,8 @@ export const getGeneralUpdateSearchEntries = createLocalizedCatalog(() => [
       ),
       ...translateSearchKeyword('auto.components.settings.general.search.e49e739a59', 'download')
     ]
-  }
+  },
+  ...getMobileUpdateInstallSearchEntries()
 ])
 
 type GeneralPaneSearchOptions = {

@@ -3379,7 +3379,13 @@ function createUpdaterApi(): NonNullable<Partial<PreloadApi>['updater']> {
           'Switching builds is only available in the desktop app.'
         )
       }),
+    // Why: the web client has no desktop to restart, so a phone request can never target it.
+    getMobileInstallRequest: () => Promise.resolve(null),
+    cancelMobileInstall: () => Promise.resolve(false),
+    restartMobileInstallNow: () => Promise.resolve(false),
     onStatus: () => noopUnsubscribe,
+    onMobileInstallRequest: () => noopUnsubscribe,
+    onMobileInstallRestart: () => noopUnsubscribe,
     onClearDismissal: () => noopUnsubscribe
   }
 }

@@ -284,6 +284,7 @@ import type { AiVaultSessionTitlesArgs } from '../shared/ai-vault-session-title'
 import type { AiVaultPrepareSessionResumeArgs } from '../shared/ai-vault-resume-preparation'
 import type { AgentType } from '../shared/native-chat-types'
 import { ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT } from '../shared/updater-renderer-events'
+import type { MobileInstallRequestState } from '../shared/remote-server-update'
 import {
   ORCA_INTERNAL_FILE_DRAG_TYPE,
   createNativeFileDropPayload,
@@ -3402,10 +3403,29 @@ const api = {
         awaitBeforeUnloadCheckpoint
       ),
 
+    getMobileInstallRequest: () => ipcRenderer.invoke('updater:getMobileInstallRequest'),
+    cancelMobileInstall: (requestId) =>
+      ipcRenderer.invoke('updater:cancelMobileInstall', requestId),
+    restartMobileInstallNow: (requestId) =>
+      ipcRenderer.invoke('updater:restartMobileInstallNow', requestId),
+
     onStatus: (callback) => {
       const listener = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status)
       ipcRenderer.on('updater:status', listener)
       return () => ipcRenderer.removeListener('updater:status', listener)
+    },
+    onMobileInstallRequest: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        request: MobileInstallRequestState | null
+      ) => callback(request)
+      ipcRenderer.on('updater:mobileInstallRequest', listener)
+      return () => ipcRenderer.removeListener('updater:mobileInstallRequest', listener)
+    },
+    onMobileInstallRestart: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('updater:mobileInstallRestart', listener)
+      return () => ipcRenderer.removeListener('updater:mobileInstallRestart', listener)
     },
     onClearDismissal: (callback) => {
       const listener = (_event: Electron.IpcRendererEvent) => callback()

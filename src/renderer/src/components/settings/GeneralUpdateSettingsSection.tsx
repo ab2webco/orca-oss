@@ -9,10 +9,20 @@ import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 import { GeneralRemoteServerUpdates } from './GeneralRemoteServerUpdates'
+import { MobileUpdateInstallSetting } from './MobileUpdateInstallSetting'
 import { ReleaseChannelSection } from './ReleaseChannelSection'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { getReleaseNotesUrlForVersion } from '../../../../shared/release-channel'
 
-export function GeneralUpdateSettingsSection(): React.JSX.Element {
+type GeneralUpdateSettingsSectionProps = {
+  settings: GlobalSettings
+  updateSettings: (updates: Partial<GlobalSettings>) => void
+}
+
+export function GeneralUpdateSettingsSection({
+  settings,
+  updateSettings
+}: GeneralUpdateSettingsSectionProps): React.JSX.Element {
   const updateStatus = useAppStore((s) => s.updateStatus)
   // Why: the 'error' variant of UpdateStatus does not carry a `version` field.
   // The main process emits `{ state: 'error' }` for both check failures (no
@@ -257,6 +267,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
                 ))}
         </p>
       </SearchableSetting>
+      <MobileUpdateInstallSetting settings={settings} updateSettings={updateSettings} />
       {channelSwitcherRevealed ? <ReleaseChannelSection /> : null}
       <GeneralRemoteServerUpdates />
     </section>
