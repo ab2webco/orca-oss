@@ -1,4 +1,6 @@
 import type {
+  MobileInstallRequestResult,
+  MobileInstallRequestState,
   RemoteServerUpdateInstallResult,
   RemoteServerUpdaterSnapshot
 } from '../../shared/remote-server-update'
@@ -9,6 +11,10 @@ type RemoteServerUpdaterAdapter = {
   check: (runtimeId: string, options?: UpdateCheckOptions) => RemoteServerUpdaterSnapshot
   download: (runtimeId: string) => RemoteServerUpdaterSnapshot
   install: (runtimeId: string) => RemoteServerUpdateInstallResult
+  requestMobileInstall: (pairedDeviceId: string) => MobileInstallRequestResult
+  cancelMobileInstall: (requestId: string) => boolean
+  restartMobileInstallNow: (requestId: string) => boolean
+  getMobileInstallRequest: () => MobileInstallRequestState | null
 }
 
 const unavailableSnapshot = (runtimeId: string): RemoteServerUpdaterSnapshot => ({
@@ -19,20 +25,23 @@ const unavailableSnapshot = (runtimeId: string): RemoteServerUpdaterSnapshot => 
     automatic: false,
     reason: 'updater-unavailable'
   },
-  status: { state: 'idle' }
+  status: { state: 'idle' },
+  mobileInstallRequest: null
 })
+
+const manualRequired = (): never => {
+  throw new Error('remote_update_manual_required')
+}
 
 let adapter: RemoteServerUpdaterAdapter = {
   getSnapshot: unavailableSnapshot,
-  check: () => {
-    throw new Error('remote_update_manual_required')
-  },
-  download: () => {
-    throw new Error('remote_update_manual_required')
-  },
-  install: () => {
-    throw new Error('remote_update_manual_required')
-  }
+  check: manualRequired,
+  download: manualRequired,
+  install: manualRequired,
+  requestMobileInstall: manualRequired,
+  cancelMobileInstall: () => false,
+  restartMobileInstallNow: () => false,
+  getMobileInstallRequest: () => null
 }
 
 export function configureRemoteServerUpdater(next: RemoteServerUpdaterAdapter): void {
@@ -40,7 +49,10 @@ export function configureRemoteServerUpdater(next: RemoteServerUpdaterAdapter): 
 }
 
 export function getRemoteServerUpdaterSnapshot(runtimeId: string): RemoteServerUpdaterSnapshot {
-  return adapter.getSnapshot(runtimeId)
+  return {
+    ...adapter.getSnapshot(runtimeId),
+    mobileInstallRequest: adapter.getMobileInstallRequest()
+  }
 }
 
 export function checkRemoteServerUpdater(
@@ -56,4 +68,18 @@ export function downloadRemoteServerUpdater(runtimeId: string): RemoteServerUpda
 
 export function installRemoteServerUpdater(runtimeId: string): RemoteServerUpdateInstallResult {
   return adapter.install(runtimeId)
+}
+
+export function requestRemoteServerMobileInstall(
+  pairedDeviceId: string
+): MobileInstallRequestResult {
+  return adapter.requestMobileInstall(pairedDeviceId)
+}
+
+export function cancelRemoteServerMobileInstall(requestId: string): boolean {
+  return adapter.cancelMobileInstall(requestId)
+}
+
+export function restartRemoteServerMobileInstallNow(requestId: string): boolean {
+  return adapter.restartMobileInstallNow(requestId)
 }

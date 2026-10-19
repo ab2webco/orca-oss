@@ -191,6 +191,9 @@ function webClientPathForEndpoint(pathname: string): string {
 const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'accounts.list',
   'accounts.snapshot',
+  // Why: status only; the install request is the one update write a phone may make (ORCA-612).
+  'updater.getStatus',
+  'updater.requestMobileInstall',
   // Read-only: it names what holds an account so a refused switch is actionable
   // on a phone, which cannot close the terminal itself (ORCA-350).
   'accounts.claudeWorktreeUsage',

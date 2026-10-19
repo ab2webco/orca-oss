@@ -10,6 +10,7 @@ import {
   MOBILE_PLANE_BOARD_MEMBERS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
+  MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../../shared/protocol-version'
 
@@ -249,12 +250,24 @@ describe('mobile RPC allowlist', () => {
     ])
   })
 
-  it('does not grant mobile credentials control over host updates', () => {
+  it('lets a phone read update status and request only the offered install', () => {
+    // Why: check, download and install stay desktop-only; the phone can only ask for the feed's own
+    // offer, and the desktop countdown and opt-in gate that request (ORCA-612).
     const allowed = mobileRpcAllowlist()
     expect(
-      ['updater.getStatus', 'updater.check', 'updater.download', 'updater.install'].filter(
-        (method) => allowed.has(method)
-      )
+      ['updater.getStatus', 'updater.requestMobileInstall'].filter((method) => !allowed.has(method))
     ).toEqual([])
+    expect(
+      [
+        'updater.check',
+        'updater.download',
+        'updater.install',
+        'updater.cancelMobileInstall'
+      ].filter((method) => allowed.has(method))
+    ).toEqual([])
+  })
+
+  it('advertises the mobile install capability so older hosts keep the phone on status only', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY)
   })
 })

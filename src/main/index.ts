@@ -112,11 +112,19 @@ import {
   checkForRemoteServerUpdate,
   checkForUpdatesFromMenu,
   downloadRemoteServerUpdate,
+  getRemoteServerUpdateSupport,
   getRemoteServerUpdaterSnapshot,
+  getUpdateStatus,
   installRemoteServerUpdate,
   isQuittingForUpdate,
-  resolveUpdateInstallMode
+  resolveUpdateInstallMode,
+  setUpdateStatusListener
 } from './updater'
+import {
+  createMobileInstallRequestController,
+  MOBILE_INSTALL_COUNTDOWN_MS
+} from './updater-mobile-install-request'
+import { randomUUID } from 'node:crypto'
 import { configureRemoteServerUpdater } from './runtime/remote-server-updater'
 import type { UpdateCheckOptions } from '../shared/update-status-types'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
@@ -326,7 +334,7 @@ import {
   buildHeadlessAutomationAgentLaunchOptions,
   buildHeadlessAutomationWorktreeCreateArgs
 } from './automations/headless-workspace-create'
-import { AgentAwakeService } from './agent-awake-service'
+import { AGENT_AWAKE_STATUS_STALE_AFTER_MS, AgentAwakeService } from './agent-awake-service'
 import { normalizeComputerAwakeMode } from '../shared/computer-awake-mode'
 import { registerSystemResumeBroadcast } from './system-resume-broadcast'
 import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
@@ -726,11 +734,49 @@ installUncaughtPipeErrorGuard()
 installUnhandledRejectionLogging()
 // Why: expose the app version via process.env so main and the forked daemon can set TERM_PROGRAM_VERSION without importing electron.
 process.env.ORCA_APP_VERSION = app.getVersion()
+const mobileInstallRequests = createMobileInstallRequestController({
+  isOptedIn: () => store?.getSettings().allowMobileUpdateInstall === true,
+  isInstallSupported: () => {
+    const support = getRemoteServerUpdateSupport()
+    return support.automatic && support.installMode === 'interactive'
+  },
+  getUpdateState: () => getUpdateStatus().state,
+  download: () => downloadRemoteServerUpdate(runtime?.getRuntimeId() ?? ''),
+  install: () => {
+    installRemoteServerUpdate(runtime?.getRuntimeId() ?? '')
+  },
+  listWorkingAgents: () =>
+    agentHookServer
+      .getStatusSnapshot()
+      .filter(
+        (status) =>
+          status.state === 'working' &&
+          Date.now() - status.receivedAt <= AGENT_AWAKE_STATUS_STALE_AFTER_MS
+      )
+      .map((status) => ({ paneKey: status.paneKey, agentType: status.agentType })),
+  now: Date.now,
+  setTimer: (fire, delayMs) => {
+    const timer = setTimeout(fire, delayMs)
+    return () => clearTimeout(timer)
+  },
+  countdownMs: MOBILE_INSTALL_COUNTDOWN_MS,
+  createRequestId: () => randomUUID(),
+  // Why: the desktop countdown dialog subscribes here once it exists; the phone reads the same state from the snapshot.
+  onChange: () => {}
+})
+setUpdateStatusListener((status) => mobileInstallRequests.onUpdateStateChange(status.state))
 configureRemoteServerUpdater({
   getSnapshot: getRemoteServerUpdaterSnapshot,
   check: checkForRemoteServerUpdate,
   download: downloadRemoteServerUpdate,
-  install: installRemoteServerUpdate
+  install: installRemoteServerUpdate,
+  requestMobileInstall: (pairedDeviceId) =>
+    mobileInstallRequests.request(
+      runtimeRpc?.getDeviceRegistry()?.getDevice(pairedDeviceId)?.name ?? 'Phone'
+    ),
+  cancelMobileInstall: (requestId) => mobileInstallRequests.cancel(requestId),
+  restartMobileInstallNow: (requestId) => mobileInstallRequests.restartNow(requestId),
+  getMobileInstallRequest: () => mobileInstallRequests.current()
 })
 patchPackagedProcessPath()
 // Why: the sync seed above covers early IPC (homebrew/nix); the async login-shell probe below (packaged only) then adds the user's rc PATH.

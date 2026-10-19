@@ -17,11 +17,31 @@ export type RemoteServerUpdateSupport = {
     | 'updater-unavailable'
 }
 
+export type MobileInstallBlockingAgent = {
+  paneKey: string
+  agentType?: string
+}
+
+export type MobileInstallDenialReason = 'disabled' | 'not-available' | 'agents-working'
+
+export type MobileInstallRequestState = {
+  requestId: string
+  deviceName: string
+  phase: 'downloading' | 'countdown'
+  deadlineAt: number | null
+}
+
+export type MobileInstallRequestResult =
+  | { accepted: true; request: MobileInstallRequestState }
+  | { accepted: false; reason: MobileInstallDenialReason; agents: MobileInstallBlockingAgent[] }
+
 export type RemoteServerUpdaterSnapshot = {
   appVersion: string
   runtimeId: string
   support: RemoteServerUpdateSupport
   status: UpdateStatus
+  // Why: optional so an older phone-facing snapshot consumer keeps parsing.
+  mobileInstallRequest?: MobileInstallRequestState | null
 }
 
 export type RemoteServerUpdateInstallResult = {
