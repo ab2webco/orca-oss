@@ -43,6 +43,7 @@ import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
+import { workerObservedModelOf, type WorkerObservedModel } from './worker-observed-model'
 import {
   deriveWorkerTerminalListState,
   WORKER_SETTLED_STATES,
@@ -1152,6 +1153,9 @@ export class OrchestrationDb {
       }
       if (current < 34 && !this.hasColumn('worker_dispatches', 'advisor_report')) {
         this.db.exec('ALTER TABLE worker_dispatches ADD COLUMN advisor_report TEXT')
+      }
+      if (current < 35 && !this.hasColumn('worker_dispatches', 'observed_model')) {
+        this.db.exec('ALTER TABLE worker_dispatches ADD COLUMN observed_model TEXT')
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -4752,6 +4756,30 @@ export class OrchestrationDb {
          )`
       )
       .run(report, terminalHandle)
+  }
+
+  /** The model and effort the member's own hooks named, kept on the terminal's newest dispatch. */
+  noteWorkerObservedModelForTerminal(terminalHandle: string, seen: WorkerObservedModel): void {
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches SET observed_model = ?
+         WHERE dispatch_id = (
+           SELECT dispatch_id FROM worker_dispatches
+           WHERE agent_terminal_handle = ? ORDER BY rowid DESC LIMIT 1
+         )`
+      )
+      .run(JSON.stringify(seen), terminalHandle)
+  }
+
+  /** The last model a member terminal was seen on, still there after its dispatch finished. */
+  workerObservedModelForTerminal(terminalHandle: string): WorkerObservedModel | null {
+    const row = this.db
+      .prepare(
+        `SELECT observed_model FROM worker_dispatches
+         WHERE agent_terminal_handle = ? ORDER BY rowid DESC LIMIT 1`
+      )
+      .get(terminalHandle) as { observed_model: string | null } | undefined
+    return row?.observed_model ? workerObservedModelOf(row.observed_model) : null
   }
 
   /** The last Jev report a member terminal said, still there after its dispatch finished. */
