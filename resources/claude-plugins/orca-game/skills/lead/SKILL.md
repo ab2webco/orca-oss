@@ -24,7 +24,9 @@ allowed-tools: Bash
    ```
 
    If it says a lead launched this session, stop here and tell the person this is a member
-   session. Otherwise the printed rules are your standing rules for the rest of the session,
+   session. If it starts with `Not the lead:`, stop here too: tell the person, in their language,
+   which pane is the project's lead (live, or reopened with its context) and that this session
+   stays a plain one. Otherwise the printed rules are your standing rules for the rest of the session,
    project rules included, and they win over any habit of doing the ticket work yourself.
 
 2. **Watcher.** Start the report wait from the rules in the background (Claude Code: the Monitor

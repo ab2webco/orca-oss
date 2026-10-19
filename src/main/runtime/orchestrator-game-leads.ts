@@ -98,6 +98,16 @@ export class GameLeads {
     return (await this.deps.isRunning(live.handle).catch(() => true)) ? live : null
   }
 
+  /** The project's live lead when it is not the caller, so a second pane does not start one. */
+  async leadElsewhere(caller: GameBoardCaller): Promise<string | null> {
+    const project = await this.deps.projectOf(caller)
+    if (project.isMember || !project.lead || project.key === UNPLACED_PROJECT) {
+      return null
+    }
+    const live = await this.leadOf(project.key)
+    return live && live.handle !== project.lead.handle ? live.handle : null
+  }
+
   list(): { leads: GameLeadListing[] } {
     return {
       leads: this.directory.live(this.deps.isLive).map((one) => ({
