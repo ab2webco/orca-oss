@@ -60,6 +60,7 @@ import {
   useSystemPrefersDark
 } from './components/terminal-pane/use-system-prefers-dark'
 import RightSidebar from './components/right-sidebar'
+import { MobileInstallRequestDialog } from './components/MobileInstallRequestDialog'
 import { StarNagCard } from './components/StarNagCard'
 import { MemoryPressureWarningCard } from './components/memory-pressure/MemoryPressureWarningCard'
 import { StarNagAgentValueMomentObserver } from './components/star-nag/StarNagAgentValueMomentObserver'
@@ -2837,6 +2838,14 @@ function App(): React.JSX.Element {
                 <RemoteServerUpdateDialog />
               </RecoverableRenderErrorBoundary>
             </Suspense>
+            {/* Why: not lazy — it owns the listener that restarts the window when a phone-requested install is due. */}
+            <RecoverableRenderErrorBoundary
+              boundaryId="overlay.mobile-install-request-dialog"
+              surface="overlay"
+              compact
+            >
+              <MobileInstallRequestDialog />
+            </RecoverableRenderErrorBoundary>
           </LinkRoutingPreferenceDialogProvider>
         </ConfirmationDialogProvider>
       </TooltipProvider>

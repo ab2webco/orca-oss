@@ -76,6 +76,10 @@ export function requestRemoteServerMobileInstall(
   return adapter.requestMobileInstall(pairedDeviceId)
 }
 
+export function getRemoteServerMobileInstallRequest(): MobileInstallRequestState | null {
+  return adapter.getMobileInstallRequest()
+}
+
 export function cancelRemoteServerMobileInstall(requestId: string): boolean {
   return adapter.cancelMobileInstall(requestId)
 }

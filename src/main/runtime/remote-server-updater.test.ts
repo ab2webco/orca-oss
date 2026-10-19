@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  cancelRemoteServerMobileInstall,
   checkRemoteServerUpdater,
   configureRemoteServerUpdater,
   downloadRemoteServerUpdater,
+  getRemoteServerMobileInstallRequest,
   getRemoteServerUpdaterSnapshot,
-  installRemoteServerUpdater
+  installRemoteServerUpdater,
+  restartRemoteServerMobileInstallNow
 } from './remote-server-updater'
 
 describe('remote server updater adapter', () => {
@@ -58,5 +61,32 @@ describe('remote server updater adapter', () => {
       ['runtime-2'],
       ['runtime-2']
     ])
+  })
+
+  it('lets the desktop dialog read, cancel and fast-forward the pending phone request', () => {
+    const pending = {
+      requestId: 'req-1',
+      deviceName: 'Pixel 9',
+      phase: 'countdown' as const,
+      deadlineAt: 31_000
+    }
+    const cancelMobileInstall = vi.fn(() => true)
+    const restartMobileInstallNow = vi.fn(() => true)
+    configureRemoteServerUpdater({
+      getSnapshot: vi.fn(),
+      check: vi.fn(),
+      download: vi.fn(),
+      install: vi.fn(),
+      requestMobileInstall: vi.fn(),
+      cancelMobileInstall,
+      restartMobileInstallNow,
+      getMobileInstallRequest: () => pending
+    })
+
+    expect(getRemoteServerMobileInstallRequest()).toBe(pending)
+    expect(cancelRemoteServerMobileInstall('req-1')).toBe(true)
+    expect(restartRemoteServerMobileInstallNow('req-1')).toBe(true)
+    expect(cancelMobileInstall).toHaveBeenCalledWith('req-1')
+    expect(restartMobileInstallNow).toHaveBeenCalledWith('req-1')
   })
 })

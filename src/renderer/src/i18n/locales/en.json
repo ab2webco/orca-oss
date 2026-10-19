@@ -11487,6 +11487,10 @@
           "label": "Member names",
           "sceneNames": "The scene's names",
           "invalid": "Use 1 to 24 names separated by commas, each up to 32 characters and none like a ticket id."
+        },
+        "MobileUpdateInstallSetting": {
+          "title": "Update from a paired phone",
+          "description": "Let a paired phone ask this computer to install the update Orca Lab already offers. A countdown you can cancel shows before Orca restarts, and requests are refused while agents are working."
         }
       },
       "right": {
@@ -16224,6 +16228,14 @@
           "closing": "Closing…",
           "confirm": "Close terminal"
         }
+      },
+      "MobileInstallRequestDialog": {
+        "title": "{{value0}} asked to update Orca Lab",
+        "downloading": "Downloading the update. A countdown you can cancel starts when it is ready.",
+        "countdown": "Orca Lab restarts to install {{value0}} in {{value1}}s. Save your work, or cancel to stay on this version.",
+        "theUpdate": "the update",
+        "cancel": "Cancel",
+        "restartNow": "Restart now"
       }
     },
     "i18n": {

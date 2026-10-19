@@ -47,6 +47,12 @@ import {
   type UpdateInstallMode
 } from '../updater'
 import { isTrustedUIRenderer } from '../ipc/ui'
+import {
+  cancelRemoteServerMobileInstall,
+  getRemoteServerMobileInstallRequest,
+  restartRemoteServerMobileInstallNow
+} from '../runtime/remote-server-updater'
+import { registerMobileInstallRequestIpc } from '../updater-mobile-install-ipc'
 import { scheduleHistoryGc } from '../terminal-history-gc'
 import { hydrateLocalPtyRegistryAtBoot } from '../memory/hydrate-local-pty-registry'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
@@ -622,6 +628,14 @@ export function registerUpdaterHandlers(_store: Store): void {
       }
     }
   )
+  registerMobileInstallRequestIpc({
+    ipc: ipcMain,
+    isTrustedSender: (sender) =>
+      isTrustedUIRenderer(sender as Parameters<typeof isTrustedUIRenderer>[0]),
+    getRequest: getRemoteServerMobileInstallRequest,
+    cancel: cancelRemoteServerMobileInstall,
+    restartNow: restartRemoteServerMobileInstallNow
+  })
 }
 
 function assertTrustedUpdaterRecoverySender(event: IpcMainInvokeEvent): void {

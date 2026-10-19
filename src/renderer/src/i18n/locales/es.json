@@ -10859,6 +10859,10 @@
           "description": "Los agentes, servidores MCP y builds que corren en las terminales pueden agotar la memoria. Orca nunca cierra una terminal por su cuenta.",
           "thresholdLabel": "Avisar por debajo de",
           "thresholdDescription": "Muestra el aviso cuando la memoria libre baja de este porcentaje de la memoria física. En macOS también aparece cuando el sistema informa presión de memoria. Las terminales en hosts SSH no se miden."
+        },
+        "MobileUpdateInstallSetting": {
+          "title": "Actualizar desde un teléfono emparejado",
+          "description": "Permite que un teléfono emparejado pida a este equipo instalar la actualización que Orca Lab ya ofrece. Antes de reiniciar se muestra una cuenta atrás que puedes cancelar, y las solicitudes se rechazan mientras haya agentes trabajando."
         }
       },
       "right": {
@@ -15281,6 +15285,14 @@
           "closing": "Cerrando…",
           "confirm": "Cerrar terminal"
         }
+      },
+      "MobileInstallRequestDialog": {
+        "title": "{{value0}} pidió actualizar Orca Lab",
+        "downloading": "Descargando la actualización. Cuando esté lista empezará una cuenta atrás que puedes cancelar.",
+        "countdown": "Orca Lab se reiniciará para instalar {{value0}} en {{value1}} s. Guarda tu trabajo o cancela para quedarte en esta versión.",
+        "theUpdate": "la actualización",
+        "cancel": "Cancelar",
+        "restartNow": "Reiniciar ahora"
       }
     },
     "i18n": {

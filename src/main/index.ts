@@ -121,6 +121,10 @@ import {
   setUpdateStatusListener
 } from './updater'
 import {
+  broadcastMobileInstallRequest,
+  requestRendererPreparedRestart
+} from './updater-mobile-install-broadcast'
+import {
   createMobileInstallRequestController,
   MOBILE_INSTALL_COUNTDOWN_MS
 } from './updater-mobile-install-request'
@@ -743,7 +747,9 @@ const mobileInstallRequests = createMobileInstallRequestController({
   getUpdateState: () => getUpdateStatus().state,
   download: () => downloadRemoteServerUpdate(runtime?.getRuntimeId() ?? ''),
   install: () => {
-    installRemoteServerUpdate(runtime?.getRuntimeId() ?? '')
+    if (!requestRendererPreparedRestart()) {
+      installRemoteServerUpdate(runtime?.getRuntimeId() ?? '')
+    }
   },
   listWorkingAgents: () =>
     agentHookServer
@@ -761,8 +767,8 @@ const mobileInstallRequests = createMobileInstallRequestController({
   },
   countdownMs: MOBILE_INSTALL_COUNTDOWN_MS,
   createRequestId: () => randomUUID(),
-  // Why: the desktop countdown dialog subscribes here once it exists; the phone reads the same state from the snapshot.
-  onChange: () => {}
+  // Why: the phone reads the same state from the snapshot; the desktop dialog needs the push.
+  onChange: broadcastMobileInstallRequest
 })
 setUpdateStatusListener((status) => mobileInstallRequests.onUpdateStateChange(status.state))
 configureRemoteServerUpdater({
