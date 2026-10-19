@@ -11,7 +11,7 @@ import { PRE_COMMIT_INSTALL_FAILURE } from './updater-test-harness'
 const {
   browserWindowMock,
   nativeUpdaterMock,
-  autoUpdaterMock,
+  autoUpdaterMock: initialAutoUpdaterMock,
   killAllPtyMock,
   getLinuxRootPackageTypeMock,
   recordUpdaterLifecycleMock,
@@ -19,8 +19,10 @@ const {
   disarmExitWatchdogMock,
   fetchNewerReleaseTagsMock,
   moduleFactories,
-  resetUpdaterMocks
+  resetUpdaterMocks,
+  rotateAutoUpdaterMock
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
+let autoUpdaterMock = initialAutoUpdaterMock
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -79,6 +81,7 @@ function stageLinuxUpdateCache(): StagedLinuxPackages {
 
 describe('updater', () => {
   beforeEach(() => {
+    autoUpdaterMock = rotateAutoUpdaterMock()
     resetUpdaterMocks()
   })
 

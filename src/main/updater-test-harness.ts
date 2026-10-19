@@ -80,6 +80,7 @@ export type UpdaterMocks = {
   closeLocalBuildFeedMock: UpdaterSpy
   moduleFactories: UpdaterModuleFactories
   resetUpdaterMocks: () => void
+  rotateAutoUpdaterMock: () => AutoUpdaterMock
 }
 
 // Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
@@ -95,7 +96,6 @@ export const PRE_COMMIT_INSTALL_FAILURE =
  */
 export function createUpdaterMocks(): UpdaterMocks {
   const appEventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
-  const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
 
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
     const handlers = appEventHandlers.get(event) ?? []
@@ -110,55 +110,54 @@ export function createUpdaterMocks(): UpdaterMocks {
     }
   }
 
-  const on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-    const handlers = eventHandlers.get(event) ?? []
-    handlers.push(handler)
-    eventHandlers.set(event, handlers)
-    return autoUpdaterMock
-  })
-
-  const emit = (event: string, ...args: unknown[]) => {
-    for (const handler of eventHandlers.get(event) ?? []) {
-      handler(...args)
+  const createAutoUpdaterMock = (): AutoUpdaterMock => {
+    const eventHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
+    const autoUpdaterMock: AutoUpdaterMock = {
+      autoDownload: false,
+      autoInstallOnAppQuit: false,
+      autoRunAppAfterInstall: true,
+      allowPrerelease: false,
+      allowDowngrade: false,
+      disableDifferentialDownload: false,
+      // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
+      logger: undefined,
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        const handlers = eventHandlers.get(event) ?? []
+        handlers.push(handler)
+        eventHandlers.set(event, handlers)
+        return autoUpdaterMock
+      }),
+      checkForUpdates: vi.fn().mockResolvedValue(null),
+      downloadUpdate: vi.fn(),
+      quitAndInstall: vi.fn(),
+      setFeedURL: vi.fn(),
+      updateConfigPath: undefined,
+      emit: (event: string, ...args: unknown[]) => {
+        for (const handler of eventHandlers.get(event) ?? []) {
+          handler(...args)
+        }
+      },
+      reset: () => {
+        appEventHandlers.clear()
+        appOn.mockClear()
+        eventHandlers.clear()
+        autoUpdaterMock.on.mockClear()
+        autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(null)
+        autoUpdaterMock.downloadUpdate.mockReset()
+        autoUpdaterMock.quitAndInstall.mockReset()
+        autoUpdaterMock.setFeedURL.mockClear()
+        autoUpdaterMock.updateConfigPath = undefined
+        autoUpdaterMock.allowPrerelease = false
+        autoUpdaterMock.allowDowngrade = false
+        autoUpdaterMock.disableDifferentialDownload = false
+        autoUpdaterMock.autoRunAppAfterInstall = true
+        autoUpdaterMock.logger = undefined
+        delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
+      }
     }
+    return autoUpdaterMock
   }
-
-  const reset = () => {
-    appEventHandlers.clear()
-    appOn.mockClear()
-    eventHandlers.clear()
-    on.mockClear()
-    autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(null)
-    autoUpdaterMock.downloadUpdate.mockReset()
-    autoUpdaterMock.quitAndInstall.mockReset()
-    autoUpdaterMock.setFeedURL.mockClear()
-    autoUpdaterMock.updateConfigPath = undefined
-    autoUpdaterMock.allowPrerelease = false
-    autoUpdaterMock.allowDowngrade = false
-    autoUpdaterMock.disableDifferentialDownload = false
-    autoUpdaterMock.autoRunAppAfterInstall = true
-    autoUpdaterMock.logger = undefined
-    delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
-  }
-
-  const autoUpdaterMock: AutoUpdaterMock = {
-    autoDownload: false,
-    autoInstallOnAppQuit: false,
-    autoRunAppAfterInstall: true,
-    allowPrerelease: false,
-    allowDowngrade: false,
-    disableDifferentialDownload: false,
-    // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
-    logger: undefined as { error: (message: unknown) => void } | undefined,
-    on,
-    checkForUpdates: vi.fn(),
-    downloadUpdate: vi.fn(),
-    quitAndInstall: vi.fn(),
-    setFeedURL: vi.fn(),
-    updateConfigPath: undefined as string | undefined,
-    emit,
-    reset
-  }
+  let autoUpdaterMock = createAutoUpdaterMock()
 
   const appMock: AppMock = {
     isPackaged: true,
@@ -277,6 +276,10 @@ export function createUpdaterMocks(): UpdaterMocks {
     startLocalBuildFeedMock,
     closeLocalBuildFeedMock,
     moduleFactories,
-    resetUpdaterMocks
+    resetUpdaterMocks,
+    rotateAutoUpdaterMock: () => {
+      autoUpdaterMock = createAutoUpdaterMock()
+      return autoUpdaterMock
+    }
   }
 }

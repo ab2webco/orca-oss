@@ -2148,6 +2148,11 @@ const MOBILE_TERMINAL_SURFACE_TIMEOUT_MS = 10_000
 // fallback kill is needed, so keep it short — an unreachable host must not stall the rejection.
 const REJECTED_SPLIT_PTY_STOP_TIMEOUT_MS = 2_000
 const EXPLICIT_TERMINAL_CLOSE_STOP_TIMEOUT_MS = 2_000
+// Why: neither leaves a tab to retire, but the PTY behind it can still be running.
+const TAB_ALREADY_RETIRED_CLOSE_ERRORS: ReadonlySet<string> = new Set([
+  'workspace_session_unavailable',
+  'tab_not_found'
+])
 const MOBILE_TERMINAL_READY_FALLBACK_MS = 1000
 const SSH_PANE_RECOVERY_GRACE_MS = 30_000
 // Why: long enough that a keystroke burst to a proven-dead leaf probes once,
@@ -29739,7 +29744,7 @@ export class OrcaRuntimeService {
             origin: 'runtime'
           })
         } catch (error) {
-          if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
+          if (!(error instanceof Error) || !TAB_ALREADY_RETIRED_CLOSE_ERRORS.has(error.message)) {
             throw error
           }
           this.notifier.closeTerminal?.(tabId)
@@ -29766,7 +29771,7 @@ export class OrcaRuntimeService {
               origin: 'runtime'
             })
           } catch (error) {
-            if (!(error instanceof Error) || error.message !== 'workspace_session_unavailable') {
+            if (!(error instanceof Error) || !TAB_ALREADY_RETIRED_CLOSE_ERRORS.has(error.message)) {
               throw error
             }
             this.notifier?.closeTerminal(tabId)

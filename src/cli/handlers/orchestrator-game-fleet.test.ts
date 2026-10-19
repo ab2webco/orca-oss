@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
-import type { RuntimeClient } from '../runtime-client'
+import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { formatStop } from './orchestrator-game-stop'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 
 const merged = {
@@ -648,6 +649,36 @@ describe('orca game fleet verbs', () => {
         })
       ])
       expect(process.exitCode).toBe(1)
+    })
+
+    it('reports a member whose tab is already closed as stopped, not failed', async () => {
+      const agents = [
+        LEAD,
+        member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' })
+      ]
+      const { client } = fakeClient(stateWith({ agents }), {
+        'orchestration.workerList': { workers: [], counts: {} }
+      })
+      const call = client.call.bind(client)
+      client.call = (async (method: string, params: unknown) => {
+        if (method === 'terminal.close') {
+          throw new RuntimeClientError('runtime_error', 'tab_not_found')
+        }
+        return call(method, params)
+      }) as typeof client.call
+
+      await run('game stop', client, [['all', true]])
+
+      expect(printed().members).toEqual([
+        expect.objectContaining({
+          ticket: 'CIN-1',
+          outcome: 'stopped',
+          alreadyClosedTerminal: 'term_1'
+        })
+      ])
+      expect(printed().members[0]).not.toHaveProperty('reason')
+      expect(process.exitCode).toBeUndefined()
+      expect(formatStop(printed())).toBe('CIN-1 stopped (term_1 tab already closed)')
     })
 
     it('still closes the terminal when the dispatch stop fails', async () => {
