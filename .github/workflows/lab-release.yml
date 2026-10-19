@@ -453,14 +453,15 @@ jobs:
           # Why unset and not env: '': with CSC_LINK set, electron-builder ignores CSC_KEYCHAIN
           # and imports the p12 into a keychain of its own, which the current image rejects
           # (ORCA-368). An empty string is still set and gets read as a path — that is the
-          # `not a file` on the repo root. Only removing them from the environment works.
-          if [[ "${{ inputs.dry_run }}" != "true" ]]; then
-            unset CSC_LINK CSC_KEY_PASSWORD
-          fi
+          # `not a file` on the repo root. Only removing them from the environment works, and a
+          # dry run needs it most: its job env sets both to '' (ORCA-640).
+          unset CSC_LINK CSC_KEY_PASSWORD
           node config/scripts/ensure-native-runtime.mjs --runtime=electron
           publish="always"
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             publish="never"
+            # Why: keeps a dry run unsigned even on a runner whose keychain holds an identity.
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish "$publish"
 
