@@ -1119,6 +1119,28 @@ class InMemoryOrchestrationMessages {
     { id: string; coordinator_handle: string | null; coordinator_pane_key: string | null }
   >()
 
+  private remoteAttachment: {
+    dispatch_id: string
+    terminal_handle: string
+    pane_key: string
+  } | null = null
+
+  setRemoteAttachment(attachment: {
+    dispatch_id: string
+    terminal_handle: string
+    pane_key: string
+  }): void {
+    this.remoteAttachment = attachment
+  }
+
+  findActiveRemoteAttachmentForPane(paneKey: string) {
+    return this.remoteAttachment?.pane_key === paneKey ? this.remoteAttachment : undefined
+  }
+
+  isRemoteAttachmentProcessCurrent(): boolean {
+    return this.remoteAttachment !== null
+  }
+
   insertMessage(msg: {
     from: string
     to: string
@@ -35488,6 +35510,118 @@ describe('OrcaRuntimeService', () => {
             typeof payload === 'string' && payload.includes('orca orchestration check')
         )
       ).toHaveLength(1)
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('points to the total check-returnable mail across a coordinator terminal and Run', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({ write, kill: vi.fn(), getForegroundProcess: async () => null })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      db.setRun({
+        id: 'run_mailbox',
+        coordinator_handle: terminal.handle,
+        coordinator_pane_key: `${terminal.tabId}:${terminal.leafId}`
+      })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
+      db.insertMessage({ from: 'other_run', to: terminal.handle, subject: 'direct' })
+      db.insertMessage({ from: 'worker', to: 'run:run_mailbox', subject: 'scoped' })
+
+      runtime.notifyMessageArrived(terminal.handle, 'status')
+      await Promise.resolve()
+      expect(write).toHaveBeenCalledWith(
+        'pty-1',
+        '\nYou have 2 orchestration messages. Run `orca orchestration check`.\n'
+      )
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('counts previously pointed unread mail when a fresh message triggers another nudge', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({ write, kill: vi.fn(), getForegroundProcess: async () => null })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      db.setRun({
+        id: 'run_mailbox',
+        coordinator_handle: terminal.handle,
+        coordinator_pane_key: `${terminal.tabId}:${terminal.leafId}`
+      })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
+      const old = db.insertMessage({ from: 'worker', to: 'run:run_mailbox', subject: 'old' })
+      db.markAsDelivered([old.id])
+      db.insertMessage({ from: 'other_run', to: terminal.handle, subject: 'new' })
+
+      runtime.notifyMessageArrived(terminal.handle, 'status')
+      await Promise.resolve()
+      const checkReturnableCount =
+        db.getUnreadMessages(terminal.handle).length +
+        db.getUnreadMessages('run:run_mailbox').length
+      expect(checkReturnableCount).toBe(2)
+      expect(write).toHaveBeenCalledWith(
+        'pty-1',
+        '\nYou have 2 orchestration messages. Run `orca orchestration check`.\n'
+      )
+      await vi.advanceTimersByTimeAsync(500)
+      runtime.notifyMessageArrived(terminal.handle, 'status')
+      await Promise.resolve()
+      expect(
+        write.mock.calls.filter(
+          ([, text]) => typeof text === 'string' && text.includes('orchestration check')
+        )
+      ).toHaveLength(1)
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('counts remote-attached Dispatch mail in a direct terminal nudge', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({ write, kill: vi.fn(), getForegroundProcess: async () => null })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      db.setRemoteAttachment({
+        dispatch_id: 'ctx_remote',
+        terminal_handle: terminal.handle,
+        pane_key: `${terminal.tabId}:${terminal.leafId}`
+      })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
+      db.insertMessage({ from: 'home', to: 'dispatch:ctx_remote', subject: 'scoped' })
+      db.insertMessage({ from: 'other_run', to: terminal.handle, subject: 'direct' })
+
+      runtime.notifyMessageArrived(terminal.handle, 'status')
+      await Promise.resolve()
+      expect(write).toHaveBeenCalledWith(
+        'pty-1',
+        '\nYou have 2 orchestration messages. Run `orca orchestration check`.\n'
+      )
       db.close()
     } finally {
       vi.useRealTimers()
