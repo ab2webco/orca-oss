@@ -1150,6 +1150,9 @@ export class OrchestrationDb {
           );
         `)
       }
+      if (current < 34 && !this.hasColumn('worker_dispatches', 'advisor_report')) {
+        this.db.exec('ALTER TABLE worker_dispatches ADD COLUMN advisor_report TEXT')
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
     } catch (err) {
@@ -4736,6 +4739,30 @@ export class OrchestrationDb {
       }
     }
     return null
+  }
+
+  /** The member's last Jev report (JSON), kept on the terminal's newest dispatch; null clears it. */
+  noteWorkerAdvisorForTerminal(terminalHandle: string, report: string | null): void {
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches SET advisor_report = ?
+         WHERE dispatch_id = (
+           SELECT dispatch_id FROM worker_dispatches
+           WHERE agent_terminal_handle = ? ORDER BY rowid DESC LIMIT 1
+         )`
+      )
+      .run(report, terminalHandle)
+  }
+
+  /** The last Jev report a member terminal said, still there after its dispatch finished. */
+  workerAdvisorForTerminal(terminalHandle: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT advisor_report FROM worker_dispatches
+         WHERE agent_terminal_handle = ? ORDER BY rowid DESC LIMIT 1`
+      )
+      .get(terminalHandle) as { advisor_report: string | null } | undefined
+    return row?.advisor_report ?? null
   }
 
   listLegacyWorkerTerminalRecoveryRows(): LegacyWorkerTerminalRecoveryRow[] {

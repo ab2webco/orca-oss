@@ -11,7 +11,7 @@ export type GameMemberAdvisorReport = GameMemberAdvisorPick & {
 /** The report the lead's Panel reads, with what the member was on before Jev's latest switch. */
 export type GameMemberAdvisor = GameMemberAdvisorReport & { previous?: GameMemberAdvisorPick }
 
-const GAME_MEMBER_ADVISOR_VERSION = 1
+export const GAME_MEMBER_ADVISOR_VERSION = 1
 const WORDS_MAX = 64
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

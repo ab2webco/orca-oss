@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 33
+export const ORCHESTRATION_SCHEMA_VERSION = 34
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -126,5 +126,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     upstreamVersion: 28,
     summary: 'durable local mutation caller identity',
     effects: ['table:mutation_caller_identities']
+  },
+  {
+    version: 34,
+    lineage: 'lab',
+    summary: 'member advisor report kept per dispatch (ORCA-653)',
+    effects: ['column:worker_dispatches.advisor_report']
   }
 ]

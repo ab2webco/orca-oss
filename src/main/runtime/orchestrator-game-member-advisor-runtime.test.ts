@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { OrchestrationDb } from './orchestration/db'
 import { OrcaRuntimeService } from './orca-runtime'
+import { GAME_MEMBER_ADVISOR_TTL_MS } from './orchestrator-game-member-advisors'
 
 const agentRow = (paneKey: string, parentPaneKey: string | null) => ({
   paneKey,
@@ -51,6 +53,45 @@ describe("a member pane's Jev report through the runtime", () => {
       model: 'Sonnet 5.5',
       effort: 'high',
       pinned: { model: true, effort: false }
+    })
+  })
+
+  it('still shows on the lead row once the member stopped reporting, from the dispatch it ran on', async () => {
+    const runtime = runtimeWithMember()
+    const db = new OrchestrationDb(':memory:')
+    Object.assign(runtime, { _orchestrationDb: db })
+    vi.spyOn(
+      runtime as unknown as { getTerminalHandleForPaneKey(paneKey: string): string | null },
+      'getTerminalHandleForPaneKey'
+    ).mockReturnValue('term_member')
+    const task = db.createTask({ spec: 'work a ticket' })
+    const started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { topology: 'current', agent: 'claude', launch: null }
+    })
+    db.recordWorkerStage({
+      dispatchId: started.dispatch.id,
+      stage: 'terminal_created',
+      terminalHandle: 'term_member'
+    })
+    const report = {
+      version: 1,
+      model: 'Opus 5.5',
+      effort: 'high',
+      pinned: { model: false, effort: false }
+    }
+
+    await runtime.getOrchestratorGameState({ paneKey: 'tab-4:member', advisor: report })
+    const now = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(now + GAME_MEMBER_ADVISOR_TTL_MS)
+    const lead = await runtime.getOrchestratorGameState({ paneKey: 'tab-1:lead' })
+    vi.restoreAllMocks()
+    db.close()
+
+    expect(lead.agents.find((agent) => agent.paneKey === 'tab-4:member')?.advisor).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      pinned: { model: false, effort: false }
     })
   })
 })
