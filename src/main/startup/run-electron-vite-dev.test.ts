@@ -179,6 +179,51 @@ describe('run-electron-vite-dev', () => {
     }
   )
 
+  it.skipIf(process.platform === 'win32')(
+    'kills the descendant process tree on SIGHUP (terminal hangup)',
+    async () => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'orca-dev-wrapper-'))
+      const pidFile = join(tempDir, 'grandchild.pid')
+      const wrapperPath = resolve('config/scripts/run-electron-vite-dev.mjs')
+      const fakeCliPath = resolve('src/main/startup/__fixtures__/fake-electron-vite-dev-cli.mjs')
+
+      const wrapper = spawn(process.execPath, [wrapperPath], {
+        cwd: resolve('.'),
+        env: devWrapperTestEnv({
+          ORCA_ELECTRON_VITE_CLI: fakeCliPath,
+          ORCA_SKIP_DEV_CLI_PREPARE: '1',
+          ORCA_SKIP_DEV_ELECTRON_APP_PREPARE: '1',
+          ORCA_SKIP_DEV_WEB_PREPARE: '1',
+          ORCA_DEV_WRAPPER_TEST_PID_FILE: pidFile
+        }),
+        stdio: 'ignore'
+      })
+
+      expect(wrapper.pid).toBeTypeOf('number')
+      processesToCleanUp.add(wrapper.pid!)
+
+      await waitFor(() => {
+        try {
+          return readFileSync(pidFile, 'utf8').trim().length > 0
+        } catch {
+          return false
+        }
+      })
+
+      const [fakeCliPid, grandchildPid] = trackPidFile(pidFile)
+      expect(processExists(fakeCliPid)).toBe(true)
+      expect(processExists(grandchildPid)).toBe(true)
+
+      wrapper.kill('SIGHUP')
+      await waitForExit(wrapper)
+      processesToCleanUp.delete(wrapper.pid!)
+
+      await waitFor(() => !processExists(fakeCliPid) && !processExists(grandchildPid))
+      processesToCleanUp.delete(fakeCliPid)
+      processesToCleanUp.delete(grandchildPid)
+    }
+  )
+
   it('forwards dev instance identity to electron-vite', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'orca-dev-wrapper-'))
     const pidFile = join(tempDir, 'grandchild.pid')
