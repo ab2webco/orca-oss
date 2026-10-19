@@ -68,6 +68,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     // desktop app while its CLI is `cursor-agent`. Let the runtime build the
     // configured launcher instead of executing the raw id.
     startupAgent: args.agent,
+    orchestrationWorker: true,
     ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
     title: `worker-${args.taskId}`,
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
@@ -151,6 +152,7 @@ export async function createWorkerWorktree(args: {
     observeSetupCompletion: true,
     createdWithAgent: args.agent,
     startupAgent: args.agent,
+    orchestrationWorker: true,
     ...(args.launchPreferences ? { startupLaunchPreferences: args.launchPreferences } : {}),
     activate: false,
     lineage: {

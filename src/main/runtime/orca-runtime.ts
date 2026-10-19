@@ -650,6 +650,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import {
+  orchestratorGameMemberCliOf,
   withOrchestratorGameArgs,
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
@@ -1667,6 +1668,8 @@ type TerminalCreateOptions = {
   // CLI is `cursor-agent`). Callers that know the agent name it here instead of
   // guessing a command, and the runtime builds the configured launch.
   startupAgent?: TuiAgent
+  /** An orchestration member pane; it exports ORCA_GAME_CLI so its own hooks can read game state. */
+  orchestrationWorker?: boolean
   launchPreferences?: AgentLaunchPreferences
   terminalColorQueryReplies?: TerminalOscColorQueryReplyColors
   viewMode?: 'terminal' | 'chat'
@@ -23849,6 +23852,8 @@ export class OrcaRuntimeService {
     observeSetupCompletion?: boolean
     createdWithAgent?: TuiAgent
     startupAgent?: TuiAgent
+    /** The startup terminal is an orchestration member; it exports ORCA_GAME_CLI. */
+    orchestrationWorker?: boolean
     startupLaunchPreferences?: AgentLaunchPreferences
     startupPrompt?: string
     pendingFirstAgentMessageRename?: boolean
@@ -23987,6 +23992,7 @@ export class OrcaRuntimeService {
           const terminal = await this.createTerminal(`id:${worktree.id}`, {
             command: effectiveStartup.command,
             env: effectiveStartup.env,
+            ...(args.orchestrationWorker ? { orchestrationWorker: true } : {}),
             ...(effectiveStartup.launchConfig
               ? { launchConfig: effectiveStartup.launchConfig }
               : {}),
@@ -28025,7 +28031,10 @@ export class OrcaRuntimeService {
           },
           paneKey,
           tabId,
-          agentTeamsPlan?.env
+          {
+            ...(opts.orchestrationWorker ? this.orchestrationMemberGameEnv(workspace) : {}),
+            ...agentTeamsPlan?.env
+          }
         )
         const terminalColorQueryReplies =
           launchOpts.terminalColorQueryReplies ?? getTerminalViewColorQueryReplyColors()
@@ -31827,6 +31836,22 @@ export class OrcaRuntimeService {
     } catch {
       return null
     }
+  }
+
+  // Why: the lead gets ORCA_GAME_CLI from its Agent Teams plan; a member pane has no plan, so it needs this too.
+  private orchestrationMemberGameEnv(scope: TerminalWorkspaceLaunchScope): Record<string, string> {
+    const cli = orchestratorGameMemberCliOf({
+      connectionId: scope.connectionId,
+      orchestrationCommand: resolveTerminalOrchestrationCliCommand({
+        connectionId: scope.connectionId,
+        isWsl: undefined,
+        worktreeId: scope.id,
+        projectRuntime: this.resolveProjectRuntimeForWorktree(scope.id)
+      }),
+      hostCli: resolveClaudeAgentTeamsShimBin(process.env),
+      platform: process.platform
+    })
+    return cli === null ? {} : { ORCA_GAME_CLI: cli }
   }
 
   private buildTerminalWorkspaceEnv(

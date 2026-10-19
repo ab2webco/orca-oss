@@ -13673,6 +13673,35 @@ describe('OrcaRuntimeService', () => {
     expect(markCursorWorkspaceTrustedMock).toHaveBeenCalledWith(TEST_WORKTREE_PATH)
   })
 
+  it('exports the host CLI to an orchestration worker pane and to no other agent pane', async () => {
+    vi.stubEnv('ORCA_AGENT_TEAMS_SHIM_BIN', process.execPath)
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'cursor',
+      orchestrationWorker: true,
+      title: 'member'
+    })
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'cursor',
+      title: 'plain'
+    })
+    vi.unstubAllEnvs()
+
+    const [member, plain] = spawn.mock.calls.map(
+      (call) => (call[0] as { env?: Record<string, string> }).env ?? {}
+    )
+    expect(member.ORCA_GAME_CLI).toBe(process.execPath.replaceAll('\\', '/'))
+    expect(plain).not.toHaveProperty('ORCA_GAME_CLI')
+  })
+
   it('resolves a startupAgent to the CLI binary on Windows, where `cursor` is the IDE', async () => {
     setPlatform('win32')
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
