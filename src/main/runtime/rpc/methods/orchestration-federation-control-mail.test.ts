@@ -178,6 +178,35 @@ describe('orchestration federation control mail', () => {
     expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(0)
   })
 
+  it('returns remote-attached worker terminal mail alongside Dispatch mail without crossing recipients', async () => {
+    const direct = workerDb.insertMessage({
+      from: 'term_other_run',
+      to: 'term_worker',
+      subject: 'Direct remote worker mail'
+    })
+    const scoped = workerDb.insertMessage({
+      from: 'term_coord',
+      to: `dispatch:${dispatchId}`,
+      subject: 'Remote Dispatch mail'
+    })
+    const foreign = workerDb.insertMessage({
+      from: 'term_coord',
+      to: 'term_other',
+      subject: 'Other terminal mail'
+    })
+
+    const checked = await workerDispatcher.dispatch(checkRequest('check-remote-direct'))
+    expect(checked).toMatchObject({
+      ok: true,
+      result: {
+        count: 2,
+        messages: [{ id: direct.id }, { id: scoped.id }]
+      }
+    })
+    expect(workerDb.getMessageById(direct.id)?.read).toBe(1)
+    expect(workerDb.getMessageById(foreign.id)?.read).toBe(0)
+  })
+
   it('wakes a remote worker waiter when control mail imports', async () => {
     const waiting = workerDispatcher.dispatch(checkRequest('wait-for-control', true))
     await Promise.resolve()

@@ -792,6 +792,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         })
         const generation = run.consumer_generation
         const address = `run:${run.id}`
+        const terminalHandle =
+          runtime.getTerminalPaneKey(handle) === run.coordinator_pane_key ? handle : undefined
         runtime.ensureOrchestrationFederationRelay(run.id)
         // Why (ORCA-191): re-arms the scan after a runtime restart — the first
         // consumer poll rebuilds the timer from the armed rows in the DB.
@@ -810,7 +812,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           )
         }
         if (params.peek || params.all || params.unread === false) {
-          const history = db.getRunMailboxHistory(run.id, 100, typeFilter)
+          const history = db.getRunMailboxHistory(run.id, 100, typeFilter, terminalHandle)
           const messages =
             params.all || (params.unread === false && !params.peek)
               ? history
@@ -834,6 +836,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           db.getOrCreateRunDelivery({
             runId: run.id,
             consumerGeneration: generation,
+            terminalHandle,
             wakeTypes,
             keepHeartbeats: typeFilter?.includes('heartbeat') === true
           })
@@ -965,10 +968,20 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           : undefined
       if (workerMailbox) {
         const address = `dispatch:${workerMailbox.dispatchId}`
+        const ownsTerminalMail =
+          activeDispatch?.assignee_handle === handle ||
+          (remoteAttachment !== undefined && runtime.getTerminalPaneKey(handle) === paneKey)
+        const addresses = ownsTerminalMail ? [address, handle] : [address]
         const showAll = params.all === true || (params.unread === false && params.peek !== true)
-        const messages = showAll
-          ? db.getAllMessagesForHandle(address, 100, typeFilter)
-          : db.getUnreadMessages(address, typeFilter)
+        const readMessages = () =>
+          addresses
+            .flatMap((recipient) =>
+              showAll
+                ? db.getAllMessagesForHandle(recipient, 100, typeFilter)
+                : db.getUnreadMessages(recipient, typeFilter)
+            )
+            .sort((a, b) => (showAll ? b.sequence - a.sequence : a.sequence - b.sequence))
+        const messages = readMessages()
         if (!showAll && params.peek !== true && messages.length > 0) {
           db.markAsRead(messages.map((message) => message.id))
         }
@@ -999,7 +1012,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             connectionLost: waitResult === 'cancelled' && signal?.aborted === true
           }
         }
-        const arrived = db.getUnreadMessages(address, typeFilter)
+        const arrived = readMessages()
         db.markAsRead(arrived.map((message) => message.id))
         return {
           ...(workerMailbox.runId ? { runId: workerMailbox.runId } : {}),

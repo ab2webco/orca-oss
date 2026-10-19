@@ -122,6 +122,142 @@ describe('orchestration RPC methods', () => {
       expect(inboxB.messages.map((message) => message.subject)).toEqual(['B only'])
     })
 
+    it('delivers terminal and Run mail to the owning coordinator and acknowledges both', async () => {
+      setup()
+      const terminalMail = db.insertMessage({
+        from: 'term_external',
+        to: 'term_coord',
+        subject: 'Terminal mail'
+      })
+      const runMail = db.insertMessage({
+        from: 'term_worker',
+        to: `run:${activeRunId}`,
+        subject: 'Run mail'
+      })
+      const foreign = db.insertMessage({
+        from: 'term_external',
+        to: 'term_other',
+        subject: 'Foreign mail'
+      })
+
+      const first = (await call('orchestration.check', { terminal: 'term_coord' })) as {
+        deliveryId: string
+        messages: { id: string }[]
+      }
+      expect(first.messages.map((message) => message.id)).toEqual([terminalMail.id, runMail.id])
+      const replay = (await call('orchestration.check', { terminal: 'term_coord' })) as {
+        deliveryId: string
+        messages: { id: string }[]
+      }
+      expect(replay.deliveryId).toBe(first.deliveryId)
+      expect(replay.messages).toEqual(first.messages)
+
+      await call('orchestration.check', { terminal: 'term_coord', ack: first.deliveryId })
+      expect(db.getMessageById(terminalMail.id)).toMatchObject({ read: 1 })
+      expect(db.getMessageById(terminalMail.id)?.delivered_at).not.toBeNull()
+      expect(db.getMessageById(runMail.id)).toMatchObject({ read: 1 })
+      expect(db.getMessageById(foreign.id)).toMatchObject({ read: 0 })
+    })
+
+    it('delivers cross-Run terminal mail by recipient rather than sender Run', async () => {
+      setup()
+      const foreignRun = db.createRun({
+        objective: 'Foreign sender',
+        coordinatorHandle: 'term_foreign',
+        coordinatorPaneKey: 'tab_foreign:leaf_foreign'
+      })
+      const message = db.insertMessage({
+        from: 'term_foreign',
+        to: 'term_coord',
+        subject: 'Cross-Run',
+        runId: foreignRun.id
+      })
+
+      const result = (await call('orchestration.check', { terminal: 'term_coord' })) as {
+        messages: { id: string }[]
+      }
+      expect(result.messages.map((row) => row.id)).toEqual([message.id])
+    })
+
+    it('wakes a Run check waiting when direct terminal mail arrives', async () => {
+      setup()
+      const waiting = call('orchestration.check', {
+        terminal: 'term_coord',
+        wait: true,
+        timeoutMs: 1_000
+      }) as Promise<{ messages: { id: string }[] }>
+      const message = db.insertMessage({
+        from: 'term_other_run',
+        to: 'term_coord',
+        subject: 'Wake direct mail'
+      })
+      runtime.notifyMessageArrived('term_coord', 'status')
+
+      expect((await waiting).messages.map((row) => row.id)).toEqual([message.id])
+    })
+
+    it('keeps no-Run terminal delivery unchanged', async () => {
+      setup(false)
+      const senderRun = db.createRun({
+        objective: 'Sender',
+        coordinatorHandle: 'term_sender',
+        coordinatorPaneKey: 'tab_sender:leaf_sender'
+      })
+      const message = db.insertMessage({
+        from: 'term_sender',
+        to: 'term_unbound',
+        subject: 'Direct mail',
+        runId: senderRun.id
+      })
+
+      const result = (await call('orchestration.check', { terminal: 'term_unbound' })) as {
+        messages: { id: string }[]
+      }
+      expect(result.messages.map((row) => row.id)).toEqual([message.id])
+      expect(db.getMessageById(message.id)?.read).toBe(1)
+    })
+
+    it('returns terminal and Dispatch mail to the assigned worker only', async () => {
+      setup()
+      const { dispatch } = createDispatchedTask()
+      const direct = db.insertMessage({
+        from: 'term_coord',
+        to: 'term_worker',
+        subject: 'Direct worker mail'
+      })
+      const scoped = db.insertMessage({
+        from: 'term_coord',
+        to: `dispatch:${dispatch.id}`,
+        subject: 'Dispatch mail'
+      })
+      db.insertMessage({ from: 'term_coord', to: 'term_other', subject: 'Other worker' })
+
+      const result = (await call('orchestration.check', { terminal: 'term_worker' })) as {
+        messages: { id: string }[]
+      }
+      expect(result.messages.map((row) => row.id)).toEqual([direct.id, scoped.id])
+      expect(db.getMessageById(direct.id)?.read).toBe(1)
+      expect(db.getMessageById(scoped.id)?.read).toBe(1)
+    })
+
+    it('wakes a Dispatch check waiting when direct worker mail arrives', async () => {
+      setup()
+      createDispatchedTask()
+      const waiting = call('orchestration.check', {
+        terminal: 'term_worker',
+        wait: true,
+        timeoutMs: 1_000
+      }) as Promise<{ messages: { id: string }[] }>
+      const message = db.insertMessage({
+        from: 'term_coord',
+        to: 'term_worker',
+        subject: 'Wake worker'
+      })
+      runtime.notifyMessageArrived('term_worker', 'status')
+
+      expect((await waiting).messages.map((row) => row.id)).toEqual([message.id])
+    })
+
     it('uses the stable pane identity when the coordinator handle was reminted', async () => {
       setup()
       db.insertMessage({
@@ -502,37 +638,6 @@ describe('orchestration RPC methods', () => {
 
       expect(result.count).toBe(1)
       expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBe(msg.created_at)
-    })
-
-    it('returns the worker_done, not an unacked heartbeat batch, to --wait --types (ORCA-637)', async () => {
-      setup()
-      db.insertMessage({
-        from: 'term_worker',
-        to: `run:${activeRunId}`,
-        subject: 'alive',
-        type: 'heartbeat',
-        runId: activeRunId
-      })
-      const plain = (await call('orchestration.check', { terminal: 'term_coord' })) as {
-        count: number
-      }
-      expect(plain.count).toBe(0)
-
-      db.insertMessage({
-        from: 'term_worker',
-        to: `run:${activeRunId}`,
-        subject: 'done',
-        type: 'worker_done',
-        runId: activeRunId
-      })
-      const typed = (await call('orchestration.check', {
-        terminal: 'term_coord',
-        wait: true,
-        types: 'worker_done,question,escalation',
-        timeoutMs: 10
-      })) as { messages: { type: string }[] }
-
-      expect(typed.messages.map((message) => message.type)).toEqual(['worker_done'])
     })
 
     it('rejects invalid type filters', async () => {

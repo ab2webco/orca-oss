@@ -35193,8 +35193,41 @@ export class OrcaRuntimeService {
 
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
-    if (!handle.startsWith('dispatch:')) {
-      this.mailPointerRepointScheduler.schedule(handle)
+    const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
+    const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
+    const dispatch =
+      !run && handle.startsWith('term_')
+        ? this._orchestrationDb?.getActiveDispatchForIdentity?.(handle, paneKey ?? undefined)
+        : undefined
+    const remoteAttachment =
+      !run && !dispatch && paneKey
+        ? this._orchestrationDb?.findActiveRemoteAttachmentForPane?.(paneKey)
+        : undefined
+    const remoteCurrent =
+      remoteAttachment &&
+      this._orchestrationDb?.isRemoteAttachmentProcessCurrent?.({
+        dispatchId: remoteAttachment.dispatch_id,
+        paneKey: paneKey ?? null,
+        processIncarnation: this.getTerminalProcessIncarnation(handle)
+      })
+    const dispatchTarget = handle.startsWith('dispatch:')
+      ? this._orchestrationDb?.getDispatchContextById?.(handle.slice('dispatch:'.length))
+      : undefined
+    const mailboxHandle = run
+      ? `run:${run.id}`
+      : dispatchTarget?.assignee_handle &&
+          (dispatchTarget.status === 'pending' || dispatchTarget.status === 'dispatched')
+        ? dispatchTarget.assignee_handle
+        : handle
+    const waiterHandle = handle.startsWith('dispatch:')
+      ? handle
+      : dispatch?.assignee_handle === handle
+        ? `dispatch:${dispatch.id}`
+        : remoteCurrent
+          ? `dispatch:${remoteAttachment.dispatch_id}`
+          : mailboxHandle
+    if (!mailboxHandle.startsWith('dispatch:')) {
+      this.mailPointerRepointScheduler.schedule(mailboxHandle)
     }
     // Why: push-on-idle is driven by status transitions; a message that
     // arrives while the recipient is already idle never sees a transition, so
@@ -35207,7 +35240,7 @@ export class OrcaRuntimeService {
     // never returns this row — check re-reads under the same filter on timeout
     // — so treating it as the consumer strands the message in exactly the
     // already-idle state #12536 is about.
-    const waiters = this.messageWaitersByHandle.get(handle)
+    const waiters = this.messageWaitersByHandle.get(waiterHandle)
     // Why: don't wake a coordinator waiting for worker_done/escalation on heartbeat noise it would misread as idleness.
     // Why: a Run delivery batches heartbeats only for a check that asks for them; any other waiter would wake empty.
     const runHeartbeat = messageType === 'heartbeat' && handle.startsWith('run:')
@@ -35232,7 +35265,7 @@ export class OrcaRuntimeService {
       // synchronous push would inject rows the resolved check is about to return.
       // Deferring one hop puts the push behind any already-queued check, and it
       // re-reads undelivered rows when it runs so nothing strands.
-      queueMicrotask(() => this.deliverPendingMessagesForHandle(handle, reservedTypes))
+      queueMicrotask(() => this.deliverPendingMessagesForHandle(mailboxHandle, reservedTypes))
       return
     }
     for (const waiter of consumers) {
@@ -36098,7 +36131,26 @@ export class OrcaRuntimeService {
     if (!handle) {
       return
     }
-    const mailboxHandle = options.mailboxHandle ?? handle
+    const run = this._orchestrationDb.getCurrentRunForPane?.(`${leaf.tabId}:${leaf.leafId}`)
+    const dispatch = !run
+      ? this._orchestrationDb.getActiveDispatchForIdentity?.(handle, `${leaf.tabId}:${leaf.leafId}`)
+      : undefined
+    const remoteAttachment =
+      !run && !dispatch
+        ? this._orchestrationDb.findActiveRemoteAttachmentForPane?.(`${leaf.tabId}:${leaf.leafId}`)
+        : undefined
+    const ownsRemoteAttachment =
+      remoteAttachment &&
+      this._orchestrationDb.isRemoteAttachmentProcessCurrent?.({
+        dispatchId: remoteAttachment.dispatch_id,
+        paneKey: `${leaf.tabId}:${leaf.leafId}`,
+        processIncarnation: this.getTerminalProcessIncarnation(handle)
+      })
+    const requestedHandle = options.mailboxHandle ?? handle
+    const mailboxHandle =
+      run && (requestedHandle === handle || requestedHandle === `run:${run.id}`)
+        ? `run:${run.id}`
+        : requestedHandle
 
     if (leaf.ptyId && this.messageDeliveryFlightsByPtyId.has(leaf.ptyId)) {
       let parked = this.parkedMessageRedeliveriesByPtyId.get(leaf.ptyId)
@@ -36121,7 +36173,17 @@ export class OrcaRuntimeService {
     // still-blocked case; reservedTypes carries the notify-time snapshot for a
     // waiter resolved later in the same drain, which is already gone from the map.
     const waiters = this.messageWaitersByHandle.get(mailboxHandle)
-    const pending = this._orchestrationDb.getUndeliveredUnreadMessages(mailboxHandle)
+    const recipientHandles =
+      run && mailboxHandle === `run:${run.id}`
+        ? [handle, mailboxHandle]
+        : dispatch?.assignee_handle === handle && mailboxHandle === handle
+          ? [handle, `dispatch:${dispatch.id}`]
+          : ownsRemoteAttachment && mailboxHandle === handle
+            ? [handle, `dispatch:${remoteAttachment.dispatch_id}`]
+            : [mailboxHandle]
+    const pending = recipientHandles
+      .flatMap((recipient) => this._orchestrationDb!.getUndeliveredUnreadMessages(recipient))
+      .sort((a, b) => a.sequence - b.sequence)
     const pendingIds = new Set(pending.map((message) => message.id))
     const pointedIds = this.pointedMessageIdsByHandle.get(mailboxHandle)
     if (pointedIds) {
@@ -36144,6 +36206,15 @@ export class OrcaRuntimeService {
     if (unread.length === 0) {
       return
     }
+
+    const nudgeCount = recipientHandles
+      .flatMap((recipient) => this._orchestrationDb!.getUnreadMessages(recipient))
+      .filter(
+        (message) =>
+          message.type !== 'heartbeat' &&
+          !options.reservedTypes?.has(message.type) &&
+          !messageTypeHasLiveWaiter(waiters, message.type)
+      ).length
 
     const watermark = this.lastPointedMessageSequenceByHandle.get(mailboxHandle) ?? -1
     const priorPointedIds = this.pointedMessageIdsByHandle.get(mailboxHandle)
@@ -36225,7 +36296,7 @@ export class OrcaRuntimeService {
     // forever. Only an armed Enter hands settling to its own callback.
     let settlesInEnterCallback = false
     try {
-      const payload = formatMessagePointer(unread.length)
+      const payload = formatMessagePointer(nudgeCount)
       const wrote = this.ptyController?.write(deliveryPtyId, payload) ?? false
       if (!wrote) {
         return

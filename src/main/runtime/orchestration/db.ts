@@ -2858,6 +2858,7 @@ export class OrchestrationDb {
   getOrCreateRunDelivery(params: {
     runId: string
     consumerGeneration: number
+    terminalHandle?: string
     limit?: number
     wakeTypes?: MessageType[]
     /** The check named heartbeat in --types, so heartbeats stay in its batch. */
@@ -2868,6 +2869,7 @@ export class OrchestrationDb {
     try {
       this.requireCurrentConsumer(params.runId, params.consumerGeneration)
       const address = `run:${params.runId}`
+      const terminalHandle = params.terminalHandle ?? address
       // Why: a heartbeat's liveness is recorded at send; batching it only replays "alive" ahead of real mail.
       const consumesHeartbeats =
         params.keepHeartbeats !== true && !params.wakeTypes?.includes('heartbeat')
@@ -2875,10 +2877,10 @@ export class OrchestrationDb {
         this.db
           .prepare(
             `UPDATE messages SET read = 1
-             WHERE run_id = ? AND to_handle = ? AND read = 0 AND type = 'heartbeat'
-               AND delivery_contract = 'current_delivery'`
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+               AND type = 'heartbeat' AND delivery_contract = 'current_delivery'`
           )
-          .run(params.runId, address)
+          .run(params.runId, address, terminalHandle)
       }
       const existing = this.db
         .prepare("SELECT * FROM deliveries WHERE run_id = ? AND status = 'outstanding'")
@@ -2908,11 +2910,11 @@ export class OrchestrationDb {
         const matching = this.db
           .prepare(
             `SELECT 1 FROM messages
-             WHERE run_id = ? AND to_handle = ? AND read = 0
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
                AND delivery_contract = 'current_delivery'
                AND type IN (${placeholders}) LIMIT 1`
           )
-          .get(params.runId, address, ...params.wakeTypes)
+          .get(params.runId, address, terminalHandle, ...params.wakeTypes)
         if (!matching) {
           this.db.exec('COMMIT')
           return undefined
@@ -2923,11 +2925,11 @@ export class OrchestrationDb {
         this.db
           .prepare(
             `SELECT * FROM messages
-             WHERE run_id = ? AND to_handle = ? AND read = 0
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
                AND delivery_contract = 'current_delivery'
              ORDER BY sequence ASC LIMIT ?`
           )
-          .all(params.runId, address, limit) as MessageRow[]
+          .all(params.runId, address, terminalHandle, limit) as MessageRow[]
       )
       if (messages.length === 0) {
         this.db.exec('COMMIT')
@@ -2988,7 +2990,9 @@ export class OrchestrationDb {
       if (messageIds.length > 0) {
         const placeholders = messageIds.map(() => '?').join(',')
         this.db
-          .prepare(`UPDATE messages SET read = 1 WHERE id IN (${placeholders})`)
+          .prepare(
+            `UPDATE messages SET read = 1, delivered_at = COALESCE(delivered_at, datetime('now')) WHERE id IN (${placeholders})`
+          )
           .run(...messageIds)
       }
       this.db
@@ -3005,26 +3009,31 @@ export class OrchestrationDb {
     }
   }
 
-  getRunMailboxHistory(runId: string, limit = 100, types?: MessageType[]): MessageRow[] {
+  getRunMailboxHistory(
+    runId: string,
+    limit = 100,
+    types?: MessageType[],
+    terminalHandle = `run:${runId}`
+  ): MessageRow[] {
     const address = `run:${runId}`
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
         this.db
           .prepare(
-            `SELECT * FROM messages WHERE run_id = ? AND to_handle = ?
+            `SELECT * FROM messages WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?)
              AND type IN (${placeholders}) ORDER BY sequence DESC LIMIT ?`
           )
-          .all(runId, address, ...types, limit) as MessageRow[]
+          .all(runId, address, terminalHandle, ...types, limit) as MessageRow[]
       )
     }
     return exposeMessageListTimestamps(
       this.db
         .prepare(
-          `SELECT * FROM messages WHERE run_id = ? AND to_handle = ?
+          `SELECT * FROM messages WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?)
            ORDER BY sequence DESC LIMIT ?`
         )
-        .all(runId, address, limit) as MessageRow[]
+        .all(runId, address, terminalHandle, limit) as MessageRow[]
     )
   }
 
