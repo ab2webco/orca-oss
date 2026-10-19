@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { join, relative } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   registerSshFilesystemProvider,
   unregisterSshFilesystemProvider
@@ -9,12 +9,28 @@ import {
 import type { IFilesystemProvider } from '../providers/types'
 import { prepareOrchestratorGameLaunch } from './orchestrator-game-launch-context'
 
+const electronApp = vi.hoisted(() => ({
+  isPackaged: false,
+  appPath: '',
+  userData: ''
+}))
+vi.mock('electron', () => ({
+  app: {
+    get isPackaged() {
+      return electronApp.isPackaged
+    },
+    getAppPath: () => electronApp.appPath,
+    getPath: (name: string) => (name === 'userData' ? electronApp.userData : '')
+  }
+}))
+
 const dirs: string[] = []
 afterEach(() => {
   for (const dir of dirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
   unregisterSshFilesystemProvider('ssh-1')
+  electronApp.isPackaged = false
 })
 
 function worktreeWith(orcaYaml: string | null): string {
@@ -143,5 +159,57 @@ describe('prepareOrchestratorGameLaunch', () => {
 
     expect(reads).toEqual(['/srv/repo/orca.yaml'])
     expect(launch).toEqual({ args: [], env: {} })
+  })
+})
+
+describe('prepareOrchestratorGameLaunch plugin dir', () => {
+  const originalResourcesPath = process.resourcesPath
+  const setResourcesPath = (value: string): void => {
+    Object.defineProperty(process, 'resourcesPath', { configurable: true, value })
+  }
+  afterEach(() => setResourcesPath(originalResourcesPath))
+
+  function bundledPlugin(root: string): void {
+    const dir = join(root, 'claude-plugins', 'orca-game', '.claude-plugin')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'plugin.json'), '{"name":"orca-game"}')
+  }
+
+  const launchArgs = { ...base, settings: undefined, repoId: null, worktreePath: null }
+
+  // Why: Claude Code writes .claude-plugin/types/ into the plugin dir, which breaks the macOS code seal.
+  it('never hands a packaged Claude a plugin dir inside the app resources', async () => {
+    const resourcesPath = worktreeWith(null)
+    const userData = worktreeWith(null)
+    bundledPlugin(resourcesPath)
+    setResourcesPath(resourcesPath)
+    Object.assign(electronApp, {
+      isPackaged: true,
+      appPath: join(resourcesPath, 'app.asar'),
+      userData
+    })
+
+    const { pluginDir: _omitted, ...withoutPluginDir } = launchArgs
+    const launch = await prepareOrchestratorGameLaunch(withoutPluginDir)
+
+    const pluginDir = launch.args[1]
+    expect(launch.args[0]).toBe('--plugin-dir')
+    expect(relative(resourcesPath, pluginDir).startsWith('..')).toBe(true)
+    expect(relative(userData, pluginDir).startsWith('..')).toBe(false)
+    expect(existsSync(join(pluginDir, '.claude-plugin', 'plugin.json'))).toBe(true)
+  })
+
+  it('keeps the dev checkout plugin dir so edits load live', async () => {
+    const appPath = worktreeWith(null)
+    bundledPlugin(join(appPath, 'resources'))
+    Object.assign(electronApp, { isPackaged: false, appPath, userData: worktreeWith(null) })
+
+    const { pluginDir: _omitted, ...withoutPluginDir } = launchArgs
+    const launch = await prepareOrchestratorGameLaunch(withoutPluginDir)
+
+    expect(launch.args).toEqual([
+      '--plugin-dir',
+      join(appPath, 'resources', 'claude-plugins', 'orca-game')
+    ])
   })
 })
