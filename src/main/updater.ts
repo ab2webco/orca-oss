@@ -292,8 +292,15 @@ function decorateStatusWithActiveNudge(status: UpdateStatus): UpdateStatus {
   return { ...status, activeNudgeId: activeUpdateNudgeId }
 }
 
+let updateStatusListener: ((status: UpdateStatus) => void) | null = null
+
+export function setUpdateStatusListener(listener: ((status: UpdateStatus) => void) | null): void {
+  updateStatusListener = listener
+}
+
 /** `force` re-delivers a status the renderer must not miss even when it repeats the current one. */
 function sendStatus(status: UpdateStatus, options?: { force?: boolean }): void {
+  updateStatusListener?.(status)
   const pendingUserInitiatedCheckVariant = pendingUserInitiatedCheckAfterInFlight
   const shouldLaunchPendingUserInitiatedCheck =
     pendingUserInitiatedCheckVariant !== null &&

@@ -377,6 +377,8 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     androidSdkPath: null,
     // Why: indefinite hold — the "Restore" banner is the explicit return action, no wall-clock guess. See docs/mobile-fit-hold.md.
     mobileAutoRestoreFitMs: null,
+    // Why: phones may request installs only after an explicit desktop opt-in (ORCA-612).
+    allowMobileUpdateInstall: false,
     // Why: Anywhere (Relay + local) is the default; local-only is written only on explicit same-network choice.
     mobilePairingConnectionMode: 'automatic',
     mobilePairingCustomAddress: null,

@@ -1,11 +1,16 @@
 import { defineMethod, type RpcMethod } from '../core'
 import { z } from 'zod'
 import {
+  cancelRemoteServerMobileInstall,
   checkRemoteServerUpdater,
   downloadRemoteServerUpdater,
   getRemoteServerUpdaterSnapshot,
-  installRemoteServerUpdater
+  installRemoteServerUpdater,
+  requestRemoteServerMobileInstall,
+  restartRemoteServerMobileInstallNow
 } from '../../remote-server-updater'
+
+const MOBILE_INSTALL_REQUEST_ID_PARAMS = z.object({ requestId: z.string().min(1) }).strict()
 
 export const UPDATER_METHODS: RpcMethod[] = [
   defineMethod({
@@ -30,5 +35,21 @@ export const UPDATER_METHODS: RpcMethod[] = [
     name: 'updater.install',
     params: null,
     handler: (_params, { runtime }) => installRemoteServerUpdater(runtime.getRuntimeId())
+  }),
+  // Why: strict so a phone cannot smuggle a version or URL; the install target is always the feed's offer.
+  defineMethod({
+    name: 'updater.requestMobileInstall',
+    params: z.object({}).strict(),
+    handler: (_params, { pairedDeviceId }) => requestRemoteServerMobileInstall(pairedDeviceId ?? '')
+  }),
+  defineMethod({
+    name: 'updater.cancelMobileInstall',
+    params: MOBILE_INSTALL_REQUEST_ID_PARAMS,
+    handler: (params) => cancelRemoteServerMobileInstall(params.requestId)
+  }),
+  defineMethod({
+    name: 'updater.restartMobileInstallNow',
+    params: MOBILE_INSTALL_REQUEST_ID_PARAMS,
+    handler: (params) => restartRemoteServerMobileInstallNow(params.requestId)
   })
 ]

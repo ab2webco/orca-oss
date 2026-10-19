@@ -164,6 +164,10 @@ export const AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY = 'automation.account-pin
 // plugins.releasePanel, so the phone hides plugin panels unless this is advertised.
 export const MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY = 'mobile.plugin-panels.v1' as const
 
+// Why: older hosts refuse updater.requestMobileInstall at dispatch, so the phone shows status only unless this is advertised.
+export const MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY =
+  'mobile.remote-update-install.v1' as const
+
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
   'runtime.environments.v1',
@@ -216,7 +220,8 @@ export const RUNTIME_CAPABILITIES = [
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
   GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
   AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY,
-  MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY
+  MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
+  MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})

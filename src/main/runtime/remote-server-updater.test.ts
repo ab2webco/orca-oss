@@ -34,9 +34,21 @@ describe('remote server updater adapter', () => {
       targetVersion: '1.5.1',
       runtimeId: 'runtime-2'
     }))
-    configureRemoteServerUpdater({ getSnapshot, check, download, install })
+    configureRemoteServerUpdater({
+      getSnapshot,
+      check,
+      download,
+      install,
+      requestMobileInstall: vi.fn(),
+      cancelMobileInstall: vi.fn(() => false),
+      restartMobileInstallNow: vi.fn(() => false),
+      getMobileInstallRequest: () => null
+    })
 
-    expect(getRemoteServerUpdaterSnapshot('runtime-2')).toBe(snapshot)
+    expect(getRemoteServerUpdaterSnapshot('runtime-2')).toEqual({
+      ...snapshot,
+      mobileInstallRequest: null
+    })
     expect(checkRemoteServerUpdater('runtime-2')).toBe(snapshot)
     expect(downloadRemoteServerUpdater('runtime-2')).toBe(snapshot)
     expect(installRemoteServerUpdater('runtime-2').accepted).toBe(true)

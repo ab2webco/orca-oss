@@ -447,6 +447,8 @@ export type GlobalSettings = {
    *  `null` (default) holds phone size indefinitely; a finite value schedules restore.
    *  Clamped on read to [5_000ms, 60min]. See docs/mobile-fit-hold.md. */
   mobileAutoRestoreFitMs: number | null
+  /** Lets a paired phone request an install of the already offered update; the desktop still counts down and can cancel. Off by default. */
+  allowMobileUpdateInstall?: boolean
   /** Preferred mobile pairing path for new QR codes. Missing/'automatic' = Anywhere (Relay + local);
    *  explicit 'local-only' = same-network only. */
   mobilePairingConnectionMode?: 'automatic' | 'local-only'
