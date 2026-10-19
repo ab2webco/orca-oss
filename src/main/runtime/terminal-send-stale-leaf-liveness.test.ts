@@ -276,6 +276,8 @@ function makeOrchestrationDbStub(toHandle: () => string) {
       // Mirrors the real query: `read = 0 AND delivered_at IS NULL`.
       getUndeliveredUnreadMessages: (handle: string) =>
         rows.filter((row) => row.to_handle === handle && row.read === 0 && !row.delivered_at),
+      getUnreadMessages: (handle: string) =>
+        rows.filter((row) => row.to_handle === handle && row.read === 0),
       getUndeliveredUnreadMailboxHandles: () => [toHandle()],
       getActiveCoordinatorRun: () => null,
       getCurrentRunForPane: () => ({ id: 'run_test' }),
@@ -379,7 +381,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
 
     const pulled: string[] = []
     const checkResumed = runtime
-      .waitForMessage(handle, { typeFilter: ['worker_done'], timeoutMs: 60_000 })
+      .waitForMessage(stub.runMailbox, { typeFilter: ['worker_done'], timeoutMs: 60_000 })
       .then(() => {
         for (const row of stub.rows) {
           if (row.type === 'worker_done' && row.read === 0) {

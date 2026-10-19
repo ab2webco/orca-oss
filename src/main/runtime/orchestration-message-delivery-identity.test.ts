@@ -251,6 +251,7 @@ describe('STA-4325 message and delivery identity', () => {
     await driveToLiveIdle(firstRuntime.runtime)
     const beforeRestart = await check(firstRuntime.runtime)
     expect(beforeRestart.messages.map((message) => message.id)).toEqual([status.id])
+    firstRuntime.runtime.onPtyExit(PTY_ID, 0)
     fixture.db.close()
 
     const reopened = new OrchestrationDb(fixture.path)
@@ -259,6 +260,9 @@ describe('STA-4325 message and delivery identity', () => {
     const afterRestart = await check(restarted.runtime, { terminal: REMINTED_TERMINAL_HANDLE })
     expect(afterRestart).toMatchObject({ deliveryId: beforeRestart.deliveryId, replayed: true })
     expect(afterRestart.messages.map((message) => message.id)).toEqual([status.id])
+    expect(pointerPayloads(restarted.write)).toEqual([
+      expect.stringContaining('1 orchestration message')
+    ])
     expect(sqliteFor(reopened).prepare('SELECT id FROM deliveries').all()).toEqual([
       { id: beforeRestart.deliveryId }
     ])
@@ -301,6 +305,7 @@ describe('STA-4325 message and delivery identity', () => {
       messages: [expect.objectContaining({ id: done.id })]
     })
     expect(pointerPayloads(restarted.write)).toEqual([
+      expect.stringContaining('1 orchestration message'),
       expect.stringContaining('1 orchestration message')
     ])
     reopened.close()

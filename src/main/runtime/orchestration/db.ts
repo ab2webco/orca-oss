@@ -2858,6 +2858,7 @@ export class OrchestrationDb {
   getOrCreateRunDelivery(params: {
     runId: string
     consumerGeneration: number
+    terminalHandle?: string
     limit?: number
     wakeTypes?: MessageType[]
   }): { delivery: DeliveryRow; messages: MessageRow[]; replayed: boolean } | undefined {
@@ -2881,16 +2882,17 @@ export class OrchestrationDb {
       }
 
       const address = `run:${params.runId}`
+      const terminalHandle = params.terminalHandle ?? address
       if (params.wakeTypes && params.wakeTypes.length > 0) {
         const placeholders = params.wakeTypes.map(() => '?').join(',')
         const matching = this.db
           .prepare(
             `SELECT 1 FROM messages
-             WHERE run_id = ? AND to_handle = ? AND read = 0
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
                AND delivery_contract = 'current_delivery'
                AND type IN (${placeholders}) LIMIT 1`
           )
-          .get(params.runId, address, ...params.wakeTypes)
+          .get(params.runId, address, terminalHandle, ...params.wakeTypes)
         if (!matching) {
           this.db.exec('COMMIT')
           return undefined
@@ -2901,11 +2903,11 @@ export class OrchestrationDb {
         this.db
           .prepare(
             `SELECT * FROM messages
-             WHERE run_id = ? AND to_handle = ? AND read = 0
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
                AND delivery_contract = 'current_delivery'
              ORDER BY sequence ASC LIMIT ?`
           )
-          .all(params.runId, address, limit) as MessageRow[]
+          .all(params.runId, address, terminalHandle, limit) as MessageRow[]
       )
       if (messages.length === 0) {
         this.db.exec('COMMIT')
@@ -2966,7 +2968,9 @@ export class OrchestrationDb {
       if (messageIds.length > 0) {
         const placeholders = messageIds.map(() => '?').join(',')
         this.db
-          .prepare(`UPDATE messages SET read = 1 WHERE id IN (${placeholders})`)
+          .prepare(
+            `UPDATE messages SET read = 1, delivered_at = COALESCE(delivered_at, datetime('now')) WHERE id IN (${placeholders})`
+          )
           .run(...messageIds)
       }
       this.db
@@ -2983,26 +2987,31 @@ export class OrchestrationDb {
     }
   }
 
-  getRunMailboxHistory(runId: string, limit = 100, types?: MessageType[]): MessageRow[] {
+  getRunMailboxHistory(
+    runId: string,
+    limit = 100,
+    types?: MessageType[],
+    terminalHandle = `run:${runId}`
+  ): MessageRow[] {
     const address = `run:${runId}`
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
         this.db
           .prepare(
-            `SELECT * FROM messages WHERE run_id = ? AND to_handle = ?
+            `SELECT * FROM messages WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?)
              AND type IN (${placeholders}) ORDER BY sequence DESC LIMIT ?`
           )
-          .all(runId, address, ...types, limit) as MessageRow[]
+          .all(runId, address, terminalHandle, ...types, limit) as MessageRow[]
       )
     }
     return exposeMessageListTimestamps(
       this.db
         .prepare(
-          `SELECT * FROM messages WHERE run_id = ? AND to_handle = ?
+          `SELECT * FROM messages WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?)
            ORDER BY sequence DESC LIMIT ?`
         )
-        .all(runId, address, limit) as MessageRow[]
+        .all(runId, address, terminalHandle, limit) as MessageRow[]
     )
   }
 
