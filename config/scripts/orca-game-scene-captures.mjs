@@ -38,7 +38,12 @@ const PARTY = [
   { key: 'a', phase: 'verify', state: 'working' },
   { key: 'b', phase: 'docs', state: 'waiting' }
 ]
-const BUBBLES = { approved: 'kept Opus', stopped: 'clef · rm -rf build' }
+const BUBBLES = {
+  approved: 'kept Opus',
+  stopped: 'clef · rm -rf build',
+  consulting: 'let me think...',
+  advised: 'here is my advice'
+}
 export const gridOf = ({ scene, phase, render, columns, tick, hour, caption, gesture }) => {
   const definition = typeof scene === 'string' ? SCENES[scene] : scene
   const advisor = { sprite: advisorSpriteOf(definition), gesture, age: 30, bubble: BUBBLES[gesture] ?? gesture }
@@ -58,7 +63,7 @@ export const cardsOf = ({ scene, isLogged }) => {
   setGameLocale('es')
   const definition = typeof scene === 'string' ? SCENES[scene] : scene
   const sprite = advisorSpriteOf(definition)
-  const card = advisorCardOf(sprite, advisorOf(JEV), isLogged ? LOG : [])
+  const card = advisorCardOf(sprite, advisorOf(JEV), isLogged ? LOG : [], { isLead: false })
   return { card, tileColumns: TILE_COLUMNS, palette: definition.band,
     tile: advisorTileGridOf(sprite, card.pose, 0), member: tileGridOf(definition, 'working', 'working', 0),
     empty: gameStrings().text.advisorEmpty }

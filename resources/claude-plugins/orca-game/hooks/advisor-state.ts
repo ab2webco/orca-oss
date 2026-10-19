@@ -3,7 +3,16 @@ import type { EngineInterface } from 'claude-code'
 
 import type { AdvisorLog, AdvisorLogEntry } from '../types'
 import {
-  advisorBubbleOf,
+  advisorCallAfter,
+  advisorCallRowOf,
+  advisorPoseOf,
+  isAdvisorActingOf,
+  isAdvisorCallCue,
+  type AdvisorCall,
+  type AdvisorScene,
+  type StoredRow
+} from './advisor-calls'
+import {
   advisorCuesOf,
   cueTicksOf,
   playingCueOf,
@@ -17,7 +26,7 @@ import { advisorOf, type Advisor } from './allies'
 import type { AdvisorPose } from './scene-cast'
 import type { SceneAdvisor } from './scenes/index'
 
-// Jev's advisor in this pane: what it last published, the gesture playing, and its decisions.
+// Jev's advisor in this pane: what it last published, the gesture playing, its decisions, and Claude's open advisor call.
 
 const JEV_ADVISOR = { plugin: 'orca-jev-mod-skills', key: 'advisor' } as const
 export const ADVISOR_LOG_MAX = 5
@@ -29,10 +38,11 @@ type AdvisorRuntime = {
   advisor: Advisor | null
   seen: AdvisorSeen | null
   cue: PlayingCue | undefined
+  call: AdvisorCall | undefined
 }
 
 // Module state: a hot reload starts it over, which only takes the gesture playing.
-const runtime: AdvisorRuntime = { advisor: null, seen: null, cue: undefined }
+const runtime: AdvisorRuntime = { advisor: null, seen: null, cue: undefined, call: undefined }
 
 /** Notes Jev's latest value; the decisions it brings, the first value's included, go to the log. */
 export function observeAdvisor(value: unknown, tick: number): AdvisorDecision[] {
@@ -41,7 +51,10 @@ export function observeAdvisor(value: unknown, tick: number): AdvisorDecision[] 
   if (advisor === null) {
     // Why forget: a Jev that comes back starts from where it stands, not with a burst of gestures.
     runtime.seen = null
-    runtime.cue = undefined
+    // Why keep a call's cue: every render reads Jev, and without Jev a reaction would be wiped as it starts.
+    if (runtime.cue !== undefined && !isAdvisorCallCue(runtime.cue.cue)) {
+      runtime.cue = undefined
+    }
     return []
   }
   const next = advisorCuesOf(runtime.seen, advisor)
@@ -72,39 +85,43 @@ export async function readJevAdvisor($: EngineInterface, tick: number): Promise<
 
 export const advisorNow = (): Advisor | null => runtime.advisor
 
-/** The advisor as the scene draws it at `tick`; none while Jev publishes nothing readable. */
+/** Notes a row the session keeps; true when it opened or closed Claude's advisor call. */
+export function noteAdvisorRow(row: StoredRow, tick: number): boolean {
+  const next = advisorCallAfter(runtime.call, advisorCallRowOf(row), tick)
+  if (next.call === runtime.call && next.cue === undefined) {
+    return false
+  }
+  runtime.call = next.call
+  if (next.cue !== undefined) {
+    playAdvisorCue(next.cue, tick)
+  }
+  return true
+}
+
+/** Forgets an open call whose result never came: the turn ended, aborted or failed. */
+export function dropAdvisorCall(): boolean {
+  const wasOpen = runtime.call !== undefined
+  runtime.call = undefined
+  return wasOpen
+}
+
+const sceneOf = (isAbsorbing: boolean): AdvisorScene => ({
+  isJevShown: isAbsorbing && runtime.advisor !== null,
+  call: runtime.call,
+  playing: runtime.cue
+})
+
+/** The advisor as the scene draws it at `tick`: Jev's while the game draws its lines, and Claude's calls. */
 export const advisorPoseAt = (
   tick: number,
   sprite: SceneAdvisor,
-  isZen: boolean
-): AdvisorPose | undefined => {
-  if (runtime.advisor === null) {
-    return undefined
-  }
-  const playing = runtime.cue
-  const age = playing === undefined ? 0 : tick - playing.at
-  if (playing === undefined || age < 0 || age >= cueTicksOf(playing.cue.gesture)) {
-    return { sprite, age: 0, bubble: '' }
-  }
-  return { sprite, gesture: playing.cue.gesture, age, bubble: advisorBubbleOf(playing.cue, isZen) }
-}
-
-const playingAt = (tick: number): AdvisorCue | undefined => {
-  const playing = runtime.cue
-  const age = playing === undefined ? -1 : tick - playing.at
-  return playing !== undefined &&
-    runtime.advisor !== null &&
-    age >= 0 &&
-    age < cueTicksOf(playing.cue.gesture)
-    ? playing.cue
-    : undefined
-}
+  isZen: boolean,
+  isAbsorbing: boolean
+): AdvisorPose | undefined => advisorPoseOf(sceneOf(isAbsorbing), tick, sprite, isZen)
 
 /** A gesture plays at `tick` worth showing the scene for; zen keeps the routine ones quiet. */
-export const isAdvisorActingAt = (tick: number, isZen: boolean): boolean => {
-  const cue = playingAt(tick)
-  return cue !== undefined && !(isZen && cue.isRoutine)
-}
+export const isAdvisorActingAt = (tick: number, isZen: boolean, isAbsorbing: boolean): boolean =>
+  isAdvisorActingOf(sceneOf(isAbsorbing), tick, isZen)
 
 export const isAdvisorCueEndingAt = (tick: number): boolean =>
   runtime.cue !== undefined && tick - runtime.cue.at === cueTicksOf(runtime.cue.cue.gesture)

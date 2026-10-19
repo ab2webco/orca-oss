@@ -53,7 +53,9 @@ const RANK: Readonly<Record<AdvisorGesture, number>> = {
   lowered: 4,
   raised: 4,
   unsure: 3,
+  advised: 3,
   ciRunning: 2,
+  consulting: 2,
   approved: 1
 }
 

@@ -115,6 +115,8 @@ export const ES: GameCatalog = {
     level: 'Nv',
     xp: 'XP',
     thinking: 'pensando',
+    advisorConsulting: 'déjame pensar...',
+    advisorAdvised: 'este es mi consejo',
     thanks: '♥ ¡gracias!',
     onIt: '¡voy!',
     levelUp: '★ ¡subes de nivel!',

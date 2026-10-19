@@ -131,9 +131,10 @@ export const isSceneShown = (): boolean => quest.stages.size > 0
 
 export const isClawdReacting = (): boolean => isReacting(reactionAt(quest.tick))
 
-/** Jev's advisor acts something out now, so the band shows the scene when no spinner does. */
+/** The advisor acts something out now, so the band shows the scene when no spinner does. */
 export const isAdvisorActing = (): boolean =>
-  isAbsorbingConfig(gameConfig()) && isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen')
+  gameConfig().mode !== 'off' &&
+  isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen', isAbsorbingConfig(gameConfig()))
 
 /** hd's light now, on the project's timezone; noon until the clock is first read. */
 export const daylightNow = (): Daylight =>
@@ -148,8 +149,11 @@ export const teamEventAt = (tick: number): TeamEvent | undefined =>
 export const isAlertShown = (): boolean =>
   !quest.isDemo && quest.caption === '' && quest.alert !== ''
 
-// Why absorbing: while the game is not drawing Jev's lines, Jev draws its own and the scene has no advisor.
+// Why absorbing: while the game is not drawing Jev's lines, Jev draws its own; only Claude's calls show.
 export const advisorShownAt = (tick: number) =>
-  isAbsorbingConfig(gameConfig())
-    ? advisorPoseAt(tick, advisorSpriteOf(currentScene()), gameConfig().mode === 'zen')
-    : undefined
+  advisorPoseAt(
+    tick,
+    advisorSpriteOf(currentScene()),
+    gameConfig().mode === 'zen',
+    isAbsorbingConfig(gameConfig())
+  )

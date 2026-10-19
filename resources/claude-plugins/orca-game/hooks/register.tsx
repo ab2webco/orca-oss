@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
+import { dropAdvisorCall } from './advisor-state'
 import { actOutGate, registerAdvisor } from './advisor-sync'
 import { clearAllies, registerAllies } from './allies-strip'
 import { registerBand } from './band'
@@ -45,6 +46,9 @@ export const register: Register = (on) => {
   on('turn.complete', ($, e, next) => {
     questTurnComplete(e.agentId)
     if (e.agentId === undefined) {
+      if (dropAdvisorCall()) {
+        $.ui.invalidate('ui.render')
+      }
       void refreshSoon($).catch(() => undefined)
       void syncLeadName($).catch(() => undefined)
     } else {

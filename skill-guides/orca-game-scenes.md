@@ -312,11 +312,13 @@ CJK characters and emoji are refused. A plain string or per-language object.
   `happy` the frame shown while petted.
 - `advisor` stands at the right edge and acts out Jev's decisions while Jev runs in the pane:
   arrows for a lowered or raised model, a yellow card for doubt, a red card for an escalation,
-  a stopwatch and flags for CI, a stop sign when the gate stops a command. The game draws
-  those props; the scene only dresses the body. `frames` are 1 to 4 idle frames; optional
-  `gestures` replaces the body for one gesture (`lowered`, `raised`, `approved`, `unsure`,
-  `escalated`, `ciRunning`, `ciPassed`, `ciFailed`, `stopped`). A `stopped` body that raises a
-  hand on the left reads best. Without an advisor the game draws a referee.
+  a stopwatch and flags for CI, a stop sign when the gate stops a command. It also comes in,
+  with or without Jev, while Claude consults its advisor tool: a thought cloud for the whole
+  call, then a lit bulb when the advice is back. The game draws those props; the scene only
+  dresses the body. `frames` are 1 to 4 idle frames; optional `gestures` replaces the body for
+  one gesture (`lowered`, `raised`, `approved`, `unsure`, `escalated`, `ciRunning`, `ciPassed`,
+  `ciFailed`, `stopped`, `consulting`, `advised`). A `stopped` body that raises a hand on the
+  left reads best. Without an advisor the game draws a referee.
 - A frame is 1 to 7 rows, every row the same width, 1 to 10 printable ASCII glyphs; every
   frame of one member is the size of the first. `.` is transparent; every other glyph needs a
   color. Frames are drawn as written, never mirrored: draw the **pet facing right**, the way

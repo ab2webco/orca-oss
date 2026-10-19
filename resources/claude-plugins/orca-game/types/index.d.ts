@@ -235,6 +235,9 @@ export type AdvisorGesture =
   | 'ciPassed'
   | 'ciFailed'
   | 'stopped'
+  /** Claude's own advisor call is open, then its advice came back; Jev decides neither. */
+  | 'consulting'
+  | 'advised'
 
 /** Who stands for Jev in the scene; the gesture props are the game's, the body the scene's. */
 export type SceneAdvisor = {

@@ -848,16 +848,16 @@ same block in a project's scene file, a plugin's scene and a built-in one.
   Clawd, as before.
 - **The advisor** stands at the right edge of the scene, and the hero and its pet walk only the
   stage left of it. It is there only while Jev's `AdvisorState` (`version: 1`) is readable in that
-  pane and the game draws other plugins' lines (`absorbing`: mode not `off`, HUD on); without Jev
-  there is no advisor and no gap. It acts out what changed, never every frame: a new decision, CI
-  state or block notice plays its gesture and bubble for about five seconds (a red card about
-  eight), then it goes idle. While the lead is idle and no spinner draws the scene, a gesture brings
+  pane and the game draws other plugins' lines (`absorbing`: mode not `off`, HUD on), or while one
+  of Claude's advisor calls plays (below); otherwise there is no advisor and no gap. It acts out
+  what changed, never every frame: a new decision, CI state or block notice plays its gesture and
+  bubble for about five seconds (a red card about eight), then it goes idle. While the lead is idle and no spinner draws the scene, a gesture brings
   the scene up above the band for as long as it plays (in zen, not for a routine one), as Pet does.
   The first value it sees is where things stand and plays nothing, and a value already acted out
   never plays again, even if a later read brings it back. When
   several changes arrive at once the most important plays: escalation, a stop or CI failure, CI
-  success, lowered or raised, unsure, CI running, then approved; a weaker gesture never cuts one
-  still playing.
+  success, lowered or raised, unsure or an advisor call's answer, CI running or an advisor call
+  opening, then approved; a weaker gesture never cuts one still playing.
 - **Jev's gate** answers every Bash command from a settings `PreToolUse` hook (orca-supervisor's
   `gate-bash.ts`), beneath the game's `classic.PreToolUse`, so the game reads its verdict from
   `next(e)`. The `advisor` value carries no verdict. Jev or Clef may have judged it (Clef first in
@@ -867,6 +867,17 @@ same block in a project's scene file, a plugin's scene and a built-in one.
   `approved` as a routine decision. The engine drops an allow's reason, so another hook's `allow`
   on Bash plays it too. Another hook's deny, an `ask`, and an obviously safe command the gate
   passes without a verdict play nothing.
+- **Claude's advisor calls** come from the session itself, not from Jev: the game hooks
+  `session.append` and reads the main conversation's rows. Claude Code keeps an advisor call as
+  an assistant row holding a `server_tool_use` block named `advisor`, then, when the advice is
+  back (80 s to several minutes later), an assistant row holding an `advisor_tool_result` block
+  whose `tool_use_id` matches it. The advisor plays `consulting` from the first row until the
+  second, then `advised`; a turn that ends with the call still open (aborted, failed) drops it
+  without a reaction. Another server tool, a subagent's call and a session that never calls the
+  advisor play nothing, and nothing is replayed from the transcript on load. It is the same
+  advisor slot as Jev's, so the two never stand side by side: with Jev drawn, the call plays on
+  Jev's advisor and Jev's stronger cues still cut it; without Jev, or while the HUD is off and
+  Jev draws its own band, the advisor comes in for the call and leaves after its reaction.
 
 | Jev                                             | Gesture                 | The advisor holds                | Bubble                     |
 | ----------------------------------------------- | ----------------------- | -------------------------------- | -------------------------- |
@@ -878,6 +889,8 @@ same block in a project's scene file, a plugin's scene and a built-in one.
 | a CI run `watching`                             | `ciRunning`             | a stopwatch                      | the run's line             |
 | a CI run `success` / `failure`                  | `ciPassed` / `ciFailed` | a green / red flag               | the run's line             |
 | the main conversation's model or effort changes | `approved`              | a thumbs-up                      | `model·effort`             |
+| Claude's advisor call, while it is open         | `consulting`            | a thought cloud, dots filling in | `let me think...`          |
+| the advisor call's result                       | `advised`               | a lit bulb                       | `here is my advice`        |
 | the gate denies a Bash command                  | `stopped`               | a stop sign, pushing             | `jev ·` / `clef ·` command |
 | the gate allows a Bash command it judged        | `approved`              | a thumbs-up                      | the command                |
 
