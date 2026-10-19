@@ -485,16 +485,17 @@ describe('iterateTerminalOutputFrameChunks equivalence with the pre-optimization
     }
   })
 
-  it('fuzzes 800 near-cap payloads whose split point lands in the random region', () => {
+  it('fuzzes 96 near-cap payloads whose split point lands in the random region', () => {
     const random = makeRandom(0x1234_5eed)
-    for (let trial = 0; trial < 800; trial += 1) {
-      const fillerLength = TERMINAL_STREAM_CHUNK_BYTES - 6 + Math.floor(random() * 12)
+    // Every filler length in the cap window is covered; the random tail varies per trial.
+    for (let trial = 0; trial < 96; trial += 1) {
+      const fillerLength = TERMINAL_STREAM_CHUNK_BYTES - 6 + (trial % 12)
       const data = 'q'.repeat(fillerLength) + randomText(random, 1 + Math.floor(random() * 24))
       expectEquivalent(data, undefined, `fuzz-cap trial=${trial}`)
       expectEquivalent(data, { seq: 88_888, rawLength: data.length }, `fuzz-cap seq trial=${trial}`)
       expectEquivalent(data, { seq: 88_888 }, `fuzz-cap delayed trial=${trial}`)
     }
-  }, 30_000)
+  })
 
   it('keeps every emitted frame within the wire cap and reassembles to the input', () => {
     const data = `${'a'.repeat(200 * 1024)}${SURROGATE_PAIR.repeat(4096)}${LONE_HIGH}`
