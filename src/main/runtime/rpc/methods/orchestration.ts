@@ -837,7 +837,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             runId: run.id,
             consumerGeneration: generation,
             terminalHandle,
-            wakeTypes
+            wakeTypes,
+            keepHeartbeats: typeFilter?.includes('heartbeat') === true
           })
         let current = readDelivery(params.wait ? typeFilter : undefined)
         if (current) {

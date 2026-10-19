@@ -103,7 +103,10 @@ export function gameInboxesOf(
   for (const address of source.leadAddresses) {
     labelOf.set(address, 'lead')
   }
-  const byId = new Map(source.mail.map((row) => [row.id, row]))
+  // Why: heartbeats are liveness, not mail; dozens of them would bury a worker_done past the 50-message cap.
+  const byId = new Map(
+    source.mail.filter((row) => row.type !== 'heartbeat').map((row) => [row.id, row])
+  )
   const oldestFirst = [...byId.values()].sort((a, b) => a.sequence - b.sequence)
   const inboxes = [
     { key: 'lead', addresses: source.leadAddresses },

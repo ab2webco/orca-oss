@@ -2861,11 +2861,27 @@ export class OrchestrationDb {
     terminalHandle?: string
     limit?: number
     wakeTypes?: MessageType[]
+    /** The check named heartbeat in --types, so heartbeats stay in its batch. */
+    keepHeartbeats?: boolean
   }): { delivery: DeliveryRow; messages: MessageRow[]; replayed: boolean } | undefined {
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 50)
     this.db.exec('BEGIN IMMEDIATE')
     try {
       this.requireCurrentConsumer(params.runId, params.consumerGeneration)
+      const address = `run:${params.runId}`
+      const terminalHandle = params.terminalHandle ?? address
+      // Why: a heartbeat's liveness is recorded at send; batching it only replays "alive" ahead of real mail.
+      const consumesHeartbeats =
+        params.keepHeartbeats !== true && !params.wakeTypes?.includes('heartbeat')
+      if (consumesHeartbeats) {
+        this.db
+          .prepare(
+            `UPDATE messages SET read = 1
+             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+               AND type = 'heartbeat' AND delivery_contract = 'current_delivery'`
+          )
+          .run(params.runId, address, terminalHandle)
+      }
       const existing = this.db
         .prepare("SELECT * FROM deliveries WHERE run_id = ? AND status = 'outstanding'")
         .get(params.runId) as DeliveryRow | undefined
@@ -2877,12 +2893,18 @@ export class OrchestrationDb {
           )
         }
         const messages = this.getDeliveryMessages(existing)
-        this.db.exec('COMMIT')
-        return { delivery: exposeDeliveryTimestamps(existing), messages, replayed: true }
+        if (!consumesHeartbeats || !messages.every((message) => message.type === 'heartbeat')) {
+          this.db.exec('COMMIT')
+          return { delivery: exposeDeliveryTimestamps(existing), messages, replayed: true }
+        }
+        // Why: an older host batched heartbeats alone; retire that batch so it stops replaying over real mail.
+        this.db
+          .prepare(
+            "UPDATE deliveries SET status = 'acknowledged', acknowledged_at = datetime('now') WHERE id = ?"
+          )
+          .run(existing.id)
       }
 
-      const address = `run:${params.runId}`
-      const terminalHandle = params.terminalHandle ?? address
       if (params.wakeTypes && params.wakeTypes.length > 0) {
         const placeholders = params.wakeTypes.map(() => '?').join(',')
         const matching = this.db

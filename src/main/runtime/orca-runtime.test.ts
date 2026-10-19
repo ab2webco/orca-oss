@@ -35516,6 +35516,78 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  it('leaves heartbeats out of the Run mailbox pointer (ORCA-637)', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({
+        write,
+        kill: vi.fn(),
+        getForegroundProcess: async () => null
+      })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      db.setRun({
+        id: 'run_heartbeats',
+        coordinator_handle: terminal.handle,
+        coordinator_pane_key: `${terminal.tabId}:${terminal.leafId}`
+      })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      for (let beat = 0; beat < 3; beat++) {
+        db.insertMessage({
+          from: 'term_worker',
+          to: 'run:run_heartbeats',
+          subject: 'alive',
+          type: 'heartbeat'
+        })
+      }
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
+      await vi.advanceTimersByTimeAsync(500)
+      expect(write).not.toHaveBeenCalled()
+
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 102)
+      db.insertMessage({
+        from: 'term_worker',
+        to: 'run:run_heartbeats',
+        subject: 'done',
+        type: 'worker_done'
+      })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 103)
+      await vi.advanceTimersByTimeAsync(500)
+      const pointers = write.mock.calls.filter(
+        ([, payload]) => typeof payload === 'string' && payload.includes('orca orchestration check')
+      )
+      expect(pointers).toEqual([
+        ['pty-1', '\nYou have 1 orchestration message. Run `orca orchestration check`.\n']
+      ])
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps an untyped Run waiter blocked through heartbeats it would never be delivered (ORCA-637)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    setInMemoryOrchestrationMessages(runtime, new InMemoryOrchestrationMessages())
+    let outcome: string | null = null
+    const wait = runtime
+      .waitForMessage('run:run_untyped', { timeoutMs: 60_000 })
+      .then((result) => (outcome = result))
+
+    runtime.notifyMessageArrived('run:run_untyped', 'heartbeat')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(outcome).toBeNull()
+
+    runtime.notifyMessageArrived('run:run_untyped', 'worker_done')
+    await wait
+    expect(outcome).toBe('notified')
+  })
+
   it('points to the total check-returnable mail across a coordinator terminal and Run', async () => {
     vi.useFakeTimers()
     try {

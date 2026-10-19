@@ -35242,9 +35242,13 @@ export class OrcaRuntimeService {
     // already-idle state #12536 is about.
     const waiters = this.messageWaitersByHandle.get(waiterHandle)
     // Why: don't wake a coordinator waiting for worker_done/escalation on heartbeat noise it would misread as idleness.
+    // Why: a Run delivery batches heartbeats only for a check that asks for them; any other waiter would wake empty.
+    const runHeartbeat = messageType === 'heartbeat' && handle.startsWith('run:')
     const consumers = waiters
-      ? [...waiters].filter(
-          (waiter) => !messageType || !waiter.typeFilter || waiter.typeFilter.includes(messageType)
+      ? [...waiters].filter((waiter) =>
+          runHeartbeat
+            ? waiter.typeFilter?.includes('heartbeat') === true
+            : !messageType || !waiter.typeFilter || waiter.typeFilter.includes(messageType)
         )
       : []
     if (consumers.length === 0) {
@@ -36192,8 +36196,10 @@ export class OrcaRuntimeService {
         this.pointedMessageIdsByHandle.delete(mailboxHandle)
       }
     }
+    // Why: heartbeats feed liveness, not the recipient's to-do list; pointing at them nudges an idle lead for nothing.
     const unread = pending.filter(
       (message) =>
+        message.type !== 'heartbeat' &&
         !options.reservedTypes?.has(message.type) &&
         !messageTypeHasLiveWaiter(waiters, message.type)
     )
@@ -36205,6 +36211,7 @@ export class OrcaRuntimeService {
       .flatMap((recipient) => this._orchestrationDb!.getUnreadMessages(recipient))
       .filter(
         (message) =>
+          message.type !== 'heartbeat' &&
           !options.reservedTypes?.has(message.type) &&
           !messageTypeHasLiveWaiter(waiters, message.type)
       ).length

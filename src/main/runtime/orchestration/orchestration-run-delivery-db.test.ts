@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import type Database from '../../sqlite/sync-database'
 import { LEGACY_RUN_ID, OrchestrationDb } from './db'
 
 describe('OrchestrationDb Run state', () => {
@@ -128,6 +129,92 @@ describe('OrchestrationDb Run state', () => {
         wakeTypes: ['worker_done']
       })
       expect(delivery?.messages.map((message) => message.subject)).toEqual(['status', 'done'])
+    })
+
+    describe('heartbeats (ORCA-637)', () => {
+      const beat = (d: OrchestrationDb, runId: string) =>
+        d.insertMessage({
+          from: 'worker',
+          to: `run:${runId}`,
+          subject: 'alive',
+          type: 'heartbeat',
+          runId
+        })
+
+      it('never batches heartbeats, so a typed wait after an unacked check finds no stale beat', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        beat(d, run.id)
+        beat(d, run.id)
+
+        expect(
+          d.getOrCreateRunDelivery({ runId: run.id, consumerGeneration: run.consumer_generation })
+        ).toBeUndefined()
+        expect(
+          d.getOrCreateRunDelivery({
+            runId: run.id,
+            consumerGeneration: run.consumer_generation,
+            wakeTypes: ['worker_done', 'question', 'escalation']
+          })
+        ).toBeUndefined()
+      })
+
+      it('keeps a worker_done behind 55 heartbeats in the first batch', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        for (let index = 0; index < 55; index++) {
+          beat(d, run.id)
+        }
+        d.insertMessage({
+          from: 'worker',
+          to: `run:${run.id}`,
+          subject: 'done',
+          type: 'worker_done',
+          runId: run.id
+        })
+        beat(d, run.id)
+
+        const delivery = d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation,
+          wakeTypes: ['worker_done']
+        })
+
+        expect(delivery?.messages.map((message) => message.type)).toEqual(['worker_done'])
+      })
+
+      it('retires an outstanding batch an older host filled with heartbeats only', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        const stale = beat(d, run.id)
+        ;(d as unknown as { db: Database.Database }).db
+          .prepare(
+            'INSERT INTO deliveries (id, run_id, consumer_generation, message_ids) VALUES (?, ?, ?, ?)'
+          )
+          .run('delivery_old', run.id, run.consumer_generation, JSON.stringify([stale.id]))
+        d.insertMessage({
+          from: 'worker',
+          to: `run:${run.id}`,
+          subject: 'done',
+          type: 'worker_done',
+          runId: run.id
+        })
+
+        const delivery = d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation,
+          wakeTypes: ['worker_done']
+        })
+
+        expect(delivery?.messages.map((message) => message.subject)).toEqual(['done'])
+        expect(
+          d.acknowledgeRunDelivery({
+            runId: run.id,
+            consumerGeneration: run.consumer_generation,
+            deliveryId: 'delivery_old'
+          }).duplicate
+        ).toBe(true)
+      })
     })
 
     it('fences an outstanding batch when the Run consumer changes', () => {

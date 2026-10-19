@@ -37,7 +37,7 @@ describe('gameInboxesOf', () => {
       mail('term_lead', 'term_1', { type: 'question' }),
       mail('term_1', 'term_lead'),
       mail('dispatch:d1b', 'term_lead'),
-      mail('run:run_1', 'term_2', { type: 'heartbeat', read: 1 })
+      mail('run:run_1', 'term_2', { read: 1 })
     ]
 
     const [lead, cin1, cin2] = gameInboxesOf(source(rows), {})
@@ -94,6 +94,22 @@ describe('gameInboxesOf', () => {
 
     expect(lead?.messages.map((one) => one.id)).toEqual(['msg_3', 'msg_1'])
     expect(lead?.unread).toBe(2)
+  })
+
+  it('leaves heartbeats out of the inbox: three beats and a worker_done are one unread message (ORCA-637)', () => {
+    sequence = 0
+    const beat = { type: 'heartbeat', subject: 'alive', body: '' }
+    const rows = [
+      mail('run:run_1', 'term_1', beat),
+      mail('run:run_1', 'term_1', beat),
+      mail('run:run_1', 'term_1', { type: 'worker_done', subject: 'done' }),
+      mail('run:run_1', 'term_1', beat)
+    ]
+
+    const [lead] = gameInboxesOf(source(rows), {})
+
+    expect(lead?.messages.map((one) => [one.id, one.type])).toEqual([['msg_3', 'worker_done']])
+    expect(lead?.unread).toBe(1)
   })
 
   it('counts as read what the board marked read up to its cursor, or what the agent already read', () => {
