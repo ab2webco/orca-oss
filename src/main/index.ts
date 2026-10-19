@@ -68,6 +68,7 @@ import {
   shouldInstallStartupManagedAgentHook
 } from './agent-hooks/managed-agent-hook-controls'
 import { claudeHookService } from './claude/hook-service'
+import { runClaudePluginDirProbeIfRequested } from './claude/claude-plugin-dir-probe'
 import {
   configureClaudeStatusLineItemOrderSource,
   configureClaudeStatusLineItemsSource
@@ -2306,6 +2307,10 @@ function shouldSuppressCodexAutoApprovalSyntheticTitleFromHook(args: {
 }
 
 void app.whenReady().then(async () => {
+  // Why first: the release gate's probe launch must never reach windows, daemons or the profile.
+  if (await runClaudePluginDirProbeIfRequested(process.env)) {
+    return
+  }
   logStartupMilestone('app-ready')
   installMainThreadHangWatchdog({ userDataPath: getCanonicalUserDataPath() })
   const hangDetection = consumeHangDetectionMarker(
