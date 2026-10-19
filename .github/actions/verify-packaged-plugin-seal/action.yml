@@ -1,0 +1,82 @@
+name: Verify packaged plugin seal
+description: >-
+  Packages the app for the runner's OS and arch, launches it the way a user does to learn the plugin
+  dirs it hands Claude, and fails when one sits inside the app or the app tree changes (ORCA-663).
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: package.json
+        cache: pnpm
+
+    - name: Install dependencies (with retry)
+      uses: nick-fields/retry@v4
+      with:
+        timeout_minutes: 15
+        max_attempts: 3
+        command: pnpm install --frozen-lockfile
+
+    # Why: the macOS and Windows packages embed helpers that extraResources expects to exist.
+    - name: Build native helpers
+      if: runner.os != 'Linux'
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          pnpm build:computer-macos && pnpm build:notification-status-macos
+        else
+          pnpm build:native
+        fi
+
+    - name: Build desktop bundles
+      shell: bash
+      run: pnpm build:desktop
+
+    # Why --dir and the host arch: the probe has to execute the packaged binary, and nothing is published.
+    - name: Package the app
+      shell: bash
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      run: |
+        node config/scripts/ensure-native-runtime.mjs --runtime=electron
+        arch="$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
+        case "$RUNNER_OS" in
+          macOS) platform=--mac ;;
+          Linux) platform=--linux ;;
+          *) platform=--win ;;
+        esac
+        pnpm exec electron-builder --config config/electron-builder.config.cjs "$platform" --dir "--$arch" --publish never
+
+    # Why ad-hoc: no signing secrets reach a gate job, and an ad-hoc seal breaks on the same writes.
+    - name: Seal the macOS app
+      if: runner.os == 'macOS'
+      shell: bash
+      run: codesign --force --deep --sign - dist/mac*/Orca.app
+
+    - name: Install xvfb
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y xvfb
+
+    - name: Verify the packaged plugin seal
+      shell: bash
+      run: |
+        case "$RUNNER_OS" in
+          macOS)
+            app="$(ls -d dist/mac*/Orca.app)"
+            node config/scripts/verify-packaged-claude-plugin-seal.mjs --app "$app"
+            ;;
+          Linux)
+            xvfb-run --auto-servernum node config/scripts/verify-packaged-claude-plugin-seal.mjs \
+              --app dist/linux-unpacked --executable dist/linux-unpacked/orca-ide
+            ;;
+          *)
+            node config/scripts/verify-packaged-claude-plugin-seal.mjs \
+              --app dist/win-unpacked --executable "dist/win-unpacked/Orca Lab.exe"
+            ;;
+        esac

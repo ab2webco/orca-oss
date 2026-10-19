@@ -64,7 +64,7 @@ describe('the lab release signal gate', () => {
   })
 
   it('names signal jobs that this workflow actually declares', () => {
-    expect(signalJobKeys()).toEqual(['gate_static', 'gate_tests'])
+    expect(signalJobKeys()).toEqual(['gate_static', 'gate_tests', 'gate_plugin_seal'])
     for (const jobKey of signalJobKeys()) {
       expect(release.jobs[jobKey]).toBeDefined()
     }
@@ -101,8 +101,9 @@ describe('the lab release signal gate', () => {
 
   it('verifies the one pinned commit and refuses to release past it', () => {
     const pinned = '${{ needs.resolve.outputs.sha }}'
-    expect(release.jobs.gate_static.steps[0].with.ref).toBe(pinned)
-    expect(release.jobs.gate_tests.steps[0].with.ref).toBe(pinned)
+    for (const jobKey of signalJobKeys()) {
+      expect(release.jobs[jobKey].steps[0].with.ref).toBe(pinned)
+    }
     // Concurrency serializes releases but does not stop a human push, so the
     // build refuses rather than bumping on top of an unverified commit.
     const guard = release.jobs.version.steps.find(
@@ -115,8 +116,23 @@ describe('the lab release signal gate', () => {
 
   it('skips the gate only on a dry run or an explicit request', () => {
     const condition = 'inputs.dry_run != true && inputs.skip_gate != true'
-    expect(release.jobs.gate_static.if).toBe(condition)
-    expect(release.jobs.gate_tests.if).toBe(condition)
+    for (const jobKey of signalJobKeys()) {
+      expect(release.jobs[jobKey].if).toBe(condition)
+    }
+  })
+
+  // ORCA-662 shipped because no gate used the packaged app; the PR workflow must run the same check.
+  it('checks the packaged plugin seal on every OS, with the action the PR workflow runs', () => {
+    const seal = release.jobs.gate_plugin_seal
+    const prSeal = parse(readFileSync('.github/workflows/packaged-plugin-seal.yml', 'utf8')).jobs
+      .seal
+    const action = './.github/actions/verify-packaged-plugin-seal'
+    expect(seal.needs).toBe('resolve')
+    expect(verdict.needs).toContain('gate_plugin_seal')
+    expect(seal.strategy.matrix.os).toEqual(['macos-latest', 'ubuntu-latest', 'windows-latest'])
+    expect(seal.strategy.matrix.os).toEqual(prSeal.strategy.matrix.os)
+    expect(seal.steps.at(-1).uses).toBe(action)
+    expect(prSeal.steps.at(-1).uses).toBe(action)
   })
 
   it('offers the escape hatch with the reason field that makes it auditable', () => {
