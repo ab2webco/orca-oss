@@ -60,7 +60,7 @@ test('the game history a previous release wrote is read, kept and extended by th
     (
       await client.call<{ records: GameHistoryRecord[] }>('game.history', { worktreeId })
     ).result.records.map((one) => one.ticket)
-  // Why poll: until main's worktree map holds the seeded worktree, it resolves to no project.
+  // Why poll: the first read right after launch came back empty once; the cause is unverified.
   await expect.poll(tickets, { timeout: 15_000 }).toEqual(['CIN-13', 'CIN-12'])
   const events = await client.call<{ events: GameEvent[] }>('game.events', { worktreeId })
   expect(events.result.events.map((one) => one.kind).sort()).toEqual(['claimed', 'merged'])
