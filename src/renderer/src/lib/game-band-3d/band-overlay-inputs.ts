@@ -25,7 +25,8 @@ export const readStorage = (key: string): string | null => {
 
 export const choiceOf = (): BandChoice => {
   const stored = readStorage(BAND_CHOICE_KEY)
-  return CHOICES.find((one) => one === stored) ?? 'auto'
+  // Why cells by default: the owner rejected the generic 3D figures; the chip opts into them.
+  return CHOICES.find((one) => one === stored) ?? 'cells'
 }
 
 export const createScene = async (lib: BandLib): Promise<BandScene> => {

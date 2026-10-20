@@ -43,6 +43,7 @@ import {
   type KeybindingOverrides
 } from '../../shared/keybindings'
 import { getMainE2EConfig } from '../e2e-config'
+import { isE2EBackgroundWindow, revealE2EBackgroundWindow } from './e2e-background-window'
 import {
   buildEditableContextMenuTemplate,
   matchingRichMarkdownContextMenuTableTarget,
@@ -374,6 +375,9 @@ export function createMainWindow(
     // Why: in E2E headless mode keep the window hidden (Playwright drives via CDP) so tests don't steal focus.
     const e2eConfig = getMainE2EConfig()
     if (e2eConfig.headless) {
+      if (isE2EBackgroundWindow()) {
+        revealE2EBackgroundWindow(mainWindow)
+      }
       return
     }
     if (savedMaximized) {
