@@ -21,6 +21,7 @@ import { configureLazyArabicShapingJoiner } from './terminal-arabic-shaping-join
 import { TerminalLigaturesAddon } from './terminal-ligatures-addon'
 import { installTerminalImeCandidateAnchor } from './terminal-ime-candidate-anchor'
 import { attachTerminalScrollbarPersistence } from './terminal-scrollbar-persistence'
+import { attachGameBand3d } from '../game-band-3d/band-overlay'
 
 // ---------------------------------------------------------------------------
 // Pane creation, terminal open/close, addon management
@@ -109,6 +110,8 @@ export function openTerminal(pane: ManagedPaneInternal): void {
 
   attachPaneFitResizeObserver(pane)
 
+  pane.gameBand3dCleanup = attachGameBand3d(pane.id, terminal, container)
+
   // Initial fit (deferred to ensure layout has settled)
   if (pane.pendingInitialFitRafId != null) {
     cancelAnimationFrame(pane.pendingInitialFitRafId)
@@ -189,6 +192,8 @@ export function disposePane(
   }
   pane.paneDragCleanup?.()
   pane.paneDragCleanup = null
+  pane.gameBand3dCleanup?.()
+  pane.gameBand3dCleanup = null
   pane.focusClassSyncCleanup?.()
   pane.focusClassSyncCleanup = null
   pane.terminalScrollIntentDisposable?.dispose()

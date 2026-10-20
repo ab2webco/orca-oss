@@ -557,6 +557,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
 
   return {
     app: {
+      gameBand3dProbe: () => Promise.reject(new Error('The game band probe needs the desktop app')),
       getIdentity: () =>
         Promise.resolve({
           name: 'Orca',

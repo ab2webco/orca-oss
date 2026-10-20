@@ -172,6 +172,8 @@ export type ManagedPaneInternal = {
   panePointerDownHandler?: ((event: PointerEvent) => void) | null
   paneMouseEnterHandler?: ((event: MouseEvent) => void) | null
   paneDragCleanup?: (() => void) | null
+  // ORCA-692 POC: the WebGL game band overlay.
+  gameBand3dCleanup?: (() => void) | null
   // Stored so disposePane() can remove it and avoid a memory leak.
   compositionHandler: (() => void) | null
   // Stored so disposePane() can remove DOM-renderer focus synchronization.

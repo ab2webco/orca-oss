@@ -25,6 +25,12 @@
     "../resources/claude-plugins/orca-game/hooks/scene-hd.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-land.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-sky.ts",
+    "../resources/claude-plugins/orca-game/hooks/demo.ts",
+    "../resources/claude-plugins/orca-game/hooks/demo-project.ts",
+    "../resources/claude-plugins/orca-game/hooks/rewards.ts",
+    "../resources/claude-plugins/orca-game/hooks/cell-width.ts",
+    "../resources/claude-plugins/orca-game/hooks/fleet-hud.ts",
+    "../resources/claude-plugins/orca-game/hooks/member-character.ts",
     "../resources/claude-plugins/orca-game/hooks/game-strings.ts",
     "../resources/claude-plugins/orca-game/hooks/lead-state.ts",
     "../resources/claude-plugins/orca-game/hooks/locales/*.ts",
@@ -56,7 +62,8 @@
   "compilerOptions": {
     "paths": {
       "@renderer/*": ["../src/renderer/src/*"],
-      "@/*": ["../src/renderer/src/*"]
+      "@/*": ["../src/renderer/src/*"],
+      "pixi.js": ["../src/renderer/src/lib/game-band-3d/pixi-surface-types.ts"]
     }
   }
 }
