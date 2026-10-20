@@ -32,11 +32,13 @@ export function isGameEventKind(value: unknown): value is GameEventKind {
   return GAME_EVENT_KINDS.some((kind) => kind === value)
 }
 
-export function appendGameEvent(
-  events: readonly GameEvent[],
+/** `T` lets the store keep, as they were, the events a newer build wrote. */
+export function appendGameEvent<T = GameEvent>(
+  events: readonly T[],
   event: GameEvent
-): { events: GameEvent[]; added: boolean } {
-  if (event.key !== undefined && events.some((one) => one.key === event.key)) {
+): { events: (T | GameEvent)[]; added: boolean } {
+  const keyOf = (one: T): unknown => (isRecord(one) ? one.key : undefined)
+  if (event.key !== undefined && events.some((one) => keyOf(one) === event.key)) {
     return { events: [...events], added: false }
   }
   return { events: [...events, event].slice(-GAME_EVENTS_MAX), added: true }

@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { copyFile, mkdir, readFile, rename } from 'node:fs/promises'
 import { join } from 'node:path'
+import { durableWriteTempPath, writeFileDurable } from '../durable-file-write'
 import {
   appendGameHistory,
   parseGameHistoryRecord,
@@ -11,23 +12,43 @@ import {
   parseGameEvent,
   type GameEvent
 } from '../../shared/orchestrator-game-events'
+import {
+  migrateGameStore,
+  type GameStoreData,
+  type GameStoreMigration
+} from '../../shared/orchestrator-game-store-migration'
 
+/** Ordered steps for this store's file; empty while version 1 is the only shape. */
+export const GAME_HISTORY_MIGRATIONS: readonly GameStoreMigration[] = []
+
+// Why raw: entries and keys this build cannot read were written by a newer one, and a rewrite
+// that dropped them would cost that history after a one-release downgrade.
 type ProjectLog = {
-  records: GameHistoryRecord[]
-  events: GameEvent[]
+  data: GameStoreData
+  records: unknown[]
+  events: unknown[]
   /** Per inbox (`lead` or a ticket), the newest orchestration message sequence the board marked read. */
-  cursors: Record<string, number>
+  cursors: Record<string, unknown>
+}
+
+type LoadedLog = {
+  log: ProjectLog
+  /** What a write must do first: set a damaged file aside, or back up the shape it migrates. */
+  before: { kind: 'none' } | { kind: 'damaged' } | { kind: 'migrated'; from: number }
 }
 
 // Why bounded: one cursor per ticket ever launched would grow without end.
 const CURSORS_MAX = 200
 
-function cursorsOf(parsed: unknown): Record<string, number> {
-  const raw =
-    typeof parsed === 'object' && parsed !== null && 'cursors' in parsed ? parsed.cursors : null
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    return {}
-  }
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const listOf = (data: GameStoreData, key: string): unknown[] => {
+  const list = data[key]
+  return Array.isArray(list) ? list : []
+}
+
+function cursorsOf(raw: Record<string, unknown>): Record<string, number> {
   return Object.fromEntries(
     Object.entries(raw).filter(
       (entry): entry is [string, number] =>
@@ -36,37 +57,45 @@ function cursorsOf(parsed: unknown): Record<string, number> {
   )
 }
 
-const listOf = <T>(parsed: unknown, key: string, parse: (raw: unknown) => T | null): T[] => {
-  const list =
-    typeof parsed === 'object' && parsed !== null && key in parsed
-      ? (parsed as Record<string, unknown>)[key]
-      : undefined
-  return Array.isArray(list) ? list.flatMap((one) => parse(one) ?? []) : []
+function logOf(data: GameStoreData): ProjectLog {
+  return {
+    data,
+    records: listOf(data, 'records'),
+    events: listOf(data, 'events'),
+    cursors: isRecord(data.cursors) ? data.cursors : {}
+  }
 }
+
+const fileStamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 
 /** Each project's member history and event record, one bounded JSON file per project on the Orca host. */
 export class GameHistoryStore {
   // Why per project: two writes to one file must not read the same old list and drop a record.
   private readonly queues = new Map<string, Promise<unknown>>()
 
-  constructor(private readonly dirOf: () => string) {}
+  constructor(
+    private readonly dirOf: () => string,
+    private readonly migrations: readonly GameStoreMigration[] = GAME_HISTORY_MIGRATIONS
+  ) {}
 
   async list(projectKey: string): Promise<GameHistoryRecord[]> {
-    return (await this.read(projectKey)).records
+    const { log } = await this.read(projectKey)
+    return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
   async events(projectKey: string): Promise<GameEvent[]> {
-    return (await this.read(projectKey)).events
+    const { log } = await this.read(projectKey)
+    return log.events.flatMap((one) => parseGameEvent(one) ?? [])
   }
 
   async cursors(projectKey: string): Promise<Record<string, number>> {
-    return (await this.read(projectKey)).cursors
+    return cursorsOf((await this.read(projectKey)).log.cursors)
   }
 
   /** Moves an inbox's read cursor forward, never back. */
   async markInboxRead(projectKey: string, inbox: string, sequence: number): Promise<void> {
     await this.update(projectKey, (current) => {
-      if ((current.cursors[inbox] ?? 0) >= sequence) {
+      if ((cursorsOf(current.cursors)[inbox] ?? 0) >= sequence) {
         return null
       }
       const { [inbox]: _old, ...others } = current.cursors
@@ -80,7 +109,7 @@ export class GameHistoryStore {
       ...current,
       records: appendGameHistory(current.records, record)
     }))
-    return log.records
+    return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
   /** `added` is false when an event with the same key is already kept. */
@@ -94,24 +123,37 @@ export class GameHistoryStore {
     return { added }
   }
 
-  private async read(projectKey: string): Promise<ProjectLog> {
+  // Why migrate only in memory here: reads run outside the queue, so only update() may persist.
+  private async read(projectKey: string): Promise<LoadedLog> {
     let text: string
     try {
       text = await readFile(this.fileOf(projectKey), 'utf8')
     } catch {
-      return { records: [], events: [], cursors: {} }
+      return this.fresh()
     }
+    let parsed: unknown
     try {
-      const parsed: unknown = JSON.parse(text)
-      return {
-        records: listOf(parsed, 'records', parseGameHistoryRecord),
-        events: listOf(parsed, 'events', parseGameEvent),
-        cursors: cursorsOf(parsed)
-      }
+      parsed = JSON.parse(text)
     } catch {
-      // Why: a damaged file must cost the history, never the stop or sweep that writes it.
-      return { records: [], events: [], cursors: {} }
+      parsed = null
     }
+    if (!isRecord(parsed)) {
+      // Why: a damaged file must cost the history, never the stop or sweep that writes it.
+      return { log: this.fresh().log, before: { kind: 'damaged' } }
+    }
+    const result = migrateGameStore(parsed, this.migrations)
+    if (result.kind === 'frozen') {
+      return { log: logOf(parsed), before: { kind: 'none' } }
+    }
+    return {
+      log: logOf(result.data),
+      before:
+        result.kind === 'migrated' ? { kind: 'migrated', from: result.from } : { kind: 'none' }
+    }
+  }
+
+  private fresh(): LoadedLog {
+    return { log: logOf(migrateGameStore({}, this.migrations).data), before: { kind: 'none' } }
   }
 
   /** `change` returns null to leave the file as it is. */
@@ -123,25 +165,41 @@ export class GameHistoryStore {
     const next = previous
       .catch(() => undefined)
       .then(async () => {
-        const current = await this.read(projectKey)
+        const { log: current, before } = await this.read(projectKey)
         const log = change(current)
         if (!log) {
           return current
         }
         await mkdir(this.dirOf(), { recursive: true })
         const file = this.fileOf(projectKey)
-        const temp = `${file}.${randomUUID()}.tmp`
-        await writeFile(temp, JSON.stringify(log), 'utf8')
-        // Why rename: a reader never sees a half-written file.
-        await rename(temp, file)
+        if (before.kind === 'damaged') {
+          await rename(file, this.besideOf(projectKey, `damaged-${fileStamp()}`))
+        } else if (before.kind === 'migrated') {
+          // Why a copy, not a rename: until the migrated file lands, the old one stays readable.
+          await copyFile(file, this.besideOf(projectKey, `v${before.from}-${fileStamp()}.backup`))
+        }
+        const { data, records, events, cursors } = log
+        await writeFileDurable(
+          durableWriteTempPath(file),
+          file,
+          JSON.stringify({ ...data, records, events, cursors })
+        )
         return log
       })
     this.queues.set(projectKey, next)
     return next
   }
 
+  private nameOf(projectKey: string): string {
+    return createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+  }
+
   private fileOf(projectKey: string): string {
-    const name = createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
-    return join(this.dirOf(), `${name}.json`)
+    return join(this.dirOf(), `${this.nameOf(projectKey)}.json`)
+  }
+
+  /** A sibling the store never reads: what it set aside or backed up. */
+  private besideOf(projectKey: string, suffix: string): string {
+    return join(this.dirOf(), `${this.nameOf(projectKey)}.${suffix}.json`)
   }
 }

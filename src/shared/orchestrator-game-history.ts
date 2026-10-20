@@ -26,10 +26,11 @@ export const GAME_HISTORY_MAX = 200
 const TEXT_MAX = 200
 const REPORT_MAX = 600
 
-export function appendGameHistory(
-  records: readonly GameHistoryRecord[],
+/** `T` lets the store keep, as they were, the records a newer build wrote. */
+export function appendGameHistory<T = GameHistoryRecord>(
+  records: readonly T[],
   record: GameHistoryRecord
-): GameHistoryRecord[] {
+): (T | GameHistoryRecord)[] {
   return [...records, record].slice(-GAME_HISTORY_MAX)
 }
 
