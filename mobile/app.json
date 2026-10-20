@@ -103,6 +103,12 @@
         }
       ],
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Orca Lab to use Face ID to confirm desktop updates you request from this phone."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {

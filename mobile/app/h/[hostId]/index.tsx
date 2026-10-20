@@ -100,6 +100,7 @@ import type { RepoSummary } from '../../../src/worktree/host-worktree-rpc-types'
 import type { WorkspaceStatusDefinition } from '../../../../src/shared/worktree/types'
 import { DEFAULT_MOBILE_WORKSPACE_STATUSES } from '../../../src/worktree/mobile-workspace-statuses'
 import { HostPluginPanelsRow } from '../../../src/plugin-panels/HostPluginPanelsRow'
+import { HostRemoteUpdateRow } from '../../../src/remote-update/HostRemoteUpdateRow'
 
 function isErrorVerdict(v: ConnectionVerdict): boolean {
   return v.kind === 'warning' || v.kind === 'unreachable' || v.kind === 'auth-failed'
@@ -1131,6 +1132,7 @@ export function HostScreen({
       )}
 
       <HostPluginPanelsRow {...pluginsRow} />
+      <HostRemoteUpdateRow client={client} connState={connState} />
 
       <HostWorkspaceListStates
         connState={connState}
