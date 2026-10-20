@@ -162,7 +162,7 @@ export function attachGameBand3d(
     scene.render(now - startedAt, model)
     meter.add(interval, performance.now() - renderStart)
     if (stats.firstFrameMs === null) {
-      stats.firstFrameMs = Math.round(now - stats.sceneRequestedAt)
+      stats.firstFrameMs = Math.round(performance.now() - stats.sceneRequestedAt)
     }
     stats.frames += 1
     if (stats.frames % 6 === 0) {
@@ -180,8 +180,9 @@ export function attachGameBand3d(
       return
     }
     creating = true
-    stats.sceneRequestedAt = performance.now()
-    stats.firstFrameMs = null
+    // Why: cold start only (not recreations), timed with performance.now() as rAF's stamp can precede it.
+    stats.sceneRequestedAt =
+      stats.firstFrameMs === null ? performance.now() : stats.sceneRequestedAt
     const lib = choice === 'auto' || choice === 'cells' ? AUTO_LIB : choice
     try {
       const created = await createScene(lib)
