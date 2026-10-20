@@ -5,6 +5,7 @@ import {
 } from '../worktree/retired-name-registry'
 
 export const CLIENT_WORKTREE_CREATE_MAX_ATTEMPTS = 25
+export const WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS = 100
 
 // Why: mixed-version runtimes can still return these legacy conflicts instead
 // of performing their own suffix retry, so every client needs one policy.

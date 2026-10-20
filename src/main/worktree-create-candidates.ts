@@ -1,11 +1,10 @@
 import {
   getGeneratedWorktreeCreateRetryCandidate,
-  isGeneratedWorktreeCreateName
+  isGeneratedWorktreeCreateName,
+  WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS
 } from '../shared/new-workspace/worktree-create-retry-policy'
 
-export { isGeneratedWorktreeCreateName }
-
-export const WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS = 100
+export { isGeneratedWorktreeCreateName, WORKTREE_CREATE_MAX_SUFFIX_ATTEMPTS }
 
 export function getWorktreeCreateCandidate(value: string, suffix: number): string {
   return suffix === 1 ? value : `${value}-${suffix}`

@@ -379,6 +379,29 @@ describe('maybeAutoRenameBranchOnFirstWork', () => {
     expect(setRenameError).not.toHaveBeenCalledWith(WORKTREE_ID, expect.any(String))
   })
 
+  it('leaves a game member branch named after its ticket untouched and clears a stale badge', async () => {
+    // `orca-696` once read as the creature `orca` at collision tier 696 (ORCA-696).
+    gitExecFileAsyncMock.mockImplementation(
+      gitResponder({ currentBranch: 'orca-696', hasUpstream: false })
+    )
+    resolveTextGenerationParamsMock.mockReturnValue({ ok: false, error: 'No agent configured.' })
+    const { deps, onRenamed, setRenameError } = makeDeps()
+    await maybeAutoRenameBranchOnFirstWork(workingEvent({ prompt: 'Work on ORCA-696' }), deps)
+    expect(generateBranchNameMock).not.toHaveBeenCalled()
+    expect(onRenamed).not.toHaveBeenCalled()
+    expect(setRenameError).not.toHaveBeenCalledWith(WORKTREE_ID, expect.any(String))
+    expect(setRenameError).toHaveBeenCalledWith(WORKTREE_ID, null)
+  })
+
+  it('still renames a high-tier creature branch once the retired-name watermark reaches it', async () => {
+    gitExecFileAsyncMock.mockImplementation(
+      gitResponder({ currentBranch: 'you/orca-696', hasUpstream: false })
+    )
+    const { deps, onRenamed } = makeDeps({ getExhaustedCreatureTiers: () => 600 })
+    await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
+    expect(onRenamed).toHaveBeenCalledWith(REPO_ID)
+  })
+
   it('clears a stale error when a retryable worktree later reaches a benign stop', async () => {
     // First event: generation fails and the prompt yields no name, so the badge is raised.
     generateBranchNameMock.mockResolvedValueOnce({ success: false, error: 'agent not ready' })
