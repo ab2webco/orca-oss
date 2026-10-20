@@ -44,6 +44,7 @@ import { OrchestrationError } from './orchestration-error'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
 import { workerObservedModelOf, type WorkerObservedModel } from './worker-observed-model'
+import { isBatchRetirableForWait } from './run-delivery-wake'
 import {
   deriveWorkerTerminalListState,
   WORKER_SETTLED_STATES,
@@ -2900,11 +2901,20 @@ export class OrchestrationDb {
           )
         }
         const messages = this.getDeliveryMessages(existing)
-        if (!consumesHeartbeats || !messages.every((message) => message.type === 'heartbeat')) {
+        const retiredForWait =
+          params.wakeTypes !== undefined &&
+          params.wakeTypes.length > 0 &&
+          isBatchRetirableForWait(messages, params.wakeTypes)
+        if (
+          !retiredForWait &&
+          (!consumesHeartbeats || !messages.every((message) => message.type === 'heartbeat'))
+        ) {
           this.db.exec('COMMIT')
           return { delivery: exposeDeliveryTimestamps(existing), messages, replayed: true }
         }
-        // Why: an older host batched heartbeats alone; retire that batch so it stops replaying over real mail.
+        // Why: an older host batched heartbeats alone, or a lead that never acks holds a status batch
+        // in front of every worker_done (ORCA-701); retire it so it stops replaying over real mail.
+        this.markAsReadAndDelivered(messages.map((message) => message.id))
         this.db
           .prepare(
             "UPDATE deliveries SET status = 'acknowledged', acknowledged_at = datetime('now') WHERE id = ?"
@@ -2928,15 +2938,19 @@ export class OrchestrationDb {
         }
       }
 
+      const oldest = this.db
+        .prepare(
+          `SELECT * FROM messages
+           WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+             AND delivery_contract = 'current_delivery'
+           ORDER BY sequence ASC LIMIT ?`
+        )
+        .all(params.runId, address, terminalHandle, limit) as MessageRow[]
+      const wakeTypes = params.wakeTypes ?? []
       const messages = exposeMessageListTimestamps(
-        this.db
-          .prepare(
-            `SELECT * FROM messages
-             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
-               AND delivery_contract = 'current_delivery'
-             ORDER BY sequence ASC LIMIT ?`
-          )
-          .all(params.runId, address, terminalHandle, limit) as MessageRow[]
+        wakeTypes.length > 0 && !oldest.some((message) => wakeTypes.includes(message.type))
+          ? this.runMailEndingAtFirstWake(params.runId, address, terminalHandle, wakeTypes, limit)
+          : oldest
       )
       if (messages.length === 0) {
         this.db.exec('COMMIT')
@@ -2962,6 +2976,40 @@ export class OrchestrationDb {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  // Why: 50+ unread status rows ahead of a worker_done would fill a FIFO batch without it; the older
+  // rows stay unread for a later batch instead of being consumed unseen (ORCA-701).
+  private runMailEndingAtFirstWake(
+    runId: string,
+    address: string,
+    terminalHandle: string,
+    wakeTypes: readonly MessageType[],
+    limit: number
+  ): MessageRow[] {
+    const mailbox = `((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+      AND delivery_contract = 'current_delivery'`
+    const placeholders = wakeTypes.map(() => '?').join(',')
+    const newestFirst = this.db
+      .prepare(
+        `SELECT * FROM messages
+         WHERE ${mailbox}
+           AND sequence <= (
+             SELECT MIN(sequence) FROM messages WHERE ${mailbox} AND type IN (${placeholders})
+           )
+         ORDER BY sequence DESC LIMIT ?`
+      )
+      .all(
+        runId,
+        address,
+        terminalHandle,
+        runId,
+        address,
+        terminalHandle,
+        ...wakeTypes,
+        limit
+      ) as MessageRow[]
+    return newestFirst.toReversed()
   }
 
   acknowledgeRunDelivery(params: {
