@@ -123,16 +123,17 @@ describe('rankMemoryPressurePanes', () => {
         worktree('wt-a', 'cineco', [
           ...heavy,
           session('agent', 80 * MIB),
-          // Why the same tab: a split pane whose agent row sits on the sibling leaf.
-          { ...session('sibling', 70 * MIB), paneKey: 'tab-agent2:leaf-other' }
+          // Why no pane key: daemon sessions rehydrated after a restart are registered without one.
+          { ...session('restored', 70 * MIB), paneKey: null }
         ])
       ]),
-      (id) => ({ ptyId: id, lastOutputAt: null }),
-      new Set(['tab-agent:leaf-agent', 'tab-agent2:leaf-agent2']),
+      // Why a distinct pty id: the registry's session id and the live PTY id can differ.
+      (id) => ({ ptyId: `pty-${id}`, lastOutputAt: null }),
+      new Set(['pty-agent', 'pty-restored']),
       3
     )
 
-    expect(ranked.map((pane) => pane.sessionId)).toEqual(['agent', 'sibling', 'shell-0'])
+    expect(ranked.map((pane) => pane.sessionId)).toEqual(['agent', 'restored', 'shell-0'])
   })
 
   it('drops empty sessions, caps the list and reports unattributed terminals with no worktree', () => {

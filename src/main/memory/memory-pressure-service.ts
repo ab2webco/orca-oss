@@ -1,7 +1,10 @@
 import { BrowserWindow } from 'electron'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
+import {
+  AGENT_STATUS_STALE_AFTER_MS,
+  type AgentStatusIpcPayload
+} from '../../shared/agent-status-types'
 import { resolveMemoryPressureWarningSettings } from '../../shared/memory-pressure-settings'
 import { MEMORY_PRESSURE_CHANGED_CHANNEL } from '../ipc/memory-pressure'
 import { collectMemorySnapshot } from './collector'
@@ -18,29 +21,48 @@ type MemoryPressureStore = Pick<
 export type MemoryPressureAgentSource = {
   getStatusSnapshot: () => readonly Pick<
     AgentStatusIpcPayload,
-    'paneKey' | 'connectionId' | 'providerSessionOnly'
+    'paneKey' | 'connectionId' | 'providerSessionOnly' | 'receivedAt'
   >[]
 }
+
+type MemoryPressureRuntime = Pick<
+  OrcaRuntimeService,
+  'getPtyLastOutputAt' | 'listLocalAgentPtyIds' | 'getPtyIdForPaneKey'
+>
 
 export type MemoryPressurePopupLog = {
   push: (record: MemoryPressurePopupRecord) => void
   close: () => void
 }
 
-function localAgentPaneKeys(agents: MemoryPressureAgentSource): Set<string> {
-  const keys = new Set<string>()
+/** Local PTYs running an agent: hook and OSC status rows, plus agents known only from their title. */
+function localAgentPtyIds(
+  agents: MemoryPressureAgentSource,
+  runtime: MemoryPressureRuntime,
+  now: number
+): Set<string> {
+  const ptyIds = new Set(runtime.listLocalAgentPtyIds())
   for (const row of agents.getStatusSnapshot()) {
-    // Why: an SSH agent's memory is on its host, and resume-only rows are not live agents.
-    if (row.connectionId === null && row.providerSessionOnly !== true && row.paneKey) {
-      keys.add(row.paneKey)
+    // Why: an SSH agent's memory is on its host, resume-only rows are not live agents, and a
+    // row outlives an agent that exited inside a still-open shell.
+    if (
+      row.connectionId !== null ||
+      row.providerSessionOnly === true ||
+      now - row.receivedAt > AGENT_STATUS_STALE_AFTER_MS
+    ) {
+      continue
+    }
+    const ptyId = runtime.getPtyIdForPaneKey(row.paneKey)
+    if (ptyId) {
+      ptyIds.add(ptyId)
     }
   }
-  return keys
+  return ptyIds
 }
 
 export function createMemoryPressureService(
   store: MemoryPressureStore,
-  runtime: Pick<OrcaRuntimeService, 'getPtyLastOutputAt'>,
+  runtime: MemoryPressureRuntime,
   agents: MemoryPressureAgentSource,
   popupLog: MemoryPressurePopupLog
 ): { monitor: MemoryPressureMonitor; dispose: () => void } {
@@ -59,7 +81,7 @@ export function createMemoryPressureService(
           const ptyId = ptyIdBySession.get(sessionId) ?? sessionId
           return { ptyId, lastOutputAt: runtime.getPtyLastOutputAt(ptyId) }
         },
-        localAgentPaneKeys(agents)
+        localAgentPtyIds(agents, runtime, Date.now())
       )
     },
     getSettings: () => resolveMemoryPressureWarningSettings(store.getSettings()),
@@ -70,7 +92,7 @@ export function createMemoryPressureService(
         }
       }
     },
-    countLocalAgentPanes: () => localAgentPaneKeys(agents).size,
+    countLocalAgentPanes: () => localAgentPtyIds(agents, runtime, Date.now()).size,
     recordPopup: (record) => popupLog.push(record)
   })
   const disposeSettings = store.onSettingsChanged((updates) => {

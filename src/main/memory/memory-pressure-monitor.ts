@@ -186,6 +186,10 @@ export class MemoryPressureMonitor {
       }
       episode.lastPressureAt = reading.readAt
       episode.peak = worstOf(episode.peak, severity)
+      // Why: the next popup must beat the worst this one saw, not the level it opened at.
+      if (this.lastOpened) {
+        this.lastOpened.peak = episode.peak
+      }
       this.warning = {
         ...this.warning,
         reading,

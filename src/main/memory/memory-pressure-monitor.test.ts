@@ -254,6 +254,21 @@ describe('MemoryPressureMonitor', () => {
       ])
     })
 
+    it('does not reopen for a level the closed popup already reached', async () => {
+      const { tickAll, opened } = setup(
+        darwinSeries([
+          ...warnFor(3 * MINUTE),
+          ...warnFor(2 * MINUTE, 'critical'),
+          ...normalFor(11 * MINUTE),
+          ...warnFor(3 * MINUTE, 'critical')
+        ])
+      )
+
+      await tickAll()
+
+      expect(opened()).toHaveLength(1)
+    })
+
     it('opens a new popup for a new situation after thirty minutes', async () => {
       const { tickAll, opened } = setup(
         darwinSeries([...warnFor(3 * MINUTE), ...normalFor(30 * MINUTE), ...warnFor(3 * MINUTE)])

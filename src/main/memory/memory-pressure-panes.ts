@@ -9,30 +9,14 @@ export type MemoryPressureSessionLookup = (sessionId: string) => {
   lastOutputAt: number | null
 }
 
-// Why not parsePaneKey: the renderer matches agent tabs by prefix, so legacy leaf ids must match here too.
-function tabIdOf(paneKey: string): string | null {
-  const colon = paneKey.indexOf(':')
-  return colon > 0 ? paneKey.slice(0, colon) : null
-}
-
-/** Agent panes first, then the heaviest local terminal subtrees, footprint first where the platform reports it. */
+/** Agent PTYs first, then the heaviest local terminal subtrees, footprint first where the platform reports it. */
 export function rankMemoryPressurePanes(
   snapshot: MemorySnapshot,
   lookupSession: MemoryPressureSessionLookup,
-  agentPaneKeys: ReadonlySet<string>,
+  // Why PTY ids, not pane keys: sessions rehydrated after a restart are registered with no pane key.
+  agentPtyIds: ReadonlySet<string>,
   limit: number = MEMORY_PRESSURE_PANE_LIMIT
 ): MemoryPressurePane[] {
-  // Why tabs too: the renderer attributes an agent to its whole tab when the leaf differs.
-  const agentTabIds = new Set(
-    [...agentPaneKeys].map(tabIdOf).filter((tabId): tabId is string => tabId !== null)
-  )
-  const isAgentPane = (paneKey: string | null): boolean => {
-    if (!paneKey) {
-      return false
-    }
-    const tabId = tabIdOf(paneKey)
-    return agentPaneKeys.has(paneKey) || (tabId !== null && agentTabIds.has(tabId))
-  }
   const panes: { pane: MemoryPressurePane; agent: boolean }[] = []
   for (const worktree of snapshot.worktrees) {
     for (const session of worktree.sessions) {
@@ -43,7 +27,7 @@ export function rankMemoryPressurePanes(
       }
       const { ptyId, lastOutputAt } = lookupSession(session.sessionId)
       panes.push({
-        agent: isAgentPane(session.paneKey),
+        agent: agentPtyIds.has(ptyId),
         pane: {
           sessionId: session.sessionId,
           ptyId,
