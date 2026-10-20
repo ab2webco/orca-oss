@@ -178,6 +178,25 @@ describe('orca game launch', () => {
     ])
   })
 
+  it('refuses a ticket paused by a restart, so it never gets a second member', async () => {
+    const pausedMember = {
+      ticket: 'CIN-12',
+      name: null,
+      agent: 'claude',
+      account: null,
+      branch: 'cin-12',
+      lastState: 'working',
+      resumable: true,
+      since: '2026-10-20T10:00:00.000Z'
+    }
+    const { client, calls } = fakeClient(stateWith({ pausedMembers: [pausedMember] }))
+
+    await expect(launch(client)).rejects.toThrow(
+      'CIN-12 is paused since Orca restarted: `orca game resume-members CIN-12` resumes it, `orca game resume-members CIN-12 --discard` frees it.'
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
   it('still launches on an Orca that cannot save members', async () => {
     const { client, calls } = fakeClient(stateWith())
     const results = client.call.bind(client)

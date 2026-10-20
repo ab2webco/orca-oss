@@ -185,6 +185,66 @@ describe('orca game fleet verbs', () => {
     expect(text).toMatch(/claude\s+ana@example\.com/)
   })
 
+  it('fleet text lists members paused by a restart and how to resume or discard them', async () => {
+    const { client } = fakeClient(
+      stateWith({
+        agents: [LEAD],
+        pausedMembers: [
+          {
+            ticket: 'CIN-7',
+            name: 'Merlin · CIN-7 Cartelera',
+            agent: 'claude',
+            account: 'ana@example.com',
+            branch: 'cin-7',
+            lastState: 'working',
+            resumable: true,
+            since: '2026-10-20T10:00:00.000Z'
+          },
+          {
+            ticket: 'CIN-8',
+            name: null,
+            agent: 'codex',
+            account: null,
+            branch: null,
+            lastState: 'launching',
+            resumable: false,
+            since: '2026-10-20T10:00:00.000Z'
+          }
+        ]
+      })
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain('Paused since Orca or the machine restarted: 2')
+    expect(text).toContain('game resume-members')
+    expect(text).toMatch(/CIN-7\s+working\s+cin-7\s+claude\s+ana@example\.com\s+its conversation/)
+    expect(text).toMatch(/CIN-8\s+launching\s+-\s+codex\s+-\s+a new launch in its worktree/)
+  })
+
+  it('fleet text says why paused members cannot be resumed', async () => {
+    const { client } = fakeClient(
+      stateWith({ agents: [LEAD], pausedMembersError: 'the saved members file is damaged' })
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(output.join('\n')).toContain(
+      'Could not resume members: the saved members file is damaged'
+    )
+  })
+
   it('wave --dry-run plans from the To Do without launching anything', async () => {
     const { client, calls } = fakeClient(stateWith({ agents: [LEAD, member({})] }))
 

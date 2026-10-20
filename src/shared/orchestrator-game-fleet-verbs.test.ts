@@ -378,3 +378,49 @@ describe('ticketInText', () => {
     expect(ticketInText(undefined)).toBeNull()
   })
 })
+
+describe('paused members after a restart', () => {
+  const paused = (ticketId: string) => ({
+    ticket: ticketId,
+    name: `Merlin · ${ticketId}`,
+    agent: 'claude',
+    account: 'ana@example.com',
+    branch: ticketId.toLowerCase(),
+    lastState: 'working',
+    resumable: true,
+    since: '2026-10-20T10:00:00.000Z'
+  })
+
+  it('lists them apart and keeps their slots, so a wave cannot fill them twice', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [member({ displayName: 'CIN-2 Busy' })],
+      pausedMembers: [paused('CIN-7')]
+    })
+    expect(fleet.paused.map((one) => one.ticket)).toEqual(['CIN-7'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 1 })
+  })
+
+  it('carries why the saved members could not be read', () => {
+    expect(
+      gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [], pausedMembersError: 'damaged' })
+        .pausedError
+    ).toBe('damaged')
+  })
+
+  it('never relaunches a paused ticket in a wave', () => {
+    const plan = gameWavePlanOf(
+      {
+        lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+        agents: [],
+        pausedMembers: [paused('CIN-1')],
+        project: todo([
+          { id: 'CIN-1', group: 'todo' },
+          { id: 'CIN-3', group: 'todo' }
+        ])
+      },
+      []
+    )
+    expect(plan).toEqual({ launch: ['CIN-3'], skipped: [{ ticket: 'CIN-1', reason: 'paused' }] })
+  })
+})
