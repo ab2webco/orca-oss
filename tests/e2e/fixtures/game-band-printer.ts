@@ -52,7 +52,7 @@ const draw = (tick: number): string => {
   })
   // Why at the bottom: the band sits above Claude Code's prompt, with output scrolling above it.
   const top = Math.max(1, viewport - rows - 2)
-  let out = `${ESC}${top - 1};1H${ESC}0m${ESC}2K● ${scene.id} band (ORCA-692 fixture)`
+  let out = `${ESC}${top - 1};1H${ESC}0m${ESC}2K● ${scene.id.replace(/^file:.*\//, '')} band (ORCA-692 fixture)`
   for (let y = 0; y < rows; y += 1) {
     out += `${ESC}${top + y};1H`
     for (let x = 0; x < columns; x += 1) {

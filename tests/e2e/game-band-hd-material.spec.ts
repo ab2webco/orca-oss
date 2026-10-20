@@ -10,7 +10,7 @@
  */
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { buildSync, type Plugin } from 'esbuild'
+import { build, type Plugin } from 'esbuild'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import {
@@ -55,7 +55,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 const bandRows = (page: Page): Promise<number> =>
   page.evaluate(
     () =>
-      Object.values(window.__gameBand3d?.panes ?? {}).find((one) => !one.detached)?.region?.rows ??
+      Object.values(window.__gameBand3d?.panes ?? {}).find((one) => !one.detached)?.detectedRows ??
       0
   )
 
@@ -71,6 +71,11 @@ test('hd band with textured, sun-lit land in a real terminal (ORCA-692) @headful
   await electronApp.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0]?.setIgnoreMouseEvents(true)
   )
+  // Why: the host's memory toast lands over the band corner; this capture is about the band.
+  await orcaPage.addStyleTag({
+    content:
+      '[data-sonner-toaster],[data-testid="memory-pressure-warning"],[role="tooltip"]{display:none!important}'
+  })
   // The POC WebGL overlay stays off: this capture is the mod's own cells.
   await orcaPage.evaluate(() => {
     window.localStorage.setItem('orca.poc.band3d', 'cells')
@@ -78,7 +83,7 @@ test('hd band with textured, sun-lit land in a real terminal (ORCA-692) @headful
   })
 
   const printer = testInfo.outputPath('game-band-printer.mjs')
-  buildSync({
+  await build({
     entryPoints: ['tests/e2e/fixtures/game-band-printer.ts'],
     bundle: true,
     platform: 'node',

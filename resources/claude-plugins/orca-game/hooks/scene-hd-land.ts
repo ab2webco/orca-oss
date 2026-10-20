@@ -144,6 +144,11 @@ export const hdFrameOf = (args: {
   return { ...sky, scroll: args.scroll, farTops: tops.far, midTops: tops.mid, ...contrastsOf(sky) }
 }
 
+// Why: texture may move a layer only away from the sky; a tone toward it lands on the contrast
+// floor, and a moon or sun glow behind it then eats the edge.
+const awayFromSky = (textured: number, flat: number, contrast: LayerContrast): number =>
+  (lightnessOf(textured) - lightnessOf(flat)) * contrast.side < 0 ? flat : textured
+
 // The sun's tint on the faces that catch it; the hour's darkening comes after, in litOf.
 const keyLightOf = (frame: HdFrame): number => mix(frame.look.sun, 0xffffff, 0.4)
 
@@ -163,7 +168,7 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   }
   const facing = facingOf(farHeightAt(frame, x - 1), farHeightAt(frame, x + 1), x, frame.sunX)
   const rock = litByFacing(materialPixel(look.far, fx, y, 11), facing, keyLightOf(frame))
-  const base = litOf(frame, rock)
+  const base = litOf(frame, awayFromSky(rock, look.far, frame.far))
   const snow = litOf(frame, look.snow)
   const layer = (color: number): number => apartFromSky(color, frame.far, y)
   const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
@@ -198,9 +203,10 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
   const heightAt = (at: number): number =>
     frame.ground - (frame.midTops[at] ?? midTopOf(frame.ground, frame.pixels, at + mx - x))
   const facing = facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
-  const grass = materialPixel(mix(frame.look.near, frame.look.far, 0.35), mx, y, 23)
-  const hill = mix(litByFacing(grass, facing, keyLightOf(frame)), 0x000000, (y - top) * 0.03)
-  return apartFromSky(litOf(frame, hill), frame.mid, y)
+  const flat = mix(frame.look.near, frame.look.far, 0.35)
+  const shade = (color: number): number => mix(color, 0x000000, (y - top) * 0.03)
+  const hill = shade(litByFacing(materialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
+  return apartFromSky(litOf(frame, awayFromSky(hill, shade(flat), frame.mid)), frame.mid, y)
 }
 
 export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | undefined => {

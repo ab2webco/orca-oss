@@ -10,10 +10,10 @@ const HIGHLIGHT = 0xfff2d6
 
 /** Shadow, shade, the color itself and a warm highlight, in rising lightness. */
 export const toneRampOf = (color: number): readonly [number, number, number, number] => [
-  mix(color, SHADOW, 0.4),
-  mix(color, SHADE, 0.18),
+  mix(color, SHADOW, 0.5),
+  mix(color, SHADE, 0.24),
   color,
-  mix(color, HIGHLIGHT, 0.16)
+  mix(color, HIGHLIGHT, 0.24)
 ]
 
 const smooth = (t: number): number => t * t * (3 - 2 * t)
@@ -38,7 +38,7 @@ export const textureOf = (x: number, y: number, seed: number): number =>
 /** The ramp tone at a pixel: wide, soft patches across x, finer grain down y. */
 export const materialPixel = (color: number, x: number, y: number, seed: number): number => {
   const n = textureOf(x * 0.45, y * 0.7, seed)
-  const v = Math.max(0, Math.min(0.999, 0.5 + (n - 0.5) * 2.4))
+  const v = Math.max(0, Math.min(0.999, 0.5 + (n - 0.5) * 3))
   return toneRampOf(color)[Math.floor(v * 4)] ?? color
 }
 
@@ -58,4 +58,4 @@ export const facingOf = (
 
 /** Shades a lit color by facing: away mixes toward shadow, toward mixes toward the key light. */
 export const litByFacing = (color: number, facing: number, key: number): number =>
-  facing >= 0.5 ? mix(color, key, (facing - 0.5) * 0.5) : mix(color, SHADOW, (0.5 - facing) * 0.6)
+  facing >= 0.5 ? mix(color, key, (facing - 0.5) * 0.7) : mix(color, SHADOW, (0.5 - facing) * 0.8)

@@ -32,6 +32,8 @@ export type BandPaneStats = {
   contextLosses: number
   cardShownFor: string | null
   rects: MemberRect[]
+  /** Band rows found in the viewport, in every mode, cells included. */
+  detectedRows: number
   events: { atMs: number; what: string }[]
   errors: string[]
   detached: boolean
@@ -67,6 +69,7 @@ export const bandRegistryEntry = (paneId: number): BandPaneStats => {
     contextLosses: 0,
     cardShownFor: null,
     rects: [],
+    detectedRows: 0,
     events: [],
     errors: [],
     detached: false

@@ -252,6 +252,7 @@ export function attachGameBand3d(
       return
     }
     region = findBandRegion(terminal.rows, readViewport(terminal))
+    stats.detectedRows = region?.rows ?? 0
     stats.mode = mode
     const shown = visible && region !== null
     if (!shown) {

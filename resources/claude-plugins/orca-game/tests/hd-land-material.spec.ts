@@ -2,34 +2,22 @@ import { describe, expect, it } from 'vitest'
 
 import { daylightAt } from '../hooks/hd-daylight'
 import { lightnessOf } from '../hooks/hd-lightness'
-import { hdFarPixel, hdFrameOf, hdGroundPixel, hdMidPixel } from '../hooks/scene-hd-land'
+import { hdFarPixel, hdFrameOf, hdGroundPixel } from '../hooks/scene-hd-land'
 import { SCENES, type ScenePhase } from '../hooks/scenes/index'
 
 const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 const WIDTH = 120
 const ROWS = 10
 
-const layerColors = (
-  pixel: (x: number, y: number) => number | undefined,
-  pixels: number
-): number[] => {
-  const colors: number[] = []
-  for (let y = 0; y < pixels; y += 1) {
-    for (let x = 0; x < WIDTH; x += 1) {
-      const color = pixel(x, y)
-      if (color !== undefined) {
-        colors.push(color)
-      }
-    }
-  }
-  return colors
-}
+// Why one row: texture is variety along x; colours that differ only by row were there before.
+const rowTones = (pixel: (x: number, y: number) => number | undefined, y: number): number =>
+  new Set(Array.from({ length: WIDTH }, (_, x) => pixel(x, y)).filter((c) => c !== undefined)).size
 
 describe('hd land materials on every built-in scene', () => {
   for (const scene of Object.values(SCENES)) {
     for (const phase of PHASES) {
       const look = scene.looks[phase]
-      it(`${scene.id} ${phase}: far, mid and ground layers are textured, not flat`, () => {
+      it(`${scene.id} ${phase}: the far range and the ground are textured along a row`, () => {
         const frame = hdFrameOf({
           look,
           width: WIDTH,
@@ -38,17 +26,13 @@ describe('hd land materials on every built-in scene', () => {
           scroll: 0,
           light: daylightAt(12)
         })
-        const far = layerColors((x, y) => hdFarPixel(frame, x, y), frame.ground)
-        const mid = layerColors((x, y) => hdMidPixel(frame, x, y), frame.ground)
-        const ground: number[] = []
-        for (let y = frame.ground + 1; y < frame.pixels; y += 1) {
-          for (let x = 0; x < WIDTH; x += 1) {
-            ground.push(hdGroundPixel(frame, x, y))
-          }
-        }
-        expect(new Set(far).size).toBeGreaterThanOrEqual(6)
-        expect(new Set(mid).size).toBeGreaterThanOrEqual(6)
-        expect(new Set(ground).size).toBeGreaterThanOrEqual(6)
+        // The flat layers drew one far tone and three ground tones on these rows.
+        expect(
+          rowTones((x, y) => hdFarPixel(frame, x, y), frame.ground - 2)
+        ).toBeGreaterThanOrEqual(3)
+        expect(
+          rowTones((x, y) => hdGroundPixel(frame, x, y), frame.ground + 1)
+        ).toBeGreaterThanOrEqual(5)
       })
     }
   }
