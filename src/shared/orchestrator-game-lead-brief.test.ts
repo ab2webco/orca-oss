@@ -69,6 +69,8 @@ describe('gameLeadBriefOf', () => {
     )
     expect(brief).toContain('`orca orchestration check --ack <deliveryId> --json`')
     expect(brief).toContain('replays the same messages')
+    // Why: a timed-out wait has no deliveryId, and `--ack null` fails the watch before it waits.
+    expect(brief).toContain('no `deliveryId` (it timed out), wait again without `--ack`')
   })
 
   it('hands a non-implementation task to a member with --prompt', () => {

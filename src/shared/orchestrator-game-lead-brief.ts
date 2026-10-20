@@ -36,6 +36,7 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  talking to you. Never poll with sleep. Each result carries a `deliveryId`; once you handled',
     `  every message in it, wait again with ${run('orchestration check --ack <deliveryId> --wait --types worker_done,escalation,question --timeout-ms 900000 --json')}.`,
     '  Until you ack it, every check replays the same messages and newer reports wait behind them.',
+    '  If a result has no `deliveryId` (it timed out), wait again without `--ack`.',
     `- Answer a member question you can with ${run('orchestration reply --id <msg_id> --body <answer>')};`,
     '  ask the person the ones only they can answer, quoting the member.',
     '- When Orca types "You have N orchestration messages" into your terminal, the person did not',
