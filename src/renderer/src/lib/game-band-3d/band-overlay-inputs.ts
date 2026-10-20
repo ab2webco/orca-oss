@@ -64,9 +64,15 @@ export const createScene = async (lib: BandLib): Promise<BandScene> => {
         hourOf
       })
     case 'ogl':
-      return (await import('./band-scene-ogl')).createOglBandScene()
+      return (await import('./band-scene-hd2d-ogl')).createHd2dOglBandScene({
+        scene: sceneOfChoice(),
+        hourOf
+      })
     case 'pixi':
-      return (await import('./band-scene-pixi')).createPixiBandScene()
+      return (await import('./band-scene-hd2d-pixi')).createHd2dPixiBandScene({
+        scene: sceneOfChoice(),
+        hourOf
+      })
   }
 }
 

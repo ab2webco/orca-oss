@@ -18,25 +18,31 @@ import {
   PointsMaterial,
   Scene,
   type Sprite,
-  Vector3,
   WebGLRenderer
 } from 'three'
 import { daylightAt } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
-import { mix } from '../../../../../resources/claude-plugins/orca-game/hooks/pixel-canvas'
-import type {
-  SceneDefinition,
-  ScenePhase
-} from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
+import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import { billboardOf, createCast, pixelTextureOf } from './band-hd2d-cast'
-import { DEPTH, groundOf, LAYER, ridgeOf, skyTextureOf, sunSpriteOf } from './band-hd2d-land'
+import { groundOf, ridgeOf, skyTextureOf, sunSpriteOf } from './band-hd2d-land'
 import type { BandModel, BandScene, MemberRect } from './band-scene'
-import { castOf, hd2dWorldOf, type Hd2dWorld } from './hd2d-world'
+import { createWardrobe } from './hd2d-cast-images'
+import {
+  cameraAt,
+  DEPTH,
+  FOG,
+  LAYER,
+  memberRectOf,
+  memberXsOf,
+  particleOf,
+  particlesShownOf,
+  SAMPLES,
+  SUN_DISTANCE,
+  sunDiscOf
+} from './hd2d-layout'
+import { lightsOf, sunOffsetOf } from './hd2d-lighting'
+import { horizonOf, ridgesOf } from './hd2d-ridge'
+import { hd2dWorldOf, type Hd2dWorld } from './hd2d-world'
 import { webglRendererNameOf } from './webgl-renderer-name'
-
-/** Silhouette samples per layer; at the walk speed the camera loops about every ten minutes. */
-const SAMPLES = 1600
-const WALK_PER_S = 3.5
-const SUN_DISTANCE = 600
 
 export const createHd2dBandScene = (args: {
   scene: SceneDefinition
@@ -54,7 +60,7 @@ export const createHd2dBandScene = (args: {
   Object.assign(sun.shadow.camera, { left: -160, right: 160, top: 80, bottom: -80, far: 800 })
   scene.add(hemi, sun, sun.target)
   const cast = createCast(args.scene)
-  const costumes = new Map<string, ScenePhase>()
+  const wardrobe = createWardrobe(args.scene)
 
   let world: Hd2dWorld | null = null
   let worldHour = Number.NaN
@@ -96,23 +102,11 @@ export const createHd2dBandScene = (args: {
     land = new Group()
     const sky = skyTextureOf(next)
     scene.background = sky
-    const horizon = next.sky.at(-1) ?? 0x8ccaf5
-    scene.fog = new Fog(horizon, DEPTH * 1.25, DEPTH * 5.2)
-    const far = ridgeOf({
-      heights: next.far.heights,
-      scale: LAYER.far,
-      top: mix(next.far.color, next.far.snow, 0.12),
-      base: mix(next.far.color, horizon, 0.25),
-      capAbove: next.pixels * 0.45,
-      cap: next.far.snow
-    })
+    scene.fog = new Fog(horizonOf(next), FOG.near, FOG.far)
+    const ridges = ridgesOf(next)
+    const far = ridgeOf(ridges.far)
     far.position.z = DEPTH * (1 - LAYER.far)
-    const mid = ridgeOf({
-      heights: next.mid.heights,
-      scale: LAYER.mid,
-      top: next.mid.color,
-      base: mix(next.mid.color, 0x000000, 0.35)
-    })
+    const mid = ridgeOf(ridges.mid)
     mid.position.z = DEPTH * (1 - LAYER.mid)
     mid.receiveShadow = true
     land.add(far, mid, groundOf(next, SAMPLES * LAYER.mid))
@@ -133,13 +127,12 @@ export const createHd2dBandScene = (args: {
     scene.add(land)
     sunSprite = sunSpriteOf(next)
     camera.add(sunSprite)
-    const nightness = next.night
-    hemi.color.setHex(mix(next.sky[0] ?? 0xffffff, 0xffffff, 0.35 + nightness * 0.3))
-    hemi.groundColor.setHex(next.soil)
-    // Why a high floor: the mod keeps figures readable after dark, and so must the billboards.
-    hemi.intensity = 1.1 + (1 - nightness) * 0.3
-    sun.color.setHex(mix(next.sun.color, 0xffffff, 0.45))
-    sun.intensity = 0.2 + (1 - nightness) * 1.6
+    const lights = lightsOf(next)
+    hemi.color.setHex(lights.hemiSky)
+    hemi.groundColor.setHex(lights.hemiGround)
+    hemi.intensity = lights.hemiIntensity
+    sun.color.setHex(lights.sunColor)
+    sun.intensity = lights.sunIntensity
     frame()
   }
 
@@ -149,11 +142,9 @@ export const createHd2dBandScene = (args: {
     camera.updateProjectionMatrix()
     if (world !== null && sunSprite !== null) {
       const k = SUN_DISTANCE / DEPTH
-      const x = (world.sun.x / SAMPLES - 0.5) * pixels * aspect * k
-      const y = (pixels / 2 - world.sun.y) * k
-      const size = Math.max(5, pixels * 0.3) * k
-      sunSprite.position.set(x, y, -SUN_DISTANCE)
-      sunSprite.scale.set(size, size, 1)
+      const disc = sunDiscOf(world.sun, pixels, aspect)
+      sunSprite.position.set(disc.x * k, disc.y * k, -SUN_DISTANCE)
+      sunSprite.scale.set(disc.size * k, disc.size * k, 1)
     }
   }
 
@@ -164,39 +155,28 @@ export const createHd2dBandScene = (args: {
   let particleCount = 0
   const tint = new Color()
   const updateParticles = (t: number, model: BandModel): void => {
-    const raining = model.ci === 'failure'
-    const shown = raining || model.merged || (world?.night ?? 0) > 0.5
-    particles.visible = shown && particleCount > 0
+    particles.visible = particlesShownOf(model, world?.night ?? 0) && particleCount > 0
     if (!particles.visible) {
       return
     }
     const position = particleGeometry.getAttribute('position')
     const color = particleGeometry.getAttribute('color')
-    const half = (pixels * aspect) / 2
+    const raining = model.ci === 'failure'
     for (let i = 0; i < particleCount; i += 1) {
-      const seed = ((i * 7919) % 1000) / 1000
-      const fall = (t / (raining ? 700 : 4000) + seed * 7) % 1
-      const x = -half + seed * 2 * half + Math.sin(t / 1300 + i) * 2
-      const y =
-        raining || model.merged ? pixels / 2 - fall * pixels : Math.sin(t / 900 + i) * 3 - seed * 4
-      position.setXYZ(i, x, y, -DEPTH + (i % 3) * 6)
-      tint.setHex(
-        raining
-          ? 0x9fb4e6
-          : model.merged
-            ? ([0xffd84a, 0x5fd3a0, 0xff7ab8][i % 3] ?? 0xffffff)
-            : 0xfff6a0
-      )
+      const one = particleOf({
+        i,
+        t,
+        raining,
+        merged: model.merged,
+        pixels,
+        width: pixels * aspect
+      })
+      position.setXYZ(i, one.x, one.y, -one.distance)
+      tint.setHex(one.color)
       color.setXYZ(i, tint.r, tint.g, tint.b)
     }
     position.needsUpdate = true
     color.needsUpdate = true
-  }
-
-  const projected = new Vector3()
-  const toScreen = (x: number, y: number): { x: number; y: number } => {
-    projected.set(x, y, 0).project(camera)
-    return { x: ((projected.x + 1) / 2) * cssWidth, y: ((1 - projected.y) / 2) * cssHeight }
   }
 
   return {
@@ -230,44 +210,30 @@ export const createHd2dBandScene = (args: {
           build(hour)
         }
       }
-      const width = pixels * aspect
-      const start = (width * LAYER.far) / 2
-      const span = SAMPLES * LAYER.mid - start - width * LAYER.mid
-      const x = start + (((t / 1000) * WALK_PER_S) % Math.max(1, span))
-      camera.position.set(x, ground - pixels / 2, DEPTH)
-      sun.position.set(x + ((world?.sun.x ?? SAMPLES / 2) / SAMPLES - 0.5) * 260, 160, DEPTH + 60)
+      const view = cameraAt(t, { pixels, ground, aspect })
+      const x = view.x
+      camera.position.set(x, view.y, DEPTH)
+      const [dx, dy, dz] = world === null ? [0, 160, DEPTH + 60] : sunOffsetOf(world)
+      sun.position.set(x + dx, dy, dz)
       sun.target.position.set(x, 0, 0)
       const fog = scene.fog as Fog | null
       if (fog !== null && world !== null) {
-        fog.color.setHex(world.sky.at(-1) ?? 0x8ccaf5)
+        fog.color.setHex(horizonOf(world))
         if (model.ci === 'failure') {
           fog.color.lerp(tint.setHex(0x40202a), 0.3 + Math.sin(t / 250) * 0.1)
         }
       }
-      rects = []
-      const order = castOf(args.scene, model.members)
-      const count = model.members.length
-      const pitch = Math.min(13, (width * 0.8) / Math.max(1, count))
-      const lead = x + width * 0.08
-      const followers = model.members.filter((one) => !one.isLead)
-      model.members.forEach((member, i) => {
-        const phase = costumes.get(member.key) ?? order.get(member.key) ?? 'working'
-        costumes.set(member.key, phase)
-        const figure = cast.pose(member, phase, t, i)
-        const at = member.isLead ? lead : lead - (followers.indexOf(member) + 1) * pitch
+      const phases = wardrobe(model.members)
+      const xs = memberXsOf(model.members, view)
+      const plane = { cssWidth, cssHeight, pixels }
+      rects = model.members.map((member, i) => {
+        const figure = cast.pose(member, phases[i] ?? 'working', t, i)
+        const at = xs[i] ?? x
         figure.root.position.set(at, 0, 0)
         if (figure.root.parent !== scene) {
           scene.add(figure.root)
         }
-        const top = toScreen(at - 6, figure.height + 2)
-        const bottom = toScreen(at + 6, 0)
-        rects.push({
-          key: member.key,
-          x: top.x,
-          y: top.y,
-          width: bottom.x - top.x,
-          height: bottom.y - top.y
-        })
+        return memberRectOf(member.key, at, figure.height, view, plane)
       })
       updateParticles(t, model)
       renderer.render(scene, camera)
