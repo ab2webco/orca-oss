@@ -187,6 +187,7 @@ describe('orca game launch', () => {
       branch: 'cin-12',
       lastState: 'working',
       resumable: true,
+      runId: 'run_1',
       since: '2026-10-20T10:00:00.000Z'
     }
     const { client, calls } = fakeClient(stateWith({ pausedMembers: [pausedMember] }))

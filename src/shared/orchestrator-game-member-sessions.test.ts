@@ -121,6 +121,7 @@ describe('pausedMembersOf', () => {
         branch: null,
         lastState: 'working',
         resumable: true,
+        runId: 'run_1',
         since: '2026-10-20T10:00:00.000Z'
       },
       expect.objectContaining({ ticket: 'ORCA-2', resumable: false })
@@ -132,6 +133,18 @@ describe('mergeGameMemberSession clipping', () => {
   it('clips a long field so the saved file stays readable', () => {
     const list = mergeGameMemberSession([], { ...member('ORCA-1'), name: 'x'.repeat(500) }, 'now')
     expect(list[0]?.name).toHaveLength(200)
+    expect(parseGameMemberSessionsFile(serializeGameMemberSessions(list)).ok).toBe(true)
+  })
+})
+
+describe('mergeGameMemberSession with fields left undefined', () => {
+  it('keeps the defaults, so the saved file stays readable', () => {
+    const list = mergeGameMemberSession(
+      [],
+      { ticket: 'ORCA-1', taskId: 't', runId: 'r', worktreeId: undefined, sessionId: undefined },
+      'now'
+    )
+    expect(list[0]?.worktreeId).toBeNull()
     expect(parseGameMemberSessionsFile(serializeGameMemberSessions(list)).ok).toBe(true)
   })
 })

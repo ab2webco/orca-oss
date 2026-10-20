@@ -175,3 +175,44 @@ describe('game.memberRecord RPC', () => {
     ])
   })
 })
+
+describe('game.memberResume and game.memberDiscard RPCs', () => {
+  it('pass one ticket to resume, and named tickets or all to discard', async () => {
+    const asked: [string, unknown][] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      resumeGameMember: async (args: unknown) => {
+        asked.push(['resume', args])
+        return { outcome: 'finished', ticket: 'CIN-1' }
+      },
+      discardGameMembers: async (args: unknown) => {
+        asked.push(['discard', args])
+        return { discarded: [], setAside: null }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const send = (method: string, params: unknown) =>
+      dispatcher.dispatch({ id: 'r', authToken: 'test', method, params })
+
+    await expect(
+      send('game.memberResume', { terminalHandle: 'h1', ticket: 'CIN-1' })
+    ).resolves.toMatchObject({ ok: true, result: { outcome: 'finished' } })
+    await expect(
+      send('game.memberDiscard', { terminalHandle: 'h1', tickets: 'all' })
+    ).resolves.toMatchObject({ ok: true })
+    await expect(
+      send('game.memberDiscard', { terminalHandle: 'h1', tickets: ['CIN-2'] })
+    ).resolves.toMatchObject({ ok: true })
+    await expect(
+      send('game.memberDiscard', { terminalHandle: 'h1', tickets: [] })
+    ).resolves.toMatchObject({ ok: false })
+    await expect(
+      send('game.memberResume', { terminalHandle: 'h1', ticket: '../x' })
+    ).resolves.toMatchObject({ ok: false })
+    expect(asked).toEqual([
+      ['resume', { worktreeId: undefined, terminalHandle: 'h1', ticket: 'CIN-1' }],
+      ['discard', { worktreeId: undefined, terminalHandle: 'h1', tickets: 'all' }],
+      ['discard', { worktreeId: undefined, terminalHandle: 'h1', tickets: ['CIN-2'] }]
+    ])
+  })
+})

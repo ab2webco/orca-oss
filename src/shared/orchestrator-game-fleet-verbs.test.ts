@@ -388,6 +388,7 @@ describe('paused members after a restart', () => {
     branch: ticketId.toLowerCase(),
     lastState: 'working',
     resumable: true,
+    runId: 'run_1',
     since: '2026-10-20T10:00:00.000Z'
   })
 

@@ -45,6 +45,25 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game resume']
   },
   {
+    path: ['game', 'resume-members'],
+    summary: 'Bring back the members Orca or the machine restart left paused, or free them',
+    usage: 'orca game resume-members [<ticket>[,<ticket>...]] [--discard] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'discard', 'dry-run'],
+    positionalArgs: ['tickets'],
+    notes: [
+      "`game fleet` lists paused members: the lead's members that ran before Orca closed or the machine restarted and are not live now. Their tickets stay held, so launch and wave never start a second member for one.",
+      'Each is resumed in turn, never past the cap: a Claude member reopens its own conversation in its worktree on its account; any other member, or one whose conversation cannot reopen, starts a new agent in its worktree. Either way a fresh dispatch on its own task reports to this lead.',
+      'A member whose task finished (worker_done succeeded) or whose worktree is gone is reported and not started.',
+      "The lead binds the run that owns the members' tasks first; it never takes over that run while it leads live members in another.",
+      '--discard frees the named members, or all of them; on a saved file this Orca cannot read, it sets the file aside, bytes kept, and starts a new record. Worktrees are never touched.'
+    ],
+    examples: [
+      'orca game resume-members --dry-run',
+      'orca game resume-members',
+      'orca game resume-members CIN-12 --discard'
+    ]
+  },
+  {
     path: ['game', 'inbox'],
     summary: "Messages to the lead or to one ticket's member, kept after the member closed",
     usage: 'orca game inbox [--ticket <id>] [--unread] [--mark-read] [--json]',
