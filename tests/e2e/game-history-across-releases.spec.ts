@@ -56,10 +56,12 @@ test('the game history a previous release wrote is read, kept and extended by th
   writeFileSync(file, JSON.stringify(seeded))
 
   const client = new RuntimeClient(userDataDir, 30_000, null, null)
-  const history = await client.call<{ records: GameHistoryRecord[] }>('game.history', {
-    worktreeId
-  })
-  expect(history.result.records.map((one) => one.ticket)).toEqual(['CIN-13', 'CIN-12'])
+  const tickets = async (): Promise<(string | null)[]> =>
+    (
+      await client.call<{ records: GameHistoryRecord[] }>('game.history', { worktreeId })
+    ).result.records.map((one) => one.ticket)
+  // Why poll: until main's worktree map holds the seeded worktree, it resolves to no project.
+  await expect.poll(tickets, { timeout: 15_000 }).toEqual(['CIN-13', 'CIN-12'])
   const events = await client.call<{ events: GameEvent[] }>('game.events', { worktreeId })
   expect(events.result.events.map((one) => one.kind).sort()).toEqual(['claimed', 'merged'])
 
@@ -70,11 +72,7 @@ test('the game history a previous release wrote is read, kept and extended by th
     records: [...seeded.records, record],
     schemaVersion: 1
   })
-  expect(
-    (
-      await client.call<{ records: GameHistoryRecord[] }>('game.history', { worktreeId })
-    ).result.records.map((one) => one.ticket)
-  ).toEqual(['CIN-14', 'CIN-13', 'CIN-12'])
+  expect(await tickets()).toEqual(['CIN-14', 'CIN-13', 'CIN-12'])
 
   // A damaged file costs the history but is set aside, never overwritten.
   writeFileSync(file, '{not json')
@@ -82,9 +80,5 @@ test('the game history a previous release wrote is read, kept and extended by th
   const aside = readdirSync(dir).filter((one) => one.startsWith(`${name}.damaged-`))
   expect(aside).toHaveLength(1)
   expect(readFileSync(path.join(dir, aside[0]!), 'utf8')).toBe('{not json')
-  expect(
-    (
-      await client.call<{ records: GameHistoryRecord[] }>('game.history', { worktreeId })
-    ).result.records.map((one) => one.ticket)
-  ).toEqual(['CIN-15'])
+  expect(await tickets()).toEqual(['CIN-15'])
 })
