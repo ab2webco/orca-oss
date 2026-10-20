@@ -67,6 +67,7 @@ import {
   resolveStartupManagedHookAction,
   shouldInstallStartupManagedAgentHook
 } from './agent-hooks/managed-agent-hook-controls'
+import { isE2EBackgroundWindow } from './window/e2e-background-window'
 import { claudeHookService } from './claude/hook-service'
 import { runClaudePluginDirProbeIfRequested } from './claude/claude-plugin-dir-probe'
 import {
@@ -563,6 +564,11 @@ function updateGpuAccelerationAboutPanel(): void {
   )
 }
 
+// Why before ready: an accessory app never takes activation at launch, so background E2E soaks
+// cannot pull the desk's focus while the window comes up.
+if (process.platform === 'darwin' && isE2EBackgroundWindow()) {
+  app.setActivationPolicy('accessory')
+}
 app.on('gpu-info-update', () => {
   gpuFeatureStatus = app.getGPUFeatureStatus()
   if (app.isReady()) {

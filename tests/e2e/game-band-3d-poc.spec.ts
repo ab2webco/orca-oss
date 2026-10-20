@@ -1,6 +1,7 @@
 /**
  * ORCA-692 decision spike (never merges): the WebGL game band overlay in a real terminal pane, per
- * hardware tier. Headful only: a hidden E2E window gets no animation frames, so FPS would be fake.
+ * hardware tier. Headless project in background-window mode: a hidden E2E window gets no animation
+ * frames, so the window is shown inactive, unfocusable and click-through at the screen's right edge.
  *
  *   ORCA_BAND_TIER=0..3  ORCA_BAND_LIB=three|ogl|pixi|auto|cells  ORCA_BAND_SOAK_MS=600000
  *   ORCA_BAND_SHOTS=1 (widths x themes)  ORCA_BAND_PANES=5 (five bands at once)
@@ -30,9 +31,15 @@ const TIER_ARGS: Record<number, string[]> = {
   0: ['--disable-gpu', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
 }
 
+// Why: the parked window is mostly off screen or covered; occlusion would throttle its frames.
+const PAINT_ARGS = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding']
+
 test.use({
-  orcaAppExtraArgs: TIER_ARGS[TIER] ?? [],
-  orcaAppExtraEnv: TIER === 1 ? { ORCA_POC_TOTAL_MEMORY_GB: '8' } : {}
+  orcaAppExtraArgs: [...PAINT_ARGS, ...(TIER_ARGS[TIER] ?? [])],
+  orcaAppExtraEnv: {
+    ORCA_E2E_BACKGROUND_WINDOW: '1',
+    ...(TIER === 1 ? { ORCA_POC_TOTAL_MEMORY_GB: '8' } : {})
+  }
 })
 
 type Stats = {
@@ -121,7 +128,7 @@ const busyLoopMs = (page: Page): Promise<number> =>
     return x > 0 ? performance.now() - start : -1
   })
 
-test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async ({
+test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -131,15 +138,13 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
   await ensureTerminalVisible(orcaPage)
   await waitForActiveTerminalManager(orcaPage)
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
-  // Why: the headful window opens on a desk someone is using; a stray click on the POC chip
-  // switches the library mid-soak. Playwright's input goes through CDP and still lands.
-  await electronApp.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows()[0]?.setIgnoreMouseEvents(true)
-  )
   // Proof the window gets real frames before any FPS is trusted (a hidden one gets none).
   const rafBaselineFps = await rafFps(orcaPage)
-  await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.focus())
-  const rafFocusedFps = await rafFps(orcaPage)
+  const windowState = await electronApp.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    return { visible: win?.isVisible() ?? false, focused: win?.isFocused() ?? false }
+  })
+  expect(windowState.focused, 'the background window took focus').toBe(false)
   expect(rafBaselineFps, 'the window is not receiving animation frames').toBeGreaterThan(20)
 
   const printer = testInfo.outputPath('game-band-printer.mjs')
@@ -257,45 +262,30 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
   }
 
-  // Hidden and minimised window: rendering must stop, and the context goes after five seconds.
+  // Hidden window: rendering must stop. Why no minimise: restoring one can activate the app.
   const releasedBefore = (await liveStats(orcaPage))?.scenesReleased ?? 0
-  const visibility = async (
-    act: 'hide' | 'minimize'
-  ): Promise<{
+  const visibility = async (): Promise<{
     state: string
     rafFps: number
     overlayFrames: number
     paused: boolean | null
     released: number
   }> => {
-    await electronApp.evaluate(({ BrowserWindow }, how) => {
-      const win = BrowserWindow.getAllWindows()[0]
-      if (how === 'hide') {
-        win?.hide()
-      } else {
-        win?.minimize()
-      }
-    }, act)
+    await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide())
     await orcaPage.waitForTimeout(1000)
     const before = await framesOf(orcaPage)
     const fps = await rafFps(orcaPage, 6000)
     const after = await liveStats(orcaPage)
     const state = await orcaPage.evaluate(() => document.visibilityState)
-    const minimisedAtEnd = await electronApp.evaluate(({ BrowserWindow }) =>
-      Boolean(BrowserWindow.getAllWindows()[0]?.isMinimized())
+    await electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.showInactive()
     )
-    await electronApp.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows()[0]
-      win?.restore()
-      win?.show()
-    })
     await orcaPage.waitForTimeout(3000)
     return {
       state,
       rafFps: fps,
       overlayFrames: (after?.frames ?? before) - before,
       paused: after?.paused ?? null,
-      minimisedAtEnd,
       released: after?.scenesReleased ?? 0
     }
   }
@@ -309,8 +299,7 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
       win?.on(name as 'hide', () => log.push(`${Date.now() - start} ${name}`))
     }
   })
-  const hiddenRun = await visibility('hide')
-  const minimisedRun = await visibility('minimize')
+  const hiddenRun = await visibility()
 
   // Context loss: the overlay drops the scene and builds a new one on the next scan.
   let contextLoss: { createdBefore: number; createdAfter: number; losses: number } | null = null
@@ -345,7 +334,7 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
         soakMs: SOAK_MS,
         throttle,
         rafBaselineFps,
-        rafFocusedFps,
+        windowState,
         stats: final,
         paneCount: allPanes.length,
         allPanes: allPanes.map((one) => ({
@@ -357,7 +346,6 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
         hidden: {
           releasedBefore,
           hide: hiddenRun,
-          minimize: minimisedRun,
           windowEvents: await electronApp.evaluate(
             () => (globalThis as { __bandWindowEvents?: string[] }).__bandWindowEvents ?? []
           )
@@ -378,7 +366,6 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
       hiddenRun.overlayFrames,
       'the overlay kept drawing while the window was hidden'
     ).toBeLessThan(5)
-    expect(minimisedRun.overlayFrames, 'the overlay kept drawing while minimised').toBeLessThan(5)
     const series = samples.map((one) => (one as { lives: number[] }).lives)
     const changed = (series[0] ?? []).some(
       (_, member) => new Set(series.map((lives) => lives[member])).size > 1
