@@ -118,6 +118,19 @@ const rafFps = (page: Page, ms = 2000): Promise<number> =>
 
 const framesOf = async (page: Page): Promise<number> => (await liveStats(page))?.frames ?? 0
 
+/** True once the overlay canvas shows over a detected band; false if it never does in `ms`. */
+const waitForBand = async (page: Page, ms: number): Promise<boolean> => {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    const canvas = page.locator('[data-testid="game-band-3d"] canvas').first()
+    if ((await liveStats(page))?.region && (await canvas.isVisible())) {
+      return true
+    }
+    await page.waitForTimeout(500)
+  }
+  return false
+}
+
 /** A fixed busy loop; under a 4x CPU throttle it must take clearly longer. */
 const busyLoopMs = (page: Page): Promise<number> =>
   page.evaluate(() => {
@@ -262,9 +275,33 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
     }
   }
 
+  // Why now: the measurement must survive a failure in the checks below.
+  const reportPath = testInfo.outputPath(
+    `band-soak-tier${TIER}-${LIB}${PANES > 1 ? `-${PANES}panes` : ''}.json`
+  )
+  const writeReport = (extra: Record<string, unknown>): void => {
+    const panes = allPanes.map((one) => ({
+      lib: one.lib,
+      mode: one.mode,
+      frames: one.frames,
+      windows: one.windows.slice(-5)
+    }))
+    const head = { tier: TIER, lib: LIB, panes: PANES, soakMs: SOAK_MS, throttle, rafBaselineFps }
+    const report = { ...head, windowState, paneCount: allPanes.length, allPanes: panes }
+    writeFileSync(reportPath, JSON.stringify({ ...report, ...extra, samples }, null, 2))
+  }
+  writeReport({ stats })
+  const bandShownAt: Record<number, boolean> = {}
+
   if (process.env.ORCA_BAND_SHOTS === '1') {
+    // Why: at 768 px and below the side panels leave the terminal under the band's 16 columns.
+    await orcaPage.evaluate(() => {
+      window.__store?.getState().setSidebarOpen(false)
+      window.__store?.getState().setRightSidebarOpen(false)
+    })
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
+      bandShownAt[width] = await waitForBand(orcaPage, 15_000)
       for (const theme of THEMES) {
         await setTheme(orcaPage, theme)
         await orcaPage.waitForTimeout(1500)
@@ -283,7 +320,8 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
   }
 
   // A short clip of the overlay itself, after the measured window so it cannot skew it.
-  if (process.env.ORCA_BAND_CLIP === '1' && drawsWebgl) {
+  if (process.env.ORCA_BAND_CLIP === '1' && drawsWebgl && (await waitForBand(orcaPage, 15_000))) {
+    await orcaPage.waitForTimeout(1500)
     const clip = await orcaPage.evaluate(
       () =>
         new Promise<string>((resolve) => {
@@ -355,8 +393,16 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
   })
   const hiddenRun = await visibility()
 
-  // Context loss: the overlay drops the scene and builds a new one on the next scan.
-  let contextLoss: { createdBefore: number; createdAfter: number; losses: number } | null = null
+  // Context loss: the overlay drops the scene and builds a new one on the next scan. Recorded, not
+  // asserted: a library that cannot recover is a finding of the spike (Pixi on SwiftShader).
+  let contextLoss: {
+    createdBefore: number
+    createdAfter: number
+    losses: number
+    recovered: boolean
+    mode: string | null
+    errors: string[]
+  } | null = null
   if (drawsWebgl && (await liveStats(orcaPage))?.mode !== 'cells') {
     const createdBefore = (await liveStats(orcaPage))?.scenesCreated ?? 0
     await orcaPage.evaluate(() => {
@@ -366,56 +412,43 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
       const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl')
       gl?.getExtension('WEBGL_lose_context')?.loseContext()
     })
-    await expect
-      .poll(async () => (await liveStats(orcaPage))?.scenesCreated ?? 0, { timeout: 20_000 })
-      .toBeGreaterThan(createdBefore)
-    const after = await liveStats(orcaPage)
+    const deadline = Date.now() + 20_000
+    while (
+      Date.now() < deadline &&
+      ((await liveStats(orcaPage))?.scenesCreated ?? 0) <= createdBefore
+    ) {
+      await orcaPage.waitForTimeout(500)
+    }
+    const after = (await allStats(orcaPage))[0] ?? null
     contextLoss = {
       createdBefore,
       createdAfter: after?.scenesCreated ?? 0,
-      losses: after?.contextLosses ?? 0
+      losses: after?.contextLosses ?? 0,
+      recovered: (after?.scenesCreated ?? 0) > createdBefore,
+      mode: after?.mode ?? null,
+      errors: after?.errors ?? []
     }
   }
 
   const final = await liveStats(orcaPage)
-  writeFileSync(
-    testInfo.outputPath(`band-soak-tier${TIER}-${LIB}${PANES > 1 ? `-${PANES}panes` : ''}.json`),
-    JSON.stringify(
-      {
-        tier: TIER,
-        lib: LIB,
-        panes: PANES,
-        soakMs: SOAK_MS,
-        throttle,
-        rafBaselineFps,
-        windowState,
-        stats: final,
-        paneCount: allPanes.length,
-        allPanes: allPanes.map((one) => ({
-          lib: one.lib,
-          mode: one.mode,
-          frames: one.frames,
-          windows: one.windows.slice(-5)
-        })),
-        hidden: {
-          releasedBefore,
-          hide: hiddenRun,
-          windowEvents: await electronApp.evaluate(
-            () => (globalThis as { __bandWindowEvents?: string[] }).__bandWindowEvents ?? []
-          )
-        },
-        contextLoss,
-        samples
-      },
-      null,
-      2
-    )
-  )
+  writeReport({
+    stats: final,
+    bandShownAt,
+    hidden: {
+      releasedBefore,
+      hide: hiddenRun,
+      windowEvents: await electronApp.evaluate(
+        () => (globalThis as { __bandWindowEvents?: string[] }).__bandWindowEvents ?? []
+      )
+    },
+    contextLoss
+  })
   if (LIB === 'auto' && TIER === 0) {
     expect(final?.mode, 'auto must leave WebGL on software rendering').toBe('cells')
     expect(final?.rendererName ?? '').toMatch(/swiftshader/i)
   }
-  if (drawsWebgl && final?.mode !== 'cells') {
+  // Why the soak's mode: a failed context-loss recovery leaves the band on cells afterwards.
+  if (drawsWebgl && stats?.mode !== 'cells') {
     expect(
       hiddenRun.overlayFrames,
       'the overlay kept drawing while the window was hidden'
