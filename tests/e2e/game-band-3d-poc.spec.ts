@@ -4,9 +4,10 @@
  * frames, so the window is shown inactive, unfocusable and click-through at the screen's right edge.
  *
  *   ORCA_BAND_TIER=0..3  ORCA_BAND_LIB=three|ogl|pixi|auto|cells  ORCA_BAND_SOAK_MS=600000
- *   ORCA_BAND_SHOTS=1 (widths x themes)  ORCA_BAND_PANES=5 (five bands at once)
+ *   ORCA_BAND_SHOTS=1 (widths x themes)  ORCA_BAND_CLIP=1 (8 s webm)  ORCA_BAND_PANES=5
+ *   ORCA_BAND_SCENE_FILE=<scene json>  ORCA_BAND_HOUR=12 (fixed light)
  */
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { buildSync } from 'esbuild'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
@@ -157,13 +158,26 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
     logLevel: 'warning'
   })
 
+  // Why a fixed hour and scene: every tier and library draws the same frame content.
+  const sceneFile = process.env.ORCA_BAND_SCENE_FILE ?? ''
   await orcaPage.evaluate(
-    ({ lib, lite }) => {
+    ({ lib, lite, scene, hour }) => {
       window.localStorage.setItem('orca.poc.band3d', lib)
       window.localStorage.setItem('orca.poc.band3d.tier', lite ? 'lite' : 'full')
+      window.localStorage.setItem('orca.poc.band3d.hour', hour)
+      if (scene === null) {
+        window.localStorage.removeItem('orca.poc.band3d.scene')
+      } else {
+        window.localStorage.setItem('orca.poc.band3d.scene', scene)
+      }
       window.dispatchEvent(new Event('orca:game-band-3d-choice'))
     },
-    { lib: LIB, lite: TIER < 3 }
+    {
+      lib: LIB,
+      lite: TIER < 3,
+      scene: sceneFile === '' ? null : readFileSync(sceneFile, 'utf8'),
+      hour: process.env.ORCA_BAND_HOUR ?? '12'
+    }
   )
 
   for (let pane = 0; pane < PANES; pane += 1) {
@@ -257,9 +271,49 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
         await orcaPage.screenshot({
           path: testInfo.outputPath(`tier${TIER}-${LIB}-${width}-${theme}.png`)
         })
+        const band = orcaPage.locator('[data-testid="game-band-3d"]').first()
+        if (await band.isVisible()) {
+          await band.screenshot({
+            path: testInfo.outputPath(`tier${TIER}-${LIB}-${width}-${theme}-band.png`)
+          })
+        }
       }
     }
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
+  }
+
+  // A short clip of the overlay itself, after the measured window so it cannot skew it.
+  if (process.env.ORCA_BAND_CLIP === '1' && drawsWebgl) {
+    const clip = await orcaPage.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const canvas = document.querySelector<HTMLCanvasElement>(
+            '[data-testid="game-band-3d"] canvas'
+          )
+          if (canvas === null) {
+            resolve('')
+            return
+          }
+          const recorder = new MediaRecorder(canvas.captureStream(30), {
+            mimeType: 'video/webm;codecs=vp9'
+          })
+          const chunks: Blob[] = []
+          recorder.ondataavailable = (event) => chunks.push(event.data)
+          recorder.onstop = () => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+            reader.readAsDataURL(new Blob(chunks, { type: 'video/webm' }))
+          }
+          recorder.start()
+          setTimeout(() => recorder.stop(), 8000)
+        })
+    )
+    if (clip !== '') {
+      writeFileSync(
+        testInfo.outputPath(`tier${TIER}-${LIB}-clip.webm`),
+        Buffer.from(clip, 'base64')
+      )
+    }
   }
 
   // Hidden window: rendering must stop. Why no minimise: restoring one can activate the app.
