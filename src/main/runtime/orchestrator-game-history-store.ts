@@ -34,7 +34,12 @@ type ProjectLog = {
 type LoadedLog = {
   log: ProjectLog
   /** What a write must do first: set a damaged file aside, or back up the shape it migrates. */
-  before: { kind: 'none' } | { kind: 'damaged' } | { kind: 'migrated'; from: number }
+  before:
+    | { kind: 'none' }
+    | { kind: 'damaged' }
+    | { kind: 'migrated'; from: number }
+    /** A frozen file whose lists this build cannot hold: a write would replace them. */
+    | { kind: 'read-only' }
 }
 
 // Why bounded: one cursor per ticket ever launched would grow without end.
@@ -143,7 +148,10 @@ export class GameHistoryStore {
     }
     const result = migrateGameStore(parsed, this.migrations)
     if (result.kind === 'frozen') {
-      return { log: logOf(parsed), before: { kind: 'none' } }
+      const fits =
+        ['records', 'events'].every((key) => !(key in parsed) || Array.isArray(parsed[key])) &&
+        (!('cursors' in parsed) || isRecord(parsed.cursors))
+      return { log: logOf(parsed), before: { kind: fits ? 'none' : 'read-only' } }
     }
     return {
       log: logOf(result.data),
@@ -167,7 +175,8 @@ export class GameHistoryStore {
       .then(async () => {
         const { log: current, before } = await this.read(projectKey)
         const log = change(current)
-        if (!log) {
+        // Why skip read-only: losing this one entry beats wiping what a newer build stored.
+        if (!log || before.kind === 'read-only') {
           return current
         }
         await mkdir(this.dirOf(), { recursive: true })

@@ -150,6 +150,17 @@ describe('GameHistoryStore across releases', () => {
     expect(readdirSync(dir).filter((name) => !isMain(name))).toEqual([])
   })
 
+  it('never writes over a newer build whose lists are no longer lists', async () => {
+    const { history, dir } = seeded()
+    const newer = { schemaVersion: 2, records: { 'CIN-1': record('CIN-1') }, events: [] }
+    const file = await seed(dir, 'repo-a', JSON.stringify(newer))
+
+    expect(await history.list('repo-a')).toEqual([])
+    await history.append('repo-a', record('CIN-2'))
+    await history.markInboxRead('repo-a', 'lead', 4)
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(newer)
+  })
+
   it('backs the file up before it persists a migrated shape, and migrates once', async () => {
     const step: GameStoreMigration = (data) => ({ ...data, migratedFrom104: true })
     const { history, dir } = seeded([step])

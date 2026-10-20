@@ -56,7 +56,9 @@ the runner in
 - A kill mid-migration leaves either the old file or the new one: the write is a durable
   temp-and-rename, and the backup is written before it. The next start migrates again.
 - A file written by a newer build, or one whose migration step throws, is **frozen**: read as well
-  as this build can, written back in the same shape and version, with new entries appended.
+  as this build can, written back in the same shape and version, with new entries appended. If
+  `records` or `events` is no longer a list (or `cursors` no longer an object), this build does not
+  write the file at all: the new entry is lost rather than everything the newer build stored.
 - On every rewrite, top-level keys, record fields and whole entries this build cannot read are kept
   as they were.
 - A file that is not JSON is moved to `<hash>.damaged-<timestamp>.json` before the store starts a
