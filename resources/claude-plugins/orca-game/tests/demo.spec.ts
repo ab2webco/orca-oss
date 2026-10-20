@@ -37,6 +37,18 @@ describe('demo', () => {
     expect(demoFrameOf(DEMO_FRAMES)).toEqual(demoFrameOf(0))
   })
 
+  it('seats five members and reverts the merged review once', () => {
+    const frames = Array.from({ length: DEMO_FRAMES }, (_, step) => demoFrameOf(step).state)
+    for (const state of frames) {
+      expect(state.agents.filter((agent) => !agent.isLeader)).toHaveLength(5)
+    }
+    const reverts = frames.filter(
+      (state, at) => frames[at - 1]?.review?.state === 'merged' && state.review?.state === 'open'
+    )
+    expect(reverts).toHaveLength(1)
+    expect(reverts[0]?.review?.ci).toBe('failure')
+  })
+
   it('shows a prompt action, an MCP action and a To Do grouped by status with counts', () => {
     const frames = Array.from({ length: DEMO_FRAMES }, (_, step) => demoFrameOf(step).state)
     for (const state of frames) {

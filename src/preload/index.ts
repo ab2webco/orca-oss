@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type { GameBand3dProbe } from '../shared/game-band-3d-probe'
 import type {
   AgentCliSelfUpdateRepairResult,
   AgentCliSelfUpdateStatus,
@@ -565,6 +566,7 @@ const api = {
     // Why: macOS input mode (or layout ID) so keyboard workarounds can tell CJK/compose layouts from US QWERTY (issue #1205); null on non-Darwin or read failure.
     getKeyboardInputSourceId: (): Promise<string | null> =>
       ipcRenderer.invoke('app:getKeyboardInputSourceId'),
+    gameBand3dProbe: (): Promise<GameBand3dProbe> => ipcRenderer.invoke('app:gameBand3dProbe'),
     getMacCapturedDigitRowChords: () => ipcRenderer.invoke('app:getMacCapturedDigitRowChords'),
     setUnreadDockBadgeCount: (count: number): Promise<void> =>
       ipcRenderer.invoke('app:setUnreadDockBadgeCount', count),

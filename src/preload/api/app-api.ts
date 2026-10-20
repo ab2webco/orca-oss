@@ -1,4 +1,5 @@
 import type { AppIdentity } from '../../shared/app-identity'
+import type { GameBand3dProbe } from '../../shared/game-band-3d-probe'
 import type { E2EConfig } from '../../shared/e2e-config'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
@@ -44,6 +45,8 @@ export type AppApi = {
    *  Distinguishes CJK IMEs and Option-layer-composing layouts that look like US QWERTY (issue #1205).
    *  Returns null on non-Darwin or when the defaults read fails. */
   getKeyboardInputSourceId: () => Promise<string | null>
+  /** ORCA-692 POC: GPU, memory and per-process metrics for the game band. */
+  gameBand3dProbe: () => Promise<GameBand3dProbe>
   /** Physical Mission Control chords before layout resolution. */
   getMacCapturedDigitRowChords: () => Promise<MacCapturedDigitRowChord[]>
   /** Updates the macOS Dock unread badge. No-op on Windows/Linux. */

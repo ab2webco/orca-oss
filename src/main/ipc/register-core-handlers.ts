@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { registerAppHandlers } from './app'
+import { registerGameBand3dProbeHandler } from './game-band-3d-probe'
 import { registerCliHandlers } from './cli'
 import { registerPreflightHandlers } from './preflight'
 import type { Store } from '../persistence'
@@ -141,6 +142,7 @@ export function registerCoreHandlers(
   registered = true
 
   registerAppHandlers(store, { onBeforeRelaunch: lifecycleOptions.onBeforeRelaunch })
+  registerGameBand3dProbeHandler()
   registerCliHandlers()
   registerPreflightHandlers()
   registerUsageProviderHandlers({ claudeUsage, codexUsage, openCodeUsage })

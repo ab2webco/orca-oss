@@ -1,13 +1,5 @@
-import type {
-  GameAction,
-  GameAgent,
-  GameCi,
-  GameLinkTone,
-  GameProjectItem,
-  GameProjectWork,
-  GameState,
-  GameStatusGroup
-} from '../types'
+import type { GameAgent, GameCi, GameState, GameStatusGroup } from '../types'
+import { DEMO_ACTIONS, demoProjectOf } from './demo-project'
 import { gameStrings, type ArtStrings } from './game-strings'
 import type { Action, FlowPhase } from './quest-policy'
 import { levelOf } from './rewards'
@@ -45,7 +37,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Read'],
       ['tester', 'working', 'Edit'],
-      ['scribe', 'waiting', null]
+      ['scribe', 'waiting', null],
+      ['scout', 'working', 'Grep'],
+      ['ranger', 'idle', null]
     ],
     ci: 'pending',
     group: 'in_progress',
@@ -58,7 +52,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Edit'],
       ['tester', 'working', 'Bash'],
-      ['scribe', 'waiting', null]
+      ['scribe', 'waiting', null],
+      ['scout', 'working', 'Read'],
+      ['ranger', 'working', 'Edit']
     ],
     ci: 'failure',
     group: 'in_progress',
@@ -71,7 +67,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Bash'],
       ['tester', 'working', 'Bash'],
-      ['scribe', 'working', 'Read']
+      ['scribe', 'working', 'Read'],
+      ['scout', 'waiting', null],
+      ['ranger', 'working', 'Bash']
     ],
     ci: 'failure',
     group: 'in_progress',
@@ -84,7 +82,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Bash'],
       ['tester', 'working', 'Bash'],
-      ['scribe', 'working', 'Grep']
+      ['scribe', 'working', 'Grep'],
+      ['scout', 'working', 'Edit'],
+      ['ranger', 'working', 'Bash']
     ],
     ci: 'pending',
     group: 'in_progress',
@@ -97,7 +97,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Bash'],
       ['tester', 'idle', null],
-      ['scribe', 'working', 'Write']
+      ['scribe', 'working', 'Write'],
+      ['scout', 'working', 'Bash'],
+      ['ranger', 'waiting', null]
     ],
     ci: 'success',
     group: 'review',
@@ -111,7 +113,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Bash'],
       ['tester', 'idle', null],
-      ['scribe', 'done', null]
+      ['scribe', 'done', null],
+      ['scout', 'working', 'Bash'],
+      ['ranger', 'working', 'Read']
     ],
     ci: 'success',
     merged: true,
@@ -125,7 +129,9 @@ const SCRIPT: readonly Step[] = [
     seats: [
       ['builder', 'working', 'Bash'],
       ['tester', 'done', null],
-      ['scribe', 'done', null]
+      ['scribe', 'done', null],
+      ['scout', 'done', null],
+      ['ranger', 'working', 'Edit']
     ],
     ci: 'success',
     merged: true,
@@ -137,9 +143,26 @@ const SCRIPT: readonly Step[] = [
   },
   {
     seats: [
+      ['builder', 'working', 'Bash'],
+      ['tester', 'done', null],
+      ['scribe', 'done', null],
+      ['scout', 'working', 'Bash'],
+      ['ranger', 'working', 'Bash']
+    ],
+    ci: 'failure',
+    group: 'done',
+    xp: 130,
+    phase: 'build',
+    action: 'commit',
+    caption: () => 'DEMO · git revert'
+  },
+  {
+    seats: [
       ['builder', 'done', null],
       ['tester', 'done', null],
-      ['scribe', 'done', null]
+      ['scribe', 'done', null],
+      ['scout', 'done', null],
+      ['ranger', 'done', null]
     ],
     ci: 'success',
     merged: true,
@@ -154,7 +177,6 @@ const SCRIPT: readonly Step[] = [
 
 export const DEMO_FRAMES = SCRIPT.length
 
-const DEMO_URL = 'https://example.invalid/demo'
 const DEMO_LIMIT_MS = 90 * 60_000
 
 // Members on other agents and managed accounts, so the Panel shows each card's tag.
@@ -169,66 +191,6 @@ const DEMO_SEAT_AGENTS: Readonly<Record<string, Pick<GameAgent, 'agentType' | 'a
   },
   scribe: { agentType: 'claude' }
 }
-const DEMO_TONES: Readonly<Record<GameCi, GameLinkTone>> = {
-  failure: 'danger',
-  success: 'success',
-  pending: 'pending',
-  neutral: 'neutral',
-  none: 'neutral'
-}
-
-const todoOf = (
-  id: string,
-  title: string,
-  group: GameStatusGroup,
-  status: string
-): GameProjectItem => ({
-  id,
-  title,
-  url: `${DEMO_URL}/${id}`,
-  status,
-  group,
-  prompt: `Work on ${id}: ${title}`,
-  ...(group === 'in_progress' ? { tone: 'pending' } : group === 'review' ? { tone: 'success' } : {})
-})
-
-// Pressing either during /quest demo only toasts; the MCP server named here is never called.
-const DEMO_ACTIONS: GameAction[] = [
-  { id: 'action-0', label: 'Open a PR', prompt: 'Open a PR for the demo work item' },
-  { id: 'action-1', label: 'Test runs', mcp: { server: 'demo', tool: 'list_test_runs' } }
-]
-
-// The project lists follow the scripted PR's CI so the PRs chip changes color with it.
-const projectOf = (step: Step): GameProjectWork => ({
-  reviews: {
-    provider: 'github',
-    total: 2,
-    url: `${DEMO_URL}/pulls`,
-    items: [
-      {
-        id: '#901',
-        title: 'demo: scripted pull request',
-        url: `${DEMO_URL}/901`,
-        status: step.ci,
-        tone: DEMO_TONES[step.ci]
-      },
-      { id: '#902', title: 'demo: second pull request', url: `${DEMO_URL}/902`, tone: 'success' }
-    ]
-  },
-  todo: {
-    provider: 'plane',
-    total: 7,
-    url: `${DEMO_URL}/todo`,
-    items: [
-      todoOf('ORCA-3', 'Another demo ticket', 'in_progress', 'In Progress'),
-      todoOf('ORCA-4', 'Demo ticket in QA', 'review', 'QA'),
-      todoOf('ORCA-5', 'Second ticket in QA', 'review', 'QA'),
-      todoOf('ORCA-2', 'Demo ticket', 'todo', 'Todo')
-    ],
-    groups: { in_progress: 1, review: 2, todo: 3, backlog: 1 }
-  }
-})
-
 const stateOf = (step: Step): GameState => ({
   config: {},
   warnings: [],
@@ -271,7 +233,7 @@ const stateOf = (step: Step): GameState => ({
     status: step.group === 'done' ? 'Done' : step.group === 'review' ? 'In Review' : 'In Progress',
     statusGroup: step.group
   },
-  project: projectOf(step),
+  project: demoProjectOf(step.ci),
   actions: DEMO_ACTIONS
 })
 
