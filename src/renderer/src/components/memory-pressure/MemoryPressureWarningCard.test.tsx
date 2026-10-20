@@ -14,12 +14,15 @@ const STATE: MemoryPressureState = {
   warning: {
     episodeId: 4,
     sweeping: false,
+    trigger: 'kernel-pressure',
+    minutesToExhaustion: null,
     reading: {
       totalMemory: 16 * GIB,
       availableMemory: GIB,
       swapTotal: 9 * GIB,
       swapUsed: 8 * GIB,
       kernelLevel: 'warn',
+      source: 'sysctl',
       readAt: 0
     },
     panes: [

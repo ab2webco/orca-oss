@@ -20,6 +20,10 @@ vi.mock('./memory-pressure-reading', () => ({ readMemoryPressure: readMemoryPres
 vi.mock('./collector', () => ({ collectMemorySnapshot: collectMemorySnapshotMock }))
 vi.mock('./pty-registry', () => ({ listRegisteredPtys: listRegisteredPtysMock }))
 
+const TICK_MS = 30_000
+// Why four ticks after the first: the low-memory rule needs two minutes of readings.
+const SUSTAINED_MS = 4 * TICK_MS
+
 function lowMemory(): MemoryPressureReading {
   return {
     totalMemory: 16 * GIB,
@@ -27,8 +31,16 @@ function lowMemory(): MemoryPressureReading {
     swapTotal: null,
     swapUsed: null,
     kernelLevel: null,
-    readAt: 1
+    source: 'meminfo',
+    readAt: Date.now()
   }
+}
+
+type AgentRow = { paneKey: string; connectionId: string | null; providerSessionOnly?: boolean }
+
+function doubles(rows: AgentRow[] = [{ paneKey: 'tab-1:leaf-1', connectionId: null }]) {
+  const popupLog = { push: vi.fn(), close: vi.fn() }
+  return { agents: { getStatusSnapshot: () => rows }, popupLog }
 }
 
 function storeDouble(initial: Partial<GlobalSettings>) {
@@ -73,7 +85,7 @@ describe('createMemoryPressureService', () => {
     listRegisteredPtysMock.mockReturnValue([
       { ptyId: 'pty-live', worktreeId: 'repo::/w', sessionId: 'sess-1', paneKey: null, pid: 1 }
     ])
-    readMemoryPressureMock.mockResolvedValue(lowMemory())
+    readMemoryPressureMock.mockImplementation(async () => lowMemory())
     collectMemorySnapshotMock.mockResolvedValue({
       processMemoryMetric: 'rss',
       worktrees: [
@@ -87,11 +99,15 @@ describe('createMemoryPressureService', () => {
     })
     const { createMemoryPressureService } = await import('./memory-pressure-service')
 
-    const service = createMemoryPressureService(storeDouble({}), {
-      getPtyLastOutputAt: (id) => (id === 'pty-live' ? 42 : null)
-    })
+    const { agents, popupLog } = doubles()
+    const service = createMemoryPressureService(
+      storeDouble({}),
+      { getPtyLastOutputAt: (id) => (id === 'pty-live' ? 42 : null) },
+      agents,
+      popupLog
+    )
     service.monitor.start()
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(SUSTAINED_MS)
 
     const sent = live.webContents.send.mock.calls.at(-1)
     expect(sent?.[0]).toBe('memory:pressure:changed')
@@ -104,16 +120,53 @@ describe('createMemoryPressureService', () => {
       })
     ])
     expect(gone.webContents.send).not.toHaveBeenCalled()
+    expect(popupLog.push).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'opened', trigger: 'low-memory', agentPanes: 1 })
+    )
+    service.dispose()
+    expect(popupLog.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('counts only local agent panes: SSH agents and resume-only rows open no popup', async () => {
+    const live = { isDestroyed: () => false, webContents: { send: vi.fn() } }
+    windowsMock.mockReturnValue([live])
+    readMemoryPressureMock.mockImplementation(async () => lowMemory())
+    const { agents, popupLog } = doubles([
+      { paneKey: 'tab-1:leaf-1', connectionId: 'ssh-1' },
+      { paneKey: 'tab-2:leaf-2', connectionId: null, providerSessionOnly: true }
+    ])
+    const { createMemoryPressureService } = await import('./memory-pressure-service')
+
+    const service = createMemoryPressureService(
+      storeDouble({}),
+      { getPtyLastOutputAt: () => null },
+      agents,
+      popupLog
+    )
+    service.monitor.start()
+    await vi.advanceTimersByTimeAsync(2 * SUSTAINED_MS)
+
+    expect(live.webContents.send).not.toHaveBeenCalled()
+    expect(popupLog.push).not.toHaveBeenCalledWith(expect.objectContaining({ event: 'opened' }))
     service.dispose()
   })
 
   it('stops sampling as soon as the setting is turned off', async () => {
     windowsMock.mockReturnValue([])
-    readMemoryPressureMock.mockResolvedValue({ ...lowMemory(), availableMemory: 8 * GIB })
+    readMemoryPressureMock.mockImplementation(async () => ({
+      ...lowMemory(),
+      availableMemory: 8 * GIB
+    }))
     const store = storeDouble({})
     const { createMemoryPressureService } = await import('./memory-pressure-service')
+    const { agents, popupLog } = doubles()
 
-    const service = createMemoryPressureService(store, { getPtyLastOutputAt: () => null })
+    const service = createMemoryPressureService(
+      store,
+      { getPtyLastOutputAt: () => null },
+      agents,
+      popupLog
+    )
     service.monitor.start()
     await vi.advanceTimersByTimeAsync(0)
     store.change({ memoryPressureWarningEnabled: false })
