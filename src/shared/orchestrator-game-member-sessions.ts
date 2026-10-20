@@ -1,0 +1,161 @@
+/** What the lead needs to resume a member after Orca or the machine restarts: `orca game resume-members`. */
+
+export const GAME_MEMBER_SESSIONS_VERSION = 1
+// Why 50: a few times the 12-member cap, so finished members the lead never swept still fit.
+export const GAME_MEMBER_SESSIONS_MAX = 50
+
+export type GameMemberSession = {
+  /** Upper-case ticket id; one entry per ticket in a project. */
+  ticket: string
+  name: string | null
+  runId: string
+  taskId: string
+  dispatchId: string | null
+  worktreeId: string | null
+  branch: string | null
+  agent: string | null
+  /** The managed account the member runs on (Claude or Codex id); null for Orca's own selection. */
+  accountId: string | null
+  account: string | null
+  /** The agent's own conversation id (Claude `session_id`), learned once the member is live. */
+  sessionId: string | null
+  lastState: string | null
+  launchedAt: string
+  updatedAt: string
+}
+
+export type GameMemberSessionPatch = { ticket: string } & Partial<
+  Omit<GameMemberSession, 'ticket' | 'updatedAt'>
+>
+
+export type GameMemberSessionsRead =
+  | { ok: true; members: GameMemberSession[] }
+  | { ok: false; reason: string }
+
+const TEXT_MAX = 200
+const NULLABLE_FIELDS = [
+  'name',
+  'dispatchId',
+  'worktreeId',
+  'branch',
+  'agent',
+  'accountId',
+  'account',
+  'sessionId',
+  'lastState'
+] as const
+const REQUIRED_FIELDS = ['ticket', 'runId', 'taskId', 'launchedAt', 'updatedAt'] as const
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isText = (value: unknown): value is string =>
+  typeof value === 'string' && value !== '' && value.length <= TEXT_MAX
+
+function parseMember(raw: unknown): GameMemberSession | null {
+  if (!isRecord(raw)) {
+    return null
+  }
+  if (!REQUIRED_FIELDS.every((key) => isText(raw[key]))) {
+    return null
+  }
+  if (!NULLABLE_FIELDS.every((key) => raw[key] === null || isText(raw[key]))) {
+    return null
+  }
+  const member = Object.fromEntries(
+    [...REQUIRED_FIELDS, ...NULLABLE_FIELDS].map((key) => [key, raw[key]])
+  ) as GameMemberSession
+  return { ...member, ticket: member.ticket.toUpperCase() }
+}
+
+/**
+ * Strict on purpose: a file this Orca cannot read whole is reported, never read as empty, so the next
+ * write cannot silently replace what an older or newer Orca saved.
+ */
+export function parseGameMemberSessionsFile(text: string): GameMemberSessionsRead {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { ok: false, reason: 'the saved members file is damaged (not JSON)' }
+  }
+  if (!isRecord(parsed) || typeof parsed.version !== 'number') {
+    return { ok: false, reason: 'the saved members file has no version' }
+  }
+  if (parsed.version > GAME_MEMBER_SESSIONS_VERSION) {
+    return {
+      ok: false,
+      reason: `the saved members file is from a newer Orca (version ${parsed.version})`
+    }
+  }
+  if (parsed.version !== GAME_MEMBER_SESSIONS_VERSION || !Array.isArray(parsed.members)) {
+    return { ok: false, reason: `the saved members file is damaged (version ${parsed.version})` }
+  }
+  const members: GameMemberSession[] = []
+  for (const [index, raw] of parsed.members.entries()) {
+    const member = parseMember(raw)
+    if (!member) {
+      return {
+        ok: false,
+        reason: `the saved members file has a malformed member (entry ${index + 1})`
+      }
+    }
+    members.push(member)
+  }
+  return { ok: true, members }
+}
+
+export function serializeGameMemberSessions(members: readonly GameMemberSession[]): string {
+  return JSON.stringify({ version: GAME_MEMBER_SESSIONS_VERSION, members })
+}
+
+/**
+ * Upserts one member by ticket. Returns `members` itself when nothing changed, so a caller can skip
+ * the write; a member it does not hold yet is only added with its task and run.
+ */
+export function mergeGameMemberSession(
+  members: readonly GameMemberSession[],
+  patch: GameMemberSessionPatch,
+  now: string
+): GameMemberSession[] {
+  const ticket = patch.ticket.toUpperCase()
+  const index = members.findIndex((one) => one.ticket === ticket)
+  const current = members[index]
+  if (!current) {
+    if (!patch.taskId || !patch.runId) {
+      return members as GameMemberSession[]
+    }
+    const added: GameMemberSession = {
+      name: null,
+      dispatchId: null,
+      worktreeId: null,
+      branch: null,
+      agent: null,
+      accountId: null,
+      account: null,
+      sessionId: null,
+      lastState: null,
+      launchedAt: now,
+      ...patch,
+      ticket,
+      runId: patch.runId,
+      taskId: patch.taskId,
+      updatedAt: now
+    }
+    return [...members, added].slice(-GAME_MEMBER_SESSIONS_MAX)
+  }
+  // Why keep launchedAt: a relaunch on the same task is the same member's work.
+  const { launchedAt: _launchedAt, ticket: _ticket, ...changes } = patch
+  const changed = (Object.keys(changes) as (keyof typeof changes)[]).some(
+    (key) => changes[key] !== undefined && changes[key] !== current[key]
+  )
+  if (!changed) {
+    return members as GameMemberSession[]
+  }
+  const defined = Object.fromEntries(
+    Object.entries(changes).filter((entry) => entry[1] !== undefined)
+  )
+  const next = members.slice()
+  next[index] = { ...current, ...defined, updatedAt: now }
+  return next
+}
