@@ -34,8 +34,16 @@ export class GameMemberSessionStore {
     return parseGameMemberSessionsFile(text)
   }
 
-  upsert(projectKey: string, patch: GameMemberSessionPatch): Promise<GameMemberSession[]> {
-    return this.update(projectKey, (members) => mergeGameMemberSession(members, patch, this.now()))
+  /** One read and at most one write for every patch. */
+  upsert(
+    projectKey: string,
+    patches: GameMemberSessionPatch | readonly GameMemberSessionPatch[]
+  ): Promise<GameMemberSession[]> {
+    const list = Array.isArray(patches) ? patches : [patches as GameMemberSessionPatch]
+    return this.update(projectKey, (members) => {
+      const now = this.now()
+      return list.reduce((current, patch) => mergeGameMemberSession(current, patch, now), members)
+    })
   }
 
   remove(projectKey: string, tickets: readonly string[]): Promise<GameMemberSession[]> {

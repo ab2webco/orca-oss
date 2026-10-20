@@ -11,7 +11,7 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
-import { postGameEvents } from './orchestrator-game-board-call'
+import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
@@ -49,7 +49,7 @@ export type GameLaunchResult = {
 type WorkerStartResult = Pick<
   GameLaunchResult,
   'runId' | 'taskId' | 'dispatchId' | 'state' | 'lastError'
->
+> & { effects?: { kind: string; id?: string }[] }
 
 const DISPLAY_NAME_MAX = 60
 
@@ -185,6 +185,16 @@ export async function launchGameMember(args: {
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
   )
+  await recordGameMember(client, {
+    ticket,
+    name: title,
+    runId,
+    taskId: task.result.task.id,
+    agent: choice.agent,
+    accountId: memberAccount.account?.id,
+    account: memberAccount.account?.email,
+    lastState: 'launching'
+  })
   const workerParams = {
     task: task.result.task.id,
     // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
@@ -205,6 +215,12 @@ export async function launchGameMember(args: {
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
   )
+  await recordGameMember(client, {
+    ticket,
+    dispatchId: worker.result.dispatchId,
+    worktreeId: worker.result.effects?.find((one) => one.kind === 'worktree')?.id,
+    lastState: worker.result.state
+  })
   const launched: GameLaunchResult = {
     ticket,
     ...(name === null ? {} : { name }),

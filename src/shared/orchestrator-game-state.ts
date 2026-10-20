@@ -12,6 +12,7 @@ import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
+import type { GamePausedMember } from './orchestrator-game-member-sessions'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -125,6 +126,10 @@ export type OrchestratorGameState = {
   stopped?: GameStop | null
   /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
   inboxes?: GameInboxSummary[]
+  /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
+  pausedMembers?: GamePausedMember[]
+  /** Why the saved members could not be read or saved; absent when they could. */
+  pausedMembersError?: string
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
 }

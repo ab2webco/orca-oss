@@ -38,6 +38,26 @@ const GameHistoryRecordParams = z.object({
   record: GameHistoryRecordSchema
 })
 
+const memberText = z.string().min(1).max(200).optional()
+
+// Why not strict: a newer CLI may send fields this host does not keep yet.
+const GameMemberRecordParams = z.object({
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional(),
+  member: z.object({
+    ticket: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/),
+    name: memberText,
+    runId: memberText,
+    taskId: memberText,
+    dispatchId: memberText,
+    worktreeId: memberText,
+    agent: memberText,
+    accountId: memberText,
+    account: memberText,
+    lastState: memberText
+  })
+})
+
 const GameHistoryParams = z
   .object({
     worktreeId: z.string().optional(),
@@ -62,6 +82,16 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         terminalHandle: params.terminalHandle,
         memberWorktreeId: params.memberWorktreeId,
         record: params.record
+      })
+  }),
+  defineMethod({
+    name: 'game.memberRecord',
+    params: GameMemberRecordParams,
+    handler: async (params, { runtime }) =>
+      runtime.recordGameMember({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        member: params.member
       })
   }),
   defineMethod({

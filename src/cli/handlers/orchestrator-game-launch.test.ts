@@ -96,7 +96,9 @@ describe('orca game launch', () => {
       'terminal.show',
       'orchestration.runCurrent',
       'orchestration.taskCreate',
+      'game.memberRecord',
       'orchestration.workerStart',
+      'game.memberRecord',
       'game.eventPost'
     ])
     expect(calls[3]?.[1]).toEqual({
@@ -104,7 +106,7 @@ describe('orca game launch', () => {
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[4]?.[1]).toEqual(
+    expect(calls[5]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
@@ -123,6 +125,74 @@ describe('orca game launch', () => {
           state: 'ready'
         })
       })
+    )
+  })
+
+  it('saves the member before its worker starts and again after, so a restart finds it', async () => {
+    const { client, calls } = fakeClient(stateWith())
+    const results = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      const response = await results(method, params as Record<string, unknown>)
+      return method === 'orchestration.workerStart'
+        ? {
+            ok: true,
+            result: {
+              ...(response.result as object),
+              effects: [{ kind: 'worktree', action: 'created', id: 'wt-cin-12' }]
+            }
+          }
+        : response
+    }) as RuntimeClient['call']
+
+    await launch(client, 'cin-12', [['account', 'ana@example.com']])
+
+    const methods = calls.map(([method]) => method)
+    expect(methods.indexOf('game.memberRecord')).toBeLessThan(
+      methods.indexOf('orchestration.workerStart')
+    )
+    expect(calls.filter(([method]) => method === 'game.memberRecord').map(([, p]) => p)).toEqual([
+      {
+        worktreeId: 'wt1',
+        terminalHandle: 'h1',
+        member: {
+          ticket: 'CIN-12',
+          name: 'Arthur · CIN-12 Cartelera page',
+          runId: 'run_1',
+          taskId: 'task_1',
+          agent: 'claude',
+          accountId: 'acct_ana',
+          account: 'ana@example.com',
+          lastState: 'launching'
+        }
+      },
+      {
+        worktreeId: 'wt1',
+        terminalHandle: 'h1',
+        member: {
+          ticket: 'CIN-12',
+          dispatchId: 'dispatch_1',
+          worktreeId: 'wt-cin-12',
+          lastState: 'ready'
+        }
+      }
+    ])
+  })
+
+  it('still launches on an Orca that cannot save members', async () => {
+    const { client, calls } = fakeClient(stateWith())
+    const results = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      if (method === 'game.memberRecord') {
+        throw new RuntimeClientError('method_not_found', 'Unknown method')
+      }
+      return results(method, params as Record<string, unknown>)
+    }) as RuntimeClient['call']
+
+    await launch(client)
+
+    expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
+    expect(JSON.parse(output.join(''))).toEqual(
+      expect.objectContaining({ result: expect.objectContaining({ dispatchId: 'dispatch_1' }) })
     )
   })
 

@@ -671,6 +671,9 @@ import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
+import { GamePausedMembers } from './orchestrator-game-paused-members'
+import type { GameMemberSessionPatch } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
 import {
@@ -3640,6 +3643,14 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  private readonly gamePausedMembers = new GamePausedMembers({
+    store: new GameMemberSessionStore(() =>
+      join(app.getPath('userData'), 'orchestrator-game-members')
+    ),
+    contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
+    sessionIdOf: (handle) =>
+      this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
+  })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
     isLive: (handle) => this.resolveLeafForHandle(handle) !== null,
@@ -30395,7 +30406,24 @@ export class OrcaRuntimeService {
       args.record.repo ??
       (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
     const records = await this.gameHistory.append(key, { ...args.record, repo })
+    // Why: a member freed by sweep or stop is done, so a restart must not offer to resume it.
+    if (args.record.ticket) {
+      await this.gamePausedMembers.forget(key, [args.record.ticket]).catch(() => undefined)
+    }
     return { recorded: true, count: records.length }
+  }
+
+  async recordGameMember(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    member: GameMemberSessionPatch
+  }): Promise<{ recorded: true }> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember) {
+      throw new Error('Only the lead saves its members.')
+    }
+    await this.gamePausedMembers.record(project.key, args.member)
+    return { recorded: true }
   }
 
   async listGameHistory(args: {
@@ -30578,7 +30606,7 @@ export class OrcaRuntimeService {
       : []
     const callerHandle =
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
-    return await buildOrchestratorGameState({
+    const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
       worktree: worktree
@@ -30732,6 +30760,32 @@ export class OrcaRuntimeService {
         return null
       }
     })
+    return await this.withPausedGameMembers(state, {
+      repoId: args.paneKey ? worktree?.repoId : undefined,
+      liveWorktreeIds: new Set(
+        summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
+      )
+    })
+  }
+
+  // Why only a lead pane: it is the one whose members are saved, and the one that resumes them.
+  private async withPausedGameMembers(
+    state: OrchestratorGameState,
+    project: { repoId: string | undefined; liveWorktreeIds: ReadonlySet<string> }
+  ): Promise<OrchestratorGameState> {
+    if (state.role !== 'lead' || !project.repoId) {
+      return state
+    }
+    const view = await this.gamePausedMembers.note(
+      `repo:${project.repoId}`,
+      state.agents,
+      project.liveWorktreeIds
+    )
+    return {
+      ...state,
+      pausedMembers: view.paused,
+      ...(view.error ? { pausedMembersError: view.error } : {})
+    }
   }
 
   private gameProjectWorkPortFor(repoId: string): GameProjectWorkPort {
