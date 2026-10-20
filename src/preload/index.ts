@@ -4533,6 +4533,11 @@ const api = {
       ipcRenderer.on('window:fullscreen-changed', listener)
       return () => ipcRenderer.removeListener('window:fullscreen-changed', listener)
     },
+    onShownChanged: (callback: (shown: boolean) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, shown: boolean) => callback(shown)
+      ipcRenderer.on('window:shown-changed', listener)
+      return () => ipcRenderer.removeListener('window:shown-changed', listener)
+    },
     /** Fired when the OS resumes from sleep — a focus-preserving wake fires no renderer focus/visibility events. */
     onSystemResumed: (callback: () => void): (() => void) => {
       const listener = () => callback()

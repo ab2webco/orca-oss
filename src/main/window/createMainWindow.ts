@@ -458,6 +458,14 @@ export function createMainWindow(
     mainWindow.webContents.send('window:fullscreen-changed', false)
   })
 
+  // ORCA-692 POC: macOS keeps visibilityState 'visible' and rAF running while minimised.
+  const sendShown = (shown: boolean): void =>
+    mainWindow.webContents.send('window:shown-changed', shown)
+  mainWindow.on('hide', () => sendShown(false))
+  mainWindow.on('minimize', () => sendShown(false))
+  mainWindow.on('show', () => sendShown(true))
+  mainWindow.on('restore', () => sendShown(true))
+
   installPrivilegedWindowNavigationPolicy(mainWindow.webContents)
   // Why: containment must be listening before any plugin panel frame is created,
   // so register it with the window's other navigation policy.

@@ -1,7 +1,7 @@
 // What the overlay measured, per pane, for the E2E soak to read through `window.__gameBand3d`.
 import type { BandMode, HardwareSignals } from './band-mode'
 import type { BandRegion } from './band-region'
-import type { BandLib } from './band-scene'
+import type { BandLib, MemberRect } from './band-scene'
 
 export type BandPaneStats = {
   lib: BandLib | null
@@ -17,6 +17,9 @@ export type BandPaneStats = {
     fps: number
     frameP50Ms: number
     frameP95Ms: number
+    targetFps: number
+    renderP50Ms: number
+    renderP95Ms: number
     rendererMb: number
     gpuMb: number
   }[]
@@ -28,6 +31,8 @@ export type BandPaneStats = {
   scenesReleased: number
   contextLosses: number
   cardShownFor: string | null
+  rects: MemberRect[]
+  events: { atMs: number; what: string }[]
   errors: string[]
   detached: boolean
 }
@@ -61,6 +66,8 @@ export const bandRegistryEntry = (paneId: number): BandPaneStats => {
     scenesReleased: 0,
     contextLosses: 0,
     cardShownFor: null,
+    rects: [],
+    events: [],
     errors: [],
     detached: false
   }

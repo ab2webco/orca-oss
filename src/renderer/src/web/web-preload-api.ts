@@ -2953,6 +2953,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     setShortcutRecorderFocused: () => {},
     onRichMarkdownContextCommand: () => noopUnsubscribe,
     onFullscreenChanged: () => noopUnsubscribe,
+    onShownChanged: () => noopUnsubscribe,
     minimize: () => {},
     maximize: () => {},
     onMaximizeChanged: () => noopUnsubscribe,

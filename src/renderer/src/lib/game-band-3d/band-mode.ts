@@ -10,8 +10,13 @@ export type HardwareSignals = {
   prefersReducedMotion: boolean
 }
 
-/** One measurement window of the running band. */
-export type BandWindow = { fps: number; frameP95Ms: number; rendererGrowthMb: number }
+/** One measurement window. `targetFps` is min(cap, display refresh): a 30 Hz screen never gives 60. */
+export type BandWindow = {
+  fps: number
+  targetFps: number
+  renderP95Ms: number
+  rendererGrowthMb: number
+}
 
 export const BAND_BUDGETS = {
   fullMinMemoryGb: 16,
@@ -19,10 +24,11 @@ export const BAND_BUDGETS = {
   liteMinMemoryGb: 8,
   fullFpsCap: 60,
   liteFpsCap: 30,
-  fullMinFps: 50,
-  fullMaxFrameP95Ms: 25,
-  liteMinFps: 25,
-  liteMaxFrameP95Ms: 45,
+  /** A window is slow below this share of its target fps. */
+  minFpsShare: 0.8,
+  /** CPU time of one scene render; leaves the rest of a 60 Hz frame to the terminal. */
+  fullMaxRenderP95Ms: 6,
+  liteMaxRenderP95Ms: 12,
   /** Renderer working-set growth since the band started; ORCA-600 reached 26 GB unbounded. */
   rendererGrowthMb: 150,
   windowMs: 2000,
@@ -60,9 +66,9 @@ export const initialBandModeOf = (signals: HardwareSignals): BandMode => {
 }
 
 const isSlow = (mode: '3d-lite' | '3d-full', window: BandWindow): boolean =>
-  mode === '3d-full'
-    ? window.fps < BAND_BUDGETS.fullMinFps || window.frameP95Ms > BAND_BUDGETS.fullMaxFrameP95Ms
-    : window.fps < BAND_BUDGETS.liteMinFps || window.frameP95Ms > BAND_BUDGETS.liteMaxFrameP95Ms
+  window.fps < window.targetFps * BAND_BUDGETS.minFpsShare ||
+  window.renderP95Ms >
+    (mode === '3d-full' ? BAND_BUDGETS.fullMaxRenderP95Ms : BAND_BUDGETS.liteMaxRenderP95Ms)
 
 /** Drops a level on a sustained breach; never upgrades, so a borderline machine cannot flap. */
 export const nextBandModeOf = (mode: BandMode, windows: readonly BandWindow[]): BandMode => {

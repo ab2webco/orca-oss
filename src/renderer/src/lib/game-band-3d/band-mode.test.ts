@@ -16,7 +16,7 @@ const signals = (overrides: Partial<HardwareSignals> = {}): HardwareSignals => (
   ...overrides
 })
 
-const healthy: BandWindow = { fps: 60, frameP95Ms: 17, rendererGrowthMb: 20 }
+const healthy: BandWindow = { fps: 60, targetFps: 60, renderP95Ms: 3, rendererGrowthMb: 20 }
 
 describe('webglClassOf', () => {
   it('reads SwiftShader, llvmpipe and Microsoft Basic Render as software', () => {
@@ -75,19 +75,30 @@ describe('nextBandModeOf', () => {
   })
 
   it('drops one level after the configured number of slow windows in a row', () => {
-    const slow: BandWindow = { ...healthy, fps: 40, frameP95Ms: 30 }
+    const slow: BandWindow = { ...healthy, fps: 40 }
     const windows = Array.from({ length: BAND_BUDGETS.breachWindows }, () => slow)
     expect(nextBandModeOf('3d-full', windows)).toBe('3d-lite')
+    const liteSlow: BandWindow = { ...healthy, fps: 20, targetFps: 30 }
     expect(
       nextBandModeOf(
         '3d-lite',
-        windows.map(() => ({ ...slow, fps: 20, frameP95Ms: 60 }))
+        windows.map(() => liteSlow)
       )
     ).toBe('cells')
   })
 
+  it('measures fps against the display, so a 30 Hz screen at 30 fps is healthy', () => {
+    const thirtyHz: BandWindow = { ...healthy, fps: 30, targetFps: 30 }
+    expect(nextBandModeOf('3d-full', [thirtyHz, thirtyHz, thirtyHz])).toBe('3d-full')
+  })
+
+  it('drops when each frame costs more than its render budget, even at full fps', () => {
+    const costly: BandWindow = { ...healthy, renderP95Ms: BAND_BUDGETS.fullMaxRenderP95Ms + 1 }
+    expect(nextBandModeOf('3d-full', [costly, costly, costly])).toBe('3d-lite')
+  })
+
   it('ignores one slow window between healthy ones', () => {
-    const slow: BandWindow = { ...healthy, fps: 40, frameP95Ms: 30 }
+    const slow: BandWindow = { ...healthy, fps: 40 }
     expect(nextBandModeOf('3d-full', [slow, healthy, slow])).toBe('3d-full')
   })
 
@@ -98,7 +109,7 @@ describe('nextBandModeOf', () => {
 
   it('never upgrades on its own and never moves the 2D or flat modes', () => {
     expect(nextBandModeOf('3d-lite', [healthy, healthy, healthy])).toBe('3d-lite')
-    const slow: BandWindow = { fps: 5, frameP95Ms: 300, rendererGrowthMb: 5000 }
+    const slow: BandWindow = { fps: 5, targetFps: 60, renderP95Ms: 300, rendererGrowthMb: 5000 }
     expect(nextBandModeOf('cells', [slow, slow, slow])).toBe('cells')
     expect(nextBandModeOf('flat', [slow, slow, slow])).toBe('flat')
   })

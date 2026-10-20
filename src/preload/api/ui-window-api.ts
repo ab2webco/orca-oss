@@ -39,6 +39,8 @@ export type UiWindowApi = {
     callback: (payload: RichMarkdownContextMenuCommandPayload) => void
   ) => () => void
   onFullscreenChanged: (callback: (isFullScreen: boolean) => void) => () => void
+  /** ORCA-692 POC: false on hide or minimise, true on show or restore. */
+  onShownChanged: (callback: (shown: boolean) => void) => () => void
   minimize: () => void
   maximize: () => void
   isMaximized: () => Promise<boolean>

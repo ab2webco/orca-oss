@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, type WebContents } from 'electron'
 import { cpus, totalmem } from 'node:os'
 import type { GameBand3dProbe } from '../../shared/game-band-3d-probe'
 
@@ -7,7 +7,14 @@ type GpuBasicInfo = { gpuDevice?: { vendorId?: number; deviceId?: number; active
 const isGpuBasicInfo = (value: unknown): value is GpuBasicInfo =>
   typeof value === 'object' && value !== null
 
-export const readGameBand3dProbe = async (): Promise<GameBand3dProbe> => {
+const displayHzOf = (sender: WebContents): number => {
+  const window = BrowserWindow.fromWebContents(sender)
+  const display =
+    window === null ? screen.getPrimaryDisplay() : screen.getDisplayMatching(window.getBounds())
+  return display.displayFrequency
+}
+
+export const readGameBand3dProbe = async (sender: WebContents): Promise<GameBand3dProbe> => {
   const info = await app.getGPUInfo('basic').catch((): unknown => null)
   const devices = isGpuBasicInfo(info) ? (info.gpuDevice ?? []) : []
   return {
@@ -17,8 +24,11 @@ export const readGameBand3dProbe = async (): Promise<GameBand3dProbe> => {
       deviceId: device.deviceId ?? 0,
       active: device.active === true
     })),
-    totalMemoryGb: totalmem() / 1024 ** 3,
+    // Why: the soak emulates an 8 GB-class machine on a bigger one; nothing else reads it.
+    totalMemoryGb: Number(process.env.ORCA_POC_TOTAL_MEMORY_GB) || totalmem() / 1024 ** 3,
     cpuCores: cpus().length,
+    rendererPid: sender.getOSProcessId(),
+    displayHz: displayHzOf(sender),
     processes: app.getAppMetrics().map((metric) => ({
       type: metric.type,
       pid: metric.pid,
@@ -29,5 +39,8 @@ export const readGameBand3dProbe = async (): Promise<GameBand3dProbe> => {
 }
 
 export function registerGameBand3dProbeHandler(): void {
-  ipcMain.handle('app:gameBand3dProbe', (): Promise<GameBand3dProbe> => readGameBand3dProbe())
+  ipcMain.handle(
+    'app:gameBand3dProbe',
+    (event): Promise<GameBand3dProbe> => readGameBand3dProbe(event.sender)
+  )
 }

@@ -12,5 +12,9 @@ export type GameBand3dProbe = {
   gpuDevices: { vendorId: number; deviceId: number; active: boolean }[]
   totalMemoryGb: number
   cpuCores: number
+  /** The OS pid of the renderer that asked, so its own memory is read, not another tab's. */
+  rendererPid: number
+  /** Refresh rate of the display the window is on; rAF never runs faster. */
+  displayHz: number
   processes: GameBand3dProcessSample[]
 }

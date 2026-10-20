@@ -1,4 +1,6 @@
 // The overlay's DOM: canvas host, name tags, life deltas, the member card and the POC chip.
+import type { Terminal } from '@xterm/xterm'
+import type { BandRegion } from './band-region'
 import type { BandMember, BandModel, MemberRect } from './band-scene'
 
 export type OverlayDom = {
@@ -6,7 +8,12 @@ export type OverlayDom = {
   host: HTMLDivElement
   chip: HTMLButtonElement
   setTags(model: BandModel, rects: readonly MemberRect[]): void
+  setChip(choice: string, lib: string, mode: string, fps: number | null): void
   showCard(member: BandMember | null, rect: MemberRect | null, ci: string): void
+  wirePicking(
+    read: () => { rects: readonly MemberRect[]; members: readonly BandMember[]; ci: string },
+    onPicked: (key: string | null) => void
+  ): void
   dispose(): void
 }
 
@@ -84,6 +91,9 @@ export const createOverlayDom = (parent: HTMLElement): OverlayDom => {
     root,
     host,
     chip,
+    setChip(choice, lib, mode, fps) {
+      chip.textContent = `POC · ${choice} · ${lib} · ${mode}${fps === null ? '' : ` · ${fps} fps`}`
+    },
     setTags(model, rects) {
       const byKey = new Map(rects.map((rect) => [rect.key, rect]))
       for (const member of model.members) {
@@ -132,6 +142,20 @@ export const createOverlayDom = (parent: HTMLElement): OverlayDom => {
       card.style.left = `${Math.max(0, rootRect.left - parentRect.left + rect.x)}px`
       card.style.top = `${Math.max(0, rootRect.top - parentRect.top - 92)}px`
     },
+    wirePicking(read, onPicked) {
+      const pick = (event: MouseEvent): MemberHit | null => {
+        const { rects, members } = read()
+        return memberAt(root, event, rects, members)
+      }
+      host.addEventListener('mousemove', (event) => {
+        host.style.cursor = pick(event) === null ? 'default' : 'pointer'
+      })
+      host.addEventListener('click', (event) => {
+        const hit = pick(event)
+        this.showCard(hit?.member ?? null, hit?.rect ?? null, read().ci)
+        onPicked(hit?.member.key ?? null)
+      })
+    },
     dispose() {
       root.remove()
       card.remove()
@@ -155,4 +179,26 @@ export const memberAt = (
   )
   const member = rect === undefined ? undefined : members.find((one) => one.key === rect.key)
   return rect === undefined || member === undefined ? null : { member, rect }
+}
+
+/** Where the band's cells sit inside the pane, in CSS pixels. */
+export const bandBoxOf = (
+  terminal: Terminal,
+  container: HTMLElement,
+  region: BandRegion
+): { left: number; top: number; width: number; height: number } | null => {
+  const screen = terminal.element?.querySelector('.xterm-screen')
+  if (!(screen instanceof HTMLElement)) {
+    return null
+  }
+  const screenRect = screen.getBoundingClientRect()
+  const box = container.getBoundingClientRect()
+  const cellW = screenRect.width / terminal.cols
+  const cellH = screenRect.height / terminal.rows
+  return {
+    left: screenRect.left - box.left + region.left * cellW,
+    top: screenRect.top - box.top + region.top * cellH,
+    width: region.cols * cellW,
+    height: region.rows * cellH
+  }
 }

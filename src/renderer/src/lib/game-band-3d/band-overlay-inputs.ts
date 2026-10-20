@@ -8,6 +8,8 @@ import type { BandLib, BandScene } from './band-scene'
 export type BandChoice = 'auto' | BandLib | 'cells'
 
 export const BAND_CHOICE_KEY = 'orca.poc.band3d'
+/** Dispatched on window after the stored choice changes, so live panes re-resolve. */
+export const BAND_CHOICE_EVENT = 'orca:game-band-3d-choice'
 export const BAND_TIER_KEY = 'orca.poc.band3d.tier'
 export const CHOICES: readonly BandChoice[] = ['auto', 'three', 'ogl', 'pixi', 'cells']
 /** The library auto uses; the report explains the pick. */
@@ -42,9 +44,7 @@ export const probe = (): Promise<GameBand3dProbe | null> =>
 
 export const rendererMbOf = (sample: GameBand3dProbe | null): { renderer: number; gpu: number } => {
   const processes = sample?.processes ?? []
-  const renderer = processes
-    .filter((p) => p.type === 'Tab')
-    .reduce((max, p) => Math.max(max, p.workingSetMb), 0)
+  const renderer = processes.find((p) => p.pid === sample?.rendererPid)?.workingSetMb ?? 0
   const gpu = processes.find((p) => p.type === 'GPU')?.workingSetMb ?? 0
   return { renderer, gpu }
 }
