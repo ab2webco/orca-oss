@@ -49,11 +49,34 @@ export function tableOf(rows: string[][]): string {
 
 const ticketLabel = (row: GameFleetRow): string => row.ticket ?? row.name
 
+function formatPaused(fleet: GameFleet): string[] {
+  if (fleet.pausedError) {
+    return [`Could not resume members: ${fleet.pausedError}`]
+  }
+  if (fleet.paused.length === 0) {
+    return []
+  }
+  const rows = fleet.paused.map((one) => [
+    one.ticket,
+    one.lastState ?? '-',
+    one.branch ?? '-',
+    one.agent ?? '-',
+    one.account ?? '-',
+    one.resumable ? 'its conversation' : 'a new launch in its worktree',
+    one.name ?? ''
+  ])
+  return [
+    `Paused since Orca or the machine restarted: ${fleet.paused.length} · \`orca game resume-members\` resumes them, \`--discard\` frees them`,
+    tableOf([['TICKET', 'STATE', 'BRANCH', 'AGENT', 'ACCOUNT', 'RESUMES', 'NAME'], ...rows])
+  ]
+}
+
 export function formatFleet(fleet: GameFleet): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const paused = formatPaused(fleet)
   if (fleet.rows.length === 0) {
-    return head
+    return [head, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
     row.phase,
@@ -69,7 +92,7 @@ export function formatFleet(fleet: GameFleet): string {
     row.name
   ])
   const header = ['PHASE', 'TICKET', 'STATUS', 'STATE', 'PR', 'CI', 'BRANCH', 'AGENT', 'ACCOUNT']
-  return `${head}\n${tableOf([[...header, 'NEXT', 'NAME'], ...rows])}`
+  return [head, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }
 
 export function formatWave(wave: GameWaveResult): string {

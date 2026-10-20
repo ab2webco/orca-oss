@@ -5,6 +5,7 @@ import {
 } from './orchestrator-game-lead'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import type { GamePausedMember } from './orchestrator-game-member-sessions'
 
 export { ticketInText }
 
@@ -40,9 +41,13 @@ export type GameFleet = {
   /** Members not finished: each holds a ticket and a slot. */
   running: number
   free: number
+  /** Members not live since Orca or the machine restarted: `game resume-members`. */
+  paused: GamePausedMember[]
+  pausedError?: string
 }
 
-type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'>
+type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
+  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError'>
 
 export function isFinishedMember(agent: GameAgent): boolean {
   const group = agent.workItem?.statusGroup
@@ -151,14 +156,24 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
     counts[row.phase] += 1
   }
   const cap = (state.lead ?? DEFAULT_GAME_LEAD).cap
-  const running = rows.length - counts.finished
-  return { rows, counts, cap, running, free: Math.max(0, cap - running) }
+  // Why paused ones count: each still holds its ticket until it is resumed or discarded.
+  const paused = state.pausedMembers ?? []
+  const running = rows.length - counts.finished + paused.length
+  return {
+    rows,
+    counts,
+    cap,
+    running,
+    free: Math.max(0, cap - running),
+    paused,
+    ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
+  }
 }
 
 // Why In Progress is allowed: a project may move a ticket there before its launch (cineco does).
 const PAST_WORK: ReadonlySet<GameStatusGroup> = new Set(['review', 'done', 'cancelled'])
 
-export type GameWaveSkipReason = 'cap' | 'already running' | 'not in To Do'
+export type GameWaveSkipReason = 'cap' | 'already running' | 'paused' | 'not in To Do'
 
 export type GameWavePlan = {
   launch: string[]
@@ -174,6 +189,7 @@ export function gameWavePlanOf(
   const held = new Set(
     fleet.rows.filter((row) => row.phase !== 'finished').map((row) => row.ticket)
   )
+  const paused = new Set(fleet.paused.map((one) => one.ticket))
   const items = state.project?.todo?.items ?? []
   const groupOf = (ticket: string) => items.find((item) => item.id.toUpperCase() === ticket)?.group
   const named = [...new Set(requested.map((ticket) => ticket.trim().toUpperCase()))].filter(
@@ -188,11 +204,13 @@ export function gameWavePlanOf(
     const group = groupOf(ticket)
     const reason: GameWaveSkipReason | null = held.has(ticket)
       ? 'already running'
-      : group !== undefined && PAST_WORK.has(group)
-        ? 'not in To Do'
-        : plan.launch.length >= fleet.free
-          ? 'cap'
-          : null
+      : paused.has(ticket)
+        ? 'paused'
+        : group !== undefined && PAST_WORK.has(group)
+          ? 'not in To Do'
+          : plan.launch.length >= fleet.free
+            ? 'cap'
+            : null
     if (reason) {
       plan.skipped.push({ ticket, reason })
     } else {

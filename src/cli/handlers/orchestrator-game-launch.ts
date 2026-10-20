@@ -252,6 +252,12 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, ticket)
+    if (response.result.pausedMembers?.some((one) => one.ticket === ticket)) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `${ticket} is paused since Orca restarted: \`orca game resume-members ${ticket}\` resumes it, \`orca game resume-members ${ticket} --discard\` frees it.`
+      )
+    }
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
     const { cap, running } = gameFleetReportOf(response.result)
     if (running >= cap) {
