@@ -139,6 +139,55 @@ export function serializeGameMemberSessions(
   })
 }
 
+// Why clip: the parser refuses a longer field, and a long display name must not make the file unreadable.
+const clipped = (patch: GameMemberSessionPatch): GameMemberSessionPatch =>
+  Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? value.slice(0, TEXT_MAX) : value
+    ])
+  ) as GameMemberSessionPatch
+
+/** A member the project had live that is not live now: what `game fleet` and the lead show as paused. */
+export type GamePausedMember = {
+  ticket: string
+  name: string | null
+  agent: string | null
+  account: string | null
+  branch: string | null
+  lastState: string | null
+  /** Whether its own conversation can be resumed; without one it is relaunched in its worktree. */
+  resumable: boolean
+  since: string
+}
+
+/**
+ * Every saved member not live now, except the ones that finished. Why the worktrees: a pane that
+ * leads no one still sees the lead's members running there, and nothing resumes over a live agent.
+ */
+export function pausedMembersOf(
+  members: readonly GameMemberSession[],
+  live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> }
+): GamePausedMember[] {
+  return members
+    .filter(
+      (one) =>
+        one.lastState !== 'finished' &&
+        !live.tickets.has(one.ticket) &&
+        !(one.worktreeId !== null && live.worktreeIds.has(one.worktreeId))
+    )
+    .map((one) => ({
+      ticket: one.ticket,
+      name: one.name,
+      agent: one.agent,
+      account: one.account,
+      branch: one.branch,
+      lastState: one.lastState,
+      resumable: one.sessionId !== null && one.worktreeId !== null,
+      since: one.updatedAt
+    }))
+}
+
 /**
  * Upserts one member by ticket. Returns `members` itself when nothing changed, so a caller can skip
  * the write; a member it does not hold yet is only added with its task and run.
@@ -148,6 +197,7 @@ export function mergeGameMemberSession(
   patch: GameMemberSessionPatch,
   now: string
 ): GameMemberSession[] {
+  patch = clipped(patch)
   const ticket = patch.ticket.toUpperCase()
   const index = members.findIndex((one) => one.ticket === ticket)
   const current = members[index]

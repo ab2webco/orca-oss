@@ -66,3 +66,11 @@ export async function postGameEvents(
     await client.call('game.eventPost', { ...gameBoardCaller(), ...draft }).catch(() => undefined)
   }
 }
+
+/** Saves what the lead needs to resume a member after a restart; never fails the launch it rides on. */
+export async function recordGameMember(
+  client: Client,
+  member: { ticket: string } & Record<string, string | undefined>
+): Promise<void> {
+  await client.call('game.memberRecord', { ...gameBoardCaller(), member }).catch(() => undefined)
+}

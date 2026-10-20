@@ -1,0 +1,92 @@
+import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
+import { isFinishedMember, ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  pausedMembersOf,
+  type GameMemberSessionPatch,
+  type GamePausedMember
+} from '../../shared/orchestrator-game-member-sessions'
+import type { GameAgent } from '../../shared/orchestrator-game-state'
+import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
+
+export type GamePausedMembersView = { paused: GamePausedMember[]; error: string | null }
+
+type Deps = {
+  store: GameMemberSessionStore
+  contextOf: (terminalHandle: string) => AgentStatusOrchestrationContext | undefined
+  /** The live agent's own conversation id, null until its hooks report one. */
+  sessionIdOf: (terminalHandle: string) => string | null
+}
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message.replace(/^Members not saved: /, '') : String(error)
+
+/** Keeps each project's members on disk while they run, so the lead finds them after a restart. */
+export class GamePausedMembers {
+  constructor(private readonly deps: Deps) {}
+
+  /**
+   * Saves what each live member needs to resume and returns the saved ones not live now. Never
+   * throws: the game state it rides on must not fail on this.
+   */
+  async note(
+    projectKey: string,
+    agents: readonly GameAgent[],
+    liveWorktreeIds: ReadonlySet<string> = new Set()
+  ): Promise<GamePausedMembersView> {
+    const live = agents.flatMap((agent) => {
+      const ticket = agent.isMember ? ticketOfMember(agent) : null
+      return ticket ? [{ agent, ticket }] : []
+    })
+    let error: string | null = null
+    try {
+      await this.deps.store.upsert(
+        projectKey,
+        live.map(({ agent, ticket }) => this.patchOf(agent, ticket))
+      )
+    } catch (failure) {
+      error = errorText(failure)
+    }
+    const read = await this.deps.store.read(projectKey)
+    if (!read.ok) {
+      return { paused: [], error: read.reason }
+    }
+    const tickets = new Set(live.map((one) => one.ticket))
+    return {
+      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }),
+      error
+    }
+  }
+
+  /** A launch, recorded before its agent runs so a launch cut short is still found. */
+  async record(projectKey: string, patch: GameMemberSessionPatch): Promise<void> {
+    await this.deps.store.upsert(projectKey, patch)
+  }
+
+  async forget(projectKey: string, tickets: readonly string[]): Promise<void> {
+    await this.deps.store.remove(projectKey, tickets)
+  }
+
+  private patchOf(agent: GameAgent, ticket: string): GameMemberSessionPatch {
+    const handle = agent.terminalHandle
+    const context = handle ? this.deps.contextOf(handle) : undefined
+    const sessionId = handle ? this.deps.sessionIdOf(handle) : null
+    // Why a completed dispatch counts: its worker_done succeeded, so it is never resumed.
+    const finished = isFinishedMember(agent) || context?.dispatchStatus === 'completed'
+    return {
+      ticket,
+      name: agent.displayName,
+      ...(context?.orchestrationRunId
+        ? {
+            runId: context.orchestrationRunId,
+            taskId: context.taskId,
+            dispatchId: context.dispatchId
+          }
+        : {}),
+      ...(agent.worktree ? { worktreeId: agent.worktree.id, branch: agent.worktree.branch } : {}),
+      agent: agent.agentType,
+      ...(agent.account ? { accountId: agent.account.id, account: agent.account.email } : {}),
+      ...(sessionId ? { sessionId } : {}),
+      lastState: finished ? 'finished' : agent.state
+    }
+  }
+}

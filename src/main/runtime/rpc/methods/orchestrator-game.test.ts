@@ -143,3 +143,35 @@ describe('game.state RPC', () => {
     ])
   })
 })
+
+describe('game.memberRecord RPC', () => {
+  it("passes a lead's member on and refuses a malformed ticket", async () => {
+    const recorded: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      recordGameMember: async (args: unknown) => {
+        recorded.push(args)
+        return { recorded: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'm', authToken: 'test', method: 'game.memberRecord', params })
+    const member = { ticket: 'CIN-1', taskId: 'task_1', runId: 'run_1', newerField: 'x' }
+
+    await expect(send({ terminalHandle: 'h1', member })).resolves.toMatchObject({
+      ok: true,
+      result: { recorded: true }
+    })
+    await expect(
+      send({ terminalHandle: 'h1', member: { ticket: 'CIN 1; rm', taskId: 'task_1' } })
+    ).resolves.toMatchObject({ ok: false })
+    expect(recorded).toEqual([
+      {
+        worktreeId: undefined,
+        terminalHandle: 'h1',
+        member: { ticket: 'CIN-1', taskId: 'task_1', runId: 'run_1' }
+      }
+    ])
+  })
+})
