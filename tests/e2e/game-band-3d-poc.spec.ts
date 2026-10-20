@@ -369,6 +369,10 @@ test('game band WebGL overlay on one hardware tier (ORCA-692) @headful', async (
       2
     )
   )
+  if (LIB === 'auto' && TIER === 0) {
+    expect(final?.mode, 'auto must leave WebGL on software rendering').toBe('cells')
+    expect(final?.rendererName ?? '').toMatch(/swiftshader/i)
+  }
   if (drawsWebgl && final?.mode !== 'cells') {
     expect(
       hiddenRun.overlayFrames,
