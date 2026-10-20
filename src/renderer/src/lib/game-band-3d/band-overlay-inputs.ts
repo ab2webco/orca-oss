@@ -4,6 +4,9 @@ import type { GameBand3dProbe } from '../../../../shared/game-band-3d-probe'
 import { webglClassOf, type HardwareSignals } from './band-mode'
 import type { BandCell } from './band-region'
 import type { BandLib, BandScene } from './band-scene'
+import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
+import { sceneDefinitionOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-shape'
+import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 
 export type BandChoice = 'auto' | BandLib | 'cells'
 
@@ -11,6 +14,10 @@ export const BAND_CHOICE_KEY = 'orca.poc.band3d'
 /** Dispatched on window after the stored choice changes, so live panes re-resolve. */
 export const BAND_CHOICE_EVENT = 'orca:game-band-3d-choice'
 export const BAND_TIER_KEY = 'orca.poc.band3d.tier'
+/** A scene definition as JSON (a project's `.orca/scenes` file); quest when unset. */
+export const BAND_SCENE_KEY = 'orca.poc.band3d.scene'
+/** A fixed hour for like-for-like captures; the local clock when unset. */
+export const BAND_HOUR_KEY = 'orca.poc.band3d.hour'
 export const CHOICES: readonly BandChoice[] = ['auto', 'three', 'ogl', 'pixi', 'cells']
 /** The library auto uses; the report explains the pick. */
 export const AUTO_LIB: BandLib = 'three'
@@ -29,10 +36,33 @@ export const choiceOf = (): BandChoice => {
   return CHOICES.find((one) => one === stored) ?? 'cells'
 }
 
+const sceneOfChoice = (): SceneDefinition => {
+  const stored = readStorage(BAND_SCENE_KEY)
+  if (stored === null) {
+    return QUEST_SCENE
+  }
+  try {
+    return sceneDefinitionOf(JSON.parse(stored), 'poc-scene') ?? QUEST_SCENE
+  } catch {
+    return QUEST_SCENE
+  }
+}
+
+const hourOf = (): number => {
+  const fixed = readStorage(BAND_HOUR_KEY)
+  const now = new Date()
+  return fixed !== null && Number.isFinite(Number(fixed))
+    ? Number(fixed)
+    : now.getHours() + now.getMinutes() / 60
+}
+
 export const createScene = async (lib: BandLib): Promise<BandScene> => {
   switch (lib) {
     case 'three':
-      return (await import('./band-scene-three')).createThreeBandScene()
+      return (await import('./band-scene-hd2d')).createHd2dBandScene({
+        scene: sceneOfChoice(),
+        hourOf
+      })
     case 'ogl':
       return (await import('./band-scene-ogl')).createOglBandScene()
     case 'pixi':
