@@ -329,7 +329,7 @@ function resolveMessageRun(
   }
   if (!run && !resolvedRunId && params.from) {
     // Why (ORCA-726): a worker's trailing mail after its Dispatch settles belongs to that Run while
-    // its coordinator is still bound; anything else is refused rather than filed as legacy mail.
+    // its coordinator is still bound.
     const latest = db.getLatestDispatchForIdentity(params.from, params.senderPaneKey)
     const latestRun = latest ? db.getRun(latest.run_id) : undefined
     if (latestRun && latestRun.legacy === 0 && latestRun.coordinator_handle) {
@@ -361,15 +361,10 @@ function resolveMessageRun(
   return { run, dispatchId: dispatch?.id ?? dispatchId }
 }
 
-function requireMessageRunId(runId: string | undefined): string {
-  if (!runId) {
-    throw new OrchestrationError(
-      'run_required',
-      'No Run could be resolved for this message. Send from a dispatched pane, pass --run <id>, or address a Run coordinator or run:<id>. No effects were applied.',
-      orchestrationSkillRecoveryData()
-    )
-  }
-  return runId
+// Why (ORCA-726): peer mail with no provable Run keeps its legacy home (push-on-idle still points
+// the pane at it), but by name; insertMessage refuses an implicit one once state was adopted.
+function messageRunIdOrLegacy(runId: string | undefined): string {
+  return runId ?? ORCHESTRATION_LEGACY_RUN_ID
 }
 
 function legacyWorkerDeliveryContract(
@@ -646,7 +641,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           }
         }
         // Point-to-point — existing single-recipient behavior
-        const messageRunId = requireMessageRunId(routing.run?.id ?? legacyCoordinatorRunId)
+        const contractRunId = routing.run?.id ?? legacyCoordinatorRunId
         revalidateLegacyCoordinator?.()
         const msg = db.insertMessage({
           from,
@@ -658,8 +653,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           threadId: params.threadId,
           payload: params.payload,
           senderPaneKey,
-          runId: messageRunId,
-          deliveryContract: legacyWorkerDeliveryContract(runtime, messageRunId, to)
+          runId: messageRunIdOrLegacy(contractRunId),
+          deliveryContract: legacyWorkerDeliveryContract(runtime, contractRunId, to)
         })
         const dispatch = routing.dispatchId
           ? db.getDispatchContextById(routing.dispatchId)
@@ -746,7 +741,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         return { message: msg }
       }
 
-      const groupRunId = requireMessageRunId(routing.run?.id ?? legacyCoordinatorRunId)
+      const groupRunId = routing.run?.id ?? legacyCoordinatorRunId
       // Why: fan out one message per recipient (independent read-tracking) but share a thread_id for correlation (Section 4.5).
       const { terminals } = await runtime.listTerminals(undefined, undefined, {
         includeVisualLayouts: false
@@ -772,7 +767,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           threadId,
           payload: params.payload,
           senderPaneKey,
-          runId: groupRunId,
+          runId: messageRunIdOrLegacy(groupRunId),
           deliveryContract: legacyWorkerDeliveryContract(runtime, groupRunId, handle)
         })
       )

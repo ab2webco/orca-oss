@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from '../../sqlite/sync-database'
+import { _resetTracerForTests, setActiveSink } from '../../observability/tracer'
 import { LEGACY_RUN_ID, OrchestrationDb } from './db'
 
 const LEAD_HANDLE = 'term_lead'
@@ -12,6 +13,7 @@ describe('OrchestrationDb stray legacy mail (ORCA-726)', () => {
   let tempDir: string | undefined
 
   afterEach(() => {
+    _resetTracerForTests()
     db?.close()
     db = undefined
     if (tempDir) {
@@ -99,21 +101,82 @@ describe('OrchestrationDb stray legacy mail (ORCA-726)', () => {
     expect(db.getMessageById(stray)?.run_id).toBe(adoptedRunId)
   })
 
-  it('still refuses a stray carried by Deliveries of two different Runs', () => {
+  function carryByTwoRuns(dbPath: string, stray: string, runIds: [string, string]): void {
+    const raw = new Database(dbPath)
+    const insert = raw.prepare(
+      "INSERT INTO deliveries (id, run_id, consumer_generation, message_ids, status) VALUES (?, ?, 1, ?, 'acknowledged')"
+    )
+    insert.run('delivery_a', runIds[0], JSON.stringify([stray]))
+    insert.run('delivery_b', runIds[1], JSON.stringify([stray]))
+    raw.close()
+  }
+
+  it('gives a stray carried by two Runs to its latest carrier and records a span', () => {
+    const pushed: unknown[] = []
+    setActiveSink({ push: (record) => pushed.push(record), flush: () => {}, close: () => {} })
     const { dbPath, first } = openAdoptedDb()
     const lead = createLeadRun(first, '3')
     const other = createLeadRun(first, '4')
     const stray = insertStray(first, lead.id, 'carried twice')
     first.close()
     moveToLegacyRun(dbPath, [stray])
-    const raw = new Database(dbPath)
-    const insert = raw.prepare(
-      "INSERT INTO deliveries (id, run_id, consumer_generation, message_ids, status) VALUES (?, ?, ?, ?, 'acknowledged')"
-    )
-    insert.run('delivery_a', lead.id, lead.consumer_generation, JSON.stringify([stray]))
-    insert.run('delivery_b', other.id, other.consumer_generation, JSON.stringify([stray]))
-    raw.close()
+    carryByTwoRuns(dbPath, stray, [lead.id, other.id])
 
+    db = new OrchestrationDb(dbPath)
+
+    expect(db.getMessageById(stray)?.run_id).toBe(other.id)
+    expect(pushed).toEqual([
+      expect.objectContaining({
+        name: 'orchestration.legacy_heal.ambiguous_carrier',
+        attributes: { 'orchestration.message_ids': stray }
+      })
+    ])
+  })
+
+  it('opens twice with peer legacy mail and an ambiguous stray, and the second open changes nothing', () => {
+    const { dbPath, first } = openAdoptedDb()
+    const lead = createLeadRun(first, '5')
+    const other = createLeadRun(first, '6')
+    const stray = insertStray(first, lead.id, 'carried twice')
+    const peer = first.insertMessage({
+      runId: LEGACY_RUN_ID,
+      from: 'term_a',
+      to: 'term_b',
+      subject: 'peer'
+    }).id
+    first.close()
+    moveToLegacyRun(dbPath, [stray])
+    carryByTwoRuns(dbPath, stray, [lead.id, other.id])
+    const snapshot = (): unknown => {
+      const raw = new Database(dbPath)
+      try {
+        return raw.prepare('SELECT id, run_id, delivery_contract FROM messages ORDER BY id').all()
+      } finally {
+        raw.close()
+      }
+    }
+
+    new OrchestrationDb(dbPath).close()
+    const afterFirst = snapshot()
+    new OrchestrationDb(dbPath).close()
+
+    expect(snapshot()).toEqual(afterFirst)
+    const rows = afterFirst as { id: string; run_id: string }[]
+    expect(rows.find((row) => row.id === stray)?.run_id).toBe(other.id)
+    expect(rows.find((row) => row.id === peer)?.run_id).not.toBe(LEGACY_RUN_ID)
+  })
+
+  it('still throws for a real ownership mismatch and closes the handle', () => {
+    const { dbPath, first } = openAdoptedDb()
+    const lead = createLeadRun(first, '7')
+    const task = first.createTask({ spec: 'work', runId: lead.id })
+    const dispatch = first.createDispatchContext(task.id, 'term_worker')
+    first.close()
+    const raw = new Database(dbPath)
+    raw
+      .prepare('UPDATE dispatch_contexts SET run_id = ? WHERE id = ?')
+      .run(LEGACY_RUN_ID, dispatch.id)
+    raw.close()
     const close = vi.spyOn(Database.prototype, 'close')
 
     expect(() => new OrchestrationDb(dbPath)).toThrow(

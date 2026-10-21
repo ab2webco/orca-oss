@@ -8,35 +8,26 @@ import { LEGACY_RUN_ID, OrchestrationDb } from './orchestration/db'
 
 const userData = { dir: '' }
 
-// A stray legacy message carried by Deliveries of two Runs: no heal can own it, so every open throws.
+// A dispatch filed under the legacy Run whose task lives in another Run: a real ownership mismatch
+// the heal never touches, so every open throws.
 function seedUnadoptableDb(dir: string): void {
   const dbPath = join(dir, 'orchestration.db')
   const seed = new OrchestrationDb(dbPath)
   seed.insertMessage({ from: 'term_old', to: 'term_old_coord', subject: 'pre-run mail' })
   seed.close()
   const adopted = new OrchestrationDb(dbPath)
-  const runs = ['1', '2'].map((suffix) =>
-    adopted.createRun({
-      objective: `lead ${suffix}`,
-      coordinatorHandle: 'term_lead',
-      coordinatorPaneKey: `tab_${suffix}:11111111-1111-4111-8111-11111111111${suffix}`
-    })
-  )
-  const stray = adopted.insertMessage({
-    runId: runs[0].id,
-    from: 'term_worker',
-    to: 'term_lead',
-    subject: 'stray'
+  const run = adopted.createRun({
+    objective: 'lead',
+    coordinatorHandle: 'term_lead',
+    coordinatorPaneKey: 'tab_1:11111111-1111-4111-8111-111111111111'
   })
+  const task = adopted.createTask({ spec: 'work', runId: run.id })
+  const dispatch = adopted.createDispatchContext(task.id, 'term_worker')
   adopted.close()
   const raw = new Database(dbPath)
-  raw.prepare('UPDATE messages SET run_id = ? WHERE id = ?').run(LEGACY_RUN_ID, stray.id)
-  const deliver = raw.prepare(
-    "INSERT INTO deliveries (id, run_id, consumer_generation, message_ids, status) VALUES (?, ?, 1, ?, 'acknowledged')"
-  )
-  for (const run of runs) {
-    deliver.run(`delivery_${run.id}`, run.id, JSON.stringify([stray.id]))
-  }
+  raw
+    .prepare('UPDATE dispatch_contexts SET run_id = ? WHERE id = ?')
+    .run(LEGACY_RUN_ID, dispatch.id)
   raw.close()
 }
 

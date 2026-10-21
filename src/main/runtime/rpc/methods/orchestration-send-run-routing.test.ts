@@ -102,7 +102,7 @@ describe('orchestration.send from a sender with no active Dispatch (ORCA-726)', 
     expect(result.message.run_id).toBe(lead.id)
   })
 
-  it('refuses with run_required when the latest Dispatch Run has no coordinator bound', async () => {
+  it('files peer mail under the legacy Run when the latest Dispatch Run lost its coordinator', async () => {
     const { adopted, runtime } = openAdopted()
     const lead = createLeadRun(adopted, '4')
     completedDispatch(adopted, lead.id)
@@ -114,11 +114,14 @@ describe('orchestration.send from a sender with no active Dispatch (ORCA-726)', 
     })
     const before = rowCount(adopted, lead.id)
 
-    await expect(
-      send(runtime, { from: WORKER_HANDLE, to: 'term_726_peer', subject: 'too late' })
-    ).rejects.toMatchObject({ code: 'run_required' })
+    const result = (await send(runtime, {
+      from: WORKER_HANDLE,
+      to: 'term_726_peer',
+      subject: 'too late'
+    })) as { message: { run_id: string } }
+
+    expect(result.message.run_id).toBe(LEGACY_RUN_ID)
     expect(rowCount(adopted, lead.id)).toBe(before)
-    expect(legacyRowCount(adopted)).toBe(0)
   })
 
   it('files mail from a never-dispatched sender under the Run its recipient coordinates', async () => {
@@ -135,21 +138,20 @@ describe('orchestration.send from a sender with no active Dispatch (ORCA-726)', 
     expect(legacyRowCount(adopted)).toBe(0)
   })
 
-  it('refuses a peer-to-peer broadcast when no Run can be resolved', async () => {
+  it('files peer mail from a never-dispatched sender under the legacy Run by name', async () => {
     const { adopted, runtime } = openAdopted()
 
-    await expect(
-      send(runtime, { from: 'term_726_stranger', to: '@all', subject: 'hello all' })
-    ).rejects.toMatchObject({ code: 'run_required' })
-    expect(legacyRowCount(adopted)).toBe(0)
-  })
+    const result = (await send(runtime, {
+      from: 'term_726_stranger',
+      to: 'term_726_peer',
+      subject: 'hello'
+    })) as { message: { run_id: string; delivery_contract: string } }
 
-  it('refuses with run_required when the sender was never dispatched', async () => {
-    const { adopted, runtime } = openAdopted()
-
-    await expect(
-      send(runtime, { from: 'term_726_stranger', to: LEAD_HANDLE, subject: 'hello' })
-    ).rejects.toMatchObject({ code: 'run_required' })
-    expect(legacyRowCount(adopted)).toBe(0)
+    // Why: push-on-idle still points the recipient pane at it, as on main.
+    expect(result.message).toMatchObject({
+      run_id: LEGACY_RUN_ID,
+      delivery_contract: 'current_delivery'
+    })
+    expect(legacyRowCount(adopted)).toBe(1)
   })
 })

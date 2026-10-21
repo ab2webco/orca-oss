@@ -13,8 +13,8 @@ const THEMES = ['light', 'dark'] as const
 // Run and carried by the lead's Delivery. 'two-runs' adds a second carrier, which no heal can own.
 function seedStrayLegacyMail(
   userDataDir: string,
-  carriers: 'lead-run' | 'two-runs'
-): { leadRunId: string; strayIds: string[] } {
+  carriers: 'lead-run' | 'two-runs' | 'ownership-mismatch'
+): { leadRunId: string; otherRunId: string; strayIds: string[] } {
   const dbPath = path.join(userDataDir, 'orchestration.db')
   const seed = new OrchestrationDb(dbPath)
   seed.insertMessage({ from: 'term_old', to: 'term_old_coord', subject: 'pre-run mail' })
@@ -30,6 +30,8 @@ function seedStrayLegacyMail(
     coordinatorHandle: 'term_orca_726_other',
     coordinatorPaneKey: 'tab_other:22222222-2222-4222-8222-222222222222'
   })
+  const task = adopted.createTask({ spec: 'ORCA-726 work', runId: lead.id })
+  adopted.createDispatchContext(task.id, 'term_worker')
   const strayIds = ['after ctx_028ddbf112a7', 'after ctx_1e4ce481939e'].map(
     (subject) =>
       adopted.insertMessage({ runId: lead.id, from: 'term_worker', to: LEAD_HANDLE, subject }).id
@@ -49,10 +51,19 @@ function seedStrayLegacyMail(
     if (carriers === 'two-runs') {
       deliver.run('delivery_other', other.id, other.consumer_generation, JSON.stringify(strayIds))
     }
+    if (carriers === 'ownership-mismatch') {
+      // A dispatch under the legacy Run whose task is in another Run: no heal applies, so it throws.
+      const task = raw.prepare('SELECT id FROM tasks WHERE run_id = ? LIMIT 1').get(lead.id) as {
+        id: string
+      }
+      raw
+        .prepare('UPDATE dispatch_contexts SET run_id = ? WHERE task_id = ?')
+        .run(LEGACY_RUN_ID, task.id)
+    }
   } finally {
     raw.close()
   }
-  return { leadRunId: lead.id, strayIds }
+  return { leadRunId: lead.id, otherRunId: other.id, strayIds }
 }
 
 function readMessageRuns(userDataDir: string, ids: string[]): string[] {
@@ -109,13 +120,49 @@ test.describe('orchestration.db with stray legacy mail (ORCA-726)', () => {
     }
   })
 
+  test('opens twice with peer legacy mail and a stray two Runs carried', async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
+    const session = createRestartSession(testInfo)
+    try {
+      const seeded = seedStrayLegacyMail(session.userDataDir, 'two-runs')
+      const raw = new Database(path.join(session.userDataDir, 'orchestration.db'))
+      raw
+        .prepare(
+          "INSERT INTO messages (id, run_id, from_handle, to_handle, subject) VALUES ('msg_peer_726', ?, 'term_a', 'term_b', 'peer')"
+        )
+        .run(LEGACY_RUN_ID)
+      raw.close()
+      for (const launchIndex of [1, 2]) {
+        const { app, page } = await session.launch()
+        try {
+          await expect(page.locator('body')).toBeVisible()
+          await page.setViewportSize({ width: 1440, height: 900 })
+          await page.screenshot({
+            path: testInfo.outputPath(`peer-and-ambiguous-launch-${launchIndex}-1440.png`)
+          })
+        } finally {
+          await session.close(app)
+        }
+      }
+      expect(readMessageRuns(session.userDataDir, seeded.strayIds)).toEqual([
+        seeded.otherRunId,
+        seeded.otherRunId
+      ])
+      expect(readMessageRuns(session.userDataDir, ['msg_peer_726'])).not.toEqual([LEGACY_RUN_ID])
+    } finally {
+      await session.dispose()
+    }
+  })
+
   test('opens the window even when orchestration.db cannot be adopted', async ({
     flushRendererRecoveryEvidenceQueue
   }, testInfo) => {
     void flushRendererRecoveryEvidenceQueue
     const session = createRestartSession(testInfo)
     try {
-      seedStrayLegacyMail(session.userDataDir, 'two-runs')
+      seedStrayLegacyMail(session.userDataDir, 'ownership-mismatch')
       let stderr = ''
       const { app, page } = await session.launch({
         onStderr: (chunk) => {
