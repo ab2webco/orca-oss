@@ -511,7 +511,10 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     })
     expect(
       readCompletedWorkerLedger().filter(
-        (event) => event.event === 'spawn' && event.args?.includes(PROVIDER_SESSION_ID)
+        (event) =>
+          event.event === 'spawn' &&
+          event.args?.includes('resume') &&
+          event.args?.includes(PROVIDER_SESSION_ID)
       )
     ).toHaveLength(0)
     await expect(orcaPage.locator('.session-restored-banner')).toHaveCount(0)
