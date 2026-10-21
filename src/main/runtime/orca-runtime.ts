@@ -3688,13 +3688,15 @@ export class OrcaRuntimeService {
       if (!pane.ok || !pane.providerSession || !pane.worktreeId) {
         return null
       }
-      // Why not over SSH: that Claude runs on the remote host, which a host account does not name.
-      const owner = pane.remoteConnectionId ? null : this.claudePtyAccountOwnerOrNull(pane.ptyId)
+      // Why only an injected account: a lead in the shared home keeps its conversation there, and SSH runs remote.
+      const accountId = pane.remoteConnectionId
+        ? null
+        : getLiveInjectedClaudePtyAccountId(pane.ptyId)
       return {
         sessionId: pane.providerSession.id,
         agentArgs: leadResumeArgsOf(pane.launchConfig),
         worktreeId: pane.worktreeId,
-        accountId: owner?.known ? owner.accountId : null
+        accountId
       }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
@@ -30543,16 +30545,12 @@ export class OrcaRuntimeService {
     if (accountId === null) {
       return null
     }
-    const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts ?? []
-    return accounts.find((one) => one.id === accountId)?.email ?? accountId
-  }
-
-  // Why never throw: an unreadable owner must cost the lead its account, not its reopen.
-  private claudePtyAccountOwnerOrNull(ptyId: string): ManagedPtyAccountOwner | null {
+    // Why the id on a failed read: the label must not replace the reason Claude refused.
     try {
-      return this.getManagedPtyAccountOwner(ptyId, 'claude')
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts ?? []
+      return accounts.find((one) => one.id === accountId)?.email ?? accountId
     } catch {
-      return null
+      return accountId
     }
   }
 

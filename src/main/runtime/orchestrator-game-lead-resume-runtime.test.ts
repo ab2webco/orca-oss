@@ -1,7 +1,12 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  markClaudePtyExited,
+  markClaudePtySpawned,
+  markInjectedClaudePtySpawned
+} from '../claude-accounts/live-pty-gate'
 import type { GameLeadSession } from './orchestrator-game-leads'
 
 const userData = vi.hoisted(() => ({ dir: '' }))
@@ -16,6 +21,7 @@ import { OrcaRuntimeService } from './orca-runtime'
 
 userData.dir = mkdtempSync(join(tmpdir(), 'orca-lead-resume-runtime-'))
 afterAll(() => rmSync(userData.dir, { recursive: true, force: true }))
+afterEach(() => markClaudePtyExited('pty-lead'))
 
 type LeadDeps = {
   sessionOf: (handle: string) => Promise<GameLeadSession | null>
@@ -25,6 +31,16 @@ type LeadDeps = {
 // Why the cast: the lead's wiring is private, and the real panes need live PTYs and hook events.
 const leadDepsOf = (runtime: OrcaRuntimeService): LeadDeps =>
   (runtime as unknown as { gameLeads: { deps: LeadDeps } }).gameLeads.deps
+
+// Why real accounts: without them every account read fails, and a shared lead would pass for no account.
+function runtimeWithAccounts(): OrcaRuntimeService {
+  const runtime = new OrcaRuntimeService(null)
+  const accounts = [{ id: 'acct-lead', email: 'lead@example.com', authMethod: 'oauth' }]
+  Object.assign(runtime, {
+    accountServices: { claudeAccounts: { listAccounts: () => ({ accounts }) } }
+  })
+  return runtime
+}
 
 function leadPane(runtime: OrcaRuntimeService, remoteConnectionId: string | null): void {
   vi.spyOn(runtime, 'snapshotClaudeTerminalSwitchTarget').mockResolvedValue({
@@ -40,11 +56,6 @@ function leadPane(runtime: OrcaRuntimeService, remoteConnectionId: string | null
     remoteConnectionId,
     providerSession: { agent: 'claude', id: 'sess-lead' }
   })
-  vi.spyOn(runtime, 'getManagedPtyAccountOwner').mockReturnValue({
-    known: true,
-    accountId: 'acct-lead',
-    customEndpoint: false
-  })
 }
 
 const STORED: GameLeadSession = {
@@ -55,16 +66,29 @@ const STORED: GameLeadSession = {
 }
 
 describe('a game lead reopened on claim', () => {
-  it('records the managed account its pane runs on', async () => {
-    const runtime = new OrcaRuntimeService(null)
+  it("records the managed account whose vault holds the lead's conversation", async () => {
+    const runtime = runtimeWithAccounts()
     leadPane(runtime, null)
+    markInjectedClaudePtySpawned('pty-lead', 'acct-lead')
 
     expect(await leadDepsOf(runtime).sessionOf('term_lead')).toEqual(STORED)
   })
 
+  it('records no account for a lead in the shared home, which is where its conversation is', async () => {
+    const runtime = runtimeWithAccounts()
+    leadPane(runtime, null)
+    markClaudePtySpawned('pty-lead', 'acct-lead')
+
+    expect(await leadDepsOf(runtime).sessionOf('term_lead')).toEqual({
+      ...STORED,
+      accountId: null
+    })
+  })
+
   it('records no host account for an SSH lead, whose Claude runs on the remote host', async () => {
-    const runtime = new OrcaRuntimeService(null)
+    const runtime = runtimeWithAccounts()
     leadPane(runtime, 'ssh-1')
+    markInjectedClaudePtySpawned('pty-lead', 'acct-lead')
 
     expect(await leadDepsOf(runtime).sessionOf('term_lead')).toEqual({
       ...STORED,
@@ -73,7 +97,7 @@ describe('a game lead reopened on claim', () => {
   })
 
   it('reopens the conversation on the account it ran on', async () => {
-    const runtime = new OrcaRuntimeService(null)
+    const runtime = runtimeWithAccounts()
     const ensure = vi
       .spyOn(runtime, 'ensureAgentSession')
       .mockResolvedValue({ terminal: { handle: 'term_new' }, disposition: 'created' } as never)
@@ -94,7 +118,7 @@ describe('a game lead reopened on claim', () => {
   })
 
   it("keeps the pane's last words in the error before it closes the pane Claude left", async () => {
-    const runtime = new OrcaRuntimeService(null)
+    const runtime = runtimeWithAccounts()
     vi.spyOn(runtime, 'ensureAgentSession').mockResolvedValue({
       terminal: { handle: 'term_new' },
       disposition: 'created'
@@ -114,7 +138,7 @@ describe('a game lead reopened on claim', () => {
     const close = vi.spyOn(runtime, 'closeTerminal').mockResolvedValue({} as never)
 
     await expect(leadDepsOf(runtime).resume(STORED)).rejects.toThrow(
-      'Claude exited instead of reopening the conversation on account acct-lead: No conversation found with session ID: sess-lead'
+      'Claude exited instead of reopening the conversation on account lead@example.com: No conversation found with session ID: sess-lead'
     )
     expect(read.mock.invocationCallOrder[0]).toBeLessThan(close.mock.invocationCallOrder[0] ?? 0)
   })
