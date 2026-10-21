@@ -610,7 +610,7 @@ test('the render and time zone rows persist globally and per project and render 
   })
   const render = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
   await expect(render).toBeVisible({ timeout: 15_000 })
-  await render.getByRole('radio', { name: 'HD' }).click()
+  await render.getByRole('radio', { name: 'HD', exact: true }).click()
   const zone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
   await zone.fill('Mars/Olympus')
   await zone.press('Enter')
@@ -643,6 +643,14 @@ test('the render and time zone rows persist globally and per project and render 
     .toEqual({ [repoId as string]: { render: 'classic', timezone: 'Europe/Madrid' } })
   await expect(orcaPage.getByText('Classic · this machine')).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'render-project', projectZone)
+
+  // ORCA-731: the short hd band is a third choice on the same row.
+  await projectRender.getByRole('radio', { name: 'HD compact' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId as string]: { render: 'hd-compact', timezone: 'Europe/Madrid' } })
+  await expect(orcaPage.getByText('HD compact · this machine')).toBeVisible()
+  await shootAll(electronApp, orcaPage, testInfo, 'render-project-compact', projectRender)
 })
 
 test('the hd preview is lit by the hour in the chosen time zone and renders at every width', async ({
@@ -658,7 +666,7 @@ test('the hd preview is lit by the hour in the chosen time zone and renders at e
   })
   const render = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
   await expect(render).toBeVisible({ timeout: 15_000 })
-  await render.getByRole('radio', { name: 'HD' }).click()
+  await render.getByRole('radio', { name: 'HD', exact: true }).click()
   const zone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
   const preview = orcaPage.locator('[data-slot="game-scene-preview"]').first()
   const brightnessOf = (): Promise<number> =>
