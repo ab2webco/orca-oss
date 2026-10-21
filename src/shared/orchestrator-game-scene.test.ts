@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { orchestratorGameScenesOf, parseOrchestratorGameScene } from './orchestrator-game-scene'
+import {
+  orchestratorGameSceneIssues,
+  orchestratorGameScenesOf,
+  parseOrchestratorGameScene
+} from './orchestrator-game-scene'
 import {
   byScenePhase as byPhase,
   sceneCard as card,
@@ -87,6 +91,29 @@ describe('parseOrchestratorGameScene', () => {
     expect(bad.ok).toBe(true)
     expect(bad.ok && bad.definition.roster).toBeUndefined()
     expect(bad.ok && bad.warnings).toEqual(['roster.0: must not look like a ticket id'])
+  })
+
+  it('takes optional palette themes, and leaves bad ones out with a clear warning', () => {
+    const themed = parse(
+      scene({ themes: [{ name: 'Dusk', weight: 0.5, look: { skyTop: '#ff0000', far: 255 } }] })
+    )
+    expect(themed.ok && themed.definition.themes).toEqual([
+      { name: 'Dusk', weight: 0.5, look: { skyTop: 0xff0000, far: 255 } }
+    ])
+    expect(themed.ok && themed.warnings).toEqual([])
+    const plain = parse(scene())
+    expect(plain.ok && 'themes' in plain.definition).toBe(false)
+
+    const bad = parse(scene({ themes: [{ name: 'Dusk', weight: 2, look: {} }] }))
+    expect(bad.ok).toBe(true)
+    expect(bad.ok && bad.definition.themes).toBeUndefined()
+    expect(bad.ok && bad.warnings).toEqual([
+      'themes.0.weight: must be from 0 to 1',
+      'themes.0.look: must set at least one look color'
+    ])
+    expect(orchestratorGameSceneIssues(JSON.stringify(scene({ themes: 'dusk' })))).toEqual([
+      'themes: must be a list of 1 to 8 themes'
+    ])
   })
 
   it('ignores an id inside the file so a plugin cannot claim another namespace', () => {

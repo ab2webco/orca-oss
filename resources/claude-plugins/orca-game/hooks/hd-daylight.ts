@@ -111,6 +111,39 @@ export const hourOf = (epochMs: number, zone: string): number => {
   return (part('hour') % 24) + part('minute') / 60
 }
 
+const DAY_MS = 86_400_000
+const dateFormats = new Map<string, Intl.DateTimeFormat | null>()
+
+const dateFormatOf = (zone: string): Intl.DateTimeFormat | null => {
+  if (!dateFormats.has(zone)) {
+    let made: Intl.DateTimeFormat | null = null
+    try {
+      made = new Intl.DateTimeFormat('en-US', {
+        timeZone: zone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      })
+    } catch {
+      made = null
+    }
+    dateFormats.set(zone, made)
+  }
+  return dateFormats.get(zone) ?? null
+}
+
+/** Days since 1970-01-01 on the calendar of an IANA zone; `local` or an unknown zone is the machine's. */
+export const dayOf = (epochMs: number, zone: string): number => {
+  const format = zone === 'local' ? null : dateFormatOf(zone)
+  if (format === null) {
+    const date = new Date(epochMs)
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS
+  }
+  const parts = format.formatToParts(epochMs)
+  const part = (type: string): number => Number(parts.find((one) => one.type === type)?.value ?? 0)
+  return Date.UTC(part('year'), part('month') - 1, part('day')) / DAY_MS
+}
+
 export const nightnessOf = (hour: number): number => {
   if (hour >= 19 || hour < 5) {
     return 1
