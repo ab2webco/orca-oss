@@ -262,6 +262,9 @@ jobs:
           # Why both shells on one line: pr-workflow-parallelism.test.mjs parses only the
           # first install command in this step to prove the lane really installs them.
           sudo apt-get install -y zsh fish
+          # Why a second source: the PPA can be added and still 503 its Packages index,
+          # which leaves Noble's fish 3.7 (ORCA-732); this fetches the pinned fish 4 release.
+          bash config/scripts/install-fish4-release.sh || true
 
       # Separate from the install so the failure names the contract, not an apt error.
       # ORCA_REQUIRE_FISH re-checks this at test time; this step just fails in seconds
