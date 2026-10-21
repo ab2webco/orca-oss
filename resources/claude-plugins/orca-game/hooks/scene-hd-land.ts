@@ -23,6 +23,8 @@ const BEACON = 0xff4a4a
 const BEACON_OFF = 0x5a1a1a
 const WATER = 0x1f4f8f
 const MAX_KEPT = 4
+const WINDOW_TICKS = 40
+const GLINT_TICKS = 8
 
 export type HdFrame = HdSky & {
   scroll: number
@@ -66,12 +68,24 @@ const farHeight = (look: Look, pixels: number, x: number): number => {
 const midTopOf = (ground: number, pixels: number, mx: number): number =>
   ground - pixels * (0.13 + 0.05 * Math.sin(mx * 0.11 + 2) + 0.03 * Math.sin(mx * 0.29))
 
+/** How far the far range and the hills have scrolled: a sixth and a third of the ground's pace. */
+export const hdFarShiftOf = (scroll: number): number => Math.floor(scroll / 6)
+export const hdMidShiftOf = (scroll: number): number => Math.floor(scroll / 3)
+
+/** What of the far range moves with the tick: a city's lit windows, a crystal range's glints. */
+export const hdFarPhaseOf = (look: Look, tick: number): number =>
+  look.scenery === 'skyline'
+    ? Math.floor(tick / WINDOW_TICKS)
+    : look.scenery === 'crystals'
+      ? Math.floor(tick / GLINT_TICKS)
+      : 0
+
 const silhouettes = new WeakMap<Look, Map<string, { far: Float64Array; mid: Float64Array }>>()
 
 // Why cached: the silhouettes move only every 3 or 6 ticks of scroll, and not at all at rest.
 const silhouettesOf = (sky: HdSky, scroll: number) => {
-  const farShift = Math.floor(scroll / 6)
-  const midShift = Math.floor(scroll / 3)
+  const farShift = hdFarShiftOf(scroll)
+  const midShift = hdMidShiftOf(scroll)
   const key = `${sky.width}x${sky.pixels}:${farShift}:${midShift}`
   const own =
     silhouettes.get(sky.look) ?? new Map<string, { far: Float64Array; mid: Float64Array }>()
@@ -85,7 +99,8 @@ const silhouettesOf = (sky: HdSky, scroll: number) => {
   for (let x = -1; x <= sky.width + 1; x += 1) {
     far[x + 1] = farHeight(sky.look, sky.pixels, x + farShift)
   }
-  for (let x = 0; x < sky.width; x += 1) {
+  // Why one past the edge: the last column's facing reads its right neighbour.
+  for (let x = 0; x <= sky.width; x += 1) {
     mid[x] = midTopOf(sky.ground, sky.pixels, x + midShift)
   }
   if (own.size >= MAX_KEPT) {
@@ -156,11 +171,11 @@ const litOf = (frame: HdFrame, color: number): number =>
   landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
 const farHeightAt = (frame: HdFrame, x: number): number =>
-  frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + Math.floor(frame.scroll / 6))
+  frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + hdFarShiftOf(frame.scroll))
 
 export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
   const { look, ground, tick, pixels } = frame
-  const fx = x + Math.floor(frame.scroll / 6)
+  const fx = x + hdFarShiftOf(frame.scroll)
   const height = farHeightAt(frame, x)
   const top = ground - height
   if (y < top) {
@@ -181,11 +196,11 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
       return layer(base)
     case 'skyline': {
       const isWindow = mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 2) === 0 && y > top + 1
-      const isLit = isWindow && (hash(fx, y) + Math.floor(tick / 40)) % 3 === 0
+      const isLit = isWindow && (hash(fx, y) + Math.floor(tick / WINDOW_TICKS)) % 3 === 0
       return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
     }
     case 'crystals':
-      if (y - top < 1 || (hash(fx, y) + Math.floor(tick / 8)) % 23 === 0) {
+      if (y - top < 1 || (hash(fx, y) + Math.floor(tick / GLINT_TICKS)) % 23 === 0) {
         return accent(mix(snow, base, 0.2))
       }
       return layer(isLitSide ? mix(base, snow, 0.18) : base)
@@ -195,7 +210,7 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
 }
 
 export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
-  const mx = x + Math.floor(frame.scroll / 3)
+  const mx = x + hdMidShiftOf(frame.scroll)
   const top = frame.midTops[x] ?? midTopOf(frame.ground, frame.pixels, mx)
   if (y < top) {
     return undefined
