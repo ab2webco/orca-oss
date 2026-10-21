@@ -60,8 +60,8 @@ const worldOf = (seeded?: unknown): World => ({
   toasts: []
 })
 
-const engine = (on: On, world: World) => {
-  mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: 'en' })
+const engine = (on: On, world: World, locale: string) => {
+  mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: locale })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
@@ -78,6 +78,7 @@ const engine = (on: On, world: World) => {
   })
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
   on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
   on('process.run', () => ({
     value: {
       exitCode: 0,
@@ -98,9 +99,9 @@ const shownOf = (one: unknown): string => {
   return isDrawn(one) && Array.isArray(one.children) ? one.children.map(shownOf).join('') : ''
 }
 
-const start = async ($: Engine, on: On, world: World) => {
+const start = async ($: Engine, on: On, world: World, locale = 'en') => {
   const clock = mock.clock(on)
-  engine(on, world)
+  engine(on, world, locale)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
 }
@@ -226,6 +227,126 @@ describe('panel layout', () => {
     await ui.press({ key: 'layout-toggle-team' })
     expect(world.writes).toEqual([])
     expect(world.toasts.at(-1)).toContain('newer')
+    await ui.unmount()
+  })
+})
+
+const layout = async ($: Engine, args = '') =>
+  (await $.command.run({ command: 'orca-game:layout', args } as never)) as { text: string }
+
+const fleetIn = (world: World) =>
+  (world.store.get(LAYOUT_KEY) as { projects: Record<string, { fleet: unknown }> }).projects[
+    'repo-1'
+  ]?.fleet
+
+describe('/orca-game:layout', () => {
+  test('lists each section in order with its state', async ($, on) => {
+    const world = worldOf({
+      version: 1,
+      projects: {
+        'repo-1': {
+          fleet: {
+            order: ['todo', 'team', 'review', 'reviews', 'actions'],
+            collapsed: ['todo'],
+            hidden: ['actions']
+          }
+        }
+      }
+    })
+    await start($, on, world)
+    expect((await layout($)).text).toBe(
+      [
+        'Panel layout for this project:',
+        '1. To Do (todo): collapsed',
+        '2. Team (team): shown',
+        '3. Review (review): shown',
+        '4. My PRs (reviews): shown',
+        '5. Actions (actions): hidden',
+        'Change it with /orca-game:layout reset, show <section>, hide <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.'
+      ].join('\n')
+    )
+    expect(world.writes).toEqual([])
+  })
+
+  test('hides, shows and moves a section, and the Panel follows', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    await layout($, 'hide team')
+    await layout($, 'move todo up')
+    expect(fleetIn(world)).toEqual({
+      order: ['team', 'review', 'todo', 'reviews', 'actions'],
+      collapsed: [],
+      hidden: ['team']
+    })
+    const ui = await pane($)
+    expect(await ui.find({ type: 'Box', key: 'layout-header-team' })).toBeUndefined()
+    await ui.unmount()
+    const shown = await layout($, 'show team')
+    expect(shown.text.split('\n')[1]).toBe('1. Team (team): shown')
+  })
+
+  test('reset brings the default back', async ($, on) => {
+    const world = worldOf({
+      version: 1,
+      projects: {
+        'repo-1': { fleet: { order: ['actions'], collapsed: ['team'], hidden: ['todo'] } }
+      }
+    })
+    await start($, on, world)
+    await layout($, 'reset')
+    expect(fleetIn(world)).toEqual({
+      order: ['team', 'review', 'reviews', 'todo', 'actions'],
+      collapsed: [],
+      hidden: []
+    })
+  })
+
+  test('an unknown word answers with how to use it and changes nothing', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    expect((await layout($, 'hide quests')).text).toBe(
+      'Unknown section "quests". Sections: team, review, reviews, todo, actions.'
+    )
+    expect((await layout($, 'move todo sideways')).text).toContain('/orca-game:layout reset')
+    expect(world.writes).toEqual([])
+  })
+
+  test('answers in Spanish and takes Spanish section names', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world, 'es')
+    const answer = await layout($, 'ocultar equipo')
+    expect(answer.text.split('\n')[0]).toBe('Diseño del Panel de este proyecto:')
+    expect(answer.text).toContain('Equipo (team): oculta')
+  })
+})
+
+const band = ($: Engine) =>
+  $.ui.mount({
+    plugin: 'orca-game',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    viewport: { columns: 124, rows: 40, isFullscreen: true },
+    props: {
+      hasSurvey: false,
+      isWorking: false,
+      maxRows: 8,
+      bodyColumns: 120,
+      scroll: { offset: 0, bodyRows: 7 },
+      view: {}
+    }
+  })
+
+describe('the layout hint', () => {
+  test('opening the Panel says once how to collapse its sections', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    const ui = await band($)
+    await ui.press({ key: 'band-panel' })
+    await ui.press({ key: 'band-panel' })
+    const hint =
+      'Tip: press ▾ beside a Panel section to collapse it; /orca-game:layout hides, moves or resets them.'
+    expect(world.toasts.filter((one) => one === hint)).toEqual([hint])
+    expect(world.store.has(LAYOUT_KEY)).toBe(false)
     await ui.unmount()
   })
 })
