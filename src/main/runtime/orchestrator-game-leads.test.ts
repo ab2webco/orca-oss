@@ -72,7 +72,8 @@ describe('GameLeads claim', () => {
   const SESSION: GameLeadSession = {
     sessionId: 'sess-old',
     agentArgs: '--teammate-mode auto',
-    worktreeId: 'wt1'
+    worktreeId: 'wt1',
+    accountId: null
   }
 
   function claiming(args: {
@@ -309,7 +310,12 @@ describe('GameLeads after a restart', () => {
       isLive: () => true,
       now: () => new Date(AT),
       roster: new GameLeadRoster(() => dir),
-      sessionOf: async () => ({ sessionId: 'sess-1', agentArgs: null, worktreeId: 'wt1' })
+      sessionOf: async () => ({
+        sessionId: 'sess-1',
+        agentArgs: null,
+        worktreeId: 'wt1',
+        accountId: null
+      })
     })
     await before.register({ project: 'cineco', label: 'Ana', claim: true })
   }
@@ -334,7 +340,12 @@ describe('GameLeads after a restart', () => {
       sessionOf: async () =>
         pane.sessionId === null
           ? null
-          : { sessionId: pane.sessionId ?? 'sess-1', agentArgs: null, worktreeId: 'wt1' },
+          : {
+              sessionId: pane.sessionId ?? 'sess-1',
+              agentArgs: null,
+              worktreeId: 'wt1',
+              accountId: null
+            },
       focus: async () => undefined
     })
   }

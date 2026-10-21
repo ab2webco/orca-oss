@@ -9,12 +9,14 @@ const sessionOf = (value: unknown): GameLeadSession | null => {
   if (typeof value !== 'object' || value === null) {
     return null
   }
-  const { sessionId, agentArgs, worktreeId } = value as Record<string, unknown>
+  const { sessionId, agentArgs, worktreeId, accountId } = value as Record<string, unknown>
+  // Why a missing account is valid: records kept before leads named their account have none.
   return typeof sessionId === 'string' &&
     sessionId !== '' &&
     typeof worktreeId === 'string' &&
-    (agentArgs === null || typeof agentArgs === 'string')
-    ? { sessionId, agentArgs, worktreeId }
+    (agentArgs === null || typeof agentArgs === 'string') &&
+    (accountId === undefined || accountId === null || typeof accountId === 'string')
+    ? { sessionId, agentArgs, worktreeId, accountId: accountId ?? null }
     : null
 }
 
@@ -90,6 +92,21 @@ export const awaitResumedLead = async (args: {
     }
     await sleep(args.intervalMs)
   }
+}
+
+const MISSING_CONVERSATION = /no conversation found/i
+
+/** Why the pane's own words: Claude prints why it refused, e.g. a conversation its account's store lacks. */
+export const resumeExitErrorOf = (args: {
+  output: readonly string[]
+  account: string | null
+}): string => {
+  const lines = args.output.map((line) => line.trim()).filter((line) => line !== '')
+  const reason =
+    lines.find((line) => MISSING_CONVERSATION.test(line)) ??
+    (lines.slice(-2).join(' | ') || 'the pane printed nothing')
+  const on = args.account === null ? '' : ` on account ${args.account}`
+  return `Claude exited instead of reopening the conversation${on}: ${reason}`
 }
 
 /** Each project's last lead conversation, one file per project, so it survives a restart of Orca. */

@@ -4,8 +4,13 @@ import type { GameLeadRecord } from './orchestrator-game-lead-roster'
 
 export type GameLeadListing = { project: string; label: string; handle: string; since: string }
 
-/** What reopens a project's lead conversation once its pane is gone. */
-export type GameLeadSession = { sessionId: string; agentArgs: string | null; worktreeId: string }
+/** What reopens a project's lead conversation once its pane is gone; `accountId` is the managed account it ran on. */
+export type GameLeadSession = {
+  sessionId: string
+  agentArgs: string | null
+  worktreeId: string
+  accountId: string | null
+}
 
 /** `registered: false` with `live` or `resumed` names the pane that is the lead instead of the caller. */
 export type GameLeadRegistration = {

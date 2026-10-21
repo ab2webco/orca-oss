@@ -7,6 +7,7 @@ import {
   awaitResumedLead,
   leadPaneStateOf,
   leadResumeArgsOf,
+  resumeExitErrorOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 
@@ -23,7 +24,12 @@ function sessions(): { store: GameLeadSessions; dir: string } {
   return { store: new GameLeadSessions(() => join(dir, 'leads')), dir }
 }
 
-const SESSION = { sessionId: 'sess-1', agentArgs: '--teammate-mode auto', worktreeId: 'wt1' }
+const SESSION = {
+  sessionId: 'sess-1',
+  agentArgs: '--teammate-mode auto',
+  worktreeId: 'wt1',
+  accountId: null
+}
 
 describe('GameLeadSessions', () => {
   it("keeps each project's lead session across a restart of the store", async () => {
@@ -40,6 +46,23 @@ describe('GameLeadSessions', () => {
       sessionId: 'sess-2',
       agentArgs: null
     })
+  })
+
+  it('keeps the account the lead ran on, so the reopen finds the conversation in its store', async () => {
+    const { store } = sessions()
+    await store.write('repo:a', { ...SESSION, accountId: 'acct-1' })
+
+    expect(await store.read('repo:a')).toEqual({ ...SESSION, accountId: 'acct-1' })
+  })
+
+  it('reads a record kept before leads named their account as one with no account', async () => {
+    const { store, dir } = sessions()
+    await store.write('repo:a', SESSION)
+    const [file] = (await import('node:fs')).readdirSync(join(dir, 'leads'))
+    const { accountId: _none, ...legacy } = SESSION
+    writeFileSync(join(dir, 'leads', file ?? ''), JSON.stringify(legacy))
+
+    expect(await store.read('repo:a')).toEqual(SESSION)
   })
 
   it('reads a damaged record as no session', async () => {
@@ -131,6 +154,40 @@ describe('awaitResumedLead', () => {
 
   it('fails a pane that never left its shell by the deadline', async () => {
     await expect(run(['shell'])).resolves.toBe('exited')
+  })
+})
+
+describe('resumeExitErrorOf', () => {
+  it("names the account and Claude's own reason for refusing the conversation", () => {
+    expect(
+      resumeExitErrorOf({
+        output: [
+          "fabolivar@mac orca-oss % claude --resume 'sess-1'",
+          'No conversation found with session ID: sess-1',
+          'fabolivar@mac orca-oss % '
+        ],
+        account: 'lead@example.com'
+      })
+    ).toBe(
+      'Claude exited instead of reopening the conversation on account lead@example.com: No conversation found with session ID: sess-1'
+    )
+  })
+
+  it('quotes the last lines the pane printed when Claude gave another reason', () => {
+    expect(
+      resumeExitErrorOf({
+        output: ['', 'Invalid API key · Please run /login', '% ', ''],
+        account: null
+      })
+    ).toBe(
+      'Claude exited instead of reopening the conversation: Invalid API key · Please run /login | %'
+    )
+  })
+
+  it('says the pane printed nothing when its output is empty', () => {
+    expect(resumeExitErrorOf({ output: [' ', ''], account: null })).toBe(
+      'Claude exited instead of reopening the conversation: the pane printed nothing'
+    )
   })
 })
 
