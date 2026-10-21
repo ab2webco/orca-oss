@@ -154,7 +154,7 @@ describe('/quest render', () => {
       /^Quest: on\. Render: hd \(this session; the project's setting is classic\)\. /
     )
     expect(await quest($, 'render neon')).toBe(
-      'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
+      'Unknown render "neon". Use /orca-game:render classic, hd or hd-compact.'
     )
     expect(await quest($, 'render classic')).toBe('Render: classic.')
     expect(await quest($, '')).toMatch(/^Quest: on\. Render: classic\. /)
@@ -231,7 +231,7 @@ describe('the /orca-game: commands', () => {
       'Unknown mode "render". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.'
     )
     expect(await run($, 'orca-game:render', 'neon')).toBe(
-      'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
+      'Unknown render "neon". Use /orca-game:render classic, hd or hd-compact.'
     )
     expect(await run($, 'orca-game:demo')).toMatch(
       /^Quest: demo\. .+ \/orca-game:mode on returns to real data\.$/
