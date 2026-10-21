@@ -39,7 +39,7 @@ export function MemoryPressureWarningSection({
         )}
         description={translate(
           'auto.components.settings.MemoryPressureWarningSection.description',
-          'Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own.'
+          'Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own. Off by default.'
         )}
       />
       <div className="divide-y divide-border/40">

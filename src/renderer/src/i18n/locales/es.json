@@ -10856,7 +10856,7 @@
         },
         "MemoryPressureWarningSection": {
           "title": "Memoria baja",
-          "description": "Orca avisa solo mientras un agente corre en una terminal local: cuando el sistema informa presión de memoria durante dos minutos, o cuando la memoria se agotará en menos de diez minutos al ritmo actual. Orca nunca cierra una terminal por su cuenta.",
+          "description": "Orca avisa solo mientras un agente corre en una terminal local: cuando el sistema informa presión de memoria durante dos minutos, o cuando la memoria se agotará en menos de diez minutos al ritmo actual. Orca nunca cierra una terminal por su cuenta. Desactivado por defecto.",
           "thresholdLabel": "Avisar por debajo de",
           "thresholdDescription": "En Linux y Windows el aviso también aparece cuando la memoria libre se mantiene dos minutos por debajo de este porcentaje. En macOS se usa la señal de presión del sistema, porque la memoria en caché hace que la memoria libre parezca baja. Las terminales en hosts SSH no se miden."
         },

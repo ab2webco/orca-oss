@@ -20,6 +20,7 @@ vi.mock('./memory-pressure-reading', () => ({ readMemoryPressure: readMemoryPres
 vi.mock('./collector', () => ({ collectMemorySnapshot: collectMemorySnapshotMock }))
 vi.mock('./pty-registry', () => ({ listRegisteredPtys: listRegisteredPtysMock }))
 
+const ON: Partial<GlobalSettings> = { memoryPressureWarningEnabled: true }
 const TICK_MS = 30_000
 // Why four ticks after the first: the low-memory rule needs two minutes of readings.
 const SUSTAINED_MS = 4 * TICK_MS
@@ -133,7 +134,7 @@ describe('createMemoryPressureService', () => {
     const { agents, popupLog, runtime } = doubles(undefined, {
       getPtyLastOutputAt: (id) => (id === 'pty-live' ? 42 : null)
     })
-    const service = createMemoryPressureService(storeDouble({}), runtime, agents, popupLog)
+    const service = createMemoryPressureService(storeDouble(ON), runtime, agents, popupLog)
     service.monitor.start()
     await vi.advanceTimersByTimeAsync(SUSTAINED_MS)
 
@@ -160,7 +161,7 @@ describe('createMemoryPressureService', () => {
       listLocalAgentPtyIds: () => ['pty-title-only']
     })
 
-    const service = createMemoryPressureService(storeDouble({}), runtime, agents, popupLog)
+    const service = createMemoryPressureService(storeDouble(ON), runtime, agents, popupLog)
     service.monitor.start()
     await vi.advanceTimersByTimeAsync(SUSTAINED_MS)
 
@@ -183,12 +184,28 @@ describe('createMemoryPressureService', () => {
     ])
     const { createMemoryPressureService } = await import('./memory-pressure-service')
 
-    const service = createMemoryPressureService(storeDouble({}), runtime, agents, popupLog)
+    const service = createMemoryPressureService(storeDouble(ON), runtime, agents, popupLog)
     service.monitor.start()
     await vi.advanceTimersByTimeAsync(2 * SUSTAINED_MS)
 
     expect(live.webContents.send).not.toHaveBeenCalled()
     expect(popupLog.push).not.toHaveBeenCalledWith(expect.objectContaining({ event: 'opened' }))
+    service.dispose()
+  })
+
+  it('never samples or logs a popup for a profile that never turned it on', async () => {
+    const live = liveWindow()
+    readMemoryPressureMock.mockImplementation(async () => lowMemory())
+    const { createMemoryPressureService } = await import('./memory-pressure-service')
+    const { agents, popupLog, runtime } = doubles()
+
+    const service = createMemoryPressureService(storeDouble({}), runtime, agents, popupLog)
+    service.monitor.start()
+    await vi.advanceTimersByTimeAsync(2 * SUSTAINED_MS)
+
+    expect(readMemoryPressureMock).not.toHaveBeenCalled()
+    expect(live.webContents.send).not.toHaveBeenCalled()
+    expect(popupLog.push).not.toHaveBeenCalled()
     service.dispose()
   })
 
@@ -198,7 +215,7 @@ describe('createMemoryPressureService', () => {
       ...lowMemory(),
       availableMemory: 8 * GIB
     }))
-    const store = storeDouble({})
+    const store = storeDouble(ON)
     const { createMemoryPressureService } = await import('./memory-pressure-service')
     const { agents, popupLog, runtime } = doubles()
 

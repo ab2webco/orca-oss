@@ -1,7 +1,8 @@
 /**
  * Invariant: under memory pressure the low-memory card names the heaviest terminals, Open
  * brings a terminal back from another view, Close asks before killing anything, Dismiss
- * reaches main for the current episode, and the Settings toggle persists (ORCA-600).
+ * reaches main for the current episode, and the Settings toggle persists (ORCA-600). The
+ * warning is off until the user turns it on (ORCA-716).
  * Needs E2E: the card is fixed-positioned over the real shell and must fit every width.
  */
 
@@ -64,6 +65,27 @@ async function readActiveTerminal(
   return found!
 }
 
+// Why centred: at the bottom edge the floating-terminal trigger covers the switch in phone widths.
+async function centerInView(section: ReturnType<Page['locator']>): Promise<void> {
+  await section.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+}
+
+async function openLowMemorySettings(page: Page): Promise<ReturnType<Page['locator']>> {
+  await page.evaluate(() => {
+    const store = window.__store?.getState()
+    store?.setSettingsSearchQuery('')
+    store?.openSettingsTarget({
+      pane: 'terminal',
+      repoId: null,
+      sectionId: 'memory-pressure-warning'
+    })
+    store?.openSettingsPage()
+  })
+  const section = page.locator('#memory-pressure-warning')
+  await expect(section).toBeVisible({ timeout: 15_000 })
+  return section
+}
+
 test('low-memory card lists heavy terminals, opens, confirms close, dismisses; Settings toggle persists', async ({
   electronApp,
   orcaPage
@@ -72,6 +94,35 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
   const worktreeId = await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
   const terminal = await readActiveTerminal(orcaPage)
+
+  // Off by default: no threshold picker until the user turns it on.
+  const offSection = await openLowMemorySettings(orcaPage)
+  const offToggle = offSection.getByRole('switch', { name: 'Low memory warning' })
+  await expect(offToggle).toHaveAttribute('aria-checked', 'false')
+  await expect(offSection.getByRole('radio')).toHaveCount(0)
+  await expect(orcaPage.getByText(/Off by default/)).toBeVisible()
+  for (const width of WIDTHS) {
+    await setWidth(orcaPage, width)
+    for (const theme of THEMES) {
+      await setTheme(orcaPage, theme)
+      await centerInView(offSection)
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`settings-default-off-${width}-${theme}.png`)
+      })
+    }
+  }
+  await setWidth(orcaPage, 1440)
+  await offToggle.click()
+  await expect
+    .poll(async () =>
+      orcaPage.evaluate(async () => (await window.api.settings.get()).memoryPressureWarningEnabled)
+    )
+    .toBe(true)
+  await expect(offSection.getByRole('radio', { name: '10%' })).toHaveAttribute(
+    'aria-checked',
+    'true'
+  )
+  await orcaPage.evaluate(() => window.__store?.getState().setActiveView('terminal'))
 
   const state = {
     warning: {
@@ -227,18 +278,7 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
     )
     .toEqual([7])
 
-  await orcaPage.evaluate(() => {
-    const store = window.__store?.getState()
-    store?.setSettingsSearchQuery('')
-    store?.openSettingsTarget({
-      pane: 'terminal',
-      repoId: null,
-      sectionId: 'memory-pressure-warning'
-    })
-    store?.openSettingsPage()
-  })
-  const section = orcaPage.locator('#memory-pressure-warning')
-  await expect(section).toBeVisible({ timeout: 15_000 })
+  const section = await openLowMemorySettings(orcaPage)
   const toggle = section.getByRole('switch', { name: 'Low memory warning' })
   await expect(toggle).toHaveAttribute('aria-checked', 'true')
   // Why the page: the subsection header sits above the searchable row the id is on.
@@ -257,7 +297,7 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
     await setWidth(orcaPage, width)
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
-      await section.scrollIntoViewIfNeeded()
+      await centerInView(section)
       await orcaPage.screenshot({ path: testInfo.outputPath(`settings-${width}-${theme}.png`) })
     }
   }

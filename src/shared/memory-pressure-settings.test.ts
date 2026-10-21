@@ -6,12 +6,18 @@ import {
 } from './memory-pressure-settings'
 
 describe('resolveMemoryPressureWarningSettings', () => {
-  it('is on at 10% for a profile that predates the setting', () => {
+  it('is off at 10% for a profile that never set it', () => {
     expect(resolveMemoryPressureWarningSettings({})).toEqual({
-      enabled: true,
+      enabled: false,
       thresholdPercent: DEFAULT_MEMORY_PRESSURE_THRESHOLD_PERCENT
     })
     expect(DEFAULT_MEMORY_PRESSURE_THRESHOLD_PERCENT).toBe(10)
+  })
+
+  it('is on only when the user turned it on', () => {
+    expect(
+      resolveMemoryPressureWarningSettings({ memoryPressureWarningEnabled: true }).enabled
+    ).toBe(true)
   })
 
   it('keeps an explicit opt-out and a listed threshold', () => {

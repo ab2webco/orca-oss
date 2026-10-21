@@ -11479,7 +11479,7 @@
         },
         "MemoryPressureWarningSection": {
           "title": "Low Memory",
-          "description": "Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own.",
+          "description": "Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own. Off by default.",
           "thresholdLabel": "Warn below",
           "thresholdDescription": "On Linux and Windows the warning also shows when free memory stays under this share for two minutes. On macOS the system pressure signal is used instead, because cached memory makes free memory look low. Terminals on SSH hosts are not measured."
         },
