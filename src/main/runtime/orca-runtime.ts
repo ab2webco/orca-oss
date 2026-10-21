@@ -3679,7 +3679,7 @@ export class OrcaRuntimeService {
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
-    isLive: (handle) => this.resolveLeafForHandle(handle) !== null,
+    isLive: (handle) => this.isGameLeadTerminalLive(handle),
     sessions: new GameLeadSessions(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
     sessionOf: async (handle) => {
       const pane = await this.snapshotClaudeTerminalSwitchTarget({
@@ -30430,10 +30430,34 @@ export class OrcaRuntimeService {
     return this.gameLeads
   }
 
+  // Why the PTY over the leaf: a pane keeps its leaf, and the renderer its ptyId, after Claude exits (ORCA-713).
+  private isGameLeadTerminalLive(handle: string): boolean {
+    const record = this.handles.get(handle)
+    if (!record?.ptyId) {
+      return false
+    }
+    const pty = this.ptysById.get(record.ptyId)
+    if (record.tabId.startsWith('pty:')) {
+      return pty !== undefined && this.isPotentiallyWritablePty(pty)
+    }
+    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    if (!leaf || leaf.ptyId !== record.ptyId || leaf.ptyGeneration !== record.ptyGeneration) {
+      return false
+    }
+    return pty ? this.isPotentiallyWritablePty(pty) : leaf.connected
+  }
+
   // Why a host without a process read counts as running: refusing a second lead is the safe side.
   private async isGameLeadPaneRunning(handle: string): Promise<boolean> {
-    const pane = await this.inspectTerminalProcess(handle).catch(() => null)
-    return !pane?.foregroundProcess || !isShellProcess(pane.foregroundProcess)
+    let foregroundProcess: string | null
+    try {
+      foregroundProcess = (await this.inspectTerminalProcess(handle)).foregroundProcess
+    } catch (error) {
+      // Why local only: an SSH provider forgets its PTYs while the relay reconnects.
+      const gone = error instanceof Error && error.message === 'terminal_gone'
+      return !gone || this.isSshOwnedPtyId(this.resolveLeafForHandle(handle)?.ptyId)
+    }
+    return !foregroundProcess || !isShellProcess(foregroundProcess)
   }
 
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
