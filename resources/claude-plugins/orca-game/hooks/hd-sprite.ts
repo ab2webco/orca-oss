@@ -5,6 +5,8 @@ import type { Costume } from './scenes/index'
 // hd characters: any glyph art gets a 1-px outline and a lit and a shaded side, from its own palette.
 
 const EDGE = '#'
+/** A gap the figure flanks and roofs, inked so the land does not show through the figure. */
+const BACKED = ':'
 // Why a ceiling: a bright palette's darkest colour (a cyan cape) would outline as a glow, not ink.
 const INK_CEILING = 0.03
 const INK_RATIO = 0.5
@@ -87,8 +89,17 @@ const spriteOf = (body: readonly string[], colors: Readonly<Record<string, numbe
     }
     rows.push(line)
   }
+  const backed = rows.map((line, r) =>
+    line.replace(/\./g, (gap, c: number) =>
+      /[^.]/.test(line.slice(0, c)) &&
+      /[^.]/.test(line.slice(c + 1)) &&
+      rows.slice(0, r).some((above) => above[c] !== '.')
+        ? BACKED
+        : gap
+    )
+  )
   const outline = outlineOf(colors)
-  return { rows, shade: Int8Array.from(shade), width, colors, outline, ink: inkOf(colors) }
+  return { rows: backed, shade: Int8Array.from(shade), width, colors, outline, ink: inkOf(colors) }
 }
 
 const frames = new WeakMap<object, Map<string, HdSprite>>()
@@ -120,14 +131,26 @@ export const frameSpriteOf = (
   colors: Readonly<Record<string, number>>
 ): HdSprite => cachedOf(frame, 'f', () => spriteOf(frame, colors))
 
-/** Whether (x, y) falls on the sprite's outline with its top-left corner at (left, top). */
-export const isHdEdgeAt = (
+/** Whether (x, y) lies just outside the sprite's outline, where a rim can part it from the land. */
+export const isHdHaloAt = (
   sprite: HdSprite,
   x: number,
   y: number,
   left: number,
   top: number
-): boolean => sprite.rows[y - top]?.[x - left] === EDGE
+): boolean => {
+  const r = y - top
+  const c = x - left
+  if (r < -1 || c < -1 || r > sprite.rows.length || c > sprite.width) {
+    return false
+  }
+  const glyph = sprite.rows[r]?.[c]
+  if (glyph !== undefined && glyph !== '.') {
+    return false
+  }
+  const isEdge = (row: number, column: number) => sprite.rows[row]?.[column] === EDGE
+  return isEdge(r - 1, c) || isEdge(r + 1, c) || isEdge(r, c - 1) || isEdge(r, c + 1)
+}
 
 /** The sprite's colour at (x, y) with its top-left corner at (left, top); `ring` tints the outline. */
 export const hdSpritePixel = (
@@ -150,6 +173,9 @@ export const hdSpritePixel = (
   }
   if (glyph === EDGE) {
     return ring === undefined ? sprite.outline : ringOf(sprite, ring)
+  }
+  if (glyph === BACKED) {
+    return sprite.outline
   }
   const color = sprite.colors[glyph]
   if (color === undefined) {

@@ -6,8 +6,8 @@ import { particleCountOf } from '../hooks/hd-fx'
 import { hdLandBakeOf } from '../hooks/hd-land-bake'
 import { lightnessOf } from '../hooks/hd-lightness'
 import { FIGURE_FLOOR, figureEdgeOf, GROUND_FLOOR } from '../hooks/hd-readability'
-import { outlineOf } from '../hooks/hd-sprite'
-import { hdSceneGridOf } from '../hooks/scene-hd'
+import { costumeSpriteOf, outlineOf } from '../hooks/hd-sprite'
+import { hdHeroPoseOf, hdSceneGridOf } from '../hooks/scene-hd'
 import { hdBakedLandOf } from '../hooks/hd-land-bake'
 import { hdFarPixel, hdFrameOf, hdMidPixel, hdPondPixel, hdSkyPixel } from '../hooks/scene-hd-land'
 import { SCENES, type SceneDefinition } from '../hooks/scenes/index'
@@ -123,37 +123,48 @@ describe('hd readability on every scene', () => {
     }
   }
 
-  it('draws no hero outline sunk into the night behind it, in a real frame', () => {
+  it('keeps the hero outline whole at night and parts it from the dark with a rim outside', () => {
     for (const scene of ALL) {
       const look = scene.looks.working
       const light = daylightAt(22)
+      const tick = 30
       const grid = hdSceneGridOf({
         scene: { ...scene, cast: undefined },
         phase: 'working',
         columns: WIDTH,
         rows: ROWS,
-        tick: 30,
+        tick,
         caption: '',
         since: 0,
-        isResting: true,
         light
       })
-      const frame = hdFrameOf({ look, width: WIDTH, rows: ROWS, tick: 30, scroll: 0, light })
+      const frame = hdFrameOf({ look, width: WIDTH, rows: ROWS, tick, scroll: tick, light })
       const land = hdLandBakeOf(frame)
       const ink = landInLight(
         outlineOf(scene.costumes.working.colors),
         look.isNight ? daylightAt(12) : { ...frame.light, night: frame.light.night * 0.5 }
       )
-      let sunk = 0
+      const sprite = costumeSpriteOf(scene.costumes.working, hdHeroPoseOf(tick, false).frame, false)
+      const inkedInArt = sprite.rows.join('').replace(/[^#:]/g, '').length
+      const shownAt = (x: number, y: number) =>
+        grid[Math.floor(y / 2) * WIDTH + x]?.[y % 2 === 0 ? 1 : 2]
+      const isSunk = (color: number) => Math.abs(lightnessOf(ink) - lightnessOf(color)) < FIGURE_FLOOR
+      let inked = 0
+      let bare = 0
       for (let y = 0; y < frame.ground; y += 1) {
         for (let x = 0; x < WIDTH; x += 1) {
-          const shown = grid[Math.floor(y / 2) * WIDTH + x]?.[y % 2 === 0 ? 1 : 2]
-          const behind = hdBackdropPixel(frame, land, x, y)
-          sunk +=
-            shown === ink && Math.abs(lightnessOf(ink) - lightnessOf(behind)) < FIGURE_FLOOR ? 1 : 0
+          if (shownAt(x, y) !== ink) {
+            continue
+          }
+          inked += 1
+          for (const [nx, ny] of [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y]] as const) {
+            const behind = ny < 0 || nx < 0 || nx >= WIDTH ? undefined : hdBackdropPixel(frame, land, nx, ny)
+            bare += behind !== undefined && shownAt(nx, ny) === behind && isSunk(behind) ? 1 : 0
+          }
         }
       }
-      expect(sunk, scene.id).toBe(0)
+      expect(inked, scene.id).toBeGreaterThanOrEqual(inkedInArt)
+      expect(bare, scene.id).toBe(0)
     }
   })
 
