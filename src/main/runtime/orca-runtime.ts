@@ -6122,6 +6122,15 @@ export class OrcaRuntimeService {
   // Why: renderer-initiated meta updates intentionally skip the renderer
   // notifier (the renderer already applied them optimistically), but remote
   // clients hold no optimistic copy and need the invalidation event.
+  // Why: desktop IPC creates and removes worktrees without the runtime, whose scan cache would hide them from CLI selectors.
+  noteIpcWorktreeLifecycle(event: RuntimeWorktreeLifecycleEvent): void {
+    const repoId = splitWorktreeIdForFilesystem(event.worktreeId)?.repoId
+    if (repoId) {
+      this.invalidateWorktreeScanCacheForRepo(repoId)
+    }
+    this.invalidateResolvedWorktreeCache()
+  }
+
   notifyWorktreesChangedForRemoteClients(repoId: string): void {
     this.invalidateResolvedWorktreeCache()
     this.emitClientEvent({ type: 'worktreesChanged', repoId })

@@ -1681,7 +1681,10 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       onBeforeUpdateQuit: () =>
         preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
       updateInstallMode: resolveUpdateInstallMode(isServeMode),
-      onWorktreeLifecycle: emitPluginWorktreeLifecycle
+      onWorktreeLifecycle: (event) => {
+        runtime?.noteIpcWorktreeLifecycle(event)
+        emitPluginWorktreeLifecycle(event)
+      }
     },
     (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
   )
