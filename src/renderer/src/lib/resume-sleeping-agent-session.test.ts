@@ -549,14 +549,17 @@ describe('resumeSleepingAgentSessionsForWorktree', () => {
   })
 
   it('launches once and clears skipped duplicates for the same provider session', () => {
+    // Why worktree-sleep: a slept worktree is the case that wakes with no tab rows (ORCA-718).
     const first = makeRecord({
       paneKey: 'tab-1:leaf-1',
+      origin: 'worktree-sleep',
       capturedAt: 1,
       updatedAt: 1,
       launchConfig: { agentArgs: '--older', agentEnv: {} }
     })
     const duplicate = makeRecord({
       paneKey: 'tab-2:leaf-1',
+      origin: 'worktree-sleep',
       capturedAt: 2,
       updatedAt: 2,
       launchConfig: { agentArgs: '--newer', agentEnv: {} }

@@ -10,7 +10,9 @@ afterEach(() => {
   useAppStore.setState(initialAppStoreState, true)
 })
 
-function makeRecord(overrides: Partial<SleepingAgentSessionRecord> = {}): SleepingAgentSessionRecord {
+function makeRecord(
+  overrides: Partial<SleepingAgentSessionRecord> = {}
+): SleepingAgentSessionRecord {
   return {
     paneKey: 'tab-1:leaf-1',
     tabId: 'tab-1',
@@ -39,7 +41,7 @@ function makeTerminalTab(id: string, worktreeId: string): Record<string, unknown
 }
 
 describe('ORCA-272: a tab closed mid-turn stays resumable end-to-end', () => {
-  it('preserves the live-checkpoint record on close and lets worktree activation relaunch it', () => {
+  it('preserves the live-checkpoint record on close without reopening the closed tab', () => {
     // Why: exercises the real closeTab path (not a synthetic sleepingAgentSessionsByPaneKey
     // seed) so this proves the full loop the ticket asks for: interrupt, close, reopen,
     // resume — not just that resumeSleepingAgentSessionsForWorktree can consume a record
@@ -79,11 +81,12 @@ describe('ORCA-272: a tab closed mid-turn stays resumable end-to-end', () => {
     // correct outcome is preserve (ORCA-272).
     expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[record.paneKey]).toBe(record)
 
+    // Why: owner rule ORCA-718 — a tab the user closed never comes back by itself; the record
+    // stays so the conversation can be resumed by hand.
     const launched = resumeSleepingAgentSessionsForWorktree('wt-1')
 
-    expect(launched).toBe(1)
-    const resumedTab = useAppStore.getState().tabsByWorktree['wt-1']?.[0]
-    expect(resumedTab?.launchAgent).toBe('claude')
-    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[record.paneKey]).toBeUndefined()
+    expect(launched).toBe(0)
+    expect(useAppStore.getState().tabsByWorktree['wt-1']).toEqual([])
+    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[record.paneKey]).toBe(record)
   })
 })
