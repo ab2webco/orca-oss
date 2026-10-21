@@ -75,10 +75,14 @@ export function createMemoryPressureService(
       const ptyIdBySession = new Map(
         listRegisteredPtys().map((pty) => [pty.sessionId ?? pty.ptyId, pty.ptyId])
       )
-      return rankMemoryPressurePanes(snapshot, (sessionId) => {
-        const ptyId = ptyIdBySession.get(sessionId) ?? sessionId
-        return { ptyId, lastOutputAt: runtime.getPtyLastOutputAt(ptyId) }
-      })
+      return rankMemoryPressurePanes(
+        snapshot,
+        (sessionId) => {
+          const ptyId = ptyIdBySession.get(sessionId) ?? sessionId
+          return { ptyId, lastOutputAt: runtime.getPtyLastOutputAt(ptyId) }
+        },
+        localAgentPtyIds(agents, runtime, Date.now())
+      )
     },
     getSettings: () => resolveMemoryPressureWarningSettings(store.getSettings()),
     broadcast: (state) => {

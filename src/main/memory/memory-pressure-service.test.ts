@@ -104,7 +104,7 @@ describe('createMemoryPressureService', () => {
     vi.useRealTimers()
   })
 
-  it('sends the warning to every live window with panes ranked from the snapshot', async () => {
+  it('sends the warning to every live window with the agent pane ranked first', async () => {
     const live = { isDestroyed: () => false, webContents: { send: vi.fn() } }
     const gone = { isDestroyed: () => true, webContents: { send: vi.fn() } }
     windowsMock.mockReturnValue([live, gone])
@@ -140,8 +140,8 @@ describe('createMemoryPressureService', () => {
     const sent = live.webContents.send.mock.calls.at(-1)
     expect(sent?.[0]).toBe('memory:pressure:changed')
     expect(sent?.[1].warning.panes).toEqual([
-      expect.objectContaining({ sessionId: 'sess-2', ptyId: 'pty-shell', memory: 4 * GIB }),
-      expect.objectContaining({ sessionId: 'sess-1', ptyId: 'pty-live', lastOutputAt: 42 })
+      expect.objectContaining({ sessionId: 'sess-1', ptyId: 'pty-live', lastOutputAt: 42 }),
+      expect.objectContaining({ sessionId: 'sess-2', ptyId: 'pty-shell', memory: 4 * GIB })
     ])
     expect(gone.webContents.send).not.toHaveBeenCalled()
     expect(popupLog.push).toHaveBeenCalledWith(

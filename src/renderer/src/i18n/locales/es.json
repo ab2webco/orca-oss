@@ -9407,7 +9407,7 @@
             "buttons": "botones",
             "position": "posición",
             "memoryPressureTitle": "Aviso de memoria baja",
-            "memoryPressureDescription": "Avisa cuando el sistema se está quedando sin memoria y nombra las terminales que más usan.",
+            "memoryPressureDescription": "Avisa cuando los agentes de las terminales están por quedarse sin memoria y nombra las terminales en riesgo.",
             "memoryKeyword": "memoria",
             "ramKeyword": "ram",
             "swapKeyword": "swap",
@@ -10856,9 +10856,9 @@
         },
         "MemoryPressureWarningSection": {
           "title": "Memoria baja",
-          "description": "Los agentes, servidores MCP y builds que corren en las terminales pueden agotar la memoria. Orca nunca cierra una terminal por su cuenta.",
+          "description": "Orca avisa solo mientras un agente corre en una terminal local: cuando el sistema informa presión de memoria durante dos minutos, o cuando la memoria se agotará en menos de diez minutos al ritmo actual. Orca nunca cierra una terminal por su cuenta.",
           "thresholdLabel": "Avisar por debajo de",
-          "thresholdDescription": "Muestra el aviso cuando la memoria libre baja de este porcentaje de la memoria física. En macOS también aparece cuando el sistema informa presión de memoria. Las terminales en hosts SSH no se miden."
+          "thresholdDescription": "En Linux y Windows el aviso también aparece cuando la memoria libre se mantiene dos minutos por debajo de este porcentaje. En macOS se usa la señal de presión del sistema, porque la memoria en caché hace que la memoria libre parezca baja. Las terminales en hosts SSH no se miden."
         },
         "MobileUpdateInstallSetting": {
           "title": "Actualizar desde un teléfono emparejado",
@@ -15268,7 +15268,7 @@
           "dismiss": "Descartar",
           "freeSummary": "{{value0}} libres de {{value1}}.",
           "swapSummary": "Swap {{value0}} de {{value1}}.",
-          "lead": "Estas terminales usan más memoria. Cierra las que ya no necesites antes de que el sistema se quede sin memoria.",
+          "lead": "Primero aparecen las terminales con agentes y después las que usan más memoria. Cierra las que ya no necesites antes de que el sistema se quede sin memoria.",
           "measuring": "Midiendo terminales…",
           "empty": "Ninguna terminal local está usando mucha memoria. Puede deberse a otras apps.",
           "untitled": "Terminal en segundo plano",
@@ -15276,7 +15276,10 @@
           "lastOutput": "última salida {{value0}}",
           "open": "Abrir",
           "close": "Cerrar",
-          "remote": "Las terminales SSH corren en sus hosts remotos y no se cuentan aquí ({{value0}} abiertas)."
+          "remote": "Las terminales SSH corren en sus hosts remotos y no se cuentan aquí ({{value0}} abiertas).",
+          "triggerExhaustion": "A este ritmo, la memoria se agota en unos {{value0}} minutos.",
+          "triggerLowMemory": "La memoria libre lleva al menos dos minutos por debajo del {{value0}}%.",
+          "triggerKernel": "El sistema lleva al menos dos minutos informando presión de memoria."
         },
         "MemoryPressureCloseDialog": {
           "title": "¿Cerrar {{value0}}?",

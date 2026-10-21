@@ -77,12 +77,15 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
     warning: {
       episodeId: 7,
       sweeping: false,
+      trigger: 'exhaustion-predicted',
+      minutesToExhaustion: 6.2,
       reading: {
         totalMemory: 16 * GIB,
         availableMemory: 0.9 * GIB,
         swapTotal: 9.2 * GIB,
         swapUsed: 8.3 * GIB,
         kernelLevel: 'critical',
+        source: 'sysctl',
         readAt: Date.now()
       },
       panes: [
@@ -140,6 +143,8 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
   const card = orcaPage.getByTestId('memory-pressure-warning')
   await expect(card).toBeVisible({ timeout: 15_000 })
   await expect(card).toContainText('Memory is running low')
+  await expect(card).toContainText('At this rate, memory runs out in about 6 minutes.')
+  await expect(card).toContainText('Terminals running agents come first')
   await expect(card).toContainText(terminal.title)
   await expect(card).toContainText('Background terminal')
   await expect(card).toContainText('5.30 GB')
@@ -236,6 +241,9 @@ test('low-memory card lists heavy terminals, opens, confirms close, dismisses; S
   await expect(section).toBeVisible({ timeout: 15_000 })
   const toggle = section.getByRole('switch', { name: 'Low memory warning' })
   await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  // Why the page: the subsection header sits above the searchable row the id is on.
+  await expect(orcaPage.getByText(/only while an agent runs in a local terminal/)).toBeVisible()
+  await expect(section).toContainText('On macOS the system pressure signal is used instead')
   await section.getByRole('radio', { name: '15%' }).click()
   await expect
     .poll(async () =>
