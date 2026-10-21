@@ -65,10 +65,15 @@ const draw = (tick: number): string => {
   return out
 }
 
-process.stdout.write(`${ESC}?25l${ESC}2J`)
-for (let line = 1; line < (process.stdout.rows || 40) - 14; line += 1) {
-  process.stdout.write(`${ESC}${line};1H${ESC}2;37mlead · earlier output line ${line}${ESC}0m`)
+const paintBackdrop = (): void => {
+  process.stdout.write(`${ESC}?25l${ESC}2J`)
+  for (let line = 1; line < (process.stdout.rows || 40) - 14; line += 1) {
+    process.stdout.write(`${ESC}${line};1H${ESC}2;37mlead · earlier output line ${line}${ESC}0m`)
+  }
 }
+paintBackdrop()
+// Why: a resize reflows the old band into wrapped rows that would sit beside the new one.
+process.stdout.on('resize', paintBackdrop)
 let tick = 0
 setInterval(() => {
   tick += 1

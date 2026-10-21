@@ -299,6 +299,11 @@ test('game band WebGL overlay on one hardware tier (ORCA-692)', async ({
       window.__store?.getState().setSidebarOpen(false)
       window.__store?.getState().setRightSidebarOpen(false)
     })
+    // Why: the host's own memory warning and the member card would cover the band in the shots.
+    await orcaPage.addStyleTag({
+      content:
+        '[data-sonner-toaster],[data-testid="memory-pressure-warning"],.game-band-3d-card{display:none!important}'
+    })
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
       bandShownAt[width] = await waitForBand(orcaPage, 15_000)
