@@ -203,6 +203,21 @@ describe('hd layers', () => {
 })
 
 describe('hd characters', () => {
+  it('keeps the hero its art’s size on a taller band, so it never fills the band', () => {
+    const outline = outlineOf(QUEST.costumes.working.colors)
+    const heroRows = (rows: number): number => {
+      const columns = 90
+      const grid = hdSceneGridOf(
+        input({ columns, rows, phase: 'working', isResting: true, caption: '' })
+      )
+      return Array.from({ length: rows * 2 }, (_, y) =>
+        Array.from({ length: columns }, (_, x) => pixelOf(grid, columns, x, y)).includes(outline)
+      ).filter(Boolean).length
+    }
+    expect(heroRows(10)).toBeGreaterThan(4)
+    expect(heroRows(14)).toBe(heroRows(10))
+  })
+
   it('draws the hero outlined in its own ink with its costume colours', () => {
     const grid = hdSceneGridOf(input({ isResting: true, caption: '' }))
     const colors = new Set(

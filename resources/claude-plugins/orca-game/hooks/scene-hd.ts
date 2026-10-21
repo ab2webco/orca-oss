@@ -1,5 +1,5 @@
 import { actionPixel, PROP_WIDTH } from './action-props'
-import { castPixelOf, hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
+import { hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import { FLASH_COLOR, flashInto, flashOf, particleKindOf, particlesInto } from './hd-fx'
 import { isTeamEventShown, quakeOf, shakeGrid, type TeamEvent } from './hd-overlay'
@@ -15,14 +15,22 @@ import {
   type HdMember,
   type March
 } from './hd-party'
-import { hdBakedGroundOf, hdBakedLandOf, hdLandBakeOf } from './hd-land-bake'
-import { costumeSpriteOf, frameSpriteOf, hdSpritePixel } from './hd-sprite'
+import { hdBackdropPixel } from './hd-backdrop'
+import { hdLandBakeOf } from './hd-land-bake'
+import { figureEdgeOf } from './hd-readability'
+import {
+  costumeSpriteOf,
+  frameSpriteOf,
+  hdSpritePixel,
+  isHdEdgeAt,
+  type HdSprite
+} from './hd-sprite'
 import { hdWordsInto } from './hd-words'
 import { mix, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import type { AdvisorPose } from './scene-cast'
-import { hdFrameOf, hdGroundPixel, hdPlantPixel, hdPondPixel, hdSkyPixel } from './scene-hd-land'
+import { hdFrameOf } from './scene-hd-land'
 import type { SceneDefinition } from './scenes/index'
 import { CLAWD_TOP } from './walk-path'
 
@@ -165,25 +173,40 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const d = Math.hypot(x - (fireLeft + FIRE_WIDTH / 2), (y - (ground - 2)) * 1.3)
     return d < 12 ? mix(color, FIRE_GLOW, (1 - d / 12) * 0.3) : color
   }
+  // Set by figureAt: whether the pixel it returned is an outline, and the state ring tinting it.
+  let isEdge = false
+  let edgeTint: number | undefined
+  // Front to back: the hero, its pet, the party, then the advisor.
+  const placed: readonly { sprite: HdSprite; left: number; top: number; ring?: number }[] = [
+    { sprite, left: walk, top },
+    ...(pet === undefined ? [] : [pet]),
+    ...members.map((one) => ({ ...one, ring: STATE_RING[one.member.state] })),
+    ...(advisor === undefined ? [] : [advisor])
+  ]
   const figureAt = (x: number, y: number): number | undefined => {
-    const hero = hdSpritePixel(sprite, x, y, walk, top) ?? castPixelOf(pet, x, y)
-    if (hero !== undefined) {
-      return hero
-    }
-    for (const one of members) {
-      const member = hdSpritePixel(
-        one.sprite,
-        x,
-        y,
-        one.left,
-        one.top,
-        STATE_RING[one.member.state]
-      )
-      if (member !== undefined) {
-        return member
+    for (const one of placed) {
+      const color = hdSpritePixel(one.sprite, x, y, one.left, one.top, one.ring)
+      if (color !== undefined) {
+        isEdge = isHdEdgeAt(one.sprite, x, y, one.left, one.top)
+        edgeTint = one.ring
+        return color
       }
     }
-    return castPixelOf(advisor, x, y)
+    return undefined
+  }
+  const shadeAt = (x: number, y: number): number => {
+    if (y !== ground) {
+      return 0
+    }
+    const isUnder = (left: number, wide: number) => x > left && x < left + wide - 1
+    if (lift === 0 && isUnder(walk, HD_SPRITE_WIDTH)) {
+      return SHADOW
+    }
+    const isUnderOther =
+      members.some((one) => isUnder(one.left, HD_SPRITE_WIDTH)) ||
+      (pet !== undefined && isUnder(pet.left, pet.sprite.width)) ||
+      (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
+    return isUnderOther ? MEMBER_SHADOW : 0
   }
   const at = (x: number, y: number): number => {
     const crowned = crown === undefined ? undefined : crownPixel(x, y, crown.left, crown.top)
@@ -194,37 +217,21 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const figure = figureAt(x, y)
     if (figure !== undefined) {
       figures[y * columns + x] = 1
-      return glow(x, y, landInLight(figure, figureLight))
+      const lit = landInLight(figure, figureLight)
+      const shown = isEdge
+        ? figureEdgeOf(lit, hdBackdropPixel(frame, land, x, y), look, edgeTint)
+        : lit
+      return glow(x, y, shown)
     }
     const held =
       input.advisor === undefined || advisor === undefined
         ? undefined
         : hdAdvisorPropPixel(input.advisor, advisor, x, y, ground)
     const fire = resting ? hdCampfirePixel(x - fireLeft, ground - 1 - y, tick) : undefined
-    const pond = hdPondPixel(frame, x, y)
-    if (held !== undefined || fire !== undefined || pond !== undefined) {
-      return held ?? fire ?? glow(x, y, pond ?? 0)
+    if (held !== undefined || fire !== undefined) {
+      return held ?? fire ?? 0
     }
-    if (y >= ground) {
-      const isUnder = (left: number, width: number) =>
-        y === ground && x > left && x < left + width - 1
-      const underHero = lift === 0 && isUnder(walk, HD_SPRITE_WIDTH)
-      const underOther =
-        members.some((one) => isUnder(one.left, HD_SPRITE_WIDTH)) ||
-        (pet !== undefined && isUnder(pet.left, pet.sprite.width)) ||
-        (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
-      const shade = underHero ? SHADOW : underOther ? MEMBER_SHADOW : 0
-      if (shade === 0) {
-        return glow(x, y, hdBakedGroundOf(land, frame, x, y))
-      }
-      const soil = mix(hdGroundPixel(frame, x, y), 0x000000, shade)
-      return glow(x, y, landInLight(soil, frame.light, frame.dayLift, look.isNight))
-    }
-    const plant = hdPlantPixel(frame, x, y)
-    if (plant !== undefined) {
-      return glow(x, y, landInLight(plant, frame.light, frame.dayLift, look.isNight))
-    }
-    return glow(x, y, hdBakedLandOf(land, frame, x, y) ?? hdSkyPixel(frame, x, y))
+    return glow(x, y, hdBackdropPixel(frame, land, x, y, shadeAt(x, y)))
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)
