@@ -18,7 +18,7 @@ import {
   terminalIdentity
 } from './helpers/completed-worker-retirement-fixture'
 import { RuntimeClient } from '../../src/cli/runtime-client'
-import type { RuntimeTerminalRead, RuntimeTerminalSummary } from '../../src/shared/runtime-types'
+import type { RuntimeTerminalSummary } from '../../src/shared/runtime-types'
 import { splitWorktreeIdForFilesystem } from '../../src/shared/worktree/id'
 import { SUCCESS_ENVELOPE } from '../../src/main/runtime/orchestration/worker-done-envelope-fixture'
 
@@ -35,7 +35,7 @@ test.afterAll(() => {
 })
 
 for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
-  test(`completed background worker ${closeMode} preserves resume authority through first activation`, async ({
+  test(`completed background worker ${closeMode} keeps its resume record but does not reopen on activation`, async ({
     orcaPage,
     electronApp
   }) => {
@@ -408,16 +408,10 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     // tab before killing the PTY, so the pane's agent status is still live and the evidence does
     // survive. ORCA-272's own known-done rule would therefore retire the record.
     //
-    // What keeps the divergence is a second job the record was quietly doing: it is what seeds the
-    // pane on activation. `resumeSleepingAgentSessionsForWorktree` -> `launchSleepingAgentSession`
-    // calls `createTab`, and it is the only caller that does so here — #14590 also made hydration
-    // keep an explicitly empty tab row, and `shouldAutoCreateInitialTerminal` refuses to seed one
-    // when that row exists. Retire the record and this worktree gets no terminal at all on
-    // activation: no pane, no PaneManager, and the second half of this spec times out.
-    //
-    // So the record is kept for availability now, not for evidence. Retiring it needs the seeding
-    // gap closed first; the interrupted-agent protection it used to imply is pinned directly in
-    // src/renderer/src/store/slices/interrupted-agent-resume-preservation.test.ts instead.
+    // The record no longer seeds a pane on activation: a closed tab never reopens by itself
+    // (ORCA-718). It is kept so the conversation can still be resumed by hand; the
+    // interrupted-agent protection is pinned in
+    // src/renderer/src/store/slices/interrupted-agent-resume-preservation.test.ts.
     await expect
       .poll(() =>
         orcaPage.evaluate(() => {
@@ -491,67 +485,39 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(targetWorktreeId)
-    await waitForActiveTerminalManager(orcaPage)
-    await waitForActivePanePtyId(orcaPage)
-    const activatedPane = await waitForActivePaneHookDescriptor(orcaPage)
-    expect(activatedPane.worktreeId).toBe(targetWorktreeId)
-    const activatedResolved = await client.call<{ terminal: { handle: string } }>(
-      'terminal.resolvePane',
-      { paneKey: activatedPane.paneKey }
-    )
-    await expect
-      .poll(
-        async () => {
-          const read = await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
-            terminal: activatedResolved.result.terminal.handle,
-            limit: 50
-          })
-          return read.result.terminal.tail.join('\n')
-        },
-        { timeout: 30_000, message: 'activated fallback terminal never produced output' }
-      )
-      .not.toBe('')
-
-    // The preserved authority is spent here, not retired: first activation resumes the exact
-    // provider session and says so. A future manual release is what makes this spawn stop.
-    await expect
-      .poll(
-        () =>
-          readCompletedWorkerLedger().filter(
-            (event) =>
-              event.event === 'spawn' &&
-              event.args?.includes('resume') &&
-              event.args?.includes(PROVIDER_SESSION_ID)
-          ).length,
-        { timeout: 30_000, message: 'first activation never resumed the preserved session' }
-      )
-      .toBe(1)
-    expect(readCompletedWorkerLedger().filter((event) => event.event === 'spawn')).toHaveLength(2)
-    await expect(orcaPage.locator('.session-restored-banner')).toHaveCount(1)
-
+    // ORCA-718 (owner rule): a tab closed before the restart never comes back by itself, whatever
+    // ran in it. Activation resumes synchronously, so by now it has decided: no tab, no claim.
     const afterActivation = await orcaPage.evaluate(
-      ({ originalTabId, worktreeId }) => {
+      ({ originalTabId, paneKey, worktreeId }) => {
         const state = window.__store?.getState()
         const tabs = state?.tabsByWorktree[worktreeId] ?? []
         return {
           everActivated: state?.everActivatedWorktreeIds.has(worktreeId) ?? false,
           originalTabPresent: tabs.some((tab) => tab.id === originalTabId),
-          replacementTabCount: tabs.filter((tab) => tab.id !== originalTabId).length,
+          resumedTabCount: tabs.filter((tab) => tab.launchAgent).length,
           resumeClaimTabCount: Object.keys(state?.automaticAgentResumeClaimsByTabId ?? {}).length,
-          claimedResumeSessionIds: Object.values(
-            state?.automaticAgentResumeClaimsByTabId ?? {}
-          ).map((claim) => claim.providerSession.id)
+          recoveryPresent: Boolean(state?.sleepingAgentSessionsByPaneKey[paneKey])
         }
       },
-      { originalTabId: workerBefore.tabId, worktreeId: targetWorktreeId }
+      { originalTabId: workerBefore.tabId, paneKey: workerPaneKey, worktreeId: targetWorktreeId }
     )
     expect(afterActivation).toEqual({
       everActivated: true,
       originalTabPresent: false,
-      replacementTabCount: 1,
-      resumeClaimTabCount: 1,
-      claimedResumeSessionIds: [PROVIDER_SESSION_ID]
+      resumedTabCount: 0,
+      resumeClaimTabCount: 0,
+      // Kept so the conversation can still be resumed by hand.
+      recoveryPresent: true
     })
+    expect(
+      readCompletedWorkerLedger().filter(
+        (event) =>
+          event.event === 'spawn' &&
+          event.args?.includes('resume') &&
+          event.args?.includes(PROVIDER_SESSION_ID)
+      )
+    ).toHaveLength(0)
+    await expect(orcaPage.locator('.session-restored-banner')).toHaveCount(0)
 
     const coordinatorAfter = (await listRuntimeTerminals(client)).find(
       (terminal) => terminal.handle === coordinatorHandle

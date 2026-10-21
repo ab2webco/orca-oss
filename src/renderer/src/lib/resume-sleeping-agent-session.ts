@@ -4,6 +4,7 @@ import {
   type SleepingAgentSessionRecord
 } from '../../../shared/agent-session-resume'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../../shared/agent-status-types'
+import { sleepingAgentSessionBelongsToTab } from '@/store/slices/terminal-tab-retirement'
 import {
   getProviderSessionClaimKey,
   isPassiveCompletedHibernationEvidence,
@@ -130,6 +131,21 @@ function activeOrQueuedResumeClaimsProviderSession(
   return false
 }
 
+// Why: a live/quit capture stands for a tab that was open; once that tab is gone it was closed
+// (by hand, CLI or its shell exiting), and only tabs open at quit may come back (ORCA-718).
+// Worktree sleep keeps its tab rows, so its wake is left as is.
+function recordTabWasClosed(
+  record: SleepingAgentSessionRecord,
+  state: ReturnType<typeof useAppStore.getState>
+): boolean {
+  if (record.origin === 'worktree-sleep') {
+    return false
+  }
+  return !Object.values(state.tabsByWorktree).some((tabs) =>
+    tabs.some((tab) => sleepingAgentSessionBelongsToTab(record.paneKey, record, tab.id))
+  )
+}
+
 // Why: an interrupted turn is still resumable — `claude --resume` reopens the transcript at the
 // prompt — so discarding those records only stranded the session across wake and restart.
 function isInvalidWorktreeActivationRecord(record: SleepingAgentSessionRecord): boolean {
@@ -210,6 +226,10 @@ export function resumeSleepingAgentSessionsForWorktree(
       continue
     }
     if (isPaneOwned) {
+      continue
+    }
+    // Why skip, not clear: the conversation stays offerable by hand (vault, ORCA-717).
+    if (recordTabWasClosed(record, currentState)) {
       continue
     }
     if (launchSleepingAgentSession(record, options)) {

@@ -33,21 +33,25 @@ function makeTerminalTab(id: string): Record<string, unknown> {
   return { id, ptyId: null, worktreeId: 'wt-1', title: 'shell', sortOrder: 0, createdAt: 1 }
 }
 
+// Why old-tab stays: a record whose tab is gone was closed and never reopens (ORCA-718).
+function resumedTab(): { id: string } {
+  return useAppStore.getState().tabsByWorktree['wt-1']!.find((tab) => tab.id !== 'old-tab')!
+}
+
 describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
   it('stores provider-session metadata in the queued startup and runtime claim', () => {
     const record = makeRecord()
     useAppStore.setState({
-      tabsByWorktree: { 'wt-1': [] },
+      tabsByWorktree: { 'wt-1': [makeTerminalTab('old-tab')] },
       sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
     } as never)
 
     expect(resumeSleepingAgentSessionsForWorktree('wt-1')).toBe(1)
-    const resumedTab = useAppStore.getState().tabsByWorktree['wt-1']![0]!
     const state = useAppStore.getState()
-    expect(state.pendingStartupByTabId[resumedTab.id]?.resumeProviderSession).toEqual(
+    expect(state.pendingStartupByTabId[resumedTab().id]?.resumeProviderSession).toEqual(
       record.providerSession
     )
-    expect(state.automaticAgentResumeClaimsByTabId[resumedTab.id]).toEqual({
+    expect(state.automaticAgentResumeClaimsByTabId[resumedTab().id]).toEqual({
       worktreeId: record.worktreeId,
       launchAgent: record.agent,
       providerSession: record.providerSession
@@ -57,7 +61,7 @@ describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
   it('does not fork a provider session that is already queued', () => {
     const record = makeRecord()
     useAppStore.setState({
-      tabsByWorktree: { 'wt-1': [] },
+      tabsByWorktree: { 'wt-1': [makeTerminalTab('old-tab')] },
       sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
     } as never)
 
@@ -77,14 +81,13 @@ describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
   it('does not fork after startup is consumed but before hooks report live status', () => {
     const record = makeRecord()
     useAppStore.setState({
-      tabsByWorktree: { 'wt-1': [] },
+      tabsByWorktree: { 'wt-1': [makeTerminalTab('old-tab')] },
       sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
     } as never)
 
     expect(resumeSleepingAgentSessionsForWorktree('wt-1')).toBe(1)
-    const resumedTab = useAppStore.getState().tabsByWorktree['wt-1']![0]!
-    expect(useAppStore.getState().consumeTabStartupCommand(resumedTab.id)).not.toBeNull()
-    expect(useAppStore.getState().pendingStartupByTabId[resumedTab.id]).toBeUndefined()
+    expect(useAppStore.getState().consumeTabStartupCommand(resumedTab().id)).not.toBeNull()
+    expect(useAppStore.getState().pendingStartupByTabId[resumedTab().id]).toBeUndefined()
 
     useAppStore.setState({
       sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
@@ -122,7 +125,7 @@ describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
     const record = makeRecord()
     useAppStore.setState({
       tabsByWorktree: {
-        'wt-1': [],
+        'wt-1': [makeTerminalTab('old-tab')],
         'wt-2': [{ ...makeTerminalTab('claimed-tab'), worktreeId: 'wt-2' }]
       },
       automaticAgentResumeClaimsByTabId: {
@@ -143,17 +146,17 @@ describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
   it('clears runtime automatic-resume claims when the tab closes', () => {
     const record = makeRecord()
     useAppStore.setState({
-      tabsByWorktree: { 'wt-1': [] },
+      tabsByWorktree: { 'wt-1': [makeTerminalTab('old-tab')] },
       sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
     } as never)
 
     expect(resumeSleepingAgentSessionsForWorktree('wt-1')).toBe(1)
-    const resumedTab = useAppStore.getState().tabsByWorktree['wt-1']![0]!
-    expect(useAppStore.getState().automaticAgentResumeClaimsByTabId[resumedTab.id]).toBeDefined()
+    const resumedTabId = resumedTab().id
+    expect(useAppStore.getState().automaticAgentResumeClaimsByTabId[resumedTabId]).toBeDefined()
 
-    useAppStore.getState().closeTab(resumedTab.id)
+    useAppStore.getState().closeTab(resumedTabId)
 
-    expect(useAppStore.getState().automaticAgentResumeClaimsByTabId[resumedTab.id]).toBeUndefined()
+    expect(useAppStore.getState().automaticAgentResumeClaimsByTabId[resumedTabId]).toBeUndefined()
   })
 
   it('does not include runtime automatic-resume claims in workspace-session payloads', () => {
