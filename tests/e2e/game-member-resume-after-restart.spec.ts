@@ -136,6 +136,14 @@ test('a game member paused by a real restart is resumed on its own task and can 
         lastState: 'launching'
       }
     })
+    // Why warm first: a slow CI run had already cached the repo's scan, which hid the new worktree.
+    await expect
+      .poll(async () =>
+        (
+          await firstClient.call<{ worktrees: { id: string }[] }>('worktree.list', {})
+        ).result.worktrees.map((one) => one.id)
+      )
+      .toContain(worktreeId)
     // Why created here: the seeded repo's primary worktree is external, which new-child cannot parent.
     const memberWorktreeId = await first.page.evaluate(async (name) => {
       const state = window.__store?.getState()
