@@ -40,6 +40,7 @@ import {
   type ClaudeSubagentRoster
 } from './claude-subagent-roster'
 import { readClaudeBackgroundAgentTasks } from './claude-background-task-inventory'
+import { trackClaudeMonitorTaskIds } from './claude-monitor-task-ids'
 import {
   claudeSessionModelOfHook,
   claudeSessionModelOfTranscriptLine,
@@ -146,6 +147,8 @@ export type HookListenerState = {
   claudeRunningNonAgentTaskPaneKeys: Set<string>
   /** Panes whose latest authoritative Claude cron inventory still has a scheduled job. */
   claudeActiveSessionCronPaneKeys: Set<string>
+  /** Background task ids of each pane's armed Monitor tools; these wait for events, not work. */
+  claudeMonitorTaskIdsByPaneKey: Map<string, Set<string>>
   /** Live thread-spawn children per Codex pane. */
   codexSubagentRosterByPaneKey: Map<string, CodexSubagentRoster>
   /** Incremental parent/child rollout cursors for Codex collaboration v2. */
@@ -186,6 +189,7 @@ export function createHookListenerState(): HookListenerState {
     claudeUnconfirmedRestoredStatusPaneKeys: new Set(),
     claudeRunningNonAgentTaskPaneKeys: new Set(),
     claudeActiveSessionCronPaneKeys: new Set(),
+    claudeMonitorTaskIdsByPaneKey: new Map(),
     claudeSessionModelByPaneKey: new Map(),
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
@@ -204,6 +208,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.claudeUnconfirmedRestoredStatusPaneKeys.delete(paneKey)
   state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
   state.claudeActiveSessionCronPaneKeys.delete(paneKey)
+  state.claudeMonitorTaskIdsByPaneKey.delete(paneKey)
   state.claudeSessionModelByPaneKey.delete(paneKey)
   state.codexSubagentRosterByPaneKey.delete(paneKey)
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
@@ -252,6 +257,7 @@ export function movePaneCacheState(
   movePaneScopedSetEntries(state.claudeUnconfirmedRestoredStatusPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedSetEntries(state.claudeRunningNonAgentTaskPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedSetEntries(state.claudeActiveSessionCronPaneKeys, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.claudeMonitorTaskIdsByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.claudeSessionModelByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
@@ -298,6 +304,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.claudeUnconfirmedRestoredStatusPaneKeys.clear()
   state.claudeRunningNonAgentTaskPaneKeys.clear()
   state.claudeActiveSessionCronPaneKeys.clear()
+  state.claudeMonitorTaskIdsByPaneKey.clear()
   state.claudeSessionModelByPaneKey.clear()
   state.codexSubagentRosterByPaneKey.clear()
   state.codexSubagentTranscriptByPaneKey.clear()
@@ -2870,7 +2877,14 @@ function normalizeClaudeEvent(
       previousLead?.interrupted === true)
       ? true
       : undefined
-  const backgroundTasks = readClaudeBackgroundAgentTasks(hookPayload)
+  const monitorTaskIds = trackClaudeMonitorTaskIds(
+    state.claudeMonitorTaskIdsByPaneKey,
+    paneKey,
+    eventName,
+    hookPayload,
+    eventAgentId === undefined
+  )
+  const backgroundTasks = readClaudeBackgroundAgentTasks(hookPayload, monitorTaskIds)
   const sessionCrons = hookPayload['session_crons']
   const sessionCronInventoryPresent = Array.isArray(sessionCrons)
   const hasActiveSessionCron = sessionCronInventoryPresent && sessionCrons.length > 0

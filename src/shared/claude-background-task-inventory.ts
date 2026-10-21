@@ -22,6 +22,10 @@ const CLAUDE_TERMINAL_BACKGROUND_TASK_STATUSES = new Set([
   'timed_out'
 ])
 
+export function isClaudeTerminalBackgroundTaskStatus(status: string): boolean {
+  return status.length > 0 && CLAUDE_TERMINAL_BACKGROUND_TASK_STATUSES.has(status)
+}
+
 /** One agent entry from the `background_tasks` array Claude attaches to Stop
  *  (and SubagentStop) hook payloads. Non-agent tasks do not become rows. */
 export type ClaudeBackgroundAgentTask = {
@@ -38,7 +42,10 @@ export type ClaudeBackgroundAgentTask = {
 /** Read the agent-typed entries of a hook payload's `background_tasks` field.
  *  `present: false` means the field was absent/malformed (older Claude builds),
  *  so callers must keep their tracked roster instead of clearing it. */
-export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unknown>): {
+export function readClaudeBackgroundAgentTasks(
+  hookPayload: Record<string, unknown>,
+  watcherTaskIds?: ReadonlySet<string>
+): {
   present: boolean
   tasks: ClaudeBackgroundAgentTask[]
   truncated: boolean
@@ -60,8 +67,7 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
     const obj = item as Record<string, unknown>
     const taskType = typeof obj.type === 'string' ? obj.type.trim().toLowerCase() : ''
     const taskStatus = typeof obj.status === 'string' ? obj.status.trim().toLowerCase() : ''
-    const isTerminal =
-      taskStatus.length > 0 && CLAUDE_TERMINAL_BACKGROUND_TASK_STATUSES.has(taskStatus)
+    const isTerminal = isClaudeTerminalBackgroundTaskStatus(taskStatus)
     if (taskType.length === 0) {
       truncated = true
       hasRunningNonAgentTask ||= !isTerminal
@@ -69,7 +75,9 @@ export function readClaudeBackgroundAgentTasks(hookPayload: Record<string, unkno
     }
     const isAgentTask = taskType === 'subagent' || taskType === 'teammate'
     // Why: future non-agent types and nonterminal labels must fail active; only typed agent rows or explicit terminal states can safely retire work.
-    if (!isAgentTask && !isTerminal) {
+    // Why: an armed Monitor waits for events; it is not work the agent is doing (ORCA-719).
+    const isWatcher = typeof obj.id === 'string' && watcherTaskIds?.has(obj.id.trim()) === true
+    if (!isAgentTask && !isTerminal && !isWatcher) {
       hasRunningNonAgentTask = true
     }
     if (!isAgentTask) {
