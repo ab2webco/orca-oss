@@ -105,6 +105,7 @@ test('an idle Claude with only a Monitor armed reads done until the Monitor wake
     tool_response: { taskId: MONITOR_TASK.id, timeoutMs: 300000, persistent: false }
   })
   await expect.poll(() => paneState(orcaPage, pane.paneKey)).toBe('working')
+  await expect(orcaPage.getByLabel('Working', { exact: true }).first()).toBeVisible()
   await orcaPage.screenshot({ path: testInfo.outputPath('working-before-stop-1440-light.png') })
 
   await postClaudeHook(endpoint, pane, {
