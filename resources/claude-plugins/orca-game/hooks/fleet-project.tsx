@@ -14,6 +14,7 @@ import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
 import { actionLabelOf, listActionOf } from './lead-actions'
+import type { PanelSection } from './panel-layout'
 import { tapButtonsOf } from './tap-buttons'
 import { isTapLayout } from './tap-layout'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
@@ -25,6 +26,14 @@ const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
   neutral: 'white'
 }
 
+/** Draws a section's ▾/▸ mark and says whether the person collapsed it. */
+export type SectionMarks = {
+  markOf: (section: PanelSection) => RenderElement
+  isCollapsed: (section: PanelSection) => boolean
+}
+
+export type ProjectSections = Partial<Record<'reviews' | 'todo' | 'actions', RenderElement>>
+
 /** My PRs, my To Do grouped by status, and the project's actions with each MCP one's last result. */
 export async function projectRowsOf(
   $: EngineInterface,
@@ -32,8 +41,9 @@ export async function projectRowsOf(
   state: GameState,
   palette: BandPalette,
   isDemo: boolean,
-  columns: number
-): Promise<RenderElement[]> {
+  columns: number,
+  marks: SectionMarks
+): Promise<ProjectSections> {
   const { Box, Text, Button } = $.ui.resolve(e)
   const worktreeId = state.worktree?.id ?? ''
   const text = gameStrings().text
@@ -73,45 +83,56 @@ export async function projectRowsOf(
     </Box>
   )
   // A heading that opens the list, then the items, under a heading per status when they have one.
-  const listRows = (key: string, heading: string, list: GameProjectList, action?: GameAction) => {
+  const listRows = (
+    section: 'reviews' | 'todo',
+    heading: string,
+    list: GameProjectList,
+    action?: GameAction
+  ) => {
+    const key = `project-${section}`
     const sections = todoSectionsOf(list)
+    const isCollapsed = marks.isCollapsed(section)
     return (
       <Box key={key} flexDirection="column">
-        <Box flexDirection="row" gap={1}>
-          {action !== undefined ? (
-            <Button
-              key={`${key}-action`}
-              plain
-              onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
-            >
-              <Text bold underline>
-                {heading}
-              </Text>
-            </Button>
-          ) : list.url === null ? (
-            <Text bold>{heading}</Text>
-          ) : (
-            gameLinkOf(
-              $,
-              e,
-              { key: `${key}-link`, url: list.url, worktreeId, label: heading },
-              <Text bold underline>
-                {heading}
-              </Text>
-            )
-          )}
-        </Box>
-        {sections.flatMap((section, at) => [
-          ...(section.heading === null
-            ? []
-            : [
-                <Text key={`${key}-heading-${at}`} dimColor bold>
-                  {`${text.todoHeadings[section.heading]}${section.count === undefined ? '' : ` ${section.count}`}`}
+        <Box key={`layout-header-${section}`} flexDirection="row">
+          {marks.markOf(section)}
+          <Box flexDirection="row" gap={1}>
+            {action !== undefined ? (
+              <Button
+                key={`${key}-action`}
+                plain
+                onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
+              >
+                <Text bold underline>
+                  {heading}
                 </Text>
-              ]),
-          ...section.items.map((one) => itemRow(key, one))
-        ])}
-        {list.total > todoDrawnCountOf(sections) && (
+              </Button>
+            ) : list.url === null ? (
+              <Text bold>{heading}</Text>
+            ) : (
+              gameLinkOf(
+                $,
+                e,
+                { key: `${key}-link`, url: list.url, worktreeId, label: heading },
+                <Text bold underline>
+                  {heading}
+                </Text>
+              )
+            )}
+          </Box>
+        </Box>
+        {!isCollapsed &&
+          sections.flatMap((group, at) => [
+            ...(group.heading === null
+              ? []
+              : [
+                  <Text key={`${key}-heading-${at}`} dimColor bold>
+                    {`${text.todoHeadings[group.heading]}${group.count === undefined ? '' : ` ${group.count}`}`}
+                  </Text>
+                ]),
+            ...group.items.map((one) => itemRow(key, one))
+          ])}
+        {!isCollapsed && list.total > todoDrawnCountOf(sections) && (
           <Text dimColor>{text.moreAllies(list.total - todoDrawnCountOf(sections))}</Text>
         )}
       </Box>
@@ -157,52 +178,65 @@ export async function projectRowsOf(
   const todo = state.project?.todo ?? null
   const actions = state.actions ?? []
   const hotkeys = actionHotkeysOf(actions)
-  return [
+  const actionsRow = isTapLayout(columns) ? (
+    <Box key="project-actions" flexDirection="column">
+      <Text dimColor>{text.actionsHeading}</Text>
+      {tapButtonsOf(
+        $,
+        e,
+        'project-actions-tap',
+        actions.map((action) => ({
+          key: `action-${action.id}`,
+          labels: [
+            'mcp' in action
+              ? `${actionLabelOf(action)} ${mcpCallTextOf(action.mcp)}`
+              : actionLabelOf(action)
+          ],
+          hotkey: hotkeys.get(action.id),
+          onPress: () => void runAction($, action, isDemo).catch(() => undefined),
+          color: palette.parchment,
+          backgroundColor: palette.panel
+        })),
+        columns
+      )}
+    </Box>
+  ) : (
+    <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
+      <Text dimColor>{text.actionsHeading}</Text>
+      {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
+    </Box>
+  )
+  const isActionsCollapsed = marks.isCollapsed('actions')
+  return {
     ...(reviews === null
-      ? []
-      : [
-          listRows(
-            'project-reviews',
+      ? {}
+      : {
+          reviews: listRows(
+            'reviews',
             text.myReviews(reviewKindOf(reviews), reviews.total),
             reviews,
             listActionOf(state, 'reviews')
           )
-        ]),
+        }),
     ...(todo === null
-      ? []
-      : [listRows('project-todo', text.todo(todo.total), todo, listActionOf(state, 'todo'))]),
+      ? {}
+      : { todo: listRows('todo', text.todo(todo.total), todo, listActionOf(state, 'todo')) }),
     ...(actions.length === 0
-      ? []
-      : [
-          isTapLayout(columns) ? (
-            <Box key="project-actions" flexDirection="column">
-              <Text dimColor>{text.actionsHeading}</Text>
-              {tapButtonsOf(
-                $,
-                e,
-                'project-actions-tap',
-                actions.map((action) => ({
-                  key: `action-${action.id}`,
-                  labels: [
-                    'mcp' in action
-                      ? `${actionLabelOf(action)} ${mcpCallTextOf(action.mcp)}`
-                      : actionLabelOf(action)
-                  ],
-                  hotkey: hotkeys.get(action.id),
-                  onPress: () => void runAction($, action, isDemo).catch(() => undefined),
-                  color: palette.parchment,
-                  backgroundColor: palette.panel
-                })),
-                columns
-              )}
+      ? {}
+      : {
+          actions: (
+            <Box key="project-actions-section" flexDirection="column">
+              <Box key="layout-header-actions" flexDirection="row">
+                {marks.markOf('actions')}
+                {isActionsCollapsed ? (
+                  <Text dimColor>{`${text.actionsHeading} ${actions.length}`}</Text>
+                ) : (
+                  actionsRow
+                )}
+              </Box>
+              {!isActionsCollapsed && actions.flatMap(resultRows)}
             </Box>
-          ) : (
-            <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
-              <Text dimColor>{text.actionsHeading}</Text>
-              {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
-            </Box>
-          ),
-          ...actions.flatMap(resultRows)
-        ])
-  ]
+          )
+        })
+  }
 }

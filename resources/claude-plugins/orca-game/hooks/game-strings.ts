@@ -1,6 +1,7 @@
 import type { GameAgentState, GameCi, GameLocale, GameReview, LocalizedName } from '../types'
 import type { TodoHeading } from './todo-sections'
 import type { CardState } from './lead-state'
+import type { PanelSection } from './panel-layout'
 import { ES } from './locales/es'
 
 // Orca hands the session its UI language as ORCA_GAME_LOCALE; the mod ships the same two.
@@ -60,6 +61,10 @@ export type TextStrings = {
   myReviews: (kind: string, count: number) => string
   todo: (count: number) => string
   actionsHeading: string
+  /** Toast when a newer Orca Lab stored the Panel layout, which this one leaves as it is. */
+  layoutNewer: string
+  /** A Panel section's name in its phone chip and in /orca-game:layout. */
+  layoutSections: Readonly<Record<PanelSection, string>>
   /** Toast once a prompt is queued for the lead's next turn. */
   sentToLead: (label: string) => string
   couldNotSend: (label: string) => string
@@ -191,6 +196,14 @@ const EN: GameStrings = {
     myReviews: (kind, count) => `My ${kind}s ${count}`,
     todo: (count) => `To Do ${count}`,
     actionsHeading: 'Actions',
+    layoutNewer: 'A newer Orca Lab saved this Panel layout; update Orca Lab to change it.',
+    layoutSections: {
+      team: 'Team',
+      review: 'Review',
+      reviews: 'My PRs',
+      todo: 'To Do',
+      actions: 'Actions'
+    },
     sentToLead: (label) => `Sent to the lead: ${label}`,
     couldNotSend: (label) => `Could not send ${label}`,
     actionRunning: 'running…',

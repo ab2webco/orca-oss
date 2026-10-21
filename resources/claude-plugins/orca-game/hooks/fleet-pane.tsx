@@ -7,10 +7,11 @@ import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
 import { countChipsOf, petLabelOf } from './band-chips'
 import { chipRowsOf, type PlacedChip } from './chip-rows'
-import { CI_COLORS, memberHeadingOf, reviewTextOf, workItemTextOf } from './fleet-labels'
+import { memberHeadingOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { projectRowsOf } from './fleet-project'
+import { projectRowsOf, type SectionMarks } from './fleet-project'
+import { reviewSectionOf } from './fleet-review-section'
 import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
@@ -22,6 +23,8 @@ import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
+import { projectKeyOf, toggleSection, type PanelSection } from './panel-layout'
+import { changeFleetLayout, readFleetLayout } from './panel-layout-store'
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
@@ -163,6 +166,22 @@ export const registerFleetPane = (on: On): void => {
       )
     }
     const state = v.state
+    const project = projectKeyOf(state.worktree?.id)
+    const layout = await readFleetLayout($, project)
+    const isCollapsed = (section: PanelSection) => layout.collapsed.includes(section)
+    const togglePressOf = (section: PanelSection) => () =>
+      void changeFleetLayout($, project, (now) => toggleSection(now, section)).catch(
+        () => undefined
+      )
+    // Why a separate mark: the To Do and My PRs headings already open their list or run an action.
+    const marks: SectionMarks = {
+      isCollapsed,
+      markOf: (section) => (
+        <Button key={`layout-toggle-${section}`} plain onPress={togglePressOf(section)}>
+          <Text dimColor>{`${isCollapsed(section) ? '▸' : '▾'} `}</Text>
+        </Button>
+      )
+    }
     const members = state.agents.map((agent) => ({
       agent,
       member: memberOf(agent, state, config.rewards)
@@ -271,11 +290,67 @@ export const registerFleetPane = (on: On): void => {
         {links.map(linkButton)}
       </Box>
     )
-    const projectRows = await projectRowsOf($, e, state, palette, v.isDemo, columns)
+    const projectSections = await projectRowsOf($, e, state, palette, v.isDemo, columns, marks)
+    const cards = members.flatMap(({ agent, member }, index) => [
+      memberCard($, e, agent, member, {
+        scene,
+        room: cardRoom,
+        leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
+        cardState: cardStateOf(agent, state),
+        tile: art.get(`tile-${member.key}`),
+        view:
+          agent.terminalHandle === undefined || isTap
+            ? undefined
+            : view(agent, agent.terminalHandle, index),
+        advisorRows: advisorRowsOf(agent),
+        link
+      }),
+      ...(agent.terminalHandle === undefined || !isTap
+        ? []
+        : [tapView(agent, agent.terminalHandle, index)])
+    ])
+    const team = (
+      <Box key="section-team" flexDirection="column">
+        <Box key="layout-header-team" flexDirection="row">
+          {marks.markOf('team')}
+          <Text bold color={counts.waiting > 0 ? 'red' : undefined}>
+            {`${text.team} ${state.agents.length}`}
+          </Text>
+        </Box>
+        {!isCollapsed('team') && cards}
+        {!isCollapsed('team') && advisorOf(art)}
+      </Box>
+    )
+    const drawn: Readonly<Partial<Record<PanelSection, RenderElement>>> = {
+      team,
+      ...reviewSectionOf($, e, state, marks, link),
+      ...projectSections
+    }
+    const shown = layout.order.filter(
+      (section) => !layout.hidden.includes(section) && drawn[section] != null
+    )
+    const sections = shown.map((section) => drawn[section])
+    // A one-cell mark is too small to tap, so a phone also gets a chip per section.
+    const sectionChips = isTap
+      ? tapButtonsOf(
+          $,
+          e,
+          'layout-tap',
+          shown.map((section) =>
+            tapOf({
+              key: `layout-tap-${section}`,
+              labels: [`${isCollapsed(section) ? '▸' : '▾'} ${text.layoutSections[section]}`],
+              onPress: togglePressOf(section)
+            })
+          ),
+          columns
+        )
+      : null
     return (
       <Box flexDirection="column">
         {art.get(HUD_KEY)}
         {isTap && menuRow}
+        {sectionChips}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           {isTap
             ? fleetChips
@@ -309,64 +384,7 @@ export const registerFleetPane = (on: On): void => {
             {` ! ${need.name}  ${need.text}`}
           </Text>
         ))}
-        {members.flatMap(({ agent, member }, index) => [
-          memberCard($, e, agent, member, {
-            scene,
-            room: cardRoom,
-            leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
-            cardState: cardStateOf(agent, state),
-            tile: art.get(`tile-${member.key}`),
-            view:
-              agent.terminalHandle === undefined || isTap
-                ? undefined
-                : view(agent, agent.terminalHandle, index),
-            advisorRows: advisorRowsOf(agent),
-            link
-          }),
-          ...(agent.terminalHandle === undefined || !isTap
-            ? []
-            : [tapView(agent, agent.terminalHandle, index)])
-        ])}
-        {advisorOf(art)}
-        {state.review !== null && (
-          <Box flexDirection="row" gap={1}>
-            <Box width={10}>
-              <Text dimColor>{text.reviewHeading}</Text>
-            </Box>
-            {link(
-              'pane-review',
-              state.review.url,
-              reviewTextOf(state.review),
-              <Text color={CI_COLORS[state.review.ci]} underline>
-                {reviewTextOf(state.review)}
-              </Text>
-            )}
-            <Text dimColor wrap="truncate-end">
-              {state.review.title}
-            </Text>
-          </Box>
-        )}
-        {state.workItem !== null && (
-          <Box flexDirection="row" gap={1}>
-            <Box width={10}>
-              <Text dimColor>{text.workItemHeading}</Text>
-            </Box>
-            {state.workItem.url === '' ? (
-              <Text>{workItemTextOf(state.workItem)}</Text>
-            ) : (
-              link(
-                'pane-work-item',
-                state.workItem.url,
-                workItemTextOf(state.workItem),
-                <Text underline>{workItemTextOf(state.workItem)}</Text>
-              )
-            )}
-            <Text dimColor wrap="truncate-end">
-              {state.workItem.title}
-            </Text>
-          </Box>
-        )}
-        {projectRows}
+        {sections}
         {links.length > 0 && linksRow}
         {!isTap && menuRow}
       </Box>
