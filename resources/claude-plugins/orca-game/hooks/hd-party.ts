@@ -151,6 +151,9 @@ export const crownAtOf = (
 }
 
 export const crownPixel = (x: number, y: number, left: number, top: number): number | undefined => {
+  if (y < top || x < left) {
+    return undefined
+  }
   const glyph = CROWN[y - top]?.[x - left]
   if (glyph === undefined || glyph === '.') {
     return undefined

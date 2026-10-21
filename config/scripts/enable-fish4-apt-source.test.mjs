@@ -206,10 +206,31 @@ describe('require-fish4 gate', () => {
     expect(output).not.toContain('DECSET 2031')
   })
 
-  it('names the contract when the source was fine and fish is still old', () => {
+  // ORCA-732: the PPA was added, its key and InRelease answered, but its Packages index 503'd.
+  it('names the PPA index, not the package, when the PPA was added and apt still kept 3.7', () => {
     const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'ppa' })
     expect(status).toBe(1)
+    expect(output).toContain('INFRASTRUCTURE, not this PR')
+    expect(output).toContain('Packages index')
+    expect(output).not.toContain('The apt source was reachable')
+  })
+
+  it('names both sources when the release fallback could not be fetched either', () => {
+    const { status, output } = runGate({
+      fishVersion: '3.7.0',
+      sourceStatus: 'release-unavailable'
+    })
+    expect(status).toBe(1)
+    expect(output).toContain('INFRASTRUCTURE, not this PR')
+    expect(output).toContain('status=release-unavailable')
+    expect(output).toContain('fish 4 release')
+  })
+
+  it('names the install, not an outage, when the fish 4 release went in but fish is still old', () => {
+    const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'release' })
+    expect(status).toBe(1)
     expect(output).toContain('DECSET 2031')
+    expect(output).toContain('PATH')
     expect(output).not.toContain('INFRASTRUCTURE')
   })
 

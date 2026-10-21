@@ -674,6 +674,11 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import {
+  GameMemberNameReservations,
+  liveProjectMemberNamesOf
+} from './orchestrator-game-member-name-reservations'
+import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
 import { GameMemberResume } from './orchestrator-game-member-resume'
 import type {
   GameMemberResumeOutcome,
@@ -688,6 +693,7 @@ import {
   awaitResumedLead,
   leadPaneStateOf,
   leadResumeArgsOf,
+  resumeExitErrorOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
@@ -3661,6 +3667,7 @@ export class OrcaRuntimeService {
     sessionIdOf: (handle) =>
       this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
   })
+  private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly gameMemberResume = new GameMemberResume({
     store: this.gameMemberSessions,
     statusOf: (taskId) => {
@@ -3679,55 +3686,36 @@ export class OrcaRuntimeService {
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
-    isLive: (handle) => this.resolveLeafForHandle(handle) !== null,
+    isLive: (handle) => this.isGameLeadTerminalLive(handle),
     sessions: new GameLeadSessions(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
     sessionOf: async (handle) => {
       const pane = await this.snapshotClaudeTerminalSwitchTarget({
         kind: 'handle',
         terminal: handle
       })
-      return pane.ok && pane.providerSession && pane.worktreeId
-        ? {
-            sessionId: pane.providerSession.id,
-            agentArgs: leadResumeArgsOf(pane.launchConfig),
-            worktreeId: pane.worktreeId
-          }
-        : null
+      if (!pane.ok || !pane.providerSession || !pane.worktreeId) {
+        return null
+      }
+      // Why only an injected account: a lead in the shared home keeps its conversation there, and SSH runs remote.
+      const accountId = pane.remoteConnectionId
+        ? null
+        : getLiveInjectedClaudePtyAccountId(pane.ptyId)
+      return {
+        sessionId: pane.providerSession.id,
+        agentArgs: leadResumeArgsOf(pane.launchConfig),
+        worktreeId: pane.worktreeId,
+        accountId
+      }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
-    resume: async (session) => {
-      const { handle } = (
-        await this.ensureAgentSession({
-          kind: 'explicit',
-          worktree: `id:${session.worktreeId}`,
-          agent: 'claude',
-          providerSession: { key: 'session_id', id: session.sessionId },
-          ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-          presentation: 'focused'
-        })
-      ).terminal
-      // Why bounded: the CLI waits on this RPC, and Claude refuses a missing conversation within seconds.
-      const outcome = await awaitResumedLead({
-        read: async () => {
-          if (
-            this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
-            session.sessionId
-          ) {
-            return 'session'
-          }
-          const pane = await this.inspectTerminalProcess(handle).catch(() => null)
-          return resumedPaneStateOf(pane?.foregroundProcess ?? null)
-        },
-        timeoutMs: 20_000,
-        settleMs: 5_000,
-        intervalMs: 500
-      })
-      if (outcome === 'exited') {
-        await this.closeTerminal(handle).catch(() => undefined)
-        throw new Error('Claude exited instead of reopening the conversation')
-      }
-      return handle
-    },
+    resume: (session) =>
+      this.reopenClaudeConversation({
+        worktreeId: session.worktreeId,
+        sessionId: session.sessionId,
+        ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
+        accountId: session.accountId,
+        presentation: 'focused'
+      }),
     focus: async (handle) => {
       await this.focusTerminal(handle)
     },
@@ -30430,10 +30418,34 @@ export class OrcaRuntimeService {
     return this.gameLeads
   }
 
+  // Why the PTY over the leaf: a pane keeps its leaf, and the renderer its ptyId, after Claude exits (ORCA-713).
+  private isGameLeadTerminalLive(handle: string): boolean {
+    const record = this.handles.get(handle)
+    if (!record?.ptyId) {
+      return false
+    }
+    const pty = this.ptysById.get(record.ptyId)
+    if (record.tabId.startsWith('pty:')) {
+      return pty !== undefined && this.isPotentiallyWritablePty(pty)
+    }
+    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    if (!leaf || leaf.ptyId !== record.ptyId || leaf.ptyGeneration !== record.ptyGeneration) {
+      return false
+    }
+    return pty ? this.isPotentiallyWritablePty(pty) : leaf.connected
+  }
+
   // Why a host without a process read counts as running: refusing a second lead is the safe side.
   private async isGameLeadPaneRunning(handle: string): Promise<boolean> {
-    const pane = await this.inspectTerminalProcess(handle).catch(() => null)
-    return !pane?.foregroundProcess || !isShellProcess(pane.foregroundProcess)
+    let foregroundProcess: string | null
+    try {
+      foregroundProcess = (await this.inspectTerminalProcess(handle)).foregroundProcess
+    } catch (error) {
+      // Why local only: an SSH provider forgets its PTYs while the relay reconnects.
+      const gone = error instanceof Error && error.message === 'terminal_gone'
+      return !gone || this.isSshOwnedPtyId(this.resolveLeafForHandle(handle)?.ptyId)
+    }
+    return !foregroundProcess || !isShellProcess(foregroundProcess)
   }
 
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
@@ -30494,6 +30506,36 @@ export class OrcaRuntimeService {
     return { recorded: true }
   }
 
+  // Why the whole project: a lead sees only its own members, so another lead's names come from here.
+  async reserveGameMemberName(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+    roster: readonly GameMemberName[]
+    locale: string
+    taken: readonly string[]
+  }): Promise<{ name: string | null }> {
+    const project = await this.gameBoardProjectOf(args)
+    const [ps, saved] = await Promise.all([
+      this.getWorktreePs(GAME_MEMBER_NAME_SCAN_LIMIT),
+      this.gameMemberSessions.read(project.key)
+    ])
+    const live = liveProjectMemberNamesOf({
+      worktrees: ps.worktrees,
+      inProject: (one) => `repo:${one.repoId}` === project.key,
+      saved: saved.ok ? saved.members : []
+    })
+    return {
+      name: this.gameMemberNames.reserve({
+        projectKey: project.key,
+        ticket: args.ticket,
+        roster: args.roster,
+        locale: args.locale,
+        taken: [...live, ...args.taken]
+      })
+    }
+  }
+
   async resumeGameMember(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -30518,26 +30560,42 @@ export class OrcaRuntimeService {
     return await this.gameMemberResume.discard(project.key, args.tickets)
   }
 
-  // Why the same wait as a reopened lead: Claude exits within seconds when the conversation is missing.
-  private async resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+  private resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+    return this.reopenClaudeConversation({
+      worktreeId: member.worktreeId ?? '',
+      sessionId: member.sessionId ?? '',
+      accountId: member.accountId,
+      presentation: 'background'
+    })
+  }
+
+  // Why bounded: the CLI waits on this, and Claude refuses a conversation it cannot find within seconds.
+  private async reopenClaudeConversation(args: {
+    worktreeId: string
+    sessionId: string
+    agentArgs?: string
+    accountId: string | null
+    presentation: 'focused' | 'background'
+  }): Promise<string> {
     const { handle } = (
       await this.ensureAgentSession(
         {
           kind: 'explicit',
-          worktree: `id:${member.worktreeId}`,
+          worktree: `id:${args.worktreeId}`,
           agent: 'claude',
-          providerSession: { key: 'session_id', id: member.sessionId ?? '' },
-          presentation: 'background'
+          providerSession: { key: 'session_id', id: args.sessionId },
+          ...(args.agentArgs === undefined ? {} : { agentArgs: args.agentArgs }),
+          presentation: args.presentation
         },
         {},
-        member.accountId ? { claudeAccountId: member.accountId } : {}
+        args.accountId ? { claudeAccountId: args.accountId } : {}
       )
     ).terminal
     const outcome = await awaitResumedLead({
       read: async () => {
         if (
           this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
-          member.sessionId
+          args.sessionId
         ) {
           return 'session'
         }
@@ -30549,10 +30607,29 @@ export class OrcaRuntimeService {
       intervalMs: 500
     })
     if (outcome === 'exited') {
+      // Why read before closing: the pane's output is the only record of why Claude refused.
+      const output = await this.readTerminal(handle, { limit: 40 })
+        .then((read) => read.tail)
+        .catch(() => [])
       await this.closeTerminal(handle).catch(() => undefined)
-      throw new Error('Claude exited instead of reopening the conversation')
+      throw new Error(
+        resumeExitErrorOf({ output, account: this.claudeAccountLabelOf(args.accountId) })
+      )
     }
     return handle
+  }
+
+  private claudeAccountLabelOf(accountId: string | null): string | null {
+    if (accountId === null) {
+      return null
+    }
+    // Why the id on a failed read: the label must not replace the reason Claude refused.
+    try {
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts ?? []
+      return accounts.find((one) => one.id === accountId)?.email ?? accountId
+    } catch {
+      return accountId
+    }
   }
 
   async listGameHistory(args: {
@@ -39995,6 +40072,8 @@ const DEFAULT_REPO_SEARCH_REFS_LIMIT = 25
 const DEFAULT_TERMINAL_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_PS_LIMIT = 200
+// Why past the ps default: a member in a worktree cut from the list would lose its name again.
+const GAME_MEMBER_NAME_SCAN_LIMIT = 10_000
 const DISCONNECTED_PTY_RECORD_MAX = 128
 const RESOLVED_WORKTREE_CACHE_TTL_MS = 1000
 const WORKTREE_SCAN_CACHE_TTL_MS = 30_000

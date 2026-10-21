@@ -15,28 +15,23 @@ import {
   type HdMember,
   type March
 } from './hd-party'
+import { hdBakedGroundOf, hdBakedLandOf, hdLandBakeOf } from './hd-land-bake'
 import { costumeSpriteOf, frameSpriteOf, hdSpritePixel } from './hd-sprite'
 import { hdWordsInto } from './hd-words'
 import { mix, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import type { AdvisorPose } from './scene-cast'
-import {
-  hdFarPixel,
-  hdFrameOf,
-  hdGroundPixel,
-  hdMidPixel,
-  hdPlantPixel,
-  hdPondPixel,
-  hdSkyPixel
-} from './scene-hd-land'
+import { hdFrameOf, hdGroundPixel, hdPlantPixel, hdPondPixel, hdSkyPixel } from './scene-hd-land'
 import type { SceneDefinition } from './scenes/index'
 import { CLAWD_TOP } from './walk-path'
 
-// The 2D-HD scene: 9 or 10 rows at native resolution, outlined and shaded characters on a lit landscape.
+// The 2D-HD scene: 9 to 14 rows at native resolution, outlined and shaded characters on a lit landscape.
 
 export const HD_ROWS = 9
-export const HD_MAX_ROWS = 10
+export const HD_MAX_ROWS = 14
+/** The band takes one row in this many of the pane's. */
+const PANE_ROWS_PER_BAND_ROW = 4
 /** A costume is 10 columns; its outline adds one on each side. */
 export const HD_SPRITE_WIDTH = 12
 
@@ -63,11 +58,9 @@ export type HdSceneInput = {
   event?: TeamEvent
 }
 
-/** 9 rows, 10 once the terminal is tall enough to spare them. */
-export const hdRowsOf = (viewportRows: number | undefined): number => {
-  const third = Math.max(12, Math.min(16, Math.round((viewportRows ?? 0) / 3.5)))
-  return Math.min(HD_MAX_ROWS, Math.round(5 + (third - 5) / 2))
-}
+/** A quarter of the pane, from 9 rows up to 14. */
+export const hdRowsOf = (viewportRows: number | undefined): number =>
+  Math.max(HD_ROWS, Math.min(HD_MAX_ROWS, Math.round((viewportRows ?? 0) / PANE_ROWS_PER_BAND_ROW)))
 
 // Columns the hero keeps clear ahead of it for its prop.
 const WALK_SLACK = 8
@@ -104,6 +97,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const light = input.light ?? (look.isNight ? MIDNIGHT : NOON)
   const frame = hdFrameOf({ look, width: columns, rows, tick, scroll: resting ? 0 : tick, light })
   const { ground, pixels } = frame
+  const land = hdLandBakeOf(frame)
   const pose = hdHeroPoseOf(tick, resting)
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
   // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
@@ -220,6 +214,9 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
         (pet !== undefined && isUnder(pet.left, pet.sprite.width)) ||
         (advisor !== undefined && isUnder(advisor.left, advisor.sprite.width))
       const shade = underHero ? SHADOW : underOther ? MEMBER_SHADOW : 0
+      if (shade === 0) {
+        return glow(x, y, hdBakedGroundOf(land, frame, x, y))
+      }
       const soil = mix(hdGroundPixel(frame, x, y), 0x000000, shade)
       return glow(x, y, landInLight(soil, frame.light, frame.dayLift, look.isNight))
     }
@@ -227,7 +224,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     if (plant !== undefined) {
       return glow(x, y, landInLight(plant, frame.light, frame.dayLift, look.isNight))
     }
-    return glow(x, y, hdMidPixel(frame, x, y) ?? hdFarPixel(frame, x, y) ?? hdSkyPixel(frame, x, y))
+    return glow(x, y, hdBakedLandOf(land, frame, x, y) ?? hdSkyPixel(frame, x, y))
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)
