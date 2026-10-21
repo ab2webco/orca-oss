@@ -37,6 +37,7 @@ function setup(
     taskStatus?: string | null
     dispatchStatus?: string | null
     worktrees?: string[]
+    taskWorktree?: string
     resume?: (member: GameMemberSession) => Promise<string>
   } = {}
 ) {
@@ -46,10 +47,12 @@ function setup(
   const resumed: GameMemberSession[] = []
   const resume = new GameMemberResume({
     store,
-    statusOf: () => ({
+    statusOf: (taskId) => ({
       task: over.taskStatus === undefined ? 'ready' : over.taskStatus,
-      latestDispatch: over.dispatchStatus ?? 'failed'
+      latestDispatch: over.dispatchStatus ?? 'failed',
+      latestDispatchId: `ctx_last_${taskId}`
     }),
+    worktreeOfTask: () => over.taskWorktree ?? null,
     worktreeExists: async (id) => (over.worktrees ?? ['wt-ORCA-1']).includes(id),
     resumeSession:
       over.resume ??
@@ -157,6 +160,37 @@ describe('GameMemberResume.resume', () => {
       outcome: 'relaunch',
       member: target,
       note: 'Claude exited instead of reopening the conversation'
+    })
+  })
+
+  it('starts nothing for a task still marked dispatched from before the restart', async () => {
+    const { store, resume, resumed } = setup({ taskStatus: 'dispatched' })
+    await store.upsert('repo:a', saved('ORCA-1'))
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'missing',
+      ticket: 'ORCA-1',
+      reason:
+        'its task task_ORCA-1 is still marked dispatched by ctx_last_task_ORCA-1, so no new member can take it'
+    })
+    expect(resumed).toEqual([])
+  })
+
+  it('retries a task that failed or was blocked from its latest dispatch', async () => {
+    const { store, resume } = setup({ taskStatus: 'failed' })
+    await store.upsert('repo:a', saved('ORCA-1'))
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'resumed',
+      terminal: 'term-ORCA-1',
+      member: { ...target, retryOf: 'ctx_last_task_ORCA-1' }
+    })
+  })
+
+  it('finds the worktree a launch cut short created, so it is reused and never orphaned', async () => {
+    const { store, resume } = setup({ taskWorktree: 'wt-ORCA-1' })
+    await store.upsert('repo:a', saved('ORCA-1', { worktreeId: undefined, sessionId: undefined }))
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'relaunch',
+      member: target
     })
   })
 
