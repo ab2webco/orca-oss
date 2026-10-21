@@ -693,6 +693,7 @@ import {
   awaitResumedLead,
   leadPaneStateOf,
   leadResumeArgsOf,
+  resumeExitErrorOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
@@ -3692,48 +3693,29 @@ export class OrcaRuntimeService {
         kind: 'handle',
         terminal: handle
       })
-      return pane.ok && pane.providerSession && pane.worktreeId
-        ? {
-            sessionId: pane.providerSession.id,
-            agentArgs: leadResumeArgsOf(pane.launchConfig),
-            worktreeId: pane.worktreeId
-          }
-        : null
+      if (!pane.ok || !pane.providerSession || !pane.worktreeId) {
+        return null
+      }
+      // Why only an injected account: a lead in the shared home keeps its conversation there, and SSH runs remote.
+      const accountId = pane.remoteConnectionId
+        ? null
+        : getLiveInjectedClaudePtyAccountId(pane.ptyId)
+      return {
+        sessionId: pane.providerSession.id,
+        agentArgs: leadResumeArgsOf(pane.launchConfig),
+        worktreeId: pane.worktreeId,
+        accountId
+      }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
-    resume: async (session) => {
-      const { handle } = (
-        await this.ensureAgentSession({
-          kind: 'explicit',
-          worktree: `id:${session.worktreeId}`,
-          agent: 'claude',
-          providerSession: { key: 'session_id', id: session.sessionId },
-          ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-          presentation: 'focused'
-        })
-      ).terminal
-      // Why bounded: the CLI waits on this RPC, and Claude refuses a missing conversation within seconds.
-      const outcome = await awaitResumedLead({
-        read: async () => {
-          if (
-            this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
-            session.sessionId
-          ) {
-            return 'session'
-          }
-          const pane = await this.inspectTerminalProcess(handle).catch(() => null)
-          return resumedPaneStateOf(pane?.foregroundProcess ?? null)
-        },
-        timeoutMs: 20_000,
-        settleMs: 5_000,
-        intervalMs: 500
-      })
-      if (outcome === 'exited') {
-        await this.closeTerminal(handle).catch(() => undefined)
-        throw new Error('Claude exited instead of reopening the conversation')
-      }
-      return handle
-    },
+    resume: (session) =>
+      this.reopenClaudeConversation({
+        worktreeId: session.worktreeId,
+        sessionId: session.sessionId,
+        ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
+        accountId: session.accountId,
+        presentation: 'focused'
+      }),
     focus: async (handle) => {
       await this.focusTerminal(handle)
     },
@@ -30578,26 +30560,42 @@ export class OrcaRuntimeService {
     return await this.gameMemberResume.discard(project.key, args.tickets)
   }
 
-  // Why the same wait as a reopened lead: Claude exits within seconds when the conversation is missing.
-  private async resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+  private resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+    return this.reopenClaudeConversation({
+      worktreeId: member.worktreeId ?? '',
+      sessionId: member.sessionId ?? '',
+      accountId: member.accountId,
+      presentation: 'background'
+    })
+  }
+
+  // Why bounded: the CLI waits on this, and Claude refuses a conversation it cannot find within seconds.
+  private async reopenClaudeConversation(args: {
+    worktreeId: string
+    sessionId: string
+    agentArgs?: string
+    accountId: string | null
+    presentation: 'focused' | 'background'
+  }): Promise<string> {
     const { handle } = (
       await this.ensureAgentSession(
         {
           kind: 'explicit',
-          worktree: `id:${member.worktreeId}`,
+          worktree: `id:${args.worktreeId}`,
           agent: 'claude',
-          providerSession: { key: 'session_id', id: member.sessionId ?? '' },
-          presentation: 'background'
+          providerSession: { key: 'session_id', id: args.sessionId },
+          ...(args.agentArgs === undefined ? {} : { agentArgs: args.agentArgs }),
+          presentation: args.presentation
         },
         {},
-        member.accountId ? { claudeAccountId: member.accountId } : {}
+        args.accountId ? { claudeAccountId: args.accountId } : {}
       )
     ).terminal
     const outcome = await awaitResumedLead({
       read: async () => {
         if (
           this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
-          member.sessionId
+          args.sessionId
         ) {
           return 'session'
         }
@@ -30609,10 +30607,29 @@ export class OrcaRuntimeService {
       intervalMs: 500
     })
     if (outcome === 'exited') {
+      // Why read before closing: the pane's output is the only record of why Claude refused.
+      const output = await this.readTerminal(handle, { limit: 40 })
+        .then((read) => read.tail)
+        .catch(() => [])
       await this.closeTerminal(handle).catch(() => undefined)
-      throw new Error('Claude exited instead of reopening the conversation')
+      throw new Error(
+        resumeExitErrorOf({ output, account: this.claudeAccountLabelOf(args.accountId) })
+      )
     }
     return handle
+  }
+
+  private claudeAccountLabelOf(accountId: string | null): string | null {
+    if (accountId === null) {
+      return null
+    }
+    // Why the id on a failed read: the label must not replace the reason Claude refused.
+    try {
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts ?? []
+      return accounts.find((one) => one.id === accountId)?.email ?? accountId
+    } catch {
+      return accountId
+    }
   }
 
   async listGameHistory(args: {
