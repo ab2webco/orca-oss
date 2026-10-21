@@ -123,4 +123,27 @@ describe('OrchestrationDb stray legacy mail (ORCA-726)', () => {
     expect(close).toHaveBeenCalledTimes(1)
     close.mockRestore()
   })
+
+  it('refuses new mail without a Run once a legacy adoption exists', () => {
+    const { dbPath, first } = openAdoptedDb()
+    db = first
+
+    expect(() =>
+      db!.insertMessage({ from: 'term_worker', to: LEAD_HANDLE, subject: 'late' })
+    ).toThrow(/requires a Run/)
+    const raw = new Database(dbPath)
+    const legacyRows = raw
+      .prepare('SELECT COUNT(*) AS n FROM messages WHERE run_id = ?')
+      .get(LEGACY_RUN_ID) as { n: number }
+    raw.close()
+    expect(legacyRows.n).toBe(0)
+  })
+
+  it('keeps the legacy fallback for a database that was never adopted', () => {
+    db = new OrchestrationDb(':memory:')
+
+    expect(db.insertMessage({ from: 'term_a', to: 'term_b', subject: 'pre-run' }).run_id).toBe(
+      LEGACY_RUN_ID
+    )
+  })
 })

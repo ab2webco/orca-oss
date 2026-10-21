@@ -16733,6 +16733,7 @@ export class OrcaRuntimeService {
     const run = this._orchestrationDb.getActiveCoordinatorRun()
     if (run) {
       this._orchestrationDb.insertMessage({
+        runId: dispatch.run_id,
         from: handle,
         to: run.coordinator_handle,
         subject: `Agent exited unexpectedly (code ${exitCode})`,

@@ -3131,6 +3131,14 @@ export class OrchestrationDb {
   // ── Messages ──
 
   insertMessage(msg: InsertMessageParams): MessageRow {
+    // Why (ORCA-726): once adopted, a legacy row makes every launch replay the adoption, and one
+    // carried by another Run's Delivery broke it; callers must name the Run explicitly.
+    if (!msg.runId && this.getLegacyAdoption()) {
+      throw new OrchestrationError(
+        'run_required',
+        'A message requires a Run once legacy orchestration state was adopted. No effects were applied.'
+      )
+    }
     const runId = msg.runId ?? LEGACY_RUN_ID
     const deliveryContract = msg.deliveryContract ?? 'current_delivery'
     this.requireRun(runId)
