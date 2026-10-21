@@ -11,6 +11,8 @@ import type { SceneDefinition } from './scenes/index'
 // sparkles, a floating team reaction, the lead's label and the merge finale.
 
 const ADVISOR_LINE_MAX = 28
+/** Columns the hero's cloud keeps before the advisor's may begin, so a narrow band drops the advisor's. */
+const HERO_CLOUD_COLUMNS = 18
 
 /** Where a figure stands, in pixels. */
 export type Figure = { left: number; top: number; width: number }
@@ -40,21 +42,6 @@ export type HdWords = {
 export const hdWordsInto = (grid: number[][], w: HdWords): void => {
   const { columns, rows, tick, reaction, event } = w
   const row = rows >= 8 ? 2 : 1
-  const advisorBox =
-    w.advisor === undefined || w.advisor.bubble === ''
-      ? undefined
-      : drawThought(grid, w.advisor.bubble, 'saying', tick - w.advisor.age, {
-          columns,
-          rows,
-          tick,
-          left: columns,
-          limit: columns,
-          row,
-          headRight: -1,
-          headTop: rows * 2,
-          floor: w.ground - 1,
-          room: Math.max(4, Math.min(ADVISOR_LINE_MAX, Math.floor(columns / 2) - 4))
-        })
   const isRed = event?.kind === 'fail'
   const mood = thoughtMoodOf({
     caption: w.caption,
@@ -72,6 +59,22 @@ export const hdWordsInto = (grid: number[][], w: HdWords): void => {
         : isRed && w.caption === ''
           ? gameStrings().art.ciIsRed
           : w.caption
+  const advisorBox =
+    w.advisor === undefined || w.advisor.bubble === ''
+      ? undefined
+      : drawThought(grid, w.advisor.bubble, 'saying', tick - w.advisor.age, {
+          columns,
+          rows,
+          tick,
+          left: columns,
+          limit: columns,
+          row,
+          headRight: -1,
+          headTop: rows * 2,
+          floor: w.ground - 1,
+          room: Math.max(4, Math.min(ADVISOR_LINE_MAX, Math.floor(columns / 2) - 4)),
+          least: said === '' ? 0 : HERO_CLOUD_COLUMNS
+        })
   const since = reaction !== undefined ? tick - reaction.age : isRed ? tick - event.age : w.since
   const box = drawThought(grid, said, mood, since, {
     columns,

@@ -130,3 +130,49 @@ describe('Jev’s advisor in hd', () => {
     }
   })
 })
+
+describe('the hd band as the pane narrows', () => {
+  const FLAMES = [0xfff1a0, 0xffd24a, 0xff9a2e, 0xe0521e]
+  const PARTY = [
+    { key: 'a', phase: 'build', state: 'working' },
+    { key: 'b', phase: 'verify', state: 'working' }
+  ] as const
+  const bandAt = (columns: number, patch: Partial<HdSceneInput> = {}) =>
+    hdSceneGridOf(
+      input({
+        columns,
+        rows: 14,
+        party: PARTY,
+        advisor: pose({ gesture: 'escalated', bubble: 'kept Opus', age: 10 }),
+        ...patch
+      })
+    )
+  // How many columns show any of `colors`: a figure half hidden behind another shows fewer.
+  const spanOf = (grid: number[][], columns: number, colors: readonly number[]): number =>
+    new Set(
+      grid.flatMap((cell, i) =>
+        cell[0] === UPPER_HALF && colors.some((one) => cell[1] === one || cell[2] === one)
+          ? [i % columns]
+          : []
+      )
+    ).size
+  const WIDTHS = Array.from({ length: 97 }, (_, i) => 24 + i)
+
+  it('keeps the resting hero’s campfire in sight at every width', () => {
+    for (const columns of WIDTHS) {
+      expect(
+        spanOf(bandAt(columns, { isResting: true, caption: '' }), columns, FLAMES),
+        `${columns}`
+      ).toBeGreaterThan(2)
+    }
+  })
+
+  it('gives the hero’s caption the room before the advisor’s words', () => {
+    for (const columns of WIDTHS) {
+      expect(glyphs(bandAt(columns, { caption: 'Editing scene.ts' })), `${columns}`).toContain(
+        'Editing'
+      )
+    }
+    expect(glyphs(bandAt(100, { caption: 'Editing scene.ts' }))).toContain('kept Opus')
+  })
+})

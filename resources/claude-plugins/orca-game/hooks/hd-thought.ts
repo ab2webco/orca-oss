@@ -44,6 +44,8 @@ export type ThoughtAt = {
   floor: number
   /** The longest line, when shorter than the cloud's own limit. */
   room?: number
+  /** The first column it may take; it is not drawn rather than start further left. */
+  least?: number
 }
 
 export type ThoughtBox = { left: number; right: number; row: number; lines: number }
@@ -181,6 +183,9 @@ export const drawThought = (
   const isShaking = mood === 'red' && tick - since >= 0 && tick - since < RED_SHAKE_TICKS
   const shake = isShaking ? (Math.floor(tick / 2) % 2 === 0 ? 1 : -1) : 0
   const left = Math.max(2, Math.min(right - total, at.left + shake))
+  if (left - 1 < (at.least ?? 0)) {
+    return undefined
+  }
   const boxRight = left + total - 1
   const cloud = mood === 'red' ? RAIN_CLOUD : CLOUD
   const outline = mood === 'red' ? RAIN_OUTLINE : OUTLINE
