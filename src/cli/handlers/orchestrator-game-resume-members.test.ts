@@ -174,6 +174,50 @@ describe('orca game resume-members', () => {
     ])
   })
 
+  it('retries a failed task from its latest dispatch', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('CIN-1')],
+      outcomes: {
+        'CIN-1': {
+          outcome: 'resumed',
+          terminal: 'term_cin1',
+          member: target('CIN-1', { retryOf: 'ctx_old' })
+        }
+      }
+    })
+
+    await run(client)
+
+    expect(calls.find(([m]) => m === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ task: 'task_CIN-1', terminal: 'term_cin1', retryOf: 'ctx_old' })
+    )
+  })
+
+  it('closes a reopened conversation no dispatch could take, so no agent runs unowned', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('CIN-1')],
+      outcomes: {
+        'CIN-1': { outcome: 'resumed', terminal: 'term_cin1', member: target('CIN-1') }
+      }
+    })
+    const answer = client.call.bind(client)
+    client.call = (async (method: string, params: Record<string, unknown>) => {
+      if (method === 'orchestration.workerStart') {
+        calls.push([method, params])
+        throw new Error('task_not_ready')
+      }
+      return answer(method, params)
+    }) as RuntimeClient['call']
+
+    await run(client)
+
+    expect(calls.find(([m]) => m === 'terminal.close')?.[1]).toEqual({ terminal: 'term_cin1' })
+    expect(printed().members).toEqual([
+      { ticket: 'CIN-1', result: 'failed', reason: 'task_not_ready' }
+    ])
+    expect(process.exitCode).toBe(1)
+  })
+
   it('reports finished and missing members without starting anything for them', async () => {
     const { client, calls } = fakeClient({
       pausedMembers: [paused('CIN-1'), paused('CIN-2')],
