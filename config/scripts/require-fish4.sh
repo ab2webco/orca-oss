@@ -33,10 +33,19 @@ fi
 # failed" are different diagnoses. Reading one red check used to mean opening the
 # job log to tell them apart, which is half the cost of this ticket.
 status="$(cat "$STATUS_FILE" 2>/dev/null || echo unknown)"
-if [ "$status" != 'ppa' ]; then
-  echo "::error::INFRASTRUCTURE, not this PR: the ppa:fish-shell/release-4 apt source could not be reached (status=${status}), so the runner kept '${version:-none}'. Launchpad's key API returns HTTP 500 intermittently - re-run this job. See ORCA-287." >&2
-  exit 1
-fi
-
-echo "::error::shell contracts needs fish 4+ (DECSET 2031 arming, #9993) but got '${version:-none}'. The apt source was reachable, so this is the fish install or the package itself, not a Launchpad outage." >&2
+case "$status" in
+  release)
+    echo "::error::shell contracts needs fish 4+ (DECSET 2031 arming, #9993) but got '${version:-none}'. The fish 4 release was installed, so this is the install or PATH order, not an outage." >&2
+    ;;
+  ppa)
+    # Why not "the source was reachable": an added PPA can still 503 its Packages index (ORCA-732).
+    echo "::error::INFRASTRUCTURE, not this PR: ppa:fish-shell/release-4 was added but apt still installed '${version:-none}', so its Packages index was not served, and no fish 4 release fallback ran. Re-run this job. See ORCA-732." >&2
+    ;;
+  release-*)
+    echo "::error::INFRASTRUCTURE, not this PR: neither ppa:fish-shell/release-4 nor the pinned fish 4 release gave the runner fish 4 (status=${status}), so it kept '${version:-none}'. Re-run this job. See ORCA-732." >&2
+    ;;
+  *)
+    echo "::error::INFRASTRUCTURE, not this PR: the ppa:fish-shell/release-4 apt source could not be reached (status=${status}), so the runner kept '${version:-none}'. Launchpad's key API returns HTTP 500 intermittently - re-run this job. See ORCA-287." >&2
+    ;;
+esac
 exit 1
