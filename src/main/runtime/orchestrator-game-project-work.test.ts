@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PRCheckDetail } from '../../shared/github/check-types'
+import type { GitHubRepositoryIdentity } from '../../shared/github/pull-request-types'
 import { GAME_TODO_ITEMS_MAX } from '../../shared/orchestrator-game-project-work'
 import {
   autoTodoSourceOf,
@@ -124,6 +125,20 @@ describe('readGameProjectWork', () => {
     ])
     expect(work.reviews?.url).toBe(
       'https://github.com/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me%20repo%3Aab2webco%2Forca-oss%20repo%3Astablyai%2Forca'
+    )
+  })
+
+  it("opens the project's own PR list when no repo holds my open PRs", async () => {
+    const work = await readGameProjectWork(
+      port({
+        githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
+        githubPullRequests: async () => ({ repos: [], items: [] })
+      }),
+      { todo: 'off', workItem: null }
+    )
+
+    expect(work.reviews?.url).toBe(
+      'https://github.com/ab2webco/orca-oss/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me'
     )
   })
 
@@ -448,6 +463,38 @@ describe('myOpenPullRequestsOf', () => {
     expect(found.items.map((one) => one.number)).toEqual([471, 90])
   })
 
+  it('names only the fork when my open PRs all live on it', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream'
+        ? result(upstream, [])
+        : result(fork, [
+            { number: 541, type: 'pr' },
+            { number: 7, type: 'issue' }
+          ])
+    )
+
+    expect(found.repos).toEqual([fork])
+    expect(found.items.map((one) => one.number)).toEqual([541])
+  })
+
+  it('names only the upstream when my open PRs all live there', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream'
+        ? result(upstream, [{ number: 90, type: 'pr' }])
+        : result(fork, [{ number: 7, type: 'issue' }])
+    )
+
+    expect(found.repos).toEqual([upstream])
+  })
+
+  it('names no repo when I have no open PRs, so the link falls back to the project', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream' ? result(upstream, []) : result(fork, [])
+    )
+
+    expect(found).toEqual({ repos: [], items: [] })
+  })
+
   it('searches once when the repo has no upstream', async () => {
     const asked: string[] = []
     const found = await myOpenPullRequestsOf(async (preference) => {
@@ -457,5 +504,85 @@ describe('myOpenPullRequestsOf', () => {
 
     expect(asked).toEqual(['upstream'])
     expect(found).toMatchObject({ repos: [fork], items: [{ number: 3 }] })
+  })
+})
+
+describe('my open PRs link, from where my PRs live', () => {
+  type Repo = GitHubRepositoryIdentity
+  const MINE = '/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me'
+  const pageOf = (repo: Repo) => `https://${repo.host ?? 'github.com'}/${repo.owner}/${repo.repo}`
+
+  // Why: drives the band's link through the real repo pick, from the remotes and the PRs on each.
+  const linkOf = async (layout: {
+    origin: Repo
+    upstream?: Repo
+    mine: { origin?: number[]; upstream?: number[] }
+  }) => {
+    const prsIn = (repo: Repo) =>
+      (repo === layout.upstream ? layout.mine.upstream : layout.mine.origin) ?? []
+    const search = async (preference: 'upstream' | 'origin') => {
+      const searched = preference === 'origin' ? layout.origin : (layout.upstream ?? layout.origin)
+      return {
+        items: prsIn(searched).map((number) => ({
+          number,
+          type: 'pr',
+          title: `#${number}`,
+          url: `${pageOf(searched)}/pull/${number}`
+        })),
+        sources: { prs: searched, originCandidate: layout.origin }
+      }
+    }
+    const work = await readGameProjectWork(
+      port({
+        githubRepo: async () => layout.origin,
+        githubPullRequests: () => myOpenPullRequestsOf(search),
+        githubChecks: async () => []
+      }),
+      { todo: 'off', workItem: null }
+    )
+    return work.reviews?.url
+  }
+
+  const own = { owner: 'acme', repo: 'widget' }
+  const parent = { owner: 'widget-org', repo: 'widget' }
+
+  it('opens a plain repo’s own list, with PRs or without', async () => {
+    expect(await linkOf({ origin: own, mine: { origin: [4] } })).toBe(`${pageOf(own)}${MINE}`)
+    expect(await linkOf({ origin: own, mine: {} })).toBe(`${pageOf(own)}${MINE}`)
+  })
+
+  it('opens the fork’s own list when my PRs live only on the fork', async () => {
+    expect(await linkOf({ origin: own, upstream: parent, mine: { origin: [12, 13] } })).toBe(
+      `${pageOf(own)}${MINE}`
+    )
+  })
+
+  it('opens the upstream’s list when, as a contributor, my PRs live only upstream', async () => {
+    expect(await linkOf({ origin: own, upstream: parent, mine: { upstream: [90] } })).toBe(
+      `${pageOf(parent)}${MINE}`
+    )
+  })
+
+  it('searches both when my PRs live on the fork and upstream', async () => {
+    expect(
+      await linkOf({ origin: own, upstream: parent, mine: { origin: [12], upstream: [90] } })
+    ).toBe(
+      `https://github.com/pulls?q=${encodeURIComponent('is:pr is:open author:@me repo:acme/widget repo:widget-org/widget')}`
+    )
+  })
+
+  it('opens the fork’s own list, not the upstream’s, when I have no open PRs', async () => {
+    expect(await linkOf({ origin: own, upstream: parent, mine: {} })).toBe(`${pageOf(own)}${MINE}`)
+  })
+
+  it('keeps a GitHub Enterprise host on the one repo that holds my PRs', async () => {
+    const ghe = { ...own, host: 'git.example.com' }
+    const gheParent = { ...parent, host: 'git.example.com' }
+    expect(await linkOf({ origin: ghe, upstream: gheParent, mine: { origin: [5] } })).toBe(
+      `https://git.example.com/acme/widget${MINE}`
+    )
+    expect(await linkOf({ origin: ghe, upstream: gheParent, mine: { upstream: [6] } })).toBe(
+      `https://git.example.com/widget-org/widget${MINE}`
+    )
   })
 })

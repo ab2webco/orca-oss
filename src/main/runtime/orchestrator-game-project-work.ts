@@ -35,7 +35,7 @@ type PullRequest = Pick<GitHubWorkItem, 'number' | 'title' | 'url' | 'headSha' |
 export type GameProjectWorkPort = {
   /** Null when the repo has no GitHub remote. */
   githubRepo: () => Promise<GitHubRepositoryIdentity | null>
-  /** My open PRs and the repos searched: a fork and its upstream when it has one. */
+  /** My open PRs and the repos holding them, out of a fork and its upstream when it has one. */
   githubPullRequests: () => Promise<{
     repos: readonly GitHubRepositoryIdentity[]
     items: readonly PullRequest[]
@@ -83,10 +83,14 @@ export async function myOpenPullRequestsOf<T extends { type: string }>(
   const searched = upstream.sources.prs
   const origin = upstream.sources.originCandidate
   const fork = origin && searched && !sameRepo(origin, searched) ? await search('origin') : null
-  const results = fork ? [fork, upstream] : [upstream]
+  const results = (fork ? [fork, upstream] : [upstream]).map((one) => ({
+    repo: one.sources.prs,
+    prs: one.items.filter((item) => item.type === 'pr')
+  }))
+  // Why: a repo without my PRs would widen the link into a global search; none leaves it on the project.
   return {
-    repos: results.flatMap((one) => (one.sources.prs ? [one.sources.prs] : [])),
-    items: results.flatMap((one) => one.items.filter((item) => item.type === 'pr'))
+    repos: results.flatMap((one) => (one.repo && one.prs.length > 0 ? [one.repo] : [])),
+    items: results.flatMap((one) => one.prs)
   }
 }
 
