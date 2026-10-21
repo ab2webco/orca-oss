@@ -53,7 +53,8 @@ async function startOnTask(
       : {
           task: member.taskId,
           worktree,
-          name: member.ticket.toLowerCase(),
+          // Why only new-child: worker-start refuses creation options on an existing worktree.
+          ...(member.worktreeId ? {} : { name: member.ticket.toLowerCase() }),
           ...(member.name ? { displayName: member.name } : {}),
           agent: member.agent ?? 'claude',
           ...accountPinOf(member)
