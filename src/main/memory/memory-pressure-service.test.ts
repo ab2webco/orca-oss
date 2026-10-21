@@ -20,6 +20,10 @@ vi.mock('./memory-pressure-reading', () => ({ readMemoryPressure: readMemoryPres
 vi.mock('./collector', () => ({ collectMemorySnapshot: collectMemorySnapshotMock }))
 vi.mock('./pty-registry', () => ({ listRegisteredPtys: listRegisteredPtysMock }))
 
+const TICK_MS = 30_000
+// Why four ticks after the first: the low-memory rule needs two minutes of readings.
+const SUSTAINED_MS = 4 * TICK_MS
+
 function lowMemory(): MemoryPressureReading {
   return {
     totalMemory: 16 * GIB,
@@ -27,7 +31,8 @@ function lowMemory(): MemoryPressureReading {
     swapTotal: null,
     swapUsed: null,
     kernelLevel: null,
-    readAt: 1
+    source: 'meminfo',
+    readAt: Date.now()
   }
 }
 
@@ -73,7 +78,7 @@ describe('createMemoryPressureService', () => {
     listRegisteredPtysMock.mockReturnValue([
       { ptyId: 'pty-live', worktreeId: 'repo::/w', sessionId: 'sess-1', paneKey: null, pid: 1 }
     ])
-    readMemoryPressureMock.mockResolvedValue(lowMemory())
+    readMemoryPressureMock.mockImplementation(async () => lowMemory())
     collectMemorySnapshotMock.mockResolvedValue({
       processMemoryMetric: 'rss',
       worktrees: [
@@ -91,7 +96,7 @@ describe('createMemoryPressureService', () => {
       getPtyLastOutputAt: (id) => (id === 'pty-live' ? 42 : null)
     })
     service.monitor.start()
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(SUSTAINED_MS)
 
     const sent = live.webContents.send.mock.calls.at(-1)
     expect(sent?.[0]).toBe('memory:pressure:changed')
@@ -109,7 +114,10 @@ describe('createMemoryPressureService', () => {
 
   it('stops sampling as soon as the setting is turned off', async () => {
     windowsMock.mockReturnValue([])
-    readMemoryPressureMock.mockResolvedValue({ ...lowMemory(), availableMemory: 8 * GIB })
+    readMemoryPressureMock.mockImplementation(async () => ({
+      ...lowMemory(),
+      availableMemory: 8 * GIB
+    }))
     const store = storeDouble({})
     const { createMemoryPressureService } = await import('./memory-pressure-service')
 

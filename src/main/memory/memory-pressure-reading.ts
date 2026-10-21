@@ -4,7 +4,8 @@ import os from 'node:os'
 import path from 'node:path'
 import type {
   MemoryPressureKernelLevel,
-  MemoryPressureReading
+  MemoryPressureReading,
+  MemoryPressureReadingSource
 } from '../../shared/memory-pressure-types'
 
 const SYSCTL_TIMEOUT_MS = 1_000
@@ -25,7 +26,10 @@ const KERNEL_LEVELS: Record<string, MemoryPressureKernelLevel> = {
   '4': 'critical'
 }
 
-type PlatformPressure = Omit<MemoryPressureReading, 'totalMemory' | 'readAt' | 'kernelLevel'> & {
+type PlatformPressure = Omit<
+  MemoryPressureReading,
+  'totalMemory' | 'readAt' | 'kernelLevel' | 'source'
+> & {
   totalMemory?: number
   kernelLevel?: MemoryPressureKernelLevel | null
 }
@@ -119,6 +123,17 @@ async function readPlatformPressure(
   return null
 }
 
+function readingSource(
+  platform: NodeJS.Platform,
+  platformPressure: PlatformPressure | null
+): MemoryPressureReadingSource {
+  if (platformPressure) {
+    return platform === 'darwin' ? 'sysctl' : 'meminfo'
+  }
+  // Why: os.freemem() on macOS counts free pages only, so a failed sysctl must not read as a low level.
+  return platform === 'darwin' || platform === 'linux' ? 'fallback' : 'freemem'
+}
+
 /** One cheap system reading: at most one sysctl spawn on macOS, one file read on Linux, none on Windows. */
 export async function readMemoryPressure(
   platform: NodeJS.Platform = os.platform(),
@@ -136,6 +151,7 @@ export async function readMemoryPressure(
     swapTotal: platformPressure?.swapTotal ?? null,
     swapUsed: platformPressure?.swapUsed ?? null,
     kernelLevel: platformPressure?.kernelLevel ?? null,
+    source: readingSource(platform, platformPressure),
     readAt: now
   }
 }
