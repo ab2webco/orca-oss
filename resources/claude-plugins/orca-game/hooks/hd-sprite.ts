@@ -131,6 +131,10 @@ export const hdSpritePixel = (
 ): number | undefined => {
   const r = y - top
   const c = x - left
+  // Why first: a negative index leaves the array's fast path, and this runs per figure per pixel.
+  if (r < 0 || c < 0 || r >= sprite.rows.length || c >= sprite.width) {
+    return undefined
+  }
   const glyph = sprite.rows[r]?.[c]
   if (glyph === undefined || glyph === '.') {
     return undefined
