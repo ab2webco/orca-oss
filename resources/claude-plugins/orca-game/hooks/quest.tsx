@@ -19,8 +19,14 @@ import {
 import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
+import { isSceneMode } from './quest-policy'
+import { flatLine } from './flat-block'
+import { dropScenes } from './flat-toggle'
+import { flatPhaseLineOf } from './flat-view'
+import { shownCaption } from './quest-state'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
+const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
 
 // Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
 const shownSetting = (key: 'mode' | 'render'): string => {
@@ -42,7 +48,7 @@ export async function animate(
   items: readonly Animated[]
 ): Promise<Map<string, RenderElement>> {
   await ready($)
-  if (isOff() || e.surface !== 'terminal' || items.length === 0) {
+  if (!isSceneDrawn() || e.surface !== 'terminal' || items.length === 0) {
     quest.animations.delete(e.requestId)
     forgetFrames(e.requestId)
     return new Map()
@@ -70,7 +76,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .register({
       name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|demo|render classic|hd|hd-compact]',
+      argumentHint: '[off|on|zen|flat|demo|render classic|hd|hd-compact]',
       immediate: true
     })
     .catch(() => undefined)
@@ -102,9 +108,8 @@ const registerCommand = (on: On, command: GameCommand) => {
     }
     quest.isDemo = false
     quest.modeOverride = asked.mode
-    if (asked.mode === 'off') {
-      quest.stages.clear()
-      forgetFrames()
+    if (!isSceneMode(asked.mode)) {
+      dropScenes()
     }
     $.ui.invalidate('ui.render')
     await publishAbsorbing($)
@@ -156,10 +161,24 @@ const registerNotes = (on: On) => {
 const registerSpinner = (on: On) => {
   on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
     await ready($)
-    if (isOff() || e.surface !== 'terminal') {
+    if (!isSceneDrawn() || e.surface !== 'terminal') {
       quest.stages.delete(e.requestId)
       forgetFrames(e.requestId)
-      return next(e)
+      if (isOff() || e.surface !== 'terminal') {
+        return next(e)
+      }
+      // Flat keeps what the hero shows, the phase's card and the caption, as one line of text.
+      const scene = currentScene()
+      const columns = sceneColumnsOf(e.viewport?.columns)
+      const line = flatPhaseLineOf(scene, shownPhase(), shownCaption(), columns)
+      const spinner = await next(e)
+      const { Box } = $.ui.resolve(e)
+      return (
+        <Box flexDirection="column">
+          {flatLine($, e, line, scene.band)}
+          {spinner}
+        </Box>
+      )
     }
     const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)
     quest.stages.set(e.requestId, stage)

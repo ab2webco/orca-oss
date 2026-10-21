@@ -13,6 +13,9 @@ export type TextStrings = {
   panel: string
   refresh: string
   pet: string
+  /** The band's toggle to the text-only view, and back to the scene. */
+  flatView: string
+  sceneView: string
   /** Pet with the scene pet's name, as in "Pet Steve". */
   petNamed: (name: string) => string
   /** The Panel card's name for an advisor a scene left unnamed. */
@@ -141,6 +144,8 @@ const EN: GameStrings = {
     panel: 'Panel',
     refresh: 'Refresh',
     pet: 'Pet',
+    flatView: 'Text',
+    sceneView: 'Scene',
     petNamed: (name) => `Pet ${name}`,
     advisor: 'Advisor',
     advisorMain: 'main conversation',
@@ -187,12 +192,12 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn.',
+      '/orca-game:mode on|zen|flat|off: off shows everything, on hides tool rows, zen also hides working notes, flat draws the game as text with no scene. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
     unknownMode: (asked) =>
-      `Unknown mode "${asked}". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.`,
+      `Unknown mode "${asked}". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode flat, /orca-game:mode off or /orca-game:demo.`,
     questRenderShown: (render) => `Render: ${render}.`,
     sessionOverride: (value, configured, source) =>
       `${value} (this session; the project's setting is ${configured}${source ? `, from ${source}` : ''})`,

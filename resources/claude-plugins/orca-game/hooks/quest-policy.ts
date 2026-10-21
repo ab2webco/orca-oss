@@ -2,9 +2,12 @@ import type { FlowPhase, GameMode, GameRender } from '../types'
 import { isGameRender } from './game-render'
 import { gameStrings } from './game-strings'
 
-export const QUEST_MODES: readonly GameMode[] = ['off', 'on', 'zen']
+export const QUEST_MODES: readonly GameMode[] = ['off', 'on', 'zen', 'flat']
 
 export const NOTE_MIN_CHARS = 240
+
+/** Modes that draw the scene and its characters; flat draws the same game as text. */
+export const isSceneMode = (mode: GameMode): boolean => mode === 'on' || mode === 'zen'
 
 export const isQuestMode = (value: unknown): value is GameMode =>
   typeof value === 'string' && (QUEST_MODES as readonly string[]).includes(value)

@@ -2,9 +2,9 @@
 name: mode
 description: |
   Set this pane's game mode for this session: off shows everything, on hides tool rows, zen also
-  hides short working notes. Alone it prints the mode and render. The game mod answers it, with
+  hides short working notes, flat draws the game as text with no scene or characters. Alone it prints the mode and render. The game mod answers it, with
   no model turn; Orca's configured mode is unchanged. Run it as /orca-game:mode.
-argument-hint: '[on|zen|off]'
+argument-hint: '[on|zen|flat|off]'
 user_invocable: true
 disable-model-invocation: true
 ---

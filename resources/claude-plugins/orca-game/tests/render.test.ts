@@ -175,7 +175,7 @@ describe('/quest render', () => {
     const mode = "zen (this session; the project's setting is on, from project)"
     expect(await quest($, 'zen')).toBe(`Quest: ${mode}.`)
     expect(await quest($, '')).toContain(
-      `Quest: ${mode}. Render: ${render}. /orca-game:mode on|zen|off: `
+      `Quest: ${mode}. Render: ${render}. /orca-game:mode on|zen|flat|off: `
     )
     expect(await quest($, 'on')).toBe('Quest: on.')
     expect(await quest($, 'render classic')).toBe('Render: classic.')
@@ -222,13 +222,13 @@ describe('the /orca-game: commands', () => {
     )
     const shown = await run($, 'orca-game:quest')
     expect(shown).toMatch(
-      /^Quest: zen \(.+\)\. Render: hd \(.+\)\. \/orca-game:mode on\|zen\|off: /
+      /^Quest: zen \(.+\)\. Render: hd \(.+\)\. \/orca-game:mode on\|zen\|flat\|off: /
     )
     expect(await run($, 'orca-game:mode')).toBe(shown)
     expect(await run($, 'orca-game:render')).toBe(shown)
     expect(await run($, 'orca-game:quest', 'render classic')).toBe('Render: classic.')
     expect(await run($, 'orca-game:mode', 'render')).toBe(
-      'Unknown mode "render". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.'
+      'Unknown mode "render". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode flat, /orca-game:mode off or /orca-game:demo.'
     )
     expect(await run($, 'orca-game:render', 'neon')).toBe(
       'Unknown render "neon". Use /orca-game:render classic, hd or hd-compact.'

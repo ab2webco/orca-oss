@@ -7,6 +7,10 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   the character of the current flow phase, with a thought bubble saying what it is doing. Each reply
   comes in a card signed by its phase's character, your own messages in a Storyteller card, tool
   rows are hidden unless they fail. `on` (default), `zen` (also hides short working notes) or `off`.
+- **Flat mode.** `flat` draws the same game as text in the scene's colors, with no scene or
+  characters: one line per teammate (name, ticket, phase, PR, CI), a score line (level, XP, latest
+  rewards) and the phase's card above the spinner. The band's `≡ Text` / `▦ Scene` chip and the
+  Panel's `0` key flip it for the session, back to the mode shown before.
 - **The band** above the prompt: a HUD with the lead as the hero and every teammate in the party
   (walking while it works, hopping with `needs you!` while it waits, hurt while CI is red), counts,
   the review, its CI, the work item, agent activity and project links as clickable chips, a
@@ -62,15 +66,15 @@ The env is the launch snapshot. Orca's live answer from `orca game state` (every
 each turn) can change mode, scene, HUD, rewards, render and timezone since, and `/orca-game:mode`
 overrides the mode for the session:
 
-| Variable             | Values                  | Default   | Effect                                                 |
-| -------------------- | ----------------------- | --------- | ------------------------------------------------------ |
-| `ORCA_GAME_MODE`     | `on`, `zen`, `off`      | `on`      | Quest mode                                             |
-| `ORCA_GAME_SCENE`    | a scene id              | `quest`   | Art set; an unknown id falls back to `quest`           |
-| `ORCA_GAME_HUD`      | `1`/`0`, `true`/`false` | `1`       | `0` hides the band                                     |
-| `ORCA_GAME_REWARDS`  | `1`/`0`, `true`/`false` | `1`       | `0` turns off XP, level-ups and the cheer confetti     |
-| `ORCA_GAME_RENDER`   | `classic`, `hd`         | `classic` | The 5-row pixel art, or the 9 to 10-row 2D-HD scene    |
-| `ORCA_GAME_TIMEZONE` | `local` or an IANA zone | `local`   | The clock hd's day and night follow                    |
-| `ORCA_GAME_LOCALE`   | `en`, `es`              | `en`      | Language of the game's words; anything else is English |
+| Variable             | Values                     | Default   | Effect                                                 |
+| -------------------- | -------------------------- | --------- | ------------------------------------------------------ |
+| `ORCA_GAME_MODE`     | `on`, `zen`, `flat`, `off` | `on`      | Quest mode                                             |
+| `ORCA_GAME_SCENE`    | a scene id                 | `quest`   | Art set; an unknown id falls back to `quest`           |
+| `ORCA_GAME_HUD`      | `1`/`0`, `true`/`false`    | `1`       | `0` hides the band                                     |
+| `ORCA_GAME_REWARDS`  | `1`/`0`, `true`/`false`    | `1`       | `0` turns off XP, level-ups and the cheer confetti     |
+| `ORCA_GAME_RENDER`   | `classic`, `hd`            | `classic` | The 5-row pixel art, or the 9 to 10-row 2D-HD scene    |
+| `ORCA_GAME_TIMEZONE` | `local` or an IANA zone    | `local`   | The clock hd's day and night follow                    |
+| `ORCA_GAME_LOCALE`   | `en`, `es`                 | `en`      | Language of the game's words; anything else is English |
 
 A project's own scene file comes from `sceneFile` in its `orca.yaml`, which Orca reads and serves
 through `orca game state`; the env never carries a path.
@@ -96,7 +100,7 @@ Typing `/orca-game:` lists every game command. Each is a plugin skill the mod an
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/orca-game:state`                    | The game state from a fresh `orca game state`: each setting with its layer, this session's mode and render, the lead and its members with their slots, a held STOP, warnings and links |
 | `/orca-game:layout [verb]`            | The Panel's sections with their state; `reset`, `show <section>`, `hide <section>`, `move <section> up\|down`                                                                          |
-| `/orca-game:mode on\|zen\|off`        | The mode for this session; alone, prints the mode and render                                                                                                                           |
+| `/orca-game:mode on\|zen\|flat\|off`  | The mode for this session; alone, prints the mode and render                                                                                                                           |
 | `/orca-game:render classic\|hd`       | The render for this session; alone, prints the mode and render                                                                                                                         |
 | `/orca-game:demo`                     | A scripted fake party (every phase, action and reaction, one level-up) that runs no command and writes no XP; `/orca-game:mode on` returns to real data                                |
 | `/orca-game:quest [args]`             | The long form taking all of the above (`render hd`, `zen`, `demo`)                                                                                                                     |

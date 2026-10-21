@@ -118,6 +118,13 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 ([`orca-game-mod-transform.ts`](../../config/build-plugins/orca-game-mod-transform.ts)): the mod's
 `tsconfig.json` sets an `h` JSX factory that React's automatic runtime refuses.
 
+The mod has a fourth mode, `flat`, that only a pane sets for its session: the band's `≡ Text` /
+`▦ Scene` chip, the Panel's `0` key, or `/orca-game:mode flat`. It draws no `Raster` and blits
+nothing (its gates are `isSceneMode` in `hooks/quest-policy.ts`); the HUD and the Panel's cards
+become the text lines of `hooks/flat-view.ts`, from the same `orca game state` poll. Settings and
+`orca.yaml` do not offer it, so `orchestratorGame.mode` and the wire are unchanged; an
+`ORCA_GAME_MODE` of `flat` reaching an older mod falls back to `on` through `isQuestMode`.
+
 ```yaml
 # orca.yaml
 orchestratorGame:
@@ -1028,9 +1035,9 @@ format, limits and consent rules are in [Game scenes](./plugin-development.md#ga
 
 ## Other plugins in a game pane
 
-Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on` or `zen`
-with the band on) the mod draws what they show in the scene's style instead of letting each one
-paint its own
+Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,
+`zen` or `flat` with the band on) the mod draws what they show in the scene's style instead of
+letting each one paint its own
 ([`allies-strip.tsx`](../../resources/claude-plugins/orca-game/hooks/allies-strip.tsx)):
 
 - **Status lines.** A `ui.status` hook takes another plugin's `$.ui.status(text)` before Claude Code

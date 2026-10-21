@@ -85,7 +85,7 @@ const band = ($: Engine, columns: number) =>
 
 type Mounted = Awaited<ReturnType<typeof band>>
 
-const BUTTONS = ['band-panel', 'band-refresh', 'band-pet', 'band-action-lead:wave']
+const BUTTONS = ['band-panel', 'band-refresh', 'band-flat', 'band-action-lead:wave']
 
 /** No team scene, the progress line within the body, the buttons kept. */
 const expectPanelBand = async (ui: Mounted, columns: number) => {

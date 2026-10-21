@@ -321,7 +321,7 @@ describe('band layout', () => {
       const ui = await mount($, on, 40, { ORCA_GAME_LOCALE: 'es' })
       const [row] = elementsOf(await ui.find({ type: 'Box', key: 'band-tap' }))
       const labels = elementsOf(row).map((chip) => shownOf(chip).split('\n')[1]?.trim())
-      expect(labels.slice(0, 3)).toEqual(['▤ Panel', '↻', '♥'])
+      expect(labels.slice(0, 3)).toEqual(['▤ Panel', '↻', '≡'])
       const chips = shownOf(await ui.find({ type: 'Box', key: 'band-chips-band-team' }))
       expect(chips).toContain('⚑')
       await ui.unmount()
