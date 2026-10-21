@@ -58,6 +58,20 @@ const GameMemberRecordParams = z.object({
   })
 })
 
+const TicketParam = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/)
+
+const GameMemberResumeParams = z.object({
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional(),
+  ticket: TicketParam
+})
+
+const GameMemberDiscardParams = z.object({
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional(),
+  tickets: z.union([z.array(TicketParam).min(1).max(50), z.literal('all')])
+})
+
 const GameHistoryParams = z
   .object({
     worktreeId: z.string().optional(),
@@ -92,6 +106,26 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         member: params.member
+      })
+  }),
+  defineMethod({
+    name: 'game.memberResume',
+    params: GameMemberResumeParams,
+    handler: async (params, { runtime }) =>
+      runtime.resumeGameMember({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        ticket: params.ticket
+      })
+  }),
+  defineMethod({
+    name: 'game.memberDiscard',
+    params: GameMemberDiscardParams,
+    handler: async (params, { runtime }) =>
+      runtime.discardGameMembers({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        tickets: params.tickets
       })
   }),
   defineMethod({

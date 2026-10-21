@@ -198,6 +198,7 @@ describe('orca game fleet verbs', () => {
             branch: 'cin-7',
             lastState: 'working',
             resumable: true,
+            runId: 'run_1',
             since: '2026-10-20T10:00:00.000Z'
           },
           {
@@ -208,6 +209,7 @@ describe('orca game fleet verbs', () => {
             branch: null,
             lastState: 'launching',
             resumable: false,
+            runId: 'run_1',
             since: '2026-10-20T10:00:00.000Z'
           }
         ]

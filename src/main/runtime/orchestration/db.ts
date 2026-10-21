@@ -4777,6 +4777,20 @@ export class OrchestrationDb {
       .get(dispatchId) as WorkerDispatchRow | undefined
   }
 
+  /** The worktree the task's newest worker created or reused; null when none got that far. */
+  latestWorkerWorktreeForTask(taskId: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT w.worktree_id FROM worker_dispatches w
+           JOIN dispatch_contexts d ON d.id = w.dispatch_id
+          WHERE d.task_id = ? AND w.worktree_id IS NOT NULL
+          ORDER BY w.created_at DESC, w.rowid DESC
+          LIMIT 1`
+      )
+      .get(taskId) as { worktree_id: string } | undefined
+    return row?.worktree_id ?? null
+  }
+
   /** The newest launch that chose a model or effort for this terminal; a reuse dispatch chooses neither. */
   workerLaunchForTerminal(terminalHandle: string): Record<string, unknown> | null {
     const rows = this.db
