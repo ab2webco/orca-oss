@@ -74,6 +74,9 @@ const particleOf = (
   }
 }
 
+/** How many particles drift over a band this wide. */
+export const particleCountOf = (columns: number): number => Math.max(2, Math.floor(columns / 24))
+
 export const particlesInto = (
   buf: Uint32Array,
   columns: number,
@@ -83,7 +86,7 @@ export const particlesInto = (
   kind: ParticleKind,
   fireX = 0
 ): void => {
-  const count = Math.max(4, Math.floor(columns / 7))
+  const count = particleCountOf(columns)
   for (let i = 0; i < count; i += 1) {
     const one = particleOf(kind, i, columns, ground, tick, fireX)
     if (one === undefined || one.x < 0 || one.x >= columns || one.y < 0 || one.y >= pixels) {

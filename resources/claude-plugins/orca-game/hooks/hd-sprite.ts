@@ -120,6 +120,15 @@ export const frameSpriteOf = (
   colors: Readonly<Record<string, number>>
 ): HdSprite => cachedOf(frame, 'f', () => spriteOf(frame, colors))
 
+/** Whether (x, y) falls on the sprite's outline with its top-left corner at (left, top). */
+export const isHdEdgeAt = (
+  sprite: HdSprite,
+  x: number,
+  y: number,
+  left: number,
+  top: number
+): boolean => sprite.rows[y - top]?.[x - left] === EDGE
+
 /** The sprite's colour at (x, y) with its top-left corner at (left, top); `ring` tints the outline. */
 export const hdSpritePixel = (
   sprite: HdSprite,

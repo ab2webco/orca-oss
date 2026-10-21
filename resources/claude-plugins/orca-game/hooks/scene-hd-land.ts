@@ -5,8 +5,9 @@ import {
   layerContrastOf,
   type LayerContrast
 } from './hd-layer-contrast'
-import { lightnessOf, luminanceOf } from './hd-lightness'
-import { facingOf, litByFacing, materialPixel } from './hd-material'
+import { lightnessOf, luminanceOf, luminanceOfLightness, withLuminance } from './hd-lightness'
+import { backdropMaterialPixel, facingOf, litByFacing, toneRampOf } from './hd-material'
+import { GROUND_FLOOR, pushedBackOf } from './hd-readability'
 import { hash, mix, mod } from './pixel-canvas'
 import { hdSkyOf, skyRowOf, type HdSky } from './scene-hd-sky'
 import type { Look } from './scenes/index'
@@ -21,6 +22,8 @@ const GROUND_ROWS = 3
 const MAX_KEPT = 4
 const WINDOW_TICKS = 40
 const GLINT_TICKS = 8
+// The backdrop skips the material's deepest step: shade, the colour and a highlight are enough.
+const BACKDROP_STEP = 1
 
 export type HdFrame = HdSky & {
   scroll: number
@@ -30,6 +33,8 @@ export type HdFrame = HdSky & {
   dayLift: number
   far: LayerContrast
   mid: LayerContrast
+  /** The walking strip's tone, already lit. */
+  floor: number
 }
 
 const farHeight = (look: Look, pixels: number, x: number): number => {
@@ -107,7 +112,65 @@ const silhouettesOf = (sky: HdSky, scroll: number) => {
   return made
 }
 
-type Contrasts = { dayLift: number; far: LayerContrast; mid: LayerContrast }
+type Contrasts = {
+  dayLift: number
+  far: LayerContrast
+  mid: LayerContrast
+  /** The walking strip's tone, lit: a floor kept well apart from the hills behind it. */
+  floor: number
+}
+
+// Room past the floor for the strip's darker seams.
+const FLOOR_MARGIN = 5
+
+/** The lightest and darkest the hills can draw on row `y`, from their material's extremes. */
+const hillsRangeOf = (args: {
+  look: Look
+  lit: (color: number) => number
+  mid: LayerContrast
+  light: Daylight
+  pixels: number
+  y: number
+}): { lo: number; hi: number } => {
+  const { look, mid, pixels, y } = args
+  const flat = mix(look.near, look.far, 0.35)
+  const key = mix(look.sun, 0xffffff, 0.4)
+  let lo = 100
+  let hi = 0
+  for (const tone of toneRampOf(flat).slice(BACKDROP_STEP)) {
+    for (const facing of [0, 1]) {
+      for (const depth of [0, pixels * 0.21]) {
+        const shade = (color: number): number => mix(color, 0x000000, depth * 0.03)
+        const hill = shade(litByFacing(tone, facing, key))
+        const drawn = apartFromSky(
+          pushedBackOf(args.lit(awayFromSky(hill, shade(flat), mid)), args.light),
+          mid,
+          y
+        )
+        lo = Math.min(lo, lightnessOf(drawn))
+        hi = Math.max(hi, lightnessOf(drawn))
+      }
+    }
+  }
+  return { lo, hi }
+}
+
+/** The floor's tone: the look's own path colour, moved clear of everything the hills can draw. */
+const floorOf = (args: Parameters<typeof hillsRangeOf>[0]): number => {
+  const { lo, hi } = hillsRangeOf(args)
+  const path = args.lit(mix(args.look.near, args.look.ground, 0.3))
+  const own = lightnessOf(path)
+  const step = GROUND_FLOOR + FLOOR_MARGIN
+  const lighter = hi + step
+  const darker = lo - step
+  const target =
+    own >= lighter || own <= darker
+      ? own
+      : (own - lo > hi - own && lighter <= 100) || darker < 0
+        ? Math.min(100, lighter)
+        : darker
+  return withLuminance(path, luminanceOfLightness(target))
+}
 
 const contrasts = new WeakMap<Look, Map<string, Contrasts>>()
 
@@ -125,14 +188,16 @@ const contrastsOf = (sky: HdSky): Contrasts => {
   const rows = Float64Array.from({ length: ground }, (_, y) => lightnessOf(skyRowOf(sky, y)))
   const lit = (color: number): number => landInLight(color, light, dayLift, look.isNight)
   const middle = skyRowOf(sky, Math.floor(ground * 0.6))
+  const mid = layerContrastOf(
+    rows,
+    lit(mix(look.near, look.far, 0.35)),
+    Math.floor(ground - pixels * 0.21)
+  )
   const made = {
     dayLift,
     far: layerContrastOf(rows, lit(mix(look.far, middle, 0.33)), Math.floor(ground - pixels * 0.6)),
-    mid: layerContrastOf(
-      rows,
-      lit(mix(look.near, look.far, 0.35)),
-      Math.floor(ground - pixels * 0.21)
-    )
+    mid,
+    floor: floorOf({ look, lit, mid, light, pixels, y: ground - 1 })
   }
   if (own.size >= MAX_KEPT) {
     own.clear()
@@ -177,11 +242,16 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   if (y < top) {
     return undefined
   }
-  const facing = facingOf(farHeightAt(frame, x - 1), farHeightAt(frame, x + 1), x, frame.sunX)
-  const rock = litByFacing(materialPixel(look.far, fx, y, 11), facing, keyLightOf(frame))
+  // Why flat for a city: its walls stand straight, and a slope light paints the gaps as lit posts.
+  const facing =
+    look.scenery === 'skyline'
+      ? 0.5
+      : facingOf(farHeightAt(frame, x - 1), farHeightAt(frame, x + 1), x, frame.sunX)
+  const rock = litByFacing(backdropMaterialPixel(look.far, fx, y, 11), facing, keyLightOf(frame))
   const base = litOf(frame, awayFromSky(rock, look.far, frame.far))
   const snow = litOf(frame, look.snow)
-  const layer = (color: number): number => apartFromSky(color, frame.far, y)
+  const layer = (color: number): number =>
+    apartFromSky(pushedBackOf(color, frame.light), frame.far, y)
   const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
   const isLitSide = facing > 0.5
   switch (look.scenery ?? 'peaks') {
@@ -191,12 +261,17 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
       }
       return layer(base)
     case 'skyline': {
-      const isWindow = mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 2) === 0 && y > top + 1
-      const isLit = isWindow && (hash(fx, y) + Math.floor(tick / WINDOW_TICKS)) % 3 === 0
+      // Why two pixels tall: a one-pixel window reads as a speck, not a lit room.
+      const floor = Math.floor(y / 3)
+      const isWindow =
+        mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 3) !== 2 && floor * 3 > top + 1
+      const isLit = isWindow && (hash(fx, floor) + Math.floor(tick / WINDOW_TICKS)) % 10 === 0
       return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
     }
     case 'crystals':
-      if (y - top < 1 || (hash(fx, y) + Math.floor(tick / GLINT_TICKS)) % 23 === 0) {
+      // Why a rim deeper than the slope, on spires only: a thinner one, or one the hills cut, leaves specks.
+      const isRim = y - top < 3 && height > pixels * 0.3
+      if (isRim || (hash(fx, Math.floor(y / 2)) + Math.floor(tick / GLINT_TICKS)) % 61 === 0) {
         return accent(mix(snow, base, 0.2))
       }
       return layer(isLitSide ? mix(base, snow, 0.18) : base)
@@ -216,18 +291,15 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
   const facing = facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
   const flat = mix(frame.look.near, frame.look.far, 0.35)
   const shade = (color: number): number => mix(color, 0x000000, (y - top) * 0.03)
-  const hill = shade(litByFacing(materialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
-  return apartFromSky(litOf(frame, awayFromSky(hill, shade(flat), frame.mid)), frame.mid, y)
+  const hill = shade(litByFacing(backdropMaterialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
+  const lit = litOf(frame, awayFromSky(hill, shade(flat), frame.mid))
+  return apartFromSky(pushedBackOf(lit, frame.light), frame.mid, y)
 }
 
 export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
   const { look, ground } = frame
   const gx = x + frame.scroll
-  if (y === ground) {
-    return hash(gx, 1) % 4 === 0 ? mix(look.near, 0xffffff, 0.2) : mix(look.near, look.ground, 0.25)
-  }
-  if (hash(gx, y) % 13 === 0) {
-    return mix(look.ground, 0xffffff, 0.12)
-  }
-  return mix(materialPixel(look.ground, gx, y, 61), 0x000000, (y - ground) * 0.08)
+  // Why half the material: under the floor, the soil only needs grain, not specks.
+  const soil = mix(backdropMaterialPixel(look.ground, gx, y, 61), look.ground, 0.5)
+  return mix(soil, 0x000000, (y - ground) * 0.08)
 }
