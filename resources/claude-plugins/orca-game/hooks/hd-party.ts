@@ -61,9 +61,6 @@ export type PlacedMember = {
   sprite: HdSprite
 }
 
-// Below this a teammate hides more than half of the one in front of it.
-const MIN_PITCH = 8
-
 /** The walking party behind the hero: how many teammates fit, their pitch, and the columns they take. */
 export const hdTrailOf = (args: {
   stage: number
@@ -76,15 +73,14 @@ export const hdTrailOf = (args: {
   const petGap = args.petWidth === 0 ? 0 : args.petWidth + 1
   // Why two rooms: the hero keeps its walk and prop while they fit, and gives them up before a teammate.
   const rooms = [stage - spriteWidth - args.slack - 1, stage - spriteWidth - 1]
+  // Why one pitch: neighbours share only their outline column; a narrower band drops a teammate instead.
+  const pitch = spriteWidth - 1
   for (let shown = Math.min(args.count, MAX_SHOWN); shown > 0; shown -= 1) {
-    for (const room of rooms) {
-      const pitch = Math.min(spriteWidth - 1, Math.floor((room - petGap) / shown))
-      if (pitch >= MIN_PITCH) {
-        return { shown, pitch, trail: petGap + shown * pitch }
-      }
+    if (rooms.some((room) => room - petGap >= shown * pitch)) {
+      return { shown, pitch, trail: petGap + shown * pitch }
     }
   }
-  return { shown: 0, pitch: spriteWidth - 1, trail: petGap }
+  return { shown: 0, pitch, trail: petGap }
 }
 
 /** Each shown teammate's sprite and where it stands this tick: walking, always left of `walk`. */
