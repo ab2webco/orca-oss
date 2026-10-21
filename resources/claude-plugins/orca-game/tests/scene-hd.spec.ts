@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { costumeSpriteOf, outlineOf } from '../hooks/hd-sprite'
 import { daylightAt } from '../hooks/hd-daylight'
-import { accentApartFromSky, apartFromSky } from '../hooks/hd-layer-contrast'
+import { apartFromSky } from '../hooks/hd-layer-contrast'
+import { lightnessOf } from '../hooks/hd-lightness'
 import { mix, UPPER_HALF } from '../hooks/pixel-canvas'
 import { HD_ROWS, hdRowsOf, hdSceneGridOf, type HdSceneInput } from '../hooks/scene-hd'
 import {
@@ -14,6 +15,7 @@ import {
   hdSkyBaseOf,
   hdSkyPixel
 } from '../hooks/scene-hd-land'
+import { skyRowOf } from '../hooks/scene-hd-sky'
 import { SCENES, sceneOf } from '../hooks/scenes/index'
 import { digest } from './grid-digest'
 
@@ -113,23 +115,26 @@ describe('hd layers', () => {
     }
   })
 
-  it('paints far scenery in its own colours, not hazed toward the sky', () => {
-    let checked = 0
+  it('paints far scenery in its own textured tones, never hazed toward the sky', () => {
+    // Why a mean against the flat layer: haze pulls every pixel toward the sky, texture only spreads them.
+    const flat: number[] = []
+    const drawn: number[] = []
+    const tones = new Set<number>()
     for (let y = 0; y < frame.ground; y += 1) {
-      const own = [
-        apartFromSky(LOOK.far, frame.far, y),
-        apartFromSky(mix(LOOK.far, 0xffffff, 0.08), frame.far, y),
-        accentApartFromSky(LOOK.snow, frame.far, y)
-      ]
+      const sky = lightnessOf(skyRowOf(frame, y))
       for (let x = 0; x < frame.width; x += 1) {
         const far = hdFarPixel(frame, x, y)
         if (far !== undefined) {
-          expect(own, `${x},${y}`).toContain(far)
-          checked += 1
+          drawn.push(Math.abs(lightnessOf(far) - sky))
+          flat.push(Math.abs(lightnessOf(apartFromSky(LOOK.far, frame.far, y)) - sky))
+          tones.add(far)
         }
       }
     }
-    expect(checked).toBeGreaterThan(20)
+    const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length
+    expect(drawn.length).toBeGreaterThan(20)
+    expect(tones.size).toBeGreaterThanOrEqual(6)
+    expect(mean(drawn)).toBeGreaterThan(mean(flat) - 3)
   })
 
   it('leaves the edge columns the colour of the sky behind them, with no vignette', () => {

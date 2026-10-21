@@ -158,6 +158,14 @@ describe('hd scenery against the sky', () => {
           // Why short of the sun: its glow is not the sky a layer stands against.
           for (let x = 0; x < WIDTH - 40; x += 1) {
             for (let y = 0; y < frame.ground; y += 1) {
+              // Why: nor is a searchlight's beam, which slants down from the signal like a sun ray.
+              const isBeam =
+                frame.look.isSignal === true &&
+                y > frame.sunY &&
+                Math.abs(x - (frame.sunX - (y - frame.sunY) * 1.4)) <= 2
+              if (isBeam) {
+                continue
+              }
               const sky = lightnessOf(hdSkyBaseOf(frame, x, y))
               const far = hdFarPixel(frame, x, y)
               const mid = hdMidPixel(frame, x, y)

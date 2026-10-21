@@ -5,7 +5,8 @@ import {
   layerContrastOf,
   type LayerContrast
 } from './hd-layer-contrast'
-import { lightnessOf } from './hd-lightness'
+import { lightnessOf, luminanceOf } from './hd-lightness'
+import { facingOf, litByFacing, materialPixel } from './hd-material'
 import { hash, mix, mod } from './pixel-canvas'
 import { hdSkyOf, hdSkyPixel, skyRowOf, type HdSky } from './scene-hd-sky'
 import type { Look } from './scenes/index'
@@ -143,6 +144,14 @@ export const hdFrameOf = (args: {
   return { ...sky, scroll: args.scroll, farTops: tops.far, midTops: tops.mid, ...contrastsOf(sky) }
 }
 
+// Why: texture may move a layer only away from the sky; a tone toward it lands on the contrast
+// floor, and a moon or sun glow behind it then eats the edge. Luminance orders like L*, minus the cbrt.
+const awayFromSky = (textured: number, flat: number, contrast: LayerContrast): number =>
+  (luminanceOf(textured) - luminanceOf(flat)) * contrast.side < 0 ? flat : textured
+
+// The sun's tint on the faces that catch it; the hour's darkening comes after, in litOf.
+const keyLightOf = (frame: HdFrame): number => mix(frame.look.sun, 0xffffff, 0.4)
+
 const litOf = (frame: HdFrame, color: number): number =>
   landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
@@ -157,17 +166,19 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
   if (y < top) {
     return undefined
   }
-  const base = litOf(frame, look.far)
+  const facing = facingOf(farHeightAt(frame, x - 1), farHeightAt(frame, x + 1), x, frame.sunX)
+  const rock = litByFacing(materialPixel(look.far, fx, y, 11), facing, keyLightOf(frame))
+  const base = litOf(frame, awayFromSky(rock, look.far, frame.far))
   const snow = litOf(frame, look.snow)
   const layer = (color: number): number => apartFromSky(color, frame.far, y)
   const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
-  const isLitSide = farHeightAt(frame, x + 1) < height
+  const isLitSide = facing > 0.5
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
       if (y - top < 1.6 && height > pixels * 0.45) {
         return accent(litOf(frame, look.snow))
       }
-      return layer(isLitSide ? mix(base, 0xffffff, 0.08) : base)
+      return layer(base)
     case 'skyline': {
       const isWindow = mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 2) === 0 && y > top + 1
       const isLit = isWindow && (hash(fx, y) + Math.floor(tick / 40)) % 3 === 0
@@ -189,9 +200,13 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
   if (y < top) {
     return undefined
   }
-  const fleck = hash(mx, y) % 7 === 0 ? 0.08 : 0
-  const hill = mix(mix(frame.look.near, frame.look.far, 0.35), 0x000000, fleck + (y - top) * 0.03)
-  return apartFromSky(litOf(frame, hill), frame.mid, y)
+  const heightAt = (at: number): number =>
+    frame.ground - (frame.midTops[at] ?? midTopOf(frame.ground, frame.pixels, at + mx - x))
+  const facing = facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
+  const flat = mix(frame.look.near, frame.look.far, 0.35)
+  const shade = (color: number): number => mix(color, 0x000000, (y - top) * 0.03)
+  const hill = shade(litByFacing(materialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
+  return apartFromSky(litOf(frame, awayFromSky(hill, shade(flat), frame.mid)), frame.mid, y)
 }
 
 export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
@@ -249,11 +264,10 @@ export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
   if (y === ground) {
     return hash(gx, 1) % 4 === 0 ? mix(look.near, 0xffffff, 0.2) : mix(look.near, look.ground, 0.25)
   }
-  const roll = hash(gx, y)
-  if (roll % 13 === 0) {
+  if (hash(gx, y) % 13 === 0) {
     return mix(look.ground, 0xffffff, 0.12)
   }
-  return mix(look.ground, 0x000000, (roll % 9 === 0 ? 0.25 : 0) + (y - ground) * 0.08)
+  return mix(materialPixel(look.ground, gx, y, 61), 0x000000, (y - ground) * 0.08)
 }
 
 /** A pond on the ground line that mirrors the sky, outside the city. */
