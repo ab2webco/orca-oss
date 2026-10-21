@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
 // The fallback for a PPA that is added but serves no packages (ORCA-732). The network,
 // sudo and /usr/local/bin are all injected, so the test drives every outcome offline.
@@ -130,5 +131,70 @@ describe('install-fish4-release fallback', () => {
     expect(apt).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(apt)
     expect(gate).toBeGreaterThan(fallback)
+  })
+})
+
+// ORCA-737: the PPA index answered but its fish .deb 503'd, apt exited 100, and `bash -e`
+// ended the step before the fallback. So the step body itself runs here, against a fake apt.
+describe('pr.yml "Install zsh and fish" step', () => {
+  const workflow = parse(
+    readFileSync(
+      path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'pr.yml'),
+      'utf8'
+    )
+  )
+  const body = workflow.jobs.shell_contracts.steps.find(
+    (step) => step.name === 'Install zsh and fish'
+  ).run
+
+  function runStep({ isFishDebDown, isZshDown = false }) {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-step-'))
+    const calls = path.join(dir, 'calls.log')
+    const scripts = path.join(dir, 'config', 'scripts')
+    mkdirSync(scripts, { recursive: true })
+    for (const name of ['enable-fish4-apt-source.sh', 'install-fish4-release.sh']) {
+      writeFileSync(path.join(scripts, name), `echo ${name} >>${JSON.stringify(calls)}\n`)
+    }
+    const fake = mkdtempSync(path.join(dir, 'fake-'))
+    writeFileSync(
+      path.join(fake, 'sudo'),
+      `#!/usr/bin/env bash
+echo "$*" >>${JSON.stringify(calls)}
+case "$*" in
+  *install*fish*) ${isFishDebDown ? 'echo "E: Failed to fetch fish.deb  503" >&2; exit 100' : 'exit 0'} ;;
+  *install*zsh*) ${isZshDown ? 'exit 100' : 'exit 0'} ;;
+esac
+exit 0
+`,
+      { mode: 0o755 }
+    )
+    let status = 0
+    try {
+      execFileSync('bash', ['-e', '-c', body], {
+        cwd: dir,
+        stdio: 'ignore',
+        env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, RUNNER_TEMP: dir }
+      })
+    } catch (error) {
+      status = error.status
+    }
+    return { status, calls: readFileSync(calls, 'utf8') }
+  }
+
+  it('still runs the fish 4 release fallback when the PPA fish .deb fails to download', () => {
+    const { status, calls } = runStep({ isFishDebDown: true })
+    expect(status).toBe(0)
+    expect(calls).toContain('install-fish4-release.sh')
+  })
+
+  it('stays fatal when zsh cannot be installed', () => {
+    const { status } = runStep({ isFishDebDown: true, isZshDown: true })
+    expect(status).not.toBe(0)
+  })
+
+  it('runs the fallback on the ordinary path too', () => {
+    const { status, calls } = runStep({ isFishDebDown: false })
+    expect(status).toBe(0)
+    expect(calls).toContain('install-fish4-release.sh')
   })
 })
