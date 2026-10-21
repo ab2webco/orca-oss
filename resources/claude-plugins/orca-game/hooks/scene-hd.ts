@@ -33,10 +33,12 @@ import {
 import type { SceneDefinition } from './scenes/index'
 import { CLAWD_TOP } from './walk-path'
 
-// The 2D-HD scene: 9 or 10 rows at native resolution, outlined and shaded characters on a lit landscape.
+// The 2D-HD scene: 9 to 14 rows at native resolution, outlined and shaded characters on a lit landscape.
 
 export const HD_ROWS = 9
-export const HD_MAX_ROWS = 10
+export const HD_MAX_ROWS = 14
+/** The band takes one row in this many of the pane's. */
+const PANE_ROWS_PER_BAND_ROW = 4
 /** A costume is 10 columns; its outline adds one on each side. */
 export const HD_SPRITE_WIDTH = 12
 
@@ -63,11 +65,9 @@ export type HdSceneInput = {
   event?: TeamEvent
 }
 
-/** 9 rows, 10 once the terminal is tall enough to spare them. */
-export const hdRowsOf = (viewportRows: number | undefined): number => {
-  const third = Math.max(12, Math.min(16, Math.round((viewportRows ?? 0) / 3.5)))
-  return Math.min(HD_MAX_ROWS, Math.round(5 + (third - 5) / 2))
-}
+/** A quarter of the pane, from 9 rows up to 14. */
+export const hdRowsOf = (viewportRows: number | undefined): number =>
+  Math.max(HD_ROWS, Math.min(HD_MAX_ROWS, Math.round((viewportRows ?? 0) / PANE_ROWS_PER_BAND_ROW)))
 
 // Columns the hero keeps clear ahead of it for its prop.
 const WALK_SLACK = 8
