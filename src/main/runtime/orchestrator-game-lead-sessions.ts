@@ -48,6 +48,12 @@ export const resumedPaneStateOf = (foreground: string | null): 'running' | 'shel
   return isShellProcess(foreground) ? 'shell' : 'starting'
 }
 
+/** What a lead's pane runs. Why the wrapper: `orca claude-teams` stays in front of the Claude it starts. */
+export const leadPaneStateOf = (foreground: string | null): 'running' | 'shell' | 'starting' => {
+  const agent = foreground === null ? undefined : recognizeAgentProcess(foreground)?.agent
+  return agent === 'claude-agent-teams' ? 'running' : resumedPaneStateOf(foreground)
+}
+
 /**
  * Whether a reopened lead took. Why wait: the terminal spawns before Claude reads the conversation, and
  * a missing one makes Claude exit to the shell within seconds. The pane starts at its shell too, so only

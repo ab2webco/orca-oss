@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   GameLeadSessions,
   awaitResumedLead,
+  leadPaneStateOf,
   leadResumeArgsOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
@@ -144,5 +145,18 @@ describe('resumedPaneStateOf', () => {
     expect(resumedPaneStateOf('login')).toBe('starting')
     expect(resumedPaneStateOf('2.1.302')).toBe('starting')
     expect(resumedPaneStateOf(null)).toBe('starting')
+  })
+})
+
+describe('leadPaneStateOf', () => {
+  it('counts the Agent Teams wrapper a lead runs under as Claude', () => {
+    expect(leadPaneStateOf('Orca')).toBe('running')
+    expect(leadPaneStateOf('claude')).toBe('running')
+  })
+
+  it('reads a shell as the shell and anything else as not yet known', () => {
+    expect(leadPaneStateOf('zsh')).toBe('shell')
+    expect(leadPaneStateOf('vim')).toBe('starting')
+    expect(leadPaneStateOf(null)).toBe('starting')
   })
 })

@@ -673,9 +673,11 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
+import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
   GameLeadSessions,
   awaitResumedLead,
+  leadPaneStateOf,
   leadResumeArgsOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
@@ -3693,6 +3695,16 @@ export class OrcaRuntimeService {
     },
     focus: async (handle) => {
       await this.focusTerminal(handle)
+    },
+    roster: new GameLeadRoster(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
+    paneOf: (handle) => this.getPaneKeyForTerminalHandle(handle),
+    handleOfPane: (paneKey) =>
+      this.getPtyRecordForPaneKey(paneKey)?.connected
+        ? this.getTerminalHandleForPaneKey(paneKey)
+        : null,
+    paneState: async (handle) => {
+      const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+      return leadPaneStateOf(pane?.foregroundProcess ?? null)
     }
   })
   private readonly gameBoard = new GameBoard({
