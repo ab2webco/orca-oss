@@ -93,6 +93,7 @@ describe('orca game launch', () => {
 
     expect(calls.map(([method]) => method)).toEqual([
       'game.state',
+      'game.memberNameReserve',
       'terminal.show',
       'orchestration.runCurrent',
       'orchestration.taskCreate',
@@ -101,12 +102,12 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[3]?.[1]).toEqual({
+    expect(calls[4]?.[1]).toEqual({
       spec: 'Implement CIN-12: Cartelera page',
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[5]?.[1]).toEqual(
+    expect(calls[6]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
@@ -257,6 +258,76 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
       expect.objectContaining({ displayName: 'Luigi · CIN-12 Cartelera page' })
+    )
+  })
+
+  it("takes the host's reserved name, after telling it the roster and the names this lead sees", async () => {
+    const holder = { paneKey: 'm', state: 'idle', displayName: 'Arthur · CIN-1 Home' }
+    const { client, calls } = fakeClient(
+      stateWith({ config: { mode: 'on', scene: 'quest' }, agents: [holder] })
+    )
+    const results = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      const response = await results(method, params as Record<string, unknown>)
+      return method === 'game.memberNameReserve'
+        ? { ok: true, result: { name: 'Gawain' } }
+        : response
+    }) as RuntimeClient['call']
+
+    await launch(client)
+
+    const reserve = calls.find(([method]) => method === 'game.memberNameReserve')?.[1] as {
+      roster: unknown[]
+    }
+    expect(reserve).toEqual(
+      expect.objectContaining({
+        worktreeId: 'wt1',
+        terminalHandle: 'h1',
+        ticket: 'CIN-12',
+        locale: 'en',
+        taken: ['Arthur']
+      })
+    )
+    expect(reserve.roster[0]).toEqual({ en: 'Arthur', es: 'Arturo' })
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'Gawain · CIN-12 Cartelera page' })
+    )
+    expect(JSON.parse(output.join('')).result).toEqual(expect.objectContaining({ name: 'Gawain' }))
+  })
+
+  it('names the member after its ticket alone when the host says every name is held', async () => {
+    const { client, calls } = fakeClient(stateWith({ config: { mode: 'on', scene: 'quest' } }))
+    const results = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      const response = await results(method, params as Record<string, unknown>)
+      return method === 'game.memberNameReserve' ? { ok: true, result: { name: null } } : response
+    }) as RuntimeClient['call']
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'CIN-12 Cartelera page' })
+    )
+    expect(JSON.parse(output.join('')).result.name).toBeUndefined()
+  })
+
+  it('picks the name itself on an Orca that cannot reserve one', async () => {
+    const holder = { paneKey: 'm', state: 'idle', displayName: 'Arthur · CIN-1 Home' }
+    const { client, calls } = fakeClient(
+      stateWith({ config: { mode: 'on', scene: 'quest' }, agents: [holder] })
+    )
+    const results = client.call.bind(client)
+    client.call = (async (method: string, params: unknown) => {
+      if (method === 'game.memberNameReserve') {
+        throw new RuntimeClientError('method_not_found', 'Unknown method: game.memberNameReserve')
+      }
+      return results(method, params as Record<string, unknown>)
+    }) as RuntimeClient['call']
+
+    await launch(client)
+
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ displayName: 'Merlin · CIN-12 Cartelera page' })
     )
   })
 

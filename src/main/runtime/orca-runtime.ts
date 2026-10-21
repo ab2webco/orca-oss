@@ -673,6 +673,11 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import {
+  GameMemberNameReservations,
+  liveProjectMemberNamesOf
+} from './orchestrator-game-member-name-reservations'
+import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
 import { GameMemberResume } from './orchestrator-game-member-resume'
 import type {
   GameMemberResumeOutcome,
@@ -3659,6 +3664,7 @@ export class OrcaRuntimeService {
     sessionIdOf: (handle) =>
       this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
   })
+  private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly gameMemberResume = new GameMemberResume({
     store: this.gameMemberSessions,
     statusOf: (taskId) => {
@@ -30476,6 +30482,36 @@ export class OrcaRuntimeService {
     return { recorded: true }
   }
 
+  // Why the whole project: a lead sees only its own members, so another lead's names come from here.
+  async reserveGameMemberName(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+    roster: readonly GameMemberName[]
+    locale: string
+    taken: readonly string[]
+  }): Promise<{ name: string | null }> {
+    const project = await this.gameBoardProjectOf(args)
+    const [ps, saved] = await Promise.all([
+      this.getWorktreePs(GAME_MEMBER_NAME_SCAN_LIMIT),
+      this.gameMemberSessions.read(project.key)
+    ])
+    const live = liveProjectMemberNamesOf({
+      worktrees: ps.worktrees,
+      inProject: (one) => `repo:${one.repoId}` === project.key,
+      saved: saved.ok ? saved.members : []
+    })
+    return {
+      name: this.gameMemberNames.reserve({
+        projectKey: project.key,
+        ticket: args.ticket,
+        roster: args.roster,
+        locale: args.locale,
+        taken: [...live, ...args.taken]
+      })
+    }
+  }
+
   async resumeGameMember(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -39977,6 +40013,8 @@ const DEFAULT_REPO_SEARCH_REFS_LIMIT = 25
 const DEFAULT_TERMINAL_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_PS_LIMIT = 200
+// Why past the ps default: a member in a worktree cut from the list would lose its name again.
+const GAME_MEMBER_NAME_SCAN_LIMIT = 10_000
 const DISCONNECTED_PTY_RECORD_MAX = 128
 const RESOLVED_WORKTREE_CACHE_TTL_MS = 1000
 const WORKTREE_SCAN_CACHE_TTL_MS = 30_000
