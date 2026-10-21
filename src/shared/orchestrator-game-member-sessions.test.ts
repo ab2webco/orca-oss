@@ -4,6 +4,7 @@ import {
   GAME_MEMBER_SESSIONS_VERSION,
   mergeGameMemberSession,
   parseGameMemberSessionsFile,
+  pausedMembersOf,
   serializeGameMemberSessions,
   type GameMemberSession
 } from './orchestrator-game-member-sessions'
@@ -99,5 +100,39 @@ describe('mergeGameMemberSession', () => {
     }
     expect(list).toHaveLength(GAME_MEMBER_SESSIONS_MAX)
     expect(list[0]?.ticket).toBe('ORCA-1')
+  })
+})
+
+describe('pausedMembersOf', () => {
+  it('lists saved members not live now, skipping the finished ones', () => {
+    const members = [
+      member('ORCA-1', { sessionId: 'abc', worktreeId: 'wt-1', lastState: 'working' }),
+      member('ORCA-2', { lastState: 'idle' }),
+      member('ORCA-3', { lastState: 'finished' }),
+      member('ORCA-4', { lastState: 'working' }),
+      member('ORCA-5', { worktreeId: 'wt-5', lastState: 'working' })
+    ]
+    const live = { tickets: new Set(['ORCA-4']), worktreeIds: new Set(['wt-5']) }
+    expect(pausedMembersOf(members, live)).toEqual([
+      {
+        ticket: 'ORCA-1',
+        name: null,
+        agent: 'claude',
+        account: null,
+        branch: null,
+        lastState: 'working',
+        resumable: true,
+        since: '2026-10-20T10:00:00.000Z'
+      },
+      expect.objectContaining({ ticket: 'ORCA-2', resumable: false })
+    ])
+  })
+})
+
+describe('mergeGameMemberSession clipping', () => {
+  it('clips a long field so the saved file stays readable', () => {
+    const list = mergeGameMemberSession([], { ...member('ORCA-1'), name: 'x'.repeat(500) }, 'now')
+    expect(list[0]?.name).toHaveLength(200)
+    expect(parseGameMemberSessionsFile(serializeGameMemberSessions(list)).ok).toBe(true)
   })
 })
