@@ -310,6 +310,8 @@ import { registerLiveTranscriptPathsProvider } from './claude-accounts/shared-tr
 import { publishStatuslineResetCountdown } from './claude/statusline-reset-countdown'
 import { StarNagService } from './star-nag/service'
 import { createMemoryPressureService } from './memory/memory-pressure-service'
+import { createMemoryPressurePopupLog } from './memory/memory-pressure-popup-log'
+import { getMemoryPressureWarningLogPath } from './observability/logs-directory'
 import { registerMemoryPressureHandlers } from './ipc/memory-pressure'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
 import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provider-session-invalidation'
@@ -3172,7 +3174,12 @@ void app.whenReady().then(async () => {
   starNag = new StarNagService(store, stats)
   starNag.start()
   starNag.registerIpcHandlers()
-  memoryPressure = createMemoryPressureService(store, runtimeService)
+  memoryPressure = createMemoryPressureService(
+    store,
+    runtimeService,
+    agentHookServer,
+    createMemoryPressurePopupLog(getMemoryPressureWarningLogPath())
+  )
   registerMemoryPressureHandlers(memoryPressure.monitor)
   memoryPressure.monitor.start()
   runtimeService.setAgentBrowserBridge(

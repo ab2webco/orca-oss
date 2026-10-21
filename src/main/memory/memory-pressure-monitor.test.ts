@@ -6,10 +6,11 @@ import type {
   MemoryPressureWarning
 } from '../../shared/memory-pressure-types'
 import type { MemoryPressureWarningSettings } from '../../shared/memory-pressure-settings'
-import { MemoryPressureMonitor } from './memory-pressure-monitor'
+import { MemoryPressureMonitor, type MemoryPressurePopupRecord } from './memory-pressure-monitor'
 import {
   CACHE_HEAVY_MAC_HOUR,
   CACHE_SWING_MAC_HOUR,
+  FALLING_MAC,
   FLAT_LOW_MAC,
   GIB,
   TICK_MS,
@@ -44,10 +45,12 @@ function normalFor(ms: number): DarwinSample[] {
   return Array.from({ length: ticksFor(ms) }, () => ({ level: 40 }))
 }
 
-function setup(series: MemoryPressureReading[]) {
+function setup(series: MemoryPressureReading[], options: { agentPanes?: number } = {}) {
   const readings = [...series]
   let settings: MemoryPressureWarningSettings = { enabled: true, thresholdPercent: 10 }
+  let agentPanes = options.agentPanes ?? 1
   const states: MemoryPressureState[] = []
+  const records: MemoryPressurePopupRecord[] = []
   const readPressure = vi.fn(async () => {
     const next = readings.shift()
     if (!next) {
@@ -61,6 +64,8 @@ function setup(series: MemoryPressureReading[]) {
     collectPanes,
     getSettings: () => settings,
     broadcast: (state) => states.push(state),
+    countLocalAgentPanes: () => agentPanes,
+    recordPopup: (record) => records.push(record),
     intervalMs: TICK_MS
   })
   // Why sweeping: every popup that opens or comes back is broadcast first with the sweep pending.
@@ -71,10 +76,14 @@ function setup(series: MemoryPressureReading[]) {
     readings,
     states,
     shown,
+    records,
     readPressure,
     collectPanes,
     setSettings: (next: MemoryPressureWarningSettings) => {
       settings = next
+    },
+    setAgentPanes: (count: number) => {
+      agentPanes = count
     },
     tickAll: async () => {
       while (readings.length > 0) {
@@ -101,11 +110,13 @@ describe('MemoryPressureMonitor', () => {
     })
 
     it('opens nothing while the cache swings the level across the old exit line', async () => {
-      const { tickAll, shown } = setup(darwinSeries(CACHE_SWING_MAC_HOUR))
+      const { tickAll, shown, records } = setup(darwinSeries(CACHE_SWING_MAC_HOUR))
 
       await tickAll()
 
       expect(shown()).toEqual([])
+      // Why: the shadow count is the owner's "before" figure; the old rule reopened on every swing.
+      expect(records.filter((r) => r.event === 'legacy-would-open')).toHaveLength(13)
     })
 
     it('opens nothing on a flat low macOS level while the kernel stays normal', async () => {
@@ -187,6 +198,18 @@ describe('MemoryPressureMonitor', () => {
 
       expect(shown()).toHaveLength(1)
       expect(shown()[0]).toMatchObject({ trigger: 'low-memory', reading: { source: 'meminfo' } })
+    })
+
+    it('warns on a falling trend well before memory runs out', async () => {
+      const { tickAll, shown } = setup(darwinSeries(FALLING_MAC))
+
+      await tickAll()
+
+      expect(shown()).toHaveLength(1)
+      const [warning] = shown()
+      expect(warning.trigger).toBe('exhaustion-predicted')
+      expect(warning.reading.availableMemory / warning.reading.totalMemory).toBeGreaterThan(0.2)
+      expect(warning.minutesToExhaustion).toBeLessThan(10)
     })
   })
 
@@ -281,6 +304,78 @@ describe('MemoryPressureMonitor', () => {
       await tickAll()
 
       expect(shown()).toEqual([])
+    })
+  })
+
+  describe('agents', () => {
+    it('stays silent while no agent runs in a local terminal', async () => {
+      const { tickAll, shown, states, collectPanes } = setup(darwinSeries(warnFor(6 * MINUTE)), {
+        agentPanes: 0
+      })
+
+      await tickAll()
+
+      expect(shown()).toEqual([])
+      expect(states).toEqual([])
+      expect(collectPanes).not.toHaveBeenCalled()
+    })
+
+    it('opens once an agent starts while pressure is sustained', async () => {
+      const { tickN, shown, setAgentPanes } = setup(darwinSeries(warnFor(8 * MINUTE)), {
+        agentPanes: 0
+      })
+
+      await tickN(8)
+      expect(shown()).toEqual([])
+      setAgentPanes(2)
+      await tickN(1)
+
+      expect(shown()).toHaveLength(1)
+    })
+  })
+
+  describe('popup log', () => {
+    it('writes one line per popup shown, with its trigger, levels and agent count', async () => {
+      const { tickN, monitor, records } = setup(
+        darwinSeries([...warnFor(4 * MINUTE), ...warnFor(4 * MINUTE, 'critical')]),
+        { agentPanes: 2 }
+      )
+      await tickN(6)
+      monitor.dismiss(1)
+      await tickN(ticksFor(4 * MINUTE))
+
+      const popups = records.filter((record) => record.event !== 'legacy-would-open')
+      expect(popups.map((record) => record.event)).toEqual(['opened', 'reshown'])
+      expect(popups[0]).toMatchObject({
+        episodeId: 1,
+        trigger: 'kernel-pressure',
+        source: 'sysctl',
+        kernelLevel: 'warn',
+        availablePercent: 20,
+        agentPanes: 2
+      })
+      expect(popups[1]).toMatchObject({ episodeId: 1, kernelLevel: 'critical' })
+    })
+
+    it('keeps warning when the log cannot be written', async () => {
+      const series = darwinSeries(warnFor(3 * MINUTE))
+      const monitor = new MemoryPressureMonitor({
+        readPressure: async () => series.shift()!,
+        collectPanes: async () => [PANE],
+        getSettings: () => ({ enabled: true, thresholdPercent: 10 }),
+        broadcast: () => {},
+        countLocalAgentPanes: () => 1,
+        recordPopup: () => {
+          throw new Error('EROFS')
+        },
+        intervalMs: TICK_MS
+      })
+
+      for (let i = 0; i < 5; i += 1) {
+        await monitor.tick()
+      }
+
+      expect(monitor.getState().warning?.episodeId).toBe(1)
     })
   })
 

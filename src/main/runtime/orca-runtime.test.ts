@@ -24067,6 +24067,31 @@ describe('OrcaRuntimeService', () => {
     await expect(runtime.isTerminalRunningAgent(handle)).resolves.toBe(true)
   })
 
+  it('lists local agent PTYs from title evidence without probing any process', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const getForegroundProcess = vi.fn(async () => 'zsh')
+    runtime.setPtyController({
+      spawn: vi
+        .fn()
+        .mockResolvedValueOnce({ id: 'pty-agent' })
+        .mockResolvedValueOnce({ id: 'pty-shell' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'codex',
+      title: 'Codex package-cache cleanup'
+    })
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, { title: 'Terminal 2' })
+
+    expect(runtime.listLocalAgentPtyIds()).toEqual(['pty-agent'])
+    expect(getForegroundProcess).not.toHaveBeenCalled()
+  })
+
   it('does not treat a bare Cursor Agent native title as a running agent session', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
