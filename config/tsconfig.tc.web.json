@@ -26,6 +26,7 @@
     "../resources/claude-plugins/orca-game/hooks/party-sprites.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-land.ts",
+    "../resources/claude-plugins/orca-game/hooks/scene-hd-props.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-sky.ts",
     "../resources/claude-plugins/orca-game/hooks/game-strings.ts",
     "../resources/claude-plugins/orca-game/hooks/lead-state.ts",
