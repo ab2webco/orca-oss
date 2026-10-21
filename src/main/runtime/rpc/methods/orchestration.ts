@@ -327,6 +327,25 @@ function resolveMessageRun(
     const paneKey = params.senderPaneKey ?? runtime.getTerminalPaneKey(params.from)
     run = paneKey ? db.getCurrentRunForPane(paneKey) : undefined
   }
+  if (!run && !resolvedRunId && params.from) {
+    // Why (ORCA-726): a worker's trailing mail after its Dispatch settles belongs to that Run while
+    // its coordinator is still bound; anything else is refused rather than filed as legacy mail.
+    const latest = db.getLatestDispatchForIdentity(params.from, params.senderPaneKey)
+    const latestRun = latest ? db.getRun(latest.run_id) : undefined
+    if (latestRun && latestRun.legacy === 0 && latestRun.coordinator_handle) {
+      run = latestRun
+    }
+  }
+  if (
+    !run &&
+    !resolvedRunId &&
+    params.to &&
+    !params.to.includes(':') &&
+    !isGroupAddress(params.to)
+  ) {
+    // Why: mail to a Run's coordinator is carried by that Run's Delivery, so it must be filed there.
+    run = db.getRunCoordinatedBy(params.to)
+  }
   if (resolvedRunId && (!run || run.legacy === 1)) {
     throw new OrchestrationError('run_not_found', `Run ${resolvedRunId} was not found.`)
   }
@@ -340,6 +359,17 @@ function resolveMessageRun(
     )
   }
   return { run, dispatchId: dispatch?.id ?? dispatchId }
+}
+
+function requireMessageRunId(runId: string | undefined): string {
+  if (!runId) {
+    throw new OrchestrationError(
+      'run_required',
+      'No Run could be resolved for this message. Send from a dispatched pane, pass --run <id>, or address a Run coordinator or run:<id>. No effects were applied.',
+      orchestrationSkillRecoveryData()
+    )
+  }
+  return runId
 }
 
 function legacyWorkerDeliveryContract(
@@ -616,6 +646,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           }
         }
         // Point-to-point — existing single-recipient behavior
+        const messageRunId = requireMessageRunId(routing.run?.id ?? legacyCoordinatorRunId)
         revalidateLegacyCoordinator?.()
         const msg = db.insertMessage({
           from,
@@ -627,12 +658,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           threadId: params.threadId,
           payload: params.payload,
           senderPaneKey,
-          runId: routing.run?.id,
-          deliveryContract: legacyWorkerDeliveryContract(
-            runtime,
-            routing.run?.id ?? legacyCoordinatorRunId,
-            to
-          )
+          runId: messageRunId,
+          deliveryContract: legacyWorkerDeliveryContract(runtime, messageRunId, to)
         })
         const dispatch = routing.dispatchId
           ? db.getDispatchContextById(routing.dispatchId)
@@ -719,6 +746,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         return { message: msg }
       }
 
+      const groupRunId = requireMessageRunId(routing.run?.id ?? legacyCoordinatorRunId)
       // Why: fan out one message per recipient (independent read-tracking) but share a thread_id for correlation (Section 4.5).
       const { terminals } = await runtime.listTerminals(undefined, undefined, {
         includeVisualLayouts: false
@@ -744,12 +772,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           threadId,
           payload: params.payload,
           senderPaneKey,
-          runId: routing.run?.id,
-          deliveryContract: legacyWorkerDeliveryContract(
-            runtime,
-            routing.run?.id ?? legacyCoordinatorRunId,
-            handle
-          )
+          runId: groupRunId,
+          deliveryContract: legacyWorkerDeliveryContract(runtime, groupRunId, handle)
         })
       )
       for (const message of messages) {

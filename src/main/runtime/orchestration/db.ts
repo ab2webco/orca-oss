@@ -2658,6 +2658,14 @@ export class OrchestrationDb {
     }
   }
 
+  /** The one current Run this handle coordinates; undefined when none or ambiguous. */
+  getRunCoordinatedBy(handle: string): RunRow | undefined {
+    const rows = this.db
+      .prepare('SELECT * FROM runs WHERE coordinator_handle = ? AND legacy = 0 LIMIT 2')
+      .all(handle) as RunRow[]
+    return rows.length === 1 ? exposeRunTimestamps(rows[0]) : undefined
+  }
+
   getCurrentRunForPane(paneKey: string): RunRow | undefined {
     const run = this.runsBoundToPane(paneKey)[0]
     return run ? exposeRunTimestamps(run) : undefined
@@ -7101,6 +7109,24 @@ export class OrchestrationDb {
       }
     }
     return undefined
+  }
+
+  getLatestDispatchForIdentity(handle: string, paneKey?: string): DispatchContextRow | undefined {
+    const byHandle = this.getLatestDispatchForTerminal(handle)
+    if (byHandle || !paneKey) {
+      return byHandle
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM dispatch_contexts
+         WHERE assignee_pane_key IS NOT NULL
+           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?
+         ORDER BY rowid DESC`
+      )
+      .all(paneKeyMatchSuffix(paneKey)) as DispatchContextRow[]
+    return rows.find(
+      (row) => row.assignee_pane_key && isEquivalentPaneKey(row.assignee_pane_key, paneKey)
+    )
   }
 
   getLatestDispatchForTerminal(handle: string): DispatchContextRow | undefined {

@@ -418,6 +418,7 @@ describe('orchestration RPC methods', () => {
       vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: 'term_b',
         subject: 'hello',
@@ -433,6 +434,7 @@ describe('orchestration RPC methods', () => {
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_worker',
         to: 'term_coord',
         subject: 'hello'
@@ -842,6 +844,7 @@ describe('orchestration RPC methods', () => {
       setupWithTerminals([makeSummary('term_a'), makeSummary('term_b'), makeSummary('term_c')])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@all',
         subject: 'broadcast'
@@ -857,6 +860,7 @@ describe('orchestration RPC methods', () => {
       setupWithTerminals([makeSummary('term_a'), makeSummary('term_b'), makeSummary('term_c')])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@all',
         subject: 'status broadcast',
@@ -923,6 +927,7 @@ describe('orchestration RPC methods', () => {
       })
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@idle',
         subject: 'idle check'
@@ -940,6 +945,7 @@ describe('orchestration RPC methods', () => {
       ])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@claude',
         subject: 'claude only'
@@ -957,6 +963,7 @@ describe('orchestration RPC methods', () => {
       ])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@droid',
         subject: 'droid only'
@@ -974,6 +981,7 @@ describe('orchestration RPC methods', () => {
       ])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@cursor',
         subject: 'cursor only'
@@ -991,6 +999,7 @@ describe('orchestration RPC methods', () => {
       ])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@worktree:wt_1',
         subject: 'worktree msg'
@@ -1004,6 +1013,7 @@ describe('orchestration RPC methods', () => {
       setupWithTerminals([makeSummary('term_a'), makeSummary('term_b'), makeSummary('term_c')])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@all',
         subject: 'threaded',
@@ -1018,6 +1028,7 @@ describe('orchestration RPC methods', () => {
       setupWithTerminals([makeSummary('term_a'), makeSummary('term_b'), makeSummary('term_c')])
 
       const result = (await call('orchestration.send', {
+        run: activeRunId,
         from: 'term_a',
         to: '@all',
         subject: 'auto thread'
@@ -1032,6 +1043,7 @@ describe('orchestration RPC methods', () => {
 
       await expect(
         call('orchestration.send', {
+          run: activeRunId,
           from: 'term_a',
           to: '@all',
           subject: 'nobody home'

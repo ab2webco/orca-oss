@@ -82,6 +82,14 @@ describe('runRemoteOrcaCli', () => {
       }),
       getLegacyAdoption: vi.fn(() => undefined),
       getActiveDispatchForIdentity: vi.fn(() => undefined),
+      getLatestDispatchForIdentity: vi.fn(() => undefined),
+      // Why: run-less mail is filed under the Run its recipient coordinates (ORCA-726).
+      getRunCoordinatedBy: vi.fn((handle: string) =>
+        handle === 'term_windows'
+          ? { id: 'run_windows', legacy: 0, coordinator_handle: handle }
+          : undefined
+      ),
+      resolveLegacyWorkerCandidate: vi.fn(() => undefined),
       getCurrentRunForPane: vi.fn(() => undefined),
       findActiveRemoteAttachmentForPane: vi.fn(() => undefined)
     }
