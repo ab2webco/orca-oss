@@ -217,6 +217,94 @@ describe('OrchestrationDb Run state', () => {
       })
     })
 
+    describe('a status batch the lead never acknowledged (ORCA-701)', () => {
+      const status = (d: OrchestrationDb, runId: string, subject: string) =>
+        d.insertMessage({ from: 'dispatch:ctx_a', to: `run:${runId}`, subject, runId })
+      const done = (d: OrchestrationDb, runId: string) =>
+        d.insertMessage({
+          from: 'worker',
+          to: `run:${runId}`,
+          subject: 'done',
+          type: 'worker_done',
+          runId
+        })
+      const waitFor = (d: OrchestrationDb, run: { id: string; consumer_generation: number }) =>
+        d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation,
+          wakeTypes: ['worker_done', 'escalation', 'question']
+        })
+
+      it('lets a typed wait past an unacknowledged status-only batch to the worker_done', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        status(d, run.id, 'Setup succeeded')
+        const stale = d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation
+        })!
+        done(d, run.id)
+
+        const delivery = waitFor(d, run)
+
+        expect(delivery?.messages.map((message) => message.subject)).toEqual(['done'])
+        expect(delivery?.replayed).toBe(false)
+        expect(
+          d.acknowledgeRunDelivery({
+            runId: run.id,
+            consumerGeneration: run.consumer_generation,
+            deliveryId: stale.delivery.id
+          }).duplicate
+        ).toBe(true)
+      })
+
+      it('reaches a worker_done queued behind 55 unread status rows', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        for (let index = 0; index < 55; index++) {
+          status(d, run.id, `status ${index}`)
+        }
+        done(d, run.id)
+
+        const delivery = waitFor(d, run)
+
+        expect(delivery?.messages.at(-1)?.type).toBe('worker_done')
+        expect(delivery?.messages).toHaveLength(50)
+      })
+
+      it('keeps replaying an unacknowledged batch that holds a worker_done', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        status(d, run.id, 'Setup succeeded')
+        done(d, run.id)
+        const first = waitFor(d, run)!
+        done(d, run.id)
+
+        const replay = waitFor(d, run)
+
+        expect(replay?.delivery.id).toBe(first.delivery.id)
+        expect(replay?.replayed).toBe(true)
+      })
+
+      it('keeps replaying a status-only batch to a check that names no wake types', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        status(d, run.id, 'Setup succeeded')
+        const first = d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation
+        })!
+        done(d, run.id)
+
+        const replay = d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation
+        })
+
+        expect(replay?.delivery.id).toBe(first.delivery.id)
+      })
+    })
+
     it('fences an outstanding batch when the Run consumer changes', () => {
       const d = createDb()
       const run = createBoundRun(d)

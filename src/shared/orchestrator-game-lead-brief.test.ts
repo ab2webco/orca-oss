@@ -60,6 +60,19 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('Never just repeat that line')
   })
 
+  // Why: an unacknowledged Delivery replays in front of every later worker_done (ORCA-701).
+  it('acknowledges each Delivery it handled before it waits again', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca orchestration check --ack <deliveryId> --wait --types worker_done,escalation,question --timeout-ms 900000 --json`'
+    )
+    expect(brief).toContain('`orca orchestration check --ack <deliveryId> --json`')
+    expect(brief).toContain('replays the same messages')
+    // Why: a timed-out wait has no deliveryId, and `--ack null` fails the watch before it waits.
+    expect(brief).toContain('no `deliveryId` (it timed out), wait again without `--ack`')
+  })
+
   it('hands a non-implementation task to a member with --prompt', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
