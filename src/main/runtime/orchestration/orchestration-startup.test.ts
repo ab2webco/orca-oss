@@ -45,6 +45,7 @@ describe('startOrchestrationAtLaunch (ORCA-726)', () => {
     startOrchestrationAtLaunch({
       prepareLegacyWorkerTerminalRecovery: () => {
         calls.push('recovery')
+        return { blockedPanes: [], candidates: [], ambiguousDispatchIds: [] }
       },
       ensureOrchestrationDispatchDeadlineMonitor: () => {
         calls.push('monitor')

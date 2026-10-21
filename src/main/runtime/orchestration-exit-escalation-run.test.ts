@@ -53,7 +53,11 @@ describe('orchestration mail on an adopted database (ORCA-726)', () => {
     adopted.createCoordinatorRun({ spec: 'lead', coordinatorHandle: 'term_orca_726_lead' })
     const runtime = new OrcaRuntimeService(null)
     runtime.setOrchestrationDb(adopted)
-    runtime.setPtyController({ write: vi.fn(() => true), kill: vi.fn() })
+    runtime.setPtyController({
+      write: vi.fn(() => true),
+      kill: vi.fn(),
+      getForegroundProcess: async () => null
+    })
     runtime.registerPty(PTY_ID, WORKTREE_ID, null, {
       tabId: TAB_ID,
       leafId: LEAF_ID,
