@@ -3661,11 +3661,15 @@ export class OrcaRuntimeService {
     store: this.gameMemberSessions,
     statusOf: (taskId) => {
       const db = this.getOrchestrationDbIfAvailable()
+      const latest = db?.getDispatchContext(taskId)
       return {
         task: db?.getTask(taskId)?.status ?? null,
-        latestDispatch: db?.getDispatchContext(taskId)?.status ?? null
+        latestDispatch: latest?.status ?? null,
+        latestDispatchId: latest?.id ?? null
       }
     },
+    worktreeOfTask: (taskId) =>
+      this.getOrchestrationDbIfAvailable()?.latestWorkerWorktreeForTask(taskId) ?? null,
     worktreeExists: async (worktreeId) => (await this.getResolvedWorktreeMap()).has(worktreeId),
     resumeSession: (member) => this.resumeGameMemberSession(member)
   })

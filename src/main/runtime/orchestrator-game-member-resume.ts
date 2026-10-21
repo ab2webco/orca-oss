@@ -8,13 +8,19 @@ import type { GameMemberSessionStore } from './orchestrator-game-member-session-
 type Deps = {
   store: GameMemberSessionStore
   /** The task's status and its latest dispatch's, from orchestration; null when it is gone. */
-  statusOf: (taskId: string) => { task: string | null; latestDispatch: string | null }
+  statusOf: (taskId: string) => {
+    task: string | null
+    latestDispatch: string | null
+    latestDispatchId: string | null
+  }
+  /** The worktree the task's newest worker got, for a launch cut short before it was saved. */
+  worktreeOfTask: (taskId: string) => string | null
   worktreeExists: (worktreeId: string) => Promise<boolean>
   /** Reopens the member's own conversation and returns its terminal once the agent runs; throws when it cannot. */
   resumeSession: (member: GameMemberSession) => Promise<string>
 }
 
-const targetOf = (member: GameMemberSession): GameMemberResumeTarget => ({
+const targetOf = (member: GameMemberSession, retryOf: string | null): GameMemberResumeTarget => ({
   ticket: member.ticket,
   name: member.name,
   runId: member.runId,
@@ -22,8 +28,12 @@ const targetOf = (member: GameMemberSession): GameMemberResumeTarget => ({
   worktreeId: member.worktreeId,
   agent: member.agent,
   accountId: member.accountId,
-  account: member.account
+  account: member.account,
+  ...(retryOf ? { retryOf } : {})
 })
+
+// Why: worker-start takes a ready task, or a failed or blocked one as a retry of its latest dispatch.
+const RETRIED = new Set(['failed', 'blocked'])
 
 /** Brings one saved member back after a restart, or frees the ones the person does not want back. */
 export class GameMemberResume {
@@ -35,9 +45,13 @@ export class GameMemberResume {
     if (!read.ok) {
       return { outcome: 'missing', ticket, reason: read.reason }
     }
-    const member = read.members.find((one) => one.ticket === ticket)
-    if (!member) {
+    const saved = read.members.find((one) => one.ticket === ticket)
+    if (!saved) {
       return { outcome: 'missing', ticket, reason: `no saved member holds ${ticket}` }
+    }
+    const member = {
+      ...saved,
+      worktreeId: saved.worktreeId ?? this.deps.worktreeOfTask(saved.taskId)
     }
     const status = this.deps.statusOf(member.taskId)
     if (status.task === 'completed' || status.latestDispatch === 'completed') {
@@ -51,6 +65,14 @@ export class GameMemberResume {
         reason: `its orchestration task ${member.taskId} is gone`
       }
     }
+    const retryOf = RETRIED.has(status.task) ? status.latestDispatchId : null
+    if (status.task !== 'ready' && !retryOf) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `its task ${member.taskId} is still marked ${status.task} by ${status.latestDispatchId ?? 'an older dispatch'}, so no new member can take it`
+      }
+    }
     if (member.worktreeId !== null && !(await this.deps.worktreeExists(member.worktreeId))) {
       return {
         outcome: 'missing',
@@ -60,15 +82,15 @@ export class GameMemberResume {
     }
     // Why Claude only: its session id is what Orca's hooks report; other agents restart on their task.
     if (member.worktreeId === null || member.sessionId === null || member.agent !== 'claude') {
-      return { outcome: 'relaunch', member: targetOf(member) }
+      return { outcome: 'relaunch', member: targetOf(member, retryOf) }
     }
     try {
       const terminal = await this.deps.resumeSession(member)
-      return { outcome: 'resumed', terminal, member: targetOf(member) }
+      return { outcome: 'resumed', terminal, member: targetOf(member, retryOf) }
     } catch (error) {
       // Why relaunch: the worktree keeps the work even when the conversation cannot reopen.
       const note = error instanceof Error ? error.message : String(error)
-      return { outcome: 'relaunch', member: targetOf(member), note }
+      return { outcome: 'relaunch', member: targetOf(member, retryOf), note }
     }
   }
 

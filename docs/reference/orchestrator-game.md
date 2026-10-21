@@ -519,7 +519,11 @@ are saved while they run, so the team picks up where it was:
     with a new preamble, so its `worker_done` and mail reach this lead even when the lead's terminal
     changed.
   - A member whose task completed is reported finished and forgotten; one whose worktree or task is
-    gone is reported and kept, for the person to discard.
+    gone, or whose task is still marked dispatched from before the restart, is reported and kept,
+    with nothing started. A failed or blocked task is retried from its latest dispatch.
+  - A launch cut short before its worktree was saved finds that worktree through its task's worker
+    record, so it is reused, never orphaned. When the new dispatch cannot be bound, the reopened
+    conversation is closed again, so no agent runs that no dispatch owns.
   - The lead's rules have it ask the person once, naming the members, before resuming.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **A file this Orca cannot read** (damaged, or from a newer Orca) is never read as empty nor

@@ -121,7 +121,10 @@ const clipped = (patch: GameMemberSessionPatch): GameMemberSessionPatch =>
 export type GameMemberResumeTarget = Pick<
   GameMemberSession,
   'ticket' | 'name' | 'runId' | 'taskId' | 'worktreeId' | 'agent' | 'accountId' | 'account'
->
+> & {
+  /** The dispatch a failed or blocked task is retried from; absent for a ready task. */
+  retryOf?: string
+}
 
 /** `resumed`: its conversation runs again in `terminal`; `relaunch`: start a new agent on its task. */
 export type GameMemberResumeOutcome =

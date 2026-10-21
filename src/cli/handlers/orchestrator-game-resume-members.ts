@@ -58,13 +58,22 @@ async function startOnTask(
           agent: member.agent ?? 'claude',
           ...accountPinOf(member)
         }
-  const started = await client.call<WorkerStarted>('orchestration.workerStart', {
-    ...params,
-    run: member.runId,
-    from,
-    devMode: isDevCliInvocation()
-  })
-  return started.result
+  try {
+    const started = await client.call<WorkerStarted>('orchestration.workerStart', {
+      ...params,
+      ...(member.retryOf ? { retryOf: member.retryOf } : {}),
+      run: member.runId,
+      from,
+      devMode: isDevCliInvocation()
+    })
+    return started.result
+  } catch (error) {
+    // Why close: an agent no dispatch owns is no member, and would hide its ticket from the fleet.
+    if (outcome.outcome === 'resumed') {
+      await client.call('terminal.close', { terminal: outcome.terminal }).catch(() => undefined)
+    }
+    throw error
+  }
 }
 
 async function resumeOne(client: Client, from: string, ticket: string): Promise<GameResumedMember> {
