@@ -11448,8 +11448,9 @@
         "OrchestratorGameRenderSetting": {
           "classic": "Classic",
           "hd": "HD",
+          "hdCompact": "HD compact",
           "label": "Render",
-          "description": "Classic is the 5-row pixel art. HD draws a 9 to 10-row scene with light, weather and day and night.",
+          "description": "Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.",
           "timezone": "Time zone",
           "timezoneDescription": "When HD turns to night. Empty or local follows this machine's clock.",
           "timezoneInvalid": "Use local or an IANA time zone such as America/Bogota."

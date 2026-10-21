@@ -29,10 +29,14 @@ describe('render and timezone', () => {
       layer: { render: 'hd', timezone: 'Asia/Tokyo' },
       warnings: []
     })
+    expect(parseOrchestratorGameLayer({ render: 'hd-compact' })).toEqual({
+      layer: { render: 'hd-compact' },
+      warnings: []
+    })
     expect(parseOrchestratorGameLayer({ render: 'hdr', timezone: 'Mars/Olympus' })).toEqual({
       layer: {},
       warnings: [
-        'orchestratorGame.render must be classic or hd',
+        'orchestratorGame.render must be classic, hd or hd-compact',
         'orchestratorGame.timezone must be local or an IANA time zone such as America/Bogota'
       ]
     })
@@ -46,7 +50,7 @@ describe('render and timezone', () => {
     expect(resolved.config).toMatchObject({ render: 'hd', timezone: 'America/Bogota' })
     expect(resolved.sources).toMatchObject({ render: 'global', timezone: 'global' })
     expect(resolved.warnings).toEqual([
-      'orchestratorGame.render must be classic or hd',
+      'orchestratorGame.render must be classic, hd or hd-compact',
       'orchestratorGame.timezone must be local or an IANA time zone such as America/Bogota'
     ])
   })

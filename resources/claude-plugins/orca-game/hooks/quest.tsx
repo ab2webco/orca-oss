@@ -70,7 +70,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .register({
       name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|demo|render classic|hd]',
+      argumentHint: '[off|on|zen|demo|render classic|hd|hd-compact]',
       immediate: true
     })
     .catch(() => undefined)

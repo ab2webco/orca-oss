@@ -128,7 +128,7 @@ orchestratorGame:
   rewards: false # XP, level-ups, celebrations
   tracker: true # follow the linked work item in the flow
   openLinks: system # orca (default) | system: where the game's links open
-  render: hd # classic (default) | hd: see "Render: classic or hd" below
+  render: hd # classic (default) | hd | hd-compact: see "Render: classic, hd or hd-compact" below
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
 ```
 
@@ -696,14 +696,14 @@ Each also dresses Jev's advisor ([The cast](#the-cast-a-pet-and-jevs-advisor)): 
 Night Watch the commissioner, Crystal Saga an oracle and Beast Tamer the professor. None has a pet,
 so Pet hearts Clawd, the hero, as before.
 
-## Render: classic or hd
+## Render: classic, hd or hd-compact
 
 `render` picks how the spinner scene is drawn
 ([`orchestrator-game-render.ts`](../../src/shared/orchestrator-game-render.ts) validates it and
 `timezone`; the mod mirrors both in
 [`game-render.ts`](../../resources/claude-plugins/orca-game/hooks/game-render.ts)). It resolves per
 key like the rest, reaches the pane as `ORCA_GAME_RENDER` and `ORCA_GAME_TIMEZONE` at launch and
-through `game state` afterwards, and `/orca-game:render classic|hd` overrides it for this pane's
+through `game state` afterwards, and `/orca-game:render classic|hd|hd-compact` overrides it for this pane's
 session the way `/orca-game:mode on|zen|off` overrides the mode; either alone prints both. The host
 never learns of an override, so `game state` keeps reporting the configured value, and both commands
 say which is which: `Render: hd (this session; the project's setting is classic, from default).`
@@ -774,6 +774,12 @@ are dropped, and anything wider than a cell or outside the Latin, punctuation, b
 a Raster draws becomes `?`, so an emoji in a caption can never make the terminal refuse the frame.
 The art uses only the upper half block and text glyphs that SF Mono, Menlo, Consolas and DejaVu Sans
 Mono carry.
+
+- **hd-compact**: the hd scene, figures and effects in a fixed 7-row band (`HD_COMPACT_ROWS`) that
+  does not grow with the pane, for people who want hd without its height. Below 8 rows there is no
+  room above the hero's head, so its thought cloud floats beside it (`heroCloudLeftOf` in
+  [`hd-words.ts`](../../resources/claude-plugins/orca-game/hooks/hd-words.ts)). An older Orca or mod
+  that does not know the value drops it with the usual warning and draws classic.
 
 The band above the prompt holds 8 rows at most, so its pet scene (the advisor acting while the lead
 is idle, Pet without a spinner) stays classic in either render.

@@ -1,10 +1,10 @@
 ---
 name: render
 description: |
-  Set this pane's game look for this session: classic, the 5-row pixel art, or hd, the 9 to
-  10-row scene. Alone it prints the mode and render. The game mod answers it, with no model turn;
+  Set this pane's game look for this session: classic, the 5-row pixel art, hd, the 9 to
+  14-row scene, or hd-compact, the same scene in 7 rows. Alone it prints the mode and render. The game mod answers it, with no model turn;
   Orca's configured render is unchanged. Run it as /orca-game:render.
-argument-hint: '[classic|hd]'
+argument-hint: '[classic|hd|hd-compact]'
 user_invocable: true
 disable-model-invocation: true
 ---

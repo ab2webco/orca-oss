@@ -10825,8 +10825,9 @@
         "OrchestratorGameRenderSetting": {
           "classic": "Clásico",
           "hd": "HD",
+          "hdCompact": "HD compacto",
           "label": "Render",
-          "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 10 filas con luz, clima y día y noche.",
+          "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 14 filas con luz, clima y día y noche; HD compacto la dibuja en 7 filas.",
           "timezone": "Zona horaria",
           "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
           "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."

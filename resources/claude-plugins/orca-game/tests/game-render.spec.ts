@@ -4,6 +4,7 @@ import { DEFAULT_GAME_CONFIG, effectiveConfigOf, gameConfigOfEnv } from '../hook
 import { isGameTimezone } from '../hooks/game-render'
 import { parseGameState } from '../hooks/game-state'
 import { questCommandOf } from '../hooks/quest-policy'
+import { HD_COMPACT_ROWS, HD_ROWS, hdBandRowsOf, hdRowsOf } from '../hooks/scene-hd'
 
 const STATE = {
   config: {},
@@ -44,15 +45,29 @@ describe('the render and the clock in the mod', () => {
     expect(live({ render: 'neon', timezone: 'Nowhere/Land' })).toEqual({})
   })
 
-  it('/quest render picks classic or hd and refuses anything else', () => {
+  it('/quest render picks classic, hd or hd-compact and refuses anything else', () => {
+    const unknown = (asked: string) =>
+      `Unknown render "${asked}". Use /orca-game:render classic, hd or hd-compact.`
     expect(questCommandOf('render hd')).toEqual({ render: 'hd' })
     expect(questCommandOf(' RENDER Classic ')).toEqual({ render: 'classic' })
-    expect(questCommandOf('render neon')).toEqual({
-      error: 'Unknown render "neon". Use /orca-game:render classic or /orca-game:render hd.'
-    })
-    expect(questCommandOf('render')).toEqual({
-      error: 'Unknown render "". Use /orca-game:render classic or /orca-game:render hd.'
-    })
+    expect(questCommandOf('render HD-Compact')).toEqual({ render: 'hd-compact' })
+    expect(questCommandOf('render neon')).toEqual({ error: unknown('neon') })
+    expect(questCommandOf('render')).toEqual({ error: unknown('') })
+  })
+
+  it('reads hd-compact from the launch env and from Orca live answer', () => {
+    expect(gameConfigOfEnv({ ORCA_GAME_RENDER: 'hd-compact' }).render).toBe('hd-compact')
+    expect(
+      parseGameState(JSON.stringify({ ...STATE, config: { render: 'hd-compact' } }))?.config
+    ).toEqual({ render: 'hd-compact' })
+  })
+
+  it('gives hd-compact a short band that does not grow with the pane', () => {
+    expect(hdBandRowsOf('hd', 80)).toBe(hdRowsOf(80))
+    for (const viewportRows of [undefined, 24, 60, 120]) {
+      expect(hdBandRowsOf('hd-compact', viewportRows)).toBe(HD_COMPACT_ROWS)
+    }
+    expect(HD_COMPACT_ROWS).toBeLessThan(HD_ROWS)
   })
 
   it('validates a timezone the way Orca does', () => {

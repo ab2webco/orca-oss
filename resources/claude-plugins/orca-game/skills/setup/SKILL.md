@@ -48,7 +48,7 @@ Offer only what applies, in this order, and skip what they decline:
 4. **The lead** (`orchestrator`): name, autostart, members at once (`cap`), agent and model, what a
    member is told (`launchPrompt`), and the project rules from step 1 the lead must follow
    (`rules`). The lead never does ticket work itself.
-5. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art or `hd` 9 to 10-row scene)
+5. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art, `hd` 9 to 14-row scene or `hd-compact` 7-row hd scene)
    and, for hd's day and night, `timezone` (`local` or the team's IANA zone, e.g. `America/Bogota`).
 
 ## 3. Write and check

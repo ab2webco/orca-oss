@@ -3,6 +3,7 @@ import { setGameLocale } from '../../../../../resources/claude-plugins/orca-game
 import { daylightAt } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import { sceneGridOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scene'
 import {
+  HD_COMPACT_ROWS,
   HD_ROWS,
   hdSceneGridOf
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd'
@@ -80,6 +81,23 @@ describe('scenePreviewPixelsOf', () => {
 })
 
 describe('the hd preview', () => {
+  it('paints hd-compact as the mod does: the hd scene in its short band', () => {
+    const quest = SCENES.quest!
+    const compact = scenePreviewFrameOf(quest, 0, 'en', 'hd-compact')
+    expect(compact.rows).toBe(HD_COMPACT_ROWS)
+    expect(compact.cells).toEqual(
+      hdSceneGridOf({
+        scene: quest,
+        phase: undefined,
+        columns: PREVIEW_COLUMNS,
+        rows: HD_COMPACT_ROWS,
+        tick: 0,
+        caption: '',
+        since: 0
+      })
+    )
+  })
+
   it('paints the hd grid the mod draws when the render is hd, and classic otherwise', () => {
     const quest = SCENES.quest!
     const hd = scenePreviewFrameOf(quest, 0, 'en', 'hd')

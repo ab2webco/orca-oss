@@ -2,10 +2,10 @@
 name: quest
 description: |
   Quest mode: alone it prints this pane's game mode and render, each beside the configured value
-  when this session changed it; with on, zen or off it sets the mode, with render classic|hd the
+  when this session changed it; with on, zen or off it sets the mode, with render classic|hd|hd-compact the
   look, with demo a scripted fake party, all for this session only. The game mod answers it, with
   no model turn. Run it as /orca-game:quest (or /quest, which also runs mid-turn).
-argument-hint: '[off|on|zen|demo|render classic|hd]'
+argument-hint: '[off|on|zen|demo|render classic|hd|hd-compact]'
 user_invocable: true
 disable-model-invocation: true
 ---

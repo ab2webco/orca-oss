@@ -21,6 +21,7 @@ import {
   type Daylight
 } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import {
+  HD_COMPACT_ROWS,
   HD_ROWS,
   hdSceneGridOf
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd'
@@ -78,16 +79,17 @@ export function scenePreviewFrameOf(
   const phase = PHASES[Math.floor(tick / PREVIEW_PHASE_TICKS) % PHASES.length] ?? 'working'
   const card = scene.cards[phase]
   const flowPhase = phase === 'working' ? undefined : phase
-  const isHd = render === 'hd'
+  const hdRows = render === 'hd-compact' ? HD_COMPACT_ROWS : HD_ROWS
+  const isHd = render !== 'classic'
   return {
     columns: PREVIEW_COLUMNS,
-    rows: isHd ? HD_ROWS : SCENE_ROWS,
+    rows: isHd ? hdRows : SCENE_ROWS,
     cells: isHd
       ? hdSceneGridOf({
           scene,
           phase: flowPhase,
           columns: PREVIEW_COLUMNS,
-          rows: HD_ROWS,
+          rows: hdRows,
           tick,
           caption: '',
           since: 0,

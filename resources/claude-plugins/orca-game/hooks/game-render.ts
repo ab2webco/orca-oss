@@ -5,7 +5,7 @@ import type { GameConfig, GameRender } from '../types'
 export const LOCAL_TIMEZONE = 'local'
 
 export const isGameRender = (value: unknown): value is GameRender =>
-  value === 'classic' || value === 'hd'
+  value === 'classic' || value === 'hd' || value === 'hd-compact'
 
 export const isGameTimezone = (value: unknown): value is string => {
   if (typeof value !== 'string' || value.trim() === '') {

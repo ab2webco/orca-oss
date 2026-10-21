@@ -326,7 +326,7 @@ describe('orca game state', () => {
       agents: [],
       review: null,
       workItem: null,
-      warnings: ['orchestratorGame.render must be classic or hd']
+      warnings: ['orchestratorGame.render must be classic, hd or hd-compact']
     }
     const client = {
       call: async () => ({ ok: true, result: state })
@@ -341,6 +341,6 @@ describe('orca game state', () => {
 
     const text = output.join('\n')
     expect(text).toContain('Render: hd (from project), timezone America/Bogota (from global)')
-    expect(text).toContain('Warning: orchestratorGame.render must be classic or hd')
+    expect(text).toContain('Warning: orchestratorGame.render must be classic, hd or hd-compact')
   })
 })

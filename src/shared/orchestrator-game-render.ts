@@ -1,18 +1,23 @@
-/** How the game draws its scene: the 5-row pixel art, or the 9 to 10-row 2D-HD one. */
-export type OrchestratorGameRender = 'classic' | 'hd'
+/** How the game draws its scene: the 5-row pixel art, the 9 to 14-row 2D-HD one, or HD in a 7-row band. */
+export type OrchestratorGameRender = 'classic' | 'hd' | 'hd-compact'
 
-export const ORCHESTRATOR_GAME_RENDERS: readonly OrchestratorGameRender[] = ['classic', 'hd']
+export const ORCHESTRATOR_GAME_RENDERS: readonly OrchestratorGameRender[] = [
+  'classic',
+  'hd',
+  'hd-compact'
+]
 
 /** The timezone value that follows the machine's own clock. */
 export const ORCHESTRATOR_GAME_LOCAL_TIMEZONE = 'local'
 
-export const ORCHESTRATOR_GAME_RENDER_WARNING = 'orchestratorGame.render must be classic or hd'
+export const ORCHESTRATOR_GAME_RENDER_WARNING =
+  'orchestratorGame.render must be classic, hd or hd-compact'
 
 export const ORCHESTRATOR_GAME_TIMEZONE_WARNING =
   'orchestratorGame.timezone must be local or an IANA time zone such as America/Bogota'
 
 export const isOrchestratorGameRender = (value: unknown): value is OrchestratorGameRender =>
-  value === 'classic' || value === 'hd'
+  ORCHESTRATOR_GAME_RENDERS.includes(value as OrchestratorGameRender)
 
 /** `local`, or a zone name the runtime's ICU knows. */
 export const isOrchestratorGameTimezone = (value: unknown): value is string => {
