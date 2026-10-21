@@ -673,7 +673,12 @@ import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
-import type { GameMemberSessionPatch } from '../../shared/orchestrator-game-member-sessions'
+import { GameMemberResume } from './orchestrator-game-member-resume'
+import type {
+  GameMemberResumeOutcome,
+  GameMemberSession,
+  GameMemberSessionPatch
+} from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
@@ -3645,13 +3650,26 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  private readonly gameMemberSessions = new GameMemberSessionStore(() =>
+    join(app.getPath('userData'), 'orchestrator-game-members')
+  )
   private readonly gamePausedMembers = new GamePausedMembers({
-    store: new GameMemberSessionStore(() =>
-      join(app.getPath('userData'), 'orchestrator-game-members')
-    ),
+    store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
     sessionIdOf: (handle) =>
       this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
+  })
+  private readonly gameMemberResume = new GameMemberResume({
+    store: this.gameMemberSessions,
+    statusOf: (taskId) => {
+      const db = this.getOrchestrationDbIfAvailable()
+      return {
+        task: db?.getTask(taskId)?.status ?? null,
+        latestDispatch: db?.getDispatchContext(taskId)?.status ?? null
+      }
+    },
+    worktreeExists: async (worktreeId) => (await this.getResolvedWorktreeMap()).has(worktreeId),
+    resumeSession: (member) => this.resumeGameMemberSession(member)
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
@@ -27532,7 +27550,9 @@ export class OrcaRuntimeService {
 
   async ensureAgentSession(
     request: RuntimeEnsureAgentSessionRequest,
-    _caller: RuntimeAgentSessionRpcCaller = {}
+    _caller: RuntimeAgentSessionRpcCaller = {},
+    // Why host-only: a game member resumes on its own account, which its worktree pin may no longer name.
+    launchAccount: { claudeAccountId?: string } = {}
   ): Promise<RuntimeEnsureAgentSessionResult> {
     if (request.kind === 'automatic') {
       // Legacy renderer sleep records are migration evidence, not host authority.
@@ -27608,7 +27628,8 @@ export class OrcaRuntimeService {
       leafId: request.placement?.leafId,
       persistHostSessionBinding: true,
       agentSessionClaim: claim,
-      signal: _caller.signal
+      signal: _caller.signal,
+      ...(launchAccount.claudeAccountId ? { claudeAccountId: launchAccount.claudeAccountId } : {})
     })
     return {
       terminal,
@@ -30445,6 +30466,67 @@ export class OrcaRuntimeService {
     }
     await this.gamePausedMembers.record(project.key, args.member)
     return { recorded: true }
+  }
+
+  async resumeGameMember(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+  }): Promise<GameMemberResumeOutcome> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember) {
+      throw new Error('Only the lead resumes its members.')
+    }
+    return await this.gameMemberResume.resume(project.key, args.ticket)
+  }
+
+  async discardGameMembers(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    tickets: string[] | 'all'
+  }): Promise<{ discarded: string[]; setAside: string | null }> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember) {
+      throw new Error('Only the lead discards its members.')
+    }
+    return await this.gameMemberResume.discard(project.key, args.tickets)
+  }
+
+  // Why the same wait as a reopened lead: Claude exits within seconds when the conversation is missing.
+  private async resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+    const { handle } = (
+      await this.ensureAgentSession(
+        {
+          kind: 'explicit',
+          worktree: `id:${member.worktreeId}`,
+          agent: 'claude',
+          providerSession: { key: 'session_id', id: member.sessionId ?? '' },
+          presentation: 'background'
+        },
+        {},
+        member.accountId ? { claudeAccountId: member.accountId } : {}
+      )
+    ).terminal
+    const outcome = await awaitResumedLead({
+      read: async () => {
+        if (
+          this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ===
+          member.sessionId
+        ) {
+          return 'session'
+        }
+        const pane = await this.inspectTerminalProcess(handle).catch(() => null)
+        return resumedPaneStateOf(pane?.foregroundProcess ?? null)
+      },
+      timeoutMs: 20_000,
+      settleMs: 5_000,
+      intervalMs: 500
+    })
+    if (outcome === 'exited') {
+      await this.closeTerminal(handle).catch(() => undefined)
+      throw new Error('Claude exited instead of reopening the conversation')
+    }
+    return handle
   }
 
   async listGameHistory(args: {

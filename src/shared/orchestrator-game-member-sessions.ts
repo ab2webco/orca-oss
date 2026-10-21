@@ -139,14 +139,26 @@ export function serializeGameMemberSessions(
   })
 }
 
-// Why clip: the parser refuses a longer field, and a long display name must not make the file unreadable.
+// Why: the parser refuses a long, empty or missing field, and no patch may make the file unreadable.
 const clipped = (patch: GameMemberSessionPatch): GameMemberSessionPatch =>
   Object.fromEntries(
-    Object.entries(patch).map(([key, value]) => [
-      key,
-      typeof value === 'string' ? value.slice(0, TEXT_MAX) : value
-    ])
+    Object.entries(patch)
+      .filter((entry) => entry[1] !== undefined && entry[1] !== '')
+      .map(([key, value]) => [key, typeof value === 'string' ? value.slice(0, TEXT_MAX) : value])
   ) as GameMemberSessionPatch
+
+/** What `orca game resume-members` needs to bind a fresh dispatch to a member's own task. */
+export type GameMemberResumeTarget = Pick<
+  GameMemberSession,
+  'ticket' | 'name' | 'runId' | 'taskId' | 'worktreeId' | 'agent' | 'accountId' | 'account'
+>
+
+/** `resumed`: its conversation runs again in `terminal`; `relaunch`: start a new agent on its task. */
+export type GameMemberResumeOutcome =
+  | { outcome: 'resumed'; terminal: string; member: GameMemberResumeTarget }
+  | { outcome: 'relaunch'; member: GameMemberResumeTarget; note?: string }
+  | { outcome: 'finished'; ticket: string }
+  | { outcome: 'missing'; ticket: string; reason: string }
 
 /** A member the project had live that is not live now: what `game fleet` and the lead show as paused. */
 export type GamePausedMember = {
@@ -158,6 +170,8 @@ export type GamePausedMember = {
   lastState: string | null
   /** Whether its own conversation can be resumed; without one it is relaunched in its worktree. */
   resumable: boolean
+  /** The orchestration run that owns its task; the lead binds it before resuming. */
+  runId: string
   since: string
 }
 
@@ -184,6 +198,7 @@ export function pausedMembersOf(
       branch: one.branch,
       lastState: one.lastState,
       resumable: one.sessionId !== null && one.worktreeId !== null,
+      runId: one.runId,
       since: one.updatedAt
     }))
 }
