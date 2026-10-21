@@ -49,7 +49,7 @@ const TICKET = /^[A-Z0-9][A-Z0-9_-]{0,39}$/
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-function ticketsOf(flags: Map<string, string | boolean>): string[] {
+export function ticketsOf(flags: Map<string, string | boolean>): string[] {
   const raw = flags.get('tickets')
   const tickets =
     typeof raw === 'string'
