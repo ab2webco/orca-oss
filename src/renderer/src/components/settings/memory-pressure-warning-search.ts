@@ -10,7 +10,7 @@ export const getMemoryPressureWarningSearchEntries = createLocalizedCatalog(() =
     ),
     description: translate(
       'auto.components.settings.terminal.search.memoryPressureDescription',
-      'Warn when the system is running out of memory and name the terminals using the most.'
+      'Warn when agents in terminals are about to run out of memory and name the terminals at risk.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.terminal.search.memoryKeyword', 'memory'),

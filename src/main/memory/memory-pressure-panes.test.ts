@@ -74,6 +74,7 @@ describe('rankMemoryPressurePanes', () => {
         ])
       ]),
       (id) => ({ ptyId: id, lastOutputAt: null }),
+      new Set(),
       5
     )
 
@@ -95,6 +96,7 @@ describe('rankMemoryPressurePanes', () => {
       ),
       // Why a distinct pty id: the registry's session id and the live PTY id can differ.
       (id) => ({ ptyId: `pty-${id}`, lastOutputAt: id === 'b' ? 1_700 : null }),
+      new Set(),
       5
     )
 
@@ -114,6 +116,26 @@ describe('rankMemoryPressurePanes', () => {
     ])
   })
 
+  it('lists agent panes first, before the cap, then the heaviest other terminals', () => {
+    const heavy = Array.from({ length: 6 }, (_, index) => session(`shell-${index}`, 900 * MIB))
+    const ranked = rankMemoryPressurePanes(
+      snapshot([
+        worktree('wt-a', 'cineco', [
+          ...heavy,
+          session('agent', 80 * MIB),
+          // Why no pane key: daemon sessions rehydrated after a restart are registered without one.
+          { ...session('restored', 70 * MIB), paneKey: null }
+        ])
+      ]),
+      // Why a distinct pty id: the registry's session id and the live PTY id can differ.
+      (id) => ({ ptyId: `pty-${id}`, lastOutputAt: null }),
+      new Set(['pty-agent', 'pty-restored']),
+      3
+    )
+
+    expect(ranked.map((pane) => pane.sessionId)).toEqual(['agent', 'restored', 'shell-0'])
+  })
+
   it('drops empty sessions, caps the list and reports unattributed terminals with no worktree', () => {
     const ranked = rankMemoryPressurePanes(
       snapshot([
@@ -121,6 +143,7 @@ describe('rankMemoryPressurePanes', () => {
         worktree('wt-a', 'cineco', [session('a', 70 * MIB), session('c', 60 * MIB)])
       ]),
       (id) => ({ ptyId: id, lastOutputAt: null }),
+      new Set(),
       2
     )
 
@@ -129,6 +152,7 @@ describe('rankMemoryPressurePanes', () => {
       rankMemoryPressurePanes(
         snapshot([worktree(ORPHAN_WORKTREE_ID, 'Other', [session('o', 5)])]),
         (id) => ({ ptyId: id, lastOutputAt: null }),
+        new Set(),
         5
       )[0].worktreeId
     ).toBeNull()

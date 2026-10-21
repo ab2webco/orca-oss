@@ -39,7 +39,7 @@ export function MemoryPressureWarningSection({
         )}
         description={translate(
           'auto.components.settings.MemoryPressureWarningSection.description',
-          'Agents, MCP servers and builds running in terminals can exhaust memory. Orca never closes a terminal on its own.'
+          'Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own.'
         )}
       />
       <div className="divide-y divide-border/40">
@@ -55,7 +55,7 @@ export function MemoryPressureWarningSection({
               label={thresholdLabel}
               description={translate(
                 'auto.components.settings.MemoryPressureWarningSection.thresholdDescription',
-                'Show the warning when free memory falls under this share of physical memory. On macOS it also shows when the system reports memory pressure. Terminals on SSH hosts are not measured.'
+                'On Linux and Windows the warning also shows when free memory stays under this share for two minutes. On macOS the system pressure signal is used instead, because cached memory makes free memory look low. Terminals on SSH hosts are not measured.'
               )}
               control={
                 <SettingsSegmentedControl

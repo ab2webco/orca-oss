@@ -49,6 +49,27 @@ function readingSummary(reading: MemoryPressureReading): string {
   return `${free} ${swap}`
 }
 
+function triggerSummary(warning: MemoryPressureWarning, thresholdPercent: number): string {
+  if (warning.trigger === 'exhaustion-predicted' && warning.minutesToExhaustion !== null) {
+    return translate(
+      'auto.components.memoryPressure.MemoryPressureWarningCard.triggerExhaustion',
+      'At this rate, memory runs out in about {{value0}} minutes.',
+      { value0: String(Math.max(1, Math.round(warning.minutesToExhaustion))) }
+    )
+  }
+  if (warning.trigger === 'low-memory') {
+    return translate(
+      'auto.components.memoryPressure.MemoryPressureWarningCard.triggerLowMemory',
+      'Free memory has stayed under {{value0}}% for at least two minutes.',
+      { value0: String(thresholdPercent) }
+    )
+  }
+  return translate(
+    'auto.components.memoryPressure.MemoryPressureWarningCard.triggerKernel',
+    'The system has reported memory pressure for at least two minutes.'
+  )
+}
+
 function rowMeta(row: MemoryPressureRow): string {
   const idle =
     row.idleMs === null
@@ -73,6 +94,9 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
   const [closing, setClosing] = useState(false)
   const mountedRef = useMountedRef()
   const enabled = useAppStore((s) => resolveMemoryPressureWarningSettings(s.settings ?? {}).enabled)
+  const thresholdPercent = useAppStore(
+    (s) => resolveMemoryPressureWarningSettings(s.settings ?? {}).thresholdPercent
+  )
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
   const terminalLayoutsByTabId = useAppStore((s) => s.terminalLayoutsByTabId)
@@ -184,6 +208,9 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
                     'Memory is running low'
                   )}
                 </h3>
+                <p className="text-xs text-muted-foreground">
+                  {triggerSummary(warning, thresholdPercent)}
+                </p>
                 <p className="text-xs text-muted-foreground">{readingSummary(warning.reading)}</p>
               </div>
             </div>
@@ -204,7 +231,7 @@ export function MemoryPressureWarningCard(): React.JSX.Element | null {
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.memoryPressure.MemoryPressureWarningCard.lead',
-              'These terminals use the most memory. Close the ones you no longer need before the system runs out.'
+              'Terminals running agents come first, then the ones using the most memory. Close the ones you no longer need before the system runs out.'
             )}
           </p>
 

@@ -158,4 +158,29 @@ describe('MemoryPressureWarningCard', () => {
 
     expect(host.textContent).toBe('')
   })
+
+  it('says what opened it, in plain words', async () => {
+    const host = await render()
+    expect(host.textContent).toContain(
+      'The system has reported memory pressure for at least two minutes.'
+    )
+
+    act(() =>
+      pushState?.({
+        warning: { ...STATE.warning!, trigger: 'exhaustion-predicted', minutesToExhaustion: 7.4 }
+      })
+    )
+    expect(host.textContent).toContain('At this rate, memory runs out in about 7 minutes.')
+
+    act(() => pushState?.({ warning: { ...STATE.warning!, trigger: 'low-memory' } }))
+    expect(host.textContent).toContain('Free memory has stayed under 10% for at least two minutes.')
+  })
+
+  it('says agent terminals come first', async () => {
+    const host = await render()
+
+    expect(host.textContent).toContain(
+      'Terminals running agents come first, then the ones using the most memory.'
+    )
+  })
 })

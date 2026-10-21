@@ -60,6 +60,15 @@ describe('MemoryPressureWarningSection', () => {
     expect(host.querySelector('[role="radio"]')).toBeNull()
   })
 
+  it('says in plain words what opens the warning', () => {
+    const text = render({}).textContent ?? ''
+
+    expect(text).toContain('only while an agent runs in a local terminal')
+    expect(text).toContain('memory pressure for two minutes')
+    expect(text).toContain('run out within ten minutes')
+    expect(text).toContain('On macOS the system pressure signal is used instead')
+  })
+
   it('is findable from Settings search', () => {
     const titles = getTerminalPaneSearchEntries({ isWindows: false, isMac: true }).map(
       (entry) => entry.title

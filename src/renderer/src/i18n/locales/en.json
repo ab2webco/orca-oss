@@ -9846,7 +9846,7 @@
             "buttons": "buttons",
             "position": "position",
             "memoryPressureTitle": "Low memory warning",
-            "memoryPressureDescription": "Warn when the system is running out of memory and name the terminals using the most.",
+            "memoryPressureDescription": "Warn when agents in terminals are about to run out of memory and name the terminals at risk.",
             "memoryKeyword": "memory",
             "ramKeyword": "ram",
             "swapKeyword": "swap",
@@ -11479,9 +11479,9 @@
         },
         "MemoryPressureWarningSection": {
           "title": "Low Memory",
-          "description": "Agents, MCP servers and builds running in terminals can exhaust memory. Orca never closes a terminal on its own.",
+          "description": "Orca warns only while an agent runs in a local terminal: when the system reports memory pressure for two minutes, or when memory will run out within ten minutes at its current rate. Orca never closes a terminal on its own.",
           "thresholdLabel": "Warn below",
-          "thresholdDescription": "Show the warning when free memory falls under this share of physical memory. On macOS it also shows when the system reports memory pressure. Terminals on SSH hosts are not measured."
+          "thresholdDescription": "On Linux and Windows the warning also shows when free memory stays under this share for two minutes. On macOS the system pressure signal is used instead, because cached memory makes free memory look low. Terminals on SSH hosts are not measured."
         },
         "OrchestratorGameMemberNamesRow": {
           "label": "Member names",
@@ -16211,7 +16211,7 @@
           "dismiss": "Dismiss",
           "freeSummary": "{{value0}} of {{value1}} free.",
           "swapSummary": "Swap {{value0}} of {{value1}}.",
-          "lead": "These terminals use the most memory. Close the ones you no longer need before the system runs out.",
+          "lead": "Terminals running agents come first, then the ones using the most memory. Close the ones you no longer need before the system runs out.",
           "measuring": "Measuring terminals…",
           "empty": "No local terminal is holding much memory. Other apps may be the cause.",
           "untitled": "Background terminal",
@@ -16219,7 +16219,10 @@
           "lastOutput": "last output {{value0}}",
           "open": "Open",
           "close": "Close",
-          "remote": "SSH terminals run on their remote hosts and are not counted here ({{value0}} open)."
+          "remote": "SSH terminals run on their remote hosts and are not counted here ({{value0}} open).",
+          "triggerExhaustion": "At this rate, memory runs out in about {{value0}} minutes.",
+          "triggerLowMemory": "Free memory has stayed under {{value0}}% for at least two minutes.",
+          "triggerKernel": "The system has reported memory pressure for at least two minutes."
         },
         "MemoryPressureCloseDialog": {
           "title": "Close {{value0}}?",
