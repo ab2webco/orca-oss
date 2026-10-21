@@ -297,5 +297,12 @@
         "G": "#fff4a0"
       }
     }
-  }
+  },
+  "themes": [
+    {
+      "name": { "en": "Autumn", "es": "Otoño" },
+      "weight": 0.4,
+      "look": { "near": "#b8742f", "plant": "#a5521f", "ground": "#7a4a2a" }
+    }
+  ]
 }

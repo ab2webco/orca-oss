@@ -8,8 +8,10 @@ import {
   type Costume,
   type HudPalette,
   type Look,
+  type LookColor,
   type SceneDefinition,
-  type ScenePhase
+  type ScenePhase,
+  type SceneTheme
 } from './scene-definition'
 import { colorOf, glyphColorsOf, hexOf, isShape, nameOf, textOf } from './scene-values'
 
@@ -19,7 +21,7 @@ const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr
 const COSTUME_ROWS = 6
 const FINALE_MAX = 24
 const SPRITE_ROW = /^[!-~]{10}$/
-const LOOK_COLORS = [
+const LOOK_COLORS: readonly LookColor[] = [
   'skyTop',
   'skyBottom',
   'sun',
@@ -29,7 +31,7 @@ const LOOK_COLORS = [
   'ground',
   'plant',
   'cloud'
-] as const
+]
 
 const lookOf = (value: unknown): Look | undefined => {
   if (!isShape(value) || typeof value.isNight !== 'boolean') {
@@ -47,7 +49,7 @@ const lookOf = (value: unknown): Look | undefined => {
     return undefined
   }
   return {
-    ...(colors as Record<(typeof LOOK_COLORS)[number], number>),
+    ...(colors as Record<LookColor, number>),
     isNight: value.isNight,
     plantKind,
     ...(scenery === undefined ? {} : { scenery }),
@@ -133,6 +135,32 @@ const hudOf = (value: unknown): HudPalette | undefined => {
     : undefined
 }
 
+// Mirrors Orca's theme schema; bad themes are dropped, as Orca drops them, never the scene.
+const THEMES_MAX = 8
+const themeOf = (value: unknown): SceneTheme | undefined => {
+  if (!isShape(value) || !isShape(value.look)) {
+    return undefined
+  }
+  const name = nameOf(value.name)
+  const { weight, look } = value
+  const colors = LOOK_COLORS.filter((key) => look[key] !== undefined).map(
+    (key) => [key, colorOf(look[key])] as const
+  )
+  const isWeight = typeof weight === 'number' && weight >= 0 && weight <= 1
+  if (!name || !isWeight || colors.length === 0 || colors.some(([, one]) => one === undefined)) {
+    return undefined
+  }
+  return { name, weight, look: Object.fromEntries(colors) }
+}
+
+const themesOf = (value: unknown): SceneTheme[] | undefined => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > THEMES_MAX) {
+    return undefined
+  }
+  const themes = value.map(themeOf)
+  return themes.every((one) => one !== undefined) ? themes : undefined
+}
+
 const byPhaseOf = <T>(
   value: unknown,
   of: (one: unknown) => T | undefined
@@ -161,6 +189,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const hud = optionalOf(value.hud, hudOf)
     const cast = castOf(value.cast)
     const roster = rosterOf(value.roster)
+    const themes = themesOf(value.themes)
     if (
       !looks ||
       !costumes ||
@@ -184,7 +213,8 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       ...(finale === undefined ? {} : { finale }),
       ...(hud === undefined ? {} : { hud }),
       ...(cast === undefined ? {} : { cast }),
-      ...(roster === undefined ? {} : { roster })
+      ...(roster === undefined ? {} : { roster }),
+      ...(themes === undefined ? {} : { themes })
     }
   } catch {
     return undefined

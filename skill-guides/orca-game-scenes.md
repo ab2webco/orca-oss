@@ -141,6 +141,7 @@ Top level, all required unless marked optional:
 | `hud`      | Optional. The team band's frame, sky and text colors               |
 | `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
 | `roster`   | Optional. Names a lead's members take, in order                    |
+| `themes`   | Optional. Palette variants the band shows one a day                |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
 The file must be at most 64 KB.
@@ -339,6 +340,20 @@ the ticket stays next to it (`Mario · CIN-12 Cartelera`). Once every name is ta
 are named after their ticket only. A name must not look like a ticket id (`K-9`), contain
 `·`, or repeat. An invalid roster is left out with a warning and the scene still draws; the
 project's `orchestratorGame.orchestrator.memberNames` replaces it.
+
+### `themes` (optional)
+
+```json
+[{ "name": { "en": "Autumn", "es": "Otoño" }, "weight": 0.4, "look": { "near": "#b8742f" } }]
+```
+
+1 to 8 palette variants. Each `look` sets any of the look colors (`skyTop`, `skyBottom`, `sun`,
+`far`, `snow`, `near`, `ground`, `plant`, `cloud`), at least one; every phase's own color is
+mixed `weight` (0 to 1) of the way toward it, so 1 replaces it and 0.3 tints it. The band takes
+turns by calendar day, on the project's timezone: one day the plain looks, the next each theme
+in order, then the plain looks again. Keep the layer contrast in mind: a `far` close to the sky
+is pushed apart from it like any other. An invalid `themes` is left out with a warning and the
+scene still draws in its plain looks.
 
 ## Common problems
 
