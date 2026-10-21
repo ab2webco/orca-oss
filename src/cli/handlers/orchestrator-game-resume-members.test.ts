@@ -163,6 +163,8 @@ describe('orca game resume-members', () => {
         codexAccountId: 'acct_bo'
       })
     ])
+    // Why: worker-start refuses creation options such as name on an existing worktree.
+    expect(starts[1]).not.toHaveProperty('name')
     expect(printed().members).toEqual([
       { ticket: 'CIN-1', result: 'relaunched', dispatchId: 'ctx_new_task_CIN-1' },
       {
