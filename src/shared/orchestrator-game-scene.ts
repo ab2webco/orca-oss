@@ -117,11 +117,44 @@ const sceneFileSchema = z.object({
     .optional()
 })
 
+const THEMES_MAX = 8
+const themesError = `must be a list of 1 to ${THEMES_MAX} themes`
+const weightError = 'must be from 0 to 1'
+const themeSchema = z.object({
+  name: localizedSceneName,
+  weight: z.number({ error: weightError }).min(0, weightError).max(1, weightError),
+  look: lookSchema
+    .pick({
+      skyTop: true,
+      skyBottom: true,
+      sun: true,
+      far: true,
+      snow: true,
+      near: true,
+      ground: true,
+      plant: true,
+      cloud: true
+    })
+    .partial()
+    .refine(
+      (look) => Object.values(look).some((one) => one !== undefined),
+      'must set at least one look color'
+    )
+})
+const themesSchema = z
+  .array(themeSchema, { error: themesError })
+  .min(1, themesError)
+  .max(THEMES_MAX, themesError)
+
+export type OrchestratorGameSceneTheme = z.infer<typeof themeSchema>
+
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & {
   id: string
   cast?: OrchestratorGameSceneCast
   /** Names a lead's members take, in order. */
   roster?: GameMemberName[]
+  /** Palette variants the band shows one a day, in turn with the plain looks. */
+  themes?: OrchestratorGameSceneTheme[]
 }
 
 type SceneParse =
@@ -141,6 +174,21 @@ function rosterOf(raw: unknown): { roster?: GameMemberName[]; issues: string[] }
     roster,
     issues: problems.map(({ path, message }) => `roster${path ? `.${path}` : ''}: ${message}`)
   }
+}
+
+// Why apart, like the roster: bad themes only cost the variants, never the scene.
+function themesOf(raw: unknown): { themes?: OrchestratorGameSceneTheme[]; issues: string[] } {
+  if (typeof raw !== 'object' || raw === null || !('themes' in raw)) {
+    return { issues: [] }
+  }
+  const parsed = themesSchema.safeParse(raw.themes)
+  return parsed.success
+    ? { themes: parsed.data, issues: [] }
+    : {
+        issues: parsed.error.issues.map(
+          (issue) => `${['themes', ...issue.path].join('.')}: ${issue.message}`
+        )
+      }
 }
 
 export type OrchestratorGameSceneExtension = {
@@ -170,7 +218,8 @@ export function orchestratorGameSceneIssues(text: string): string[] {
           (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
         )),
     ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
-    ...rosterOf(raw).issues
+    ...rosterOf(raw).issues,
+    ...themesOf(raw).issues
   ]
 }
 
@@ -192,15 +241,17 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   // Why apart: a bad pet or advisor is left out with a warning; the scene and its hero still draw.
   const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
   const { roster, issues: rosterIssues } = rosterOf(raw)
+  const { themes, issues: themeIssues } = themesOf(raw)
   return {
     ok: true,
     definition: {
       ...parsed.data,
       ...(cast === undefined ? {} : { cast }),
       ...(roster === undefined ? {} : { roster }),
+      ...(themes === undefined ? {} : { themes }),
       id
     },
-    warnings: [...issues, ...rosterIssues]
+    warnings: [...issues, ...rosterIssues, ...themeIssues]
   }
 }
 

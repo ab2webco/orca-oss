@@ -8,12 +8,14 @@ export type {
   Costume,
   HudPalette,
   Look,
+  LookColor,
   PlantKind,
   SceneAdvisor,
   SceneCast,
   SceneDefinition,
   ScenePet,
   ScenePhase,
+  SceneTheme,
   Scenery
 } from '../../types'
 

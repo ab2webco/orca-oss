@@ -279,6 +279,26 @@ export type SceneDefinition = {
   cast?: SceneCast
   /** Names Orca gives a lead's members, in order. */
   roster?: readonly LocalizedName[]
+  /** Palette variants; the band shows one a day in turn with the plain looks. */
+  themes?: readonly SceneTheme[]
+}
+
+export type LookColor =
+  | 'skyTop'
+  | 'skyBottom'
+  | 'sun'
+  | 'far'
+  | 'snow'
+  | 'near'
+  | 'ground'
+  | 'plant'
+  | 'cloud'
+
+/** Colors mixed into every phase's look, `weight` of the way from the look's own. */
+export type SceneTheme = {
+  name: LocalizedName
+  weight: number
+  look: Readonly<Partial<Record<LookColor, number>>>
 }
 
 export type GameSceneExtension = { id: string; pluginId: string; definition: SceneDefinition }

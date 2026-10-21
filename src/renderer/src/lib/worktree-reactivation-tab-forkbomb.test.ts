@@ -71,7 +71,8 @@ describe('STA-1111 worktree reopen does not fork-bomb tabs', () => {
             providerSession,
             prompt: 'resume prior task',
             state: 'working',
-            origin: 'live',
+            // Why worktree-sleep: a live record with no tab is a closed tab and never reopens (ORCA-718).
+            origin: 'worktree-sleep',
             capturedAt: 1000 + reopen,
             updatedAt: 1000 + reopen,
             terminalTitle: 'Codex'

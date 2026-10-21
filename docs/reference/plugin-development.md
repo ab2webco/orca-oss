@@ -858,6 +858,12 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   `advisor` (the referee otherwise), each sprite frames of 1 to 7 rows by 1 to 10 glyphs. An
   invalid member is left out with a warning and the scene still draws; the rules and the advisor's
   gestures are in [The cast](./orchestrator-game.md#the-cast-a-pet-and-jevs-advisor).
+- Optional `themes` holds 1 to 8 palette variants, each a `name`, a `weight` from 0 to 1 and a
+  `look` with any of the look colors; every phase's own color is mixed `weight` of the way toward
+  the theme's. The mod shows one a day in turn with the plain looks, on the project's timezone
+  ([`scene-theme.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-theme.ts)). Bad
+  `themes` are left out with a warning and the scene still draws; an Orca or mod older than
+  `themes` ignores it and draws the plain looks.
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the

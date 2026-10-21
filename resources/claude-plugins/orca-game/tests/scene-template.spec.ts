@@ -11,9 +11,11 @@ describe('the scene template `orca game scene new` writes', () => {
   it('is the built-in Quest with its hud palette plus example extras, drawn as Orca parses it', () => {
     const parsed = parseOrchestratorGameScene(ORCHESTRATOR_GAME_SCENE_TEMPLATE, 'quest')
     const definition = parsed.ok ? parsed.definition : undefined
-    // Why: Quest has no foe, finale, pet or roster; the template adds one of each to show their shape.
-    const { foe, finale, cast, roster, ...quest } = definition ?? QUEST_SCENE
-    expect([foe, finale, cast?.pet, roster].every((extra) => extra !== undefined)).toBe(true)
+    // Why: Quest has no foe, finale, pet, roster or themes; the template adds one of each to show their shape.
+    const { foe, finale, cast, roster, themes, ...quest } = definition ?? QUEST_SCENE
+    expect([foe, finale, cast?.pet, roster, themes].every((extra) => extra !== undefined)).toBe(
+      true
+    )
     expect({ ...quest, cast: { advisor: cast?.advisor } }).toEqual({
       ...QUEST_SCENE,
       hud: QUEST_HUD

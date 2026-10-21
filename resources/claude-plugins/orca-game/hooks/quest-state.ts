@@ -3,13 +3,14 @@ import { advisorSpriteOf } from './advisor-art'
 import { advisorPoseAt, isAdvisorActingAt } from './advisor-state'
 import { demoFrameOf, type DemoFrame } from './demo'
 import { DEFAULT_GAME_CONFIG, effectiveConfigOf, isAbsorbingConfig } from './game-config'
-import { daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
+import { dayOf, daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
 import type { HdMember, March } from './hd-party'
 import type { LeadState } from './lead-state'
 import type { Action, FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
+import { themedSceneOf } from './scenes/scene-theme'
 
 export type Animated = {
   key: string
@@ -97,7 +98,12 @@ export const gameConfig = (): GameConfig =>
 export const configuredConfig = (): GameConfig =>
   effectiveConfigOf(quest.envConfig, quest.liveConfig, undefined)
 
-export const currentScene = (): SceneDefinition => sceneOf(gameConfig().scene)
+/** The configured scene in its theme of the day, on the project's timezone; plain until the clock is read. */
+export const currentScene = (): SceneDefinition =>
+  themedSceneOf(
+    sceneOf(gameConfig().scene),
+    quest.clockMs === 0 ? undefined : dayOf(quest.clockMs, gameConfig().timezone)
+  )
 
 export const demoNow = (): DemoFrame => demoFrameOf(quest.demoStep)
 
