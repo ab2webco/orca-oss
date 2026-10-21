@@ -485,6 +485,57 @@ The lead's verbs, run from the lead's terminal
 - `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` and
   `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
   have it read events and inbox before answering "qué pasó".
+- `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
+  restart left paused, below.
+
+### Paused members after a restart
+
+When Orca Lab closes or the machine restarts, each member's agent stops with it. The lead's members
+are saved while they run, so the team picks up where it was:
+
+- **What is saved.** One file per project on the Orca host that runs the lead, under the app's data
+  folder, `orchestrator-game-members/`
+  ([`orchestrator-game-member-session-store.ts`](../../src/main/runtime/orchestrator-game-member-session-store.ts)).
+  Per ticket: name, orchestration run, task and dispatch, worktree and branch, agent, managed
+  account, the agent's conversation id and its last state. `game launch` saves the member before its
+  worker starts and again after, so a launch cut short is still found; every `game state` read by the
+  lead fills in the conversation id and state of each live member
+  ([`orchestrator-game-paused-members.ts`](../../src/main/runtime/orchestrator-game-paused-members.ts)).
+  Writes are fsynced before the rename, since this file exists for the crash that loses a plain one.
+- **Paused.** A saved member that is not live now, and whose worktree runs no agent, is paused.
+  `game state` gives the lead `pausedMembers`, and `game fleet` lists them under
+  `Paused since Orca or the machine restarted`. A paused member keeps its ticket and its slot:
+  `game launch` refuses its ticket and `game wave` skips it (`paused`), so a ticket never gets a
+  second member. A member whose PR merged or whose dispatch reported success is never paused, and
+  `game sweep --close` and `game stop` forget the members they free.
+- **Resume.** `game resume-members` takes the paused members in turn, one at a time and never past
+  the cap ([`orchestrator-game-member-resume.ts`](../../src/main/runtime/orchestrator-game-member-resume.ts)):
+  - It first binds the run that owns their tasks; it never takes that run over while this lead
+    leads live members in another, and says so.
+  - A Claude member reopens its own conversation (`claude --resume`) in its worktree, on the
+    account it ran on, and Orca waits until Claude is up; any other agent, a launch cut short, or a
+    conversation Claude cannot reopen gets a new agent on the same task in its worktree (a new child
+    worktree when none was created). Either way the member gets a fresh dispatch on its own task,
+    with a new preamble, so its `worker_done` and mail reach this lead even when the lead's terminal
+    changed.
+  - A member whose task completed is reported finished and forgotten; one whose worktree or task is
+    gone, or whose task is still marked dispatched from before the restart, is reported and kept,
+    with nothing started. A failed or blocked task is retried from its latest dispatch.
+  - A launch cut short before its worktree was saved finds that worktree through its task's worker
+    record, so it is reused, never orphaned. When the new dispatch cannot be bound, the reopened
+    conversation is closed again, so no agent runs that no dispatch owns.
+  - The lead's rules have it ask the person once, naming the members, before resuming.
+- **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
+- **A file this Orca cannot read** (damaged, or from a newer Orca) is never read as empty nor
+  written over: Orca starts normally, `game fleet` says `Could not resume members: <reason>`, and
+  nothing is saved until `game resume-members --discard` sets a damaged file aside, bytes kept,
+  under a `.unreadable-<time>.json` name. A file from a newer Orca is left where it is, so going
+  back to that Orca still finds it; updating Orca is the way to resume those members. Unknown keys
+  survive a rewrite (see [`game-data-migrations.md`](./game-data-migrations.md)).
+- **Mixed versions.** `game.memberRecord`, `game.memberResume` and `game.memberDiscard` are new RPC
+  methods, and `pausedMembers`/`pausedMembersError` new optional fields of `game.state`. A newer
+  CLI's launch against an older host saves nothing and launches anyway; `game resume-members` there
+  says to update Orca.
 
 ### Accounts and limited members
 
