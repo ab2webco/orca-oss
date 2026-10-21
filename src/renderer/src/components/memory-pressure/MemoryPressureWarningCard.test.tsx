@@ -15,6 +15,7 @@ const STATE: MemoryPressureState = {
     episodeId: 4,
     sweeping: false,
     trigger: 'kernel-pressure',
+    minutesToExhaustion: null,
     reading: {
       totalMemory: 16 * GIB,
       availableMemory: GIB,

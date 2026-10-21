@@ -33,6 +33,11 @@ export function getTraceFilePath(): string {
   return join(getLogsDirectory(), 'main.trace.ndjson')
 }
 
+/** NDJSON line per low-memory popup shown (and per popup the pre-ORCA-691 rule would have shown). */
+export function getMemoryPressureWarningLogPath(): string {
+  return join(getLogsDirectory(), 'memory-pressure-warnings.ndjson')
+}
+
 /** NDJSON lifecycle log written by the detached daemon process. Shared here so
  *  the daemon fork (which passes it as `--log-file`) and the bundle collector
  *  (which reads it) agree on one path. */

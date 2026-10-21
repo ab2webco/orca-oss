@@ -6,6 +6,10 @@ import type {
 /** How long a signal must hold, by readAt, before it opens a popup. */
 export const MEMORY_PRESSURE_SUSTAIN_MS = 2 * 60_000
 const EXIT_MARGIN_PERCENT = 5
+// Why swap needs company: macOS keeps swap occupied long after pressure passes.
+const SWAP_COMPANION_MARGIN_PERCENT = 10
+const SWAP_ENTER_RATIO = 0.8
+const SWAP_STAY_RATIO = 0.7
 
 export function availablePercentOf(reading: MemoryPressureReading): number {
   return reading.totalMemory > 0 ? (reading.availableMemory / reading.totalMemory) * 100 : 100
@@ -70,4 +74,29 @@ export function findSustainedMemoryPressureTrigger(
     return heldFor(history, isKernelElevated) ? 'kernel-pressure' : null
   }
   return heldFor(history, (reading) => isBelow(reading, thresholdPercent)) ? 'low-memory' : null
+}
+
+/** The pre-ORCA-691 single-sample rule, kept only to count the popups it would have opened. */
+export function isLegacyMemoryPressureElevated(
+  reading: MemoryPressureReading,
+  thresholdPercent: number,
+  wasElevated: boolean
+): boolean {
+  if (isKernelElevated(reading)) {
+    return true
+  }
+  if (reading.totalMemory <= 0) {
+    return false
+  }
+  const availablePercent = availablePercentOf(reading)
+  const margin = wasElevated ? EXIT_MARGIN_PERCENT : 0
+  if (availablePercent < thresholdPercent + margin) {
+    return true
+  }
+  const swapRatio =
+    reading.swapTotal && reading.swapUsed !== null ? reading.swapUsed / reading.swapTotal : 0
+  return (
+    swapRatio >= (wasElevated ? SWAP_STAY_RATIO : SWAP_ENTER_RATIO) &&
+    availablePercent < thresholdPercent + SWAP_COMPANION_MARGIN_PERCENT + margin
+  )
 }

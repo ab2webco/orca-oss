@@ -16,9 +16,9 @@ export type MemoryPressureReading = {
   readAt: number
 }
 
-/** What opened the popup: a sustained kernel signal, or sustained low memory where there is no
- *  kernel signal. */
-export type MemoryPressureTrigger = 'kernel-pressure' | 'low-memory'
+/** What opened the popup: a sustained kernel signal, sustained low memory where there is no
+ *  kernel signal, or a falling trend that runs out soon. */
+export type MemoryPressureTrigger = 'kernel-pressure' | 'low-memory' | 'exhaustion-predicted'
 
 /** phys-footprint on macOS; otherwise the collector's per-process metric. */
 export type MemoryPressurePaneMetric = 'phys-footprint' | 'rss' | 'working-set'
@@ -43,6 +43,8 @@ export type MemoryPressureWarning = {
   episodeId: number
   reading: MemoryPressureReading
   trigger: MemoryPressureTrigger
+  /** Minutes until memory runs out at the current rate; null when it is not falling. */
+  minutesToExhaustion: number | null
   panes: MemoryPressurePane[]
   /** True while the per-pane sweep for this episode is still running. */
   sweeping: boolean

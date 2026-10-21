@@ -92,3 +92,9 @@ export const CACHE_SWING_MAC_HOUR: DarwinSample[] = repeat(
 
 /** Same machine with the level flat at 6%: low, but nothing is getting worse. */
 export const FLAT_LOW_MAC: DarwinSample[] = repeat([{ level: 6, swapUsedMiB: 7000 }], 40)
+
+/** A build eats memory: the level falls 1.25 points per tick while swap grows 50 MiB per tick. */
+export const FALLING_MAC: DarwinSample[] = Array.from({ length: 32 }, (_, index) => ({
+  level: Math.max(0, Math.round(40 - index * 1.25)),
+  swapUsedMiB: 4000 + index * 50
+}))

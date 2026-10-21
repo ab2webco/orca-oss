@@ -17826,6 +17826,10 @@ export class OrcaRuntimeService {
     return handle === null && title === null ? null : { handle, title }
   }
 
+  getPtyIdForPaneKey(paneKey: string): string | null {
+    return this.getPtyRecordForPaneKey(paneKey)?.ptyId ?? null
+  }
+
   getTerminalWorktreeIdForPaneKey(paneKey: string): string | null {
     const parsed = parsePaneKey(paneKey)
     const leaf = parsed ? this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId)) : null
@@ -35119,10 +35123,25 @@ export class OrcaRuntimeService {
     }
   }
 
-  private async isPtyRunningAgent(
+  /** Local PTYs whose titles, prompt or last status already show an agent; never probes a process. */
+  listLocalAgentPtyIds(): string[] {
+    const ptyIds: string[] = []
+    for (const pty of this.ptysById.values()) {
+      if (
+        pty.connected &&
+        pty.connectionId === null &&
+        this.readPtyAgentEvidence(pty, this.getPrimaryLeafForPty(pty.ptyId)).proven
+      ) {
+        ptyIds.push(pty.ptyId)
+      }
+    }
+    return ptyIds
+  }
+
+  private readPtyAgentEvidence(
     pty: RuntimePtyWorktreeRecord,
-    leaf: RuntimeLeafRecord | null = null
-  ): Promise<boolean> {
+    leaf: RuntimeLeafRecord | null
+  ): { proven: true } | { proven: false; suppressClaudeForeground: boolean } {
     const leafTitle = leaf
       ? getLatestAgentCandidateTitle(
           { title: leaf.paneTitle, updatedAt: leaf.paneTitleUpdatedAt },
@@ -35131,7 +35150,7 @@ export class OrcaRuntimeService {
       : null
     const leafTitleClassification = classifyAgentTitle(leafTitle)
     if (ptyTitleProvesAgentPresence(pty, leafTitle, leafTitleClassification)) {
-      return true
+      return { proven: true }
     }
     const ptyTitle = getLatestAgentCandidateTitle(
       { title: pty.title, updatedAt: pty.titleUpdatedAt },
@@ -35139,7 +35158,7 @@ export class OrcaRuntimeService {
     )
     const ptyTitleClassification = classifyAgentTitle(ptyTitle)
     if (leafTitle === null && ptyTitleProvesAgentPresence(pty, ptyTitle, ptyTitleClassification)) {
-      return true
+      return { proven: true }
     }
     const managementTitleClassification = classifyLatestAgentTitle({
       title: pty.managementTitle,
@@ -35147,11 +35166,11 @@ export class OrcaRuntimeService {
     })
     const openCodeMarkerTitle = leafTitle ?? ptyTitle
     if (isOpenCodeNativeTitle(openCodeMarkerTitle) && pty.launchAgent === 'opencode') {
-      return true
+      return { proven: true }
     }
     const waitText = buildTerminalWaitText(pty.tailBuffer, pty.tailPartialLine, pty.preview)
     if (!isOpenCodeNativeTitle(openCodeMarkerTitle) && isKnownReadyPromptPreview(waitText)) {
-      return true
+      return { proven: true }
     }
     // Why: stale status is a fallback only when no current title evidence exists; neutral titles (shells) clear it.
     if (
@@ -35160,6 +35179,23 @@ export class OrcaRuntimeService {
       ptyTitle === null &&
       managementTitleClassification !== 'management'
     ) {
+      return { proven: true }
+    }
+    return {
+      proven: false,
+      suppressClaudeForeground:
+        leafTitle !== null
+          ? leafTitleClassification === 'management'
+          : managementTitleClassification === 'management'
+    }
+  }
+
+  private async isPtyRunningAgent(
+    pty: RuntimePtyWorktreeRecord,
+    leaf: RuntimeLeafRecord | null = null
+  ): Promise<boolean> {
+    const evidence = this.readPtyAgentEvidence(pty, leaf)
+    if (evidence.proven) {
       return true
     }
     if (!this.ptyController) {
@@ -35171,10 +35207,7 @@ export class OrcaRuntimeService {
     if (!fg) {
       return false
     }
-    const shouldSuppressClaudeForeground =
-      leafTitle !== null
-        ? leafTitleClassification === 'management'
-        : managementTitleClassification === 'management'
+    const shouldSuppressClaudeForeground = evidence.suppressClaudeForeground
     if (shouldSuppressClaudeForeground && isExpectedAgentProcess(fg, 'claude')) {
       return false
     }
