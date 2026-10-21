@@ -130,6 +130,7 @@ import type { WorkerObservedModel } from './orchestration/worker-observed-model'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
 import { ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS } from './orchestration/dispatch-lifecycle-deadline'
+import { ORCHESTRATION_DB_REOPEN_BACKOFF_MS } from './orchestration/orchestration-startup'
 import {
   classifyWorkerTerminalProcessIncarnation,
   parseWorkerTerminalHostScope,
@@ -3084,6 +3085,7 @@ export class OrcaRuntimeService {
   private readonly orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport | null
   private readonly orchestrationFederationTimers = new Map<string, ReturnType<typeof setInterval>>()
   private orchestrationDeadlineTimer: ReturnType<typeof setInterval> | null = null
+  private orchestrationDbOpenFailure: { error: unknown; at: number } | null = null
   private orchestrationTerminalHistoryRecoveryTimer: ReturnType<typeof setTimeout> | null = null
   private orchestrationTerminalHistoryRecoveryInFlight: Promise<void> | null = null
   private orchestrationTerminalRecoveryRowId = 0
@@ -4450,13 +4452,28 @@ export class OrcaRuntimeService {
   // to inject an in-memory DB without touching the filesystem.
   getOrchestrationDb(): OrchestrationDb {
     if (!this._orchestrationDb) {
-      const { app } = require('electron')
-      const dbPath = join(app.getPath('userData'), 'orchestration.db')
-      this._orchestrationDb = new OrchestrationDb(dbPath)
+      const failure = this.orchestrationDbOpenFailure
+      // Why (ORCA-726): hot paths (the 16ms graph publish) reach here; a DB that failed to open
+      // would otherwise replay its whole migration on every call.
+      if (failure && Date.now() - failure.at < ORCHESTRATION_DB_REOPEN_BACKOFF_MS) {
+        throw failure.error
+      }
+      try {
+        this._orchestrationDb = new OrchestrationDb(this.resolveOrchestrationDbPath())
+      } catch (error) {
+        this.orchestrationDbOpenFailure = { error, at: Date.now() }
+        throw error
+      }
+      this.orchestrationDbOpenFailure = null
       this.ensureOrchestrationFederationRelay()
       this.scheduleRestoredMessageRepoints()
     }
     return this._orchestrationDb
+  }
+
+  private resolveOrchestrationDbPath(): string {
+    const { app } = require('electron')
+    return join(app.getPath('userData'), 'orchestration.db')
   }
 
   setOrchestrationDb(db: OrchestrationDb): void {

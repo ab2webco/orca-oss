@@ -1,6 +1,9 @@
 import { startSpan } from '../../observability/tracer'
 import type { OrcaRuntimeService } from '../orca-runtime'
 
+/** How long a failed orchestration.db open is reported from memory before the next attempt. */
+export const ORCHESTRATION_DB_REOPEN_BACKOFF_MS = 60_000
+
 type OrchestrationLaunchRuntime = Pick<
   OrcaRuntimeService,
   'prepareLegacyWorkerTerminalRecovery' | 'ensureOrchestrationDispatchDeadlineMonitor'
