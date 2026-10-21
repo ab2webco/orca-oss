@@ -159,6 +159,15 @@ describe('MemoryPressureWarningCard', () => {
     expect(host.textContent).toBe('')
   })
 
+  it('shows nothing for a profile that never turned the setting on', async () => {
+    useAppStore.setState({ settings: {} as GlobalSettings })
+    const host = await render()
+
+    act(() => pushState?.(STATE))
+
+    expect(host.textContent).toBe('')
+  })
+
   it('says what opened it, in plain words', async () => {
     const host = await render()
     expect(host.textContent).toContain(

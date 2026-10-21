@@ -20,7 +20,7 @@ export function resolveMemoryPressureWarningSettings(
 ): MemoryPressureWarningSettings {
   const stored = settings.memoryPressureWarningThresholdPercent
   return {
-    enabled: settings.memoryPressureWarningEnabled !== false,
+    enabled: settings.memoryPressureWarningEnabled === true,
     thresholdPercent: isMemoryPressureThresholdChoice(stored)
       ? stored
       : DEFAULT_MEMORY_PRESSURE_THRESHOLD_PERCENT

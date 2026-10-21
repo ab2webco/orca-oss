@@ -418,7 +418,7 @@ export type GlobalSettings = {
   tabAutoGenerateTitle: boolean
   /** Why: pinned tabs can still be closed via keyboard/native-menu; this gates that behind a confirmation. Defaults on. */
   confirmClosePinnedTab: boolean
-  /** Warn about low memory and name the heaviest terminal panes. Missing means on. */
+  /** Warn about low memory and name the heaviest terminal panes. Missing means off; only an explicit true turns it on. */
   memoryPressureWarningEnabled?: boolean
   /** Available-memory percent under which the warning shows; one of 5/10/15/20. */
   memoryPressureWarningThresholdPercent?: number
