@@ -677,6 +677,7 @@ import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
   GameLeadSessions,
   awaitResumedLead,
+  leadPaneStateOf,
   leadResumeArgsOf,
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
@@ -3703,7 +3704,7 @@ export class OrcaRuntimeService {
         : null,
     paneState: async (handle) => {
       const pane = await this.inspectTerminalProcess(handle).catch(() => null)
-      return resumedPaneStateOf(pane?.foregroundProcess ?? null)
+      return leadPaneStateOf(pane?.foregroundProcess ?? null)
     }
   })
   private readonly gameBoard = new GameBoard({

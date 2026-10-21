@@ -219,16 +219,18 @@ export class GameLeads {
     if (!handle || !this.deps.isLive(handle) || !this.deps.paneState) {
       return 'wait'
     }
+    // Why the shell first: a pane back at its shell can still report the conversation it last ran.
     const state = await this.deps.paneState(handle).catch(() => 'starting' as const)
     if (state === 'shell') {
       return 'forget'
     }
-    if (state !== 'running') {
-      return 'wait'
-    }
     const session = (await this.deps.sessionOf?.(handle).catch(() => null)) ?? null
-    if (one.sessionId !== null && session !== null && session.sessionId !== one.sessionId) {
-      return 'forget'
+    if (one.sessionId !== null && session !== null) {
+      if (session.sessionId !== one.sessionId) {
+        return 'forget'
+      }
+    } else if (state !== 'running') {
+      return 'wait'
     }
     if (this.pending.get(one.projectKey) !== one) {
       return 'wait'

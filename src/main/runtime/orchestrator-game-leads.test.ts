@@ -374,12 +374,20 @@ describe('GameLeads after a restart', () => {
     await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
   })
 
+  it('lists it on its conversation alone, whatever the pane shows in front', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    const leads = (await relaunched(dir, { state: () => 'starting' }).list()).leads
+    expect(leads.map((one) => one.handle)).toEqual(['term_new'])
+  })
+
   it('waits for a pane that is not back yet, or not yet running Claude, and lists it once it is', async () => {
     const dir = rosterDir()
     await registeredBefore(dir, WITH_PANE)
     let handle: string | null = null
     let state: 'running' | 'starting' = 'starting'
-    const game = relaunched(dir, { handle: () => handle, state: () => state })
+    const game = relaunched(dir, { handle: () => handle, state: () => state, sessionId: null })
 
     await expect(game.list()).resolves.toEqual({ leads: [] })
     handle = 'term_new'
