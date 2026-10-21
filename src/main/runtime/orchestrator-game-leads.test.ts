@@ -60,6 +60,17 @@ describe('GameLeads', () => {
     expect((await game.list()).leads).toEqual([])
   })
 
+  it('does not list a lead whose pane is back at its shell', async () => {
+    const game = new GameLeads({
+      projectOf: async () => LEAD,
+      isLive: () => true,
+      isRunning: async () => false
+    })
+    await game.register({ project: 'cineco', label: 'Ana' })
+
+    expect((await game.list()).leads).toEqual([])
+  })
+
   it('gives the inbox the labels of the live leads', async () => {
     const game = leads(LEAD)
     await game.register({ project: 'cineco', label: '' })

@@ -117,10 +117,11 @@ export class GameLeads {
 
   private async leadOf(projectKey: string): Promise<{ handle: string } | null> {
     const live = this.directory.leadOf(projectKey, this.deps.isLive)
-    if (!live || !this.deps.isRunning) {
-      return live
-    }
-    return (await this.deps.isRunning(live.handle).catch(() => true)) ? live : null
+    return live && (await this.isRunning(live.handle)) ? live : null
+  }
+
+  private async isRunning(handle: string): Promise<boolean> {
+    return !this.deps.isRunning || (await this.deps.isRunning(handle).catch(() => true))
   }
 
   /** The project's live lead when it is not the caller, so a second pane does not start one. */
@@ -136,13 +137,17 @@ export class GameLeads {
 
   async list(): Promise<{ leads: GameLeadListing[] }> {
     await this.settle()
+    const live = this.directory.live(this.deps.isLive)
+    const running = await Promise.all(live.map((one) => this.isRunning(one.handle)))
     return {
-      leads: this.directory.live(this.deps.isLive).map((one) => ({
-        project: one.project,
-        label: one.label,
-        handle: one.handle,
-        since: one.at
-      }))
+      leads: live
+        .filter((_, index) => running[index])
+        .map((one) => ({
+          project: one.project,
+          label: one.label,
+          handle: one.handle,
+          since: one.at
+        }))
     }
   }
 
