@@ -86,6 +86,7 @@ import {
   fingerprintOrchestrationPeer,
   type OrchestrationEnvironmentTransport
 } from './runtime/orchestration/environment-transport'
+import { startOrchestrationAtLaunch } from './runtime/orchestration/orchestration-startup'
 import { callRuntimeEnvironment } from './ipc/runtime-environment-transport-routing'
 import { resolveEnvironment } from '../shared/runtime-environment-store'
 import { getPreferredPairingOffer } from '../shared/runtime-environments'
@@ -2872,9 +2873,7 @@ void app.whenReady().then(async () => {
     orchestrationEnvironmentTransport
   })
   runtime = runtimeService
-  runtimeService.prepareLegacyWorkerTerminalRecovery()
-  // Why (ORCA-191): armed deadlines live in the DB, so a restart re-arms the scan here.
-  runtimeService.ensureOrchestrationDispatchDeadlineMonitor()
+  startOrchestrationAtLaunch(runtimeService)
   claudeAccounts = new ClaudeAccountService(
     store,
     rateLimits,

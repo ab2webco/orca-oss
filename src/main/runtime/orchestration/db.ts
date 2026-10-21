@@ -41,6 +41,7 @@ import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestra
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
+import { startSpan } from '../../observability/tracer'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
 import { workerObservedModelOf, type WorkerObservedModel } from './worker-observed-model'
@@ -375,8 +376,14 @@ export class OrchestrationDb {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
     this.db.pragma('busy_timeout = 5000')
-    this.createTables()
-    this.migrate()
+    try {
+      this.createTables()
+      this.migrate()
+    } catch (error) {
+      // Why: the runtime retries a failed open on every call; each retry would otherwise leak a handle.
+      this.db.close()
+      throw error
+    }
     hardenOrchestrationDatabaseFiles(dbPath)
   }
 
@@ -1246,6 +1253,8 @@ export class OrchestrationDb {
          WHERE run_id = ? AND capability_hash IS NULL`
       )
       .run(LEGACY_CONTRACT_VERSION, LEGACY_RUN_ID)
+    // Why: before classification, so healed mail keeps the contract it was sent with.
+    this.healLegacyMessagesCarriedByDeliveries()
     this.classifyLegacyMessageContracts(LEGACY_RUN_ID, false)
     this.ensureLegacySchedulerLossColumn()
     this.adoptLegacyRunIfNeeded()
@@ -1406,7 +1415,48 @@ export class OrchestrationDb {
     }
   }
 
+  // Why (ORCA-726): mail filed under the legacy Run but carried by another Run's Delivery belongs to
+  // that Run; adopting it elsewhere broke the ownership check on every launch. When several Runs
+  // carried it, the latest carrier keeps it and a span records the choice instead of a throw.
+  private healLegacyMessagesCarriedByDeliveries(): void {
+    const carriersSql = `WITH carriers(message_id, run_id, delivery_rowid) AS (
+           SELECT ids.value, d.run_id, d.rowid
+           FROM deliveries d
+           INNER JOIN json_each(d.message_ids) ids
+           INNER JOIN messages m ON m.id = ids.value AND m.run_id = ?
+         ),
+         owned(message_id, carrier_runs) AS (
+           SELECT c.message_id, COUNT(DISTINCT c.run_id) FROM carriers c
+           LEFT JOIN runs r ON r.id = c.run_id
+           GROUP BY c.message_id
+           HAVING MIN(COALESCE(r.legacy = 0, 0)) = 1
+         )`
+    const ambiguous = this.db
+      .prepare(`${carriersSql} SELECT message_id FROM owned WHERE carrier_runs > 1`)
+      .all(LEGACY_RUN_ID) as { message_id: string }[]
+    this.db
+      .prepare(
+        `${carriersSql}
+         UPDATE messages
+         SET run_id = (
+           SELECT c.run_id FROM carriers c
+           WHERE c.message_id = messages.id
+           ORDER BY c.delivery_rowid DESC LIMIT 1
+         )
+         WHERE run_id = ? AND id IN (SELECT message_id FROM owned)`
+      )
+      .run(LEGACY_RUN_ID, LEGACY_RUN_ID)
+    if (ambiguous.length > 0) {
+      startSpan('orchestration.legacy_heal.ambiguous_carrier', {
+        attributes: {
+          'orchestration.message_ids': ambiguous.map((row) => row.message_id).join(',')
+        }
+      }).end()
+    }
+  }
+
   private adoptLegacyRunIfNeeded(): void {
+    this.healLegacyMessagesCarriedByDeliveries()
     const existing = this.db
       .prepare('SELECT * FROM legacy_adoptions WHERE source_run_id = ?')
       .get(LEGACY_RUN_ID) as LegacyAdoptionRow | undefined
@@ -2622,6 +2672,14 @@ export class OrchestrationDb {
     }
   }
 
+  /** The one current Run this handle coordinates; undefined when none or ambiguous. */
+  getRunCoordinatedBy(handle: string): RunRow | undefined {
+    const rows = this.db
+      .prepare('SELECT * FROM runs WHERE coordinator_handle = ? AND legacy = 0 LIMIT 2')
+      .all(handle) as RunRow[]
+    return rows.length === 1 ? exposeRunTimestamps(rows[0]) : undefined
+  }
+
   getCurrentRunForPane(paneKey: string): RunRow | undefined {
     const run = this.runsBoundToPane(paneKey)[0]
     return run ? exposeRunTimestamps(run) : undefined
@@ -3095,6 +3153,14 @@ export class OrchestrationDb {
   // ── Messages ──
 
   insertMessage(msg: InsertMessageParams): MessageRow {
+    // Why (ORCA-726): once adopted, a legacy row makes every launch replay the adoption, and one
+    // carried by another Run's Delivery broke it; callers must name the Run explicitly.
+    if (!msg.runId && this.getLegacyAdoption()) {
+      throw new OrchestrationError(
+        'run_required',
+        'A message requires a Run once legacy orchestration state was adopted. No effects were applied.'
+      )
+    }
     const runId = msg.runId ?? LEGACY_RUN_ID
     const deliveryContract = msg.deliveryContract ?? 'current_delivery'
     this.requireRun(runId)
@@ -7057,6 +7123,24 @@ export class OrchestrationDb {
       }
     }
     return undefined
+  }
+
+  getLatestDispatchForIdentity(handle: string, paneKey?: string): DispatchContextRow | undefined {
+    const byHandle = this.getLatestDispatchForTerminal(handle)
+    if (byHandle || !paneKey) {
+      return byHandle
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM dispatch_contexts
+         WHERE assignee_pane_key IS NOT NULL
+           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?
+         ORDER BY rowid DESC`
+      )
+      .all(paneKeyMatchSuffix(paneKey)) as DispatchContextRow[]
+    return rows.find(
+      (row) => row.assignee_pane_key && isEquivalentPaneKey(row.assignee_pane_key, paneKey)
+    )
   }
 
   getLatestDispatchForTerminal(handle: string): DispatchContextRow | undefined {

@@ -1,3 +1,4 @@
+import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { MESSAGE_TYPES, type MessagePriority, type MessageType } from './types'
 import type { OrchestrationDb } from './db'
 import { OrchestrationError } from './orchestration-error'
@@ -80,6 +81,8 @@ export function importFederatedControlMessage(
     return { imported: false, type: message.type }
   }
   db.insertMessage({
+    // Why: the worker host has no Run for a remote Dispatch; its mail is read by dispatch handle.
+    runId: ORCHESTRATION_LEGACY_RUN_ID,
     id: params.messageId,
     from: message.from,
     to: recipient,
