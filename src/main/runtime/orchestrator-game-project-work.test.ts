@@ -127,6 +127,20 @@ describe('readGameProjectWork', () => {
     )
   })
 
+  it("opens the project's own PR list when no repo holds my open PRs", async () => {
+    const work = await readGameProjectWork(
+      port({
+        githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
+        githubPullRequests: async () => ({ repos: [], items: [] })
+      }),
+      { todo: 'off', workItem: null }
+    )
+
+    expect(work.reviews?.url).toBe(
+      'https://github.com/ab2webco/orca-oss/pulls?q=is%3Apr%20is%3Aopen%20author%3A%40me'
+    )
+  })
+
   it('keeps the PRs when one PR has no readable checks', async () => {
     const work = await readGameProjectWork(
       port({
@@ -446,6 +460,38 @@ describe('myOpenPullRequestsOf', () => {
     expect(asked).toEqual(['upstream', 'origin'])
     expect(found.repos).toEqual([fork, upstream])
     expect(found.items.map((one) => one.number)).toEqual([471, 90])
+  })
+
+  it('names only the fork when my open PRs all live on it', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream'
+        ? result(upstream, [])
+        : result(fork, [
+            { number: 541, type: 'pr' },
+            { number: 7, type: 'issue' }
+          ])
+    )
+
+    expect(found.repos).toEqual([fork])
+    expect(found.items.map((one) => one.number)).toEqual([541])
+  })
+
+  it('names only the upstream when my open PRs all live there', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream'
+        ? result(upstream, [{ number: 90, type: 'pr' }])
+        : result(fork, [{ number: 7, type: 'issue' }])
+    )
+
+    expect(found.repos).toEqual([upstream])
+  })
+
+  it('names no repo when I have no open PRs, so the link falls back to the project', async () => {
+    const found = await myOpenPullRequestsOf(async (preference) =>
+      preference === 'upstream' ? result(upstream, []) : result(fork, [])
+    )
+
+    expect(found).toEqual({ repos: [], items: [] })
   })
 
   it('searches once when the repo has no upstream', async () => {
