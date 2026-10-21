@@ -118,7 +118,12 @@ describe('readMemoryPressure', () => {
       'kern.memorystatus_vm_pressure_level',
       'vm.swapusage'
     ])
-    expect(reading).toMatchObject({ totalMemory: 16 * GIB, kernelLevel: 'normal', readAt: 1_000 })
+    expect(reading).toMatchObject({
+      totalMemory: 16 * GIB,
+      kernelLevel: 'normal',
+      source: 'sysctl',
+      readAt: 1_000
+    })
   })
 
   it('falls back to free memory with no swap when sysctl fails on macOS', async () => {
@@ -133,8 +138,16 @@ describe('readMemoryPressure', () => {
       swapTotal: null,
       swapUsed: null,
       kernelLevel: null,
+      source: 'fallback',
       readAt: 5
     })
+  })
+
+  it('marks the os.freemem() figure as a fallback when /proc is unreadable on Linux', async () => {
+    readFileMock.mockRejectedValue(new Error('EACCES'))
+    const { readMemoryPressure } = await loadReading()
+
+    expect(await readMemoryPressure('linux', 3)).toMatchObject({ source: 'fallback' })
   })
 
   it('reads /proc/meminfo on Linux without spawning anything', async () => {
@@ -144,7 +157,11 @@ describe('readMemoryPressure', () => {
     const reading = await readMemoryPressure('linux', 7)
 
     expect(execFileMock).not.toHaveBeenCalled()
-    expect(reading).toMatchObject({ availableMemory: 1024000 * 1024, kernelLevel: null })
+    expect(reading).toMatchObject({
+      availableMemory: 1024000 * 1024,
+      kernelLevel: null,
+      source: 'meminfo'
+    })
   })
 
   it('uses the OS free figure on Windows, where swap is not reported', async () => {
@@ -160,6 +177,7 @@ describe('readMemoryPressure', () => {
       swapTotal: null,
       swapUsed: null,
       kernelLevel: null,
+      source: 'freemem',
       readAt: 9
     })
   })
