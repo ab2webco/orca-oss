@@ -150,6 +150,6 @@ export const hdSkyPixel = (frame: HdSky, x: number, y: number): number => {
   if (cloud > 0) {
     color = mix(color, frame.cloud, cloud === 1 ? 0.92 : 0.6)
   }
-  const isStar = isNightOf(frame) && y < frame.ground * 0.55 && hash(x, y) % 41 === 0
+  const isStar = isNightOf(frame) && y < frame.ground * 0.45 && hash(x, y) % 1021 === 0
   return isStar && (hash(x, y) + Math.floor(tick / 6)) % 5 !== 0 ? STAR : color
 }

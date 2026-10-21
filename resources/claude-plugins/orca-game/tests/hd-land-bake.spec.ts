@@ -9,7 +9,7 @@ import { SCENES } from '../hooks/scenes/index'
 
 vi.mock('../hooks/hd-material', async (original) => {
   const real = await original<typeof material>()
-  return { ...real, materialPixel: vi.fn(real.materialPixel) }
+  return { ...real, backdropMaterialPixel: vi.fn(real.backdropMaterialPixel) }
 })
 
 const QUEST = SCENES.quest
@@ -36,11 +36,11 @@ const gridAt = (tick: number, isResting: boolean) =>
     light: NOON
   })
 
-const calls = (): number => vi.mocked(material.materialPixel).mock.calls.length
+const calls = (): number => vi.mocked(material.backdropMaterialPixel).mock.calls.length
 
 describe('baked hd land', () => {
   beforeEach(() => {
-    vi.mocked(material.materialPixel).mockClear()
+    vi.mocked(material.backdropMaterialPixel).mockClear()
   })
 
   it('draws the same far range, hills and lit ground as the per-pixel layers', () => {

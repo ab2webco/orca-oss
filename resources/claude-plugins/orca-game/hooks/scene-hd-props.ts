@@ -69,6 +69,6 @@ export const hdPondPixel = (frame: HdFrame, x: number, y: number): number | unde
     return undefined
   }
   const mirror = hdSkyPixel(frame, x, Math.max(0, frame.ground - 5 - (y - frame.ground + 1) * 3))
-  const ripple = hash(x + Math.floor(frame.tick / 3), y) % 7 === 0 ? -0.2 : 0
+  const ripple = hash(x + Math.floor(frame.tick / 3), y) % 19 === 0 ? -0.2 : 0
   return mix(mirror, WATER, 0.4 + ripple)
 }

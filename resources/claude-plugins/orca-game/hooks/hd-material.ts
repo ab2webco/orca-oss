@@ -49,12 +49,19 @@ const valueNoiseOf = (x: number, y: number, seed: number): number => {
 export const textureOf = (x: number, y: number, seed: number): number =>
   (valueNoiseOf(x, y, seed) * 2 + valueNoiseOf(x * 2.03, y * 2.03, seed + 17)) / 3
 
+const stepOf = (n: number): number =>
+  Math.floor(Math.max(0, Math.min(0.999, 0.5 + (n - 0.5) * 3)) * 4)
+
 /** The ramp tone at a pixel: wide, soft patches across x, finer grain down y. */
-export const materialPixel = (color: number, x: number, y: number, seed: number): number => {
-  const n = textureOf(x * 0.45, y * 0.7, seed)
-  const v = Math.max(0, Math.min(0.999, 0.5 + (n - 0.5) * 3))
-  return toneOf(color, Math.floor(v * 4))
-}
+export const materialPixel = (color: number, x: number, y: number, seed: number): number =>
+  toneOf(color, stepOf(textureOf(x * 0.45, y * 0.7, seed)))
+
+/**
+ * The backdrop's calmer material: patches a few pixels tall and no deepest step, so nothing
+ * behind the figures reads as a speck.
+ */
+export const backdropMaterialPixel = (color: number, x: number, y: number, seed: number): number =>
+  toneOf(color, Math.max(1, stepOf(textureOf(x * 0.3, y * 0.35, seed))))
 
 /**
  * 0 (turned away) to 1 (facing the sun) from the land's height either side of `x`; 0.5 when flat
