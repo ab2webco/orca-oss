@@ -187,7 +187,7 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
+      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',

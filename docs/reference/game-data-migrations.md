@@ -21,6 +21,7 @@ fixture of the previous release's data.
 | `userData/orchestrator-game-members/<hash>.members.json`                          | app           | Versioned (`version`). Unknown keys survive a rewrite. A newer or damaged file is reported and never written; a discard sets only a damaged one aside.                              |
 | `orchestration.db` `worker_dispatches.advisor_report`, `observed_model`           | app           | The SQLite `user_version` ladder. `advisor_report` carries `version: 1`; add optional fields without bumping it (ORCA-657), since older builds drop a report with any other number. |
 | Plugin `$.store` (`xp-ledger`, lead names)                                        | Claude Code   | `<CLAUDE_CONFIG_DIR>/plugins/store/orca-game_inline-<id>.json`. The id does not follow the plugin's content-hashed folder, so an update that replaces the folder keeps the XP.      |
+| Plugin `$.store` `panel-layout`                                                   | Claude Code   | `version: 1`, per repo id. Unknown keys and other projects survive a write. A damaged value draws the default; a newer one is drawn as the default and never written.               |
 
 `<hash>` is `sha256(projectKey)` cut to 32 hex characters, with `projectKey` = `repo:<repoId>`. Two
 projects never share a file, so each one migrates on its own. The userData stores live on the Orca

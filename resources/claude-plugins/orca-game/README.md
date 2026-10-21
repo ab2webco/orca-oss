@@ -16,7 +16,9 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   tile and activity link, then the review and the work item as links. **Open** takes `i` (work
   item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
   tab. `r` refreshes, `p` pets, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
-  that teammate's Orca pane.
+  that teammate's Orca pane. Each section (Team, Review, My PRs, To Do, Actions) collapses from
+  the `▾` before its heading, and `/orca-game:layout` hides, moves or resets them; the layout is
+  kept per project in `$.store`.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
 - **Allies.** Other plugins keep running: their `$.ui.status` lines, and Jev's advisor state when
   Jev is installed, become rows of a strip under the band, and their band elements take the scene
@@ -93,6 +95,7 @@ Typing `/orca-game:` lists every game command. Each is a plugin skill the mod an
 | Command                               | What it does                                                                                                                                                                           |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/orca-game:state`                    | The game state from a fresh `orca game state`: each setting with its layer, this session's mode and render, the lead and its members with their slots, a held STOP, warnings and links |
+| `/orca-game:layout [verb]`            | The Panel's sections with their state; `reset`, `show <section>`, `hide <section>`, `move <section> up\|down`                                                                          |
 | `/orca-game:mode on\|zen\|off`        | The mode for this session; alone, prints the mode and render                                                                                                                           |
 | `/orca-game:render classic\|hd`       | The render for this session; alone, prints the mode and render                                                                                                                         |
 | `/orca-game:demo`                     | A scripted fake party (every phase, action and reaction, one level-up) that runs no command and writes no XP; `/orca-game:mode on` returns to real data                                |
