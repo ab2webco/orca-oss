@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import { GameLeads, type GameLeadSession } from './orchestrator-game-leads'
 import type { GameBoardProject } from './orchestrator-game-board'
 
@@ -25,7 +29,7 @@ describe('GameLeads', () => {
       game.register({ terminalHandle: 'term_a', project: 'cineco', label: 'Ana' })
     ).resolves.toEqual({ registered: true })
 
-    expect(game.list()).toEqual({
+    expect(await game.list()).toEqual({
       leads: [
         { project: 'cineco', label: 'Ana', handle: 'term_a', since: '2026-10-17T10:00:00.000Z' }
       ]
@@ -42,8 +46,8 @@ describe('GameLeads', () => {
     await expect(nobody.register({ project: 'cineco', label: '' })).resolves.toEqual({
       registered: false
     })
-    expect(member.list().leads).toEqual([])
-    expect(nobody.list().leads).toEqual([])
+    expect((await member.list()).leads).toEqual([])
+    expect((await nobody.list()).leads).toEqual([])
   })
 
   it('drops a lead once its terminal is gone', async () => {
@@ -53,7 +57,7 @@ describe('GameLeads', () => {
 
     live.length = 0
 
-    expect(game.list().leads).toEqual([])
+    expect((await game.list()).leads).toEqual([])
   })
 
   it('gives the inbox the labels of the live leads', async () => {
@@ -126,7 +130,7 @@ describe('GameLeads claim', () => {
       live: { handle: 'term_a' }
     })
     expect(focused).toEqual(['term_a'])
-    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_a'])
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_a'])
 
     caller = 'term_a'
     await expect(game.register({ project: 'cineco', label: 'Ana', claim: true })).resolves.toEqual({
@@ -148,7 +152,7 @@ describe('GameLeads claim', () => {
     })
     expect(resumed).toEqual([SESSION])
     expect(focused).toEqual([])
-    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_resumed'])
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_resumed'])
   })
 
   it('starts a new lead and says why when the resume fails', async () => {
@@ -166,7 +170,7 @@ describe('GameLeads claim', () => {
       registered: true,
       resumeError: 'agent_session_legacy_required'
     })
-    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_a'])
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_a'])
     expect(stored.get('repo:a')).toEqual(caller)
   })
 
@@ -223,7 +227,7 @@ describe('GameLeads claim', () => {
       registered: true
     })
     expect(focused).toEqual([])
-    expect(game.list().leads.map((one) => one.handle)).toEqual(['term_b'])
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_b'])
   })
 
   it('resumes once when two panes claim a closed lead at the same time', async () => {
@@ -278,5 +282,145 @@ describe('GameLeads leadElsewhere', () => {
 
     await expect(member.leadElsewhere({})).resolves.toBeNull()
     await expect(unplaced.leadElsewhere({})).resolves.toBeNull()
+  })
+})
+
+describe('GameLeads after a restart', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  const PANE = 'tab-1:leaf-1'
+  const AT = '2026-10-17T10:00:00.000Z'
+
+  function rosterDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-game-leads-'))
+    dirs.push(dir)
+    return dir
+  }
+
+  // The first launch: `term_a` in pane PANE runs `game lead` with conversation sess-1.
+  async function registeredBefore(dir: string, project: GameBoardProject = LEAD): Promise<void> {
+    const before = new GameLeads({
+      projectOf: async () => project,
+      isLive: () => true,
+      now: () => new Date(AT),
+      roster: new GameLeadRoster(() => dir),
+      sessionOf: async () => ({ sessionId: 'sess-1', agentArgs: null, worktreeId: 'wt1' })
+    })
+    await before.register({ project: 'cineco', label: 'Ana', claim: true })
+  }
+
+  // The relaunch: handles are minted anew, so the surviving pane answers to `term_new`.
+  function relaunched(
+    dir: string,
+    pane: {
+      handle?: () => string | null
+      state?: () => 'running' | 'shell' | 'starting'
+      sessionId?: string | null
+      caller?: string
+    } = {}
+  ) {
+    const caller = pane.caller ?? 'term_new'
+    return new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: (handle) => ['term_new', 'term_other'].includes(handle),
+      roster: new GameLeadRoster(() => dir),
+      handleOfPane: (paneKey) => (paneKey === PANE ? (pane.handle?.() ?? 'term_new') : null),
+      paneState: async () => pane.state?.() ?? 'running',
+      sessionOf: async () =>
+        pane.sessionId === null
+          ? null
+          : { sessionId: pane.sessionId ?? 'sess-1', agentArgs: null, worktreeId: 'wt1' },
+      focus: async () => undefined
+    })
+  }
+
+  const WITH_PANE: GameBoardProject = { ...LEAD, lead: { handle: 'term_a', paneKey: PANE } }
+
+  it('lists a lead whose pane survived the restart, under the handle the pane has now', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    await expect(relaunched(dir).list()).resolves.toEqual({
+      leads: [{ project: 'cineco', label: 'Ana', handle: 'term_new', since: AT }]
+    })
+  })
+
+  it('lists it when the conversation is not reported yet but Claude runs in the pane', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    const leads = (await relaunched(dir, { sessionId: null }).list()).leads
+    expect(leads.map((one) => one.handle)).toEqual(['term_new'])
+  })
+
+  it('forgets a lead whose pane is back at its shell', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    await expect(relaunched(dir, { state: () => 'shell' }).list()).resolves.toEqual({ leads: [] })
+    await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
+  })
+
+  it('forgets a lead whose pane now holds another conversation', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    await expect(relaunched(dir, { sessionId: 'sess-2' }).list()).resolves.toEqual({ leads: [] })
+    await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
+  })
+
+  it('waits for a pane that is not back yet, or not yet running Claude, and lists it once it is', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+    let handle: string | null = null
+    let state: 'running' | 'starting' = 'starting'
+    const game = relaunched(dir, { handle: () => handle, state: () => state })
+
+    await expect(game.list()).resolves.toEqual({ leads: [] })
+    handle = 'term_new'
+    await expect(game.list()).resolves.toEqual({ leads: [] })
+    state = 'running'
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_new'])
+  })
+
+  it('lists no pane that never ran game lead', async () => {
+    const dir = rosterDir()
+
+    await expect(relaunched(dir).list()).resolves.toEqual({ leads: [] })
+  })
+
+  it('keeps the surviving lead when another pane claims the project before anyone lists', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    await expect(
+      relaunched(dir, { caller: 'term_other' }).register({
+        project: 'cineco',
+        label: 'Bo',
+        claim: true
+      })
+    ).resolves.toEqual({ registered: false, live: { handle: 'term_new' } })
+  })
+
+  it('names the surviving lead to another pane', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+
+    await expect(relaunched(dir, { caller: 'term_other' }).leadElsewhere({})).resolves.toBe(
+      'term_new'
+    )
+  })
+
+  it('keeps nothing for a caller without a pane or one Orca cannot place', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, LEAD)
+    await registeredBefore(dir, { ...WITH_PANE, key: 'no-project' })
+
+    await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
   })
 })

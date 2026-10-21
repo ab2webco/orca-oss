@@ -1,5 +1,6 @@
 import type { GameBoardCaller, GameBoardProject } from './orchestrator-game-board'
 import { GameLeadDirectory } from './orchestrator-game-lead-directory'
+import type { GameLeadRecord } from './orchestrator-game-lead-roster'
 
 export type GameLeadListing = { project: string; label: string; handle: string; since: string }
 
@@ -22,6 +23,10 @@ const UNPLACED_PROJECT = 'no-project'
 export class GameLeads {
   private readonly directory = new GameLeadDirectory()
   private readonly queues = new Map<string, Promise<unknown>>()
+  /** What the roster keeps, by project; `pending` are the ones a restart has not matched to a pane yet. */
+  private readonly records = new Map<string, GameLeadRecord>()
+  private readonly pending = new Map<string, GameLeadRecord>()
+  private loaded: Promise<void> | null = null
 
   constructor(
     private readonly deps: {
@@ -38,6 +43,15 @@ export class GameLeads {
       /** Reopens the conversation in a new pane and returns that pane's handle. */
       resume?: (session: GameLeadSession) => Promise<string>
       focus?: (handle: string) => Promise<void>
+      roster?: {
+        read: () => Promise<GameLeadRecord[]>
+        write: (records: GameLeadRecord[]) => Promise<void>
+      }
+      paneOf?: (handle: string) => string | null
+      /** The handle of a pane whose terminal is connected now; null until the pane is back. */
+      handleOfPane?: (paneKey: string) => string | null
+      /** `starting` is anything that is neither Claude nor a shell, and an unreadable pane. */
+      paneState?: (handle: string) => Promise<'running' | 'shell' | 'starting'>
     }
   ) {}
 
@@ -53,6 +67,7 @@ export class GameLeads {
       return { registered: false }
     }
     const caller = project.lead.handle
+    const callerPane = project.lead.paneKey
     const entryOf = (handle: string) => ({
       projectKey: project.key,
       project: args.project,
@@ -61,10 +76,16 @@ export class GameLeads {
       at: (this.deps.now?.() ?? new Date()).toISOString()
     })
     if (!args.claim || project.key === UNPLACED_PROJECT) {
-      this.directory.register(entryOf(caller))
+      const entry = entryOf(caller)
+      this.directory.register(entry)
+      if (project.key !== UNPLACED_PROJECT) {
+        const mine = (await this.deps.sessionOf?.(caller).catch(() => null)) ?? null
+        await this.remember(entry, callerPane, mine)
+      }
       return { registered: true }
     }
     return this.queued(project.key, async () => {
+      await this.settle(project.key)
       const live = await this.leadOf(project.key)
       if (live && live.handle !== caller) {
         await this.deps.focus?.(live.handle).catch(() => undefined)
@@ -76,13 +97,17 @@ export class GameLeads {
       if (stored && stored.sessionId !== mine?.sessionId && this.deps.resume) {
         try {
           const handle = await this.deps.resume(stored)
-          this.directory.register(entryOf(handle))
+          const entry = entryOf(handle)
+          this.directory.register(entry)
+          await this.remember(entry, this.deps.paneOf?.(handle) ?? null, stored)
           return { registered: false, resumed: { handle } }
         } catch (error) {
           resumeError = error instanceof Error ? error.message : String(error)
         }
       }
-      this.directory.register(entryOf(caller))
+      const entry = entryOf(caller)
+      this.directory.register(entry)
+      await this.remember(entry, callerPane, mine)
       if (mine) {
         await this.deps.sessions?.write(project.key, mine).catch(() => undefined)
       }
@@ -104,11 +129,13 @@ export class GameLeads {
     if (project.isMember || !project.lead || project.key === UNPLACED_PROJECT) {
       return null
     }
+    await this.settle(project.key)
     const live = await this.leadOf(project.key)
     return live && live.handle !== project.lead.handle ? live.handle : null
   }
 
-  list(): { leads: GameLeadListing[] } {
+  async list(): Promise<{ leads: GameLeadListing[] }> {
+    await this.settle()
     return {
       leads: this.directory.live(this.deps.isLive).map((one) => ({
         project: one.project,
@@ -122,6 +149,97 @@ export class GameLeads {
   /** Lead handle to label, for naming a peer lead in an inbox. */
   labels(): Record<string, string> {
     return this.directory.labelsOf(this.deps.isLive)
+  }
+
+  private async remember(
+    entry: { projectKey: string; project: string; label: string; at: string },
+    paneKey: string | null,
+    session: GameLeadSession | null
+  ): Promise<void> {
+    await this.load()
+    this.pending.delete(entry.projectKey)
+    this.records.delete(entry.projectKey)
+    // Why: one project per pane, as the directory keeps one per terminal.
+    for (const [key, one] of this.records) {
+      if (one.paneKey === paneKey) {
+        this.records.delete(key)
+        this.pending.delete(key)
+      }
+    }
+    if (paneKey) {
+      const { projectKey, project, label, at } = entry
+      const sessionId = session?.sessionId ?? null
+      this.records.set(projectKey, { projectKey, project, paneKey, label, at, sessionId })
+    }
+    await this.persist()
+  }
+
+  private load(): Promise<void> {
+    this.loaded ??= (async () => {
+      const kept = (await this.deps.roster?.read().catch(() => [])) ?? []
+      for (const one of kept) {
+        if (one.projectKey !== UNPLACED_PROJECT) {
+          this.records.set(one.projectKey, one)
+          this.pending.set(one.projectKey, one)
+        }
+      }
+    })()
+    return this.loaded
+  }
+
+  /**
+   * Matches leads kept from before a restart to the pane each now answers to. Why on every read: panes
+   * come back only after the renderer and the daemon reattach, and an SSH pane later still.
+   */
+  private async settle(projectKey?: string): Promise<void> {
+    await this.load()
+    let forgot = false
+    for (const one of this.pending.values()) {
+      if (projectKey !== undefined && one.projectKey !== projectKey) {
+        continue
+      }
+      const verdict = await this.restore(one)
+      if (verdict === 'wait' || this.pending.get(one.projectKey) !== one) {
+        continue
+      }
+      this.pending.delete(one.projectKey)
+      if (verdict === 'forget') {
+        this.records.delete(one.projectKey)
+        forgot = true
+      }
+    }
+    if (forgot) {
+      await this.persist()
+    }
+  }
+
+  // Why proof and not liveness: a restored lead must be the conversation that ran `game lead` (ORCA-613).
+  private async restore(one: GameLeadRecord): Promise<'restored' | 'forget' | 'wait'> {
+    const handle = this.deps.handleOfPane?.(one.paneKey) ?? null
+    if (!handle || !this.deps.isLive(handle) || !this.deps.paneState) {
+      return 'wait'
+    }
+    const state = await this.deps.paneState(handle).catch(() => 'starting' as const)
+    if (state === 'shell') {
+      return 'forget'
+    }
+    if (state !== 'running') {
+      return 'wait'
+    }
+    const session = (await this.deps.sessionOf?.(handle).catch(() => null)) ?? null
+    if (one.sessionId !== null && session !== null && session.sessionId !== one.sessionId) {
+      return 'forget'
+    }
+    if (this.pending.get(one.projectKey) !== one) {
+      return 'wait'
+    }
+    const { projectKey, project, label, at } = one
+    this.directory.register({ projectKey, project, handle, label, at })
+    return 'restored'
+  }
+
+  private async persist(): Promise<void> {
+    await this.deps.roster?.write([...this.records.values()]).catch(() => undefined)
   }
 
   // Why per project: two panes claiming at once would otherwise both resume the closed lead.
