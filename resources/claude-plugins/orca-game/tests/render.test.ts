@@ -241,13 +241,14 @@ describe('the /orca-game: commands', () => {
 })
 
 describe('the hd scene above the spinner', () => {
-  test('draws 9 rows, 10 on a tall terminal, and back to 5 in classic', async ($, on) => {
+  test('draws 9 rows, a quarter of a tall terminal up to 14, and back to 5 in classic', async ($, on) => {
     const clock = mock.clock(on)
     engine(on, { ORCA_GAME_RENDER: 'hd' })
     await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
     await clock.settle()
-    expect((await rasterOf($, 40))?.rows).toBe(9)
-    expect((await rasterOf($, 60))?.rows).toBe(10)
+    expect((await rasterOf($, 30))?.rows).toBe(9)
+    expect((await rasterOf($, 40))?.rows).toBe(10)
+    expect((await rasterOf($, 60))?.rows).toBe(14)
     await quest($, 'render classic')
     expect((await rasterOf($, 60))?.rows).toBe(5)
   })
