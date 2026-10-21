@@ -171,7 +171,7 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         { ...response, result: { error: state.pausedMembersError } },
         json,
         (result) =>
-          `Could not resume members: ${result.error}. \`orca game resume-members --discard\` sets the file aside, kept, and starts a new record.`
+          `Could not resume members: ${result.error}. If a newer Orca wrote it, update Orca; this one leaves it as it is. If it is damaged, \`orca game resume-members --discard\` sets it aside, kept, and starts a new record.`
       )
       return
     }

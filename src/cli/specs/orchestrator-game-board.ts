@@ -55,7 +55,7 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
       'Each is resumed in turn, never past the cap: a Claude member reopens its own conversation in its worktree on its account; any other member, or one whose conversation cannot reopen, starts a new agent in its worktree. Either way a fresh dispatch on its own task reports to this lead.',
       'A member whose task finished (worker_done succeeded) or whose worktree is gone is reported and not started.',
       "The lead binds the run that owns the members' tasks first; it never takes over that run while it leads live members in another.",
-      '--discard frees the named members, or all of them; on a saved file this Orca cannot read, it sets the file aside, bytes kept, and starts a new record. Worktrees are never touched.'
+      '--discard frees the named members, or all of them; on a damaged saved file, it sets the file aside, bytes kept, and starts a new record. A file from a newer Orca is left as it is. Worktrees are never touched.'
     ],
     examples: [
       'orca game resume-members --dry-run',

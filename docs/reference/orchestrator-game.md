@@ -528,8 +528,10 @@ are saved while they run, so the team picks up where it was:
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **A file this Orca cannot read** (damaged, or from a newer Orca) is never read as empty nor
   written over: Orca starts normally, `game fleet` says `Could not resume members: <reason>`, and
-  nothing is saved until `game resume-members --discard` sets the file aside, bytes kept, under a
-  `.unreadable-<time>.json` name.
+  nothing is saved until `game resume-members --discard` sets a damaged file aside, bytes kept,
+  under a `.unreadable-<time>.json` name. A file from a newer Orca is left where it is, so going
+  back to that Orca still finds it; updating Orca is the way to resume those members. Unknown keys
+  survive a rewrite (see [`game-data-migrations.md`](./game-data-migrations.md)).
 - **Mixed versions.** `game.memberRecord`, `game.memberResume` and `game.memberDiscard` are new RPC
   methods, and `pausedMembers`/`pausedMembersError` new optional fields of `game.state`. A newer
   CLI's launch against an older host saves nothing and launches anyway; `game resume-members` there

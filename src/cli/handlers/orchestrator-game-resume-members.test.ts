@@ -339,7 +339,7 @@ describe('orca game resume-members', () => {
     await run(client, [], false)
 
     expect(output.join('\n')).toContain(
-      'Could not resume members: the saved members file is damaged. `orca game resume-members --discard` sets the file aside, kept, and starts a new record.'
+      'Could not resume members: the saved members file is damaged. If a newer Orca wrote it, update Orca; this one leaves it as it is. If it is damaged, `orca game resume-members --discard` sets it aside, kept, and starts a new record.'
     )
     expect(process.exitCode).toBe(1)
     expect(calls.map(([m]) => m)).toEqual(['game.state'])
