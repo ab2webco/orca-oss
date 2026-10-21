@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ADVISOR_PROP_WIDTH } from '../hooks/advisor-art'
 import { hdBandRoomOf, hdHeroRoomOf, hdRestColumnOf } from '../hooks/hd-band-room'
+import { hdTrailOf } from '../hooks/hd-party'
 
 const HERO = 12
 const PET = 11
@@ -55,6 +56,22 @@ describe('what the hd band keeps as the pane narrows', () => {
         hdHeroRoomOf(HERO) + (room.isPetShown ? PET + 1 : 0)
       )
     }
+  })
+
+  it('drops a teammate rather than stand one over another', () => {
+    for (let stage = 20; stage <= 200; stage += 1) {
+      for (let count = 1; count <= 4; count += 1) {
+        for (const petWidth of [0, PET]) {
+          const trail = hdTrailOf({ stage, count, petWidth, spriteWidth: HERO, slack: 8 })
+          if (trail.shown > 0) {
+            expect(trail.pitch, `${stage} ${count} ${petWidth}`).toBe(HERO - 1)
+          }
+        }
+      }
+    }
+    expect(
+      hdTrailOf({ stage: 200, count: 4, petWidth: PET, spriteWidth: HERO, slack: 8 }).shown
+    ).toBe(4)
   })
 
   it('without an advisor or a pet, gives the hero every column', () => {
