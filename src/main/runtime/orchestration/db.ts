@@ -1246,6 +1246,8 @@ export class OrchestrationDb {
          WHERE run_id = ? AND capability_hash IS NULL`
       )
       .run(LEGACY_CONTRACT_VERSION, LEGACY_RUN_ID)
+    // Why: before classification, so healed mail keeps the contract it was sent with.
+    this.healLegacyMessagesCarriedByOneRun()
     this.classifyLegacyMessageContracts(LEGACY_RUN_ID, false)
     this.ensureLegacySchedulerLossColumn()
     this.adoptLegacyRunIfNeeded()
@@ -1406,7 +1408,35 @@ export class OrchestrationDb {
     }
   }
 
+  // Why (ORCA-726): mail filed under the legacy Run after an adoption but carried by another Run's
+  // Delivery belongs to that Run; adopting it elsewhere broke the ownership check on every launch.
+  private healLegacyMessagesCarriedByOneRun(): void {
+    this.db
+      .prepare(
+        `WITH carriers(message_id, run_id) AS (
+           SELECT ids.value, d.run_id
+           FROM deliveries d
+           INNER JOIN json_each(d.message_ids) ids
+           INNER JOIN messages m ON m.id = ids.value AND m.run_id = ?
+         ),
+         owners(message_id, run_id) AS (
+           SELECT message_id, MIN(run_id) FROM carriers
+           GROUP BY message_id
+           HAVING COUNT(DISTINCT run_id) = 1
+         )
+         UPDATE messages
+         SET run_id = (SELECT o.run_id FROM owners o WHERE o.message_id = messages.id)
+         WHERE run_id = ?
+           AND id IN (
+             SELECT o.message_id FROM owners o
+             INNER JOIN runs r ON r.id = o.run_id AND r.legacy = 0
+           )`
+      )
+      .run(LEGACY_RUN_ID, LEGACY_RUN_ID)
+  }
+
   private adoptLegacyRunIfNeeded(): void {
+    this.healLegacyMessagesCarriedByOneRun()
     const existing = this.db
       .prepare('SELECT * FROM legacy_adoptions WHERE source_run_id = ?')
       .get(LEGACY_RUN_ID) as LegacyAdoptionRow | undefined
