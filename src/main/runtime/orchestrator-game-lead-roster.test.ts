@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -50,6 +50,19 @@ describe('GameLeadRoster', () => {
 
     writeFileSync(file, JSON.stringify({ version: 2, leads: [RECORD] }))
     expect(await store.read()).toEqual([])
+  })
+
+  it("never overwrites a newer build's file, so going back a release keeps its leads", async () => {
+    const { store, dir } = roster()
+    mkdirSync(join(dir, 'leads'), { recursive: true })
+    const file = join(dir, 'leads', 'live-leads.json')
+    const newer = JSON.stringify({ version: 2, leads: [{ ...RECORD, extra: true }] })
+    writeFileSync(file, newer)
+
+    expect(await store.read()).toEqual([])
+    await store.write([{ ...RECORD, projectKey: 'repo:b' }])
+
+    expect(readFileSync(file, 'utf8')).toBe(newer)
   })
 
   it('skips a malformed record and keeps the others', async () => {

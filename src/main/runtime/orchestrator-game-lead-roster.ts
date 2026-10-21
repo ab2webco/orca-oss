@@ -37,7 +37,7 @@ export class GameLeadRoster {
 
   constructor(private readonly dirOf: () => string) {}
 
-  /** Empty for a missing, damaged or other-version file: the leads then register again by hand. */
+  /** Empty for a missing, damaged or other-version file; another version's file is also never written. */
   async read(): Promise<GameLeadRecord[]> {
     try {
       const parsed: unknown = JSON.parse(await readFile(this.file(), 'utf8'))
@@ -62,11 +62,28 @@ export class GameLeadRoster {
   }
 
   private async replace(records: GameLeadRecord[]): Promise<void> {
+    // Why: going back a release must keep what the newer build stored (docs/reference/game-data-migrations.md).
+    if (await this.writtenByAnotherVersion()) {
+      return
+    }
     await mkdir(this.dirOf(), { recursive: true })
     const file = this.file()
     const temp = `${file}.${randomUUID()}.tmp`
     await writeFile(temp, JSON.stringify({ version: VERSION, leads: records }), 'utf8')
     await rename(temp, file)
+  }
+
+  private async writtenByAnotherVersion(): Promise<boolean> {
+    try {
+      const parsed: unknown = JSON.parse(await readFile(this.file(), 'utf8'))
+      const version =
+        typeof parsed === 'object' && parsed !== null
+          ? (parsed as Record<string, unknown>).version
+          : undefined
+      return typeof version === 'number' && version !== VERSION
+    } catch {
+      return false
+    }
   }
 
   private file(): string {
