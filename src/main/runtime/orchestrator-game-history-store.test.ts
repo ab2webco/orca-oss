@@ -1,10 +1,11 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import type { GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import type { GameEvent } from '../../shared/orchestrator-game-events'
+import type { GameStoreMigration } from '../../shared/orchestrator-game-store-migration'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -54,15 +55,149 @@ describe('GameHistoryStore', () => {
     expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1', 'CIN-2'])
   })
 
-  it('reads a damaged file as empty and starts it over', async () => {
+  it('reads a damaged file as empty, sets it aside, and starts it over', async () => {
     const { store: history, dir } = store()
     await history.append('repo-a', record('CIN-1'))
-    const [file] = readdirSync(dir)
-    writeFileSync(join(dir, file as string), '{not json')
+    const [file] = readdirSync(dir) as [string]
+    writeFileSync(join(dir, file), '{not json')
 
     expect(await history.list('repo-a')).toEqual([])
     await history.append('repo-a', record('CIN-2'))
     expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-2'])
+    const aside = readdirSync(dir).filter((name) => name !== file)
+    expect(aside).toHaveLength(1)
+    expect(aside[0]).toMatch(new RegExp(`^${file.replace('.json', '')}\\.damaged-.+\\.json$`))
+    expect(readFileSync(join(dir, aside[0] as string), 'utf8')).toBe('{not json')
+  })
+})
+
+describe('GameHistoryStore across releases', () => {
+  const fixture = readFileSync(
+    join(__dirname, '__fixtures__', 'orchestrator-game-history-lab-104.json'),
+    'utf8'
+  )
+
+  function seeded(migrations?: GameStoreMigration[]) {
+    const { dir } = store()
+    return { history: new GameHistoryStore(() => dir, migrations), dir }
+  }
+  const isMain = (name: string): boolean => /^[0-9a-f]+\.json$/.test(name)
+  async function seed(dir: string, projectKey: string, text: string): Promise<string> {
+    // Why through the store: the file name is the store's own hash of the project key.
+    await new GameHistoryStore(() => dir).markInboxRead(projectKey, 'seed', 1)
+    const name = readdirSync(dir).find(isMain) as string
+    writeFileSync(join(dir, name), text)
+    return join(dir, name)
+  }
+
+  it('reads lab.104 data as it was and keeps all of it on the first write', async () => {
+    const { history, dir } = seeded()
+    const file = await seed(dir, 'repo:cineco', fixture)
+
+    expect((await history.list('repo:cineco')).map((one) => one.ticket)).toEqual([
+      'CIN-12',
+      'CIN-13'
+    ])
+    expect((await history.events('repo:cineco')).map((one) => one.kind)).toEqual([
+      'claimed',
+      'merged'
+    ])
+    expect(await history.cursors('repo:cineco')).toEqual({ lead: 42, 'CIN-12': 7 })
+    expect(readFileSync(file, 'utf8')).toBe(fixture)
+
+    await history.append('repo:cineco', record('CIN-14'))
+    const written = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    const before = JSON.parse(fixture) as Record<string, unknown[]>
+    expect(written).toEqual({
+      ...before,
+      records: [...(before.records as unknown[]), record('CIN-14')],
+      schemaVersion: 1
+    })
+    expect(readdirSync(dir).filter((name) => !isMain(name))).toEqual([])
+  })
+
+  it('keeps what a newer build added when this build rewrites the file', async () => {
+    const { history, dir } = seeded()
+    const newer = {
+      schemaVersion: 1,
+      streaks: { 'CIN-12': 3 },
+      records: [
+        { ...record('CIN-20'), score: 9 },
+        { ...record('CIN-21'), outcome: 'abandoned' }
+      ],
+      events: [{ at: '2026-10-20T10:00:00.000Z', kind: 'leveled_up', ticket: null, by: 'orca' }],
+      cursors: { lead: 3, 'CIN-21': 'opaque' }
+    }
+    const file = await seed(dir, 'repo-a', JSON.stringify(newer))
+
+    expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-20'])
+    expect(await history.events('repo-a')).toEqual([])
+    await history.markInboxRead('repo-a', 'lead', 9)
+
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      ...newer,
+      cursors: { 'CIN-21': 'opaque', lead: 9 }
+    })
+  })
+
+  it('never reshapes a store a newer build wrote, and still records into it', async () => {
+    const { history, dir } = seeded([(data) => ({ ...data, reshaped: true })])
+    const newer = { schemaVersion: 7, records: [], events: [], cursors: {}, ledger: [1, 2] }
+    const file = await seed(dir, 'repo-a', JSON.stringify(newer))
+
+    await history.append('repo-a', record('CIN-1'))
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ ...newer, records: [record('CIN-1')] })
+    expect(readdirSync(dir).filter((name) => !isMain(name))).toEqual([])
+  })
+
+  it('never writes over a newer build whose lists are no longer lists', async () => {
+    const { history, dir } = seeded()
+    const newer = { schemaVersion: 2, records: { 'CIN-1': record('CIN-1') }, events: [] }
+    const file = await seed(dir, 'repo-a', JSON.stringify(newer))
+
+    expect(await history.list('repo-a')).toEqual([])
+    await history.append('repo-a', record('CIN-2'))
+    await history.markInboxRead('repo-a', 'lead', 4)
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(newer)
+  })
+
+  it('backs the file up before it persists a migrated shape, and migrates once', async () => {
+    const step: GameStoreMigration = (data) => ({ ...data, migratedFrom104: true })
+    const { history, dir } = seeded([step])
+    const file = await seed(dir, 'repo:cineco', fixture)
+
+    expect((await history.list('repo:cineco')).map((one) => one.ticket)).toHaveLength(2)
+    expect(readFileSync(file, 'utf8')).toBe(fixture)
+
+    await history.append('repo:cineco', record('CIN-14'))
+    const backups = readdirSync(dir).filter((name) => !isMain(name))
+    expect(backups).toHaveLength(1)
+    expect(backups[0]).toMatch(/^[0-9a-f]+\.v1-.+\.backup\.json$/)
+    expect(readFileSync(join(dir, backups[0] as string), 'utf8')).toBe(fixture)
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+      schemaVersion: 2,
+      migratedFrom104: true
+    })
+
+    await new GameHistoryStore(() => dir, [step]).append('repo:cineco', record('CIN-15'))
+    expect(readdirSync(dir).filter((name) => !isMain(name))).toHaveLength(1)
+  })
+
+  it('keeps the old data usable when a migration step throws', async () => {
+    const broken: GameStoreMigration = () => {
+      throw new Error('bad step')
+    }
+    const { history, dir } = seeded([broken])
+    const file = await seed(dir, 'repo:cineco', fixture)
+
+    expect((await history.list('repo:cineco')).map((one) => one.ticket)).toEqual([
+      'CIN-12',
+      'CIN-13'
+    ])
+    await history.append('repo:cineco', record('CIN-14'))
+    const written = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    expect(written.schemaVersion).toBeUndefined()
+    expect((written.records as unknown[]).length).toBe(3)
   })
 })
 

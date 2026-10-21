@@ -558,7 +558,9 @@ What one member did or asked outlives its tab and its account, so the lead can a
 after a restart. Everything here lives on the Orca host that runs the lead, per project (the lead
 worktree's repo, so SSH and folder projects too); a member's calls land on its lead's project even
 when it works in another repo (`--repo`), since the host resolves it through the member's dispatch
-([`orchestrator-game-board.ts`](../../src/main/runtime/orchestrator-game-board.ts)).
+([`orchestrator-game-board.ts`](../../src/main/runtime/orchestrator-game-board.ts)). How these
+files survive an update or a downgrade, and what a change to them must ship with, is in
+[`game-data-migrations.md`](./game-data-migrations.md).
 
 **Events** — an append-only record, kept in the same per-project file as `game history`
 (`orchestrator-game-history/`), the last 500

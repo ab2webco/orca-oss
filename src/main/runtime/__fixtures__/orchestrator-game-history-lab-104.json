@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "ticket": "CIN-12",
+      "repo": "cineco",
+      "branch": "fabolivark/cin-12",
+      "agent": "claude",
+      "account": "member@example.com",
+      "launchedAt": "2026-10-18T14:02:11.000Z",
+      "endedAt": "2026-10-18T15:40:03.000Z",
+      "outcome": "merged",
+      "pr": "#41 merged",
+      "lastReport": "Opened #41 with the seat map fix; tests and E2E green."
+    },
+    {
+      "ticket": "CIN-13",
+      "repo": "cineco",
+      "branch": null,
+      "agent": "codex",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T09:12:45.000Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-10-18T14:02:11.000Z",
+      "kind": "claimed",
+      "ticket": "CIN-12",
+      "text": "Took CIN-12",
+      "by": "lead"
+    },
+    {
+      "at": "2026-10-18T15:40:03.000Z",
+      "kind": "merged",
+      "ticket": "CIN-12",
+      "text": "#41 merged",
+      "by": "orca",
+      "key": "merged CIN-12"
+    }
+  ],
+  "cursors": {
+    "lead": 42,
+    "CIN-12": 7
+  }
+}
