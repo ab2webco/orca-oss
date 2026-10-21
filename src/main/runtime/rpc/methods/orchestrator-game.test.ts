@@ -216,3 +216,31 @@ describe('game.memberResume and game.memberDiscard RPCs', () => {
     ])
   })
 })
+
+describe('game.memberNameReserve RPC', () => {
+  it('hands the roster and the taken names to the runtime, and refuses a bad ticket', async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      reserveGameMemberName: async (args: unknown) => {
+        asked.push(args)
+        return { name: 'Merlin' }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'r', authToken: 'test', method: 'game.memberNameReserve', params })
+    const params = {
+      worktreeId: 'wt1',
+      terminalHandle: 'h1',
+      ticket: 'CIN-12',
+      roster: [{ en: 'Arthur', es: 'Arturo' }, 'Merlin'],
+      locale: 'es',
+      taken: ['Arthur']
+    }
+
+    await expect(send(params)).resolves.toMatchObject({ ok: true, result: { name: 'Merlin' } })
+    await expect(send({ ...params, ticket: '../x' })).resolves.toMatchObject({ ok: false })
+    expect(asked).toEqual([params])
+  })
+})

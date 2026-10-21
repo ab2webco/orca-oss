@@ -11,7 +11,7 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
-import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
@@ -121,6 +121,33 @@ export const readCallerGameState = (client: Client) =>
     paneKey: process.env.ORCA_PANE_KEY
   })
 
+// Why the host picks: it sees every lead's members and holds the pick against a concurrent launch.
+async function memberNameFor(
+  client: Client,
+  state: OrchestratorGameState,
+  ticket: string,
+  taken: readonly string[]
+): Promise<string | null> {
+  const roster = memberRosterOf(state)
+  const locale = process.env.ORCA_GAME_LOCALE ?? 'en'
+  const reserved = await client
+    .call<{ name?: unknown }>('game.memberNameReserve', {
+      ...gameBoardCaller(),
+      ticket,
+      roster,
+      locale,
+      taken
+    })
+    .then(
+      (response) => response.result,
+      () => undefined
+    )
+  // Why a local pick on any failure: an older Orca cannot reserve, and a name never blocks a launch.
+  return reserved?.name === null || typeof reserved?.name === 'string'
+    ? reserved.name
+    : nextMemberName(roster, taken, locale)
+}
+
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: {
   client: Client
@@ -143,11 +170,7 @@ export async function launchGameMember(args: {
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
-  const name = nextMemberName(
-    memberRosterOf(state),
-    [...inUse, ...(args.namesTaken ?? [])],
-    process.env.ORCA_GAME_LOCALE ?? 'en'
-  )
+  const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
   const title = memberDisplayNameOf(
     name,
     item ? `${item.id} ${item.title}` : ticket,
