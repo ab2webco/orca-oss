@@ -375,8 +375,14 @@ export class OrchestrationDb {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
     this.db.pragma('busy_timeout = 5000')
-    this.createTables()
-    this.migrate()
+    try {
+      this.createTables()
+      this.migrate()
+    } catch (error) {
+      // Why: the runtime retries a failed open on every call; each retry would otherwise leak a handle.
+      this.db.close()
+      throw error
+    }
     hardenOrchestrationDatabaseFiles(dbPath)
   }
 

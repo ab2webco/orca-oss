@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from '../../sqlite/sync-database'
 import { LEGACY_RUN_ID, OrchestrationDb } from './db'
 
@@ -114,8 +114,13 @@ describe('OrchestrationDb stray legacy mail (ORCA-726)', () => {
     insert.run('delivery_b', other.id, other.consumer_generation, JSON.stringify([stray]))
     raw.close()
 
+    const close = vi.spyOn(Database.prototype, 'close')
+
     expect(() => new OrchestrationDb(dbPath)).toThrow(
       'Legacy orchestration adoption produced inconsistent Run ownership.'
     )
+    // Why: getOrchestrationDb retries the open on every call, so a failed open must not leak its handle.
+    expect(close).toHaveBeenCalledTimes(1)
+    close.mockRestore()
   })
 })
