@@ -9,19 +9,6 @@ import { GROUND } from './scenery'
 
 export type PlacedCast = { sprite: HdSprite; left: number; top: number }
 
-/** The columns the hero walks: all of them, or up to the outlined advisor and its prop. */
-export const hdStageOf = (
-  columns: number,
-  pose: AdvisorPose | undefined,
-  heroWidth: number
-): number =>
-  pose === undefined
-    ? columns
-    : Math.max(
-        heroWidth + 1,
-        columns - ((pose.sprite.frames[0]?.[0]?.length ?? 0) + 2) - ADVISOR_PROP_WIDTH - 1
-      )
-
 /** The pet right behind the walking hero, ahead of the party, or sitting just left of the resting hero. */
 export const hdPetOf = (args: {
   pet: ScenePet

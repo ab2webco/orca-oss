@@ -1,5 +1,6 @@
 import { actionPixel, PROP_WIDTH } from './action-props'
-import { hdAdvisorOf, hdAdvisorPropPixel, hdPetOf, hdStageOf } from './hd-cast'
+import { hdBandRoomOf, hdRestColumnOf } from './hd-band-room'
+import { hdAdvisorOf, hdAdvisorPropPixel, hdPetOf } from './hd-cast'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import { FLASH_COLOR, flashInto, flashOf, particleKindOf, particlesInto } from './hd-fx'
 import { isTeamEventShown, quakeOf, shakeGrid, type TeamEvent } from './hd-overlay'
@@ -79,9 +80,6 @@ export const hdWalkColumn = (width: number, tick: number): number => {
   return step < span ? step : span * 2 - step
 }
 
-export const hdRestColumnOf = (width: number): number =>
-  Math.max(0, Math.floor((width - HD_SPRITE_WIDTH) / 3))
-
 /** A four-frame walk: two leg poses, each with the body up and down; breathing at rest. */
 export const hdHeroPoseOf = (tick: number, isResting: boolean): { frame: number; bob: number } => ({
   frame: Math.floor(tick / 4) % 2,
@@ -108,9 +106,22 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const land = hdLandBakeOf(frame)
   const pose = hdHeroPoseOf(tick, resting)
   const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
-  // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
-  const stage = hdStageOf(columns, input.advisor, HD_SPRITE_WIDTH)
   const petDef = scene.cast?.pet
+  const petWidth =
+    petDef?.frames[0] === undefined ? 0 : frameSpriteOf(petDef.frames[0], petDef.colors).width
+  const standing =
+    input.advisor === undefined ? undefined : hdAdvisorOf(input.advisor, columns, ground, tick)
+  // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
+  const room = hdBandRoomOf({
+    columns,
+    heroWidth: HD_SPRITE_WIDTH,
+    petWidth,
+    advisorWidth: standing?.sprite.width,
+    hasGesture: input.advisor?.gesture !== undefined
+  })
+  const { stage } = room
+  const advisor = room.isAdvisorShown ? standing : undefined
+  const petRoom = room.isPetShown ? petWidth + 1 : 0
   // Why a trail: the pet and party walk behind the hero, so its path starts where they all fit.
   const party = input.party ?? []
   const {
@@ -120,18 +131,19 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   } = hdTrailOf({
     stage,
     count: party.length,
-    petWidth:
-      petDef?.frames[0] === undefined ? 0 : frameSpriteOf(petDef.frames[0], petDef.colors).width,
+    petWidth: room.isPetShown ? petWidth : 0,
     spriteWidth: HD_SPRITE_WIDTH,
     slack: WALK_SLACK
   })
-  const walk = resting ? hdRestColumnOf(stage) : trail + hdWalkColumn(stage - trail, tick)
-  const isPetted = reaction?.kind === 'pet' && petDef !== undefined
+  const walk = resting
+    ? hdRestColumnOf(stage, HD_SPRITE_WIDTH, petRoom)
+    : trail + hdWalkColumn(stage - trail, tick)
+  const isPetted = reaction?.kind === 'pet' && room.isPetShown
   const hop = reaction !== undefined && reaction.age % 6 < 3 ? 2 : 0
   const lift = isPetted ? 0 : hop
   const top = ground - sprite.rows.length + 1 - lift - pose.bob
   const pet =
-    petDef === undefined
+    petDef === undefined || !room.isPetShown
       ? undefined
       : hdPetOf({
           pet: petDef,
@@ -143,8 +155,6 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
           ground,
           lift: isPetted ? hop : 0
         })
-  const advisor =
-    input.advisor === undefined ? undefined : hdAdvisorOf(input.advisor, columns, ground, tick)
   const shown =
     resting || walk + HD_SPRITE_WIDTH - 1 + PROP_WIDTH > stage ? undefined : input.action
   const fireLeft = walk + HD_SPRITE_WIDTH + 1
@@ -224,7 +234,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
       return glow(x, y, shown)
     }
     const held =
-      input.advisor === undefined || advisor === undefined
+      input.advisor === undefined || advisor === undefined || !room.isGestureShown
         ? undefined
         : hdAdvisorPropPixel(input.advisor, advisor, x, y, ground)
     const fire = resting ? hdCampfirePixel(x - fireLeft, ground - 1 - y, tick) : undefined
@@ -279,7 +289,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
         : hero,
     members,
     memberWidth: HD_SPRITE_WIDTH,
-    advisor: input.advisor
+    advisor: advisor === undefined ? undefined : input.advisor
   })
   return shakeGrid(grid, columns, quakeOf(event))
 }
