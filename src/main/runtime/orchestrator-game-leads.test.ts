@@ -60,6 +60,17 @@ describe('GameLeads', () => {
     expect((await game.list()).leads).toEqual([])
   })
 
+  it('does not list a lead whose pane is back at its shell', async () => {
+    const game = new GameLeads({
+      projectOf: async () => LEAD,
+      isLive: () => true,
+      isRunning: async () => false
+    })
+    await game.register({ project: 'cineco', label: 'Ana' })
+
+    expect((await game.list()).leads).toEqual([])
+  })
+
   it('gives the inbox the labels of the live leads', async () => {
     const game = leads(LEAD)
     await game.register({ project: 'cineco', label: '' })
@@ -72,7 +83,8 @@ describe('GameLeads claim', () => {
   const SESSION: GameLeadSession = {
     sessionId: 'sess-old',
     agentArgs: '--teammate-mode auto',
-    worktreeId: 'wt1'
+    worktreeId: 'wt1',
+    accountId: null
   }
 
   function claiming(args: {
@@ -309,7 +321,12 @@ describe('GameLeads after a restart', () => {
       isLive: () => true,
       now: () => new Date(AT),
       roster: new GameLeadRoster(() => dir),
-      sessionOf: async () => ({ sessionId: 'sess-1', agentArgs: null, worktreeId: 'wt1' })
+      sessionOf: async () => ({
+        sessionId: 'sess-1',
+        agentArgs: null,
+        worktreeId: 'wt1',
+        accountId: null
+      })
     })
     await before.register({ project: 'cineco', label: 'Ana', claim: true })
   }
@@ -334,7 +351,12 @@ describe('GameLeads after a restart', () => {
       sessionOf: async () =>
         pane.sessionId === null
           ? null
-          : { sessionId: pane.sessionId ?? 'sess-1', agentArgs: null, worktreeId: 'wt1' },
+          : {
+              sessionId: pane.sessionId ?? 'sess-1',
+              agentArgs: null,
+              worktreeId: 'wt1',
+              accountId: null
+            },
       focus: async () => undefined
     })
   }

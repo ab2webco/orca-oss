@@ -8,21 +8,19 @@ import {
 import { lightnessOf, luminanceOf } from './hd-lightness'
 import { facingOf, litByFacing, materialPixel } from './hd-material'
 import { hash, mix, mod } from './pixel-canvas'
-import { hdSkyOf, hdSkyPixel, skyRowOf, type HdSky } from './scene-hd-sky'
+import { hdSkyOf, skyRowOf, type HdSky } from './scene-hd-sky'
 import type { Look } from './scenes/index'
 
+export { hdPlantPixel, hdPondPixel } from './scene-hd-props'
 export { hdSkyBaseOf, hdSkyPixel } from './scene-hd-sky'
 
 // hd's land, back to front: far scenery fogged toward the sky, a mid layer of hills, near props, the ground.
 // Far and mid come out lit for the hour and kept legible against the sky; props and ground are lit by the caller.
 
 const GROUND_ROWS = 3
-const PLANT_EVERY = 19
-const TRUNK = 0x3e2c1f
-const BEACON = 0xff4a4a
-const BEACON_OFF = 0x5a1a1a
-const WATER = 0x1f4f8f
 const MAX_KEPT = 4
+const WINDOW_TICKS = 40
+const GLINT_TICKS = 8
 
 export type HdFrame = HdSky & {
   scroll: number
@@ -66,12 +64,24 @@ const farHeight = (look: Look, pixels: number, x: number): number => {
 const midTopOf = (ground: number, pixels: number, mx: number): number =>
   ground - pixels * (0.13 + 0.05 * Math.sin(mx * 0.11 + 2) + 0.03 * Math.sin(mx * 0.29))
 
+/** How far the far range and the hills have scrolled: a sixth and a third of the ground's pace. */
+export const hdFarShiftOf = (scroll: number): number => Math.floor(scroll / 6)
+export const hdMidShiftOf = (scroll: number): number => Math.floor(scroll / 3)
+
+/** What of the far range moves with the tick: a city's lit windows, a crystal range's glints. */
+export const hdFarPhaseOf = (look: Look, tick: number): number =>
+  look.scenery === 'skyline'
+    ? Math.floor(tick / WINDOW_TICKS)
+    : look.scenery === 'crystals'
+      ? Math.floor(tick / GLINT_TICKS)
+      : 0
+
 const silhouettes = new WeakMap<Look, Map<string, { far: Float64Array; mid: Float64Array }>>()
 
 // Why cached: the silhouettes move only every 3 or 6 ticks of scroll, and not at all at rest.
 const silhouettesOf = (sky: HdSky, scroll: number) => {
-  const farShift = Math.floor(scroll / 6)
-  const midShift = Math.floor(scroll / 3)
+  const farShift = hdFarShiftOf(scroll)
+  const midShift = hdMidShiftOf(scroll)
   const key = `${sky.width}x${sky.pixels}:${farShift}:${midShift}`
   const own =
     silhouettes.get(sky.look) ?? new Map<string, { far: Float64Array; mid: Float64Array }>()
@@ -85,7 +95,8 @@ const silhouettesOf = (sky: HdSky, scroll: number) => {
   for (let x = -1; x <= sky.width + 1; x += 1) {
     far[x + 1] = farHeight(sky.look, sky.pixels, x + farShift)
   }
-  for (let x = 0; x < sky.width; x += 1) {
+  // Why one past the edge: the last column's facing reads its right neighbour.
+  for (let x = 0; x <= sky.width; x += 1) {
     mid[x] = midTopOf(sky.ground, sky.pixels, x + midShift)
   }
   if (own.size >= MAX_KEPT) {
@@ -156,11 +167,11 @@ const litOf = (frame: HdFrame, color: number): number =>
   landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
 const farHeightAt = (frame: HdFrame, x: number): number =>
-  frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + Math.floor(frame.scroll / 6))
+  frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + hdFarShiftOf(frame.scroll))
 
 export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
   const { look, ground, tick, pixels } = frame
-  const fx = x + Math.floor(frame.scroll / 6)
+  const fx = x + hdFarShiftOf(frame.scroll)
   const height = farHeightAt(frame, x)
   const top = ground - height
   if (y < top) {
@@ -181,11 +192,11 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
       return layer(base)
     case 'skyline': {
       const isWindow = mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 2) === 0 && y > top + 1
-      const isLit = isWindow && (hash(fx, y) + Math.floor(tick / 40)) % 3 === 0
+      const isLit = isWindow && (hash(fx, y) + Math.floor(tick / WINDOW_TICKS)) % 3 === 0
       return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
     }
     case 'crystals':
-      if (y - top < 1 || (hash(fx, y) + Math.floor(tick / 8)) % 23 === 0) {
+      if (y - top < 1 || (hash(fx, y) + Math.floor(tick / GLINT_TICKS)) % 23 === 0) {
         return accent(mix(snow, base, 0.2))
       }
       return layer(isLitSide ? mix(base, snow, 0.18) : base)
@@ -195,7 +206,7 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
 }
 
 export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
-  const mx = x + Math.floor(frame.scroll / 3)
+  const mx = x + hdMidShiftOf(frame.scroll)
   const top = frame.midTops[x] ?? midTopOf(frame.ground, frame.pixels, mx)
   if (y < top) {
     return undefined
@@ -209,55 +220,6 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
   return apartFromSky(litOf(frame, awayFromSky(hill, shade(flat), frame.mid)), frame.mid, y)
 }
 
-export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
-  const { look, ground } = frame
-  const px = x + Math.floor(frame.scroll / 1.5)
-  if (look.plantKind === 'none' || hash(Math.floor(px / PLANT_EVERY), 9) % 3 === 0) {
-    return undefined
-  }
-  const slot = mod(px, PLANT_EVERY)
-  const h = ground - 1 - y
-  const lit = slot < 9 ? 0.12 : 0
-  switch (look.plantKind) {
-    case 'tree':
-      if (slot === 9 && h >= 0 && h < 2) {
-        return TRUNK
-      }
-      return h >= 2 && h < 11 && Math.abs(slot - 9) <= (8 - h * 0.7) / 2
-        ? mix(mix(look.plant, 0xffffff, lit), 0x000000, h % 3 === 2 ? 0.12 : 0)
-        : undefined
-    case 'cactus': {
-      if (slot === 9 && h >= 0 && h < 8) {
-        return mix(look.plant, 0xffffff, lit)
-      }
-      const isArm =
-        (slot === 7 && h >= 3 && h < 6) ||
-        (slot === 8 && h === 3) ||
-        (slot === 11 && h >= 4 && h < 7) ||
-        (slot === 10 && h === 4)
-      return isArm ? look.plant : undefined
-    }
-    case 'antenna':
-      if (slot === 9 && h >= 0 && h < 8) {
-        return look.plant
-      }
-      return slot === 9 && h === 8
-        ? Math.floor(frame.tick / 6) % 2 === 0
-          ? BEACON
-          : BEACON_OFF
-        : undefined
-    case 'crystal':
-      return h >= 0 && h < 7 && Math.abs(slot - 9) <= (7 - h) * 0.45
-        ? mix(look.plant, 0xffffff, slot <= 9 ? 0.25 : 0)
-        : undefined
-    case 'flower':
-      if (h === 0 && (slot === 4 || slot === 12)) {
-        return mix(look.near, 0x000000, 0.2)
-      }
-      return h === 1 && (slot === 4 || slot === 12) ? look.plant : undefined
-  }
-}
-
 export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
   const { look, ground } = frame
   const gx = x + frame.scroll
@@ -268,18 +230,4 @@ export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
     return mix(look.ground, 0xffffff, 0.12)
   }
   return mix(materialPixel(look.ground, gx, y, 61), 0x000000, (y - ground) * 0.08)
-}
-
-/** A pond on the ground line that mirrors the sky, outside the city. */
-export const hdPondPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
-  const px = mod(x + Math.floor(frame.scroll / 1.5), 97)
-  if (frame.look.scenery === 'skyline' || px < 64 || px >= 86 || y < frame.ground - 1) {
-    return undefined
-  }
-  if (y > frame.ground) {
-    return undefined
-  }
-  const mirror = hdSkyPixel(frame, x, Math.max(0, frame.ground - 5 - (y - frame.ground + 1) * 3))
-  const ripple = hash(x + Math.floor(frame.tick / 3), y) % 7 === 0 ? -0.2 : 0
-  return mix(mirror, WATER, 0.4 + ripple)
 }

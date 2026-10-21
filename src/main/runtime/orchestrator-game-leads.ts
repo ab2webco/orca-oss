@@ -4,8 +4,13 @@ import type { GameLeadRecord } from './orchestrator-game-lead-roster'
 
 export type GameLeadListing = { project: string; label: string; handle: string; since: string }
 
-/** What reopens a project's lead conversation once its pane is gone. */
-export type GameLeadSession = { sessionId: string; agentArgs: string | null; worktreeId: string }
+/** What reopens a project's lead conversation once its pane is gone; `accountId` is the managed account it ran on. */
+export type GameLeadSession = {
+  sessionId: string
+  agentArgs: string | null
+  worktreeId: string
+  accountId: string | null
+}
 
 /** `registered: false` with `live` or `resumed` names the pane that is the lead instead of the caller. */
 export type GameLeadRegistration = {
@@ -117,10 +122,11 @@ export class GameLeads {
 
   private async leadOf(projectKey: string): Promise<{ handle: string } | null> {
     const live = this.directory.leadOf(projectKey, this.deps.isLive)
-    if (!live || !this.deps.isRunning) {
-      return live
-    }
-    return (await this.deps.isRunning(live.handle).catch(() => true)) ? live : null
+    return live && (await this.isRunning(live.handle)) ? live : null
+  }
+
+  private async isRunning(handle: string): Promise<boolean> {
+    return !this.deps.isRunning || (await this.deps.isRunning(handle).catch(() => true))
   }
 
   /** The project's live lead when it is not the caller, so a second pane does not start one. */
@@ -136,13 +142,17 @@ export class GameLeads {
 
   async list(): Promise<{ leads: GameLeadListing[] }> {
     await this.settle()
+    const live = this.directory.live(this.deps.isLive)
+    const running = await Promise.all(live.map((one) => this.isRunning(one.handle)))
     return {
-      leads: this.directory.live(this.deps.isLive).map((one) => ({
-        project: one.project,
-        label: one.label,
-        handle: one.handle,
-        since: one.at
-      }))
+      leads: live
+        .filter((_, index) => running[index])
+        .map((one) => ({
+          project: one.project,
+          label: one.label,
+          handle: one.handle,
+          since: one.at
+        }))
     }
   }
 

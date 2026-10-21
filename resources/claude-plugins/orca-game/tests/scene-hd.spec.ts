@@ -43,18 +43,21 @@ const pixelOf = (grid: number[][], columns: number, x: number, y: number): numbe
   grid[Math.floor(y / 2) * columns + x]?.[y % 2 === 0 ? 1 : 2] ?? -1
 
 describe('hd geometry', () => {
-  it('draws 9 rows, 10 on a tall terminal', () => {
+  it('grows with the pane, a quarter of its rows, from 9 to 14', () => {
     expect(hdRowsOf(undefined)).toBe(9)
-    expect(hdRowsOf(40)).toBe(9)
-    expect(hdRowsOf(60)).toBe(10)
-    expect(hdRowsOf(200)).toBe(10)
+    expect(hdRowsOf(30)).toBe(9)
+    expect(hdRowsOf(40)).toBe(10)
+    expect(hdRowsOf(45)).toBe(11)
+    expect(hdRowsOf(50)).toBe(13)
+    expect(hdRowsOf(56)).toBe(14)
+    expect(hdRowsOf(200)).toBe(14)
   })
 
   it('fills rows × columns for every built-in scene and phase at any width, without throwing', () => {
     for (const scene of Object.values(SCENES)) {
       for (const phase of [undefined, 'docs', 'build', 'verify', 'pr', 'handoff'] as const) {
         for (const columns of [1, 2, 7, 13, 20, 60, 130]) {
-          for (const rows of [9, 10]) {
+          for (const rows of [9, 10, 14]) {
             const grid = hdSceneGridOf(input({ scene, phase, columns, rows }))
             expect(grid).toHaveLength(rows * columns)
           }
