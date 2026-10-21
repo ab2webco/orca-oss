@@ -1,4 +1,4 @@
-export type GameMode = 'on' | 'zen' | 'off'
+export type GameMode = 'on' | 'zen' | 'flat' | 'off'
 
 /** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
 export type GameConfig = {
@@ -341,7 +341,11 @@ export type FleetState = {
   state: GameState | null
   note: string
   xp: number
+  /** The latest rewards, newest first; absent in an atom an older mod stored. */
+  recent?: readonly RecentReward[]
 }
+
+export type RecentReward = { label: string; xp: number; at: number }
 
 /** A line another plugin set with `$.ui.status`, held for the allies strip while the game draws. */
 export type AllyStatus = { plugin: string; text: string }

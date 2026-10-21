@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { FleetState, GameState } from '../types'
+import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
 import { readJevAdvisor } from './advisor-state'
@@ -28,6 +28,7 @@ import {
   questLiveConfig
 } from './quest-runtime'
 import { fleetRewardsOf } from './fleet-rewards'
+import { RECENT_KEY, recentRewardsOf, withRecent } from './recent-rewards'
 import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
@@ -134,14 +135,26 @@ export async function openGameLink(
   return out?.exitCode === 0
 }
 
-async function syncXp($: EngineInterface, before: GameState | null, next: GameState) {
-  const stored = xpLedgerOf(await $.store.get(XP_KEY).catch(() => undefined))
+type Score = { xp: number; recent: readonly RecentReward[] }
+
+async function syncXp(
+  $: EngineInterface,
+  before: GameState | null,
+  next: GameState
+): Promise<Score> {
+  const [stored, kept] = await Promise.all([
+    $.store.get(XP_KEY).then(xpLedgerOf, () => xpLedgerOf(undefined)),
+    $.store.get(RECENT_KEY).then(recentRewardsOf, () => [])
+  ])
   const earned = [...rewardsOf(before, next), ...fleetRewardsOf(before, next)]
-  const { ledger, awarded } = awardXp(stored, earned, await $.clock.now())
+  const now = await $.clock.now()
+  const { ledger, awarded } = awardXp(stored, earned, now)
   if (awarded.length === 0) {
-    return stored.total
+    return { xp: stored.total, recent: kept }
   }
+  const recent = withRecent(kept, awarded, now)
   await $.store.set(XP_KEY, ledger).catch(() => undefined)
+  await $.store.set(RECENT_KEY, recent).catch(() => undefined)
   for (const one of awarded) {
     $.ui.toast(`+${one.xp} XP · ${one.label}`)
   }
@@ -155,7 +168,7 @@ async function syncXp($: EngineInterface, before: GameState | null, next: GameSt
   if (levelOf(ledger.total).level > levelOf(stored.total).level) {
     clawdReact($, 'level')
   }
-  return ledger.total
+  return { xp: ledger.total, recent }
 }
 
 export async function refresh($: EngineInterface): Promise<void> {
@@ -175,10 +188,11 @@ export async function refresh($: EngineInterface): Promise<void> {
     questLiveConfig($, next.config, next.sources)
   }
   const config = gameConfig()
-  const xp =
+  const kept: Score = { xp: before.xp, recent: before.recent ?? [] }
+  const { xp, recent } =
     next !== undefined && config.rewards
-      ? await syncXp($, before.state, next).catch(() => before.xp)
-      : before.xp
+      ? await syncXp($, before.state, next).catch(() => kept)
+      : kept
   const note = next === undefined ? gameStrings().text.unavailable : (next.warnings[0] ?? '')
   const doneAt = await $.clock.now()
   await update($, fleet, (s) => ({
@@ -187,7 +201,8 @@ export async function refresh($: EngineInterface): Promise<void> {
     refreshedAt: doneAt,
     state: next ?? s.state,
     note,
-    xp
+    xp,
+    recent
   }))
   quest.clockMs = doneAt
   if (next !== undefined) {
