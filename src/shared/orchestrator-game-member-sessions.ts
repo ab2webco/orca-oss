@@ -28,9 +28,15 @@ export type GameMemberSessionPatch = { ticket: string } & Partial<
   Omit<GameMemberSession, 'ticket' | 'updatedAt'>
 >
 
+/** Keys a newer Orca added that this one does not know; a rewrite puts them back where they were. */
+export type GameMemberSessionsKept = {
+  file: Record<string, unknown>
+  members: Record<string, Record<string, unknown>>
+}
+
 export type GameMemberSessionsRead =
-  | { ok: true; members: GameMemberSession[] }
-  | { ok: false; reason: string }
+  | { ok: true; members: GameMemberSession[]; kept?: GameMemberSessionsKept }
+  | { ok: false; reason: string; newer?: true }
 
 const TEXT_MAX = 200
 const NULLABLE_FIELDS = [
@@ -68,6 +74,15 @@ function parseMember(raw: unknown): GameMemberSession | null {
   return { ...member, ticket: member.ticket.toUpperCase() }
 }
 
+const MEMBER_KEYS: ReadonlySet<string> = new Set([...REQUIRED_FIELDS, ...NULLABLE_FIELDS])
+const FILE_KEYS: ReadonlySet<string> = new Set(['version', 'members'])
+
+const keysOutside = (
+  raw: Record<string, unknown>,
+  known: ReadonlySet<string>
+): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(raw).filter(([key]) => !known.has(key)))
+
 /**
  * Strict on purpose: a file this Orca cannot read whole is reported, never read as empty, so the next
  * write cannot silently replace what an older or newer Orca saved.
@@ -85,28 +100,43 @@ export function parseGameMemberSessionsFile(text: string): GameMemberSessionsRea
   if (parsed.version > GAME_MEMBER_SESSIONS_VERSION) {
     return {
       ok: false,
-      reason: `the saved members file is from a newer Orca (version ${parsed.version})`
+      reason: `the saved members file is from a newer Orca (version ${parsed.version})`,
+      newer: true
     }
   }
   if (parsed.version !== GAME_MEMBER_SESSIONS_VERSION || !Array.isArray(parsed.members)) {
     return { ok: false, reason: `the saved members file is damaged (version ${parsed.version})` }
   }
   const members: GameMemberSession[] = []
+  const kept: GameMemberSessionsKept = { file: keysOutside(parsed, FILE_KEYS), members: {} }
   for (const [index, raw] of parsed.members.entries()) {
     const member = parseMember(raw)
-    if (!member) {
+    if (!member || !isRecord(raw)) {
       return {
         ok: false,
         reason: `the saved members file has a malformed member (entry ${index + 1})`
       }
     }
     members.push(member)
+    const extra = keysOutside(raw, MEMBER_KEYS)
+    if (Object.keys(extra).length > 0) {
+      kept.members[member.ticket] = extra
+    }
   }
-  return { ok: true, members }
+  const keepsAny = Object.keys(kept.file).length > 0 || Object.keys(kept.members).length > 0
+  return keepsAny ? { ok: true, members, kept } : { ok: true, members }
 }
 
-export function serializeGameMemberSessions(members: readonly GameMemberSession[]): string {
-  return JSON.stringify({ version: GAME_MEMBER_SESSIONS_VERSION, members })
+// Why the kept keys: an older Orca must not drop the optional fields a newer one added (game-data-migrations rule 1).
+export function serializeGameMemberSessions(
+  members: readonly GameMemberSession[],
+  kept?: GameMemberSessionsKept
+): string {
+  return JSON.stringify({
+    ...kept?.file,
+    version: GAME_MEMBER_SESSIONS_VERSION,
+    members: members.map((member) => ({ ...kept?.members[member.ticket], ...member }))
+  })
 }
 
 /**

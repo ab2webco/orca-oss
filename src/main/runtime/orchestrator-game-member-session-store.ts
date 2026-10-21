@@ -48,13 +48,18 @@ export class GameMemberSessionStore {
   }
 
   /**
-   * Moves an unreadable file out of the way, bytes kept, and returns where it went; null when the
-   * file is readable or missing. Only the person's discard calls this.
+   * Moves a damaged file out of the way, bytes kept, and returns where it went; null when the file
+   * is readable or missing. Only the person's discard calls this.
    */
   setAside(projectKey: string): Promise<string | null> {
     return this.queued(projectKey, async () => {
-      if ((await this.read(projectKey)).ok) {
+      const read = await this.read(projectKey)
+      if (read.ok) {
         return null
+      }
+      // Why: going back to the newer Orca must find its file where it left it (game-data-migrations).
+      if (read.newer) {
+        throw new Error(`Left as it is: ${read.reason}. Update Orca to resume these members.`)
       }
       const file = this.fileOf(projectKey)
       const kept = file.replace(/\.json$/, `.unreadable-${Date.now()}.json`)
@@ -80,7 +85,11 @@ export class GameMemberSessionStore {
       await mkdir(this.dirOf(), { recursive: true })
       const file = this.fileOf(projectKey)
       // Why durable: this file exists for the crash or reboot that a plain rename can lose.
-      await writeFileDurable(durableWriteTempPath(file), file, serializeGameMemberSessions(next))
+      await writeFileDurable(
+        durableWriteTempPath(file),
+        file,
+        serializeGameMemberSessions(next, current.kept)
+      )
       return next
     })
   }

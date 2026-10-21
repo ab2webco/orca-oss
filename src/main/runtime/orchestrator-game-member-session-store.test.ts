@@ -82,7 +82,8 @@ describe('GameMemberSessionStore', () => {
     writeFileSync(file, '{"version":99,"members":[]}')
     expect(await one.read('repo:a')).toEqual({
       ok: false,
-      reason: 'the saved members file is from a newer Orca (version 99)'
+      reason: 'the saved members file is from a newer Orca (version 99)',
+      newer: true
     })
     await expect(one.upsert('repo:a', launched('ORCA-2'))).rejects.toThrow(
       'not saved: the saved members file is from a newer Orca (version 99)'
@@ -99,5 +100,70 @@ describe('GameMemberSessionStore', () => {
     expect(kept && readFileSync(kept, 'utf8')).toBe('not json')
     expect(await one.read('repo:a')).toEqual({ ok: true, members: [] })
     expect(await one.setAside('repo:a')).toBeNull()
+  })
+
+  it('leaves a file from a newer Orca in place, even when asked to set it aside', async () => {
+    const { store: one, dir } = store()
+    await one.upsert('repo:a', launched('ORCA-1'))
+    const file = onlyFile(dir)
+    const newer = '{"version":2,"members":[],"lanes":{}}'
+    writeFileSync(file, newer)
+    await expect(one.setAside('repo:a')).rejects.toThrow('from a newer Orca (version 2)')
+    expect(readdirSync(dir)).toEqual([file.slice(dir.length + 1)])
+    expect(readFileSync(file, 'utf8')).toBe(newer)
+  })
+})
+
+// Why: docs/reference/game-data-migrations.md — every stored shape ships a fixture the next version must read.
+describe('GameMemberSessionStore across Orca versions', () => {
+  const FIXTURE = join(__dirname, '__fixtures__', 'orchestrator-game-members-v1.json')
+
+  const seeded = async (text: string) => {
+    const made = store()
+    await made.store.upsert('repo:a', launched('SEED-1'))
+    const file = onlyFile(made.dir)
+    writeFileSync(file, text)
+    return { ...made, file }
+  }
+
+  it('reads the version 1 file this release writes', async () => {
+    const { store: one } = await seeded(readFileSync(FIXTURE, 'utf8'))
+    const read = await one.read('repo:a')
+    expect(read.ok && read.members.map((m) => [m.ticket, m.sessionId, m.worktreeId])).toEqual([
+      [
+        'ORCA-702',
+        'c8c80799-ac62-4a26-ab91-a1833a8d5c1f',
+        'repo-1::/Users/me/orca/workspaces/app/orca-702'
+      ],
+      ['ORCA-695', null, null]
+    ])
+  })
+
+  it('keeps the keys a newer Orca added when it rewrites the file', async () => {
+    const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'))
+    fixture.lanes = { kept: true }
+    fixture.members[0].mood = 'focused'
+    const { store: one, file } = await seeded(JSON.stringify(fixture))
+    await one.upsert('repo:a', { ticket: 'ORCA-702', lastState: 'paused' })
+    const written = JSON.parse(readFileSync(file, 'utf8'))
+    expect(written.lanes).toEqual({ kept: true })
+    expect(written.members[0]).toMatchObject({
+      ticket: 'ORCA-702',
+      mood: 'focused',
+      lastState: 'paused'
+    })
+    expect(written.members[1]).not.toHaveProperty('mood')
+  })
+
+  it('drops the kept keys of a member it removes', async () => {
+    const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'))
+    fixture.members[0].mood = 'focused'
+    const { store: one, file } = await seeded(JSON.stringify(fixture))
+    await one.remove('repo:a', ['ORCA-702'])
+    await one.upsert('repo:a', launched('ORCA-702'))
+    const written = JSON.parse(readFileSync(file, 'utf8'))
+    expect(
+      written.members.find((m: { ticket: string }) => m.ticket === 'ORCA-702')
+    ).not.toHaveProperty('mood')
   })
 })

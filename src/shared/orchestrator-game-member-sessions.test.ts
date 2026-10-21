@@ -46,7 +46,8 @@ describe('parseGameMemberSessionsFile', () => {
     const text = JSON.stringify({ version: GAME_MEMBER_SESSIONS_VERSION + 1, members: [] })
     expect(parseGameMemberSessionsFile(text)).toEqual({
       ok: false,
-      reason: `the saved members file is from a newer Orca (version ${GAME_MEMBER_SESSIONS_VERSION + 1})`
+      reason: `the saved members file is from a newer Orca (version ${GAME_MEMBER_SESSIONS_VERSION + 1})`,
+      newer: true
     })
   })
 

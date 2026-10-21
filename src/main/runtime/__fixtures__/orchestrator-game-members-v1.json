@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "members": [
+    {
+      "ticket": "ORCA-702",
+      "runId": "run_e08fb6865859",
+      "taskId": "task_e7d75a9ff597",
+      "launchedAt": "2026-10-20T10:00:00.000Z",
+      "updatedAt": "2026-10-20T10:05:00.000Z",
+      "name": "Bruno",
+      "dispatchId": "ctx_7ece556a8635",
+      "worktreeId": "repo-1::/Users/me/orca/workspaces/app/orca-702",
+      "branch": "fabolivark/orca-702",
+      "agent": "claude",
+      "accountId": "acct_1",
+      "account": "me@example.com",
+      "sessionId": "c8c80799-ac62-4a26-ab91-a1833a8d5c1f",
+      "lastState": "working"
+    },
+    {
+      "ticket": "ORCA-695",
+      "runId": "run_e08fb6865859",
+      "taskId": "task_0a1b2c3d4e5f",
+      "launchedAt": "2026-10-20T10:01:00.000Z",
+      "updatedAt": "2026-10-20T10:01:00.000Z",
+      "name": null,
+      "dispatchId": null,
+      "worktreeId": null,
+      "branch": null,
+      "agent": "codex",
+      "accountId": null,
+      "account": null,
+      "sessionId": null,
+      "lastState": "launching"
+    }
+  ]
+}
