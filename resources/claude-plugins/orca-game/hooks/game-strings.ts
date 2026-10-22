@@ -65,6 +65,12 @@ export type TextStrings = {
   layoutNewer: string
   /** A Panel section's name in its phone chip and in /orca-game:layout. */
   layoutSections: Readonly<Record<PanelSection, string>>
+  /** Toast the first time a person opens the Panel. */
+  layoutHint: string
+  layoutHeading: string
+  layoutStates: Readonly<Record<'shown' | 'collapsed' | 'hidden', string>>
+  layoutUsage: string
+  layoutUnknownSection: (asked: string, sections: string) => string
   /** Toast once a prompt is queued for the lead's next turn. */
   sentToLead: (label: string) => string
   couldNotSend: (label: string) => string
@@ -181,7 +187,7 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
+      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
@@ -204,6 +210,13 @@ const EN: GameStrings = {
       todo: 'To Do',
       actions: 'Actions'
     },
+    layoutHint:
+      'Tip: press ▾ beside a Panel section to collapse it; /orca-game:layout hides, moves or resets them.',
+    layoutHeading: 'Panel layout for this project:',
+    layoutStates: { shown: 'shown', collapsed: 'collapsed', hidden: 'hidden' },
+    layoutUsage:
+      'Change it with /orca-game:layout reset, show <section>, hide <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.',
+    layoutUnknownSection: (asked, sections) => `Unknown section "${asked}". Sections: ${sections}.`,
     sentToLead: (label) => `Sent to the lead: ${label}`,
     couldNotSend: (label) => `Could not send ${label}`,
     actionRunning: 'running…',

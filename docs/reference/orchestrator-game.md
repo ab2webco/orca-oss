@@ -268,6 +268,27 @@ popover.
   tab of the worktree on every platform, and a toast says when Orca could not. The menu keeps `r`
   (Refresh) and `q` (Close); Pet is `p`.
 
+## Panel layout
+
+The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
+item rows), My PRs, To Do and Actions, in that order. Each heading starts with a mark: `▾` while
+it is expanded, `▸` once collapsed to its heading line (`▸ To Do 12`). A click, a tap or Tab and
+Enter on the mark toggles it; every letter is already a Panel hotkey, so sections take none. The
+headings keep their own link or action, and a collapsed Team turns red while a teammate waits; a
+collapsed Review keeps its CI color. The `Needs you` lines above the sections are never hidden.
+On a phone-width pane each section also gets a touch-sized chip under the menu.
+
+`/orca-game:layout` lists the sections with their state and takes `reset`, `show <section>`,
+`hide <section>` and `move <section> up|down` (Spanish words work too: `ocultar equipo`). The
+first time a person opens the Panel a toast says how to collapse sections.
+
+The layout is kept in the mod's `$.store` under `panel-layout`: `{ version: 1, projects: {
+<repoId>: { fleet: { order, collapsed, hidden } } } }`, so every worktree of one repo shares it
+and other people keep their own. Nothing is written until the person changes the layout. A damaged
+value draws the default; one a newer build wrote is drawn as the default and never overwritten
+(see [Game data migrations](./game-data-migrations.md)). Later view settings belong in the same
+key, next to `fleet`.
+
 ## My PRs and To Do
 
 The band also shows two project-wide chips, so a lead on `main` with no PR of its own still sees
@@ -960,7 +981,7 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
 
 - **The Panel card** names the advisor and Jev's line, wrapped over as many rows as they need,
   then one `★` row for this pane's main conversation on the model it runs now (`★ lead · Opus
-  5.5·high` in the lead's pane, `★ main conversation · …` elsewhere), then Jev's latest subagent
+5.5·high` in the lead's pane, `★ main conversation · …` elsewhere), then Jev's latest subagent
   decisions with their verdict, colored by gesture; before the first one it lists the agents
   running now. A switch of the main model is the same conversation, so it never adds a second `★`
   row: when Jev's router lowers one turn to Haiku and goes back, the row just follows the value.

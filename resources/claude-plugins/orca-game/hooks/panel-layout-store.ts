@@ -3,6 +3,17 @@ import type { EngineInterface } from 'claude-code'
 import { gameStrings } from './game-strings'
 import { PANEL_LAYOUT_KEY, fleetLayoutOf, withFleetLayout, type FleetLayout } from './panel-layout'
 
+const HINT_KEY = 'panel-layout-hinted'
+
+/** Says once per person how to collapse the Panel's sections; its own key leaves the layout unwritten. */
+export async function hintLayoutOnce($: EngineInterface): Promise<void> {
+  if ((await $.store.get(HINT_KEY).catch(() => undefined)) === true) {
+    return
+  }
+  await $.store.set(HINT_KEY, true)
+  $.ui.toast(gameStrings().text.layoutHint)
+}
+
 export async function readFleetLayout($: EngineInterface, project: string): Promise<FleetLayout> {
   return fleetLayoutOf(await $.store.get(PANEL_LAYOUT_KEY).catch(() => undefined), project)
 }

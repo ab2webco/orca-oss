@@ -7,6 +7,9 @@ import { gameStrings } from './game-strings'
 /** Answered by the mod from a fresh `orca game state`. */
 export const STATE_COMMAND = 'orca-game:state'
 
+/** Lists and changes the Panel's sections; answered by the mod. */
+export const LAYOUT_COMMAND = 'orca-game:layout'
+
 /** The game's commands under `/orca-game:`, each a plugin skill the mod answers itself. */
 export const GAME_COMMANDS = [
   'orca-game:quest',

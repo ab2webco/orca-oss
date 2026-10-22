@@ -24,7 +24,7 @@ import { animate } from './quest'
 import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { projectKeyOf, toggleSection, type PanelSection } from './panel-layout'
-import { changeFleetLayout, readFleetLayout } from './panel-layout-store'
+import { changeFleetLayout, hintLayoutOnce, readFleetLayout } from './panel-layout-store'
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
@@ -43,6 +43,7 @@ const FLEET_CHIP_COLORS: Readonly<Record<string, string>> = {
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
   await $.ui.open({ id: PANE_ID, title, closeOnEscape: true, focus: true })
+  await hintLayoutOnce($).catch(() => undefined)
 }
 
 /** True while the Panel is placed and is the tab its surface shows. */

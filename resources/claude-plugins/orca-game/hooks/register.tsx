@@ -10,6 +10,7 @@ import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
 import { registerStateCommand } from './state-command'
+import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
 import { clawdReact } from './quest-runtime'
@@ -29,6 +30,7 @@ export const register: Register = (on) => {
   registerLeadName(on)
   registerActionCommands(on)
   registerStateCommand(on)
+  registerLayoutCommand(on)
 
   on('session.start', async ($, e, next) => {
     await clearAllies($)

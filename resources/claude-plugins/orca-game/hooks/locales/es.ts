@@ -54,7 +54,7 @@ export const ES: GameCatalog = {
     questDescription:
       'Modo quest, forma corta de /orca-game:quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:
-      '/orca-game:mode on|zen|off: off lo muestra todo, on oculta las filas de herramientas y zen también oculta las notas de trabajo. /orca-game:render classic|hd|hd-compact elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego. /quest es la forma corta, que también funciona a mitad de un turno.',
+      '/orca-game:mode on|zen|off: off lo muestra todo, on oculta las filas de herramientas y zen también oculta las notas de trabajo. /orca-game:render classic|hd|hd-compact elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego y /orca-game:layout ordena las secciones del Panel. /quest es la forma corta, que también funciona a mitad de un turno.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /orca-game:mode on vuelve a los datos reales.',
@@ -78,6 +78,14 @@ export const ES: GameCatalog = {
       todo: 'Por hacer',
       actions: 'Acciones'
     },
+    layoutHint:
+      'Consejo: pulsa ▾ junto a una sección del Panel para plegarla; /orca-game:layout las oculta, mueve o restablece.',
+    layoutHeading: 'Diseño del Panel de este proyecto:',
+    layoutStates: { shown: 'visible', collapsed: 'plegada', hidden: 'oculta' },
+    layoutUsage:
+      'Cámbialo con /orca-game:layout restablecer, mostrar <sección>, ocultar <sección> o mover <sección> arriba|abajo. Pulsa ▾ o ▸ en el Panel para plegar una sección.',
+    layoutUnknownSection: (asked, sections) =>
+      `Sección desconocida "${asked}". Secciones: ${sections}.`,
     sentToLead: (label) => `Enviado al líder: ${label}`,
     couldNotSend: (label) => `No se pudo enviar ${label}`,
     actionRunning: 'ejecutando…',
