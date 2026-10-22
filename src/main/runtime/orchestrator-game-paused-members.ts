@@ -4,6 +4,7 @@ import {
   pausedMembersOf,
   queuedMembersOf,
   type GameMemberSessionPatch,
+  type GamePausedCauseOf,
   type GamePausedMember,
   type GameQueuedMember,
   type GameSetupQueueEntry
@@ -22,6 +23,8 @@ type Deps = {
   contextOf: (terminalHandle: string) => AgentStatusOrchestrationContext | undefined
   /** The live agent's own conversation id, null until its hooks report one. */
   sessionIdOf: (terminalHandle: string) => string | null
+  /** Why a saved member is not live while its terminal is open; null when the terminal is gone. */
+  causeOf?: GamePausedCauseOf
 }
 
 const errorText = (error: unknown): string =>
@@ -64,7 +67,12 @@ export class GamePausedMembers {
     const tickets = new Set(live.map((one) => one.ticket))
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     return {
-      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }, starting),
+      paused: pausedMembersOf(
+        read.members,
+        { tickets, worktreeIds: liveWorktreeIds },
+        starting,
+        this.deps.causeOf
+      ),
       queued: queuedMembersOf(read.members, setup.queued),
       error
     }

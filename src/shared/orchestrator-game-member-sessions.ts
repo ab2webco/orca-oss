@@ -163,6 +163,16 @@ export type GameMemberResumeOutcome =
   | { outcome: 'finished'; ticket: string }
   | { outcome: 'missing'; ticket: string; reason: string }
 
+/**
+ * Why a paused member is not live while its terminal is still open (ORCA-754): `unsubmitted`, its
+ * brief was written and no turn started; `terminal-open`, past that but not reporting.
+ */
+export type GamePausedCause = 'unsubmitted' | 'terminal-open'
+
+export type GamePausedCauseOf = (
+  member: GameMemberSession
+) => { cause: GamePausedCause; terminal: string } | null
+
 /** A member the project had live that is not live now: what `game fleet` and the lead show as paused. */
 export type GamePausedMember = {
   ticket: string
@@ -176,6 +186,10 @@ export type GamePausedMember = {
   /** The orchestration run that owns its task; the lead binds it before resuming. */
   runId: string
   since: string
+  /** Absent when its terminal is gone, as after a restart; older hosts never send it. */
+  cause?: GamePausedCause
+  /** The member's still-open terminal, sent with `cause`. */
+  terminal?: string
 }
 
 /** A start the host holds until its setup slot frees (ORCA-746). */
@@ -216,7 +230,8 @@ export function pausedMembersOf(
   members: readonly GameMemberSession[],
   live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> },
   /** Tasks whose start is queued or running on the host: on their way, not paused. */
-  startingTaskIds: ReadonlySet<string> = new Set()
+  startingTaskIds: ReadonlySet<string> = new Set(),
+  causeOf: GamePausedCauseOf = () => null
 ): GamePausedMember[] {
   return members
     .filter(
@@ -235,7 +250,8 @@ export function pausedMembersOf(
       lastState: one.lastState,
       resumable: one.sessionId !== null && one.worktreeId !== null,
       runId: one.runId,
-      since: one.updatedAt
+      since: one.updatedAt,
+      ...causeOf(one)
     }))
 }
 
