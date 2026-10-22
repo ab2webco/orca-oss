@@ -6,13 +6,26 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import { resolveDefaultAppDir } from './packaged-app-dir.mjs'
+import {
+  formatSmokeFailure,
+  formatSmokeSuccess,
+  smokePhaseLine,
+  smokeSucceeded
+} from './packaged-watchdog-smoke-report.mjs'
 
 const INTERNAL_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_INTERNAL'
 const ASAR_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_ASAR'
 const TIMEOUT_MS = 100
 const CHECK_INTERVAL_MS = 20
 const POLL_TIMEOUT_MS = 5_000
+const SPAWN_BUDGET_MS = 15_000
 const SUCCESS_LINE = '[packaged-watchdog-smoke] app.asar worker detected and recovered a stall'
+
+// Why uptime: it includes Electron's own startup before this module ran, which is
+// the part a cold hosted runner is suspected of stretching.
+function logPhase(phase) {
+  console.log(smokePhaseLine(phase, process.uptime() * 1000))
+}
 
 function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms))
@@ -81,7 +94,9 @@ async function runInternal() {
   const entryPath = join(appAsar, 'out', 'main', 'main-thread-hang-watchdog-entry.js')
   let worker
   try {
+    logPhase('launched')
     await app.whenReady()
+    logPhase('ready')
     if (!existsSync(entryPath)) {
       throw new Error(`Packaged watchdog entry is missing from app.asar: ${entryPath}`)
     }
@@ -97,11 +112,15 @@ async function runInternal() {
     worker.once('error', (error) => {
       workerError.current = error
     })
+    logPhase('worker-started')
     await waitForMarker(markerPath, (marker) => marker?.selfRecovered === false, workerError)
+    logPhase('stall-detected')
     worker.postMessage({ type: 'heartbeat' })
     await waitForMarker(markerPath, (marker) => marker?.selfRecovered === true, workerError)
+    logPhase('recovered')
     worker.postMessage({ type: 'shutdown' })
     await waitForExit(worker, workerError)
+    logPhase('worker-exited')
     worker = undefined
     console.log(SUCCESS_LINE)
   } finally {
@@ -136,24 +155,20 @@ function runSmoke() {
   try {
     const electronArgs =
       process.platform === 'linux' ? ['--no-sandbox', launcherDir] : [launcherDir]
+    const startedAt = performance.now()
     const result = spawnSync(executable, electronArgs, {
       env,
       encoding: 'utf8',
-      timeout: 15_000
+      timeout: SPAWN_BUDGET_MS
     })
-    if (result.status !== 0) {
-      throw new Error(
-        `Packaged watchdog smoke failed (${result.error?.message ?? result.signal ?? result.status}):\n` +
-          `${result.stderr || result.stdout}`
-      )
-    }
-    // Why: Electron discards process.exitCode, so status 0 alone can't prove the worker ran.
-    if (!result.stdout.includes(SUCCESS_LINE)) {
-      throw new Error(
-        `Packaged watchdog smoke did not report success:\n${result.stderr || result.stdout}`
-      )
+    const elapsedMs = performance.now() - startedAt
+    // Why one check: Electron discards process.exitCode, so status 0 alone can't prove
+    // the worker ran, and a timed-out run can still exit 0.
+    if (!smokeSucceeded(result, SUCCESS_LINE)) {
+      throw new Error(formatSmokeFailure({ result, elapsedMs, budgetMs: SPAWN_BUDGET_MS }))
     }
     process.stdout.write(result.stdout)
+    console.log(formatSmokeSuccess({ elapsedMs, budgetMs: SPAWN_BUDGET_MS }))
   } finally {
     rmSync(launcherDir, { recursive: true, force: true })
   }
