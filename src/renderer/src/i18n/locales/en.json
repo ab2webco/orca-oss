@@ -11381,7 +11381,8 @@
           "sceneFileSshOffline": "Connect this SSH project to read its scene file.",
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
           "sceneFileNotText": "not a text file",
-          "flat": "Flat"
+          "flat": "Flat",
+          "previewFlat": "Flat draws the game as text, with no scene or characters."
         },
         "OrchestratorGameLeadSetting": {
           "cap": "Member cap",

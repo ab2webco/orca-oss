@@ -100,6 +100,11 @@ describe('OrchestratorGameScenePreview', () => {
     expect(figure().dataset.mode).toBe('off')
     expect(container.querySelector('canvas')).toBeNull()
     expect(figure().textContent).toContain('start as plain Claude')
+
+    show('quest', 'flat')
+    expect(figure().dataset.mode).toBe('flat')
+    expect(container.querySelector('canvas')).toBeNull()
+    expect(figure().textContent).toContain('Flat draws the game as text, with no scene')
   })
 
   it('draws quest for a scene nothing installed serves and says why', () => {
