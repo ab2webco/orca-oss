@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 
-const dispatch = (extra: Partial<Parameters<typeof gamePausedCauseOf>[0] & object> = {}) => ({
+type DispatchFacts = NonNullable<Parameters<typeof gamePausedCauseOf>[0]>
+
+const dispatch = (extra: Partial<DispatchFacts> = {}): DispatchFacts => ({
   status: 'dispatched',
   assignee_handle: 'term_member',
   first_lifecycle_signal_at: null,
