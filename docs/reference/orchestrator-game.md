@@ -28,7 +28,8 @@ the same args and env plus `ORCA_GAME_ROLE=member`, so it draws its member band 
 sequencing wraps it, and under Agent Teams the team launch then adds no lead game on top. A codex
 member, an `orchestration worker-start` without the game, an SSH or WSL member and a project with
 `orchestratorGame.orchestrator.memberGame: false` (Settings: **Game in member panes**) stay plain.
-`game.state` reads no My PRs or To Do for a member caller, since its band shows neither.
+`game.state` reads no My PRs, To Do or tracker ticket for a member caller: its band shows none of
+them and takes the ticket from its own name.
 
 It loads only when all of these hold, and otherwise Claude starts exactly as before:
 

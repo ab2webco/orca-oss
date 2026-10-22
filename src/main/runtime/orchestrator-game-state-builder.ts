@@ -172,7 +172,8 @@ export async function buildOrchestratorGameState(
   }
   const resolved = resolveOrchestratorGameConfig(layers)
   const integrations = resolveOrchestratorGameIntegrations(layers)
-  const tracker = resolved.config.tracker && input.worktree !== null
+  // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
+  const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
   const { readStop, readInboxes, readLeadElsewhere } = input
   const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere, suggested] =
