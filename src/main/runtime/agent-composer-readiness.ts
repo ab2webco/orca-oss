@@ -27,9 +27,9 @@ import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 export const AGENT_COMPOSER_READY_TIMEOUT_MS = 10_000
 
 // Why: turn acceptance is the agent's first repaint after the submit CR, which
-// lands well under a second on every agent observed. Bounded short because the
-// result never changes what Orca does — a miss is a warning, never a resend and
-// never a refusal — so every extra second is latency bought with no decision.
+// lands well under a second on every agent observed. Bounded short because a
+// miss here only records; the Enter retry (ORCA-754) waits its own, longer
+// window before pressing, so a slow repaint is never pressed over.
 export const AGENT_TURN_ACCEPTANCE_TIMEOUT_MS = 5_000
 
 export type AgentComposerReadiness = {
@@ -290,9 +290,9 @@ export class AgentComposerReadinessTracker {
     timeoutMs: number,
     now: () => number = Date.now
   ): { arm: () => Promise<AgentTurnAcceptance>; cancel: () => void } {
-    // Why: the caller never blocks on this. The result changes nothing Orca
-    // does — it is not a refusal and never a resend — so making an RPC wait on
-    // it would buy latency with no decision (and, on worker-start, could push
+    // Why: the caller never blocks on this. It is never a refusal, and the
+    // Enter retry it can lead to runs after the RPC (ORCA-754), so making an
+    // RPC wait on it would only buy latency (and, on worker-start, could push
     // the handler past the caller's own budget).
     const scanner = createAgentTurnAcceptanceScanner()
     let armed = false

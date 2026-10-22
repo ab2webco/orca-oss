@@ -71,7 +71,8 @@ export function buildDispatchDeadlineFailureReason(params: {
   return (
     `Dispatch ${params.dispatchId} for task ${params.taskId} sent no lifecycle signal within ` +
     `${minutes} min of injection: terminal ${terminal}, pane ${pane}, host ${host}. ` +
-    `${delivery}${readiness} Orca Lab did not resend it — the submit outcome is ambiguous. ` +
+    `${delivery}${readiness} Orca Lab never re-typed it — on a pane it watches it only ` +
+    'pressed Enter again, at most twice — so the submit outcome is ambiguous. ' +
     'Inspect the pane, then retry explicitly.'
   )
 }

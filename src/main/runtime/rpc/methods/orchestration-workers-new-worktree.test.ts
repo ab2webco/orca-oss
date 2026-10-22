@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
+import { DISPATCH_SUBMIT_RETRY_AFTER_MS } from '../../orchestration/dispatch-submit-retry'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import { ORCHESTRATION_METHODS } from './orchestration'
@@ -567,7 +568,8 @@ describe('orchestration new-worktree workers', () => {
         accepted: true,
         evidence: 'working-title',
         waitedMs: 61
-      })
+      }),
+      submit: null
     })
 
     const { result, task } = await startWorker()
@@ -582,6 +584,28 @@ describe('orchestration new-worktree workers', () => {
     // deadline that catches a silent worker must stay armed.
     expect(db.getDispatchContext(task.id)?.first_lifecycle_signal_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
+  })
+
+  // Why (ORCA-754): `game launch` runs through worker-start; its brief sat in
+  // the composer with the CR dropped until a person pressed Enter.
+  it('presses Enter again when the member never took the submit', async () => {
+    mockCreatedWorktree()
+    let pressed = 0
+    const pressEnter = async (): Promise<boolean> => ++pressed > 0
+    vi.spyOn(runtime, 'sendTerminalAgentPromptObservingTurn').mockResolvedValue({
+      send: { handle: 'term_worker', accepted: true, bytesWritten: 1 },
+      turnAcceptance: Promise.resolve({ accepted: false, evidence: null, waitedMs: 5_000 }),
+      submit: { state: () => (pressed > 0 ? 'turn-seen' : 'awaiting-turn'), pressEnter }
+    })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { task } = await startWorker()
+      await vi.advanceTimersByTimeAsync(DISPATCH_SUBMIT_RETRY_AFTER_MS * 2)
+      expect(pressed).toBe(1)
+      expect(db.getDispatchContext(task.id)?.turn_accepted_at).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('distinguishes no-effect failure, unknown acceptance, and durable residual effects', async () => {

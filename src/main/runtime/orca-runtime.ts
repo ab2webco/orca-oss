@@ -505,6 +505,12 @@ import {
   AGENT_TURN_ACCEPTANCE_TIMEOUT_MS
 } from './agent-composer-readiness'
 import type { AgentComposerReadiness, AgentTurnAcceptance } from './agent-composer-readiness'
+import {
+  AGENT_SUBMIT_RETRY_COMPOSER_WAIT_MS,
+  SUBMIT_RETRY_AGENTS,
+  createAgentPromptSubmitProbe,
+  type AgentPromptSubmitProbe
+} from './agent-prompt-submit-probe'
 import { TerminalUnsubmittedInputTracker } from './terminal-unsubmitted-input-tracker'
 import { detectInstalledAgentsWithShellPathHydration, detectRemoteAgents } from '../ipc/preflight'
 import {
@@ -18571,13 +18577,19 @@ export class OrcaRuntimeService {
     handle: string,
     prompt: string,
     options: { acceptanceTimeoutMs?: number } = {}
-  ): Promise<{ send: RuntimeTerminalSend; turnAcceptance: Promise<AgentTurnAcceptance> }> {
+  ): Promise<{
+    send: RuntimeTerminalSend
+    turnAcceptance: Promise<AgentTurnAcceptance>
+    /** Null for a pane this runtime does not observe: nothing could prove its submit dropped. */
+    submit: AgentPromptSubmitProbe | null
+  }> {
     const target = await this.resolveComposerReadinessTarget(handle)
     if (!target) {
       const send = await this.sendTerminalAgentPrompt(handle, prompt)
       return {
         send,
-        turnAcceptance: Promise.resolve({ accepted: false, evidence: null, waitedMs: 0 })
+        turnAcceptance: Promise.resolve({ accepted: false, evidence: null, waitedMs: 0 }),
+        submit: null
       }
     }
     const observer = this.composerReadiness.observeTurnAcceptance(
@@ -18591,7 +18603,25 @@ export class OrcaRuntimeService {
       observer.cancel()
       throw error
     }
-    return { send, turnAcceptance: observer.arm() }
+    const { ptyId, agent } = target
+    if (!agent || !SUBMIT_RETRY_AGENTS.has(agent)) {
+      return { send, turnAcceptance: observer.arm(), submit: null }
+    }
+    const submit = createAgentPromptSubmitProbe({
+      ptyId,
+      currentPtyId: () => this.findPtyIdForHandle(handle),
+      unsubmitted: () => this.unsubmittedInput.read(ptyId),
+      waitForComposer: () =>
+        this.composerReadiness.wait(ptyId, agent, AGENT_SUBMIT_RETRY_COMPOSER_WAIT_MS),
+      write: (data) => this.ptyController?.write(ptyId, data) ?? false,
+      recordSubmit: () =>
+        this.unsubmittedInput.recordWrite(ptyId, {
+          hasText: false,
+          submitted: true,
+          atMs: Date.now()
+        })
+    })
+    return { send, turnAcceptance: observer.arm(), submit }
   }
 
   async getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
