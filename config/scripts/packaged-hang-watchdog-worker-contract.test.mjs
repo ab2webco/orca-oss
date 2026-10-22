@@ -30,6 +30,6 @@ describe('packaged hang watchdog worker contract', () => {
 
     expect(smokeSource).toContain('app.exit(1)')
     expect(smokeSource).not.toContain('app.quit()')
-    expect(smokeSource).toContain('if (!result.stdout.includes(SUCCESS_LINE))')
+    expect(smokeSource).toContain('if (!smokeSucceeded(result, SUCCESS_LINE))')
   })
 })
