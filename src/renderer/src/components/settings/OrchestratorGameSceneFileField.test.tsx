@@ -103,7 +103,9 @@ function project(
 }
 
 const select = (container: HTMLElement): HTMLSelectElement =>
-  container.querySelector('select') as HTMLSelectElement
+  Array.from(container.querySelectorAll('select')).find((one) =>
+    Array.from(one.options).some((option) => option.value === 'quest')
+  ) as HTMLSelectElement
 
 function choose(container: HTMLElement, value: string): void {
   act(() => {

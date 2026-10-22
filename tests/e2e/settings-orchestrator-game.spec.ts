@@ -84,14 +84,34 @@ test('global and per-project Agent Teams game settings persist and render at eve
     state.openSettingsTarget({ pane: 'agents', repoId: null })
     state.openSettingsPage()
   })
-  const globalSection = orcaPage.getByRole('radiogroup', { name: 'Game mode' }).first()
+  const globalSection = orcaPage.getByRole('combobox', { name: 'Default view' }).first()
   await expect(globalSection).toBeVisible({ timeout: 15_000 })
 
-  await globalSection.getByRole('radio', { name: 'Zen' }).click()
+  await globalSection.click()
+  // Why every option: Settings must list the shared view table, in order, with its costs.
+  await expect(orcaPage.getByRole('option')).toHaveText([
+    'Off · light',
+    'Flat · light',
+    'Zen · medium',
+    '2D classic · medium',
+    '2D hd · heavy'
+  ])
+  await orcaPage.getByRole('option', { name: 'Zen · medium' }).click()
   await orcaPage.getByRole('switch', { name: 'Rewards' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
     .toEqual({ mode: 'zen', rewards: false })
+  const show = orcaPage.getByRole('switch', { name: 'Show the game' }).first()
+  await show.click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ mode: 'zen', rewards: false, show: false })
+  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeDisabled()
+  await expect(globalSection).toHaveText('Zen · medium')
+  await show.click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ mode: 'zen', rewards: false, show: true })
 
   await shootAll(electronApp, orcaPage, testInfo, 'global', globalSection)
 
@@ -104,17 +124,28 @@ test('global and per-project Agent Teams game settings persist and render at eve
     state.openSettingsPage()
   }, repoId)
 
-  const projectMode = orcaPage.getByRole('radiogroup', { name: 'Game mode' }).first()
-  await expect(projectMode).toBeVisible({ timeout: 15_000 })
+  const projectView = orcaPage.getByRole('combobox', { name: 'Default view' }).first()
+  await expect(projectView).toBeVisible({ timeout: 15_000 })
   await expect(orcaPage.getByText('Zen · global setting')).toBeVisible()
+  await expect(orcaPage.getByText('On · global setting').first()).toBeVisible()
 
-  await projectMode.getByRole('radio', { name: 'Off' }).click()
+  await projectView.click()
+  await orcaPage.getByRole('option', { name: '2D hd · heavy' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
-    .toEqual({ [repoId as string]: { mode: 'off' } })
-  await expect(orcaPage.getByText('Off · this machine')).toBeVisible()
+    .toEqual({ [repoId as string]: { mode: 'on', render: 'hd' } })
+  await expect(orcaPage.getByText('2D hd · this machine')).toBeVisible()
 
-  await shootAll(electronApp, orcaPage, testInfo, 'project', projectMode)
+  await orcaPage
+    .getByRole('radiogroup', { name: 'Show the game' })
+    .getByRole('radio', { name: 'Off' })
+    .click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId as string]: { mode: 'on', render: 'hd', show: false } })
+  await expect(orcaPage.getByText('Off · this machine').first()).toBeVisible()
+
+  await shootAll(electronApp, orcaPage, testInfo, 'project', projectView)
 })
 
 const SPACE_PACK = {
@@ -266,11 +297,7 @@ test('the game section says it is for Claude Agent Teams only and previews the p
   }
 
   await setWindowWidth(electronApp, orcaPage, 1440)
-  await orcaPage
-    .getByRole('radiogroup', { name: 'Game mode' })
-    .first()
-    .getByRole('radio', { name: 'Off' })
-    .click()
+  await orcaPage.getByRole('switch', { name: 'Show the game' }).first().click()
   await expect(nightWatch).toBeHidden()
   await expect(
     orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')

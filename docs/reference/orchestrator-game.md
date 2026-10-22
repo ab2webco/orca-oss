@@ -122,7 +122,7 @@ Each field resolves on its own; a later layer wins
 4. Settings → the project → **Agent Teams game**, this machine only
    (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
 
-Both Settings pages group the game's controls (mode, scene, teammate HUD, rewards, work item
+Both Settings pages group the game's controls (**Show the game**, **Default view** with each view's cost, scene, teammate HUD, rewards, work item
 tracking, where links open, render and time zone) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
 panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
