@@ -20,7 +20,14 @@ export type GameLessonMirror = {
   list: (project: GameLessonProject) => Promise<GameLesson[]>
 }
 
-type Loaded = { lessons: GameLesson[]; isDamaged: boolean }
+// Why raw: keys and lessons this build cannot read were written by a newer one, and a rewrite
+// that dropped them would cost them after a one-release downgrade.
+type Loaded = {
+  lessons: GameLesson[]
+  unread: unknown[]
+  data: Record<string, unknown>
+  isDamaged: boolean
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -44,7 +51,7 @@ export class GameLessonStore {
     const next = previous
       .catch(() => undefined)
       .then(async () => {
-        const { lessons, isDamaged } = await this.read(projectKey)
+        const { lessons, unread, data, isDamaged } = await this.read(projectKey)
         const merged = mergeGameLesson(lessons, lesson)
         await mkdir(this.dirOf(), { recursive: true })
         const file = this.fileOf(projectKey)
@@ -58,7 +65,7 @@ export class GameLessonStore {
         await writeFileDurable(
           durableWriteTempPath(file),
           file,
-          JSON.stringify({ version: 1, lessons: merged })
+          JSON.stringify({ version: 1, ...data, lessons: [...unread, ...merged] })
         )
         return merged.find((one) => one.fingerprint === lesson.fingerprint) ?? lesson
       })
@@ -71,21 +78,28 @@ export class GameLessonStore {
     try {
       text = await readFile(this.fileOf(projectKey), 'utf8')
     } catch {
-      return { lessons: [], isDamaged: false }
+      return { lessons: [], unread: [], data: {}, isDamaged: false }
     }
     let parsed: unknown
     try {
       parsed = JSON.parse(text)
     } catch {
-      return { lessons: [], isDamaged: true }
+      return { lessons: [], unread: [], data: {}, isDamaged: true }
     }
     if (!isRecord(parsed) || !Array.isArray(parsed.lessons)) {
-      return { lessons: [], isDamaged: true }
+      return { lessons: [], unread: [], data: {}, isDamaged: true }
     }
-    return {
-      lessons: parsed.lessons.flatMap((one) => parseGameLesson(one) ?? []),
-      isDamaged: false
+    const lessons: GameLesson[] = []
+    const unread: unknown[] = []
+    for (const one of parsed.lessons) {
+      const lesson = parseGameLesson(one)
+      if (lesson) {
+        lessons.push(lesson)
+      } else {
+        unread.push(one)
+      }
     }
+    return { lessons, unread, data: parsed, isDamaged: false }
   }
 
   private nameOf(projectKey: string): string {

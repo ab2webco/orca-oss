@@ -56,13 +56,15 @@ export class EngramLessonMirror implements GameLessonMirror {
       })
       this.sessions.add(sessionId)
     }
+    const id = createHash('sha256').update(lesson.fingerprint).digest('hex').slice(0, 24)
     await this.call('/observations', {
       session_id: sessionId,
       type: 'learning',
       scope: 'project',
       project: project.name,
-      title: `Orca lesson (${lesson.kind}): ${lesson.what.slice(0, 80)}`,
-      topic_key: `${TOPIC_PREFIX}${createHash('sha256').update(lesson.fingerprint).digest('hex').slice(0, 24)}`,
+      // Why no lesson text: Engram's hooks print titles into every session, outside any data block.
+      title: `Orca lesson: ${lesson.kind} ${id.slice(0, 8)}`,
+      topic_key: `${TOPIC_PREFIX}${id}`,
       content: `${MARKER} ${JSON.stringify(lesson)}`
     })
   }

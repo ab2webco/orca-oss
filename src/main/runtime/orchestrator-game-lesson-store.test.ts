@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -105,6 +105,28 @@ describe('GameLessonStore', () => {
     ])
   })
 
+  it('keeps what a newer build wrote through its own rewrite', async () => {
+    const dir = tempDir()
+    const store = storeIn(dir)
+    await store.record('repo:a', gameLessonOf(signal()))
+    const [file] = readdirSync(dir)
+    const path = join(dir, file ?? 'x.json')
+    const newer = { kind: 'insight', what: 'a kind this build cannot read' }
+    const stored = JSON.parse(readFileSync(path, 'utf8')) as { lessons: unknown[] }
+    writeFileSync(
+      path,
+      JSON.stringify({ ...stored, streaks: 3, lessons: [...stored.lessons, newer] })
+    )
+    await store.record('repo:a', gameLessonOf(signal({ what: 'another outcome' })))
+    const written = JSON.parse(readFileSync(path, 'utf8')) as {
+      streaks: number
+      lessons: unknown[]
+    }
+    expect(written.streaks).toBe(3)
+    expect(written.lessons).toContainEqual(newer)
+    expect(await store.list('repo:a')).toHaveLength(2)
+  })
+
   it('sets a damaged file aside instead of failing the record', async () => {
     const dir = tempDir()
     const store = new GameLessonStore(() => dir)
@@ -126,6 +148,10 @@ describe('EngramLessonMirror', () => {
     await mirror.save(PROJECT, lesson)
     await mirror.save(PROJECT, { ...lesson, count: 2 })
     expect(engram.rows.size).toBe(1)
+    // Why: Engram prints titles into sessions outside any data block, so no agent text goes there.
+    expect(String([...engram.rows.values()][0]?.title)).toMatch(
+      /^Orca lesson: failure [0-9a-f]{8}$/
+    )
     expect(await mirror.list(PROJECT)).toEqual([{ ...lesson, count: 2 }])
     expect(await mirror.list({ ...PROJECT, name: 'other' })).toEqual([])
   })
