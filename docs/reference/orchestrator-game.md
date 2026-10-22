@@ -554,6 +554,15 @@ are saved while they run, so the team picks up where it was:
     conversation is closed again, so no agent runs that no dispatch owns.
   - The lead's rules have it ask the person once, naming the members, before resuming.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
+- **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
+  of any saved member that has not finished, paused or live, even with `--force`, which only waives
+  the dirty-tree check. The refusal (`game_member_worktree`) names the member and lists up to 20
+  commits no remote has, then says how to resume or `--discard` it; `--force-member` removes it
+  anyway and returns the same list as a warning
+  ([`game-member-worktree-guard.ts`](../../src/main/runtime/game-member-worktree-guard.ts)). The
+  merged-worktree sweep (`config/scripts/merged-worktree-close.mjs`) never falls back to
+  `git worktree remove` after that refusal. The desktop's own delete dialog does not go through
+  `worktree.rm` and is not guarded.
 - **A file this Orca cannot read** (damaged, or from a newer Orca) is never read as empty nor
   written over: Orca starts normally, `game fleet` says `Could not resume members: <reason>`, and
   nothing is saved until `game resume-members --discard` sets a damaged file aside, bytes kept,

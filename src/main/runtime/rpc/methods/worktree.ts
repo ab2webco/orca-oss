@@ -16,6 +16,7 @@ import {
   WorktreeTeardownMissingTerminalsParams
 } from './worktree-schemas'
 import { WORKTREE_CATALOG_METHODS } from './worktree-catalog-methods'
+import { memberWorktreeRefusal, memberWorktreeWarning } from '../../game-member-worktree-guard'
 
 export const WORKTREE_METHODS: RpcMethod[] = [
   ...WORKTREE_CATALOG_METHODS,
@@ -174,6 +175,11 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     name: 'worktree.rm',
     params: WorktreeRemove,
     handler: async (params, { runtime }) => {
+      // Why (ORCA-746): `force` only waives the dirty-tree check, so a member's worktree needs its own consent.
+      const memberHold = await runtime.gameMemberWorktreeHold(params.worktree)
+      if (memberHold && params.allowGameMember !== true) {
+        throw memberWorktreeRefusal(memberHold)
+      }
       const removalArgs = [
         params.worktree,
         params.force === true,
@@ -183,7 +189,14 @@ export const WORKTREE_METHODS: RpcMethod[] = [
       const result = params.hostId
         ? await runtime.removeManagedWorktree(...removalArgs, params.hostId)
         : await runtime.removeManagedWorktree(...removalArgs)
-      return { removed: true, ...result }
+      const memberWarning = memberHold ? memberWorktreeWarning(memberHold) : null
+      return {
+        removed: true,
+        ...result,
+        ...(memberWarning
+          ? { warning: [result.warning, memberWarning].filter(Boolean).join('\n') }
+          : {})
+      }
     }
   }),
   defineMethod({
