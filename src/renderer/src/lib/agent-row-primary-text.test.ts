@@ -284,3 +284,34 @@ Checkout race body`,
     ).toBe('Refactor the auth middleware')
   })
 })
+
+describe('a one-line dispatch brief (ORCA-757)', () => {
+  const brief = 'Read your Orca Lab brief at .orca/briefs/ctx-7.md (task task-7) and follow it.'
+
+  it('is still the dispatch turn, with its task id', () => {
+    expect(isOrcaDispatchPrompt(brief)).toBe(true)
+    expect(getOrcaDispatchTaskId(brief)).toBe('task-7')
+  })
+
+  it('names the row from the matching orchestration labels', () => {
+    expect(
+      getAgentRowPrimaryText({
+        prompt: brief,
+        orchestration: { taskId: 'task-7', dispatchId: 'ctx-7', displayName: 'Fix checkout race' }
+      })
+    ).toBe('Fix checkout race')
+  })
+
+  it('keeps sticky labels of another task off the row', () => {
+    expect(
+      getAgentRowPrimaryText({
+        prompt: brief,
+        orchestration: { taskId: 'task-1', dispatchId: 'ctx-1', displayName: 'Old task' }
+      })
+    ).not.toBe('Old task')
+  })
+
+  it('shows the line itself before any label arrives, never an empty row', () => {
+    expect(getAgentRowPrimaryText({ prompt: brief })).toBe(brief)
+  })
+})

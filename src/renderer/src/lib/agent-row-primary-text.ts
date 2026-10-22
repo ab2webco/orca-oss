@@ -4,6 +4,7 @@ import {
   ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX,
   ORCA_DISPATCH_STATUS_TASK_MARKER
 } from '../../../shared/orca-dispatch-status-prompt'
+import { parseDispatchBriefLine } from '../../../shared/orca-dispatch-brief-line'
 
 export const ORCA_DISPATCH_PREAMBLE_PREFIX = ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX
 const ORCA_DISPATCH_TASK_MARKER = ORCA_DISPATCH_STATUS_TASK_MARKER
@@ -19,7 +20,10 @@ const ORCA_DISPATCH_TASK_MARKER_SCAN_LIMIT = 32_768
 
 /** True when the live prompt is still an Orca dispatch turn (not sticky metadata alone). */
 export function isOrcaDispatchPrompt(prompt: string): boolean {
-  return prompt.trimStart().startsWith(ORCA_DISPATCH_PREAMBLE_PREFIX)
+  return (
+    prompt.trimStart().startsWith(ORCA_DISPATCH_PREAMBLE_PREFIX) ||
+    parseDispatchBriefLine(prompt) !== null
+  )
 }
 
 /**
@@ -60,7 +64,10 @@ export function getAgentRowPrimaryText(
     )
   }
   if (isOrcaDispatchPrompt(entry.prompt)) {
-    return getOrcaDispatchTaskPreview(entry.prompt)
+    // Why the line itself: a one-line brief has no task body to preview.
+    return parseDispatchBriefLine(entry.prompt)
+      ? entry.prompt.trim()
+      : getOrcaDispatchTaskPreview(entry.prompt)
   }
   return entry.prompt.trim()
 }
@@ -79,6 +86,10 @@ export function getAgentRowGeneratedTitleText(
 export function getOrcaDispatchTaskId(prompt: string): string | null {
   if (!isOrcaDispatchPrompt(prompt)) {
     return null
+  }
+  const brief = parseDispatchBriefLine(prompt)
+  if (brief) {
+    return brief.taskId
   }
   const scan = prompt.trimStart().slice(0, ORCA_DISPATCH_TASK_ID_SCAN_LIMIT)
   const markerIndex = scan.indexOf(ORCA_DISPATCH_TASK_ID_MARKER)
