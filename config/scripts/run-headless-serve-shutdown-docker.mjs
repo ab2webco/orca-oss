@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { runWithTransientRetry } from './transient-http-retry.mjs'
 
 const args = process.argv.slice(2)
 const appImageArg = valueAfter('--appimage')
@@ -43,16 +44,20 @@ const artifactVolume = `orca-headless-serve-shutdown-${suffix}`
 const sha256 = createHash('sha256').update(readFileSync(appImage)).digest('hex')
 
 try {
-  docker([
-    'build',
-    '--platform',
-    platform,
-    '-f',
-    shutdownDockerfile,
-    '-t',
-    image,
-    shutdownDockerDirectory
-  ])
+  docker(
+    [
+      'build',
+      '--platform',
+      platform,
+      '-f',
+      shutdownDockerfile,
+      '-t',
+      image,
+      shutdownDockerDirectory
+    ],
+    // Why: a registry 500 on the base image failed PR #599 at this step (ORCA-659).
+    { retryTransient: true }
+  )
   docker(['volume', 'create', artifactVolume])
   docker([
     'run',
@@ -135,11 +140,15 @@ function valueAfter(flag) {
 }
 
 function docker(dockerArgs, options = {}) {
-  const result = spawnSync('docker', dockerArgs, {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024
-  })
+  const run = () =>
+    spawnSync('docker', dockerArgs, {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    })
+  const result = options.retryTransient
+    ? runWithTransientRetry({ run, describe: `docker ${dockerArgs[0]}` }).result
+    : run()
   if (result.error) {
     throw result.error
   }

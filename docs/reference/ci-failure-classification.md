@@ -99,6 +99,10 @@ passes a `readJobLog` function, so classification stays reproducible off saved p
   than guessing — but it never asserts a red test on a log it did not read. The workflow
   deletes a zero-byte capture for the same reason: an empty log reads as "no hang".
 - The reporter never gates. `verify` remains the merge gate and is untouched.
+- The two API reads go through `config/scripts/gh-api-with-retry.mjs`: a 5xx or a dropped
+  connection is retried with 5/15/45 s waits, a 4xx (429 included) fails on the first attempt,
+  and the output file is written only on success (ORCA-659). A sustained outage still turns the
+  reporter red; it names the endpoint and the final status.
 - One consumer does gate: `lab-release.yml`'s release signal gate classifies its own test jobs
   with `classifyRunJobs` before publishing (`config/scripts/release-signal-gate.mjs`). It blocks
   on every class, including `hang` and `timeout` — a run that did not finish cannot be read as
