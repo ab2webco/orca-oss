@@ -27,6 +27,8 @@ import {
 import { levelOf } from './rewards'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
 import { isTapLayout } from './tap-layout'
+import { flatBandRows } from './flat-rows'
+import { isFlatMode, toggleFlat } from './flat-toggle'
 
 const PET_KEY = 'band-pet-scene'
 const ACTION_ROWS = 1
@@ -78,11 +80,16 @@ export const registerBand = (on: On): void => {
       ))
     const menuActions: Readonly<Record<string, () => void>> = {
       'band-panel': () => openFleet($),
+      'band-flat': () => void toggleFlat($).catch(() => undefined),
       'band-refresh': () => void refreshSoon($).catch(() => undefined),
       'band-pet': () => clawdReact($, 'pet')
     }
     const isTap = isTapLayout(columns)
-    const menuChips = menuChipsOf(currentScene())
+    const isFlat = isFlatMode()
+    // Why no Pet on a phone: its one row keeps the flat toggle; the Panel still offers Pet.
+    const menuChips = menuChipsOf(currentScene(), isFlat).filter(
+      (chip) => !isTap || chip.key !== 'band-pet'
+    )
     const menuTaps: TapButton[] = menuChips.map((chip) => ({
       key: chip.key,
       // Why Panel keeps its word: actions drop into its +N before it turns into a bare icon.
@@ -273,6 +280,8 @@ export const registerBand = (on: On): void => {
               </Text>
             </Box>
           )
+        ) : isFlat ? (
+          flatBandRows($, e, { state, palette, columns, level, recent: v.recent, isDemo: v.isDemo })
         ) : isFramed || !isArtShown ? (
           art.get(HUD_KEY)
         ) : (

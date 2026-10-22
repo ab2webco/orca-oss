@@ -19,7 +19,8 @@ describe('quest policy', () => {
     expect(questCommandOf(' ZEN ')).toEqual({ mode: 'zen' })
     expect(questCommandOf('zen please')).toEqual({ mode: 'zen' })
     expect(questCommandOf('loud')).toEqual({
-      error: 'Unknown mode "loud". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off or /orca-game:demo.'
+      error:
+        'Unknown mode "loud". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode flat, /orca-game:mode off or /orca-game:demo.'
     })
     expect(questCommandOf('demo')).toEqual({ demo: true })
   })
@@ -47,7 +48,8 @@ describe('quest policy', () => {
       expect(activityOf('Read', { file_path: '/repo/hooks/quest.tsx' })).toBe('Leyendo quest.tsx')
       expect(activityOf('Grep', { pattern: 'x' })).toBe('Buscando en el código')
       expect(questCommandOf('loud')).toEqual({
-        error: 'Modo desconocido "loud". Usa /orca-game:mode on, /orca-game:mode zen, /orca-game:mode off o /orca-game:demo.'
+        error:
+          'Modo desconocido "loud". Usa /orca-game:mode on, /orca-game:mode zen, /orca-game:mode flat, /orca-game:mode off o /orca-game:demo.'
       })
     } finally {
       setGameLocale('en')

@@ -6,7 +6,7 @@ import { DEMO_STEP_TICKS } from './demo'
 import { gameConfigOfEnv, isAbsorbingConfig } from './game-config'
 import { forgetFrames, isNewFrame } from './frame-gate'
 import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
-import { restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
+import { isSceneMode, restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
 import { demoNow, gameConfig, quest } from './quest-state'
 import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene'
 import { stageCellsOf } from './scene-frame'
@@ -132,7 +132,7 @@ async function repaint($: EngineInterface): Promise<void> {
     }
     $.ui.invalidate('ui.render')
   }
-  if (gameConfig().mode !== 'off') {
+  if (isSceneMode(gameConfig().mode)) {
     await blitAll($)
   }
 }

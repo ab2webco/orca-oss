@@ -7,7 +7,7 @@ import { dayOf, daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
 import type { HdMember, March } from './hd-party'
 import type { LeadState } from './lead-state'
-import type { Action, FlowPhase } from './quest-policy'
+import { isSceneMode, type Action, type FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
 import { themedSceneOf } from './scenes/scene-theme'
@@ -139,7 +139,7 @@ export const isClawdReacting = (): boolean => isReacting(reactionAt(quest.tick))
 
 /** The advisor acts something out now, so the band shows the scene when no spinner does. */
 export const isAdvisorActing = (): boolean =>
-  gameConfig().mode !== 'off' &&
+  isSceneMode(gameConfig().mode) &&
   isAdvisorActingAt(quest.tick, gameConfig().mode === 'zen', isAbsorbingConfig(gameConfig()))
 
 /** hd's light now, on the project's timezone; noon until the clock is first read. */

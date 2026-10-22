@@ -175,7 +175,7 @@ const expectTapGroup = async (
 const tapGroupsOf = async (ui: Mounted) =>
   (await ui.findAll({ type: 'Box' })).filter((one) => String(one.key).endsWith('-tap'))
 
-const BAND_MENU = ['band-panel', 'band-refresh', 'band-pet']
+const BAND_MENU = ['band-panel', 'band-refresh', 'band-flat']
 
 describe('the band on a phone', () => {
   for (const columns of [36, 45, TAP_LAYOUT_COLUMNS - 1]) {
@@ -229,7 +229,13 @@ describe('the Fleet pane on a phone', () => {
   test('at 41 columns Close, the menu, View, the links and the actions are chips', async ($, on) => {
     await start($, on)
     const ui = await pane($, 41)
-    const [menu] = await expectTapGroup(ui, 'pane-menu-tap', 41, ['refresh', 'pet', 'quit'], 1)
+    const [menu] = await expectTapGroup(
+      ui,
+      'pane-menu-tap',
+      41,
+      ['refresh', 'flat', 'pet', 'quit'],
+      1
+    )
     // Close leads: a phone shows the pane's top rows, and Close is how it leaves.
     expect(keyOf(menu?.[0])).toBe('quit')
     await expectTapGroup(ui, 'view-tap-t:builder', 41, ['view-t:builder'], 1)

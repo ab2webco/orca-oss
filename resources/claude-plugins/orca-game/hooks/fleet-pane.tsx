@@ -5,14 +5,19 @@ import { advisorCard, advisorCardViewOf } from './advisor-card'
 import { advisorPinsOf, ownAdvisorOf } from './advisor-report'
 import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
-import { countChipsOf, petLabelOf } from './band-chips'
+import { countChipsOf } from './band-chips'
+import { flatLine } from './flat-block'
+import { flatPaneMembers } from './flat-rows'
+import { isFlatMode } from './flat-toggle'
+import { paneMenuItemsOf } from './pane-menu'
+import { flatScoreLineOf } from './flat-view'
 import { chipRowsOf, type PlacedChip } from './chip-rows'
 import { memberHeadingOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf, type SectionMarks } from './fleet-project'
 import { reviewSectionOf } from './fleet-review-section'
-import { focusTerminal, openGameLink, refreshSoon, viewOf } from './fleet-sync'
+import { focusTerminal, openGameLink, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
 import { cardStateOf, leadStateOf } from './lead-state'
@@ -21,7 +26,7 @@ import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
-import { clawdReact, currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
+import { currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { projectKeyOf, toggleSection, type PanelSection } from './panel-layout'
 import { changeFleetLayout, hintLayoutOnce, readFleetLayout } from './panel-layout-store'
@@ -113,16 +118,8 @@ export const registerFleetPane = (on: On): void => {
         ],
         columns
       )
-    const menuItems = [
-      {
-        key: 'refresh',
-        hotkey: 'r',
-        label: `↻ ${text.refresh}`,
-        onPress: () => void refreshSoon($).catch(() => undefined)
-      },
-      { key: 'pet', hotkey: 'p', label: petLabelOf(scene), onPress: () => clawdReact($, 'pet') },
-      { key: 'quit', hotkey: 'q', label: `✕ ${text.close}`, onPress: close }
-    ]
+    const isFlat = isFlatMode()
+    const menuItems = paneMenuItemsOf($, scene, isFlat, close)
     const menuRow = isTap ? (
       tapButtonsOf(
         $,
@@ -292,24 +289,35 @@ export const registerFleetPane = (on: On): void => {
       </Box>
     )
     const projectSections = await projectRowsOf($, e, state, palette, v.isDemo, columns, marks)
-    const cards = members.flatMap(({ agent, member }, index) => [
-      memberCard($, e, agent, member, {
-        scene,
-        room: cardRoom,
-        leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
-        cardState: cardStateOf(agent, state),
-        tile: art.get(`tile-${member.key}`),
-        view:
-          agent.terminalHandle === undefined || isTap
-            ? undefined
-            : view(agent, agent.terminalHandle, index),
-        advisorRows: advisorRowsOf(agent),
-        link
-      }),
-      ...(agent.terminalHandle === undefined || !isTap
-        ? []
-        : [tapView(agent, agent.terminalHandle, index)])
-    ])
+    const flatScore = flatScoreLineOf({ level, recent: v.recent ?? [], isDemo: v.isDemo, columns })
+    const cards = isFlat
+      ? flatPaneMembers($, e, {
+          state,
+          palette,
+          columns,
+          isTap,
+          viewLabel: text.view,
+          pressOf: viewPressOf,
+          hotkeyOf: viewHotkeyOf
+        })
+      : members.flatMap(({ agent, member }, index) => [
+          memberCard($, e, agent, member, {
+            scene,
+            room: cardRoom,
+            leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
+            cardState: cardStateOf(agent, state),
+            tile: art.get(`tile-${member.key}`),
+            view:
+              agent.terminalHandle === undefined || isTap
+                ? undefined
+                : view(agent, agent.terminalHandle, index),
+            advisorRows: advisorRowsOf(agent),
+            link
+          }),
+          ...(agent.terminalHandle === undefined || !isTap
+            ? []
+            : [tapView(agent, agent.terminalHandle, index)])
+        ])
     const team = (
       <Box key="section-team" flexDirection="column">
         <Box key="layout-header-team" flexDirection="row">
@@ -349,7 +357,7 @@ export const registerFleetPane = (on: On): void => {
       : null
     return (
       <Box flexDirection="column">
-        {art.get(HUD_KEY)}
+        {isFlat ? flatScore !== undefined && flatLine($, e, flatScore, palette) : art.get(HUD_KEY)}
         {isTap && menuRow}
         {sectionChips}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">

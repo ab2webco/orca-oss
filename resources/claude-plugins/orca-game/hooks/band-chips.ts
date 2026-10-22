@@ -252,12 +252,19 @@ export const petLabelOf = (scene: SceneDefinition): string => {
   return `♥ ${name === undefined ? text.pet : text.petNamed(localizedNameOf(name))}`
 }
 
-/** Panel, Refresh and Pet; the last two keep only their icon when the band is narrow. */
-export const menuChipsOf = (scene: SceneDefinition): Chip[] => {
+/** The toggle between the scene and the flat text view, naming the one it switches to. */
+export const flatToggleLabelsOf = (isFlat: boolean): [string, string] => {
+  const text = gameStrings().text
+  return isFlat ? [`▦ ${text.sceneView}`, '▦'] : [`≡ ${text.flatView}`, '≡']
+}
+
+/** Panel, Refresh, the flat toggle and Pet, which only the scene draws; all but Panel shrink to an icon. */
+export const menuChipsOf = (scene: SceneDefinition, isFlat = false): Chip[] => {
   const text = gameStrings().text
   return [
     { key: 'band-panel', priority: 0, labels: [`▤ ${text.panel}`, '▤'] },
     { key: 'band-refresh', priority: 1, labels: [`↻ ${text.refresh}`, '↻'] },
-    { key: 'band-pet', priority: 2, labels: [petLabelOf(scene), '♥'] }
+    { key: 'band-flat', priority: 1, labels: flatToggleLabelsOf(isFlat) },
+    ...(isFlat ? [] : [{ key: 'band-pet', priority: 2, labels: [petLabelOf(scene), '♥'] as const }])
   ]
 }
