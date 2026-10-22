@@ -45875,6 +45875,86 @@ describe('OrcaRuntimeService', () => {
     }
   )
 
+  it('starts a Claude game member on an SSH repo plain, since the plugin folder is local', async () => {
+    const created = {
+      path: '/remote/repo-ssh-member',
+      head: 'def',
+      branch: 'refs/heads/ssh-member',
+      isBare: false,
+      isMainWorktree: false
+    }
+    const metaById: Record<string, WorktreeMeta> = {}
+    const remoteStore = {
+      ...store,
+      getRepos: () => [
+        {
+          id: TEST_REPO_ID,
+          path: '/remote/repo',
+          displayName: 'repo',
+          badgeColor: 'blue',
+          addedAt: 1,
+          connectionId: 'ssh-1'
+        }
+      ],
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      }
+    }
+    const provider = {
+      exec: vi.fn(async (args: string[]) => {
+        if (args[0] === 'config') {
+          return { stdout: 'Remote User\n', stderr: '' }
+        }
+        if (args[0] === 'symbolic-ref') {
+          return { stdout: 'origin/main\n', stderr: '' }
+        }
+        if (isOriginMainBaseRefProbe(args)) {
+          return { stdout: 'main-sha\n', stderr: '' }
+        }
+        return { stdout: '', stderr: '' }
+      }),
+      addWorktree: vi.fn().mockResolvedValue(undefined),
+      listWorktrees: vi.fn().mockResolvedValue([created])
+    }
+    registerSshGitProvider('ssh-1', provider as never)
+    getActiveMultiplexerMock.mockReturnValue({ request: muxRequestMock, notify: vi.fn() })
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-ssh' })
+    const runtime = new OrcaRuntimeService(remoteStore as never)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    prepareOrchestratorGameLaunchMock.mockClear()
+    prepareOrchestratorGameLaunchMock.mockResolvedValue({
+      args: ['--plugin-dir', '/r/orca-game'],
+      env: { ORCA_GAME_ROLE: 'member' }
+    })
+    try {
+      await runtime.createManagedWorktree({
+        repoSelector: TEST_REPO_ID,
+        name: 'ssh-member',
+        startupAgent: 'claude',
+        orchestrationWorker: true,
+        orchestrationGameMember: true
+      })
+    } finally {
+      prepareOrchestratorGameLaunchMock.mockResolvedValue({ args: [], env: {} })
+    }
+
+    expect(prepareOrchestratorGameLaunchMock).not.toHaveBeenCalled()
+    for (const [options] of spawn.mock.calls as [
+      { command?: string; env?: Record<string, string> }
+    ][]) {
+      expect(options.command ?? '').not.toContain('--plugin-dir')
+      expect(options.env ?? {}).not.toHaveProperty('ORCA_GAME_ROLE')
+    }
+  })
+
   it('sends follow-up prompts for CLI-created stdin-after-start startup agents', async () => {
     const metaById: Record<string, WorktreeMeta> = {}
     const runtimeStore = {
