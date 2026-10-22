@@ -153,7 +153,7 @@ export const registerFleetPane = (on: On): void => {
     const advisorOf = (art: Map<string, RenderElement>) =>
       advisorView === null
         ? null
-        : advisorCard($, e, palette, advisorView.card, isFlat ? null : art.get(ADVISOR_TILE_KEY))
+        : advisorCard($, e, palette, advisorView.card, art.get(ADVISOR_TILE_KEY), !isFlat)
     if (v.state === null) {
       return (
         <Box flexDirection="column">

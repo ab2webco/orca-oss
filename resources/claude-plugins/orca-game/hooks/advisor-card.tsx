@@ -53,13 +53,14 @@ export function advisorCard(
   e: RenderInput,
   palette: BandPalette,
   card: AdvisorCard,
-  tile?: RenderElement | null
+  tile?: RenderElement,
+  withTileColumn = true
 ): RenderElement {
   const { Box, Text } = $.ui.resolve(e)
   return (
     <Box key="advisor-card" flexDirection="row" borderStyle="round" borderColor={palette.gold}>
-      {/* Why null: flat draws no Raster, so the text takes the row instead of an empty column. */}
-      {tile === null ? null : (tile ?? <Box width={TILE_COLUMNS} />)}
+      {/* Why: flat draws no Raster, so the text takes the row instead of an empty column. */}
+      {withTileColumn ? (tile ?? <Box width={TILE_COLUMNS} />) : null}
       <Box flexDirection="column" paddingLeft={1} flexGrow={1} flexShrink={1}>
         <Text color={palette.gold} bold wrap="wrap">{`◆ ${card.name}`}</Text>
         {card.line === null ? (
