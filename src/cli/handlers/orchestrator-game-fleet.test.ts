@@ -427,7 +427,7 @@ describe('orca game fleet verbs', () => {
       LEAD,
       member({
         paneKey: 'f',
-        displayName: 'CIN-9',
+        displayName: 'Arthur · CIN-9 Seats',
         review: merged,
         terminalHandle: 'term_9',
         workItem: {
@@ -474,6 +474,7 @@ describe('orca game fleet verbs', () => {
       worktreeId: 'wt1',
       terminalHandle: 'term_lead',
       memberWorktreeId: 'wt_9',
+      character: 'Arthur',
       record: expect.objectContaining({
         ticket: 'CIN-9',
         branch: 'cin-9',

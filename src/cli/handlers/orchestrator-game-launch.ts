@@ -13,6 +13,7 @@ import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
+import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
 import {
   GAME_PROMPT_MAX,
@@ -191,13 +192,17 @@ export async function launchGameMember(args: {
     from,
     `${lead.label ?? 'Lead'} of ${project}: one member per ticket`
   )
+  const lessons = await gameLessonBriefFor(client, item?.id ?? ticket)
   const taskParams = {
-    spec: renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
-      id: item?.id ?? ticket,
-      title: item?.title ?? '',
-      url: item?.url ?? '',
-      status: item?.status
-    }),
+    spec: withGameLessons(
+      renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
+        id: item?.id ?? ticket,
+        title: item?.title ?? '',
+        url: item?.url ?? '',
+        status: item?.status
+      }),
+      lessons
+    ),
     taskTitle: title,
     callerTerminalHandle: from
   }
