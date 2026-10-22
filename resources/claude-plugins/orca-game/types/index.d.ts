@@ -19,7 +19,7 @@ export type GameSource = 'default' | 'global' | 'project' | 'local'
 export type GameSources = Partial<Record<keyof GameConfig | 'tracker', GameSource>>
 
 /** The 5-row pixel art, or the 9 to 10-row 2D-HD scene. */
-export type GameRender = 'classic' | 'hd'
+export type GameRender = 'classic' | 'hd' | 'hd-compact'
 
 export type GameAgentState = 'working' | 'waiting' | 'idle' | 'done'
 

@@ -11,10 +11,14 @@ import { translate } from '@/i18n/i18n'
 
 export const orchestratorGameRenderLabels = (): Record<OrchestratorGameRender, string> => ({
   classic: translate('auto.components.settings.OrchestratorGameRenderSetting.classic', 'Classic'),
-  hd: translate('auto.components.settings.OrchestratorGameRenderSetting.hd', 'HD')
+  hd: translate('auto.components.settings.OrchestratorGameRenderSetting.hd', 'HD'),
+  'hd-compact': translate(
+    'auto.components.settings.OrchestratorGameRenderSetting.hdCompact',
+    'HD compact'
+  )
 })
 
-/** Classic or hd; a project row also offers Inherit and says what it resolves to. */
+/** Classic, hd or hd-compact; a project row also offers Inherit and says what it resolves to. */
 export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'inherit'>({
   value,
   effective,
@@ -34,7 +38,8 @@ export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'in
       ? []
       : [{ value: 'inherit' as V, label: orchestratorGameInheritLabel() }]),
     { value: 'classic' as V, label: labels.classic },
-    { value: 'hd' as V, label: labels.hd }
+    { value: 'hd' as V, label: labels.hd },
+    { value: 'hd-compact' as V, label: labels['hd-compact'] }
   ]
   return (
     <SettingsRow
@@ -43,7 +48,7 @@ export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'in
         effective ??
         translate(
           'auto.components.settings.OrchestratorGameRenderSetting.description',
-          'Classic is the 5-row pixel art. HD draws a 9 to 10-row scene with light, weather and day and night.'
+          'Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.'
         )
       }
       control={

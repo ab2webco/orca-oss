@@ -68,9 +68,17 @@ export type HdSceneInput = {
   event?: TeamEvent
 }
 
+/** hd-compact's band: the hero, its cloud beside it and a strip of sky, whatever the pane's height. */
+export const HD_COMPACT_ROWS = 7
+
 /** A quarter of the pane, from 9 rows up to 14. */
 export const hdRowsOf = (viewportRows: number | undefined): number =>
   Math.max(HD_ROWS, Math.min(HD_MAX_ROWS, Math.round((viewportRows ?? 0) / PANE_ROWS_PER_BAND_ROW)))
+
+export const hdBandRowsOf = (
+  render: 'hd' | 'hd-compact',
+  viewportRows: number | undefined
+): number => (render === 'hd-compact' ? HD_COMPACT_ROWS : hdRowsOf(viewportRows))
 
 // Columns the hero keeps clear ahead of it for its prop.
 const WALK_SLACK = 8

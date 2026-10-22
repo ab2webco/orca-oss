@@ -39,6 +39,16 @@ export type HdWords = {
   advisor: AdvisorPose | undefined
 }
 
+/** Bands shorter than this have no room above the hero's head, so its cloud floats beside it. */
+const CLOUD_ABOVE_MIN_ROWS = 8
+
+export const heroCloudLeftOf = (rows: number, speaker: Figure): number =>
+  rows < CLOUD_ABOVE_MIN_ROWS ? speaker.left + speaker.width + 1 : speaker.left + speaker.width - 2
+
+/** Beside the hero, a cloud that would slide back over it is dropped; the caption line still shows it. */
+export const heroCloudLeastOf = (rows: number, speaker: Figure): number | undefined =>
+  rows < CLOUD_ABOVE_MIN_ROWS ? speaker.left + speaker.width : undefined
+
 export const hdWordsInto = (grid: number[][], w: HdWords): void => {
   const { columns, rows, tick, reaction, event } = w
   const row = rows >= 8 ? 2 : 1
@@ -80,12 +90,13 @@ export const hdWordsInto = (grid: number[][], w: HdWords): void => {
     columns,
     rows,
     tick,
-    left: w.speaker.left + w.speaker.width - 2,
+    left: heroCloudLeftOf(rows, w.speaker),
     limit: advisorBox === undefined ? columns : advisorBox.left - 3,
     row,
     headRight: w.speaker.left + w.speaker.width - 1,
     headTop: w.speaker.top,
-    floor: w.ground - 1
+    floor: w.ground - 1,
+    least: heroCloudLeastOf(rows, w.speaker)
   })
   const clouds = [box, advisorBox]
   waitingMarksInto(grid, columns, w.members, w.memberWidth, tick, clouds)

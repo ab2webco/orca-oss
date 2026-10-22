@@ -364,6 +364,16 @@ describe('render and time zone', () => {
     view.unmount()
   })
 
+  it('offers hd-compact next to classic and hd', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+    )
+    click(view.container, '[aria-label="Render"] button', 'HD compact')
+    expect(updates).toEqual([{ orchestratorGame: { render: 'hd-compact' } }])
+    view.unmount()
+  })
+
   it('goes back to the local clock when the global zone is cleared', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(

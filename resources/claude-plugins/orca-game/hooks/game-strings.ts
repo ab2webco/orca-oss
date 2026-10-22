@@ -181,7 +181,7 @@ const EN: GameStrings = {
     questDescription:
       'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
     questModesHelp:
-      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
+      '/orca-game:mode on|zen|off: off shows everything, on hides tool rows, zen also hides working notes. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
@@ -191,7 +191,7 @@ const EN: GameStrings = {
     sessionOverride: (value, configured, source) =>
       `${value} (this session; the project's setting is ${configured}${source ? `, from ${source}` : ''})`,
     unknownRender: (asked) =>
-      `Unknown render "${asked}". Use /orca-game:render classic or /orca-game:render hd.`,
+      `Unknown render "${asked}". Use /orca-game:render classic, hd or hd-compact.`,
     moreAllies: (count) => `+${count} more`,
     myReviews: (kind, count) => `My ${kind}s ${count}`,
     todo: (count) => `To Do ${count}`,

@@ -19,15 +19,17 @@ import {
   type Stage
 } from './quest-state'
 import { SCENE_ROWS, sceneCellsOf } from './scene'
-import { hdRowsOf, hdSceneGridOf } from './scene-hd'
+import { hdBandRowsOf, hdSceneGridOf } from './scene-hd'
 
 // What each Raster the game owns draws on a tick: the spinner's scene in its render, and the band's pet.
 
 /** The spinner's stage for this width and terminal height, in the render the session draws now. */
-export const stageOf = (columns: number, viewportRows?: number): Stage =>
-  gameConfig().render === 'hd'
-    ? { columns, rows: hdRowsOf(viewportRows), render: 'hd' }
-    : { columns, rows: SCENE_ROWS, render: 'classic' }
+export const stageOf = (columns: number, viewportRows?: number): Stage => {
+  const { render } = gameConfig()
+  return render === 'classic'
+    ? { columns, rows: SCENE_ROWS, render: 'classic' }
+    : { columns, rows: hdBandRowsOf(render, viewportRows), render: 'hd' }
+}
 
 const demoPartyOf = (hasRewards: boolean): HdMember[] =>
   partyOf(demoNow().state, hasRewards).map((one) => ({

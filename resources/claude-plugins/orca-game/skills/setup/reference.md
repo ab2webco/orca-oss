@@ -12,7 +12,7 @@ orchestratorGame:
   hud: true # teammate band above the prompt
   rewards: true # XP, level-ups, celebrations
   tracker: true # follow the worktree's linked work item
-  render: hd # classic (5-row pixel art, the default) | hd (9 to 10-row 2D-HD scene)
+  render: hd # classic (5-row pixel art, the default) | hd (9 to 14-row 2D-HD scene) | hd-compact (the hd scene in 7 rows)
   timezone: America/Bogota # hd's day and night: local (the machine's clock, the default) | an IANA zone
 
   todo: # or: off
