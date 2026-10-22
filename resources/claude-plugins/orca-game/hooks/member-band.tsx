@@ -2,7 +2,7 @@ import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { BandPalette, GameState } from '../types'
 import { fitCells } from './cell-width'
-import { flatLine } from './flat-block'
+import { paneLine } from './flat-block'
 import { memberSelfLineOf } from './flat-view'
 import { gameStrings } from './game-strings'
 import { holdQuestion, pendingQuestion } from './member-pane'
@@ -15,7 +15,7 @@ export type MemberBandInput = {
   columns: number
 }
 
-/** A member's band: its own line, then its question while the lead has not answered it. */
+/** A member's band: its own line on the pane's colors, then its question while the lead has not answered it. */
 export function memberBandRows(
   $: EngineInterface,
   e: RenderInput,
@@ -23,7 +23,7 @@ export function memberBandRows(
 ): RenderElement[] {
   const { Box, Text } = $.ui.resolve(e)
   const line = memberSelfLineOf(state, currentScene(), shownPhase(), columns)
-  const self = flatLine($, e, line, palette)
+  const self = paneLine($, e, line)
   const question = pendingQuestion()
   if (question === undefined) {
     return [self]
