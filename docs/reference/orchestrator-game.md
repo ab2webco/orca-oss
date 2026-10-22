@@ -516,6 +516,32 @@ The lead's verbs, run from the lead's terminal
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
 
+### One setup at a time
+
+A member's new worktree runs the project's setup (`pnpm install` and the like). Four of them at once
+next to five agents force-quit Orca Lab on a 16 GB Mac (ORCA-746), so `game launch`, `game wave` and
+`game resume-members` (when it needs a new worktree) ask `orchestration.workerStart` to queue the
+start with `setupAdmission: 'queue'`
+([`worker-setup-admission.ts`](../../src/main/runtime/orchestration/worker-setup-admission.ts)):
+
+- **One per host.** The host starts one such member at a time per setup host: this machine, or
+  each SSH connection. The next one starts when the previous setup command ends, when an agent that
+  waits for setup sees it end, at once when the worktree runs no setup, or after 20 minutes at most.
+- **Memory.** On this machine the head of the queue also waits for room: macOS must not report
+  `warn` or `critical` memory pressure; elsewhere a fifth of physical memory, at least 2 GiB, must be
+  free. An SSH host's memory is its own, so it is not checked here.
+- **The launch returns at once.** A queued start answers `state: 'queued'` with its place and what it
+  waits on, and creates no dispatch yet, so its task stays ready. The host starts it later by
+  itself; if that start fails, the lead gets a `Queued start of <member> failed: <reason>` message.
+  `game launch` prints `queued #<n>, waiting on <what>; it starts by itself` and does not fail.
+- **In the game state.** Queued members are `queuedMembers`, never `pausedMembers`; a start that
+  holds the slot is neither. They keep their ticket and slot: `game launch` refuses the ticket,
+  `game wave` skips it (`queued`), and `game fleet` lists them under `Queued behind a setup`.
+- **After a restart** the queue is gone, the task is still ready, and the member shows as paused;
+  `game resume-members` relaunches it into the queue.
+- **Mixed versions.** The runtime advertises `orchestration.worker-setup-queue.v1`; against a host
+  without it the CLI says the setups run at the same time and launches at once, as before.
+
 ### Paused members after a restart
 
 When Orca Lab closes or the machine restarts, each member's agent stops with it. The lead's members
