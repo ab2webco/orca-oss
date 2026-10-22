@@ -143,6 +143,8 @@ describe('PR E2E scope selection', () => {
     expect(selectPrE2eScope(['.github/workflows/pr.yml']).mode).toBe('full')
     expect(selectPrE2eScope(['.github/workflows/e2e.yml']).mode).toBe('full')
     expect(selectPrE2eScope(['config/scripts/select-pr-e2e-scope.mjs']).mode).toBe('full')
+    expect(selectPrE2eScope(['.github/actions/install-apt-packages/action.yml']).mode).toBe('full')
+    expect(selectPrE2eScope(['config/scripts/apt-archive-cache.mjs']).mode).toBe('full')
   })
 
   it('ignores blank lines from an empty diff', () => {

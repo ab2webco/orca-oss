@@ -1,0 +1,65 @@
+name: Install apt packages
+description: >-
+  Installs Ubuntu packages from .deb archives restored out of the Actions cache, so a
+  slow apt mirror cannot spend the job's time budget (ORCA-750).
+
+inputs:
+  packages:
+    description: Space-separated apt package names.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Why keyed on the resolved archive names: the key moves on any version bump
+    # and is stable across runs that would download the same set.
+    - name: Resolve apt archives
+      id: resolve
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        prefix="apt-archives-${RUNNER_OS}-${RUNNER_ARCH}-${ImageOS:-unknown}"
+        # shellcheck disable=SC2086
+        sudo apt-get install --print-uris -qq -y $PACKAGES > "$RUNNER_TEMP/apt-archives.uris"
+        node config/scripts/apt-archive-cache.mjs key --prefix "$prefix" \
+          --uris "$RUNNER_TEMP/apt-archives.uris" --list "$RUNNER_TEMP/apt-archives.list" >> "$GITHUB_OUTPUT"
+        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
+
+    - name: Restore apt archives
+      id: restore
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.resolve.outputs.dir }}
+        key: ${{ steps.resolve.outputs.key }}
+        restore-keys: ${{ steps.resolve.outputs.prefix }}-
+
+    - name: Install apt packages
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        ARCHIVE_DIR: ${{ steps.resolve.outputs.dir }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$ARCHIVE_DIR/partial"
+        # shellcheck disable=SC2086
+        sudo apt-get install -y \
+          -o Dir::Cache::Archives="$ARCHIVE_DIR/" \
+          -o APT::Keep-Downloaded-Packages=true \
+          $PACKAGES
+        # apt leaves root-owned lock and partial/ behind, which the cache save cannot read.
+        sudo chown -R "$(id -u):$(id -g)" "$ARCHIVE_DIR"
+        node config/scripts/apt-archive-cache.mjs prune \
+          --dir "$ARCHIVE_DIR" --list "$RUNNER_TEMP/apt-archives.list"
+
+    # Why saved here and not in a post step: a shard cancelled at its cap never
+    # runs post steps, and that is the run that most needs the next one cached.
+    - name: Save apt archives
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.resolve.outputs.dir }}
+        key: ${{ steps.resolve.outputs.key }}
