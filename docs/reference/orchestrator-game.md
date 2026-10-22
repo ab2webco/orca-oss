@@ -794,6 +794,10 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's failure (failed setup, first-signal deadline, agent exit, failed `worker_done`) leaves
   the inbox and its count once the same ticket gets past it: a later succeeded `worker_done`, or any
   message from a newer dispatch. Mail from the failed dispatch itself does not hide it.
+- A member sends one heartbeat when its brief arrives and no loop (ORCA-746): that first signal
+  keeps the 11-minute first-signal deadline from failing the dispatch. After it, Orca records the
+  member's `last_activity_at` every 30 s from its agent hooks (or terminal output when the agent
+  has none), and the coordinator's stale warning reads heartbeat or activity, once per stale spell.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,
