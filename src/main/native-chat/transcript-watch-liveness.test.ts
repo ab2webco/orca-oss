@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { renameSync, type FSWatcher } from 'node:fs'
 import type * as NodeFs from 'node:fs'
-import { appendFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, open, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -155,6 +155,9 @@ describe('native chat transcript watcher liveness', () => {
     const stableTail = claudeLine('stable-tail', 'assistant', 'x'.repeat(200))
     expect(Buffer.byteLength(prefixAfter)).toBe(Buffer.byteLength(prefixBefore))
     const filePath = await tempFile(prefixBefore + stableTail)
+    // Why: a past mtime keeps the rewrite a version change on coarse-mtime filesystems.
+    const past = new Date(Date.now() - 60_000)
+    await utimes(filePath, past, past)
     const snapshots = vi.fn()
     const replacements = vi.fn()
     const subscription = await subscribeNativeChatTranscript({
@@ -170,9 +173,11 @@ describe('native chat transcript watcher liveness', () => {
     })
     await waitFor(() => snapshots.mock.calls.length === 1)
 
-    await writeFile(filePath, prefixAfter + stableTail)
-    const future = new Date(Date.now() + 10_000)
-    await utimes(filePath, future, future)
+    // Why: one in-place write is one version change; writeFile then utimes is
+    // two, and a reconcile landing between them rightly replaces twice.
+    const handle = await open(filePath, 'r+')
+    await handle.write(prefixAfter, 0)
+    await handle.close()
     await waitFor(() =>
       replacements.mock.calls.flat(2).some((message) => message.id === 'prefix-new')
     )
