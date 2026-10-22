@@ -1,4 +1,4 @@
-import type { GameAgent, GameState, RecentReward } from '../types'
+import type { GameAgent, GameReview, GameState, RecentReward } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { xpTextOf, type Level } from './fleet-hud'
 import { CI_COLORS, ciShortOf } from './fleet-labels'
@@ -8,7 +8,7 @@ import { memberOf } from './party'
 import { isCiRed, reviewLabelOf } from './rewards'
 import type { SceneDefinition, ScenePhase } from './scenes/index'
 import { memberPhaseOf, ticketOf } from './state-report'
-import { stateReportWordsOf, type MemberPhase } from './state-report-words'
+import { stateReportWordsOf, type MemberPhase, type StateReportWords } from './state-report-words'
 
 /** A run of text in one color; no color reads in the scene's parchment. */
 export type FlatPart = { key: string; text: string; color?: string; bold?: boolean }
@@ -125,6 +125,30 @@ const markOf = (agent: GameAgent, phase: MemberPhase): [string, string | undefin
   return phase === 'working' ? ['•', 'cyan'] : ['z', 'gray']
 }
 
+const reviewSlotsOf = (review: GameReview | null, words: StateReportWords): Slot[] => {
+  if (review === null) {
+    return []
+  }
+  const kind = review.provider === 'gitlab' ? 'MR' : 'PR'
+  const id = reviewLabelOf(review)
+  const slots: Slot[] = [
+    {
+      key: 'review',
+      priority: 3,
+      labels: [`${kind} ${id} ${words.reviewStates[review.state]}`, id]
+    }
+  ]
+  if (review.ci !== 'none') {
+    slots.push({
+      key: 'ci',
+      priority: 3,
+      labels: [`CI ${words.ciWords[review.ci]}`, ciShortOf(review.ci)],
+      color: CI_COLORS[review.ci]
+    })
+  }
+  return slots
+}
+
 const memberLineOf = (
   agent: GameAgent,
   state: GameState,
@@ -160,24 +184,7 @@ const memberLineOf = (
     const label = words.phases[phase]
     slots.push({ key: 'phase', priority: 1, labels: [label], color: PHASE_COLORS[phase], bold })
   }
-  const review = agent.review
-  if (review !== undefined) {
-    const kind = review.provider === 'gitlab' ? 'MR' : 'PR'
-    const id = reviewLabelOf(review)
-    slots.push({
-      key: 'review',
-      priority: 3,
-      labels: [`${kind} ${id} ${words.reviewStates[review.state]}`, id]
-    })
-    if (review.ci !== 'none') {
-      slots.push({
-        key: 'ci',
-        priority: 3,
-        labels: [`CI ${words.ciWords[review.ci]}`, ciShortOf(review.ci)],
-        color: CI_COLORS[review.ci]
-      })
-    }
-  }
+  slots.push(...reviewSlotsOf(agent.review ?? null, words))
   return {
     key: `flat-member-${agent.paneKey}`,
     parts: fitSlots(slots, columns),
@@ -269,4 +276,39 @@ export const flatPhaseLineOf = (
     ...(caption === '' ? [] : [{ key: 'caption', text: `${SEP}${caption}` }])
   ]
   return { key: 'flat-phase', parts: cutParts(parts, columns) }
+}
+
+/** A member pane's own line: its character, ticket, the phase it shows, its PR and CI. */
+export const memberSelfLineOf = (
+  state: GameState | null,
+  scene: SceneDefinition,
+  phase: ScenePhase | undefined,
+  columns: number
+): FlatLine => {
+  const words = stateReportWordsOf(gameLocale())
+  // Why the leader row: Orca marks the pane that asked for the state as its leader.
+  const self = state?.agents.find((one) => one.isLeader) ?? state?.agents[0]
+  const slots: Slot[] = []
+  const name = self === undefined ? undefined : flatNameOf(self)
+  if (name !== undefined) {
+    const short = fitCells(name, NAME_CELLS)
+    const gold = scene.band.gold
+    slots.push({ key: 'name', priority: 0, labels: [name, short], color: gold, bold: true })
+  }
+  const ticket = state?.workItem?.identifier ?? (self === undefined ? undefined : ticketOf(self))
+  if (ticket !== undefined && ticket !== name && ticket !== self?.displayName) {
+    slots.push({ key: 'ticket', priority: 2, labels: [ticket] })
+  }
+  const card = scene.cards[phase ?? 'working']
+  slots.push({
+    key: 'phase',
+    priority: 1,
+    labels: [`${card.icon} ${localizedNameOf(card.name)}`, card.icon],
+    color: card.color
+  })
+  slots.push(...reviewSlotsOf(state?.review ?? null, words))
+  if (state === null) {
+    slots.push({ key: 'loading', priority: 4, labels: [gameStrings().text.loading], color: 'gray' })
+  }
+  return { key: 'band-member-self', parts: fitSlots(slots, columns) }
 }

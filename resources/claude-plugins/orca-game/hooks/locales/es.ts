@@ -26,6 +26,7 @@ export const ES: GameCatalog = {
     workItemHeading: 'Tarea',
     needsYou: 'Te necesitan:',
     waitingNeed: 'te espera',
+    asksLead: (lead) => `? Pregunta a ${lead}:`,
     ciFailingNeed: 'CI fallando',
     teammates: (count) => `Equipo: ${plural(count, 'compañero', 'compañeros')}`,
     working: (count) => `${count} trabajando`,

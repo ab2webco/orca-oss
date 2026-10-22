@@ -9,6 +9,8 @@ import { HUD_KEY, HUD_MIN_COLUMNS, HUD_ROWS, hudCellsOf, hudLineOf, xpTextOf } f
 import { runAction } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
+import { memberBandRows } from './member-band'
+import { isMemberPane } from './member-pane'
 import { ACTION_CHIP_PREFIX, actionChipsOf } from './lead-actions'
 import { isPaneShown, openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
@@ -61,6 +63,17 @@ export const registerBand = (on: On): void => {
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
     const [beneath, isPanelShown] = await Promise.all([next(e).then(beneathOf), isPaneShown($)])
     const allies = await alliesStrip($, e, palette, columns, isPanelShown)
+    // Why no menu, team or actions: a member reports to its lead and never runs the team.
+    if (isMemberPane(v.state)) {
+      const { Box } = $.ui.resolve(e)
+      return (
+        <Box flexDirection="column">
+          {memberBandRows($, e, { state: v.state, palette, columns })}
+          {allies}
+          {beneath}
+        </Box>
+      )
+    }
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     // Why Jev too: CI often lands while the lead is idle, when no spinner draws the scene.

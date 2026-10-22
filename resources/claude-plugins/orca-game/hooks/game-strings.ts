@@ -35,6 +35,8 @@ export type TextStrings = {
   workItemHeading: string
   needsYou: string
   waitingNeed: string
+  /** A member pane's question to its lead, while the lead has not answered. */
+  asksLead: (lead: string) => string
   ciFailingNeed: string
   teammates: (count: number) => string
   working: (count: number) => string
@@ -162,6 +164,7 @@ const EN: GameStrings = {
     workItemHeading: 'Work item',
     needsYou: 'Needs you:',
     waitingNeed: 'waiting on you',
+    asksLead: (lead) => `? Asked ${lead}:`,
     ciFailingNeed: 'CI failing',
     teammates: (count) => `Team ${count} teammate${count === 1 ? '' : 's'}`,
     working: (count) => `${count} working`,
