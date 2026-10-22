@@ -647,6 +647,8 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
+import { readMemoryPressure } from '../memory/memory-pressure-reading'
+import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
@@ -3668,6 +3670,9 @@ export class OrcaRuntimeService {
       this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
+  private readonly workerSetupAdmission = new WorkerSetupAdmission({
+    readMemory: () => readMemoryPressure()
+  })
   private readonly gameMemberResume = new GameMemberResume({
     store: this.gameMemberSessions,
     statusOf: (taskId) => {
@@ -19580,6 +19585,10 @@ export class OrcaRuntimeService {
       composerReadyState: readiness.state,
       waitedMs: readiness.waitedMs
     }
+  }
+
+  getWorkerSetupAdmission(): WorkerSetupAdmission {
+    return this.workerSetupAdmission
   }
 
   async waitForSetupTerminalCompletion(handle: string): Promise<{ exitCode: number | null }> {
