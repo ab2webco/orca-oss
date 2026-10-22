@@ -11,9 +11,16 @@ import type { CDPSession, Page, TestInfo } from '@stablyai/playwright-test'
 
 /**
  * `contexts-cleared` is what a main-document reload or navigation emits, not
- * per-context destruction, and it names no frame.
+ * per-context destruction, and it names no frame. `main-context-created` is the main
+ * frame's page world: the replay at enable is the baseline, any later one replaced it.
+ * `mark` is a caller's label carrying the main frame context live at that call (ORCA-753).
  */
-export type LifecycleKind = 'context-destroyed' | 'contexts-cleared' | 'frame-detached'
+export type LifecycleKind =
+  | 'context-destroyed'
+  | 'contexts-cleared'
+  | 'frame-detached'
+  | 'main-context-created'
+  | 'mark'
 
 export type LifecycleRecord = {
   /** ms since the recorder attached. */
@@ -94,11 +101,18 @@ export function applyCdpLifecycleEvent(
       return null
     }
     const auxData = isRecord(context.auxData) ? context.auxData : {}
-    state.contexts.set(contextId, {
-      frameId: readString(auxData.frameId),
-      type: readString(auxData.type)
+    const info = { frameId: readString(auxData.frameId), type: readString(auxData.type) }
+    state.contexts.set(contextId, info)
+    if (info.frameId === null || info.frameId !== state.mainFrameId || info.type !== 'default') {
+      return null
+    }
+    return toRecord(state, meta, {
+      kind: 'main-context-created',
+      frameId: info.frameId,
+      contextId,
+      contextType: info.type,
+      reason: null
     })
-    return null
   }
   if (method === 'Runtime.executionContextDestroyed') {
     const contextId = isRecord(params) ? readNumber(params.executionContextId) : null
@@ -142,26 +156,52 @@ export function applyCdpLifecycleEvent(
   return null
 }
 
+/** A caller's label with the main frame's page-world context as the recorder last saw it. */
+export function markLifecycle(
+  state: LifecycleState,
+  meta: LifecycleMeta,
+  label: string
+): LifecycleRecord {
+  let mainContextId: number | null = null
+  for (const [contextId, info] of state.contexts) {
+    if (info.frameId === state.mainFrameId && info.type === 'default') {
+      mainContextId = contextId
+    }
+  }
+  return toRecord(state, meta, {
+    kind: 'mark',
+    frameId: state.mainFrameId,
+    contextId: mainContextId,
+    contextType: mainContextId === null ? null : 'default',
+    reason: label
+  })
+}
+
 /** One log line naming the counts and the last event, in the shape the other evidence helpers print. */
 export function formatContextLifecycleLine(
   testTitle: string,
   records: readonly LifecycleRecord[]
 ): string {
   const head = `[context-lifecycle] ${testTitle} :: `
-  const last = records.at(-1)
-  if (!last) {
+  if (records.length === 0) {
     return `${head}no events`
   }
+  // Why apart: a mark before every setTheme would otherwise always be the "last event".
+  const last = records.findLast((record) => record.kind !== 'mark')
+  const lastMark = records.findLast((record) => record.kind === 'mark')
   const counts = new Map<LifecycleKind, number>()
   for (const record of records) {
     counts.set(record.kind, (counts.get(record.kind) ?? 0) + 1)
   }
   const kinds = [...counts].map(([kind, count]) => `${kind}=${count}`).join(', ')
-  return (
-    `${head}${records.length} events (${kinds}), last: ${last.kind} ` +
-    `frame=${last.frameId ?? 'none'} main=${last.isMainFrame} reason=${last.reason ?? 'none'} ` +
-    `at ${last.atMs}ms`
-  )
+  const lastEvent = last
+    ? `last: ${last.kind} frame=${last.frameId ?? 'none'} main=${last.isMainFrame} ` +
+      `reason=${last.reason ?? 'none'} at ${last.atMs}ms`
+    : 'last: none'
+  const markPart = lastMark
+    ? `, last mark: ${lastMark.reason ?? ''} ctx=${lastMark.contextId ?? 'none'} at ${lastMark.atMs}ms`
+    : ''
+  return `${head}${records.length} events (${kinds}), ${lastEvent}${markPart}`
 }
 
 function readMainFrameId(frameTree: unknown): string | null {
@@ -173,6 +213,8 @@ function readMainFrameId(frameTree: unknown): string | null {
 }
 
 export type ContextLifecycleRecorder = {
+  /** Records a label with the main frame context that is live right now. */
+  mark: (label: string) => void
   /** Detaches the CDP session and returns every record captured so far. */
   stop: () => Promise<LifecycleRecord[]>
 }
@@ -209,6 +251,12 @@ export async function startContextLifecycleRecording(
   await session.send('Runtime.enable')
 
   return {
+    mark: (label) => {
+      const now = Date.now()
+      records.push(
+        markLifecycle(state, { atMs: now - startedAt, at: new Date(now).toISOString() }, label)
+      )
+    },
     stop: async () => {
       // A renderer that died or a closed window can reject detach; the records stand either way.
       await session.detach().catch(() => undefined)
