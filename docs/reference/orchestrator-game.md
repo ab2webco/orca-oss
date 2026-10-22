@@ -762,6 +762,9 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   (`setup_state`, shown by `orchestration worker-show`). A failed setup still mails the run as a
   high-priority `status`. Heartbeats never reach the inbox, its count or the terminal's
   "You have N orchestration messages" line.
+- A member's failure (failed setup, first-signal deadline, agent exit, failed `worker_done`) leaves
+  the inbox and its count once the same ticket gets past it: a later succeeded `worker_done`, or any
+  message from a newer dispatch. Mail from the failed dispatch itself does not hide it.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,

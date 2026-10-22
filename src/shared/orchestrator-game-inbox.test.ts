@@ -112,6 +112,56 @@ describe('gameInboxesOf', () => {
     expect(lead?.unread).toBe(1)
   })
 
+  it("collapses a member's failure once a later dispatch of the same ticket is alive (ORCA-746)", () => {
+    sequence = 0
+    const rows = [
+      mail('run:run_1', 'dispatch:d1', {
+        subject: 'Setup failed for worker d1',
+        payload: JSON.stringify({ dispatchId: 'd1', setupState: 'failed' })
+      }),
+      mail('run:run_1', 'dispatch:d2', {
+        subject: 'First signal deadline expired',
+        payload: JSON.stringify({ dispatchId: 'd2', reason: 'first_signal_deadline_expired' })
+      }),
+      mail('run:run_1', 'term_1b', {
+        type: 'heartbeat',
+        payload: JSON.stringify({ dispatchId: 'd1b' })
+      })
+    ]
+
+    const [lead] = gameInboxesOf(source(rows), {})
+
+    expect(lead?.messages.map((one) => one.id)).toEqual(['msg_2'])
+    expect(lead?.unread).toBe(1)
+  })
+
+  it("collapses a member's failure once the same ticket reports success, and keeps it while only the failed dispatch talks", () => {
+    sequence = 0
+    const rows = [
+      mail('run:run_1', 'term_1', {
+        type: 'escalation',
+        subject: 'Agent exited unexpectedly (code 1)',
+        payload: JSON.stringify({ taskId: 't1', exitCode: 1, handle: 'term_1' })
+      }),
+      mail('run:run_1', 'term_2', {
+        type: 'worker_done',
+        payload: JSON.stringify({ dispatchId: 'd2', outcome: 'failed' })
+      }),
+      mail('run:run_1', 'term_2', {
+        type: 'heartbeat',
+        payload: JSON.stringify({ dispatchId: 'd2' })
+      }),
+      mail('run:run_1', 'term_1b', {
+        type: 'worker_done',
+        payload: JSON.stringify({ dispatchId: 'd1b', outcome: 'succeeded' })
+      })
+    ]
+
+    const [lead] = gameInboxesOf(source(rows), {})
+
+    expect(lead?.messages.map((one) => one.id)).toEqual(['msg_4', 'msg_2'])
+  })
+
   it('counts as read what the board marked read up to its cursor, or what the agent already read', () => {
     sequence = 0
     const rows = [
