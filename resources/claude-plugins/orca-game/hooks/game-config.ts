@@ -81,6 +81,11 @@ export const gameStateArgvOf = (cli: string | null | undefined): readonly string
   return path === undefined ? undefined : [path, 'game', 'state', '--json']
 }
 
+export const gameFleetArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined ? undefined : [path, 'game', 'fleet']
+}
+
 // Orca issues `term_<uuid>`; the shape also keeps a handle from ever reading as a CLI flag.
 const TERMINAL_HANDLE = /^term_[A-Za-z0-9_-]{1,128}$/
 

@@ -9,6 +9,7 @@ import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
+import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
 import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
@@ -28,6 +29,7 @@ export const register: Register = (on) => {
   registerAdvisor(on)
   registerFleetPane(on)
   registerLeadName(on)
+  registerLeadBrief(on)
   registerActionCommands(on)
   registerStateCommand(on)
   registerLayoutCommand(on)

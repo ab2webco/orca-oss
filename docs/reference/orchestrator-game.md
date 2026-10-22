@@ -553,6 +553,13 @@ are saved while they run, so the team picks up where it was:
     record, so it is reused, never orphaned. When the new dispatch cannot be bound, the reopened
     conversation is closed again, so no agent runs that no dispatch owns.
   - The lead's rules have it ask the person once, naming the members, before resuming.
+- **The lead's brief** (ORCA-746). When a lead's own conversation is resumed or compacted, the
+  orca-game mod hands it `game fleet` as context, paused members included, so it answers from the
+  host's record and not from a summary; after a compaction it also points the lead back to
+  `game lead` for its rules ([`lead-brief.ts`](../../resources/claude-plugins/orca-game/hooks/lead-brief.ts),
+  Claude's `SessionStart` with `source` `resume` or `compact`). Only a session that ran the lead
+  rules, is the project's lead, and has no other live lead gets it; a fresh start reads the fleet
+  through the lead skill instead.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
   of any saved member that has not finished, paused or live, even with `--force`, which only waives
