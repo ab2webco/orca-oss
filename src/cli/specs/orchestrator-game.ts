@@ -146,6 +146,25 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['game', 'metrics'],
+    summary:
+      "The project's delivery numbers: tickets done, lead time, freed members by outcome, events",
+    usage:
+      'orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'since', 'until', 'ticket', 'character'],
+    notes: [
+      'Computed from `game events` and `game history` on the Orca host that runs the lead, so it also works for SSH and folder projects. Read-only.',
+      'Done: a merged event, or a member freed as merged or with a merged PR. Lead time: first claim to last merge, per ticket.',
+      '--since keeps entries at or after it, --until entries before it. Metrics with no recorded fact print "not recorded", never 0.',
+      '--character is refused until characters are recorded per member.'
+    ],
+    examples: [
+      'orca game metrics --since 2026-10-13',
+      'orca game metrics --ticket CIN-12 --json',
+      'orca game metrics --since 2026-10-01 --until 2026-10-08'
+    ]
+  },
+  {
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:
