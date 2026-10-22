@@ -167,6 +167,12 @@ later change from Settings. When the state carries no `viewScopes` (an older Orc
 refuses the command (an older `orca` on an SSH host), the view applies to this pane only and the
 reply says so.
 
+The Panel's menu has the same selector (`hooks/view-picker.tsx`): `◐ View: <current>` opens a row
+of scope chips (this pane, and the scopes Orca can store) and a row of view chips with their cost,
+`●` on the current view and `★` on the suggested one. A pick goes through the same `switchView` as
+the command, closes the selector and names the result in a toast. On a phone both rows are tap
+chips, and the menu takes two rows of chips at about 40 columns.
+
 ```yaml
 # orca.yaml
 orchestratorGame:
