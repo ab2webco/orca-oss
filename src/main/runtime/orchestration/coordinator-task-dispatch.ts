@@ -1,4 +1,4 @@
-/** Picking worker terminals, sending a task's dispatch preamble, and warning about hung dispatches. */
+/** Picking worker terminals and sending a task's dispatch preamble. */
 import type { OrchestrationDb } from './db'
 import type { TaskRow } from './types'
 import { buildDispatchPreamble } from './preamble'
@@ -9,21 +9,6 @@ import {
 } from './coordinator-stale-base-flag'
 
 export type TaskDispatchResult = 'dispatched' | 'stale-base-refused'
-
-// Why: 10 min = documented heartbeat cadence (5 min) × 2, so one missed heartbeat is the earliest a dispatch can look stale.
-const HUNG_THRESHOLD_MS = 10 * 60 * 1000
-
-// Why: warn only, never auto-fail — a false positive (slow but correct worker) costs more than a false negative (hung worker holding a slot); see R6 of DESIGN_DOC_PREAMBLE_FIX.md.
-export function warnStaleDispatches(db: OrchestrationDb, onLog: (msg: string) => void): void {
-  const thresholdIso = new Date(Date.now() - HUNG_THRESHOLD_MS).toISOString()
-  const stale = db.getStaleDispatches(thresholdIso)
-  for (const ctx of stale) {
-    const minutes = Math.round(HUNG_THRESHOLD_MS / 60000)
-    onLog(
-      `Warning: worker ${ctx.assignee_handle ?? '<unknown>'} on task ${ctx.task_id} has not sent a heartbeat in ~${minutes} min (dispatch ${ctx.id})`
-    )
-  }
-}
 
 export async function listAvailableWorkerTerminals(
   db: OrchestrationDb,
