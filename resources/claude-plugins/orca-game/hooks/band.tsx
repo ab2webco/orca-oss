@@ -64,7 +64,9 @@ export const registerBand = (on: On): void => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const text = gameStrings().text
     // Why Jev too: CI often lands while the lead is idle, when no spinner draws the scene.
-    const showPet = (isClawdReacting() || isAdvisorActing()) && !isSceneShown()
+    // Why isWorking: the spinner draws the scene all turn, and its stage count can lag or drop.
+    const showPet =
+      !e.props.isWorking && (isClawdReacting() || isAdvisorActing()) && !isSceneShown()
     const pet = showPet ? [petScene(PET_KEY, columns)] : []
     const rowsOf = (
       prefix: string,

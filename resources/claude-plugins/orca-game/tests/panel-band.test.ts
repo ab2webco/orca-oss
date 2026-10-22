@@ -67,7 +67,7 @@ const start = async (
   await clock.settle()
 }
 
-const band = ($: Engine, columns: number) =>
+const band = ($: Engine, columns: number, isWorking = false) =>
   $.ui.mount({
     plugin: 'orca-game',
     surface: 'terminal',
@@ -75,7 +75,7 @@ const band = ($: Engine, columns: number) =>
     viewport: { columns: columns + 4, rows: 60, isFullscreen: true },
     props: {
       hasSurvey: false,
-      isWorking: false,
+      isWorking,
       maxRows: 30,
       bodyColumns: columns,
       scroll: { offset: 0, bodyRows: 29 },
@@ -166,6 +166,38 @@ describe('the band with the Panel closed or behind another tab', () => {
       await phone.unmount()
     })
   }
+})
+
+// The spinner draws the scene while a turn runs; its stage count can lag or drop, so the band must not draw a second one.
+describe('the pet strip while a turn runs', () => {
+  for (const mode of ['on', 'zen']) {
+    for (const render of ['classic', 'hd']) {
+      test(`${mode} ${render}: no second scene beside the spinner, even before it registers its stage`, async ($, on) => {
+        await start($, on, [], { ORCA_GAME_MODE: mode, ORCA_GAME_RENDER: render })
+        const ui = await band($, 160, true)
+        await ui.press({ key: 'band-pet' })
+        expect(await ui.find({ type: 'Raster', key: 'band-pet-scene' })).toBeUndefined()
+        await ui.unmount()
+      })
+    }
+  }
+
+  test('the idle band keeps the pet strip and drops it once a turn starts', async ($, on) => {
+    await start($, on, [])
+    const ui = await band($, 160)
+    await ui.press({ key: 'band-pet' })
+    expect(await ui.find({ type: 'Raster', key: 'band-pet-scene' })).toBeDefined()
+    await ui.redraw({
+      hasSurvey: false,
+      isWorking: true,
+      maxRows: 30,
+      bodyColumns: 160,
+      scroll: { offset: 0, bodyRows: 29 },
+      view: {}
+    })
+    expect(await ui.find({ type: 'Raster', key: 'band-pet-scene' })).toBeUndefined()
+    await ui.unmount()
+  })
 })
 
 const ADVISOR = {
