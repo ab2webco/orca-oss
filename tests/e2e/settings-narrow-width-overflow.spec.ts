@@ -204,7 +204,7 @@ test('settings panes fit the window without horizontal overflow at every width',
     orcaPage,
     testInfo,
     'agents-game',
-    '[role="radiogroup"][aria-label="Game mode"]',
+    '[role="combobox"][aria-label="Default view"]',
     failures
   )
 
@@ -218,7 +218,7 @@ test('settings panes fit the window without horizontal overflow at every width',
     orcaPage,
     testInfo,
     'repo-game',
-    '[role="radiogroup"][aria-label="Game mode"]',
+    '[role="combobox"][aria-label="Default view"]',
     failures
   )
 

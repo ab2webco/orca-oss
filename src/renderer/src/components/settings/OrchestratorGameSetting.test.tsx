@@ -70,7 +70,10 @@ beforeEach(() => {
 })
 
 function sceneSelect(container: HTMLElement): HTMLSelectElement {
-  const select = container.querySelector('select')
+  // Why by its options: the Default view select comes first in the section.
+  const select = Array.from(container.querySelectorAll('select')).find((one) =>
+    Array.from(one.options).some((option) => option.value === 'quest')
+  )
   expect(select).toBeTruthy()
   return select as HTMLSelectElement
 }
@@ -81,6 +84,11 @@ function choose(select: HTMLSelectElement, value: string): void {
     select.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
+
+const viewSelect = (container: HTMLElement): HTMLSelectElement =>
+  Array.from(container.querySelectorAll('select')).find((one) =>
+    Array.from(one.options).some((option) => option.value === '2d-hd')
+  ) as HTMLSelectElement
 
 const optionsOf = (select: HTMLSelectElement): [string, string][] =>
   Array.from(select.options).map((option) => [option.value, option.textContent ?? ''])
@@ -112,7 +120,7 @@ function click(container: HTMLElement, selector: string, label: string): void {
 }
 
 describe('OrchestratorGameSetting', () => {
-  it('writes the global layer from the mode control and the switches', () => {
+  it('writes the global layer from the default view and the switches', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <OrchestratorGameSetting
@@ -121,7 +129,7 @@ describe('OrchestratorGameSetting', () => {
       />
     )
 
-    click(view.container, 'button', 'Zen')
+    choose(viewSelect(view.container), 'zen')
     click(view.container, '[role="switch"]', 'Teammate HUD')
     expect(updates).toEqual([
       { orchestratorGame: { rewards: false, mode: 'zen' } },
@@ -187,7 +195,7 @@ describe('ProjectOrchestratorGameSetting', () => {
     expect(view.container.textContent).toContain('Off · from orca.yaml')
     expect(view.container.textContent).toContain('Off · this machine')
 
-    click(view.container, '[aria-label="Game mode"] button', 'Zen')
+    choose(viewSelect(view.container), 'zen')
     click(view.container, '[aria-label="Teammate HUD"] button', 'Inherit')
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { hud: false, mode: 'zen' } } },

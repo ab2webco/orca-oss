@@ -10866,6 +10866,20 @@
         "MobileUpdateInstallSetting": {
           "title": "Actualizar desde un teléfono emparejado",
           "description": "Permite que un teléfono emparejado pida a este equipo instalar la actualización que Orca Lab ya ofrece. Antes de reiniciar se muestra una cuenta atrás que puedes cancelar, y las solicitudes se rechazan mientras haya agentes trabajando."
+        },
+        "OrchestratorGameViewSetting": {
+          "off": "Apagado",
+          "flat": "Plano",
+          "zen": "Zen",
+          "classic": "2D clásico",
+          "hd": "2D hd",
+          "light": "ligera",
+          "medium": "media",
+          "heavy": "pesada",
+          "show": "Mostrar el juego",
+          "view": "Vista por defecto",
+          "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
+          "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
         }
       },
       "right": {

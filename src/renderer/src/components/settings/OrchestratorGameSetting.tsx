@@ -7,8 +7,7 @@ import {
   resolveOrchestratorGameConfig,
   type OrchestratorGameBuiltInScene,
   type OrchestratorGameConfig,
-  type OrchestratorGameLayer,
-  type OrchestratorGameMode
+  type OrchestratorGameLayer
 } from '../../../../shared/orchestrator-game-config'
 import {
   withOrchestratorGameField,
@@ -59,6 +58,11 @@ import {
   orchestratorGameRenderLabels
 } from './OrchestratorGameRenderSetting'
 import { OrchestratorGameScenesSkillCard } from './OrchestratorGameScenesSkillCard'
+import {
+  OrchestratorGameViewRows,
+  ProjectOrchestratorGameViewRows
+} from './OrchestratorGameViewSetting'
+import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -106,9 +110,6 @@ const sectionHeader = (): React.JSX.Element => (
   />
 )
 
-const modeTitle = (): string =>
-  translate('auto.components.settings.OrchestratorGameSetting.mode', 'Game mode')
-
 const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen', 'scene']
 
 const sceneTitle = (): string =>
@@ -122,12 +123,13 @@ export function OrchestratorGameSetting({
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
   const layer = settings.orchestratorGame
-  const { config } = resolveOrchestratorGameConfig({ global: layer })
+  const resolved = resolveOrchestratorGameConfig({ global: layer }).config
+  // Why the shown mode: with Show the game off the rest of the section is disabled and the preview is off.
+  const config = { ...resolved, mode: shownOrchestratorGameModeOf(resolved) }
   const set = <K extends keyof OrchestratorGameConfig>(
     key: K,
     value: OrchestratorGameConfig[K]
   ): void => updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
-  const labels = modeLabels()
   const description = translate(
     'auto.components.settings.OrchestratorGameSetting.description',
     'Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.'
@@ -142,22 +144,7 @@ export function OrchestratorGameSetting({
         className="space-y-1"
       >
         {sectionHeader()}
-        <SettingsRow
-          label={modeTitle()}
-          description={description}
-          control={
-            <SettingsSegmentedControl
-              value={config.mode}
-              onChange={(mode) => set('mode', mode)}
-              ariaLabel={modeTitle()}
-              size="sm"
-              options={(['on', 'zen', 'off'] as const).map((mode) => ({
-                value: mode,
-                label: labels[mode]
-              }))}
-            />
-          }
-        />
+        <OrchestratorGameViewRows settings={settings} updateSettings={updateSettings} />
         <SettingsRow
           label={sceneTitle()}
           description={translate(
@@ -202,7 +189,7 @@ export function OrchestratorGameSetting({
   )
 }
 
-type FieldValue = OrchestratorGameMode | 'true' | 'false'
+type FieldValue = 'true' | 'false'
 
 const EMPTY_WORKTREES: never[] = []
 
@@ -284,43 +271,37 @@ export function ProjectOrchestratorGameSetting({
     "Override the game for this project on this machine. The project's orca.yaml sets its default."
   )
   const rows: {
-    key: 'mode' | ToggleKey
+    key: ToggleKey
     label: string
     text: string
     value: FieldValue | 'inherit'
     options: { value: FieldValue | 'inherit'; label: string }[]
-  }[] = [
-    {
-      key: 'mode',
-      label: modeTitle(),
-      text: labels[config.mode],
-      value: local?.mode ?? 'inherit',
-      options: [
-        { value: 'inherit', label: inherit },
-        ...(['on', 'zen', 'off'] as const).map((mode) => ({ value: mode, label: labels[mode] }))
-      ]
-    },
-    ...toggles().map((toggle) => ({
-      key: toggle.key,
-      label: toggle.label,
-      text: onOff(config[toggle.key]),
-      value:
-        local?.[toggle.key] === undefined
-          ? ('inherit' as const)
-          : (String(local[toggle.key]) as 'true' | 'false'),
-      options: [
-        { value: 'inherit' as const, label: inherit },
-        { value: 'true' as const, label: labels.on },
-        { value: 'false' as const, label: labels.off }
-      ]
-    }))
-  ]
+  }[] = toggles().map((toggle) => ({
+    key: toggle.key,
+    label: toggle.label,
+    text: onOff(config[toggle.key]),
+    value:
+      local?.[toggle.key] === undefined
+        ? ('inherit' as const)
+        : (String(local[toggle.key]) as 'true' | 'false'),
+    options: [
+      { value: 'inherit' as const, label: inherit },
+      { value: 'true' as const, label: labels.on },
+      { value: 'false' as const, label: labels.off }
+    ]
+  }))
 
   return (
     <SearchableSetting title={title()} description={description} keywords={keywords}>
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
+        <ProjectOrchestratorGameViewRows
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
+        />
         {rows.map((row) => (
           <SettingsRow
             key={row.key}
@@ -335,8 +316,6 @@ export function ProjectOrchestratorGameSetting({
                 onChange={(next) => {
                   if (next === 'inherit') {
                     set(row.key, undefined)
-                  } else if (row.key === 'mode') {
-                    set('mode', next as OrchestratorGameMode)
                   } else {
                     set(row.key, next === 'true')
                   }
@@ -390,7 +369,10 @@ export function ProjectOrchestratorGameSetting({
         ) : (
           <OrchestratorGameSceneFileStatus read={file.state} />
         )}
-        <OrchestratorGameScenePreview config={config} fileScene={file.state} />
+        <OrchestratorGameScenePreview
+          config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
+          fileScene={file.state}
+        />
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}
           settings={settings}
