@@ -159,14 +159,13 @@ jobs:
       # Why fonts-noto-cjk: ubuntu-latest carries no font with Korean coverage
       # (`fc-list :lang=ko` is empty), so a spec measuring CJK glyph metrics
       # measures a tofu box instead of Hangul.
-      - name: Install native build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk python3 zsh
-
-      # Why: Electron on Linux needs an X display even when the app
+      # Why xvfb: Electron on Linux needs an X display even when the app
       # suppresses mainWindow.show() via ORCA_E2E_HEADLESS. xvfb provides a
       # virtual framebuffer so Chromium can initialize without a real display.
-      - name: Install xvfb
-        run: sudo apt-get install -y xvfb
+      - name: Install native build tools
+        uses: ./.github/actions/install-apt-packages
+        with:
+          packages: build-essential fonts-noto-cjk python3 xvfb zsh
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -257,7 +256,9 @@ jobs:
       # Why fonts-noto-cjk: same reason as the sharded job — a changed CJK spec
       # lands here instead.
       - name: Install native build and headless UI tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk python3 xvfb zsh
+        uses: ./.github/actions/install-apt-packages
+        with:
+          packages: build-essential fonts-noto-cjk python3 xvfb zsh
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -348,7 +349,9 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Install native build and headless UI tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential fonts-noto-cjk openssh-client python3 xvfb
+        uses: ./.github/actions/install-apt-packages
+        with:
+          packages: build-essential fonts-noto-cjk openssh-client python3 xvfb
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

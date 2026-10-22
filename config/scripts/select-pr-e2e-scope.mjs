@@ -41,7 +41,8 @@ export const FULL_SUITE_PATHS = [
   /^tests\/playwright\.config\.ts$/,
   // The lane itself, so a change to this gate is proved by running it.
   /^\.github\/workflows\/(pr|e2e)\.yml$/,
-  /^config\/scripts\/select-pr-e2e-scope\.mjs$/
+  /^\.github\/actions\/install-apt-packages\//,
+  /^config\/scripts\/(select-pr-e2e-scope|apt-archive-cache)\.mjs$/
 ]
 
 /**

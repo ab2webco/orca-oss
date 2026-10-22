@@ -149,7 +149,7 @@ describe('PR E2E gate contract', () => {
       const installStep = e2eWorkflow.jobs[jobName].steps.find((step) =>
         step.name.startsWith('Install native build')
       )
-      expect(installStep.run, jobName).toMatch(/\bzsh\b/)
+      expect(installStep.with.packages, jobName).toMatch(/\bzsh\b/)
     }
   })
 
