@@ -3,6 +3,7 @@ import {
   applyCdpLifecycleEvent,
   createLifecycleState,
   formatContextLifecycleLine,
+  markLifecycle,
   type LifecycleRecord
 } from './execution-context-lifecycle'
 
@@ -174,6 +175,95 @@ describe('formatContextLifecycleLine', () => {
     expect(formatContextLifecycleLine('spec > test', records)).toBe(
       '[context-lifecycle] spec > test :: 2 events (context-destroyed=1, frame-detached=1), ' +
         'last: frame-detached frame=MAIN_FRAME main=true reason=swap at 1500ms'
+    )
+  })
+})
+
+// ORCA-753: setTheme lost its context with no main-frame destroy on record, so the
+// main frame's context is now tracked by id and each call site can be marked.
+describe('main-frame context tracking', () => {
+  it('records a main-frame default-world creation, which a silent replacement would show as', () => {
+    const lifecycle = createLifecycleState(MAIN)
+    expect(
+      applyCdpLifecycleEvent(
+        lifecycle,
+        'Runtime.executionContextCreated',
+        created(9, MAIN, 'default'),
+        AT
+      )
+    ).toEqual({
+      ...AT,
+      kind: 'main-context-created',
+      frameId: MAIN,
+      isMainFrame: true,
+      contextId: 9,
+      contextType: 'default',
+      reason: null
+    })
+  })
+
+  it('keeps a main-frame isolated world out of the records', () => {
+    expect(
+      applyCdpLifecycleEvent(
+        createLifecycleState(MAIN),
+        'Runtime.executionContextCreated',
+        created(10, MAIN, 'isolated'),
+        AT
+      )
+    ).toBeNull()
+  })
+
+  it('marks a call site with the main frame context that is live at that moment', () => {
+    const lifecycle = createLifecycleState(MAIN)
+    applyCdpLifecycleEvent(
+      lifecycle,
+      'Runtime.executionContextCreated',
+      created(3, MAIN, 'default'),
+      AT
+    )
+    expect(markLifecycle(lifecycle, AT, 'setTheme dark frame=390')).toEqual({
+      ...AT,
+      kind: 'mark',
+      frameId: MAIN,
+      isMainFrame: true,
+      contextId: 3,
+      contextType: 'default',
+      reason: 'setTheme dark frame=390'
+    })
+  })
+
+  it('marks with no context when the main frame has none on record', () => {
+    expect(markLifecycle(createLifecycleState(MAIN), AT, 'setTheme light')).toMatchObject({
+      kind: 'mark',
+      contextId: null
+    })
+  })
+
+  it('names the last mark apart from the last event, so a mark never hides the event before it', () => {
+    const records: LifecycleRecord[] = [
+      {
+        ...AT,
+        kind: 'frame-detached',
+        frameId: PANEL,
+        isMainFrame: false,
+        contextId: null,
+        contextType: null,
+        reason: 'swap'
+      },
+      {
+        ...AT,
+        kind: 'mark',
+        frameId: MAIN,
+        isMainFrame: true,
+        contextId: 3,
+        contextType: 'default',
+        reason: 'setTheme dark frame=390'
+      }
+    ]
+    expect(formatContextLifecycleLine('spec > test', records)).toBe(
+      '[context-lifecycle] spec > test :: 2 events (frame-detached=1, mark=1), ' +
+        'last: frame-detached frame=PANEL_FRAME main=false reason=swap at 1200ms, ' +
+        'last mark: setTheme dark frame=390 ctx=3 at 1200ms'
     )
   })
 })

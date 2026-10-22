@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import type { ElectronApplication, FrameLocator, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import {
+  type ContextLifecycleRecorder,
   reportContextLifecycle,
   startContextLifecycleRecording
 } from './helpers/execution-context-lifecycle'
@@ -23,7 +24,14 @@ const SCREENSHOT_WIDTHS = [1440, 768, 390, 320]
 
 /** Drives the real setting so the whole window repaints, not just the root
  *  class — the panel's tokens are re-injected from the live document. */
-async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+async function setTheme(
+  page: Page,
+  theme: 'light' | 'dark',
+  lifecycle: ContextLifecycleRecorder,
+  where: string
+): Promise<void> {
+  // ORCA-753: names the main-frame context each call ran against if one is lost.
+  lifecycle.mark(`setTheme ${theme} ${where}`)
   await page.evaluate(async (next) => {
     const settings = await window.api.settings.set({ theme: next })
     window.__store?.setState({ settings })
@@ -181,7 +189,7 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     for (const width of SCREENSHOT_WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
       for (const theme of ['light', 'dark'] as const) {
-        await setTheme(orcaPage, theme)
+        await setTheme(orcaPage, theme, lifecycle, `window=${width}`)
         const frame = orcaPage.locator(`iframe[title="${PANEL_TITLE}"]`)
         await expect(frame).toBeVisible()
         // A settings-surface frame is sized by the height the panel reports, and
@@ -254,7 +262,7 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
         frameWidth + 2
       )
       for (const theme of ['light', 'dark'] as const) {
-        await setTheme(orcaPage, theme)
+        await setTheme(orcaPage, theme, lifecycle, `frame=${achieved}`)
         await expect
           .poll(async () =>
             panelFrame(orcaPage)
