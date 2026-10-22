@@ -4,6 +4,8 @@ import { buildRegistry, type RpcContext } from '../core'
 import { OrchestrationDb } from '../../orchestration/db'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentComposerReadiness, AgentTurnAcceptance } from '../../agent-composer-readiness'
+import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
+import { DISPATCH_SUBMIT_RETRY_AFTER_MS } from '../../orchestration/dispatch-submit-retry'
 
 /**
  * The inject-time readiness gate (ORCA-191 slice 2).
@@ -77,10 +79,14 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
     })
   }
 
-  function mockSend(turnAcceptance: AgentTurnAcceptance): ReturnType<typeof vi.spyOn> {
+  function mockSend(
+    turnAcceptance: AgentTurnAcceptance,
+    submit: AgentPromptSubmitProbe | null = null
+  ): ReturnType<typeof vi.spyOn> {
     return vi.spyOn(runtime, 'sendTerminalAgentPromptObservingTurn').mockResolvedValue({
       send: { handle: WORKER, accepted: true, bytesWritten: 1 },
-      turnAcceptance: Promise.resolve(turnAcceptance)
+      turnAcceptance: Promise.resolve(turnAcceptance),
+      submit
     })
   }
 
@@ -199,5 +205,32 @@ describe('orchestration.dispatch composer readiness (ORCA-191)', () => {
     // worker, so it must leave the deadline armed.
     expect(db.getDispatchContext(task.id)?.first_lifecycle_signal_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
+  })
+
+  // Why (ORCA-754): a brief typed into the composer whose CR was dropped sat
+  // there until a person pressed Enter; the injector now presses it, once more.
+  it('presses Enter again when the agent never took the submit', async () => {
+    setup()
+    const task = db.createTask({ spec: 'work', runId })
+    mockComposerReadiness({ proven: false, state: 'awaiting-composer', waitedMs: 10_000 })
+    let pressed = 0
+    const submit: AgentPromptSubmitProbe = {
+      state: () => (pressed > 0 ? 'turn-seen' : 'awaiting-turn'),
+      pressEnter: async () => {
+        pressed += 1
+        return true
+      }
+    }
+    mockSend({ accepted: false, evidence: null, waitedMs: 5_000 }, submit)
+    vi.useFakeTimers()
+    try {
+      await dispatch({ task: task.id, to: WORKER, inject: true })
+      await vi.advanceTimersByTimeAsync(DISPATCH_SUBMIT_RETRY_AFTER_MS * 2)
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(pressed).toBe(1)
+    expect(db.getDispatchContext(task.id)?.turn_accepted_at).not.toBeNull()
   })
 })

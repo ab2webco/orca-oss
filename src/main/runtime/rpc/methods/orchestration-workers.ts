@@ -287,11 +287,11 @@ async function startWorker(
     // to `status = 'dispatched'`, which this call is what establishes.
     db.recordDispatchComposerReadiness(started.dispatch.id, composerReady.proven)
     runtime.ensureOrchestrationDispatchDeadlineMonitor()
-    // Why (ORCA-191): not awaited. Turn acceptance is advisory — it never
-    // refuses and never resends — so it must not spend the caller's budget.
-    // It lands on the dispatch row for `dispatch show` and the deadline's
-    // failure reason.
-    recordTurnAcceptanceInBackground(db, started.dispatch.id, sent.turnAcceptance)
+    // Why (ORCA-191): not awaited. Turn acceptance never refuses, and its
+    // Enter retry (ORCA-754) runs after the write, so it must not spend the
+    // caller's budget. It lands on the dispatch row for `dispatch show` and
+    // the deadline's failure reason.
+    void recordTurnAcceptanceInBackground(db, started.dispatch.id, sent.turnAcceptance, sent.submit)
     monitorWorkerSetup({
       runtime,
       db,

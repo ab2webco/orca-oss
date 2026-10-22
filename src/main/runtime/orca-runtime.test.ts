@@ -52,6 +52,7 @@ import {
 } from '../effective-hook-config'
 import { getBaseRefDefault, getBranchConflictKind } from '../git/repo'
 import { OrchestrationDb } from './orchestration/db'
+import { recordTurnAcceptanceInBackground } from './orchestration/dispatch-turn-acceptance'
 import type { MessagePriority, MessageRow, MessageType } from './orchestration/types'
 import {
   AUTHORITATIVE_TERMINAL_SNAPSHOT_TIMEOUT_MS,
@@ -17475,6 +17476,154 @@ describe('OrcaRuntimeService', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  describe('dispatch submit retry on a slow Claude pane (ORCA-754)', () => {
+    const BRIEF = 'ORCA-754 brief: do the work'
+
+    // Why: on a loaded machine a CR that lands before the composer takes it is
+    // dropped, and the brief sits typed in the composer with no turn.
+    async function slowClaudePane(options: { dropEnters: number }) {
+      const writes: string[] = []
+      let composerMounted = false
+      let enters = 0
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: (_ptyId, data) => {
+          writes.push(data)
+          if (data === '\r' && composerMounted) {
+            enters += 1
+            if (enters > options.dropEnters) {
+              setTimeout(
+                () => runtime.onPtyData('pty-bg', '\r\n✻ Thinking… (esc to interrupt)', Date.now()),
+                50
+              )
+            }
+          }
+          return true
+        },
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        launchAgent: 'claude'
+      })
+      runtime.onPtyData('pty-bg', '\x1b[?2004h\x1b[?25l Claude Code', Date.now())
+      const mountComposer = (): void => {
+        composerMounted = true
+        runtime.onPtyData('pty-bg', '\x1b[37;3H\x1b[?25h', Date.now())
+      }
+      return { runtime, handle, writes, mountComposer }
+    }
+
+    function dispatchedIn(db: OrchestrationDb): string {
+      const runId = db.createRun({
+        objective: 'submit retry',
+        coordinatorHandle: 'term_coord',
+        coordinatorPaneKey: 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      }).id
+      return db.createDispatchContext(db.createTask({ spec: 'work', runId }).id, 'term_member').id
+    }
+
+    const briefWrites = (writes: string[]): number =>
+      writes.filter((data) => data.includes(BRIEF)).length
+    const enterWrites = (writes: string[]): number => writes.filter((data) => data === '\r').length
+
+    async function inject(
+      db: OrchestrationDb,
+      runtime: OrcaRuntimeService,
+      handle: string,
+      dispatchId: string
+    ): Promise<{ background: Promise<void> }> {
+      const sending = runtime.sendTerminalAgentPromptObservingTurn(handle, BRIEF)
+      // The Claude render gate's bounded fallback when the pane draws nothing.
+      await vi.advanceTimersByTimeAsync(8_000)
+      const sent = await sending
+      expect(sent.submit).toBeTruthy()
+      // Why wrapped: an async function returning the promise would await the whole retry.
+      return {
+        background: recordTurnAcceptanceInBackground(
+          db,
+          dispatchId,
+          sent.turnAcceptance,
+          sent.submit
+        )
+      }
+    }
+
+    it('re-presses a dropped Enter so the turn starts, and types the brief once', async () => {
+      vi.useFakeTimers()
+      const db = new OrchestrationDb(':memory:')
+      try {
+        const { runtime, handle, writes, mountComposer } = await slowClaudePane({ dropEnters: 1 })
+        mountComposer()
+        const dispatchId = dispatchedIn(db)
+
+        const { background } = await inject(db, runtime, handle, dispatchId)
+        await vi.advanceTimersByTimeAsync(60_000)
+        await background
+
+        expect(briefWrites(writes)).toBe(1)
+        expect(enterWrites(writes)).toBe(2)
+        expect(db.getDispatchContextById(dispatchId)?.turn_accepted_at).not.toBeNull()
+      } finally {
+        db.close()
+        vi.useRealTimers()
+      }
+    })
+
+    it('submits once a late composer marker shows, with no manual Enter', async () => {
+      vi.useFakeTimers()
+      const db = new OrchestrationDb(':memory:')
+      try {
+        const { runtime, handle, writes, mountComposer } = await slowClaudePane({ dropEnters: 0 })
+        const readiness = runtime.waitForAgentComposerReady(handle)
+        await vi.advanceTimersByTimeAsync(10_000)
+        await expect(readiness).resolves.toMatchObject({
+          proven: false,
+          state: 'awaiting-composer'
+        })
+        const dispatchId = dispatchedIn(db)
+
+        const { background } = await inject(db, runtime, handle, dispatchId)
+        // Past the first retry window: the press waits on the marker, not blind.
+        await vi.advanceTimersByTimeAsync(25_000)
+        expect(enterWrites(writes)).toBe(1)
+        expect(db.getDispatchContextById(dispatchId)?.turn_accepted_at).toBeNull()
+
+        mountComposer()
+        await vi.advanceTimersByTimeAsync(20_000)
+        await background
+
+        expect(briefWrites(writes)).toBe(1)
+        expect(enterWrites(writes)).toBe(2)
+        expect(db.getDispatchContextById(dispatchId)?.turn_accepted_at).not.toBeNull()
+      } finally {
+        db.close()
+        vi.useRealTimers()
+      }
+    })
+
+    it('never presses again once the agent took the first submit', async () => {
+      vi.useFakeTimers()
+      const db = new OrchestrationDb(':memory:')
+      try {
+        const { runtime, handle, writes, mountComposer } = await slowClaudePane({ dropEnters: 0 })
+        mountComposer()
+        const dispatchId = dispatchedIn(db)
+
+        const { background } = await inject(db, runtime, handle, dispatchId)
+        await vi.advanceTimersByTimeAsync(60_000)
+        await background
+
+        expect(enterWrites(writes)).toBe(1)
+        expect(db.getDispatchContextById(dispatchId)?.turn_accepted_at).not.toBeNull()
+      } finally {
+        db.close()
+        vi.useRealTimers()
+      }
+    })
   })
 
   it('chunks large agent prompt paste frames before delayed submit', async () => {
