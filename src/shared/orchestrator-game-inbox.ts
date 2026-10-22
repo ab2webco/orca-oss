@@ -56,18 +56,18 @@ export type GameInboxSummary = {
 // Why 50: a lead's turn reads it whole; older mail stays in `orca orchestration inbox`.
 export const GAME_INBOX_MESSAGES_MAX = 50
 
-const dispatchOfPayload = (payload: string | null): string | null => {
+const payloadOf = (payload: string | null): Record<string, unknown> => {
   try {
     const parsed: unknown = payload ? JSON.parse(payload) : null
-    return typeof parsed === 'object' &&
-      parsed !== null &&
-      'dispatchId' in parsed &&
-      typeof parsed.dispatchId === 'string'
-      ? parsed.dispatchId
-      : null
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
   } catch {
-    return null
+    return {}
   }
+}
+
+const dispatchOfPayload = (payload: string | null): string | null => {
+  const dispatchId = payloadOf(payload).dispatchId
+  return typeof dispatchId === 'string' ? dispatchId : null
 }
 
 // Why: a worker_done can be sent twice (a retried send, the member and a watcher); the lead acts on it once.
@@ -84,6 +84,49 @@ function withoutRepeatedDone(rows: readonly GameInboxMail[]): GameInboxMail[] {
     seen.add(key)
     return true
   })
+}
+
+const dispatchOfRow = (row: GameInboxMail): string | null =>
+  dispatchOfPayload(row.payload) ??
+  (row.from_handle.startsWith('dispatch:') ? row.from_handle.slice('dispatch:'.length) : null)
+
+const isMemberFailure = (row: GameInboxMail): boolean => {
+  const payload = payloadOf(row.payload)
+  return (
+    payload.setupState === 'failed' ||
+    payload.reason === 'first_signal_deadline_expired' ||
+    (row.type === 'escalation' && typeof payload.exitCode === 'number') ||
+    (row.type === 'worker_done' && payload.outcome === 'failed')
+  )
+}
+
+// Why: a failure the ticket already got past (a later success, or a relaunched dispatch talking) needs no action from the lead.
+function withoutSupersededFailures(
+  rows: readonly GameInboxMail[],
+  ticketOf: ReadonlyMap<string, string>
+): GameInboxMail[] {
+  const superseded = new Set<string>()
+  for (const failure of rows) {
+    const ticket = ticketOf.get(failure.from_handle)
+    if (!ticket || !isMemberFailure(failure)) {
+      continue
+    }
+    const failedDispatch = dispatchOfRow(failure)
+    const later = rows.filter(
+      (row) => row.sequence > failure.sequence && ticketOf.get(row.from_handle) === ticket
+    )
+    const passed = later.some((row) => {
+      if (row.type === 'worker_done' && payloadOf(row.payload).outcome === 'succeeded') {
+        return true
+      }
+      const dispatch = dispatchOfRow(row)
+      return failedDispatch !== null && dispatch !== null && dispatch !== failedDispatch
+    })
+    if (passed) {
+      superseded.add(failure.id)
+    }
+  }
+  return rows.filter((row) => !superseded.has(row.id))
 }
 
 /** The lead's inbox first, then one per ticket; a message is unread until an agent read it or the board's cursor passed it. */
@@ -103,11 +146,18 @@ export function gameInboxesOf(
   for (const address of source.leadAddresses) {
     labelOf.set(address, 'lead')
   }
-  // Why: heartbeats are liveness, not mail; dozens of them would bury a worker_done past the 50-message cap.
-  const byId = new Map(
-    source.mail.filter((row) => row.type !== 'heartbeat').map((row) => [row.id, row])
+  const ticketOf = new Map(
+    source.members.flatMap((member) =>
+      member.addresses.map((address) => [address, member.ticket] as const)
+    )
   )
-  const oldestFirst = [...byId.values()].sort((a, b) => a.sequence - b.sequence)
+  const allOldestFirst = [...new Map(source.mail.map((row) => [row.id, row])).values()].sort(
+    (a, b) => a.sequence - b.sequence
+  )
+  // Why: heartbeats are liveness, not mail; dozens of them would bury a worker_done past the 50-message cap.
+  const oldestFirst = withoutSupersededFailures(allOldestFirst, ticketOf).filter(
+    (row) => row.type !== 'heartbeat'
+  )
   const inboxes = [
     { key: 'lead', addresses: source.leadAddresses },
     ...source.members.map((member) => ({ key: member.ticket, addresses: member.addresses }))
