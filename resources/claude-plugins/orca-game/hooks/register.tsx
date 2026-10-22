@@ -10,6 +10,8 @@ import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
+import { whileAsking } from './member-band'
+import { askedQuestionOf } from './member-pane'
 import { registerStateCommand } from './state-command'
 import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
@@ -74,6 +76,10 @@ export const register: Register = (on) => {
           () => undefined
         )
         return answered
+      }
+      const question = askedQuestionOf(command)
+      if (question !== undefined) {
+        return await whileAsking($, question, () => next(e))
       }
     }
     return next(e)

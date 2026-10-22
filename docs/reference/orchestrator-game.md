@@ -38,6 +38,15 @@ locale; a plugin language pack maps by its tag), one of `en`, `es`, else `en`. T
 its words from it. A Raster only takes width-1 characters, so a wide character inside the pixel art
 (a CJK teammate or file name an agent reports) is drawn as `?`.
 
+### A member's pane
+
+A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws a member
+band in place of the lead's: one line with its character, ticket, the phase card it shows, its PR
+and CI ([`member-band.tsx`](../../resources/claude-plugins/orca-game/hooks/member-band.tsx)). It has
+no menu, team chips, party HUD or buttons. While the member's `orca orchestration ask` waits on
+the lead, a second line shows the question (`? Asked <lead>: …`), cleared when the answer returns.
+Its replies use the same cards as the lead's, and the scene still draws above the spinner.
+
 ### On Windows
 
 The pane's shell parses the launch line, so `--plugin-dir` is quoted for it
