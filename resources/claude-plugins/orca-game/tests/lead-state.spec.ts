@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { GameAgent, GameState } from '../types'
 import { gameStrings, setGameLocale } from '../hooks/game-strings'
+import { memberDoingOf } from '../hooks/fleet-member-card'
+import { cardStateOf, leadStateOf } from '../hooks/lead-state'
 import { memberOf } from '../hooks/party'
+import { sceneOf } from '../hooks/scenes/index'
 import { moodMarkOf } from '../hooks/party-sprites'
 
 const agent = (patch: Partial<GameAgent>): GameAgent => ({
@@ -88,5 +91,31 @@ describe('the lead card while its members work', () => {
   it('control: a done member keeps its own finished look while others work', () => {
     const member = memberOf(DONE_MEMBER, state([LEAD_DONE, BUILDER, DONE_MEMBER]), true)
     expect(member).toMatchObject({ state: 'idle', isDone: true, phase: 'handoff', mood: 'cheer' })
+  })
+})
+
+describe('a lead idle at its prompt with only a Monitor armed (ORCA-719)', () => {
+  it('reads asleep, not working, and drops the Monitor activity', () => {
+    setGameLocale('es')
+    const lead = agent({ ...LEAD_DONE, toolName: 'Monitor' })
+    const fleet = state([lead])
+    const card = cardStateOf(lead, fleet)
+
+    expect(leadStateOf(fleet)).toBe('sleeping')
+    expect(gameStrings().text.agentStates[card]).not.toBe('trabajando')
+    expect(memberDoingOf(lead, memberOf(lead, fleet, true), sceneOf(undefined))).not.toMatch(
+      /Usando/
+    )
+  })
+
+  it('control: the same lead mid-turn reads working with the Monitor as its activity', () => {
+    setGameLocale('es')
+    const lead = agent({ ...LEAD_WORKING, toolName: 'Monitor' })
+    const fleet = state([lead])
+
+    expect(gameStrings().text.agentStates[cardStateOf(lead, fleet)]).toBe('trabajando')
+    expect(memberDoingOf(lead, memberOf(lead, fleet, true), sceneOf(undefined))).toMatch(
+      /Usando Monitor/
+    )
   })
 })
