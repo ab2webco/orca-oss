@@ -35,6 +35,11 @@ type TypingMeasurement = {
   worstLatencyMs: number
   secondWorstLatencyMs: number
   maxTimerDriftMs: number
+  /** Every tick later than LATE_TIMER_TICK_MS, so one stall reads apart from many (ORCA-752). */
+  lateTimerTicksMs: number[]
+  /** document.visibilityState at start/end: a hidden renderer's timers wake on Chromium's
+   *  throttling grid, which is what CI's 1000/2000/3000 ms drift clusters look like. */
+  timerVisibility: string
   frameCount: number
 }
 
@@ -116,6 +121,7 @@ const HIDDEN_PRESSURE_START_DELAY_MS = 1200
 const DEFAULT_FRAME_COUNT = 180
 const DEFAULT_FRAME_INTERVAL_MS = 6
 const TIMER_SAMPLE_MS = 16
+const LATE_TIMER_TICK_MS = 100
 const MAIN_RENDERER_PRESSURE_TARGET_CHARS = 2 * 1024 * 1024
 // Why: these are regression budgets, not observed baselines. Repeated local
 // 100-pane OpenCode-scale runs are below 50ms worst-key latency; keep enough
@@ -257,21 +263,34 @@ async function measureTypingDuringLoad(
   await waitForTerminalOutputForPtyId(page, ptyId, `OPENCODE_TYPING_READY_${runId}`, 10_000)
   await focusActiveTerminalInput(page)
 
-  const eventLoop = await page.evaluateHandle((sampleMs) => {
-    let maxTimerDriftMs = 0
-    let lastTick = performance.now()
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      maxTimerDriftMs = Math.max(maxTimerDriftMs, now - lastTick - sampleMs)
-      lastTick = now
-    }, sampleMs)
-    return {
-      stop: () => {
-        window.clearInterval(timer)
-        return maxTimerDriftMs
+  const eventLoop = await page.evaluateHandle(
+    ({ sampleMs, lateTickMs }) => {
+      let maxTimerDriftMs = 0
+      const lateTimerTicksMs: number[] = []
+      const startVisibility = document.visibilityState
+      let lastTick = performance.now()
+      const timer = window.setInterval(() => {
+        const now = performance.now()
+        const driftMs = now - lastTick - sampleMs
+        maxTimerDriftMs = Math.max(maxTimerDriftMs, driftMs)
+        if (driftMs > lateTickMs) {
+          lateTimerTicksMs.push(Math.round(driftMs))
+        }
+        lastTick = now
+      }, sampleMs)
+      return {
+        stop: () => {
+          window.clearInterval(timer)
+          return {
+            maxTimerDriftMs,
+            lateTimerTicksMs,
+            timerVisibility: `${startVisibility}->${document.visibilityState}`
+          }
+        }
       }
-    }
-  }, TIMER_SAMPLE_MS)
+    },
+    { sampleMs: TIMER_SAMPLE_MS, lateTickMs: LATE_TIMER_TICK_MS }
+  )
 
   const latencies: number[] = []
   for (const [index, char] of [...KEY_LATENCY_SAMPLES].entries()) {
@@ -284,7 +303,9 @@ async function measureTypingDuringLoad(
     latencies.push(performance.now() - start)
   }
 
-  const maxTimerDriftMs = await eventLoop.evaluate((watcher) => watcher.stop())
+  const { maxTimerDriftMs, lateTimerTicksMs, timerVisibility } = await eventLoop.evaluate(
+    (watcher) => watcher.stop()
+  )
   await eventLoop.dispose()
   return {
     latencies,
@@ -292,6 +313,8 @@ async function measureTypingDuringLoad(
     worstLatencyMs: Math.max(...latencies),
     secondWorstLatencyMs: secondWorst(latencies),
     maxTimerDriftMs,
+    lateTimerTicksMs,
+    timerVisibility,
     frameCount: FRAME_COUNT
   }
 }
@@ -400,7 +423,9 @@ function annotateTypingMeasurement(
       1
     )}ms secondWorst=${measurement.secondWorstLatencyMs.toFixed(
       1
-    )}ms maxTimerDrift=${measurement.maxTimerDriftMs.toFixed(1)}ms samples=${measurement.latencies
+    )}ms maxTimerDrift=${measurement.maxTimerDriftMs.toFixed(1)}ms lateTimerTicks=${
+      measurement.lateTimerTicksMs.join(',') || 'none'
+    } timerVisibility=${measurement.timerVisibility} samples=${measurement.latencies
       .map((value) => value.toFixed(1))
       .join(',')}${hiddenSkipSummary}${schedulerSummary}${mainPressureSummary}${ackGateSummary}`
   })
