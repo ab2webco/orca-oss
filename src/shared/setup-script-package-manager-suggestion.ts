@@ -6,15 +6,15 @@ import type {
 import { isSetupScriptImportFieldWithinLimit } from './setup-script-import-limits'
 
 const PACKAGE_JSON_PATH = 'package.json'
-type PackageManagerName = 'pnpm' | 'bun' | 'yarn' | 'npm'
+export type NodePackageManagerName = 'pnpm' | 'bun' | 'yarn' | 'npm'
 
 const PACKAGE_MANAGER_LOCKFILES = [
-  { path: 'pnpm-lock.yaml', manager: 'pnpm', setup: 'pnpm install' },
-  { path: 'bun.lock', manager: 'bun', setup: 'bun install' },
-  { path: 'bun.lockb', manager: 'bun', setup: 'bun install' },
-  { path: 'yarn.lock', manager: 'yarn', setup: 'yarn install' },
-  { path: 'package-lock.json', manager: 'npm', setup: 'npm install' },
-  { path: 'npm-shrinkwrap.json', manager: 'npm', setup: 'npm install' }
+  { path: 'pnpm-lock.yaml', manager: 'pnpm' },
+  { path: 'bun.lock', manager: 'bun' },
+  { path: 'bun.lockb', manager: 'bun' },
+  { path: 'yarn.lock', manager: 'yarn' },
+  { path: 'package-lock.json', manager: 'npm' },
+  { path: 'npm-shrinkwrap.json', manager: 'npm' }
 ] as const
 
 export async function inspectPackageManagerSetupCandidate(
@@ -27,47 +27,55 @@ export async function inspectPackageManagerSetupCandidate(
     return null
   }
 
-  const packageManager = getPackageManagerName(packageJson.packageManager)
-  const packageManagerSetup = packageManager ? getPackageManagerSetup(packageManager) : null
-  if (packageManagerSetup) {
-    return {
-      provider: 'package-manager',
-      label: 'package manager',
-      files: [PACKAGE_JSON_PATH],
-      setup: packageManagerSetup,
-      unsupportedFields: []
-    }
-  }
-
-  const checkFileExists = fileExists ?? fallbackFileExists(readFile)
-  const lockfileReads = await Promise.all(
-    PACKAGE_MANAGER_LOCKFILES.map(async (entry) => ({
-      ...entry,
-      exists: await checkFileExists(entry.path)
-    }))
+  const resolution = await resolveNodePackageManager(
+    packageJson,
+    fileExists ?? fallbackFileExists(readFile)
   )
-  const lockfiles = lockfileReads.filter((entry) => entry.exists)
-  const lockfileManagers = new Set(lockfiles.map((entry) => entry.manager))
-  const selectedLockfile = lockfileManagers.size === 1 ? lockfiles[0] : null
-  if (lockfileManagers.size > 1) {
+  if (!resolution) {
     return null
   }
-  const setup = selectedLockfile?.setup ?? 'npm install'
 
   return {
     provider: 'package-manager',
     label: 'package manager',
-    files: selectedLockfile ? [selectedLockfile.path] : [PACKAGE_JSON_PATH],
-    setup,
+    files: resolution.files,
+    setup: `${resolution.manager} install`,
     unsupportedFields: []
   }
+}
+
+/** Null when lockfiles from different managers disagree; npm when nothing names one. */
+export async function resolveNodePackageManager(
+  packageJson: Record<string, unknown>,
+  fileExists: SetupScriptImportFileExists
+): Promise<{ manager: NodePackageManagerName; files: string[] } | null> {
+  const packageManager = getPackageManagerName(packageJson.packageManager)
+  if (packageManager) {
+    return { manager: packageManager, files: [PACKAGE_JSON_PATH] }
+  }
+
+  const lockfileReads = await Promise.all(
+    PACKAGE_MANAGER_LOCKFILES.map(async (entry) => ({
+      ...entry,
+      exists: await fileExists(entry.path)
+    }))
+  )
+  const lockfiles = lockfileReads.filter((entry) => entry.exists)
+  const lockfileManagers = new Set(lockfiles.map((entry) => entry.manager))
+  if (lockfileManagers.size > 1) {
+    return null
+  }
+  const selectedLockfile = lockfiles[0]
+  return selectedLockfile
+    ? { manager: selectedLockfile.manager, files: [selectedLockfile.path] }
+    : { manager: 'npm', files: [PACKAGE_JSON_PATH] }
 }
 
 function fallbackFileExists(readFile: SetupScriptImportFileRead): SetupScriptImportFileExists {
   return async (relativePath) => (await readFile(relativePath)) !== null
 }
 
-function parsePackageJson(content: string | null): Record<string, unknown> | null {
+export function parsePackageJson(content: string | null): Record<string, unknown> | null {
   if (!content) {
     return null
   }
@@ -81,7 +89,7 @@ function parsePackageJson(content: string | null): Record<string, unknown> | nul
   }
 }
 
-function getPackageManagerName(value: unknown): PackageManagerName | null {
+function getPackageManagerName(value: unknown): NodePackageManagerName | null {
   if (typeof value !== 'string' || !isSetupScriptImportFieldWithinLimit(value)) {
     return null
   }
@@ -99,17 +107,4 @@ function getPackageManagerName(value: unknown): PackageManagerName | null {
     return 'npm'
   }
   return null
-}
-
-function getPackageManagerSetup(packageManager: PackageManagerName): string {
-  switch (packageManager) {
-    case 'pnpm':
-      return 'pnpm install'
-    case 'bun':
-      return 'bun install'
-    case 'yarn':
-      return 'yarn install'
-    case 'npm':
-      return 'npm install'
-  }
 }
