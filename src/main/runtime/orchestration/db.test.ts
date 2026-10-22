@@ -744,6 +744,20 @@ describe('OrchestrationDb', () => {
       expect(stale).toEqual([])
     })
 
+    it('getStaleDispatches counts host-observed activity as liveness when heartbeats stopped (ORCA-746)', () => {
+      const d = createDb()
+      const working = d.createDispatchContext(d.createTask({ spec: 'w' }).id, 'term_working')
+      const quiet = d.createDispatchContext(d.createTask({ spec: 'q' }).id, 'term_quiet')
+      setDispatchTimes(d, working.id, '2026-07-12 10:00:00', '2026-07-12 10:01:00')
+      setDispatchTimes(d, quiet.id, '2026-07-12 10:00:00', '2026-07-12 10:01:00')
+      d.recordDispatchActivity(working.id, '2026-07-12T11:58:00.000Z')
+      d.recordDispatchActivity(quiet.id, '2026-07-12T11:00:00.000Z')
+
+      const stale = d.getStaleDispatches('2026-07-12T11:55:00.000Z')
+
+      expect(stale.map((s) => s.id)).toEqual([quiet.id])
+    })
+
     // Same-UTC-date midnight threshold: keeps the buggy space-vs-'T' compare in
     // play so this guards the fix at a day boundary (#8452; idea from @KMGeon's #8453).
     it('getStaleDispatches keeps a fresh row just after a UTC-midnight threshold (#8452)', () => {

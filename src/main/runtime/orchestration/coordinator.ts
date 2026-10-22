@@ -107,6 +107,7 @@ export class Coordinator {
   private runtime: CoordinatorRuntime
   private state: CoordinatorState
   private stopped = false
+  private readonly warnedStaleDispatchIds = new Set<string>()
   private opts: Required<Omit<CoordinatorOptions, 'onLog' | 'worktree'>> & {
     onLog: (msg: string) => void
     worktree?: string
@@ -236,10 +237,21 @@ export class Coordinator {
   private warnStaleDispatches(): void {
     const thresholdIso = new Date(Date.now() - HUNG_THRESHOLD_MS).toISOString()
     const stale = this.db.getStaleDispatches(thresholdIso)
+    const staleIds = new Set(stale.map((ctx) => ctx.id))
+    // Why (ORCA-746): tick runs every poll interval; warn once per stale spell, again only after it recovers.
+    for (const id of this.warnedStaleDispatchIds) {
+      if (!staleIds.has(id)) {
+        this.warnedStaleDispatchIds.delete(id)
+      }
+    }
     for (const ctx of stale) {
+      if (this.warnedStaleDispatchIds.has(ctx.id)) {
+        continue
+      }
+      this.warnedStaleDispatchIds.add(ctx.id)
       const minutes = Math.round(HUNG_THRESHOLD_MS / 60000)
       this.opts.onLog(
-        `Warning: worker ${ctx.assignee_handle ?? '<unknown>'} on task ${ctx.task_id} has not sent a heartbeat in ~${minutes} min (dispatch ${ctx.id})`
+        `Warning: worker ${ctx.assignee_handle ?? '<unknown>'} on task ${ctx.task_id} has shown no heartbeat or activity in ~${minutes} min (dispatch ${ctx.id})`
       )
     }
   }

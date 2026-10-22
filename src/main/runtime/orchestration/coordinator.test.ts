@@ -561,7 +561,9 @@ describe('Coordinator', () => {
     coordinator.stop()
     await runPromise
 
-    expect(logs.some((l) => /has not sent a heartbeat/.test(l) && l.includes(task.id))).toBe(true)
+    const warnings = logs.filter((l) => /no heartbeat or activity/.test(l) && l.includes(task.id))
+    // Why (ORCA-746): ticks run every pollIntervalMs; one stale spell is one warning.
+    expect(warnings).toHaveLength(1)
     // Task status must NOT have been auto-failed — logging only.
     expect(db.getTask(task.id)?.status).toBe('dispatched')
   })
