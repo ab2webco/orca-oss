@@ -69,6 +69,15 @@ export const ES: GameCatalog = {
     myReviews: (kind, count) => `Mis ${kind}s ${count}`,
     todo: (count) => `Por hacer ${count}`,
     actionsHeading: 'Acciones',
+    layoutNewer:
+      'Una versión más nueva de Orca Lab guardó este diseño del Panel; actualiza Orca Lab para cambiarlo.',
+    layoutSections: {
+      team: 'Equipo',
+      review: 'Revisión',
+      reviews: 'Mis PRs',
+      todo: 'Por hacer',
+      actions: 'Acciones'
+    },
     sentToLead: (label) => `Enviado al líder: ${label}`,
     couldNotSend: (label) => `No se pudo enviar ${label}`,
     actionRunning: 'ejecutando…',
