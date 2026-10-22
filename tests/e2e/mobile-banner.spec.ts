@@ -173,11 +173,11 @@ test('restore all refits non-focused restored terminal panes', async ({
   }
   await installRestoreTerminalFitAutoRestoreRecorder(electronApp)
 
-  await sendHeldPhoneFitIpc(electronApp, { ptyId: inactivePtyId, cols: 45, rows: 20 })
+  // Why the hold and not terminal.resize(1): every fit of a held pane snaps xterm back to the
+  // hold's grid, so a direct resize raced the split's own refit and lost to 45 cols (ORCA-755).
+  await sendHeldPhoneFitIpc(electronApp, { ptyId: inactivePtyId, cols: 1, rows: 20 })
   await sendHeldPhoneFitIpc(electronApp, { ptyId: focusPtyId, cols: 45, rows: 20 })
   await expect(orcaPage.locator('.mobile-driver-banner')).toHaveCount(2, { timeout: 15_000 })
-
-  await forcePaneToOneColumn(orcaPage, inactivePtyId)
   await expect
     .poll(() => getPaneTerminalCols(orcaPage, inactivePtyId), {
       message: 'test harness should force the non-focused pane into the bad narrow state'
@@ -436,22 +436,6 @@ async function waitForVisiblePanePtyIds(page: Page, expectedCount: number): Prom
     )
     .toBe(expectedCount)
   return ptyIds
-}
-
-async function forcePaneToOneColumn(page: Page, ptyId: string): Promise<void> {
-  await page.evaluate((targetPtyId) => {
-    for (const manager of window.__paneManagers?.values?.() ?? []) {
-      const pane = manager
-        .getPanes?.()
-        .find((candidate) => candidate.container.dataset.ptyId === targetPtyId)
-      if (pane) {
-        pane.terminal.resize(1, Math.max(8, pane.terminal.rows))
-        pane.terminal.refresh(0, pane.terminal.rows - 1)
-        return
-      }
-    }
-    throw new Error(`No pane found for PTY ${targetPtyId}`)
-  }, ptyId)
 }
 
 async function forcePaneToOneColumnAndSwitchWorktree(
