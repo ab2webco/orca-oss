@@ -134,10 +134,10 @@ describe("a lead's members across a restart, through the runtime", () => {
       const runtime = runtimeWith([leadWorktree], task.id)
       runtime.setOrchestrationDb(db)
       const internals = runtime as unknown as {
-        findPtyIdForHandle: (handle: string) => string | null
+        isTerminalOpenForHandle: (handle: string) => boolean
       }
-      vi.spyOn(internals, 'findPtyIdForHandle').mockImplementation((handle) =>
-        handle === 'term_member' ? 'pty-member' : null
+      vi.spyOn(internals, 'isTerminalOpenForHandle').mockImplementation(
+        (handle) => handle === 'term_member'
       )
 
       const after = await runtime.getOrchestratorGameState({

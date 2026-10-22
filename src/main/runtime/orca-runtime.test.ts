@@ -17483,11 +17483,38 @@ describe('OrcaRuntimeService', () => {
 
     // Why: on a loaded machine a CR that lands before the composer takes it is
     // dropped, and the brief sits typed in the composer with no turn.
-    async function slowClaudePane(options: { dropEnters: number }) {
+    const SSH_MEMBER_PATH = '/srv/remote/repo'
+    const sshMemberStore = () => {
+      const remoteRepo = { ...store.getRepos()[0], path: SSH_MEMBER_PATH, connectionId: 'ssh-1' }
+      return {
+        ...store,
+        getRepos: () => [remoteRepo],
+        getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined)
+      }
+    }
+    const memberFolderStore = (folderPath: string) =>
+      createFolderWorkspaceRuntimeStore(
+        makeFolderWorkspace({ folderPath }),
+        makeFolderProjectGroup({ parentPath: folderPath })
+      )
+    const MEMBER_WORKSPACES = {
+      git: { store: () => store, selector: `path:${TEST_WORKTREE_PATH}` },
+      ssh: { store: sshMemberStore, selector: `path:${SSH_MEMBER_PATH}` },
+      folder: { store: memberFolderStore, selector: TEST_FOLDER_WORKSPACE_KEY }
+    }
+
+    async function slowClaudePane(options: {
+      dropEnters: number
+      workspace?: keyof typeof MEMBER_WORKSPACES
+      folderPath?: string
+    }) {
       const writes: string[] = []
       let composerMounted = false
       let enters = 0
-      const runtime = new OrcaRuntimeService(store)
+      const workspace = MEMBER_WORKSPACES[options.workspace ?? 'git']
+      const runtime = new OrcaRuntimeService(
+        workspace.store(options.folderPath ?? TEST_FOLDER_WORKSPACE_PATH) as never
+      )
       runtime.setPtyController({
         spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
         write: (_ptyId, data) => {
@@ -17506,7 +17533,7 @@ describe('OrcaRuntimeService', () => {
         kill: () => true,
         getForegroundProcess: async () => null
       })
-      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      const { handle } = await runtime.createTerminal(workspace.selector, {
         launchAgent: 'claude'
       })
       runtime.onPtyData('pty-bg', '\x1b[?2004h\x1b[?25l Claude Code', Date.now())
@@ -17604,6 +17631,92 @@ describe('OrcaRuntimeService', () => {
         vi.useRealTimers()
       }
     })
+
+    // Why: a slow host behind SSH or a folder workspace drops the CR the same way;
+    // this runtime spawned and watches both, so both get the Enter-only retry.
+    it.each([
+      ['an SSH member', 'ssh'],
+      ['a folder workspace member', 'folder']
+    ] as const)(
+      're-presses a dropped Enter for %s and types the brief once',
+      async (_label, workspace) => {
+        vi.useFakeTimers()
+        const db = new OrchestrationDb(':memory:')
+        const folderPath = await mkdtemp(join(tmpdir(), 'orca-754-folder-member-'))
+        const sshGit = {
+          listWorktrees: vi.fn().mockResolvedValue([
+            {
+              path: SSH_MEMBER_PATH,
+              head: 'abc',
+              branch: 'main',
+              isBare: false,
+              isMainWorktree: true
+            }
+          ])
+        }
+        registerSshGitProvider('ssh-1', sshGit as never)
+        try {
+          const { runtime, handle, writes, mountComposer } = await slowClaudePane({
+            dropEnters: 1,
+            workspace,
+            folderPath
+          })
+          mountComposer()
+          const dispatchId = dispatchedIn(db)
+
+          const { background } = await inject(db, runtime, handle, dispatchId)
+          await vi.advanceTimersByTimeAsync(60_000)
+          await background
+
+          expect(briefWrites(writes)).toBe(1)
+          expect(enterWrites(writes)).toBe(2)
+          expect(db.getDispatchContextById(dispatchId)?.turn_accepted_at).not.toBeNull()
+        } finally {
+          unregisterSshGitProvider('ssh-1')
+          db.close()
+          vi.useRealTimers()
+          await rm(folderPath, { recursive: true, force: true })
+        }
+      }
+    )
+
+    // Why: the paused cause reads "terminal still open" from this lookup; an agent
+    // that exited leaves its PTY record behind, and must read as gone (ORCA-754).
+    it.each([
+      ['a git worktree member', 'git'],
+      ['an SSH member', 'ssh'],
+      ['a folder workspace member', 'folder']
+    ] as const)(
+      'reads the terminal of %s as gone once its PTY exits',
+      async (_label, workspace) => {
+        const folderPath = await mkdtemp(join(tmpdir(), 'orca-754-folder-member-'))
+        const sshGit = {
+          listWorktrees: vi.fn().mockResolvedValue([
+            {
+              path: SSH_MEMBER_PATH,
+              head: 'abc',
+              branch: 'main',
+              isBare: false,
+              isMainWorktree: true
+            }
+          ])
+        }
+        registerSshGitProvider('ssh-1', sshGit as never)
+        try {
+          const { runtime, handle } = await slowClaudePane({ dropEnters: 0, workspace, folderPath })
+          const isOpen = (runtime as unknown as { isTerminalOpenForHandle: (h: string) => boolean })
+            .isTerminalOpenForHandle
+          expect(isOpen.call(runtime, handle)).toBe(true)
+
+          runtime.onPtyExit('pty-bg', 0)
+
+          expect(isOpen.call(runtime, handle)).toBe(false)
+        } finally {
+          unregisterSshGitProvider('ssh-1')
+          await rm(folderPath, { recursive: true, force: true })
+        }
+      }
+    )
 
     it('never presses again once the agent took the first submit', async () => {
       vi.useFakeTimers()

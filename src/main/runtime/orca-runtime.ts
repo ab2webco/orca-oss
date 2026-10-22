@@ -3715,7 +3715,7 @@ export class OrcaRuntimeService {
     causeOf: (member) =>
       gamePausedCauseOf(
         this.getOrchestrationDbIfAvailable()?.getDispatchContext(member.taskId),
-        (handle) => this.findPtyIdForHandle(handle) !== null
+        (handle) => this.isTerminalOpenForHandle(handle)
       )
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
@@ -18719,6 +18719,20 @@ export class OrcaRuntimeService {
       )
     } catch {
       return null
+    }
+  }
+
+  // Why not findPtyIdForHandle: an exited PTY keeps its record, so that lookup still resolves.
+  private isTerminalOpenForHandle(handle: string): boolean {
+    try {
+      const pty = this.getLivePtyForHandle(handle)
+      if (pty) {
+        return pty.pty.connected
+      }
+      const { leaf } = this.getLiveLeafForHandle(handle)
+      return getTerminalState(leaf) === 'running' && leaf.ptyId !== null
+    } catch {
+      return false
     }
   }
 
