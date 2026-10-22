@@ -57,7 +57,7 @@ export const ES: GameCatalog = {
     questDescription:
       'Modo quest, forma corta de /orca-game:quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',
     questModesHelp:
-      '/orca-game:mode on|zen|flat|off: off lo muestra todo, on oculta las filas de herramientas, zen también oculta las notas de trabajo y flat dibuja el juego como texto, sin escena. /orca-game:render classic|hd|hd-compact elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego y /orca-game:layout ordena las secciones del Panel. /quest es la forma corta, que también funciona a mitad de un turno.',
+      '/orca-game:mode on|zen|flat|off: off lo muestra todo, on oculta las filas de herramientas, zen también oculta las notas de trabajo y flat dibuja el juego como texto, sin escena. /orca-game:render classic|hd|hd-compact elige el aspecto, /orca-game:demo reproduce un grupo ficticio con guion y /orca-game:state muestra todo el estado del juego y /orca-game:layout ordena las secciones del Panel. /quest es la forma corta, que también funciona a mitad de un turno. /orca-game:view lista cada vista con su costo y cambia este panel, este proyecto o todos los proyectos.',
     questShown: (mode) => `Quest: ${mode}.`,
     questDemo:
       'Quest: demo. Un grupo ficticio con guion reproduce todas las reacciones; no se lee ni se escribe nada. /orca-game:mode on vuelve a los datos reales.',

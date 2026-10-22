@@ -1,4 +1,5 @@
 import type { GameConfig, GameMode, GameRender } from '../types'
+import type { GameViewId } from './game-view'
 import { isGameRender, lookConfigOf, LOCAL_TIMEZONE } from './game-render'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
@@ -125,4 +126,14 @@ export const tabCreateArgvOf = (
   }
   const worktree = worktreeId === '' ? [] : ['--worktree', `id:${worktreeId}`]
   return [path, 'tab', 'create', '--url', url, ...worktree, '--json']
+}
+
+/** Stores a view beyond this pane; Orca writes the project's or the global Settings layer. */
+export const gameViewArgvOf = (
+  cli: string | null | undefined,
+  view: GameViewId,
+  scope: 'project' | 'global'
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined ? undefined : [path, 'game', 'view', view, '--scope', scope, '--json']
 }

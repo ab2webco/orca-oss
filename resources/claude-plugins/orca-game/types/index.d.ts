@@ -329,6 +329,10 @@ export type GameState = {
   leadElsewhere?: { handle: string }
   /** Orca's UI language now; absent from an older host, which keeps the launch language. */
   locale?: GameLocale
+  /** The scopes Orca can store a view in for this pane; absent from an older host. */
+  viewScopes?: ('project' | 'global')[]
+  /** The view this machine's resources suggest; absent from an older host. */
+  suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

@@ -9,11 +9,13 @@ import { cliInvocationOf } from './cli-invocation'
 import {
   gameFleetArgvOf,
   gameStateArgvOf,
+  gameViewArgvOf,
   openLinkArgvOf,
   tabCreateArgvOf,
   terminalFocusArgvOf
 } from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
+import type { GameViewId } from './game-view'
 import { gameLocale, gameStrings, setGameLocale } from './game-strings'
 import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
@@ -140,6 +142,17 @@ export async function openGameLink(
     }
   }
   const out = await runCli($, tabCreateArgvOf(cli, url, worktreeId))
+  return out?.exitCode === 0
+}
+
+/** Asks Orca to store a view for this project or every project; false when it could not. */
+export async function storeGameView(
+  $: EngineInterface,
+  view: GameViewId,
+  scope: 'project' | 'global'
+): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, gameViewArgvOf(cli, view, scope))
   return out?.exitCode === 0
 }
 

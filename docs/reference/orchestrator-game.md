@@ -98,7 +98,7 @@ shell is involved) and prints each setting with the layer that set it, the mode 
 this session set itself, the lead and its members with their slots, a held STOP, warnings and links
 ([`state-report.ts`](../../resources/claude-plugins/orca-game/hooks/state-report.ts)). In a session
 Orca did not start with its game it says so instead. Every game command lives under `/orca-game:`
-(`state`, `mode`, `render`, `demo`, `quest`, `setup`, `lead`), each a plugin skill the mod answers
+(`state`, `view`, `mode`, `render`, `demo`, `quest`, `setup`, `lead`), each a plugin skill the mod answers
 without a model turn, because the engine refuses a `:` in a name a mod registers; `/quest` stays as
 the mod-registered short form that runs mid-turn. Project buttons (`actions[].command`) keep the
 names the project chose.
@@ -157,6 +157,15 @@ Settings → the project edits, shown as `this machine`), `global` writes the gl
 It never writes `orca.yaml`. Picking a view other than `off` also sets `show: true` in that layer
 when the game was hidden there. An open Settings page shows the change at once
 (`settings:changed`); panes see it on their next `game state` poll.
+
+In a pane, `/orca-game:view` lists the views with their cost, the current one (`●`) and the
+suggested one (`★`); `/orca-game:view <view> [pane|project|global]` switches it (`hooks/view-command.ts`,
+`hooks/view-switch.ts`). `pane`, the default, is a session override like `/orca-game:mode` and
+`/orca-game:render`, which stay as they were and map to the same views. `project` and `global` run
+`orca game view` and then drop this pane's override, so the pane follows what it stored and any
+later change from Settings. When the state carries no `viewScopes` (an older Orca) or the CLI
+refuses the command (an older `orca` on an SSH host), the view applies to this pane only and the
+reply says so.
 
 ```yaml
 # orca.yaml
