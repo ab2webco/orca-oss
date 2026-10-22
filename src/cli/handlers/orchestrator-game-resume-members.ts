@@ -206,19 +206,26 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     const fleet = gameFleetReportOf({ ...state, pausedMembers: [] })
     const liveMembers = fleet.running
     if (flags.get('dry-run') === true) {
-      const free = Math.max(0, fleet.cap - liveMembers)
+      // Why apart: the real run presses Enter or skips these, and their agents already hold slots.
+      const open = paused.filter((one) => one.terminal && one.cause !== undefined)
+      const closed = paused.filter((one) => !open.includes(one))
+      const free = Math.max(0, fleet.cap - liveMembers - open.length)
+      const ticketsWith = (cause: string): string[] =>
+        open.filter((one) => one.cause === cause).map((one) => one.ticket)
       printResult(
         {
           ...response,
           result: {
             dryRun: true,
-            resume: paused.slice(0, free).map((one) => one.ticket),
-            overCap: paused.slice(free).map((one) => one.ticket)
+            submit: ticketsWith('unsubmitted'),
+            openTerminal: ticketsWith('terminal-open'),
+            resume: closed.slice(0, free).map((one) => one.ticket),
+            overCap: closed.slice(free).map((one) => one.ticket)
           }
         },
         json,
         (plan) =>
-          `Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}`
+          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}`
       )
       return
     }
