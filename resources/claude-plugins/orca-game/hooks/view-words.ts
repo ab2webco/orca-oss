@@ -18,6 +18,12 @@ export type ViewWords = {
   notStored: (view: string, scope: ViewScope) => string
   unknownView: (asked: string) => string
   unknownScope: (asked: string) => string
+  /** The Panel's chip that opens the selector, with the view shown now. */
+  menu: (view: string) => string
+  /** Before the Panel's scope chips. */
+  where: string
+  /** Why the Panel offers this pane only. */
+  paneOnly: string
 }
 
 const IDS = 'off, flat, zen, 2d-classic or 2d-hd'
@@ -44,7 +50,10 @@ const EN: ViewWords = {
   notStored: (view, scope) =>
     `View: ${view}, this pane only: this Orca could not store it for ${EN.scopes[scope]}.`,
   unknownView: (asked) => `Unknown view "${asked}". Use /orca-game:view ${IDS}.`,
-  unknownScope: (asked) => `Unknown scope "${asked}". Use pane, project or global.`
+  unknownScope: (asked) => `Unknown scope "${asked}". Use pane, project or global.`,
+  menu: (view) => `View: ${view}`,
+  where: 'For',
+  paneOnly: 'This Orca can change this pane only.'
 }
 
 const ES: ViewWords = {
@@ -79,7 +88,10 @@ const ES: ViewWords = {
     `Vista: ${view}, solo este panel: este Orca no pudo guardarla para ${ES.scopes[scope]}.`,
   unknownView: (asked) =>
     `Vista desconocida "${asked}". Usa /orca-game:view ${IDS.replace(' or ', ' o ')}.`,
-  unknownScope: (asked) => `Alcance desconocido "${asked}". Usa pane, project o global.`
+  unknownScope: (asked) => `Alcance desconocido "${asked}". Usa pane, project o global.`,
+  menu: (view) => `Vista: ${view}`,
+  where: 'Para',
+  paneOnly: 'Este Orca solo puede cambiar este panel.'
 }
 
 const CATALOG: Readonly<Record<GameLocale, ViewWords>> = { en: EN, es: ES }

@@ -33,6 +33,7 @@ import { changeFleetLayout, hintLayoutOnce, readFleetLayout } from './panel-layo
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
+import { viewPickerOf } from './view-picker'
 import { isTapLayout } from './tap-layout'
 
 export const PANE_ID = 'orca-game-fleet'
@@ -74,7 +75,7 @@ export const registerFleetPane = (on: On): void => {
       color: palette.parchment,
       backgroundColor: palette.panel
     })
-    const menu = (key: string, hotkey: string, label: string, onPress: () => void) => (
+    const menu = (key: string, hotkey: string | undefined, label: string, onPress: () => void) => (
       <Button key={key} plain hotkey={hotkey} onPress={onPress}>
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
       </Button>
@@ -120,21 +121,27 @@ export const registerFleetPane = (on: On): void => {
       )
     const isFlat = isFlatMode()
     const menuItems = paneMenuItemsOf($, scene, isFlat, close)
-    const menuRow = isTap ? (
-      tapButtonsOf(
-        $,
-        e,
-        'pane-menu-tap',
-        // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
-        [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map(({ label, ...one }) => ({
-          ...tapOf({ ...one, labels: [label] }),
-          bold: true
-        })),
-        columns
-      )
-    ) : (
-      <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-        {menuItems.map((one) => menu(one.key, one.hotkey, one.label, one.onPress))}
+    const picker = await viewPickerOf($, e, palette, columns)
+    const menuRow = (
+      <Box flexDirection="column">
+        {isTap ? (
+          tapButtonsOf(
+            $,
+            e,
+            'pane-menu-tap',
+            // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
+            [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map((one) => ({
+              ...tapOf(one),
+              bold: true
+            })),
+            columns
+          )
+        ) : (
+          <Box flexDirection="row" columnGap={1} flexWrap="wrap">
+            {menuItems.map((one) => menu(one.key, one.hotkey, one.labels[0], one.onPress))}
+          </Box>
+        )}
+        {picker}
       </Box>
     )
     const isLead = v.state?.role === 'lead'
