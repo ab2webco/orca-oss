@@ -58,6 +58,19 @@ const NPM_LIFECYCLE_SCRIPTS: ReadonlySet<string> = new Set([
   'preversion',
   'version'
 ])
+// Why: a long scripts list must not push these past the per-source cap.
+const EVERYDAY_PACKAGE_SCRIPTS = [
+  'dev',
+  'start',
+  'build',
+  'test',
+  'lint',
+  'typecheck',
+  'format',
+  'check'
+]
+// Why: one busy release workflow must not crowd out the CI workflow people actually mirror.
+const MAX_CANDIDATES_PER_WORKFLOW = 5
 // Why: these characters survive both sh and cmd unquoted, so the name is never rewritten or escaped.
 const SHELL_SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9:._/@+-]*$/
 const SCRIPT_RUNNERS: Readonly<Record<string, string>> = {
@@ -144,9 +157,15 @@ async function detectPackageScripts(
       !NPM_LIFECYCLE_SCRIPTS.has(name) &&
       !isPrePostHook(name, scriptNames)
   )
+  const rank = (name: string): number => {
+    const index = EVERYDAY_PACKAGE_SCRIPTS.indexOf(name)
+    return index === -1 ? EVERYDAY_PACKAGE_SCRIPTS.length : index
+  }
   return toCandidates(
     'package-json',
-    runnable.map((name) => ({ name, run: `${manager} run ${name}`, file: 'package.json' }))
+    runnable
+      .toSorted((a, b) => rank(a) - rank(b))
+      .map((name) => ({ name, run: `${manager} run ${name}`, file: 'package.json' }))
   )
 }
 
@@ -198,7 +217,8 @@ async function detectGithubWorkflows(
   for (const file of workflowFiles) {
     const content = await readFile(file)
     if (content !== null) {
-      runs.push(...parseGithubWorkflowCommands(content).map((command) => ({ ...command, file })))
+      const commands = parseGithubWorkflowCommands(content).slice(0, MAX_CANDIDATES_PER_WORKFLOW)
+      runs.push(...commands.map((command) => ({ ...command, file })))
     }
   }
   return toCandidates('github-actions', runs)

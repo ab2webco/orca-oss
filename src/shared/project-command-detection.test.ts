@@ -167,6 +167,13 @@ describe('detectProjectCommands', () => {
       {
         source: 'package-json',
         file: 'package.json',
+        label: 'Build',
+        run: 'pnpm run build',
+        slashCommand: 'build'
+      },
+      {
+        source: 'package-json',
+        file: 'package.json',
         label: 'Test',
         run: 'pnpm run test',
         slashCommand: 'test'
@@ -177,13 +184,6 @@ describe('detectProjectCommands', () => {
         label: 'Lint',
         run: 'pnpm run lint',
         slashCommand: 'lint'
-      },
-      {
-        source: 'package-json',
-        file: 'package.json',
-        label: 'Build',
-        run: 'pnpm run build',
-        slashCommand: 'build'
       },
       {
         source: 'package-json',
@@ -259,6 +259,48 @@ describe('detectProjectCommands', () => {
     ])
   })
 
+  it('skips CI steps that would run elsewhere or in another shell from the repo root', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.github/workflows/web.yml': [
+          'jobs:',
+          '  root:',
+          '    steps:',
+          '      - run: make check',
+          '      - run: npm test',
+          '        working-directory: web',
+          '      - run: Get-ChildItem',
+          '        shell: pwsh',
+          '      - run: make root-again',
+          '        shell: bash',
+          '  nested:',
+          '    defaults:',
+          '      run:',
+          '        working-directory: api',
+          '    steps:',
+          '      - run: go test ./...',
+          '  windows:',
+          '    defaults:',
+          '      run:',
+          '        shell: cmd',
+          '    steps:',
+          '      - run: dir'
+        ].join('\n'),
+        '.github/workflows/moved.yml': [
+          'defaults:',
+          '  run:',
+          '    working-directory: docs',
+          'jobs:',
+          '  build:',
+          '    steps:',
+          '      - run: mkdocs build'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map((candidate) => candidate.run)).toEqual(['make check', 'make root-again'])
+  })
+
   it('keeps one candidate per source when two sources name the same command', async () => {
     const candidates = await detectProjectCommands(
       memoryRepo({
@@ -328,6 +370,66 @@ describe('detectProjectCommands', () => {
     )
 
     expect(candidates).toHaveLength(20)
+  })
+
+  it('keeps the everyday package scripts when the cap cuts a long list', async () => {
+    const scripts = Object.fromEntries([
+      ...Array.from({ length: 30 }, (_, index) => [`audit${index}`, 'x']),
+      ['typecheck', 'tsc'],
+      ['build', 'vite build'],
+      ['dev', 'vite']
+    ])
+    const candidates = await detectProjectCommands(
+      memoryRepo({ 'package.json': JSON.stringify({ scripts }) })
+    )
+
+    expect(candidates.slice(0, 4).map((candidate) => candidate.run)).toEqual([
+      'npm run dev',
+      'npm run build',
+      'npm run typecheck',
+      'npm run audit0'
+    ])
+  })
+
+  it('spreads the CI cap across workflow files and skips CI-only plumbing', async () => {
+    const steps = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => `      - run: ${prefix} ${index}`)
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.github/workflows/a-release.yml': [
+          'jobs:',
+          '  r:',
+          '    steps:',
+          ...steps(30, 'release')
+        ].join('\n'),
+        '.github/workflows/ci.yml': [
+          'jobs:',
+          '  test:',
+          '    steps:',
+          '      - run: sudo apt-get install -y libpq-dev',
+          '      - run: |',
+          '          set -euo pipefail',
+          '          echo "$TAG"',
+          '      - run: npm test',
+          '  win:',
+          '    runs-on: windows-latest',
+          '    steps:',
+          '      - run: dir',
+          '  win-bash:',
+          '    runs-on: [self-hosted, windows]',
+          '    defaults:',
+          '      run:',
+          '        shell: bash',
+          '    steps:',
+          '      - run: make win'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.filter((c) => c.file.endsWith('a-release.yml'))).toHaveLength(5)
+    expect(
+      candidates.filter((c) => c.file.endsWith('ci.yml')).map((candidate) => candidate.run)
+    ).toEqual(['npm test', 'make win'])
   })
 
   it('ignores files over the import size limit and unparsable CI', async () => {
