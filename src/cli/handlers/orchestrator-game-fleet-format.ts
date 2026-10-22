@@ -1,6 +1,7 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import type { GameHold } from './orchestrator-game-hold'
+import { formatSetupQueue } from './orchestrator-game-setup-queue'
 import type {
   GameFleet,
   GameFleetRow,
@@ -71,10 +72,18 @@ function formatPaused(fleet: GameFleet): string[] {
   ]
 }
 
+const formatQueued = (fleet: GameFleet): string[] =>
+  fleet.queued.length === 0
+    ? []
+    : [
+        `Queued behind a setup: ${fleet.queued.length} · each starts by itself`,
+        ...fleet.queued.map((one) => `${one.ticket}: ${formatSetupQueue(one)}`)
+      ]
+
 export function formatFleet(fleet: GameFleet): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
-  const paused = formatPaused(fleet)
+  const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
   if (fleet.rows.length === 0) {
     return [head, ...paused].join('\n')
   }

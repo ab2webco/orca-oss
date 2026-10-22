@@ -607,6 +607,19 @@ describe('orca game launch', () => {
     )
   })
 
+  it('refuses a ticket already queued behind a setup, so it never gets a second member', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        queuedMembers: [{ ticket: 'CIN-12', name: null, position: 1, waitingOn: 'Ford · CIN-9' }]
+      })
+    )
+
+    await expect(launch(client)).rejects.toThrow(
+      'CIN-12 is queued #1, waiting on Ford · CIN-9; it starts by itself.'
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
   it('says so when the connected Orca Lab cannot queue setups, and launches at once', async () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     const { client, calls } = fakeClient(stateWith(), undefined, {

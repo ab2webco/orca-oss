@@ -294,6 +294,10 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
         `${ticket} is paused since Orca restarted: \`orca game resume-members ${ticket}\` resumes it, \`orca game resume-members ${ticket} --discard\` frees it.`
       )
     }
+    const queued = response.result.queuedMembers?.find((one) => one.ticket === ticket)
+    if (queued) {
+      throw new RuntimeClientError('invalid_argument', `${ticket} is ${formatSetupQueue(queued)}.`)
+    }
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
     const { cap, running } = gameFleetReportOf(response.result)
     if (running >= cap) {

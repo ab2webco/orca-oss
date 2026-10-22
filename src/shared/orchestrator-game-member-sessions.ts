@@ -178,19 +178,52 @@ export type GamePausedMember = {
   since: string
 }
 
+/** A start the host holds until its setup slot frees (ORCA-746). */
+export type GameSetupQueueEntry = { taskId: string; position: number; waitingOn: string }
+
+/** A member whose start waits for the setup in flight: neither live nor paused. */
+export type GameQueuedMember = {
+  ticket: string
+  name: string | null
+  position: number
+  waitingOn: string
+}
+
+export function queuedMembersOf(
+  members: readonly GameMemberSession[],
+  setupQueue: readonly GameSetupQueueEntry[]
+): GameQueuedMember[] {
+  return setupQueue.flatMap((entry) => {
+    const member = members.find((one) => one.taskId === entry.taskId)
+    return member
+      ? [
+          {
+            ticket: member.ticket,
+            name: member.name,
+            position: entry.position,
+            waitingOn: entry.waitingOn
+          }
+        ]
+      : []
+  })
+}
+
 /**
  * Every saved member not live now, except the ones that finished. Why the worktrees: a pane that
  * leads no one still sees the lead's members running there, and nothing resumes over a live agent.
  */
 export function pausedMembersOf(
   members: readonly GameMemberSession[],
-  live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> }
+  live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> },
+  setupQueue: readonly GameSetupQueueEntry[] = []
 ): GamePausedMember[] {
+  const queued = new Set(setupQueue.map((entry) => entry.taskId))
   return members
     .filter(
       (one) =>
         one.lastState !== 'finished' &&
         !live.tickets.has(one.ticket) &&
+        !queued.has(one.taskId) &&
         !(one.worktreeId !== null && live.worktreeIds.has(one.worktreeId))
     )
     .map((one) => ({

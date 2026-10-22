@@ -30994,11 +30994,13 @@ export class OrcaRuntimeService {
     const view = await this.gamePausedMembers.note(
       `repo:${project.repoId}`,
       state.agents,
-      project.liveWorktreeIds
+      project.liveWorktreeIds,
+      this.workerSetupAdmission.queued()
     )
     return {
       ...state,
       pausedMembers: view.paused,
+      ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }

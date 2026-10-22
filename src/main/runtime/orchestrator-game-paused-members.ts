@@ -2,13 +2,20 @@ import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-
 import { isFinishedMember, ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import {
   pausedMembersOf,
+  queuedMembersOf,
   type GameMemberSessionPatch,
-  type GamePausedMember
+  type GamePausedMember,
+  type GameQueuedMember,
+  type GameSetupQueueEntry
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 
-export type GamePausedMembersView = { paused: GamePausedMember[]; error: string | null }
+export type GamePausedMembersView = {
+  paused: GamePausedMember[]
+  queued: GameQueuedMember[]
+  error: string | null
+}
 
 type Deps = {
   store: GameMemberSessionStore
@@ -31,7 +38,8 @@ export class GamePausedMembers {
   async note(
     projectKey: string,
     agents: readonly GameAgent[],
-    liveWorktreeIds: ReadonlySet<string> = new Set()
+    liveWorktreeIds: ReadonlySet<string> = new Set(),
+    setupQueue: readonly GameSetupQueueEntry[] = []
   ): Promise<GamePausedMembersView> {
     const live = agents.flatMap((agent) => {
       const ticket = agent.isMember ? ticketOfMember(agent) : null
@@ -48,11 +56,12 @@ export class GamePausedMembers {
     }
     const read = await this.deps.store.read(projectKey)
     if (!read.ok) {
-      return { paused: [], error: read.reason }
+      return { paused: [], queued: [], error: read.reason }
     }
     const tickets = new Set(live.map((one) => one.ticket))
     return {
-      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }),
+      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }, setupQueue),
+      queued: queuedMembersOf(read.members, setupQueue),
       error
     }
   }

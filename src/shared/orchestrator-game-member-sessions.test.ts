@@ -5,6 +5,7 @@ import {
   mergeGameMemberSession,
   parseGameMemberSessionsFile,
   pausedMembersOf,
+  queuedMembersOf,
   serializeGameMemberSessions,
   type GameMemberSession
 } from './orchestrator-game-member-sessions'
@@ -126,6 +127,25 @@ describe('pausedMembersOf', () => {
         since: '2026-10-20T10:00:00.000Z'
       },
       expect.objectContaining({ ticket: 'ORCA-2', resumable: false })
+    ])
+  })
+})
+
+describe('members queued behind a running setup (ORCA-746)', () => {
+  const members = [
+    member('ORCA-1', { name: 'Merlin · ORCA-1', lastState: 'queued' }),
+    member('ORCA-2', { lastState: 'working' })
+  ]
+  const queue = [{ taskId: 'task_ORCA-1', position: 1, waitingOn: 'Arthur · ORCA-9' }]
+
+  it('are not paused: their start is on its way', () => {
+    const live = { tickets: new Set<string>(), worktreeIds: new Set<string>() }
+    expect(pausedMembersOf(members, live, queue).map((one) => one.ticket)).toEqual(['ORCA-2'])
+  })
+
+  it('are listed by ticket with their place in the queue', () => {
+    expect(queuedMembersOf(members, queue)).toEqual([
+      { ticket: 'ORCA-1', name: 'Merlin · ORCA-1', position: 1, waitingOn: 'Arthur · ORCA-9' }
     ])
   })
 })

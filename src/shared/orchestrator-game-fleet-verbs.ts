@@ -5,7 +5,7 @@ import {
 } from './orchestrator-game-lead'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
-import type { GamePausedMember } from './orchestrator-game-member-sessions'
+import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 
 export { ticketInText }
 
@@ -43,11 +43,13 @@ export type GameFleet = {
   free: number
   /** Members not live since Orca or the machine restarted: `game resume-members`. */
   paused: GamePausedMember[]
+  /** Members whose start waits for the setup in flight (ORCA-746). */
+  queued: GameQueuedMember[]
   pausedError?: string
 }
 
 type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
-  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError'>
+  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers'>
 
 export function isFinishedMember(agent: GameAgent): boolean {
   const group = agent.workItem?.statusGroup
@@ -158,7 +160,8 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
   const cap = (state.lead ?? DEFAULT_GAME_LEAD).cap
   // Why paused ones count: each still holds its ticket until it is resumed or discarded.
   const paused = state.pausedMembers ?? []
-  const running = rows.length - counts.finished + paused.length
+  const queued = state.queuedMembers ?? []
+  const running = rows.length - counts.finished + paused.length + queued.length
   return {
     rows,
     counts,
@@ -166,6 +169,7 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
     running,
     free: Math.max(0, cap - running),
     paused,
+    queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
   }
 }
@@ -173,7 +177,7 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
 // Why In Progress is allowed: a project may move a ticket there before its launch (cineco does).
 const PAST_WORK: ReadonlySet<GameStatusGroup> = new Set(['review', 'done', 'cancelled'])
 
-export type GameWaveSkipReason = 'cap' | 'already running' | 'paused' | 'not in To Do'
+export type GameWaveSkipReason = 'cap' | 'already running' | 'paused' | 'queued' | 'not in To Do'
 
 export type GameWavePlan = {
   launch: string[]
@@ -190,6 +194,7 @@ export function gameWavePlanOf(
     fleet.rows.filter((row) => row.phase !== 'finished').map((row) => row.ticket)
   )
   const paused = new Set(fleet.paused.map((one) => one.ticket))
+  const queued = new Set(fleet.queued.map((one) => one.ticket))
   const items = state.project?.todo?.items ?? []
   const groupOf = (ticket: string) => items.find((item) => item.id.toUpperCase() === ticket)?.group
   const named = [...new Set(requested.map((ticket) => ticket.trim().toUpperCase()))].filter(
@@ -206,11 +211,13 @@ export function gameWavePlanOf(
       ? 'already running'
       : paused.has(ticket)
         ? 'paused'
-        : group !== undefined && PAST_WORK.has(group)
-          ? 'not in To Do'
-          : plan.launch.length >= fleet.free
-            ? 'cap'
-            : null
+        : queued.has(ticket)
+          ? 'queued'
+          : group !== undefined && PAST_WORK.has(group)
+            ? 'not in To Do'
+            : plan.launch.length >= fleet.free
+              ? 'cap'
+              : null
     if (reason) {
       plan.skipped.push({ ticket, reason })
     } else {
