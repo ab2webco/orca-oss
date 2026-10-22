@@ -126,7 +126,8 @@ const JEWEL = 0xd83a2e
 export const CROWN_WIDTH = CROWN[0].length
 export const LEAD_GOLD = GOLD
 
-const spanOf = (row: string): number => row.replace(/[.#]/g, '').length
+// Why `:` too: it backs a gap with ink, so it is no art the crown can stand on.
+const spanOf = (row: string): number => row.replace(/[.#:]/g, '').length
 
 /** Where the crown sits: centred on the sprite's first row wide enough to hold it. */
 export const crownAtOf = (
@@ -137,8 +138,8 @@ export const crownAtOf = (
   const wide = rows.findIndex((row) => spanOf(row) >= CROWN_WIDTH)
   const first = Math.max(0, wide !== -1 ? wide : rows.findIndex((row) => spanOf(row) > 0))
   const row = rows[first] ?? ''
-  const from = row.search(/[^.#]/)
-  const to = row.search(/[^.#][.#]*$/)
+  const from = row.search(/[^.#:]/)
+  const to = row.search(/[^.#:][.#:]*$/)
   const centre = from < 0 ? row.length / 2 : (from + to) / 2
   return {
     left: left + Math.round(centre - (CROWN_WIDTH - 1) / 2),

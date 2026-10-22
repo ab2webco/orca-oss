@@ -23,7 +23,8 @@ import {
   costumeSpriteOf,
   frameSpriteOf,
   hdSpritePixel,
-  isHdEdgeAt,
+  isHdHaloAt,
+  ringOf,
   type HdSprite
 } from './hd-sprite'
 import { hdWordsInto } from './hd-words'
@@ -183,9 +184,6 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const d = Math.hypot(x - (fireLeft + FIRE_WIDTH / 2), (y - (ground - 2)) * 1.3)
     return d < 12 ? mix(color, FIRE_GLOW, (1 - d / 12) * 0.3) : color
   }
-  // Set by figureAt: whether the pixel it returned is an outline, and the state ring tinting it.
-  let isEdge = false
-  let edgeTint: number | undefined
   // Front to back: the hero, its pet, the party, then the advisor.
   const placed: readonly { sprite: HdSprite; left: number; top: number; ring?: number }[] = [
     { sprite, left: walk, top },
@@ -197,9 +195,23 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     for (const one of placed) {
       const color = hdSpritePixel(one.sprite, x, y, one.left, one.top, one.ring)
       if (color !== undefined) {
-        isEdge = isHdEdgeAt(one.sprite, x, y, one.left, one.top)
-        edgeTint = one.ring
         return color
+      }
+    }
+    return undefined
+  }
+  // Why outside: a rim that replaced the outline read as a hole in the figure.
+  const rimAt = (x: number, y: number, behind: number): number | undefined => {
+    // Why above the floor only: a figure stands on the ground, it needs no rim against it.
+    if (y > ground) {
+      return undefined
+    }
+    for (const one of placed) {
+      if (isHdHaloAt(one.sprite, x, y, one.left, one.top)) {
+        const outline = one.ring === undefined ? one.sprite.outline : ringOf(one.sprite, one.ring)
+        const ink = landInLight(outline, figureLight)
+        const edge = figureEdgeOf(ink, behind, look, one.ring)
+        return edge === ink ? undefined : edge
       }
     }
     return undefined
@@ -227,11 +239,7 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     const figure = figureAt(x, y)
     if (figure !== undefined) {
       figures[y * columns + x] = 1
-      const lit = landInLight(figure, figureLight)
-      const shown = isEdge
-        ? figureEdgeOf(lit, hdBackdropPixel(frame, land, x, y), look, edgeTint)
-        : lit
-      return glow(x, y, shown)
+      return glow(x, y, landInLight(figure, figureLight))
     }
     const held =
       input.advisor === undefined || advisor === undefined || !room.isGestureShown
@@ -241,7 +249,8 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
     if (held !== undefined || fire !== undefined) {
       return held ?? fire ?? 0
     }
-    return glow(x, y, hdBackdropPixel(frame, land, x, y, shadeAt(x, y)))
+    const behind = hdBackdropPixel(frame, land, x, y, shadeAt(x, y))
+    return glow(x, y, rimAt(x, y, behind) ?? behind)
   }
   if (buffer.length !== columns * pixels) {
     buffer = new Uint32Array(columns * pixels)
