@@ -64,6 +64,7 @@ function fakeClient(args: {
           setAside: null
         },
         'status.get': { capabilities: args.capabilities ?? [] },
+        'terminal.send': { send: { handle: params.terminal, accepted: true, bytesWritten: 1 } },
         'orchestration.workerStart': args.start ?? {
           runId: 'run_1',
           taskId: `task_${String(params.task).replace('task_', '')}`,
@@ -387,5 +388,63 @@ describe('orca game resume-members', () => {
   it('says to update Orca when the host keeps no members', async () => {
     const { client } = fakeClient({})
     await expect(run(client)).rejects.toThrow('does not keep game members yet')
+  })
+
+  // Why (ORCA-754): its dispatch still holds the task, so memberResume refused it and
+  // only --discard was offered; one Enter in the open terminal starts its turn.
+  it('presses Enter in the terminal of a member whose brief was never submitted', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('POP-486', { cause: 'unsubmitted', terminal: 'term_486' })]
+    })
+
+    await run(client)
+
+    expect(calls.find(([m]) => m === 'terminal.send')?.[1]).toMatchObject({
+      terminal: 'term_486',
+      enter: true
+    })
+    expect(calls.find(([m]) => m === 'terminal.send')?.[1]).not.toHaveProperty('text')
+    expect(
+      calls.some(([m]) => m === 'game.memberResume' || m === 'orchestration.workerStart')
+    ).toBe(false)
+    expect(printed().members).toEqual([
+      { ticket: 'POP-486', result: 'submitted', terminal: 'term_486' }
+    ])
+  })
+
+  it('never starts a second agent beside a member whose terminal is still open', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('POP-487', { cause: 'terminal-open', terminal: 'term_487' })]
+    })
+
+    await run(client)
+
+    expect(calls.some(([m]) => m === 'game.memberResume' || m === 'terminal.send')).toBe(false)
+    expect(printed().members).toEqual([
+      expect.objectContaining({
+        ticket: 'POP-487',
+        result: 'skipped',
+        reason: expect.stringContaining('term_487')
+      })
+    ])
+  })
+
+  it('presses Enter even at the cap, and counts that member against it', async () => {
+    const { client, calls } = fakeClient({
+      cap: 1,
+      pausedMembers: [
+        paused('POP-486', { cause: 'unsubmitted', terminal: 'term_486' }),
+        paused('POP-489')
+      ]
+    })
+
+    await run(client)
+
+    expect(calls.filter(([m]) => m === 'terminal.send')).toHaveLength(1)
+    expect(calls.some(([m]) => m === 'game.memberResume')).toBe(false)
+    expect(printed().members).toEqual([
+      { ticket: 'POP-486', result: 'submitted', terminal: 'term_486' },
+      { ticket: 'POP-489', result: 'skipped', reason: 'cap: 1 members already run' }
+    ])
   })
 })
