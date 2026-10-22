@@ -189,3 +189,27 @@ describe('GamePausedMembers.record and forget', () => {
     expect((await paused.note('repo:a', [])).paused).toEqual([])
   })
 })
+
+describe('GamePausedMembers.note with an open terminal (ORCA-754)', () => {
+  it('carries why each paused member is not live', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-game-paused-'))
+    dirs.push(dir)
+    const paused = new GamePausedMembers({
+      store: new GameMemberSessionStore(() => dir),
+      contextOf: () => undefined,
+      sessionIdOf: () => null,
+      causeOf: (one) =>
+        one.taskId === 'task_9' ? { cause: 'unsubmitted', terminal: 'term_9' } : null
+    })
+    await paused.record('repo:a', { ticket: 'ORCA-9', taskId: 'task_9', runId: 'run_1' })
+    await paused.record('repo:a', { ticket: 'ORCA-8', taskId: 'task_8', runId: 'run_1' })
+
+    const view = await paused.note('repo:a', [])
+
+    expect(view.paused.find((one) => one.ticket === 'ORCA-9')).toMatchObject({
+      cause: 'unsubmitted',
+      terminal: 'term_9'
+    })
+    expect(view.paused.find((one) => one.ticket === 'ORCA-8')).not.toHaveProperty('cause')
+  })
+})

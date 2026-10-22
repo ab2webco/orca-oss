@@ -12,6 +12,7 @@ vi.mock('electron', () => ({
 }))
 
 import { OrcaRuntimeService } from './orca-runtime'
+import { OrchestrationDb } from './orchestration/db'
 
 userData.dir = mkdtempSync(join(tmpdir(), 'orca-paused-runtime-'))
 afterAll(() => rmSync(userData.dir, { recursive: true, force: true }))
@@ -46,7 +47,7 @@ const memberWorktree = {
 }
 
 // Why the casts: these lookups are private, and real ones need live PTYs and hook events.
-function runtimeWith(worktrees: (typeof leadWorktree)[]): OrcaRuntimeService {
+function runtimeWith(worktrees: (typeof leadWorktree)[], taskId = 'task_609'): OrcaRuntimeService {
   const runtime = new OrcaRuntimeService(null)
   vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({ worktrees } as never)
   const internals = runtime as unknown as {
@@ -66,7 +67,7 @@ function runtimeWith(worktrees: (typeof leadWorktree)[]): OrcaRuntimeService {
   vi.spyOn(internals, 'getAgentStatusOrchestrationContextForHandle').mockImplementation((handle) =>
     handle === 'term_member'
       ? {
-          taskId: 'task_609',
+          taskId,
           dispatchId: 'ctx_609',
           dispatchStatus: 'dispatched',
           orchestrationRunId: 'run_1'
@@ -112,5 +113,47 @@ describe("a lead's members across a restart, through the runtime", () => {
       paneKey: 'tab-4:member'
     })
     expect(member.pausedMembers).toBeUndefined()
+  })
+
+  // Why (ORCA-754): a member whose brief never started a turn reports no agent,
+  // so it reads as not live, yet its terminal is still open.
+  it('says a member with an open terminal and no first turn has an unsubmitted brief', async () => {
+    const db = new OrchestrationDb(':memory:')
+    const runId = db.createRun({
+      objective: 'game',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: 'tab-1:lead'
+    }).id
+    const task = db.createTask({ spec: 'ORCA-609', runId })
+    db.createDispatchContext(task.id, 'term_member')
+    try {
+      await runtimeWith([leadWorktree, memberWorktree], task.id).getOrchestratorGameState({
+        worktreeId: 'wt-lead',
+        paneKey: 'tab-1:lead'
+      })
+      const runtime = runtimeWith([leadWorktree], task.id)
+      runtime.setOrchestrationDb(db)
+      const internals = runtime as unknown as {
+        findPtyIdForHandle: (handle: string) => string | null
+      }
+      vi.spyOn(internals, 'findPtyIdForHandle').mockImplementation((handle) =>
+        handle === 'term_member' ? 'pty-member' : null
+      )
+
+      const after = await runtime.getOrchestratorGameState({
+        worktreeId: 'wt-lead',
+        paneKey: 'tab-1:lead'
+      })
+
+      expect(after.pausedMembers).toEqual([
+        expect.objectContaining({
+          ticket: 'ORCA-609',
+          cause: 'unsubmitted',
+          terminal: 'term_member'
+        })
+      ])
+    } finally {
+      db.close()
+    }
   })
 })

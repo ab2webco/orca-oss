@@ -129,6 +129,28 @@ describe('pausedMembersOf', () => {
       expect.objectContaining({ ticket: 'ORCA-2', resumable: false })
     ])
   })
+
+  // Why (ORCA-754): a member stuck before its first turn is not live either,
+  // but its terminal is open — "paused since restart" sent the lead the wrong way.
+  it('says why a member is not live when its terminal is still open', () => {
+    const members = [member('ORCA-1'), member('ORCA-2'), member('ORCA-3')]
+    const live = { tickets: new Set<string>(), worktreeIds: new Set<string>() }
+    const causes = {
+      'task_ORCA-1': { cause: 'unsubmitted', terminal: 'term_1' },
+      'task_ORCA-2': { cause: 'terminal-open', terminal: 'term_2' }
+    } as const
+
+    const paused = pausedMembersOf(members, live, new Set(), (one) => causes[one.taskId] ?? null)
+
+    expect(paused[0]).toMatchObject({ ticket: 'ORCA-1', cause: 'unsubmitted', terminal: 'term_1' })
+    expect(paused[1]).toMatchObject({
+      ticket: 'ORCA-2',
+      cause: 'terminal-open',
+      terminal: 'term_2'
+    })
+    expect(paused[2]).not.toHaveProperty('cause')
+    expect(paused[2]).not.toHaveProperty('terminal')
+  })
 })
 
 describe('members queued behind a running setup (ORCA-746)', () => {
