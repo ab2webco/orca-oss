@@ -9,7 +9,7 @@ export type SessionOverrides = { mode?: GameMode | 'demo'; render?: GameRender }
 // Mirrors Orca's src/shared/orchestrator-game-fleet-verbs.ts, which the mod cannot import.
 const TICKET = /(?:^|[^A-Z0-9])([A-Z][A-Z0-9_]*-\d+)(?![A-Z0-9])/
 
-const ticketOf = (agent: GameAgent): string => {
+export const ticketOf = (agent: GameAgent): string => {
   if (agent.workItem) {
     return agent.workItem.identifier.toUpperCase()
   }
@@ -30,7 +30,7 @@ const isFinished = (agent: GameAgent): boolean => {
   )
 }
 
-const phaseOf = (agent: GameAgent): MemberPhase => {
+export const memberPhaseOf = (agent: GameAgent): MemberPhase => {
   if (isFinished(agent)) {
     return 'finished'
   }
@@ -76,7 +76,7 @@ function memberRowsOf(members: readonly GameAgent[], words: StateReportWords): s
         : '',
       agent.workItem?.status ?? ''
     ].filter((one) => one !== '')
-    return [ticketOf(agent), words.phases[phaseOf(agent)], detail.join(' · ')]
+    return [ticketOf(agent), words.phases[memberPhaseOf(agent)], detail.join(' · ')]
   })
   return columnsOf(rows).map((row) => `  ${row}`)
 }
