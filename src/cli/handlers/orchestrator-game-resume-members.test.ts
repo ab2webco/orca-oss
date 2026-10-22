@@ -389,6 +389,27 @@ describe('orca game resume-members', () => {
     expect(printed()).toEqual(expect.objectContaining({ dryRun: true, resume: ['CIN-1'] }))
   })
 
+  it('plans an Enter for an unsubmitted brief and a skip for an open terminal on --dry-run', async () => {
+    const { client } = fakeClient({
+      cap: 1,
+      pausedMembers: [
+        paused('POP-486', { cause: 'unsubmitted', terminal: 'term_486' }),
+        paused('POP-487', { cause: 'terminal-open', terminal: 'term_487' }),
+        paused('CIN-1')
+      ]
+    })
+
+    await run(client, [['dry-run', true]])
+
+    expect(printed()).toEqual({
+      dryRun: true,
+      submit: ['POP-486'],
+      openTerminal: ['POP-487'],
+      resume: [],
+      overCap: ['CIN-1']
+    })
+  })
+
   it('says to update Orca when the host keeps no members', async () => {
     const { client } = fakeClient({})
     await expect(run(client)).rejects.toThrow('does not keep game members yet')
