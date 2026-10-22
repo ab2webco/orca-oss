@@ -219,9 +219,9 @@ export async function buildOrchestratorGameState(
   }
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
-  // Why not for a member: its band never shows them, and every member pane polls this state.
+  // Why `tracker`: it is already off for a member, whose band shows no project work.
   const projectWork =
-    tracker && readProjectWork && !input.callerParentPaneKey
+    tracker && readProjectWork
       ? await settle(() => readProjectWork({ todo: integrations.todo, workItem }))
       : null
   const placeholders = {
