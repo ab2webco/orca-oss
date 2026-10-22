@@ -62,9 +62,13 @@ export function dispatchOf(
   )
 }
 
-async function stopOne(
+/** Ends one member's agent: its live dispatch first, then its terminal if one is left. */
+export async function stopOne(
   client: Client,
-  target: GameStopTarget,
+  target: {
+    row: Pick<GameStopTarget['row'], 'ticket' | 'name' | 'terminalHandle'>
+    worktreeId: string | null
+  },
   workers: GameStopWorker[]
 ): Promise<GameStopEntry> {
   const entry: GameStopEntry = {
