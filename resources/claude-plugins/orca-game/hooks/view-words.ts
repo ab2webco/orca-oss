@@ -15,6 +15,8 @@ export type ViewWords = {
   help: (scopes: readonly ViewScope[]) => string
   setPane: (view: string) => string
   stored: (view: string, scope: ViewScope) => string
+  /** Stored for every project while this project's own layer keeps `shown`. */
+  storedShadowed: (view: string, shown: string) => string
   notStored: (view: string, scope: ViewScope) => string
   unknownView: (asked: string) => string
   unknownScope: (asked: string) => string
@@ -47,6 +49,8 @@ const EN: ViewWords = {
   setPane: (view) => `View: ${view}, this pane only.`,
   stored: (view, scope) =>
     `View: ${view}, saved for ${scope === 'project' ? 'this project on this machine' : 'every project'}.`,
+  storedShadowed: (view, shown) =>
+    `View: ${view}, saved for every project; this project's own setting keeps ${shown} here.`,
   notStored: (view, scope) =>
     `View: ${view}, this pane only: this Orca could not store it for ${EN.scopes[scope]}.`,
   unknownView: (asked) => `Unknown view "${asked}". Use /orca-game:view ${IDS}.`,
@@ -84,6 +88,8 @@ const ES: ViewWords = {
   setPane: (view) => `Vista: ${view}, solo este panel.`,
   stored: (view, scope) =>
     `Vista: ${view}, guardada para ${scope === 'project' ? 'este proyecto en esta máquina' : 'todos los proyectos'}.`,
+  storedShadowed: (view, shown) =>
+    `Vista: ${view}, guardada para todos los proyectos; la configuración propia de este proyecto mantiene ${shown} aquí.`,
   notStored: (view, scope) =>
     `Vista: ${view}, solo este panel: este Orca no pudo guardarla para ${ES.scopes[scope]}.`,
   unknownView: (asked) =>

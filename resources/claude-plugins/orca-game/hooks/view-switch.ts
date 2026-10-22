@@ -58,12 +58,19 @@ export async function switchView(
   quest.isDemo = false
   quest.modeOverride = undefined
   quest.renderOverride = undefined
-  questLiveConfig(
-    $,
-    { ...quest.liveConfig, ...gameViewPatchOf(view, gameConfig()) },
-    quest.liveSources
-  )
+  // Why: every project sits under this project's own layers, so a value they set keeps winning here.
+  const isShadowed =
+    scope === 'global' &&
+    [quest.liveSources.mode, quest.liveSources.render].some(
+      (source) => source === 'project' || source === 'local'
+    )
+  if (!isShadowed) {
+    const patch = gameViewPatchOf(view, gameConfig())
+    questLiveConfig($, { ...quest.liveConfig, ...patch }, quest.liveSources)
+  }
   await redraw($)
   await refreshSoon($)
-  return words.stored(name, scope)
+  return isShadowed
+    ? words.storedShadowed(name, words.names[currentView()])
+    : words.stored(name, scope)
 }
