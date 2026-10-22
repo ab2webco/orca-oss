@@ -556,6 +556,9 @@ are saved while they run, so the team picks up where it was:
   - The lead's rules have it run `game resume-members` at once and then tell the person who resumed
     (ORCA-746). `askBeforeResume: true` (orca.yaml, or the project Settings' **Ask before resuming**)
     keeps the earlier rule: ask the person once, naming the members, before resuming.
+  - A ticket is resumed once even when two leads ask together: a second call within two minutes of
+    the first (the time the CLI takes to bind the new dispatch) is refused with `already being
+    resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
 - **The lead's brief** (ORCA-746). When a lead's own conversation is resumed or compacted, the
   orca-game mod hands it `game fleet` as context, paused members included, so it answers from the
   host's record and not from a summary; after a compaction it also points the lead back to
