@@ -3668,7 +3668,8 @@ export class OrcaRuntimeService {
   // Why Engram as a mirror: lessons must survive without it, and reads merge what either holds.
   private readonly gameLessons = new GameLessons({
     store: new GameLessonStore(() => join(app.getPath('userData'), 'orchestrator-game-lessons')),
-    mirror: new EngramLessonMirror(engramRequestOf())
+    // Why not under E2E: a spec must never write the developer's own Engram.
+    mirror: process.env.ORCA_E2E_USER_DATA_DIR ? null : new EngramLessonMirror(engramRequestOf())
   })
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
@@ -30418,7 +30419,13 @@ export class OrcaRuntimeService {
       (args.terminalHandle
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
-    const repoId = worktreeId ? worktreesById.get(worktreeId)?.repoId : undefined
+    // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
+    // keyed `no-project` then would split the project's history and lessons in two.
+    const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
+    const repoId = worktreeId
+      ? (worktreesById.get(worktreeId)?.repoId ??
+        (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined))
+      : undefined
     return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
   }
 
