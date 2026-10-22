@@ -13,8 +13,10 @@ function runtimeWith(settings: GameSettings) {
       writes.push([updates, options])
     }
   } as never)
-  vi.spyOn(runtime, 'getResolvedWorktreeMap').mockResolvedValue(
-    new Map([['w1', { id: 'w1', repoId: 'r1' }]]) as never
+  // Why the cast: the worktree map is private, and a real one needs repos on disk.
+  const internals = runtime as unknown as { getResolvedWorktreeMap: () => Promise<unknown> }
+  vi.spyOn(internals, 'getResolvedWorktreeMap').mockResolvedValue(
+    new Map([['w1', { id: 'w1', repoId: 'r1' }]])
   )
   return { runtime, writes }
 }
