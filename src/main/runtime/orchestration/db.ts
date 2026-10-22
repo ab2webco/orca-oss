@@ -7613,6 +7613,7 @@ export class OrchestrationDb {
   }
 
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).
+  // Why (ORCA-746): host-observed activity is liveness too, so a worker that stopped beating but keeps working is not stale.
   getStaleDispatches(thresholdIso: string): DispatchContextRow[] {
     return this.db
       .prepare(
@@ -7620,9 +7621,10 @@ export class OrchestrationDb {
          WHERE status = 'dispatched'
            AND dispatched_at IS NOT NULL
            AND julianday(dispatched_at) < julianday(?)
-           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))`
+           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))
+           AND (last_activity_at IS NULL OR julianday(last_activity_at) < julianday(?))`
       )
-      .all(thresholdIso, thresholdIso) as DispatchContextRow[]
+      .all(thresholdIso, thresholdIso, thresholdIso) as DispatchContextRow[]
   }
 
   failDispatch(ctxId: string, error: string): DispatchContextRow | undefined {
