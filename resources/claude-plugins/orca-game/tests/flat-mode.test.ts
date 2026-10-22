@@ -1,12 +1,40 @@
 // Runs under `claude plugin test`: flat draws the game as text, with no Raster and no frame work.
 import { describe, expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { ADVISOR_TILE_KEY } from '../hooks/advisor-tile'
 import { cellWidthOf } from '../hooks/cell-width'
 import { HUD_KEY } from '../hooks/fleet-hud'
 import { PANE_ID } from '../hooks/fleet-pane'
+import { TILE_COLUMNS } from '../hooks/fleet-tiles'
 import { SCENE_TICK_MS } from '../hooks/scene'
+
+const ADVISOR = {
+  version: 1,
+  locale: 'en',
+  line: 'jev · 2 agents',
+  model: 'Opus 5.5',
+  modelId: 'claude-opus-5-5',
+  effort: 'high',
+  subagents: [],
+  ci: [],
+  notices: []
+}
+
+// Publishes TEST_ADVISOR at start, as Jev does in a game pane.
+const JEV: Plugin = {
+  name: 'orca-jev-mod-skills',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      const raw = await $.env.get('TEST_ADVISOR')
+      if (raw !== undefined && raw !== null && raw !== '') {
+        await $.state.set({ plugin: 'orca-jev-mod-skills', key: 'advisor' }, JSON.parse(raw))
+      }
+      return next(e)
+    })
+  }
+}
 
 const agent = (name: string, isLeader: boolean) => ({
   paneKey: `t:${name}`,
@@ -194,6 +222,24 @@ describe('flat mode', () => {
     expect(row?.text).toContain('▸ tester')
     const keys = (await panel.findAll({ type: 'Button' })).map((one) => String(one.key))
     expect(keys).toEqual(expect.arrayContaining(['view-t:builder', 'view-t:tester']))
+    await panel.unmount()
+  })
+
+  test('flat drops the empty advisor tile column', { plugins: [JEV] }, async ($, on) => {
+    await start($, on, { ORCA_GAME_MODE: 'flat', TEST_ADVISOR: JSON.stringify(ADVISOR) })
+    const panel = await pane($, 130)
+    expect(await panel.find({ type: 'Box', key: 'advisor-card' })).toBeDefined()
+    const blanks = (await panel.findAll({ type: 'Box' })).filter(
+      (one) => one.props.width === TILE_COLUMNS
+    )
+    expect(blanks).toEqual([])
+    await panel.unmount()
+  })
+
+  test('scene mode keeps the advisor sprite tile', { plugins: [JEV] }, async ($, on) => {
+    await start($, on, { ORCA_GAME_MODE: 'on', TEST_ADVISOR: JSON.stringify(ADVISOR) })
+    const panel = await pane($, 130)
+    expect(await panel.find({ type: 'Raster', key: ADVISOR_TILE_KEY })).toBeDefined()
     await panel.unmount()
   })
 })
