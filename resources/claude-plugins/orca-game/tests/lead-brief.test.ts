@@ -31,6 +31,7 @@ const start = async (
 ) => {
   const store = new Map<string, unknown>([[STARTED, args.started ?? ['s1']]])
   const runs: string[][] = []
+  const commands: string[] = []
   const clock = mock.clock(on)
   mock.env(on, { ORCA_GAME_CLI: '/opt/orca/bin/orca' })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
@@ -44,7 +45,10 @@ const start = async (
   })
   on('ui.toast', () => ({ value: undefined }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
-  on('command.run', () => ({ text: '' }) as never)
+  on('command.run', ($s, e) => {
+    commands.push(e.command)
+    return { text: '' } as never
+  })
   on('classic.SessionStart', () => ({}))
   on('process.run', ($s, e) => {
     const argv = (Reflect.get(e, 'argv') as string[] | undefined) ?? []
@@ -62,7 +66,7 @@ const start = async (
   })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
-  return { runs }
+  return { runs, commands, clock }
 }
 
 const contextOf = (answer: unknown): string =>
@@ -83,6 +87,29 @@ describe('lead brief', () => {
     expect(context).toContain('compacted')
     expect(context).toContain('CIN-7')
     expect(context).toContain('game lead')
+  })
+
+  test('runs the lead skill again for a resumed lead, so its rules and report watcher come back', async ($, on) => {
+    const { commands, clock } = await start($, on, {})
+    await $.classic.SessionStart({ source: 'resume' })
+    await clock.settle()
+    expect(commands).toEqual(['orca-game:lead'])
+  })
+
+  test('leaves the lead skill alone after a compaction, which keeps the session running', async ($, on) => {
+    const { commands, clock } = await start($, on, {})
+    await $.classic.SessionStart({ source: 'compact' })
+    await clock.settle()
+    expect(commands).toEqual([])
+  })
+
+  test('runs no lead skill for a resumed session that is not the lead', async ($, on) => {
+    const { commands, clock } = await start($, on, {
+      state: { ...STATE, leadElsewhere: { handle: 'term_other' } }
+    })
+    await $.classic.SessionStart({ source: 'resume' })
+    await clock.settle()
+    expect(commands).toEqual([])
   })
 
   test('leaves a fresh start to the lead rules, which print the fleet themselves', async ($, on) => {

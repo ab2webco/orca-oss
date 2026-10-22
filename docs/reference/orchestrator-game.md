@@ -559,7 +559,8 @@ are saved while they run, so the team picks up where it was:
   `game lead` for its rules ([`lead-brief.ts`](../../resources/claude-plugins/orca-game/hooks/lead-brief.ts),
   Claude's `SessionStart` with `source` `resume` or `compact`). Only a session that ran the lead
   rules, is the project's lead, and has no other live lead gets it; a fresh start reads the fleet
-  through the lead skill instead.
+  through the lead skill instead. A resumed lead also runs the lead skill again: a restart killed its
+  report watcher, and its rules then resume the paused members or ask first.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
   of any saved member that has not finished, paused or live, even with `--force`, which only waives
