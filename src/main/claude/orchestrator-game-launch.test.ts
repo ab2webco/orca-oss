@@ -37,6 +37,28 @@ describe('buildOrchestratorGameLaunch', () => {
     })
   })
 
+  it('tells a member pane its role, and leaves the lead launch without one', () => {
+    const resolved = resolveOrchestratorGameConfig({})
+    const args = { resolved, claudeVersion: '2.1.301', pluginDir: PLUGIN_DIR }
+
+    const member = buildOrchestratorGameLaunch({ ...args, role: 'member' })
+    expect(member.args).toEqual(['--plugin-dir', PLUGIN_DIR])
+    expect(member.env.ORCA_GAME_ROLE).toBe('member')
+    expect(buildOrchestratorGameLaunch(args).env).not.toHaveProperty('ORCA_GAME_ROLE')
+  })
+
+  it('launches a member plain when the project turns the member game off', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({}),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR,
+      role: 'member',
+      memberGame: false
+    })
+
+    expect(launch).toEqual({ args: [], env: {} })
+  })
+
   it('hands a flat pane its mode', () => {
     const launch = buildOrchestratorGameLaunch({
       resolved: resolveOrchestratorGameConfig({ project: { mode: 'flat' } }),

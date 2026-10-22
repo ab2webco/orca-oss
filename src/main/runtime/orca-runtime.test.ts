@@ -13619,6 +13619,51 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it.skipIf(process.platform === 'win32')(
+    'resumes a game member with its member game and a plain session without it',
+    async () => {
+      prepareOrchestratorGameLaunchMock.mockClear()
+      prepareOrchestratorGameLaunchMock.mockResolvedValue({
+        args: ['--plugin-dir', '/r/orca-game'],
+        env: { ORCA_GAME_ROLE: 'member' }
+      })
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-resumed' })
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const request = (id: string) => ({
+        kind: 'explicit' as const,
+        worktree: `id:${TEST_WORKTREE_ID}`,
+        agent: 'claude' as const,
+        providerSession: { key: 'session_id' as const, id }
+      })
+
+      try {
+        await runtime.ensureAgentSession(
+          request('member-session'),
+          {},
+          {
+            orchestrationGameMember: true
+          }
+        )
+        await runtime.ensureAgentSession(request('plain-session'))
+      } finally {
+        prepareOrchestratorGameLaunchMock.mockResolvedValue({ args: [], env: {} })
+      }
+
+      const [member, plain] = spawn.mock.calls.map(
+        (call) => call[0] as { command?: string; env?: Record<string, string> }
+      )
+      expect(member?.command).toMatch(/^claude '--plugin-dir' '\/r\/orca-game'.*member-session/)
+      expect(member?.env?.ORCA_GAME_ROLE).toBe('member')
+      expect(plain?.command).not.toContain('--plugin-dir')
+    }
+  )
+
   it('builds structured fresh drafts with supported launch preferences on the host', async () => {
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-agent-draft' })
     const runtime = new OrcaRuntimeService({
@@ -13766,6 +13811,97 @@ describe('OrcaRuntimeService', () => {
     expect(member.ORCA_GAME_CLI).toBe(process.execPath.replaceAll('\\', '/'))
     expect(plain).not.toHaveProperty('ORCA_GAME_CLI')
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'gives a game member under Agent Teams its own game once, not the lead game on top',
+    async () => {
+      prepareOrchestratorGameLaunchMock.mockClear()
+      prepareOrchestratorGameLaunchMock.mockImplementation(async (args) => {
+        const env: Record<string, string> =
+          Reflect.get(args, 'role') === 'member' ? { ORCA_GAME_ROLE: 'member' } : {}
+        return { args: ['--plugin-dir', '/r/orca-game'], env }
+      })
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+      const runtime = new OrcaRuntimeService({
+        ...store,
+        getSettings: () => ({ ...store.getSettings(), claudeAgentTeamsMode: 'in-process' as const })
+      })
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+
+      let prepared: unknown[] = []
+      try {
+        await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+          startupAgent: 'claude',
+          orchestrationWorker: true,
+          orchestrationGameMember: true,
+          title: 'member'
+        })
+        prepared = prepareOrchestratorGameLaunchMock.mock.calls.map((call) => call[0])
+      } finally {
+        prepareOrchestratorGameLaunchMock.mockReset()
+        prepareOrchestratorGameLaunchMock.mockResolvedValue({ args: [], env: {} })
+      }
+
+      const member = spawn.mock.calls[0]?.[0] as { command?: string; env?: Record<string, string> }
+      expect(member.command?.match(/--plugin-dir/g)).toHaveLength(1)
+      expect(member.env?.ORCA_GAME_ROLE).toBe('member')
+      expect(prepared).toEqual([expect.objectContaining({ role: 'member' })])
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'loads the game into a Claude game member only, never a codex member or a plain worker',
+    async () => {
+      prepareOrchestratorGameLaunchMock.mockClear()
+      prepareOrchestratorGameLaunchMock.mockResolvedValue({
+        args: ['--plugin-dir', '/r/orca-game'],
+        env: { ORCA_GAME_ROLE: 'member' }
+      })
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+
+      try {
+        for (const [agent, gameMember] of [
+          ['claude', true],
+          ['codex', true],
+          ['claude', false]
+        ] as const) {
+          await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+            startupAgent: agent,
+            orchestrationWorker: true,
+            ...(gameMember ? { orchestrationGameMember: true } : {}),
+            title: 'member'
+          })
+        }
+      } finally {
+        prepareOrchestratorGameLaunchMock.mockResolvedValue({ args: [], env: {} })
+      }
+
+      const [member, codex, worker] = spawn.mock.calls.map(
+        (call) => call[0] as { command?: string; env?: Record<string, string> }
+      )
+      expect(member?.command).toMatch(/^claude '--plugin-dir' '\/r\/orca-game'/)
+      expect(member?.env?.ORCA_GAME_ROLE).toBe('member')
+      expect(codex?.command).not.toContain('--plugin-dir')
+      expect(worker?.command).not.toContain('--plugin-dir')
+      expect(worker?.env).not.toHaveProperty('ORCA_GAME_ROLE')
+      expect(prepareOrchestratorGameLaunchMock).toHaveBeenCalledTimes(1)
+      expect(prepareOrchestratorGameLaunchMock).toHaveBeenCalledWith(
+        expect.objectContaining({ worktreePath: TEST_WORKTREE_PATH, role: 'member' })
+      )
+    }
+  )
 
   it('resolves a startupAgent to the CLI binary on Windows, where `cursor` is the IDE', async () => {
     setPlatform('win32')
@@ -45659,6 +45795,85 @@ describe('OrcaRuntimeService', () => {
     )
     expect(metaById[result.worktree.id]).toMatchObject({ createdWithAgent: 'codex' })
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'loads the game into a Claude game member a new worktree starts with',
+    async () => {
+      const metaById: Record<string, WorktreeMeta> = {}
+      const runtimeStore = {
+        ...store,
+        getSettings: () => ({
+          ...store.getSettings(),
+          agentCmdOverrides: {}
+        }),
+        getAllWorktreeMeta: () => metaById,
+        getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+        setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+          metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+          return metaById[worktreeId]
+        }
+      }
+      const runtime = new OrcaRuntimeService(runtimeStore as never)
+      const spawn = vi.fn().mockResolvedValue({ id: 'pty-cli-agent-startup' })
+      runtime.setPtyController({
+        spawn,
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      runtime.setNotifier({
+        worktreesChanged: vi.fn(),
+        reposChanged: vi.fn(),
+        activateWorktree: vi.fn(),
+        createTerminal: vi.fn(),
+        revealTerminalSession: vi.fn().mockResolvedValue({ tabId: 'tab-cli-agent-startup' }),
+        splitTerminal: vi.fn(),
+        renameTerminal: vi.fn(),
+        focusTerminal: vi.fn(),
+        closeTerminal: vi.fn(),
+        sleepWorktree: vi.fn(),
+        terminalFitOverrideChanged: vi.fn(),
+        terminalDriverChanged: vi.fn()
+      })
+      runtime.attachWindow(1)
+
+      computeWorktreePathMock.mockReturnValue('/tmp/workspaces/runtime-cli-agent-startup')
+      ensurePathWithinWorkspaceMock.mockReturnValue('/tmp/workspaces/runtime-cli-agent-startup')
+      vi.mocked(listWorktrees).mockResolvedValue([
+        {
+          path: '/tmp/workspaces/runtime-cli-agent-startup',
+          head: 'def',
+          branch: 'runtime-cli-agent-startup',
+          isBare: false,
+          isMainWorktree: false
+        }
+      ])
+
+      prepareOrchestratorGameLaunchMock.mockClear()
+      prepareOrchestratorGameLaunchMock.mockResolvedValue({
+        args: ['--plugin-dir', '/r/orca-game'],
+        env: { ORCA_GAME_ROLE: 'member' }
+      })
+      try {
+        await runtime.createManagedWorktree({
+          repoSelector: TEST_REPO_ID,
+          name: 'runtime-cli-agent-startup',
+          startupAgent: 'claude',
+          orchestrationWorker: true,
+          orchestrationGameMember: true
+        })
+      } finally {
+        prepareOrchestratorGameLaunchMock.mockResolvedValue({ args: [], env: {} })
+      }
+
+      const spawned = spawn.mock.calls[0]?.[0] as { command?: string; env?: Record<string, string> }
+      expect(spawned.command).toMatch(/^claude '--plugin-dir' '\/r\/orca-game'/)
+      expect(spawned.env?.ORCA_GAME_ROLE).toBe('member')
+      expect(prepareOrchestratorGameLaunchMock).toHaveBeenCalledWith(
+        expect.objectContaining({ repoId: TEST_REPO_ID, role: 'member' })
+      )
+    }
+  )
 
   it('sends follow-up prompts for CLI-created stdin-after-start startup agents', async () => {
     const metaById: Record<string, WorktreeMeta> = {}

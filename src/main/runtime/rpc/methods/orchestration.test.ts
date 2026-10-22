@@ -2571,6 +2571,24 @@ describe('orchestration RPC methods', () => {
       )
     })
 
+    it('marks the worker terminal of a game launch as a game member', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'game member' })
+
+      await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        game: true
+      })
+
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({ startupAgent: 'claude', orchestrationGameMember: true })
+      )
+    })
+
     it('passes launch-scoped account overrides to the created worker terminal', async () => {
       setup()
       mockCurrentWorkerStart()

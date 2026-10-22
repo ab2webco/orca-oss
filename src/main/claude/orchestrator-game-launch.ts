@@ -73,12 +73,17 @@ export function buildOrchestratorGameLaunch(args: {
   /** Absolute Orca CLI the mod polls for `game state`. */
   orcaCli?: string | null
   locale?: SupportedUiLocale
+  /** A member's pane draws the member band; the lead launch passes none. */
+  role?: 'member'
+  /** `orchestrator.memberGame`; only false keeps a member plain. */
+  memberGame?: boolean
 }): OrchestratorGameLaunch {
   const { config } = args.resolved
   const mode = shownOrchestratorGameModeOf(config)
   // Why: an unknown or older Claude Code would reject or ignore the mod; plain Claude is the safe launch.
   if (
     mode === 'off' ||
+    (args.role === 'member' && args.memberGame === false) ||
     args.pluginDir === null ||
     args.claudeVersion === null ||
     compareAppVersions(args.claudeVersion, ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION) < 0
@@ -96,6 +101,7 @@ export function buildOrchestratorGameLaunch(args: {
       ORCA_GAME_RENDER: config.render,
       ORCA_GAME_TIMEZONE: desktopGameTimezoneOf(config.timezone),
       ORCA_GAME_LOCALE: args.locale ?? DEFAULT_UI_LOCALE,
+      ...(args.role === 'member' ? { ORCA_GAME_ROLE: 'member' } : {}),
       // Why: Team panes carry TMUX, which keeps Claude on the main screen, where the terminal
       // reports no clicks; the fullscreen layout is the only one where the game's buttons click.
       CLAUDE_CODE_NO_FLICKER: '1'

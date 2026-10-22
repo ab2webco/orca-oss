@@ -584,6 +584,28 @@ describe('buildOrchestratorGameState', () => {
     expect(outside.project).toBeUndefined()
   })
 
+  it("reads no project work for a member, whose band never shows the lead's PRs and To Do", async () => {
+    let reads = 0
+    const member = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout('')),
+      agents: [],
+      leaderPaneKey: 'tab:member',
+      callerParentPaneKey: 'tab:lead',
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readProjectWork: async () => {
+        reads += 1
+        return { reviews: null, todo: null }
+      }
+    })
+
+    expect(reads).toBe(0)
+    expect(member.role).toBe('member')
+    expect(member.project).toBeUndefined()
+  })
+
   it('answers with defaults outside a worktree', async () => {
     const state = await buildOrchestratorGameState({
       settings: undefined,

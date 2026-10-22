@@ -116,6 +116,21 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     fromYaml.unmount()
   })
 
+  it('turns the game off in member panes on this machine, on by default', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+    expect(view.container.textContent).toContain('Game in member panes')
+    click(view.container, '[aria-label="Game in member panes"] button', 'Off')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { orchestrator: { memberGame: false } } } }
+    ])
+    view.unmount()
+
+    const offInYaml = render({}, { orchestrator: { memberGame: false } })
+    expect(offInYaml.container.textContent).toContain('Off · from orca.yaml')
+    offInYaml.unmount()
+  })
+
   it('keeps asking before resuming paused members on this machine, off by default', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({}, undefined, updates)

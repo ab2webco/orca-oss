@@ -10779,6 +10779,7 @@
           "yamlOnly": "El prompt de lanzamiento y las reglas del proyecto se definen en orca.yaml, en orchestratorGame.orchestrator.",
           "actions": "Botones del líder",
           "askBeforeResume": "Preguntar antes de reanudar",
+          "memberGame": "Juego en los paneles de miembros",
           "accounts": "Cuentas de los miembros",
           "accountsDefault": "La cuenta de Orca",
           "accountsAuto": "La de más cuota libre",

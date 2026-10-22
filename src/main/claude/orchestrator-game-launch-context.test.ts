@@ -114,6 +114,34 @@ describe('prepareOrchestratorGameLaunch', () => {
     expect(launch).toEqual({ args: [], env: {} })
   })
 
+  it("reads memberGame from the project's layers for a member launch only", async () => {
+    const worktreePath = worktreeWith('orchestratorGame:\n  orchestrator:\n    memberGame: false\n')
+    const member = await prepareOrchestratorGameLaunch({
+      ...base,
+      settings: undefined,
+      repoId: 'repo1',
+      worktreePath,
+      role: 'member'
+    })
+    const lead = await prepareOrchestratorGameLaunch({
+      ...base,
+      settings: undefined,
+      repoId: 'repo1',
+      worktreePath
+    })
+    const switchedBackOn = await prepareOrchestratorGameLaunch({
+      ...base,
+      settings: { orchestratorGameProjects: { repo1: { orchestrator: { memberGame: true } } } },
+      repoId: 'repo1',
+      worktreePath,
+      role: 'member'
+    })
+
+    expect(member).toEqual({ args: [], env: {} })
+    expect(lead.args).toEqual(['--plugin-dir', '/plugins/orca-game'])
+    expect(switchedBackOn.env.ORCA_GAME_ROLE).toBe('member')
+  })
+
   it('uses the defaults for a folder without orca.yaml or a repo id', async () => {
     const launch = await prepareOrchestratorGameLaunch({
       ...base,

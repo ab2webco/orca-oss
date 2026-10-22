@@ -5,6 +5,15 @@ import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 
 const LEAD_KEY_PREFIX = 'orchestratorGame.orchestrator.'
 
+export function requiredTicket(flags: Map<string, string | boolean>): string {
+  const raw = flags.get('ticket')
+  const ticket = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
+  if (!/^[A-Z0-9][A-Z0-9_-]{0,39}$/.test(ticket)) {
+    throw new RuntimeClientError('invalid_argument', 'Name the ticket to launch, like CIN-12.')
+  }
+  return ticket
+}
+
 /** `game launch` / `game wave` overrides as typed, checked before the lead config is read. */
 export type GameLaunchFlags = {
   agent?: string

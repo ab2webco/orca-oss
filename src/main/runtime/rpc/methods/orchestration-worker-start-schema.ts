@@ -29,6 +29,8 @@ export const WorkerStartParams = z.object({
   retryOf: OptionalString,
   timeoutMs: OptionalFiniteNumber,
   devMode: z.boolean().optional(),
+  // Why optional: only `orca game launch` sends it; an older runtime ignores it and starts plain.
+  game: z.boolean().optional(),
   // Why optional: an older CLI omits it and starts at once, as before (ORCA-746).
   setupAdmission: z.enum(['queue']).optional()
 })

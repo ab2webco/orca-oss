@@ -178,6 +178,7 @@ async function startWorker(
         taskId: task.id,
         claudeAccountId: params.claudeAccountId,
         codexAccountId: params.codexAccountId,
+        ...(params.game ? { gameMember: true } : {}),
         effects
       })
       terminalHandle = terminal.handle

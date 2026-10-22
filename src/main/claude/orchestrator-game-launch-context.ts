@@ -16,7 +16,10 @@ import {
   type OrchestratorGameLaunch
 } from './orchestrator-game-launch'
 import { installOrchestratorGamePlugin } from './orchestrator-game-plugin-install'
-import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
+import {
+  resolveOrchestratorGameConfig,
+  resolveOrchestratorGameLead
+} from '../../shared/orchestrator-game-config'
 import type { GlobalSettings } from '../../shared/types'
 
 const execFileAsync = promisify(execFile)
@@ -91,17 +94,19 @@ export async function prepareOrchestratorGameLaunch(args: {
   systemLocale?: string
   detectClaudeVersion?: () => Promise<string | null>
   platform?: NodeJS.Platform
+  role?: 'member'
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
   const [claudeVersion, project] = await Promise.all([
     detect().catch(() => null),
     args.worktreePath ? readWorktreeOrcaYaml(args.worktreePath, args.connectionId) : null
   ])
-  const resolved = resolveOrchestratorGameConfig({
+  const layers = {
     global: args.settings?.orchestratorGame,
     project: project?.orchestratorGame,
     local: args.repoId ? args.settings?.orchestratorGameProjects?.[args.repoId] : undefined
-  })
+  }
+  const resolved = resolveOrchestratorGameConfig(layers)
   return buildOrchestratorGameLaunch({
     resolved,
     claudeVersion,
@@ -115,6 +120,9 @@ export async function prepareOrchestratorGameLaunch(args: {
     locale: orchestratorGameLocaleOf(
       args.settings?.uiLanguage,
       args.systemLocale ?? getPreferredSystemLocale()
-    )
+    ),
+    ...(args.role === 'member'
+      ? { role: 'member' as const, memberGame: resolveOrchestratorGameLead(layers).memberGame }
+      : {})
   })
 }

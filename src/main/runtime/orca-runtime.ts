@@ -673,6 +673,10 @@ import {
   withOrchestratorGameArgs,
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
+import {
+  withOrchestratorGameMemberLaunch,
+  type OrchestratorGameMemberLaunch
+} from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
@@ -1722,6 +1726,8 @@ type TerminalCreateOptions = {
   startupAgent?: TuiAgent
   /** An orchestration member pane; it exports ORCA_GAME_CLI so its own hooks can read game state. */
   orchestrationWorker?: boolean
+  /** A member `orca game launch` started; a Claude one loads the game in its member render. */
+  orchestrationGameMember?: boolean
   launchPreferences?: AgentLaunchPreferences
   terminalColorQueryReplies?: TerminalOscColorQueryReplyColors
   viewMode?: 'terminal' | 'chat'
@@ -23545,7 +23551,8 @@ export class OrcaRuntimeService {
     repo: Repo,
     agent: TuiAgent,
     prompt: string | undefined,
-    launchPreferences?: AgentLaunchPreferences
+    launchPreferences?: AgentLaunchPreferences,
+    gameMember?: OrchestratorGameMemberLaunch | null
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -23564,7 +23571,7 @@ export class OrcaRuntimeService {
       terminalWindowsShell: settings.terminalWindowsShell
     })
     const sessionOptions = this.toAgentSessionOptions(launchPreferences)
-    const startupPlan = buildAgentStartupPlan({
+    const builtPlan = buildAgentStartupPlan({
       agent,
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
@@ -23577,9 +23584,12 @@ export class OrcaRuntimeService {
       isRemote,
       allowEmptyPromptLaunch: true
     })
-    if (!startupPlan) {
+    if (!builtPlan) {
       throw new Error(`Could not build launch command for ${agent}.`)
     }
+    const startupPlan = gameMember
+      ? withOrchestratorGameMemberLaunch(builtPlan, gameMember.game, gameMember.shell)
+      : builtPlan
     return {
       agent,
       startup: {
@@ -24016,6 +24026,8 @@ export class OrcaRuntimeService {
     startupAgent?: TuiAgent
     /** The startup terminal is an orchestration member; it exports ORCA_GAME_CLI. */
     orchestrationWorker?: boolean
+    /** A Claude startup member `orca game launch` started loads the game in its member render. */
+    orchestrationGameMember?: boolean
     startupLaunchPreferences?: AgentLaunchPreferences
     startupPrompt?: string
     pendingFirstAgentMessageRename?: boolean
@@ -24050,13 +24062,23 @@ export class OrcaRuntimeService {
     ) {
       throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
     }
+    // Why the repo's own path: the worktree does not exist yet, and its orca.yaml is the repo's.
+    const gameMember =
+      !args.startup && args.startupAgent === 'claude' && args.orchestrationGameMember
+        ? await this.orchestratorGameMemberFor({
+            repoId: repo.id,
+            path: repo.path,
+            connectionId: repo.connectionId ?? null
+          })
+        : null
     const agentStartup =
       !args.startup && args.startupAgent
         ? this.buildStartupForAgent(
             repo,
             args.startupAgent,
             args.startupPrompt,
-            args.startupLaunchPreferences
+            args.startupLaunchPreferences,
+            gameMember
           )
         : null
     const draftStartup =
@@ -24155,6 +24177,7 @@ export class OrcaRuntimeService {
             command: effectiveStartup.command,
             env: effectiveStartup.env,
             ...(args.orchestrationWorker ? { orchestrationWorker: true } : {}),
+            ...(args.orchestrationGameMember ? { orchestrationGameMember: true } : {}),
             ...(effectiveStartup.launchConfig
               ? { launchConfig: effectiveStartup.launchConfig }
               : {}),
@@ -27569,7 +27592,7 @@ export class OrcaRuntimeService {
     // Why: folder workspaces have no repo, so remoteness comes from the connection.
     const isRemote = workspace.repo ? repoIsRemote(workspace.repo) : Boolean(workspace.connectionId)
     const sessionOptions = this.toAgentSessionOptions(opts.launchPreferences)
-    const startupPlan = buildAgentStartupPlan({
+    const builtPlan = buildAgentStartupPlan({
       agent,
       prompt: '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
@@ -27586,6 +27609,19 @@ export class OrcaRuntimeService {
       isRemote,
       allowEmptyPromptLaunch: true
     })
+    const member =
+      opts.orchestrationGameMember && agent === 'claude'
+        ? await this.orchestratorGameMemberFor({
+            repoId: workspace.repo?.id ?? null,
+            path: workspace.path,
+            connectionId: workspace.connectionId,
+            worktreeId: workspace.id
+          })
+        : null
+    const startupPlan =
+      builtPlan && member
+        ? withOrchestratorGameMemberLaunch(builtPlan, member.game, member.shell)
+        : builtPlan
     if (!startupPlan) {
       // Why: an explicit agent that yields no plan would otherwise spawn a bare
       // shell that never reaches agent readiness.
@@ -27682,7 +27718,7 @@ export class OrcaRuntimeService {
     request: RuntimeEnsureAgentSessionRequest,
     _caller: RuntimeAgentSessionRpcCaller = {},
     // Why host-only: a game member resumes on its own account, which its worktree pin may no longer name.
-    launchAccount: { claudeAccountId?: string } = {}
+    launchAccount: { claudeAccountId?: string; orchestrationGameMember?: boolean } = {}
   ): Promise<RuntimeEnsureAgentSessionResult> {
     if (request.kind === 'automatic') {
       // Legacy renderer sleep records are migration evidence, not host authority.
@@ -27718,7 +27754,7 @@ export class OrcaRuntimeService {
       isRemote,
       terminalWindowsShell: settings.terminalWindowsShell
     })
-    const startup = buildAgentResumeStartupPlan({
+    const builtStartup = buildAgentResumeStartupPlan({
       agent: request.agent,
       providerSession: identity.providerSession,
       cmdOverrides: settings.agentCmdOverrides ?? {},
@@ -27733,9 +27769,21 @@ export class OrcaRuntimeService {
       shell,
       isRemote
     })
-    if (!startup) {
+    if (!builtStartup) {
       throw new Error('agent_session_identity_required')
     }
+    const member =
+      launchAccount.orchestrationGameMember && request.agent === 'claude'
+        ? await this.orchestratorGameMemberFor({
+            repoId: workspace.repo?.id ?? null,
+            path: workspace.path,
+            connectionId: workspace.connectionId,
+            worktreeId: workspace.id
+          })
+        : null
+    const startup = member
+      ? withOrchestratorGameMemberLaunch(builtStartup, member.game, member.shell)
+      : builtStartup
     if (workspace.connectionId) {
       await this.markRemoteWorkspaceTrustedForAgent(
         request.agent,
@@ -27759,7 +27807,8 @@ export class OrcaRuntimeService {
       persistHostSessionBinding: true,
       agentSessionClaim: claim,
       signal: _caller.signal,
-      ...(launchAccount.claudeAccountId ? { claudeAccountId: launchAccount.claudeAccountId } : {})
+      ...(launchAccount.claudeAccountId ? { claudeAccountId: launchAccount.claudeAccountId } : {}),
+      ...(launchAccount.orchestrationGameMember ? { orchestrationGameMember: true } : {})
     })
     return {
       terminal,
@@ -28160,8 +28209,9 @@ export class OrcaRuntimeService {
                     shimDir,
                     shimBin
                   }).env,
+                // Why not for a game member: its startup already carries the member game, or none by choice.
                 game:
-                  gameShell !== null
+                  gameShell !== null && !opts.orchestrationGameMember
                     ? () =>
                         this.prepareOrchestratorGameFor({
                           repoId: workspace.repo?.id ?? null,
@@ -30728,7 +30778,8 @@ export class OrcaRuntimeService {
       worktreeId: member.worktreeId ?? '',
       sessionId: member.sessionId ?? '',
       accountId: member.accountId,
-      presentation: 'background'
+      presentation: 'background',
+      gameMember: true
     })
   }
 
@@ -30739,6 +30790,7 @@ export class OrcaRuntimeService {
     agentArgs?: string
     accountId: string | null
     presentation: 'focused' | 'background'
+    gameMember?: boolean
   }): Promise<string> {
     const { handle } = (
       await this.ensureAgentSession(
@@ -30751,7 +30803,10 @@ export class OrcaRuntimeService {
           presentation: args.presentation
         },
         {},
-        args.accountId ? { claudeAccountId: args.accountId } : {}
+        {
+          ...(args.accountId ? { claudeAccountId: args.accountId } : {}),
+          ...(args.gameMember ? { orchestrationGameMember: true } : {})
+        }
       )
     ).terminal
     const outcome = await awaitResumedLead({
@@ -31265,6 +31320,7 @@ export class OrcaRuntimeService {
     repoId: string | null
     worktreePath: string | null
     connectionId: string | null
+    role?: 'member'
   }): Promise<OrchestratorGameLaunch> {
     try {
       return await prepareOrchestratorGameLaunch({
@@ -31274,6 +31330,39 @@ export class OrcaRuntimeService {
     } catch {
       return { args: [], env: {} }
     }
+  }
+
+  // Why on the startup plan: a member has no Agent Teams plan, and setup sequencing wraps it later.
+  private async orchestratorGameMemberFor(scope: {
+    repoId: string | null
+    path: string
+    connectionId: string | null
+    worktreeId?: string
+  }): Promise<OrchestratorGameMemberLaunch | null> {
+    // Why local only: the plugin folder is on this machine, as for the lead.
+    if (scope.connectionId !== null) {
+      return null
+    }
+    const shell = localOrchestratorGamePaneShell({
+      platform: process.platform,
+      settings: this.store?.getSettings?.(),
+      projectRuntime:
+        process.platform === 'win32' && scope.worktreeId
+          ? this.resolveProjectRuntimeForWorktree(scope.worktreeId)
+          : undefined,
+      cwd: scope.path,
+      fallbackHostShell: process.env.COMSPEC || 'powershell.exe'
+    })
+    if (shell === null) {
+      return null
+    }
+    const game = await this.prepareOrchestratorGameFor({
+      repoId: scope.repoId,
+      worktreePath: scope.path,
+      connectionId: null,
+      role: 'member'
+    })
+    return { game, shell }
   }
 
   async prepareClaudeAgentTeamsLeaderForHandle(args: {

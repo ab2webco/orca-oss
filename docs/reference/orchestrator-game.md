@@ -22,6 +22,14 @@ Both ways into a team load it with `--plugin-dir <bundled plugin>` and the `ORCA
   local workspaces only, since the plugin folder is on this machine. On Windows the args are quoted
   for the pane's shell (see [On Windows](#on-windows)); a WSL pane gets no game.
 
+A Claude member that `orca game launch` starts, or `game resume-members` restarts or resumes, gets
+the same args and env plus `ORCA_GAME_ROLE=member`, so it draws its member band (see
+[A member's pane](#a-members-pane)). They go on the member's own startup command, before setup
+sequencing wraps it, and under Agent Teams the team launch then adds no lead game on top. A codex
+member, an `orchestration worker-start` without the game, an SSH or WSL member and a project with
+`orchestratorGame.orchestrator.memberGame: false` (Settings: **Game in member panes**) stay plain.
+`game.state` reads no My PRs or To Do for a member caller, since its band shows neither.
+
 It loads only when all of these hold, and otherwise Claude starts exactly as before:
 
 - the effective mode is not `off`;
@@ -446,6 +454,7 @@ orchestratorGame:
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: auto # optional: default (Orca's own account selection) or auto (see below)
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
+    memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
 ```
 
