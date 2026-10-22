@@ -37,6 +37,8 @@ export type TextStrings = {
   waitingNeed: string
   /** A member pane's question to its lead, while the lead has not answered. */
   asksLead: (lead: string) => string
+  /** Orca's one-line dispatch brief, drawn as a block in the member's transcript. */
+  briefReceived: string
   ciFailingNeed: string
   teammates: (count: number) => string
   working: (count: number) => string
@@ -165,6 +167,7 @@ const EN: GameStrings = {
     needsYou: 'Needs you:',
     waitingNeed: 'waiting on you',
     asksLead: (lead) => `? Asked ${lead}:`,
+    briefReceived: 'Brief received',
     ciFailingNeed: 'CI failing',
     teammates: (count) => `Team ${count} teammate${count === 1 ? '' : 's'}`,
     working: (count) => `${count} working`,

@@ -6,6 +6,8 @@ import {
   getOrcaDispatchTaskId,
   isOrcaDispatchPrompt
 } from './agent-row-primary-text'
+import { dispatchBriefLineOf } from '../../../shared/orca-dispatch-brief-line'
+import { briefPathOf } from '../../../../resources/claude-plugins/orca-game/hooks/brief-line'
 
 describe('getAgentRowPrimaryText', () => {
   it('prefers orchestration display name over the raw hook prompt', () => {
@@ -313,5 +315,11 @@ describe('a one-line dispatch brief (ORCA-757)', () => {
 
   it('shows the line itself before any label arrives, never an empty row', () => {
     expect(getAgentRowPrimaryText({ prompt: brief })).toBe(brief)
+  })
+
+  it("is Orca's own line, the one the game mod draws as a brief received block", () => {
+    expect(dispatchBriefLineOf({ dispatchId: 'ctx-7', taskId: 'task-7' })).toBe(brief)
+    expect(briefPathOf(brief)).toBe('.orca/briefs/ctx-7.md')
+    expect(briefPathOf('Read the README')).toBeNull()
   })
 })
