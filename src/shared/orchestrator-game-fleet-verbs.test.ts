@@ -425,3 +425,38 @@ describe('paused members after a restart', () => {
     expect(plan).toEqual({ launch: ['CIN-3'], skipped: [{ ticket: 'CIN-1', reason: 'paused' }] })
   })
 })
+
+describe('members queued behind a running setup (ORCA-746)', () => {
+  const queued = (ticketId: string, position: number) => ({
+    ticket: ticketId,
+    name: `Merlin · ${ticketId}`,
+    position,
+    waitingOn: 'Arthur · CIN-2'
+  })
+
+  it('lists them apart and keeps their slots', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [member({ displayName: 'CIN-2 Busy' })],
+      queuedMembers: [queued('CIN-7', 1)]
+    })
+    expect(fleet.queued.map((one) => one.ticket)).toEqual(['CIN-7'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 1 })
+  })
+
+  it('never launches a queued ticket again in a wave', () => {
+    const plan = gameWavePlanOf(
+      {
+        lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+        agents: [],
+        queuedMembers: [queued('CIN-1', 1)],
+        project: todo([
+          { id: 'CIN-1', group: 'todo' },
+          { id: 'CIN-3', group: 'todo' }
+        ])
+      },
+      []
+    )
+    expect(plan).toEqual({ launch: ['CIN-3'], skipped: [{ ticket: 'CIN-1', reason: 'queued' }] })
+  })
+})

@@ -56,7 +56,11 @@ describe('GamePausedMembers.note', () => {
   it('saves what each live member needs to resume, with its conversation id', async () => {
     const { store, paused, sessions } = setup({ 'term-ORCA-1': context('ORCA-1') })
     sessions['term-ORCA-1'] = 'sess-1'
-    expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({ paused: [], error: null })
+    expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
+      paused: [],
+      queued: [],
+      error: null
+    })
     expect(await store.read('repo:a')).toEqual({
       ok: true,
       members: [
@@ -91,6 +95,40 @@ describe('GamePausedMembers.note', () => {
     expect((await paused.note('repo:a', [], new Set(['wt-ORCA-1']))).paused).toEqual([])
   })
 
+  it('lists a member whose start waits for the setup in flight as queued, not paused', async () => {
+    const { paused } = setup()
+    await paused.record('repo:a', {
+      ticket: 'ORCA-2',
+      name: 'Merlin · ORCA-2',
+      runId: 'run_1',
+      taskId: 'task_ORCA-2',
+      lastState: 'queued'
+    })
+    const queue = [{ taskId: 'task_ORCA-2', position: 1, waitingOn: 'Arthur · ORCA-1' }]
+
+    expect(await paused.note('repo:a', [], new Set(), { queued: queue, starting: [] })).toEqual({
+      paused: [],
+      queued: [
+        { ticket: 'ORCA-2', name: 'Merlin · ORCA-2', position: 1, waitingOn: 'Arthur · ORCA-1' }
+      ],
+      error: null
+    })
+  })
+
+  it('lists a member whose start holds the setup slot as neither paused nor queued', async () => {
+    const { paused } = setup()
+    await paused.record('repo:a', {
+      ticket: 'ORCA-2',
+      runId: 'run_1',
+      taskId: 'task_ORCA-2',
+      lastState: 'queued'
+    })
+
+    expect(
+      await paused.note('repo:a', [], new Set(), { queued: [], starting: ['task_ORCA-2'] })
+    ).toEqual({ paused: [], queued: [], error: null })
+  })
+
   it('never lists a member that finished: merged PR or a completed dispatch', async () => {
     const { paused } = setup({
       'term-ORCA-1': context('ORCA-1'),
@@ -118,6 +156,7 @@ describe('GamePausedMembers.note', () => {
     writeFileSync(file, 'broken')
     expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
       paused: [],
+      queued: [],
       error: 'the saved members file is damaged (not JSON)'
     })
     expect((await store.read('repo:a')).ok).toBe(false)
@@ -135,6 +174,7 @@ describe('GamePausedMembers.note on a host that cannot reach its folder', () => 
     })
     expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
       paused: [],
+      queued: [],
       error: 'the saved members file cannot be read (Error: no userData)'
     })
   })

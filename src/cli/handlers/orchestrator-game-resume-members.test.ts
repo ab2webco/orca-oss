@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS } from './orchestrator-game-resume-members'
 import type { RuntimeClient } from '../runtime-client'
 import type { GameMemberResumeOutcome } from '../../shared/orchestrator-game-member-sessions'
+import { ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+
+const QUEUE = { position: 1, waitingOn: 'Ford · CIN-9' }
 
 const paused = (ticket: string, extra: Record<string, unknown> = {}) => ({
   ticket,
@@ -37,10 +40,12 @@ function fakeClient(args: {
   cap?: number
   run?: { id: string } | null
   outcomes?: Record<string, GameMemberResumeOutcome>
+  capabilities?: string[]
+  start?: Record<string, unknown>
 }) {
   const calls: [string, Record<string, unknown>][] = []
   const client = {
-    call: async (method: string, params: Record<string, unknown>) => {
+    call: async (method: string, params: Record<string, unknown> = {}) => {
       calls.push([method, params])
       const results: Record<string, unknown> = {
         'game.state': {
@@ -58,7 +63,8 @@ function fakeClient(args: {
           discarded: params.tickets === 'all' ? ['CIN-1', 'CIN-2'] : params.tickets,
           setAside: null
         },
-        'orchestration.workerStart': {
+        'status.get': { capabilities: args.capabilities ?? [] },
+        'orchestration.workerStart': args.start ?? {
           runId: 'run_1',
           taskId: `task_${String(params.task).replace('task_', '')}`,
           dispatchId: `ctx_new_${String(params.task)}`,
@@ -128,6 +134,30 @@ describe('orca game resume-members', () => {
     ])
     expect(printed().members).toEqual([
       { ticket: 'CIN-1', result: 'resumed', dispatchId: 'ctx_new_task_CIN-1' }
+    ])
+  })
+
+  it('queues a relaunch that needs a new worktree behind the setup already running', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('CIN-1', { resumable: false })],
+      outcomes: {
+        'CIN-1': { outcome: 'relaunch', member: target('CIN-1', { worktreeId: null }) }
+      },
+      capabilities: [ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY],
+      start: { runId: 'run_1', taskId: 'task_CIN-1', state: 'queued', setupQueue: QUEUE }
+    })
+
+    await run(client)
+
+    expect(calls.find(([m]) => m === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ worktree: 'new-child', setupAdmission: 'queue' })
+    )
+    expect(calls.findLast(([m]) => m === 'game.memberRecord')?.[1]).toEqual(
+      expect.objectContaining({ member: { ticket: 'CIN-1', lastState: 'queued' } })
+    )
+    expect(process.exitCode).toBeUndefined()
+    expect(printed().members).toEqual([
+      { ticket: 'CIN-1', result: 'relaunched', setupQueue: QUEUE }
     ])
   })
 

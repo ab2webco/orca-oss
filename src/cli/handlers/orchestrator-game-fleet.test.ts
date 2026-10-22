@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { formatStop } from './orchestrator-game-stop'
+import { formatFleet } from './orchestrator-game-fleet-format'
+import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
+import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 
 const merged = {
@@ -297,6 +300,43 @@ describe('orca game fleet verbs', () => {
         ]
       })
     )
+  })
+
+  it('wave counts a member queued behind a running setup as launched, not failed', async () => {
+    const { client } = fakeClient(stateWith(), {
+      'orchestration.workerStart': {
+        runId: 'r1',
+        taskId: 't1',
+        state: 'queued',
+        setupQueue: { position: 1, waitingOn: 'CIN-3' }
+      }
+    })
+
+    await run('game wave', client, [['tickets', 'CIN-3,CIN-2']])
+
+    expect(process.exitCode).toBeUndefined()
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        failed: [],
+        launched: [
+          expect.objectContaining({ ticket: 'CIN-3', state: 'queued' }),
+          expect.objectContaining({ ticket: 'CIN-2', state: 'queued' })
+        ]
+      })
+    )
+  })
+
+  it('fleet text lists the members queued behind a setup apart from the paused ones', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [],
+      queuedMembers: [{ ticket: 'CIN-4', name: null, position: 1, waitingOn: 'Arthur · CIN-3' }]
+    })
+
+    expect(formatFleet(fleet).split('\n').slice(1)).toEqual([
+      'Queued behind a setup: 1 · each starts by itself',
+      'CIN-4: queued #1, waiting on Arthur · CIN-3; it starts by itself'
+    ])
   })
 
   it('wave names each member it launches after a different free character of the scene', async () => {

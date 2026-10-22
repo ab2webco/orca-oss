@@ -652,6 +652,8 @@ import {
   readGameMemberWorktreeHold,
   type GameMemberWorktreeHold
 } from './game-member-worktree-guard'
+import { readMemoryPressure } from '../memory/memory-pressure-reading'
+import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
@@ -3673,6 +3675,9 @@ export class OrcaRuntimeService {
       this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
+  private readonly workerSetupAdmission = new WorkerSetupAdmission({
+    readMemory: () => readMemoryPressure()
+  })
   private readonly gameMemberResume = new GameMemberResume({
     store: this.gameMemberSessions,
     statusOf: (taskId) => {
@@ -19587,6 +19592,10 @@ export class OrcaRuntimeService {
     }
   }
 
+  getWorkerSetupAdmission(): WorkerSetupAdmission {
+    return this.workerSetupAdmission
+  }
+
   async waitForSetupTerminalCompletion(handle: string): Promise<{ exitCode: number | null }> {
     const ptyId = this.getLivePtyForHandle(handle)?.pty.ptyId
     if (!ptyId) {
@@ -31008,11 +31017,16 @@ export class OrcaRuntimeService {
     const view = await this.gamePausedMembers.note(
       `repo:${project.repoId}`,
       state.agents,
-      project.liveWorktreeIds
+      project.liveWorktreeIds,
+      {
+        queued: this.workerSetupAdmission.queued(),
+        starting: this.workerSetupAdmission.startingTaskIds()
+      }
     )
     return {
       ...state,
       pausedMembers: view.paused,
+      ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }

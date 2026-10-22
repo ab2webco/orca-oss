@@ -12,7 +12,7 @@ import {
   type GameWaveResult,
   type SweepClose
 } from './orchestrator-game-fleet-format'
-import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { isLaunchUnderway, launchGameMember, readCallerGameState } from './orchestrator-game-launch'
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
@@ -168,7 +168,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           ])
         }
         wave.launched.push(launched)
-        if (launched.state !== 'ready') {
+        if (!isLaunchUnderway(launched)) {
           process.exitCode = 1
         }
       } catch (error) {
