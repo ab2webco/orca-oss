@@ -39,6 +39,7 @@ function setup(
     worktrees?: string[]
     taskWorktree?: string
     resume?: (member: GameMemberSession) => Promise<string>
+    now?: () => number
   } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-resume-'))
@@ -59,7 +60,8 @@ function setup(
       (async (member) => {
         resumed.push(member)
         return `term-${member.ticket}`
-      })
+      }),
+    ...(over.now ? { now: over.now } : {})
   })
   return { dir, store, resume, resumed }
 }
@@ -76,6 +78,40 @@ const target = {
 }
 
 describe('GameMemberResume.resume', () => {
+  it('resumes a ticket once when two leads ask at the same time', async () => {
+    let finish: (terminal: string) => void = () => undefined
+    let entered: () => void = () => undefined
+    const reached = new Promise<void>((resolve) => (entered = resolve))
+    const { store, resume } = setup({
+      resume: async () => {
+        entered()
+        return await new Promise<string>((resolve) => (finish = resolve))
+      }
+    })
+    await store.upsert('repo:a', saved('ORCA-1'))
+    const first = resume.resume('repo:a', 'ORCA-1')
+    await reached
+    expect(await resume.resume('repo:a', 'orca-1')).toEqual({
+      outcome: 'missing',
+      ticket: 'ORCA-1',
+      reason: 'ORCA-1 is already being resumed by another call; run game fleet in a minute'
+    })
+    finish('term-ORCA-1')
+    expect((await first).outcome).toBe('resumed')
+  })
+
+  it('keeps a resumed ticket claimed while its dispatch is bound, then frees it', async () => {
+    let clock = 1_000
+    const { store, resume, resumed } = setup({ now: () => clock })
+    await store.upsert('repo:a', saved('ORCA-1'))
+    expect((await resume.resume('repo:a', 'ORCA-1')).outcome).toBe('resumed')
+    clock += 119_000
+    expect((await resume.resume('repo:a', 'ORCA-1')).outcome).toBe('missing')
+    clock += 2_000
+    expect((await resume.resume('repo:a', 'ORCA-1')).outcome).toBe('resumed')
+    expect(resumed).toHaveLength(2)
+  })
+
   it("reopens a Claude member's own conversation in its worktree on its account", async () => {
     const { store, resume, resumed } = setup()
     await store.upsert('repo:a', saved('ORCA-1'))

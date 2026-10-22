@@ -10,6 +10,8 @@ import { parseMemberRoster, type GameMemberName } from './orchestrator-game-memb
 export type OrchestratorGameLead = {
   /** Make a plain session in this project the lead as soon as it starts. */
   autostart: boolean
+  /** Ask the person before `game resume-members` after a restart; unset or false resumes at once. */
+  askBeforeResume?: boolean
   /** Members running at once; a launch past it is refused. */
   cap: number
   /** The agent a member runs, as `orca orchestration worker-start --agent` names it. */
@@ -89,7 +91,7 @@ const promptKey =
   }
 
 const switchKey =
-  (key: 'autostart' | 'actions'): KeyParser =>
+  (key: 'autostart' | 'actions' | 'askBeforeResume'): KeyParser =>
   (value) =>
     typeof value === 'boolean' ? { [key]: value } : `${at(key)} must be true or false`
 
@@ -101,6 +103,7 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
       : `${at('accounts')} must be default or auto`
   },
   autostart: switchKey('autostart'),
+  askBeforeResume: switchKey('askBeforeResume'),
   actions: switchKey('actions'),
   cap: (value) =>
     typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= GAME_LEAD_CAP_MAX

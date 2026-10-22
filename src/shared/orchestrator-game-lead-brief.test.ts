@@ -42,10 +42,21 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain("don't relaunch or re-arm watchers until asked")
   })
 
-  it('offers to resume the members a restart paused, and never relaunches their tickets', () => {
+  it('resumes the members a restart paused at once, then tells the person', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
     expect(brief).toContain('After Orca or the machine restarts')
+    expect(brief).toContain('run `orca game resume-members` at once, without asking')
+    expect(brief).toContain('Then tell the person in one line who resumed')
+    expect(brief).not.toContain('resume them?')
+    expect(brief).toContain('never `game launch` a paused ticket')
+  })
+
+  it('asks the person first when the project keeps resuming ask-first', () => {
+    const brief = gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, askBeforeResume: true }, 'cineco')
+
+    expect(brief).toContain('After Orca or the machine restarts')
+    expect(brief).not.toContain('without asking')
     expect(brief).toContain('"3 members were working; resume them?"')
     expect(brief).toContain('`orca game resume-members`')
     expect(brief).toContain('`orca game resume-members --discard`')

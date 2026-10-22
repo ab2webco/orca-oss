@@ -498,6 +498,12 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
     })
   await expect(lead.getByText('Arthur, Merlin, Morgana · this machine')).toBeVisible()
 
+  const askFirst = lead.getByRole('radiogroup', { name: 'Ask before resuming' })
+  await askFirst.getByRole('radio', { name: 'On' }).click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toMatchObject({ [repoId]: { orchestrator: { askBeforeResume: true } } })
+
   const yamlOnly = lead.getByText('The launch prompt and the project', { exact: false })
   for (const theme of THEMES) {
     await setTheme(orcaPage, theme)
@@ -517,6 +523,8 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
       await orcaPage.screenshot({ path: testInfo.outputPath(`lead-end-${theme}-${width}.png`) })
       await names.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       await orcaPage.screenshot({ path: testInfo.outputPath(`lead-names-${theme}-${width}.png`) })
+      await askFirst.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-resume-${theme}-${width}.png`) })
     }
   }
 })

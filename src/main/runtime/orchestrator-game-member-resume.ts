@@ -18,6 +18,7 @@ type Deps = {
   worktreeExists: (worktreeId: string) => Promise<boolean>
   /** Reopens the member's own conversation and returns its terminal once the agent runs; throws when it cannot. */
   resumeSession: (member: GameMemberSession) => Promise<string>
+  now?: () => number
 }
 
 const targetOf = (member: GameMemberSession, retryOf: string | null): GameMemberResumeTarget => ({
@@ -34,13 +35,43 @@ const targetOf = (member: GameMemberSession, retryOf: string | null): GameMember
 
 // Why: worker-start takes a ready task, or a failed or blocked one as a retry of its latest dispatch.
 const RETRIED = new Set(['failed', 'blocked'])
+// Why: the CLI binds the resumed member's dispatch after this returns; until then its task still reads ready.
+const RESUME_CLAIM_MS = 120_000
 
 /** Brings one saved member back after a restart, or frees the ones the person does not want back. */
 export class GameMemberResume {
+  /** When each project's ticket was claimed; a second lead's call in that window must not reopen it again. */
+  private readonly claims = new Map<string, number>()
+
   constructor(private readonly deps: Deps) {}
 
   async resume(projectKey: string, rawTicket: string): Promise<GameMemberResumeOutcome> {
     const ticket = rawTicket.toUpperCase()
+    const key = `${projectKey}\u0000${ticket}`
+    const now = (this.deps.now ?? Date.now)()
+    const claimedAt = this.claims.get(key)
+    if (claimedAt !== undefined && now - claimedAt < RESUME_CLAIM_MS) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `${ticket} is already being resumed by another call; run game fleet in a minute`
+      }
+    }
+    this.claims.set(key, now)
+    const outcome = await this.resumeClaimed(projectKey, ticket).catch((error: unknown) => {
+      this.claims.delete(key)
+      throw error
+    })
+    if (outcome.outcome !== 'resumed' && outcome.outcome !== 'relaunch') {
+      this.claims.delete(key)
+    }
+    return outcome
+  }
+
+  private async resumeClaimed(
+    projectKey: string,
+    ticket: string
+  ): Promise<GameMemberResumeOutcome> {
     const read = await this.deps.store.read(projectKey)
     if (!read.ok) {
       return { outcome: 'missing', ticket, reason: read.reason }

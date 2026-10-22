@@ -180,7 +180,11 @@ export function ProjectOrchestratorGameLeadSetting({
   const effective = (key: keyof OrchestratorGameLead, text: string): string =>
     `${text} · ${orchestratorGameSourceLabel(gameLeadSourceOf(layers, key))}`
   const onOff = orchestratorGameModeLabels()
-  const switches: { key: 'autostart' | 'actions'; label: string; isOn: boolean }[] = [
+  const switches: {
+    key: 'autostart' | 'actions' | 'askBeforeResume'
+    label: string
+    isOn: boolean
+  }[] = [
     {
       key: 'autostart',
       label: translate(
@@ -197,6 +201,14 @@ export function ProjectOrchestratorGameLeadSetting({
       ),
       // Why: unset means on; Orca's buttons show unless a layer turns them off.
       isOn: lead.actions !== false
+    },
+    {
+      key: 'askBeforeResume',
+      label: translate(
+        'auto.components.settings.OrchestratorGameLeadSetting.askBeforeResume',
+        'Ask before resuming'
+      ),
+      isOn: lead.askBeforeResume === true
     }
   ]
   const accountsText = {

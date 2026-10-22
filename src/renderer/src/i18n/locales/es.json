@@ -10777,6 +10777,7 @@
           "description": "La sesión que habla contigo y lanza un miembro por ticket. orca.yaml define el valor del proyecto; estos ajustes lo cambian en este equipo.",
           "yamlOnly": "El prompt de lanzamiento y las reglas del proyecto se definen en orca.yaml, en orchestratorGame.orchestrator.",
           "actions": "Botones del líder",
+          "askBeforeResume": "Preguntar antes de reanudar",
           "accounts": "Cuentas de los miembros",
           "accountsDefault": "La cuenta de Orca",
           "accountsAuto": "La de más cuota libre",

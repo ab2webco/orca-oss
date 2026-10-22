@@ -411,6 +411,7 @@ orchestratorGame:
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
 ```
 
@@ -578,7 +579,12 @@ are saved while they run, so the team picks up where it was:
   - A launch cut short before its worktree was saved finds that worktree through its task's worker
     record, so it is reused, never orphaned. When the new dispatch cannot be bound, the reopened
     conversation is closed again, so no agent runs that no dispatch owns.
-  - The lead's rules have it ask the person once, naming the members, before resuming.
+  - The lead's rules have it run `game resume-members` at once and then tell the person who resumed
+    (ORCA-746). `askBeforeResume: true` (orca.yaml, or the project Settings' **Ask before resuming**)
+    keeps the earlier rule: ask the person once, naming the members, before resuming.
+  - A ticket is resumed once even when two leads ask together: a second call within two minutes of
+    the first (the time the CLI takes to bind the new dispatch) is refused with `already being
+    resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
 - **The lead's brief** (ORCA-746). When a lead's own conversation is resumed or compacted, the
   orca-game mod hands it `game fleet` as context, paused members included, so it answers from the
   host's record and not from a summary; after a compaction it also points the lead back to
