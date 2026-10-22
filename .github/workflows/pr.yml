@@ -813,11 +813,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_PATH: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Why the retry script: one GitHub 502 here turned PR #521 red (ORCA-659).
         run: |
           set -euo pipefail
-          gh api "$RUN_PATH" > "$RUNNER_TEMP/ci-run.json"
-          gh api --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]' \
-            | jq -s '{jobs: .}' > "$RUNNER_TEMP/ci-jobs.json"
+          node config/scripts/gh-api-with-retry.mjs --output "$RUNNER_TEMP/ci-run.json" -- "$RUN_PATH"
+          node config/scripts/gh-api-with-retry.mjs --output "$RUNNER_TEMP/ci-jobs.ndjson" -- --paginate "$RUN_PATH/jobs?per_page=100" --jq '.jobs[]'
+          jq -s '{jobs: .}' "$RUNNER_TEMP/ci-jobs.ndjson" > "$RUNNER_TEMP/ci-jobs.json"
 
       # Why only failed jobs: a watchdog kill and a red test are the same shape in
       # the jobs API, and only the log separates them (ORCA-263). One request per

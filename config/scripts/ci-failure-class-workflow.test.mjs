@@ -35,4 +35,14 @@ describe('the CI failure-class reporter job', () => {
     expect(command).toContain(`--exclude-job '${reporter.name}'`)
     expect(workflow.jobs.verify.name ?? 'verify').toBe('verify')
   })
+
+  // Why: one GitHub 502 on these calls turned PR #521 red with every test green (ORCA-659).
+  it('reads both API inputs through the bounded retry, never bare gh api', () => {
+    const capture = reporter.steps.find((step) => step.name === "Capture this run's jobs")
+    const calls = capture.run.match(/gh-api-with-retry\.mjs[^\n]*/g) ?? []
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toContain('"$RUN_PATH"')
+    expect(calls[1]).toContain('--paginate "$RUN_PATH/jobs?per_page=100"')
+    expect(capture.run).not.toMatch(/^\s*gh api/m)
+  })
 })
