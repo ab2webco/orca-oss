@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
-import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+import {
+  ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+  ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
+} from '../../shared/protocol-version'
 
 const TODO_ITEM = {
   id: 'CIN-12',
@@ -30,12 +33,21 @@ const ACCOUNTS = {
   rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
 }
 
-function fakeClient(state: unknown, run: { id: string } | null = { id: 'run_1' }) {
+function fakeClient(
+  state: unknown,
+  run: { id: string } | null = { id: 'run_1' },
+  overrides: Record<string, unknown> = {}
+) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
     'terminal.show': { terminal: { handle: 'h1' } },
-    'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] },
+    'status.get': {
+      capabilities: [
+        ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+        ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
+      ]
+    },
     'orchestration.runCurrent': { run },
     'accounts.snapshot': ACCOUNTS,
     'orchestration.runCreate': { run: { id: 'run_new', objective: 'x' } },
@@ -47,7 +59,8 @@ function fakeClient(state: unknown, run: { id: string } | null = { id: 'run_1' }
       state: 'ready',
       effects: [],
       residualResources: []
-    }
+    },
+    ...overrides
   }
   const client = {
     call: async (method: string, params: unknown) => {
@@ -95,6 +108,7 @@ describe('orca game launch', () => {
       'game.state',
       'game.memberNameReserve',
       'terminal.show',
+      'status.get',
       'orchestration.runCurrent',
       'orchestration.taskCreate',
       'game.memberRecord',
@@ -102,15 +116,16 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[4]?.[1]).toEqual({
+    expect(calls[5]?.[1]).toEqual({
       spec: 'Implement CIN-12: Cartelera page',
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[6]?.[1]).toEqual(
+    expect(calls[7]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
+        setupAdmission: 'queue',
         name: 'cin-12',
         displayName: 'Arthur · CIN-12 Cartelera page',
         agent: 'claude',
@@ -561,5 +576,60 @@ describe('orca game launch', () => {
     expect(JSON.parse(output.join('')).result).toEqual(
       expect.objectContaining({ dispatchId: 'dispatch_1', state: 'ready' })
     )
+  })
+
+  it('queues the member behind a running setup and reports it as queued, not as a failure', async () => {
+    const { client, calls } = fakeClient(stateWith(), undefined, {
+      'orchestration.workerStart': {
+        runId: 'run_1',
+        taskId: 'task_1',
+        state: 'queued',
+        setupQueue: { position: 2, waitingOn: 'Ford · CIN-9' }
+      }
+    })
+
+    await launch(client)
+
+    expect(process.exitCode).toBeUndefined()
+    expect(calls.findLast(([method]) => method === 'game.memberRecord')?.[1]).toEqual(
+      expect.objectContaining({ member: { ticket: 'CIN-12', lastState: 'queued' } })
+    )
+    const launched = JSON.parse(output.join('')).result
+    expect(launched).toEqual(
+      expect.objectContaining({
+        ticket: 'CIN-12',
+        state: 'queued',
+        setupQueue: { position: 2, waitingOn: 'Ford · CIN-9' }
+      })
+    )
+    expect(formatGameLaunch(launched)).toBe(
+      'CIN-12 (Arthur): queued #2 · claude, waiting on Ford · CIN-9; it starts by itself'
+    )
+  })
+
+  it('refuses a ticket already queued behind a setup, so it never gets a second member', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        queuedMembers: [{ ticket: 'CIN-12', name: null, position: 1, waitingOn: 'Ford · CIN-9' }]
+      })
+    )
+
+    await expect(launch(client)).rejects.toThrow(
+      'CIN-12 is queued #1, waiting on Ford · CIN-9; it starts by itself.'
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
+  it('says so when the connected Orca Lab cannot queue setups, and launches at once', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+    const { client, calls } = fakeClient(stateWith(), undefined, {
+      'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] }
+    })
+
+    await launch(client)
+
+    const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    expect(start).not.toHaveProperty('setupAdmission')
+    expect(String(stderr.mock.calls[0]?.[0])).toContain('This Orca Lab cannot queue member setups')
   })
 })

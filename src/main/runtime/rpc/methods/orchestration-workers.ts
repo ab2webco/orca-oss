@@ -22,6 +22,12 @@ import {
 } from './orchestration-worker-setup-gate'
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
 import {
+  admitWorkerSetup,
+  holdSlotForSetup,
+  runQueuedStart,
+  type WorkerSetupSlot
+} from './orchestration-worker-setup-queue'
+import {
   requireWorkerStartTask,
   resolveExistingWorkerWorktree,
   resolveLocalWorkerTopology
@@ -39,7 +45,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
 async function startWorker(
   params: WorkerStartInput,
   runtime: OrcaRuntimeService,
-  orchestrationMutation: RpcContext['orchestrationMutation']
+  orchestrationMutation: RpcContext['orchestrationMutation'],
+  admittedSlot?: WorkerSetupSlot
 ): Promise<unknown> {
   const { db, run, task } = requireWorkerStartTask(params, runtime)
 
@@ -77,13 +84,47 @@ async function startWorker(
         : 'orchestration_default'
       : 'existing_worktree'
   }
-  const started = db.createStartingWorkerDispatch({
-    taskId: task.id,
-    retryOf: params.retryOf,
-    startOptions,
-    runtimeEpoch: runtime.getRuntimeId(),
-    mutationReceipt: orchestrationMutation
-  })
+  let setupSlot = admittedSlot
+  if (creationWorktree && params.setupAdmission === 'queue' && !setupSlot) {
+    const label = params.displayName ?? params.name ?? task.id
+    const admission = await admitWorkerSetup({
+      runtime,
+      repoSelector: startOptions.repo ?? creationWorktree.repoId,
+      taskId: task.id,
+      label,
+      start: (slot) =>
+        runQueuedStart({
+          runtime,
+          runId: run.id,
+          taskId: task.id,
+          label,
+          slot,
+          start: () => startWorker(params, runtime, undefined, slot)
+        })
+    })
+    if ('queued' in admission) {
+      // Why: the mutation executor completes this request's receipt, which a Dispatch would open.
+      if (orchestrationMutation) {
+        db.beginMutationReceipt(orchestrationMutation)
+      }
+      // Why no Dispatch yet: the Task stays ready, so a restart leaves it for resume-members.
+      return { runId: run.id, taskId: task.id, state: 'queued', setupQueue: admission.queued }
+    }
+    setupSlot = admission.slot
+  }
+  let started
+  try {
+    started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      retryOf: params.retryOf,
+      startOptions,
+      runtimeEpoch: runtime.getRuntimeId(),
+      mutationReceipt: orchestrationMutation
+    })
+  } catch (error) {
+    setupSlot?.release()
+    throw error
+  }
   const effects: WorkerEffect[] = []
   if (resolvedWorktree) {
     effects.push(
@@ -119,6 +160,9 @@ async function startWorker(
       resolvedWorktree = created.worktree
       terminalHandle = created.terminalHandle
       setupReceipt = created.setupReceipt
+      if (setupSlot) {
+        holdSlotForSetup(runtime, setupSlot, setupReceipt, effects)
+      }
     } else if (!terminalHandle) {
       db.recordWorkerStage({
         dispatchId: started.dispatch.id,
@@ -175,6 +219,10 @@ async function startWorker(
       timeoutMs: readinessBudgetMs
     })
     persistWorkerSetupWaitOutcome({ ...setupStage, wait })
+    // Why: a wait-for-setup agent saw the setup end; its Setup tab may never exit.
+    if (setupReceipt.state !== 'running') {
+      setupSlot?.release()
+    }
     if (!wait.satisfied) {
       if (setupReceipt.state === 'failed') {
         failedStage = 'setup_wait'
@@ -266,6 +314,9 @@ async function startWorker(
       ...(terminalRevealWarning ? { warning: terminalRevealWarning } : {})
     }
   } catch (error) {
+    if (setupSlot && !setupSlot.watching) {
+      setupSlot.release()
+    }
     return failWorkerStartWithReceipt({
       db,
       runId: run.id,

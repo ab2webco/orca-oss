@@ -28,7 +28,9 @@ export const WorkerStartParams = z.object({
   effort: OptionalWorkerLaunchPreference,
   retryOf: OptionalString,
   timeoutMs: OptionalFiniteNumber,
-  devMode: z.boolean().optional()
+  devMode: z.boolean().optional(),
+  // Why optional: an older CLI omits it and starts at once, as before (ORCA-746).
+  setupAdmission: z.enum(['queue']).optional()
 })
 
 export type WorkerStartInput = z.infer<typeof WorkerStartParams>
