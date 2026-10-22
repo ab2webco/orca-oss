@@ -97,7 +97,7 @@ names the project chose.
 Each field resolves on its own; a later layer wins
 ([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)):
 
-1. Orca defaults: `mode: on`, `scene: quest`, `hud`, `rewards` and `tracker` all `true`,
+1. Orca defaults: `mode: on`, `show: true`, `scene: quest`, `hud`, `rewards` and `tracker` all `true`,
    `render: classic`, `timezone: local`.
 2. Global Settings → Agents → **Agent Teams game** (`orchestratorGame`).
 3. The project's committed `orca.yaml` — owned by whoever owns the repo, a dev or a company.
@@ -118,17 +118,33 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 ([`orca-game-mod-transform.ts`](../../config/build-plugins/orca-game-mod-transform.ts)): the mod's
 `tsconfig.json` sets an `h` JSX factory that React's automatic runtime refuses.
 
-The mod has a fourth mode, `flat`, that only a pane sets for its session: the band's `≡ Text` /
-`▦ Scene` chip, the Panel's `0` key, or `/orca-game:mode flat`. It draws no `Raster` and blits
-nothing (its gates are `isSceneMode` in `hooks/quest-policy.ts`); the HUD and the Panel's cards
-become the text lines of `hooks/flat-view.ts`, from the same `orca game state` poll. Settings and
-`orca.yaml` do not offer it, so `orchestratorGame.mode` and the wire are unchanged; an
-`ORCA_GAME_MODE` of `flat` reaching an older mod falls back to `on` through `isQuestMode`.
+`flat` draws no `Raster` and blits nothing (its gates are `isSceneMode` in
+`hooks/quest-policy.ts`); the HUD and the Panel's cards become the text lines of
+`hooks/flat-view.ts`, from the same `orca game state` poll. A pane switches to it with the band's
+`≡ Text` / `▦ Scene` chip, the Panel's `0` key or `/orca-game:mode flat`, and since ORCA-689
+`orca.yaml` and Settings can store it too. A mod older than flat reads a stored `flat` (or an
+`ORCA_GAME_MODE` of `flat`) as unknown through `isQuestMode` and keeps drawing the scene.
+
+`show: false` (**Show the game**) hides the game and keeps `mode` as the view it comes back to:
+the pane launches as plain Claude and `orca game state` reports `mode: off`, sourced from the layer
+that set `show`.
+
+### Views
+
+The view switcher names one list of views
+([`orchestrator-game-view.ts`](../../src/shared/orchestrator-game-view.ts), mirrored by the mod's
+`hooks/game-view.ts`): `off` and `flat` (light), `zen` and `2d-classic` (medium), `2d-hd` (heavy);
+the 3D views join with ORCA-683. A view is stored as the `mode` and `render` keys, so older files
+and mods keep working: `2d-classic` is `mode: on` + `render: classic`, `2d-hd` is `mode: on` +
+`render: hd` (an `hd-compact` look is kept), and the others set `mode` alone. The suggested view is
+one rule on the host's memory in `suggestedOrchestratorGameView`: `flat` at 8 GiB or less, or
+under 2 GiB free; `2d-classic` up to 16 GiB; `2d-hd` above.
 
 ```yaml
 # orca.yaml
 orchestratorGame:
-  mode: zen # on | zen | off
+  mode: zen # on | zen | flat | off
+  show: true # false hides the game and keeps mode for when it is shown again
   scene: quest # quest, vigilante, jrpg, tamer, or a plugin scene: <publisher>.<id>/<scene id>
   sceneFile: .orca/scenes/mario.json # optional: the project's own scene; wins over scene (below)
   hud: true # teammate band above the prompt

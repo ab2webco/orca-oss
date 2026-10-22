@@ -7,6 +7,7 @@ import { translate } from '@/i18n/i18n'
 export const orchestratorGameModeLabels = (): Record<OrchestratorGameMode, string> => ({
   on: translate('auto.components.settings.OrchestratorGameSetting.on', 'On'),
   zen: translate('auto.components.settings.OrchestratorGameSetting.zen', 'Zen'),
+  flat: translate('auto.components.settings.OrchestratorGameSetting.flat', 'Flat'),
   off: translate('auto.components.settings.OrchestratorGameSetting.off', 'Off')
 })
 

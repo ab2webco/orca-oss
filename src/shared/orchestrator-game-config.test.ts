@@ -189,7 +189,7 @@ describe('parseOrchestratorGameLayer', () => {
 
     expect(parsed.layer).toEqual({})
     expect(parsed.warnings).toEqual([
-      'orchestratorGame.mode must be one of on, zen, off',
+      'orchestratorGame.mode must be one of on, zen, flat, off',
       'orchestratorGame.hud must be true or false',
       'orchestratorGame.scene must be a non-empty scene id',
       'orchestratorGame.extra is not a known setting'

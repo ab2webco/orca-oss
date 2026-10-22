@@ -11380,7 +11380,8 @@
           "sceneFileSsh": "This project is on an SSH host, so type the path; the file picker only browses this computer.",
           "sceneFileSshOffline": "Connect this SSH project to read its scene file.",
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
-          "sceneFileNotText": "not a text file"
+          "sceneFileNotText": "not a text file",
+          "flat": "Flat"
         },
         "OrchestratorGameLeadSetting": {
           "cap": "Member cap",
