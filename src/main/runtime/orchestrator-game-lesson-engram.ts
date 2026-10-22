@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 import { parseGameLesson, type GameLesson } from '../../shared/orchestrator-game-lessons'
 import type { GameLessonMirror, GameLessonProject } from './orchestrator-game-lesson-store'
 
@@ -30,6 +31,7 @@ export function engramRequestOf(
       signal: AbortSignal.timeout(timeoutMs)
     })
     if (!response.ok) {
+      await cancelUnreadResponseBody(response)
       throw new Error(`Engram answered ${response.status}`)
     }
     return response.json()
