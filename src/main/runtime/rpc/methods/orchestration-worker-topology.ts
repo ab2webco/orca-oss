@@ -255,7 +255,8 @@ export function monitorWorkerSetup(args: {
           effect.kind === 'setup' ? { ...effect, state: setupState } : effect
         )
       })
-      if (!evidence.changed) {
+      // Why: a success is logged on the Dispatch only; the lead's mail is for what needs it.
+      if (!evidence.changed || setupState === 'succeeded') {
         return
       }
       const message = args.db.insertMessage({

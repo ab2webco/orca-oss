@@ -702,6 +702,10 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   the lead's `orchestration check --wait` still gets every message.
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
+- A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch
+  (`setup_state`, shown by `orchestration worker-show`). A failed setup still mails the run as a
+  high-priority `status`. Heartbeats never reach the inbox, its count or the terminal's
+  "You have N orchestration messages" line.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,
