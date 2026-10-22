@@ -56,6 +56,24 @@ describe('writing a view to a settings layer', () => {
     ).toEqual({ orchestratorGameProjects: { r1: { mode: 'flat', show: true } } })
   })
 
+  it("shows a game the project's orca.yaml hides when this project picks a view", () => {
+    expect(
+      orchestratorGameViewSettingsOf(
+        {},
+        { view: 'flat', scope: 'project', repoId: 'r1', project: { show: false } }
+      )
+    ).toEqual({ orchestratorGameProjects: { r1: { mode: 'flat', show: true } } })
+  })
+
+  it("keeps the hd-compact look the project's orca.yaml sets when 2D hd is picked", () => {
+    expect(
+      orchestratorGameViewSettingsOf(
+        {},
+        { view: '2d-hd', scope: 'project', repoId: 'r1', project: { render: 'hd-compact' } }
+      )
+    ).toEqual({ orchestratorGameProjects: { r1: { mode: 'on', render: 'hd-compact' } } })
+  })
+
   it('refuses this project without a repo to key it on', () => {
     expect(() => orchestratorGameViewSettingsOf({}, { view: 'flat', scope: 'project' })).toThrow(
       /no project/

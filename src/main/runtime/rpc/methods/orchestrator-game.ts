@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isHttpUrl } from '../../../../shared/orchestrator-game-integrations'
-import type {
-  OrchestratorGameViewId,
-  OrchestratorGameViewScope
+import {
+  ORCHESTRATOR_GAME_VIEWS,
+  ORCHESTRATOR_GAME_VIEW_SCOPES
 } from '../../../../shared/orchestrator-game-view'
 import {
   parseGameHistoryRecord,
@@ -21,8 +21,8 @@ const GameStateParams = z
   .optional()
 
 const GameSetViewParams = z.object({
-  view: z.enum(['off', 'flat', 'zen', '2d-classic', '2d-hd'] satisfies OrchestratorGameViewId[]),
-  scope: z.enum(['project', 'global'] satisfies OrchestratorGameViewScope[]),
+  view: z.enum(ORCHESTRATOR_GAME_VIEWS.map((view) => view.id)),
+  scope: z.enum(ORCHESTRATOR_GAME_VIEW_SCOPES),
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional()
 })

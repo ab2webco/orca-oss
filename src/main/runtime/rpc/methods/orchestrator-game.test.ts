@@ -3,6 +3,7 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
+import { ORCHESTRATOR_GAME_VIEWS } from '../../../../shared/orchestrator-game-view'
 
 function request(params?: unknown): RpcRequest {
   return { id: 'game-state-test', authToken: 'test', method: 'game.state', params }
@@ -321,5 +322,24 @@ describe('game.setView RPC', () => {
     expect(calls).toEqual([
       { view: 'flat', scope: 'global', worktreeId: 'w1', terminalHandle: undefined }
     ])
+  })
+
+  it('accepts every view the table lists', async () => {
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      setOrchestratorGameView: async (args: { view: string }) => args
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    for (const { id } of ORCHESTRATOR_GAME_VIEWS) {
+      await expect(
+        dispatcher.dispatch({
+          id: id,
+          authToken: 'test',
+          method: 'game.setView',
+          params: { view: id, scope: 'project' }
+        })
+      ).resolves.toMatchObject({ ok: true, result: { view: id } })
+    }
   })
 })

@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { OrcaRuntimeService } from './orca-runtime'
+import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import type { GlobalSettings } from '../../shared/types'
+
+vi.mock('../worktree-orca-yaml', () => ({ readWorktreeOrcaYaml: vi.fn() }))
+
+beforeEach(() => {
+  vi.mocked(readWorktreeOrcaYaml).mockReset().mockResolvedValue(null)
+})
 
 type GameSettings = Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>>
 
@@ -16,7 +23,7 @@ function runtimeWith(settings: GameSettings) {
   // Why the cast: the worktree map is private, and a real one needs repos on disk.
   const internals = runtime as unknown as { getResolvedWorktreeMap: () => Promise<unknown> }
   vi.spyOn(internals, 'getResolvedWorktreeMap').mockResolvedValue(
-    new Map([['w1', { id: 'w1', repoId: 'r1' }]])
+    new Map([['w1', { id: 'w1', repoId: 'r1', path: '/repo/w1' }]])
   )
   return { runtime, writes }
 }
@@ -30,6 +37,21 @@ describe('storing a game view through the runtime', () => {
     ).resolves.toEqual({ view: 'flat', scope: 'project', layer: 'local' })
     expect(writes).toEqual([
       [{ orchestratorGameProjects: { r1: { mode: 'flat' } } }, { notifyListeners: true }]
+    ])
+  })
+
+  it('shows the game again for this project when its orca.yaml hides it', async () => {
+    vi.mocked(readWorktreeOrcaYaml).mockResolvedValue({
+      scripts: {},
+      orchestratorGame: { show: false }
+    })
+    const { runtime, writes } = runtimeWith({})
+
+    await runtime.setOrchestratorGameView({ view: 'zen', scope: 'project', worktreeId: 'w1' })
+
+    expect(readWorktreeOrcaYaml).toHaveBeenCalledWith('/repo/w1', null)
+    expect(writes).toEqual([
+      [{ orchestratorGameProjects: { r1: { mode: 'zen', show: true } } }, { notifyListeners: true }]
     ])
   })
 

@@ -124,6 +124,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
+import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
@@ -30457,9 +30458,21 @@ export class OrcaRuntimeService {
     if (!this.store?.getSettings || !this.store.updateSettings) {
       throw new Error('runtime_unavailable')
     }
-    const { key } = await this.gameHistoryProjectOf(args)
+    const { key, worktree } = await this.gameHistoryProjectOf(args)
     const repoId = key.startsWith('repo:') ? key.slice('repo:'.length) : null
-    const updates = orchestratorGameViewSettingsOf(this.store.getSettings(), { ...args, repoId })
+    // Why: an orca.yaml that hides the game would keep hiding the view this project just saved.
+    const yaml =
+      args.scope === 'project' && worktree
+        ? await readWorktreeOrcaYaml(
+            worktree.path,
+            this.store.getRepo?.(worktree.repoId)?.connectionId ?? null
+          )
+        : null
+    const updates = orchestratorGameViewSettingsOf(this.store.getSettings(), {
+      ...args,
+      repoId,
+      project: yaml?.orchestratorGame
+    })
     this.store.updateSettings(updates, { notifyListeners: true })
     return {
       view: args.view,
@@ -30475,6 +30488,7 @@ export class OrcaRuntimeService {
   }): Promise<{
     key: string
     worktreesById: Awaited<ReturnType<OrcaRuntimeService['getResolvedWorktreeMap']>>
+    worktree: ResolvedWorktree | undefined
   }> {
     const worktreesById = await this.getResolvedWorktreeMap()
     const worktreeId =
@@ -30482,14 +30496,13 @@ export class OrcaRuntimeService {
       (args.terminalHandle
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
+    const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
     // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
     // keyed `no-project` then would split the project's history and lessons in two.
     const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
-    const repoId = worktreeId
-      ? (worktreesById.get(worktreeId)?.repoId ??
-        (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined))
-      : undefined
-    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
+    const repoId =
+      worktree?.repoId ?? (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
+    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById, worktree }
   }
 
   getGameBoard(): GameBoard {

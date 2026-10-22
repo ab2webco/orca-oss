@@ -35,7 +35,13 @@ function withView(
 /** The settings update that stores a view for every project or for one repo on this machine. */
 export function orchestratorGameViewSettingsOf(
   settings: GameSettings,
-  args: { view: OrchestratorGameViewId; scope: OrchestratorGameViewScope; repoId?: string | null }
+  args: {
+    view: OrchestratorGameViewId
+    scope: OrchestratorGameViewScope
+    repoId?: string | null
+    /** The repo's orca.yaml layer; it sits between every project and the repo's own layer. */
+    project?: OrchestratorGameLayer
+  }
 ): GameSettings {
   const global = settings.orchestratorGame
   if (args.scope === 'global') {
@@ -48,7 +54,7 @@ export function orchestratorGameViewSettingsOf(
     )
   }
   const local = settings.orchestratorGameProjects?.[args.repoId]
-  const now = resolveOrchestratorGameConfig({ global, local }).config
+  const now = resolveOrchestratorGameConfig({ global, project: args.project, local }).config
   return {
     orchestratorGameProjects: {
       ...settings.orchestratorGameProjects,
