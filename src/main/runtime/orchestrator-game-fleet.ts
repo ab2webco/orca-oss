@@ -111,7 +111,10 @@ export async function gameFleetOf(args: {
           isMemberRow(row) || (handle !== null && handle !== undefined && teamHandles.has(handle))
         )
       })
-    : args.agents.filter((row) => !row.parentPaneKey || isMemberRow(row))
+    : // Why the caller's own row: a member pane has a parent, and its band names it from this row.
+      args.agents.filter(
+        (row) => !row.parentPaneKey || isMemberRow(row) || row.paneKey === leaderPaneKey
+      )
   const sourced = [
     ...rows.map((row) => ({ row, worktree: undefined })),
     ...args.members.filter((one) => !rows.some((row) => row.paneKey === one.row.paneKey))
