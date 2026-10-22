@@ -27,7 +27,12 @@ import {
   nextMemberName
 } from '../../shared/orchestrator-game-member-names'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
-import type { RuntimeStatus } from '../../shared/runtime-types'
+import {
+  formatSetupQueue,
+  runtimeCapabilitiesOf,
+  setupAdmissionOf,
+  type GameSetupQueue
+} from './orchestrator-game-setup-queue'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -41,14 +46,16 @@ export type GameLaunchResult = {
   accountId?: string
   runId: string
   taskId: string
-  dispatchId: string
+  /** Absent while the member waits for the host's setup slot. */
+  dispatchId?: string
   state: string
+  setupQueue?: GameSetupQueue
   lastError?: string
 }
 
 type WorkerStartResult = Pick<
   GameLaunchResult,
-  'runId' | 'taskId' | 'dispatchId' | 'state' | 'lastError'
+  'runId' | 'taskId' | 'dispatchId' | 'state' | 'setupQueue' | 'lastError'
 > & { effects?: { kind: string; id?: string }[] }
 
 const DISPLAY_NAME_MAX = 60
@@ -99,13 +106,8 @@ async function boundRunId(client: Client, from: string, objective: string): Prom
   return created.result.run.id
 }
 
-async function requireLaunchPreferences(client: Client): Promise<void> {
-  const status = await client.call<RuntimeStatus>('status.get')
-  if (
-    !status.result.capabilities?.includes(
-      ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
-    )
-  ) {
+function requireLaunchPreferences(capabilities: readonly string[]): void {
+  if (!capabilities.includes(ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY)) {
     throw new RuntimeClientError(
       'incompatible_runtime',
       'The connected Orca Lab runtime cannot pick a member model. Update or restart Orca Lab.'
@@ -182,8 +184,9 @@ export async function launchGameMember(args: {
     launched: args.launched
   })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
+  const capabilities = await runtimeCapabilitiesOf(client)
   if (choice.model) {
-    await requireLaunchPreferences(client)
+    requireLaunchPreferences(capabilities)
   }
   const project = state.worktree?.displayName ?? 'this project'
   const runId = await boundRunId(
@@ -229,7 +232,8 @@ export async function launchGameMember(args: {
     ...memberAccount.pin,
     run: runId,
     from,
-    devMode: isDevCliInvocation()
+    devMode: isDevCliInvocation(),
+    ...setupAdmissionOf(capabilities)
   }
   const worker = await callWithLaunchRetry((requestId) =>
     client.call<WorkerStartResult>(
@@ -257,14 +261,23 @@ export async function launchGameMember(args: {
     {
       kind: 'claimed',
       ticket,
-      text: `member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}`
+      text: `${launched.dispatchId ? `member ${launched.dispatchId} ` : ''}[${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}`
     }
   ])
   return launched
 }
 
-export const formatGameLaunch = (launched: GameLaunchResult): string =>
-  `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: member ${launched.dispatchId} [${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}${launched.lastError ? `\n${launched.lastError}` : ''}`
+export const formatGameLaunch = (launched: GameLaunchResult): string => {
+  const who = [launched.agent, launched.account].filter(Boolean).join(' · ')
+  const what = launched.setupQueue
+    ? formatSetupQueue(launched.setupQueue, who)
+    : `member ${launched.dispatchId} [${launched.state}] ${who}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.lastError ? `\n${launched.lastError}` : ''}`
+}
+
+/** A queued member is on its way, not a failed launch. */
+export const isLaunchUnderway = (launched: GameLaunchResult): boolean =>
+  launched.state === 'ready' || launched.state === 'queued'
 
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {
@@ -299,7 +312,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       prompt,
       overrides
     })
-    if (launched.state !== 'ready') {
+    if (!isLaunchUnderway(launched)) {
       process.exitCode = 1
     }
     printResult({ ...response, result: launched }, json, formatGameLaunch)

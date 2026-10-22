@@ -6,6 +6,12 @@ import { gameBoardCaller, recordGameMember } from './orchestrator-game-board-cal
 import { ticketsOf } from './orchestrator-game-fleet'
 import { readCallerGameState } from './orchestrator-game-launch'
 import { refuseWhileStopped } from './orchestrator-game-hold'
+import {
+  formatSetupQueue,
+  runtimeCapabilitiesOf,
+  setupAdmissionOf,
+  type GameSetupQueue
+} from './orchestrator-game-setup-queue'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import type {
   GameMemberResumeOutcome,
@@ -19,11 +25,12 @@ export type GameResumedMember = {
   ticket: string
   result: 'resumed' | 'relaunched' | 'finished' | 'skipped' | 'failed'
   dispatchId?: string
+  setupQueue?: GameSetupQueue
   reason?: string
   note?: string
 }
 
-type WorkerStarted = { dispatchId: string; state: string }
+type WorkerStarted = { dispatchId?: string; state: string; setupQueue?: GameSetupQueue }
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
@@ -57,7 +64,9 @@ async function startOnTask(
           ...(member.worktreeId ? {} : { name: member.ticket.toLowerCase() }),
           ...(member.name ? { displayName: member.name } : {}),
           agent: member.agent ?? 'claude',
-          ...accountPinOf(member)
+          ...accountPinOf(member),
+          // Why only without a worktree: only a new worktree runs setup.
+          ...(member.worktreeId ? {} : setupAdmissionOf(await runtimeCapabilitiesOf(client)))
         }
   try {
     const started = await client.call<WorkerStarted>('orchestration.workerStart', {
@@ -99,6 +108,7 @@ async function resumeOne(client: Client, from: string, ticket: string): Promise<
     ticket,
     result: outcome.outcome === 'resumed' ? 'resumed' : 'relaunched',
     dispatchId: started.dispatchId,
+    ...(started.setupQueue ? { setupQueue: started.setupQueue } : {}),
     ...(outcome.outcome === 'relaunch' && outcome.note ? { note: outcome.note } : {})
   }
 }
@@ -138,7 +148,7 @@ export const formatResumedMembers = (result: { members: GameResumedMember[] }): 
     : result.members
         .map(
           (one) =>
-            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
+            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
         )
         .join('\n')
 
@@ -219,7 +229,7 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         }
         const resumed = await resumeOne(client, from, member.ticket)
         members.push(resumed)
-        if (resumed.dispatchId) {
+        if (resumed.dispatchId || resumed.setupQueue) {
           running += 1
         }
       } catch (error) {

@@ -299,6 +299,30 @@ describe('orca game fleet verbs', () => {
     )
   })
 
+  it('wave counts a member queued behind a running setup as launched, not failed', async () => {
+    const { client } = fakeClient(stateWith(), {
+      'orchestration.workerStart': {
+        runId: 'r1',
+        taskId: 't1',
+        state: 'queued',
+        setupQueue: { position: 1, waitingOn: 'CIN-3' }
+      }
+    })
+
+    await run('game wave', client, [['tickets', 'CIN-3,CIN-2']])
+
+    expect(process.exitCode).toBeUndefined()
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        failed: [],
+        launched: [
+          expect.objectContaining({ ticket: 'CIN-3', state: 'queued' }),
+          expect.objectContaining({ ticket: 'CIN-2', state: 'queued' })
+        ]
+      })
+    )
+  })
+
   it('wave names each member it launches after a different free character of the scene', async () => {
     const { client, calls } = fakeClient(
       stateWith({
