@@ -176,8 +176,9 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     ],
     destructive: true,
     summary: 'Remove a worktree from Orca Lab and git',
-    usage: 'orca worktree rm --worktree <selector> [--force] [--run-hooks] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'force', 'run-hooks'],
+    usage:
+      'orca worktree rm --worktree <selector> [--force] [--force-member] [--run-hooks] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'force', 'force-member', 'run-hooks'],
     notes: ['Repo-defined orca.yaml archive hooks are skipped unless --run-hooks is passed.']
   },
   {

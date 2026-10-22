@@ -12,7 +12,11 @@ import {
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { deleteRemoteBranch, parseWorktreeList } from './merged-worktree-close.mjs'
+import {
+  deleteRemoteBranch,
+  orcaRemovalDecision,
+  parseWorktreeList
+} from './merged-worktree-close.mjs'
 
 const script = resolve(import.meta.dirname, 'merged-worktree-close.mjs')
 const tempDirs = []
@@ -26,6 +30,27 @@ afterAll(() => {
       retryDelay: 200
     })
   }
+})
+
+describe('orcaRemovalDecision', () => {
+  // Why (ORCA-746): falling back to `git worktree remove` would delete what Orca refused to.
+  it('never hands a game member worktree Orca refused to git', () => {
+    const refused = {
+      ok: false,
+      stdout: JSON.stringify({
+        error: {
+          code: 'game_member_worktree',
+          message: 'This is the worktree of game member ORCA-2'
+        }
+      }),
+      stderr: ''
+    }
+
+    expect(orcaRemovalDecision(refused)).toEqual({
+      action: 'fail',
+      error: 'This is the worktree of game member ORCA-2'
+    })
+  })
 })
 
 describe('deleteRemoteBranch', () => {

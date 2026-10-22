@@ -80,6 +80,7 @@ describe('worktree RPC methods', () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       dedupeWorktreeCreate: passthroughDedupe,
+      gameMemberWorktreeHold: vi.fn().mockResolvedValue(null),
       removeManagedWorktree: vi.fn().mockResolvedValue({})
     } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })

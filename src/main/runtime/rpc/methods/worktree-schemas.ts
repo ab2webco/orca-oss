@@ -127,7 +127,9 @@ export const WorktreeRemove = WorktreeSelector.extend({
   // desktop sets `force` for an ordinary confirmed delete too, so the PTY-stop
   // waiver travels on its own field.
   allowUnverifiedPtyStop: OptionalBoolean,
-  runHooks: OptionalBoolean
+  runHooks: OptionalBoolean,
+  // Why optional: an older CLI sends none, and the guard refuses a member's worktree (ORCA-746).
+  allowGameMember: OptionalBoolean
 })
 
 export const WorktreeForceDeleteBranch = WorktreeSelector.extend({

@@ -295,7 +295,8 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       force: flags.get('force') === true,
       // Why (#11960): --force is explicit here, so it may also waive PTY-stop proof.
       allowUnverifiedPtyStop: flags.get('force') === true,
-      runHooks: flags.get('run-hooks') === true
+      runHooks: flags.get('run-hooks') === true,
+      allowGameMember: flags.get('force-member') === true
     })
     printHookWarning(result.result, json)
     printPreservedBranchWarning(result.result, json)

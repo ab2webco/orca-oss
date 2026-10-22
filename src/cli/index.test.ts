@@ -161,6 +161,19 @@ describe('command aliases dispatch to the canonical handler', () => {
     )
   })
 
+  it('asks to remove a game member worktree only with --force-member, never with --force (ORCA-746)', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req', { removed: true }),
+      okFixture('req', { removed: true })
+    )
+
+    await main(['worktree', 'rm', '--worktree', 'id:wt-1', '--force', '--json'], '/tmp/repo')
+    await main(['worktree', 'rm', '--worktree', 'id:wt-1', '--force-member', '--json'], '/tmp/repo')
+
+    expect(callMock.mock.calls.map(([, params]) => params.allowGameMember)).toEqual([false, true])
+  })
+
   it('runs `worktree delete` as the canonical `worktree rm`', async () => {
     queueFixtures(callMock, okFixture('req', { removed: true }))
 

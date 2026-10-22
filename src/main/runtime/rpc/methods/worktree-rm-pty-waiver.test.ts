@@ -9,6 +9,7 @@ function makeRuntime(): OrcaRuntimeService {
     getRuntimeId: () => 'test-runtime',
     dedupeWorktreeCreate: <T>(_repo: string, _id: string | undefined, run: () => Promise<T>) =>
       run(),
+    gameMemberWorktreeHold: vi.fn().mockResolvedValue(null),
     removeManagedWorktree: vi.fn().mockResolvedValue({})
   } as unknown as OrcaRuntimeService
 }

@@ -647,6 +647,11 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
+import {
+  parseUnpushedCommits,
+  readGameMemberWorktreeHold,
+  type GameMemberWorktreeHold
+} from './game-member-worktree-guard'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
@@ -26540,6 +26545,24 @@ export class OrcaRuntimeService {
       // branch/path selectors cannot resolve to an arbitrary missing path.
       return meta.pushTarget ? { ...removalTarget, pushTarget: meta.pushTarget } : removalTarget
     }
+  }
+
+  /** The saved game member whose worktree this is, with its unpushed commits (ORCA-746). */
+  async gameMemberWorktreeHold(worktreeSelector: string): Promise<GameMemberWorktreeHold | null> {
+    const target = await this.resolveWorktreeRemovalTarget(worktreeSelector)
+    const repo = this.store?.getRepo(target.repoId)
+    const args = ['log', '--format=%h %s', '-n', '20', 'HEAD', '--not', '--remotes']
+    return readGameMemberWorktreeHold({
+      read: () => this.gameMemberSessions.read(`repo:${target.repoId}`),
+      worktreeId: target.id,
+      listUnpushed: async () =>
+        parseUnpushedCommits(
+          (repo?.connectionId
+            ? await requireSshGitProvider(repo.connectionId).exec(args, target.path)
+            : await gitExecFileAsync(args, { cwd: target.path })
+          ).stdout
+        )
+    })
   }
 
   private removeWorktreeMetadataAndHistory(store: RuntimeStore, worktreeId: string): void {
