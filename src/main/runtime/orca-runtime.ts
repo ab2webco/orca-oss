@@ -691,6 +691,7 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
   liveProjectMemberNamesOf
@@ -3693,7 +3694,12 @@ export class OrcaRuntimeService {
     store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
     sessionIdOf: (handle) =>
-      this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
+      this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null,
+    causeOf: (member) =>
+      gamePausedCauseOf(
+        this.getOrchestrationDbIfAvailable()?.getDispatchContext(member.taskId),
+        (handle) => this.findPtyIdForHandle(handle) !== null
+      )
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({

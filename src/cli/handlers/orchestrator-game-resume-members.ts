@@ -7,6 +7,11 @@ import { ticketsOf } from './orchestrator-game-fleet'
 import { readCallerGameState } from './orchestrator-game-launch'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import {
+  formatStoppedTerminal,
+  settleOpenTerminal,
+  stopDiscardedTerminals
+} from './orchestrator-game-open-member-terminal'
+import {
   formatSetupQueue,
   runtimeCapabilitiesOf,
   setupAdmissionOf,
@@ -23,8 +28,10 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameResumedMember = {
   ticket: string
-  result: 'resumed' | 'relaunched' | 'finished' | 'skipped' | 'failed'
+  result: 'resumed' | 'relaunched' | 'submitted' | 'finished' | 'skipped' | 'failed'
   dispatchId?: string
+  /** The open terminal Enter was pressed in, for `submitted`. */
+  terminal?: string
   setupQueue?: GameSetupQueue
   reason?: string
   note?: string
@@ -137,6 +144,7 @@ async function bindRunOf(
 const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
   resumed: 'its conversation reopened',
   relaunched: 'a new agent started on its task',
+  submitted: 'Enter pressed in its terminal',
   finished: 'already finished, forgotten',
   skipped: 'skipped',
   failed: 'failed'
@@ -148,7 +156,7 @@ export const formatResumedMembers = (result: { members: GameResumedMember[] }): 
     : result.members
         .map(
           (one) =>
-            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
+            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.terminal ? ` (${one.terminal})` : ''}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
         )
         .join('\n')
 
@@ -168,10 +176,17 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         'game.memberDiscard',
         { ...gameBoardCaller(), tickets: named.length > 0 ? named : 'all' }
       )
-      printResult(discarded, json, (result) =>
+      const stopped = await stopDiscardedTerminals(
+        client,
+        (state.pausedMembers ?? []).filter((one) => discarded.result.discarded.includes(one.ticket))
+      )
+      printResult({ ...discarded, result: { ...discarded.result, stopped } }, json, (result) =>
         result.setAside
           ? `Set the unreadable members file aside at ${result.setAside}; new members are saved from now on.`
-          : `Freed ${result.discarded.length}: ${result.discarded.join(', ') || 'none'}`
+          : [
+              `Freed ${result.discarded.length}: ${result.discarded.join(', ') || 'none'}`,
+              ...result.stopped.map(formatStoppedTerminal)
+            ].join('\n')
       )
       return
     }
@@ -191,19 +206,26 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     const fleet = gameFleetReportOf({ ...state, pausedMembers: [] })
     const liveMembers = fleet.running
     if (flags.get('dry-run') === true) {
-      const free = Math.max(0, fleet.cap - liveMembers)
+      // Why apart: the real run presses Enter or skips these, and their agents already hold slots.
+      const open = paused.filter((one) => one.terminal && one.cause !== undefined)
+      const closed = paused.filter((one) => !open.includes(one))
+      const free = Math.max(0, fleet.cap - liveMembers - open.length)
+      const ticketsWith = (cause: string): string[] =>
+        open.filter((one) => one.cause === cause).map((one) => one.ticket)
       printResult(
         {
           ...response,
           result: {
             dryRun: true,
-            resume: paused.slice(0, free).map((one) => one.ticket),
-            overCap: paused.slice(free).map((one) => one.ticket)
+            submit: ticketsWith('unsubmitted'),
+            openTerminal: ticketsWith('terminal-open'),
+            resume: closed.slice(0, free).map((one) => one.ticket),
+            overCap: closed.slice(free).map((one) => one.ticket)
           }
         },
         json,
         (plan) =>
-          `Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}`
+          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}`
       )
       return
     }
@@ -213,15 +235,25 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     let running = liveMembers
     // Why one at a time: N agents reopening at once can exhaust a small machine's memory.
     for (const member of paused) {
-      if (running >= fleet.cap) {
-        members.push({
-          ticket: member.ticket,
-          result: 'skipped',
-          reason: `cap: ${fleet.cap} members already run`
-        })
-        continue
-      }
       try {
+        // Why before the cap: its agent already runs, so it holds a slot whatever happens here.
+        const settled = await settleOpenTerminal(client, member)
+        if (settled) {
+          members.push(settled)
+          running += 1
+          if (settled.result === 'failed') {
+            process.exitCode = 1
+          }
+          continue
+        }
+        if (running >= fleet.cap) {
+          members.push({
+            ticket: member.ticket,
+            result: 'skipped',
+            reason: `cap: ${fleet.cap} members already run`
+          })
+          continue
+        }
         const refused = await bindRunOf(client, from, member, running)
         if (refused) {
           members.push({ ticket: member.ticket, result: 'skipped', reason: refused })

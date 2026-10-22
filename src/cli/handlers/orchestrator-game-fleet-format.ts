@@ -50,14 +50,46 @@ export function tableOf(rows: string[][]): string {
 
 const ticketLabel = (row: GameFleetRow): string => row.ticket ?? row.name
 
+// Why apart from the restart (ORCA-754): these terminals are open, so "restarted" sent the lead to resume over a live agent.
+function formatOpenTerminals(paused: GameFleet['paused']): string[] {
+  const unsubmitted = paused.filter((one) => one.cause === 'unsubmitted')
+  const silent = paused.filter((one) => one.cause === 'terminal-open')
+  const rowOf = (one: GameFleet['paused'][number], state: boolean): string[] => [
+    one.ticket,
+    ...(state ? [one.lastState ?? '-'] : []),
+    one.terminal ?? '-',
+    one.branch ?? '-',
+    one.agent ?? '-',
+    one.account ?? '-',
+    one.name ?? ''
+  ]
+  const head = ['TICKET', 'TERMINAL', 'BRANCH', 'AGENT', 'ACCOUNT', 'NAME']
+  return [
+    ...(unsubmitted.length === 0
+      ? []
+      : [
+          `Brief sent, not submitted: ${unsubmitted.length} · \`orca game resume-members\` presses Enter in its terminal`,
+          tableOf([head, ...unsubmitted.map((one) => rowOf(one, false))])
+        ]),
+    ...(silent.length === 0
+      ? []
+      : [
+          `Not reporting, terminal still open: ${silent.length} · check the terminal; \`orca game resume-members --discard\` stops and frees them`,
+          tableOf([['TICKET', 'STATE', ...head.slice(1)], ...silent.map((one) => rowOf(one, true))])
+        ])
+  ]
+}
+
 function formatPaused(fleet: GameFleet): string[] {
   if (fleet.pausedError) {
     return [`Could not resume members: ${fleet.pausedError}`]
   }
-  if (fleet.paused.length === 0) {
-    return []
+  const restarted = fleet.paused.filter((one) => one.cause === undefined)
+  const open = formatOpenTerminals(fleet.paused)
+  if (restarted.length === 0) {
+    return open
   }
-  const rows = fleet.paused.map((one) => [
+  const rows = restarted.map((one) => [
     one.ticket,
     one.lastState ?? '-',
     one.branch ?? '-',
@@ -67,7 +99,8 @@ function formatPaused(fleet: GameFleet): string[] {
     one.name ?? ''
   ])
   return [
-    `Paused since Orca or the machine restarted: ${fleet.paused.length} · \`orca game resume-members\` resumes them, \`--discard\` frees them`,
+    ...open,
+    `Paused since Orca or the machine restarted: ${restarted.length} · \`orca game resume-members\` resumes them, \`--discard\` frees them`,
     tableOf([['TICKET', 'STATE', 'BRANCH', 'AGENT', 'ACCOUNT', 'RESUMES', 'NAME'], ...rows])
   ]
 }
