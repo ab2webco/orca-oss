@@ -17624,6 +17624,29 @@ describe('OrcaRuntimeService', () => {
         vi.useRealTimers()
       }
     })
+
+    // Why: a turn is only provable from Claude's and Codex's own repaint. Any
+    // other agent would read as never started, and an Enter mid-turn can pick
+    // the highlighted option of a menu.
+    it('builds no Enter retry for an agent whose turn it cannot see', async () => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => null
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        launchAgent: 'opencode'
+      })
+      runtime.onPtyData('pty-bg', '\x1b[?2004h\x1b[?25h', Date.now())
+
+      const sent = await runtime.sendTerminalAgentPromptObservingTurn(handle, BRIEF, {
+        acceptanceTimeoutMs: 1
+      })
+
+      expect(sent.submit).toBeNull()
+    })
   })
 
   it('chunks large agent prompt paste frames before delayed submit', async () => {

@@ -507,6 +507,7 @@ import {
 import type { AgentComposerReadiness, AgentTurnAcceptance } from './agent-composer-readiness'
 import {
   AGENT_SUBMIT_RETRY_COMPOSER_WAIT_MS,
+  SUBMIT_RETRY_AGENTS,
   createAgentPromptSubmitProbe,
   type AgentPromptSubmitProbe
 } from './agent-prompt-submit-probe'
@@ -18597,6 +18598,9 @@ export class OrcaRuntimeService {
       throw error
     }
     const { ptyId, agent } = target
+    if (!agent || !SUBMIT_RETRY_AGENTS.has(agent)) {
+      return { send, turnAcceptance: observer.arm(), submit: null }
+    }
     const submit = createAgentPromptSubmitProbe({
       ptyId,
       currentPtyId: () => this.findPtyIdForHandle(handle),

@@ -1,5 +1,10 @@
 import { AGENT_PROMPT_SUBMIT } from '../../shared/agent-prompt-injection'
 import type { TerminalUnsubmittedInput } from '../../shared/terminal-unsubmitted-input'
+import type { TuiAgent } from '../../shared/types'
+
+// Why only these: their own repaint proves a turn started (working title, `esc to interrupt`).
+// Another agent would read as never started, and an Enter mid-turn can pick a menu option.
+export const SUBMIT_RETRY_AGENTS: ReadonlySet<TuiAgent> = new Set(['claude', 'codex'])
 
 // Why 30 s: the press is already late, so it can afford a composer that mounts
 // well after the injector's 10 s gate gave up on a loaded machine (ORCA-754).
