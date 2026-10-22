@@ -35,6 +35,8 @@ export type ProjectCommandCandidate = {
 const MAX_CANDIDATES_PER_SOURCE = 20
 const MAX_DIR_ENTRIES = 200
 const MAX_RUN_LENGTH = 1000
+// Why: GAME_ACTION_COMMAND accepts at most 24 characters.
+const SLASH_COMMAND_MAX = 24
 // Why: make and rake look these names up in this order; listing the root keeps case-insensitive disks from matching twice.
 const MAKEFILE_NAMES = ['GNUmakefile', 'makefile', 'Makefile']
 const JUSTFILE_NAMES = ['justfile', 'Justfile', 'JUSTFILE', '.justfile']
@@ -116,7 +118,39 @@ export async function detectProjectCommands(
     detectGithubWorkflows(readFile, reader),
     detectFromFile(readFile, firstPresent(['.gitlab-ci.yml']), 'gitlab-ci', parseGitlabCiCommands)
   ])
-  return groups.flat()
+  return withUniqueSlashCommands(groups.flat())
+}
+
+const SLASH_COMMAND_SOURCE_PREFIX: Readonly<Record<ProjectCommandSource, string>> = {
+  'package-json': 'package',
+  makefile: 'make',
+  justfile: 'just',
+  rakefile: 'rake',
+  bin: 'bin',
+  scripts: 'scripts',
+  'github-actions': 'github',
+  'gitlab-ci': 'gitlab'
+}
+
+// Why: one slash command must name one candidate; the first in source order keeps the plain name.
+function withUniqueSlashCommands(candidates: ProjectCommandCandidate[]): ProjectCommandCandidate[] {
+  const taken = new Set<string>()
+  return candidates.map((candidate) => {
+    let command = candidate.slashCommand
+    if (taken.has(command)) {
+      const prefixed = `${SLASH_COMMAND_SOURCE_PREFIX[candidate.source]}-${command}`
+      command = fitSlashCommand(prefixed, '')
+      for (let n = 2; taken.has(command); n++) {
+        command = fitSlashCommand(prefixed, `-${n}`)
+      }
+    }
+    taken.add(command)
+    return command === candidate.slashCommand ? candidate : { ...candidate, slashCommand: command }
+  })
+}
+
+function fitSlashCommand(base: string, suffix: string): string {
+  return `${base.slice(0, SLASH_COMMAND_MAX - suffix.length).replace(/-+$/, '')}${suffix}`
 }
 
 type NamedRun = { name: string; run: string }
@@ -260,6 +294,6 @@ function toSlashCommand(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   const prefixed = /^[a-z]/.test(slug) ? slug : `run-${slug}`
-  const command = prefixed.slice(0, 24).replace(/-+$/, '')
+  const command = fitSlashCommand(prefixed, '')
   return GAME_ACTION_COMMAND.test(command) ? command : 'run'
 }

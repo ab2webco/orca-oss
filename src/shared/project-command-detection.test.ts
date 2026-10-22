@@ -315,6 +315,53 @@ describe('detectProjectCommands', () => {
     ])
   })
 
+  it('gives a later source its own slash command when two sources name the same command', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        'package.json': JSON.stringify({
+          scripts: { test: 'jest', 'check-everything-includi': 'x' }
+        }),
+        Makefile: 'test:\n\tnpm test\ncheck-everything-includi:\n\ttrue',
+        justfile: 'test:\n  cargo test'
+      })
+    )
+
+    expect(candidates.map(({ run, slashCommand }) => [run, slashCommand])).toEqual([
+      ['npm run test', 'test'],
+      ['npm run check-everything-includi', 'check-everything-includi'],
+      ['make test', 'make-test'],
+      ['make check-everything-includi', 'make-check-everything-in'],
+      ['just test', 'just-test']
+    ])
+  })
+
+  it('numbers slash commands that still collide, including names that fall back to run', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.github/workflows/ci.yml': [
+          'jobs:',
+          '  build:',
+          '    steps:',
+          '      - name: 🚀',
+          '        run: make ship',
+          '      - name: ✅',
+          '        run: make verify',
+          '      - name: 🔥',
+          '        run: make burn'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map(({ run, slashCommand }) => [run, slashCommand])).toEqual([
+      ['make ship', 'run'],
+      ['make verify', 'github-run'],
+      ['make burn', 'github-run-2']
+    ])
+    for (const candidate of candidates) {
+      expect(candidate.slashCommand).toMatch(GAME_ACTION_COMMAND)
+    }
+  })
+
   it('uses npm run when lockfiles from two package managers disagree', async () => {
     const candidates = await detectProjectCommands(
       memoryRepo({
