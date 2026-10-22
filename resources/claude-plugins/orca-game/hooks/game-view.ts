@@ -34,7 +34,9 @@ export function gameViewPatchOf(id: GameViewId, now: ViewLook): Partial<ViewLook
       return { mode: 'on', render: 'classic' }
     case '2d-hd':
       return { mode: 'on', render: now.render === 'hd-compact' ? 'hd-compact' : 'hd' }
-    default:
+    case 'off':
+    case 'flat':
+    case 'zen':
       return { mode: id }
   }
 }

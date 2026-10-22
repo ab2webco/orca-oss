@@ -40,7 +40,9 @@ export function orchestratorGameViewPatchOf(
       return { mode: 'on', render: 'classic' }
     case '2d-hd':
       return { mode: 'on', render: now.render === 'hd-compact' ? 'hd-compact' : 'hd' }
-    default:
+    case 'off':
+    case 'flat':
+    case 'zen':
       return { mode: id }
   }
 }
