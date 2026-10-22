@@ -5,6 +5,7 @@ import {
   type GameHistoryRecord
 } from '../../shared/orchestrator-game-history'
 import { ticketOfMember, type GameFleetRow } from '../../shared/orchestrator-game-fleet-verbs'
+import { memberNameOf } from '../../shared/orchestrator-game-member-names'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
 
 type Client = Parameters<CommandHandler>[0]['client']
@@ -108,7 +109,8 @@ export async function recordFreedMember(args: {
       worktreeId: process.env.ORCA_WORKTREE_ID,
       terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
       memberWorktreeId: member.worktree?.id,
-      record
+      record,
+      character: memberNameOf(member.displayName) ?? undefined
     })
     return null
   } catch (error) {
