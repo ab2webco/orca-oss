@@ -28,6 +28,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 const { createLocalProjectFileReader, createRemoteProjectFileReader } =
   await import('./project-file-reader')
+const { detectProjectCommands } = await import('../shared/project-command-detection')
 
 function fakeProvider(
   files: Record<string, string>,
@@ -108,6 +109,32 @@ describe('createRemoteProjectFileReader', () => {
     const reader = createRemoteProjectFileReader('/r', fakeProvider({ '/r/blob': '\0\0' }, {}))
 
     await expect(reader.readFile('blob')).resolves.toBeNull()
+  })
+
+  it('detects commands in an SSH repo from the remote host without reading the local disk', async () => {
+    const reader = createRemoteProjectFileReader(
+      '/srv/repo',
+      fakeProvider(
+        {
+          '/srv/repo/Makefile': 'test:\n\tpytest\n',
+          '/srv/repo/package.json': '{"scripts":{"lint":"ruff"}}',
+          '/srv/repo/yarn.lock': ''
+        },
+        {
+          '/srv/repo': [
+            { name: 'Makefile', isDirectory: false },
+            { name: 'package.json', isDirectory: false },
+            { name: 'yarn.lock', isDirectory: false }
+          ]
+        }
+      )
+    )
+
+    await expect(detectProjectCommands(reader)).resolves.toEqual([
+      expect.objectContaining({ source: 'package-json', run: 'yarn run lint' }),
+      expect.objectContaining({ source: 'makefile', run: 'make test' })
+    ])
+    expect(localFs.calls).toEqual([])
   })
 
   it('reads nothing when the SSH provider is not connected', async () => {

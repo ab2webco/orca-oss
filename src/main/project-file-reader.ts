@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
-import type { ProjectFileReader } from '../../shared/project-file-reader-contract'
+import type { ProjectFileReader } from '../shared/project-file-reader-contract'
 import { isENOENT } from './ipc/filesystem-path-containment'
 import type { IFilesystemProvider } from './providers/types'
 import { joinWorktreeRelativePath } from './runtime/runtime-relative-paths'
