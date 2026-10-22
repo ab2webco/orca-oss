@@ -30995,7 +30995,10 @@ export class OrcaRuntimeService {
       `repo:${project.repoId}`,
       state.agents,
       project.liveWorktreeIds,
-      this.workerSetupAdmission.queued()
+      {
+        queued: this.workerSetupAdmission.queued(),
+        starting: this.workerSetupAdmission.startingTaskIds()
+      }
     )
     return {
       ...state,

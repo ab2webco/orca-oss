@@ -103,6 +103,10 @@ async function startWorker(
         })
     })
     if ('queued' in admission) {
+      // Why: the mutation executor completes this request's receipt, which a Dispatch would open.
+      if (orchestrationMutation) {
+        db.beginMutationReceipt(orchestrationMutation)
+      }
       // Why no Dispatch yet: the Task stays ready, so a restart leaves it for resume-members.
       return { runId: run.id, taskId: task.id, state: 'queued', setupQueue: admission.queued }
     }
@@ -215,6 +219,10 @@ async function startWorker(
       timeoutMs: readinessBudgetMs
     })
     persistWorkerSetupWaitOutcome({ ...setupStage, wait })
+    // Why: a wait-for-setup agent saw the setup end; its Setup tab may never exit.
+    if (setupReceipt.state !== 'running') {
+      setupSlot?.release()
+    }
     if (!wait.satisfied) {
       if (setupReceipt.state === 'failed') {
         failedStage = 'setup_wait'

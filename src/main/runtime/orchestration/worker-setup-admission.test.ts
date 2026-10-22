@@ -164,6 +164,19 @@ describe('WorkerSetupAdmission', () => {
     expect(next).toHaveBeenCalledTimes(1)
   })
 
+  it('names the tasks whose start holds a slot, so a drained start is not taken for paused', async () => {
+    const first = await admission.admit(request('a'))
+    await admission.admit(request('b'))
+    expect(admission.startingTaskIds()).toEqual(['a'])
+
+    if (!first.admitted) {
+      throw new Error('expected an admission')
+    }
+    first.release()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(admission.startingTaskIds()).toEqual(['b'])
+  })
+
   it('answers a repeated request for a queued task with its place, not a second entry', async () => {
     await admission.admit(request('a'))
     await admission.admit(request('b'))

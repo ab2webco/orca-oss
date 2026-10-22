@@ -140,7 +140,9 @@ describe('members queued behind a running setup (ORCA-746)', () => {
 
   it('are not paused: their start is on its way', () => {
     const live = { tickets: new Set<string>(), worktreeIds: new Set<string>() }
-    expect(pausedMembersOf(members, live, queue).map((one) => one.ticket)).toEqual(['ORCA-2'])
+    expect(
+      pausedMembersOf(members, live, new Set(['task_ORCA-1'])).map((one) => one.ticket)
+    ).toEqual(['ORCA-2'])
   })
 
   it('are listed by ticket with their place in the queue', () => {

@@ -215,15 +215,15 @@ export function queuedMembersOf(
 export function pausedMembersOf(
   members: readonly GameMemberSession[],
   live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> },
-  setupQueue: readonly GameSetupQueueEntry[] = []
+  /** Tasks whose start is queued or running on the host: on their way, not paused. */
+  startingTaskIds: ReadonlySet<string> = new Set()
 ): GamePausedMember[] {
-  const queued = new Set(setupQueue.map((entry) => entry.taskId))
   return members
     .filter(
       (one) =>
         one.lastState !== 'finished' &&
         !live.tickets.has(one.ticket) &&
-        !queued.has(one.taskId) &&
+        !startingTaskIds.has(one.taskId) &&
         !(one.worktreeId !== null && live.worktreeIds.has(one.worktreeId))
     )
     .map((one) => ({

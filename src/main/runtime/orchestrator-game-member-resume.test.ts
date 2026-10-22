@@ -149,6 +149,23 @@ describe('GameMemberResume.resume', () => {
     expect(resumed).toEqual([])
   })
 
+  it('relaunches a member a restart caught queued behind a setup, with no dispatch to retry (ORCA-746)', async () => {
+    const { store, resume } = setup({ taskStatus: 'ready' })
+    await store.upsert('repo:a', [
+      saved('ORCA-1', {
+        dispatchId: undefined,
+        worktreeId: undefined,
+        sessionId: undefined,
+        lastState: 'queued'
+      })
+    ])
+
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'relaunch',
+      member: { ...target, worktreeId: null }
+    })
+  })
+
   it('relaunches in its worktree when Claude cannot reopen the conversation, saying why', async () => {
     const { store, resume } = setup({
       resume: async () => {

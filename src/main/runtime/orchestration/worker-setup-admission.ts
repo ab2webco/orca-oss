@@ -93,6 +93,11 @@ export class WorkerSetupAdmission {
     return queuedAdmission(this.placeOf(request.host, request.taskId)!)
   }
 
+  /** Tasks whose start holds a slot: starting, or running their setup. */
+  startingTaskIds(): string[] {
+    return [...this.holders.values()].map((holder) => holder.taskId)
+  }
+
   queued(): QueuedSetupStart[] {
     return [...this.queues.keys()].flatMap((host) =>
       this.queueOf(host).map((one) => this.placeOf(host, one.taskId)!)

@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
 import { WorkerSetupAdmission } from '../../orchestration/worker-setup-admission'
+import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
+import { RpcDispatcher } from '../dispatcher'
+import type { RpcRequest } from '../core'
 import { ORCHESTRATION_METHODS } from './orchestration'
 
 type SetupState = 'running' | 'not_configured' | 'skipped' | 'spawn_failed'
@@ -12,6 +15,7 @@ describe('orchestration worker setup queue (ORCA-746)', () => {
   let runtime: OrcaRuntimeService
   let runId: string
   let setupState: SetupState
+  let startupPolicy: 'start-immediately' | 'wait-for-setup'
   let setupWaiters: Map<string, (() => void)[]>
   let created: number
 
@@ -25,6 +29,7 @@ describe('orchestration worker setup queue (ORCA-746)', () => {
       coordinatorPaneKey
     }).id
     setupState = 'running'
+    startupPolicy = 'start-immediately'
     setupWaiters = new Map()
     created = 0
     vi.spyOn(runtime, 'getWorkerSetupAdmission').mockReturnValue(
@@ -67,7 +72,7 @@ describe('orchestration worker setup queue (ORCA-746)', () => {
         setupReceipt: {
           requested: setupState === 'skipped' ? 'skip' : 'run',
           hookFound: setupState !== 'not_configured',
-          startupPolicy: 'start-immediately',
+          startupPolicy,
           state: setupState,
           terminalHandle: setupState === 'running' ? `term_setup${created}` : undefined
         }
@@ -188,6 +193,14 @@ describe('orchestration worker setup queue (ORCA-746)', () => {
     }
   )
 
+  it('frees the slot once an agent that waits for setup sees it finish', async () => {
+    startupPolicy = 'wait-for-setup'
+    await startWorker('a')
+    const second = await startWorker('b')
+
+    expect(second.result.state).toBe('ready')
+  })
+
   it('frees the slot when the worktree cannot be created', async () => {
     vi.mocked(runtime.createManagedWorktree).mockRejectedValueOnce(new Error('disk full'))
     const first = await startWorker('a')
@@ -209,6 +222,45 @@ describe('orchestration worker setup queue (ORCA-746)', () => {
       )
     )
     expect(queued.result.state).toBe('queued')
+  })
+
+  it('answers a queued start through the RPC path, and its retry with the same place', async () => {
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATION_METHODS })
+    const request = (task: string, requestId: string): RpcRequest => ({
+      id: `rpc_${requestId}`,
+      authToken: 'caller-token',
+      orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+      orchestrationRequestId: requestId,
+      method: 'orchestration.workerStart',
+      params: {
+        task,
+        from: 'term_coord',
+        worktree: 'new-child',
+        name: requestId,
+        displayName: requestId.toUpperCase(),
+        agent: 'codex',
+        setupAdmission: 'queue'
+      }
+    })
+    const first = db.createTask({ spec: 'a', runId })
+    const second = db.createTask({ spec: 'b', runId })
+
+    expect(await dispatcher.dispatch(request(first.id, 'a'))).toMatchObject({
+      ok: true,
+      result: { state: 'ready' }
+    })
+    const queued = await dispatcher.dispatch(request(second.id, 'b'))
+    const retried = await dispatcher.dispatch({ ...request(second.id, 'b'), id: 'rpc_b_retry' })
+
+    expect(queued).toMatchObject({
+      ok: true,
+      result: { state: 'queued', setupQueue: { position: 1, waitingOn: 'A' } }
+    })
+    expect(retried).toMatchObject({
+      ok: true,
+      result: { state: 'queued', setupQueue: { position: 1, waitingOn: 'A' } }
+    })
+    expect(runtime.getWorkerSetupAdmission().queued()).toHaveLength(1)
   })
 
   it('leaves starts that do not ask for the queue alone', async () => {

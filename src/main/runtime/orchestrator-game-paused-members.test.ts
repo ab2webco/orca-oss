@@ -106,13 +106,27 @@ describe('GamePausedMembers.note', () => {
     })
     const queue = [{ taskId: 'task_ORCA-2', position: 1, waitingOn: 'Arthur · ORCA-1' }]
 
-    expect(await paused.note('repo:a', [], new Set(), queue)).toEqual({
+    expect(await paused.note('repo:a', [], new Set(), { queued: queue, starting: [] })).toEqual({
       paused: [],
       queued: [
         { ticket: 'ORCA-2', name: 'Merlin · ORCA-2', position: 1, waitingOn: 'Arthur · ORCA-1' }
       ],
       error: null
     })
+  })
+
+  it('lists a member whose start holds the setup slot as neither paused nor queued', async () => {
+    const { paused } = setup()
+    await paused.record('repo:a', {
+      ticket: 'ORCA-2',
+      runId: 'run_1',
+      taskId: 'task_ORCA-2',
+      lastState: 'queued'
+    })
+
+    expect(
+      await paused.note('repo:a', [], new Set(), { queued: [], starting: ['task_ORCA-2'] })
+    ).toEqual({ paused: [], queued: [], error: null })
   })
 
   it('never lists a member that finished: merged PR or a completed dispatch', async () => {

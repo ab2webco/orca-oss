@@ -39,7 +39,10 @@ export class GamePausedMembers {
     projectKey: string,
     agents: readonly GameAgent[],
     liveWorktreeIds: ReadonlySet<string> = new Set(),
-    setupQueue: readonly GameSetupQueueEntry[] = []
+    setup: { queued: readonly GameSetupQueueEntry[]; starting: readonly string[] } = {
+      queued: [],
+      starting: []
+    }
   ): Promise<GamePausedMembersView> {
     const live = agents.flatMap((agent) => {
       const ticket = agent.isMember ? ticketOfMember(agent) : null
@@ -59,9 +62,10 @@ export class GamePausedMembers {
       return { paused: [], queued: [], error: read.reason }
     }
     const tickets = new Set(live.map((one) => one.ticket))
+    const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     return {
-      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }, setupQueue),
-      queued: queuedMembersOf(read.members, setupQueue),
+      paused: pausedMembersOf(read.members, { tickets, worktreeIds: liveWorktreeIds }, starting),
+      queued: queuedMembersOf(read.members, setup.queued),
       error
     }
   }
