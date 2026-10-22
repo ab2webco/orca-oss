@@ -21,6 +21,7 @@ import {
   waitForActiveTerminalManager
 } from './helpers/terminal'
 import { describeRestoreSample, measureHiddenOutputRestoreLatency } from './hidden-restore-latency'
+import { secondWorstLateTimerTickMs } from './hidden-pressure-timer-drift'
 import { hiddenRestoreWithinBudget } from './hidden-restore-sample'
 
 type HiddenPressurePane = {
@@ -63,6 +64,7 @@ type HiddenPressureMeasurement = {
   medianLatencyMs: number
   worstLatencyMs: number
   maxTimerDriftMs: number
+  lateTimerTicksMs: number[]
 }
 
 type HiddenPressureMainSnapshot = {
@@ -92,8 +94,9 @@ const MAX_HIDDEN_RESTORE_LATENCY_MS = 2_000
 // main after model ingestion, so renderer-delivery pressure must stay FAR
 // below the old 2 MB ACK-backpressure target instead of reaching it.
 const MAIN_RENDERER_PRESSURE_TARGET_CHARS = 2 * 1024 * 1024
-// Why: in this hidden real-PTY pressure case, maxTimerDriftMs and worst-key
-// latency catch the same isolated CI starvation spike; median remains strict.
+// Why: in this hidden real-PTY pressure case, timer drift and worst-key latency
+// catch the same isolated CI starvation spike; median remains strict. Asserted on
+// the second-worst late tick so one whole-second stall (ORCA-760) passes and two fail.
 const MAX_HIDDEN_PRESSURE_TIMER_DRIFT_MS = 3_000
 
 export async function runHiddenRealPtyPressureScenario<
@@ -213,7 +216,10 @@ export async function runHiddenRealPtyPressureScenario<
     // detector — the original regression (input freezing for seconds) shows up in
     // the median too. Aligns with ssh-docker-relay-perf's 2s worst-key tolerance.
     expect(measurement.worstLatencyMs).toBeLessThan(3_000)
-    expect(measurement.maxTimerDriftMs).toBeLessThan(MAX_HIDDEN_PRESSURE_TIMER_DRIFT_MS)
+    expect(
+      secondWorstLateTimerTickMs(measurement.lateTimerTicksMs),
+      `lateTimerTicks=${measurement.lateTimerTicksMs.join(',') || 'none'}`
+    ).toBeLessThan(MAX_HIDDEN_PRESSURE_TIMER_DRIFT_MS)
 
     await deps.releaseTerminalAckGate(orcaPage)
     const restoreSample = await measureHiddenOutputRestoreLatency(orcaPage, secondWorktreeId, runId)
