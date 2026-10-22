@@ -660,7 +660,8 @@ export class OrchestrationDb {
         -- Why (ORCA-191): 1 when the agent's composer marker was observed before
         -- the write, 0 when the injector proceeded without proof. Only ever
         -- diagnosis — readiness is never a reason to refuse a dispatch.
-        composer_ready_proven INTEGER
+        composer_ready_proven INTEGER,
+        last_activity_at TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_dispatch_task ON dispatch_contexts(task_id);
@@ -1164,6 +1165,9 @@ export class OrchestrationDb {
       }
       if (current < 35 && !this.hasColumn('worker_dispatches', 'observed_model')) {
         this.db.exec('ALTER TABLE worker_dispatches ADD COLUMN observed_model TEXT')
+      }
+      if (current < 36 && !this.hasColumn('dispatch_contexts', 'last_activity_at')) {
+        this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN last_activity_at TEXT')
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -7292,6 +7296,27 @@ export class OrchestrationDb {
       )
       .run(at, dispatchId)
     this.recordDispatchLifecycleSignal(dispatchId, at)
+  }
+
+  /** Dispatched attempts with a terminal the host can observe (ORCA-746). */
+  listActivityWatchedDispatches(): { id: string; assignee_handle: string }[] {
+    return this.db
+      .prepare(
+        `SELECT id, assignee_handle FROM dispatch_contexts
+         WHERE status = 'dispatched' AND assignee_handle IS NOT NULL`
+      )
+      .all() as { id: string; assignee_handle: string }[]
+  }
+
+  // Why: monotonic, and only while dispatched — a late observation must not revive a finished attempt.
+  recordDispatchActivity(dispatchId: string, at: string): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts SET last_activity_at = ?
+         WHERE id = ? AND status = 'dispatched'
+           AND (last_activity_at IS NULL OR julianday(last_activity_at) < julianday(?))`
+      )
+      .run(at, dispatchId, at)
   }
 
   /**

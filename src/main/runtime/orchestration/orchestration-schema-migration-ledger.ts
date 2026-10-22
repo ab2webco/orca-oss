@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 35
+export const ORCHESTRATION_SCHEMA_VERSION = 36
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -138,5 +138,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     lineage: 'lab',
     summary: 'member model seen by its own hooks, kept per dispatch (ORCA-653)',
     effects: ['column:worker_dispatches.observed_model']
+  },
+  {
+    version: 36,
+    lineage: 'lab',
+    summary: 'host-observed worker activity per dispatch (ORCA-746)',
+    effects: ['column:dispatch_contexts.last_activity_at']
   }
 ]

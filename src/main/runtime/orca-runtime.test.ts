@@ -2700,6 +2700,51 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it("records a live dispatch's terminal output as its activity, and leaves an unknown terminal unknown (ORCA-746)", async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const db = new OrchestrationDb(':memory:')
+    runtime.setOrchestrationDb(db)
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: 'tab-1',
+          worktreeId: 'repo-1::/tmp/worktree-a',
+          title: 'Codex',
+          activeLeafId: 'pane:1',
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: 'tab-1',
+          worktreeId: 'repo-1::/tmp/worktree-a',
+          leafId: 'pane:1',
+          paneRuntimeId: 1,
+          ptyId: 'pty-1'
+        }
+      ]
+    })
+    const outputAt = Date.parse('2026-10-22T11:58:00.000Z')
+    runtime.onPtyData('pty-1', 'compiling\n', outputAt)
+    const handle = (await runtime.listTerminals('branch:feature/foo')).terminals[0].handle
+    const live = db.createDispatchContext(db.createTask({ spec: 'live' }).id, handle)
+    const unknown = db.createDispatchContext(db.createTask({ spec: 'gone' }).id, 'term_gone')
+
+    try {
+      runtime.ensureOrchestrationDispatchDeadlineMonitor()
+
+      expect(db.getDispatchContextById(live.id)?.last_activity_at).toBe(
+        new Date(outputAt).toISOString()
+      )
+      expect(db.getDispatchContextById(unknown.id)?.last_activity_at).toBeNull()
+    } finally {
+      db.completeDispatch(live.id)
+      db.completeDispatch(unknown.id)
+      db.close()
+    }
+  })
+
   it('routes a launch-draft resolution to the handle-owning local and remote renderers', async () => {
     const runtime = new OrcaRuntimeService(store)
     const nativeChatLaunchDraftResolved = vi.fn()
