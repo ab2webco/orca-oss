@@ -54,6 +54,19 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game open-link https://github.com/o/r/pulls']
   },
   {
+    path: ['game', 'view'],
+    summary: 'Store the Agent Teams game view for this project or every project',
+    usage: 'orca game view <off|flat|zen|2d-classic|2d-hd> --scope <project|global> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'view', 'scope'],
+    positionalArgs: ['view'],
+    notes: [
+      "--scope project stores it for the calling pane's repo on this machine (Settings → the project); global stores it for every project.",
+      "A view is stored as orchestratorGame.mode and render; orca.yaml is never written. For every project, a project's own setting (this machine or orca.yaml) still wins.",
+      "One pane alone changes with the game's /orca-game:view; an older host refuses this command."
+    ],
+    examples: ['orca game view flat --scope project', 'orca game view 2d-hd --scope global --json']
+  },
+  {
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own child worktree, as this project's lead",
     usage:

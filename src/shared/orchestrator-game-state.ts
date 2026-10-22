@@ -2,6 +2,7 @@ import type { AgentStatusState } from './agent-status-types'
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
+import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameProjectWork } from './orchestrator-game-project-work'
@@ -106,6 +107,10 @@ export type OrchestratorGameState = {
   agents: GameAgent[]
   review: GameReview | null
   workItem: GameWorkItem | null
+  /** The scopes `orca game view` can store a view in for this pane; absent from an older host. */
+  viewScopes?: OrchestratorGameViewScope[]
+  /** The view this host's resources suggest; absent from an older host or with no reading. */
+  suggestedView?: OrchestratorGameViewId
   /** Optional on the wire: a host older than plugin scenes sends none. */
   extensions?: { scenes: OrchestratorGameSceneExtension[] }
   /** Optional on the wire: a host older than game links sends none. */

@@ -39,7 +39,10 @@ import {
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
-import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
+import {
+  shownOrchestratorGameModeOf,
+  type OrchestratorGameViewId
+} from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
@@ -109,6 +112,8 @@ export type OrchestratorGameStateInput = {
   readStop?: () => Promise<GameStop | null>
   /** The project's inboxes; read only for a lead. */
   readInboxes?: () => Promise<GameInboxSummary[]>
+  /** The view the host's resources suggest; absent leaves `suggestedView` out. */
+  suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -170,7 +175,7 @@ export async function buildOrchestratorGameState(
   const tracker = resolved.config.tracker && input.worktree !== null
   const readScenes = input.readScenes
   const { readStop, readInboxes, readLeadElsewhere } = input
-  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere] =
+  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere, suggested] =
     await Promise.all([
       input.worktree ? settle(input.readReview) : Promise.resolve(null),
       tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -179,7 +184,8 @@ export async function buildOrchestratorGameState(
       readSceneFile(resolved, input.worktree),
       readStop ? settleGameStop(readStop) : Promise.resolve(null),
       readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null),
-      readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null)
+      readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
+      input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null)
     ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -294,6 +300,8 @@ export async function buildOrchestratorGameState(
     agents,
     lead,
     role,
+    viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
+    ...(suggested ? { suggestedView: suggested } : {}),
     ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
     review: gameReview,
     workItem,

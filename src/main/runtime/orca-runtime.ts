@@ -663,6 +663,15 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { createGameSuggestedView } from './orchestrator-game-suggested-view'
+import {
+  orchestratorGameViewSettingsOf,
+  type OrchestratorGameViewWrite
+} from '../../shared/orchestrator-game-view-settings'
+import type {
+  OrchestratorGameViewId,
+  OrchestratorGameViewScope
+} from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
 import {
@@ -3662,6 +3671,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameSuggestedView = createGameSuggestedView()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
     read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
@@ -30437,6 +30447,27 @@ export class OrcaRuntimeService {
     return { opened: true }
   }
 
+  /** Stores a game view for the caller's repo on this machine or for every project; Settings shows it live. */
+  async setOrchestratorGameView(args: {
+    view: OrchestratorGameViewId
+    scope: OrchestratorGameViewScope
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<OrchestratorGameViewWrite> {
+    if (!this.store?.getSettings || !this.store.updateSettings) {
+      throw new Error('runtime_unavailable')
+    }
+    const { key } = await this.gameHistoryProjectOf(args)
+    const repoId = key.startsWith('repo:') ? key.slice('repo:'.length) : null
+    const updates = orchestratorGameViewSettingsOf(this.store.getSettings(), { ...args, repoId })
+    this.store.updateSettings(updates, { notifyListeners: true })
+    return {
+      view: args.view,
+      scope: args.scope,
+      layer: args.scope === 'global' ? 'global' : 'local'
+    }
+  }
+
   // Why the lead's repo: history is the project's, kept on this Orca host for local, SSH and folder repos alike.
   private async gameHistoryProjectOf(args: {
     worktreeId?: string
@@ -30937,6 +30968,7 @@ export class OrcaRuntimeService {
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
+      suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
       readInboxes: () =>

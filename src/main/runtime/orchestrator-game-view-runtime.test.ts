@@ -1,0 +1,52 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { OrcaRuntimeService } from './orca-runtime'
+import type { GlobalSettings } from '../../shared/types'
+
+type GameSettings = Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>>
+
+function runtimeWith(settings: GameSettings) {
+  const writes: [GameSettings, unknown][] = []
+  const runtime = new OrcaRuntimeService({
+    getSettings: () => settings,
+    updateSettings: (updates: GameSettings, options: unknown) => {
+      writes.push([updates, options])
+    }
+  } as never)
+  vi.spyOn(runtime, 'getResolvedWorktreeMap').mockResolvedValue(
+    new Map([['w1', { id: 'w1', repoId: 'r1' }]]) as never
+  )
+  return { runtime, writes }
+}
+
+describe('storing a game view through the runtime', () => {
+  it("writes the caller repo's own layer and tells every Settings window", async () => {
+    const { runtime, writes } = runtimeWith({ orchestratorGame: { render: 'hd' } })
+
+    await expect(
+      runtime.setOrchestratorGameView({ view: 'flat', scope: 'project', worktreeId: 'w1' })
+    ).resolves.toEqual({ view: 'flat', scope: 'project', layer: 'local' })
+    expect(writes).toEqual([
+      [{ orchestratorGameProjects: { r1: { mode: 'flat' } } }, { notifyListeners: true }]
+    ])
+  })
+
+  it('writes every project without needing a worktree', async () => {
+    const { runtime, writes } = runtimeWith({})
+
+    await runtime.setOrchestratorGameView({ view: '2d-hd', scope: 'global' })
+
+    expect(writes).toEqual([
+      [{ orchestratorGame: { mode: 'on', render: 'hd' } }, { notifyListeners: true }]
+    ])
+  })
+
+  it('refuses this project for a pane outside any repo and writes nothing', async () => {
+    const { runtime, writes } = runtimeWith({})
+
+    await expect(
+      runtime.setOrchestratorGameView({ view: 'zen', scope: 'project', worktreeId: 'gone' })
+    ).rejects.toThrow(/no project/)
+    expect(writes).toEqual([])
+  })
+})

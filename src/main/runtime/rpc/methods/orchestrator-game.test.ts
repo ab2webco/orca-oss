@@ -297,3 +297,29 @@ describe('game.memberNameReserve RPC', () => {
     expect(asked).toEqual([params])
   })
 })
+
+describe('game.setView RPC', () => {
+  it('stores a known view for a known scope and refuses anything else', async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      setOrchestratorGameView: async (args: unknown) => {
+        calls.push(args)
+        return { view: 'flat', scope: 'global', layer: 'global' }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const set = (params: unknown) =>
+      dispatcher.dispatch({ id: 'v', authToken: 'test', method: 'game.setView', params })
+
+    await expect(set({ view: 'flat', scope: 'global', worktreeId: 'w1' })).resolves.toMatchObject({
+      ok: true,
+      result: { view: 'flat', layer: 'global' }
+    })
+    await expect(set({ view: '3d-band', scope: 'global' })).resolves.toMatchObject({ ok: false })
+    await expect(set({ view: 'flat', scope: 'pane' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      { view: 'flat', scope: 'global', worktreeId: 'w1', terminalHandle: undefined }
+    ])
+  })
+})

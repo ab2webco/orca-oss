@@ -18,6 +18,14 @@ export const ORCHESTRATOR_GAME_VIEWS: readonly OrchestratorGameView[] = [
   { id: '2d-hd', cost: 'heavy' }
 ]
 
+/** Where a view is stored beyond the pane: this repo on this machine, or every project. */
+export type OrchestratorGameViewScope = 'project' | 'global'
+
+export const ORCHESTRATOR_GAME_VIEW_SCOPES: readonly OrchestratorGameViewScope[] = [
+  'project',
+  'global'
+]
+
 type ViewLook = { mode: OrchestratorGameMode; render: OrchestratorGameRender }
 
 export const isOrchestratorGameViewId = (value: unknown): value is OrchestratorGameViewId =>
