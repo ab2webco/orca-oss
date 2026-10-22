@@ -49,7 +49,21 @@ const NODE_REPO = {
   }),
   'pnpm-lock.yaml': 'lockfileVersion: 9.0',
   'scripts/release.mjs': 'console.info(1)',
-  'scripts/notes.md': '# notes'
+  'scripts/notes.md': '# notes',
+  '.github/workflows/ci.yml': [
+    'jobs:',
+    '  verify:',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '      - name: Install',
+    '        run: pnpm install --frozen-lockfile',
+    '      - run: pnpm test',
+    '      - name: Deploy',
+    '        run: deploy ${{ secrets.TOKEN }}',
+    '  e2e:',
+    '    steps:',
+    '      - run: pnpm test'
+  ].join('\n')
 }
 
 const RUBY_REPO = {
@@ -77,7 +91,21 @@ const PYTHON_REPO = {
   'pyproject.toml': '[project]\nname = "app"',
   Makefile: ['install:', '\tpip install -e .', 'test:', '\tpytest'].join('\n'),
   'scripts/format.py': 'import black',
-  'scripts/bootstrap.sh': 'python3 -m venv .venv'
+  'scripts/bootstrap.sh': 'python3 -m venv .venv',
+  '.gitlab-ci.yml': [
+    'stages: [test]',
+    'variables:',
+    '  PIP_CACHE_DIR: .cache',
+    '.base:',
+    '  image: python:3.12',
+    'unit-tests:',
+    '  stage: test',
+    '  script:',
+    '    - pip install -r requirements.txt',
+    '    - pytest -q',
+    'lint:',
+    '  script: ruff check .'
+  ].join('\n')
 }
 
 const MAKE_REPO = {
@@ -132,7 +160,7 @@ const MAKE_REPO = {
 }
 
 describe('detectProjectCommands', () => {
-  it('detects a node repo: package scripts with its package manager and scripts/', async () => {
+  it('detects a node repo: package scripts with its package manager, scripts/ and CI steps', async () => {
     const candidates = await detectProjectCommands(memoryRepo(NODE_REPO))
 
     expect(candidates).toEqual([
@@ -170,6 +198,20 @@ describe('detectProjectCommands', () => {
         label: 'Release',
         run: 'node scripts/release.mjs',
         slashCommand: 'release'
+      },
+      {
+        source: 'github-actions',
+        file: '.github/workflows/ci.yml',
+        label: 'Install',
+        run: 'pnpm install --frozen-lockfile',
+        slashCommand: 'install'
+      },
+      {
+        source: 'github-actions',
+        file: '.github/workflows/ci.yml',
+        label: 'Verify',
+        run: 'pnpm test',
+        slashCommand: 'verify'
       }
     ])
   })
@@ -188,14 +230,15 @@ describe('detectProjectCommands', () => {
     ])
   })
 
-  it('detects a python repo: Makefile targets and scripts/ by interpreter', async () => {
+  it('detects a python repo: Makefile targets, scripts/ by interpreter and single-line GitLab CI jobs', async () => {
     const candidates = await detectProjectCommands(memoryRepo(PYTHON_REPO))
 
     expect(candidates.map(({ source, file, run, label }) => [source, file, run, label])).toEqual([
       ['makefile', 'Makefile', 'make install', 'Install'],
       ['makefile', 'Makefile', 'make test', 'Test'],
       ['scripts', 'scripts/bootstrap.sh', 'bash scripts/bootstrap.sh', 'Bootstrap'],
-      ['scripts', 'scripts/format.py', 'python3 scripts/format.py', 'Format']
+      ['scripts', 'scripts/format.py', 'python3 scripts/format.py', 'Format'],
+      ['gitlab-ci', '.gitlab-ci.yml', 'ruff check .', 'Lint']
     ])
   })
 
@@ -215,6 +258,80 @@ describe('detectProjectCommands', () => {
     ])
   })
 
+  it('skips CI steps that would run elsewhere or in another shell from the repo root', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.github/workflows/web.yml': [
+          'jobs:',
+          '  root:',
+          '    steps:',
+          '      - run: make check',
+          '      - run: npm test',
+          '        working-directory: web',
+          '      - run: Get-ChildItem',
+          '        shell: pwsh',
+          '      - run: make root-again',
+          '        shell: bash',
+          '  nested:',
+          '    defaults:',
+          '      run:',
+          '        working-directory: api',
+          '    steps:',
+          '      - run: go test ./...',
+          '  windows:',
+          '    defaults:',
+          '      run:',
+          '        shell: cmd',
+          '    steps:',
+          '      - run: dir'
+        ].join('\n'),
+        '.github/workflows/moved.yml': [
+          'defaults:',
+          '  run:',
+          '    working-directory: docs',
+          'jobs:',
+          '  build:',
+          '    steps:',
+          '      - run: mkdocs build'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map((candidate) => candidate.run)).toEqual(['make check', 'make root-again'])
+  })
+
+  it.each([
+    ['a multi-line script', ['npm ci', 'npm test']],
+    ['a $CI_ variable', ['docker build -t $CI_REGISTRY_IMAGE .']],
+    ['a ${CI_} variable', ['docker push registry/app:${CI_COMMIT_SHA}']],
+    ['sudo', ['sudo apt-get install -y libpq-dev']]
+  ])('skips a GitLab job whose script has %s', async (_case, script) => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({ '.gitlab-ci.yml': JSON.stringify({ job: { script } }) })
+    )
+
+    expect(candidates).toEqual([])
+  })
+
+  it('keeps a GitLab job whose script is one plain line', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.gitlab-ci.yml': [
+          'test:',
+          '  script:',
+          '    - npm test',
+          'lint:',
+          '  script: npm run lint'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map(({ run, label }) => [run, label])).toEqual([
+      ['npm test', 'Test'],
+      ['npm run lint', 'Lint']
+    ])
+  })
+
   it('keeps one candidate per source when two sources name the same command', async () => {
     const candidates = await detectProjectCommands(
       memoryRepo({
@@ -227,6 +344,53 @@ describe('detectProjectCommands', () => {
       ['package-json', 'npm run test'],
       ['makefile', 'make test']
     ])
+  })
+
+  it('gives a later source its own slash command when two sources name the same command', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        'package.json': JSON.stringify({
+          scripts: { test: 'jest', 'check-everything-includi': 'x' }
+        }),
+        Makefile: 'test:\n\tnpm test\ncheck-everything-includi:\n\ttrue',
+        justfile: 'test:\n  cargo test'
+      })
+    )
+
+    expect(candidates.map(({ run, slashCommand }) => [run, slashCommand])).toEqual([
+      ['npm run test', 'test'],
+      ['npm run check-everything-includi', 'check-everything-includi'],
+      ['make test', 'make-test'],
+      ['make check-everything-includi', 'make-check-everything-in'],
+      ['just test', 'just-test']
+    ])
+  })
+
+  it('numbers slash commands that still collide, including names that fall back to run', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.github/workflows/ci.yml': [
+          'jobs:',
+          '  build:',
+          '    steps:',
+          '      - name: 🚀',
+          '        run: make ship',
+          '      - name: ✅',
+          '        run: make verify',
+          '      - name: 🔥',
+          '        run: make burn'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map(({ run, slashCommand }) => [run, slashCommand])).toEqual([
+      ['make ship', 'run'],
+      ['make verify', 'github-run'],
+      ['make burn', 'github-run-2']
+    ])
+    for (const candidate of candidates) {
+      expect(candidate.slashCommand).toMatch(GAME_ACTION_COMMAND)
+    }
   })
 
   it('uses npm run when lockfiles from two package managers disagree', async () => {
@@ -305,10 +469,53 @@ describe('detectProjectCommands', () => {
     ])
   })
 
-  it('ignores files over the import size limit', async () => {
+  it('spreads the CI cap across workflow files and skips CI-only plumbing', async () => {
+    const steps = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => `      - run: ${prefix} ${index}`)
     const candidates = await detectProjectCommands(
       memoryRepo({
-        Makefile: `test:\n${'#'.repeat(300 * 1024)}`
+        '.github/workflows/a-release.yml': [
+          'jobs:',
+          '  r:',
+          '    steps:',
+          ...steps(30, 'release')
+        ].join('\n'),
+        '.github/workflows/ci.yml': [
+          'jobs:',
+          '  test:',
+          '    steps:',
+          '      - run: sudo apt-get install -y libpq-dev',
+          '      - run: |',
+          '          set -euo pipefail',
+          '          echo "$TAG"',
+          '      - run: npm test',
+          '  win:',
+          '    runs-on: windows-latest',
+          '    steps:',
+          '      - run: dir',
+          '  win-bash:',
+          '    runs-on: [self-hosted, windows]',
+          '    defaults:',
+          '      run:',
+          '        shell: bash',
+          '    steps:',
+          '      - run: make win'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.filter((c) => c.file.endsWith('a-release.yml'))).toHaveLength(5)
+    expect(
+      candidates.filter((c) => c.file.endsWith('ci.yml')).map((candidate) => candidate.run)
+    ).toEqual(['npm test', 'make win'])
+  })
+
+  it('ignores files over the import size limit and unparsable CI', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        Makefile: `test:\n${'#'.repeat(300 * 1024)}`,
+        '.github/workflows/broken.yml': 'jobs: [unclosed',
+        '.gitlab-ci.yml': '- not a mapping'
       })
     )
 

@@ -1,5 +1,6 @@
 import { GAME_ACTION_COMMAND } from './orchestrator-game-actions'
 import { GAME_LINK_LABEL_MAX } from './orchestrator-game-integrations'
+import { parseGithubWorkflowCommands, parseGitlabCiCommands } from './project-command-ci-parsers'
 import {
   parseJustfileRecipes,
   parseMakefileTargets,
@@ -19,6 +20,8 @@ export type ProjectCommandSource =
   | 'rakefile'
   | 'bin'
   | 'scripts'
+  | 'github-actions'
+  | 'gitlab-ci'
 
 /** A command found in the repo. `run` is shell text shown as-is; `slashCommand` already fits the actions schema. */
 export type ProjectCommandCandidate = {
@@ -32,6 +35,8 @@ export type ProjectCommandCandidate = {
 const MAX_CANDIDATES_PER_SOURCE = 20
 const MAX_DIR_ENTRIES = 200
 const MAX_RUN_LENGTH = 1000
+// Why: GAME_ACTION_COMMAND accepts at most 24 characters.
+const SLASH_COMMAND_MAX = 24
 // Why: make and rake look these names up in this order; listing the root keeps case-insensitive disks from matching twice.
 const MAKEFILE_NAMES = ['GNUmakefile', 'makefile', 'Makefile']
 const JUSTFILE_NAMES = ['justfile', 'Justfile', 'JUSTFILE', '.justfile']
@@ -66,6 +71,8 @@ const EVERYDAY_PACKAGE_SCRIPTS = [
   'format',
   'check'
 ]
+// Why: one busy release workflow must not crowd out the CI workflow people actually mirror.
+const MAX_CANDIDATES_PER_WORKFLOW = 5
 // Why: these characters survive both sh and cmd unquoted, so the name is never rewritten or escaped.
 const SHELL_SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9:._/@+-]*$/
 const SCRIPT_RUNNERS: Readonly<Record<string, string>> = {
@@ -107,9 +114,43 @@ export async function detectProjectCommands(
       return parseRakefileTasks(content).map((task) => ({ name: task, run: `${rake} ${task}` }))
     }),
     detectDirectoryScripts(reader, 'bin'),
-    detectDirectoryScripts(reader, 'scripts')
+    detectDirectoryScripts(reader, 'scripts'),
+    detectGithubWorkflows(readFile, reader),
+    detectFromFile(readFile, firstPresent(['.gitlab-ci.yml']), 'gitlab-ci', parseGitlabCiCommands)
   ])
-  return groups.flat()
+  return withUniqueSlashCommands(groups.flat())
+}
+
+const SLASH_COMMAND_SOURCE_PREFIX: Readonly<Record<ProjectCommandSource, string>> = {
+  'package-json': 'package',
+  makefile: 'make',
+  justfile: 'just',
+  rakefile: 'rake',
+  bin: 'bin',
+  scripts: 'scripts',
+  'github-actions': 'github',
+  'gitlab-ci': 'gitlab'
+}
+
+// Why: one slash command must name one candidate; the first in source order keeps the plain name.
+function withUniqueSlashCommands(candidates: ProjectCommandCandidate[]): ProjectCommandCandidate[] {
+  const taken = new Set<string>()
+  return candidates.map((candidate) => {
+    let command = candidate.slashCommand
+    if (taken.has(command)) {
+      const prefixed = `${SLASH_COMMAND_SOURCE_PREFIX[candidate.source]}-${command}`
+      command = fitSlashCommand(prefixed, '')
+      for (let n = 2; taken.has(command); n++) {
+        command = fitSlashCommand(prefixed, `-${n}`)
+      }
+    }
+    taken.add(command)
+    return command === candidate.slashCommand ? candidate : { ...candidate, slashCommand: command }
+  })
+}
+
+function fitSlashCommand(base: string, suffix: string): string {
+  return `${base.slice(0, SLASH_COMMAND_MAX - suffix.length).replace(/-+$/, '')}${suffix}`
 }
 
 type NamedRun = { name: string; run: string }
@@ -195,6 +236,28 @@ async function detectDirectoryScripts(
   return toCandidates(dir, runs)
 }
 
+async function detectGithubWorkflows(
+  readFile: (path: string) => Promise<string | null>,
+  reader: ProjectFileReader
+): Promise<ProjectCommandCandidate[]> {
+  const workflowDir = '.github/workflows'
+  const entries = (await reader.readDir(workflowDir)) ?? []
+  const workflowFiles = entries
+    .slice(0, MAX_DIR_ENTRIES)
+    .filter((entry) => !entry.isDirectory && /\.ya?ml$/.test(entry.name))
+    .map((entry) => `${workflowDir}/${entry.name}`)
+    .toSorted()
+  const runs: (NamedRun & { file: string })[] = []
+  for (const file of workflowFiles) {
+    const content = await readFile(file)
+    if (content !== null) {
+      const commands = parseGithubWorkflowCommands(content).slice(0, MAX_CANDIDATES_PER_WORKFLOW)
+      runs.push(...commands.map((command) => ({ ...command, file })))
+    }
+  }
+  return toCandidates('github-actions', runs)
+}
+
 function toCandidates(
   source: ProjectCommandSource,
   runs: (NamedRun & { file: string })[]
@@ -231,6 +294,6 @@ function toSlashCommand(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   const prefixed = /^[a-z]/.test(slug) ? slug : `run-${slug}`
-  const command = prefixed.slice(0, 24).replace(/-+$/, '')
+  const command = fitSlashCommand(prefixed, '')
   return GAME_ACTION_COMMAND.test(command) ? command : 'run'
 }
