@@ -215,6 +215,20 @@ describe('dispatch first-signal deadline (ORCA-191)', () => {
     expect(expired.reason).not.toContain('started a turn after the submit')
   })
 
+  // Why (ORCA-754): the injector now presses Enter again on a pane it watches,
+  // so "did not resend it" would be false; what it never does is re-type it.
+  it('says the preamble was never re-typed, only Enter pressed again', () => {
+    const d = createDb()
+    const run = createRun(d)
+    startReadyWorker(d, { runId: run.id })
+
+    const [expired] = expireDueDispatchDeadlines(d, fakeNotifier(), pastDeadline())
+
+    expect(expired.reason).not.toContain('did not resend it')
+    expect(expired.reason).toContain('never re-typed it')
+    expect(expired.reason).toContain('Enter')
+  })
+
   it('says the agent started a turn when acceptance was observed', () => {
     const d = createDb()
     const run = createRun(d)

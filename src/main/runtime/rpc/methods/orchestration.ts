@@ -32,6 +32,7 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
+import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
 import {
@@ -1475,9 +1476,11 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // `AgentComposerReadinessTracker.wait`.
         const composerReady = await runtime.waitForAgentComposerReady(to)
         let pendingAcceptance: Promise<AgentTurnAcceptance>
+        let submit: AgentPromptSubmitProbe | null
         try {
           const sent = await runtime.sendTerminalAgentPromptObservingTurn(to, preamble)
           pendingAcceptance = sent.turnAcceptance
+          submit = sent.submit
           injected = true
         } catch (err) {
           db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
@@ -1489,11 +1492,11 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         db.armDispatchLifecycleDeadline(ctx.id)
         db.recordDispatchComposerReadiness(ctx.id, composerReady.proven)
         runtime.ensureOrchestrationDispatchDeadlineMonitor()
-        // Why: not awaited. Turn acceptance changes nothing about this dispatch
-        // — no refusal, no resend — so holding the RPC open for it would only
+        // Why: not awaited. Turn acceptance never refuses, and its Enter retry
+        // (ORCA-754) runs after the write, so holding the RPC open would only
         // add latency. It lands on the dispatch row, where `dispatch show`
         // reads it and the deadline's failure reason uses it.
-        recordTurnAcceptanceInBackground(db, ctx.id, pendingAcceptance)
+        void recordTurnAcceptanceInBackground(db, ctx.id, pendingAcceptance, submit)
       }
 
       // Why: returnPreamble is opt-in because the preamble is several hundred bytes most callers don't need in the response.

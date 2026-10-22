@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrchestrationDb } from './db'
 import { Coordinator, type CoordinatorRuntime } from './coordinator'
+import { DISPATCH_SUBMIT_RETRY_AFTER_MS } from './dispatch-submit-retry'
 
 /**
  * The in-process coordinator loop's dispatch path (ORCA-191 slice 2).
@@ -194,5 +195,35 @@ describe('Coordinator dispatch lifecycle (ORCA-191)', () => {
     expect(db.getTask(taskId)?.status).toBe('dispatched')
     expect(db.getDispatchContext(taskId)?.turn_accepted_at).toBeNull()
     expect(db.countArmedDispatchDeadlines()).toBe(1)
+  })
+
+  // Why (ORCA-754): the miss above may be a dropped CR. The preamble is still
+  // written once; only Enter is pressed again, on a pane the runtime watches.
+  it('presses Enter again, never the preamble, when the agent never took the submit', async () => {
+    db = new OrchestrationDb(':memory:')
+    let pressed = 0
+    const runtime = createRuntime({ turnAccepted: false })
+    const send = runtime.sendTerminalAgentPromptObservingTurn!.bind(runtime)
+    runtime.sendTerminalAgentPromptObservingTurn = async (handle, prompt) => ({
+      ...(await send(handle, prompt)),
+      submit: {
+        state: () => (pressed > 0 ? 'turn-seen' : 'awaiting-turn'),
+        pressEnter: async () => {
+          pressed += 1
+          return true
+        }
+      }
+    })
+    vi.useFakeTimers()
+    try {
+      const { taskId } = await dispatchOnce(runtime, db)
+      await vi.advanceTimersByTimeAsync(DISPATCH_SUBMIT_RETRY_AFTER_MS * 2)
+
+      expect(runtime.sent).toHaveLength(1)
+      expect(pressed).toBe(1)
+      expect(db.getDispatchContext(taskId)?.turn_accepted_at).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

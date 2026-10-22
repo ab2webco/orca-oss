@@ -2,6 +2,7 @@
 import type { OrchestrationDb } from './db'
 import type { MessageRow, TaskRow, CoordinatorStatus } from './types'
 import type { AgentTurnAcceptance } from '../agent-composer-readiness'
+import type { AgentPromptSubmitProbe } from '../agent-prompt-submit-probe'
 import { buildDispatchPreamble } from './preamble'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 import { DISPATCH_STALE_THRESHOLD_MS } from './dispatch-lifecycle-deadline'
@@ -24,7 +25,10 @@ export type CoordinatorRuntime = {
   sendTerminalAgentPromptObservingTurn?(
     handle: string,
     prompt: string
-  ): Promise<{ turnAcceptance: Promise<AgentTurnAcceptance> }>
+  ): Promise<{
+    turnAcceptance: Promise<AgentTurnAcceptance>
+    submit?: AgentPromptSubmitProbe | null
+  }>
   getOrchestrationDispatchAuthority?(handle: string): {
     paneKey: string | null
     processIncarnation: string | null
@@ -505,6 +509,7 @@ export class Coordinator {
     }
 
     let pendingAcceptance: Promise<AgentTurnAcceptance> | null = null
+    let submit: AgentPromptSubmitProbe | null = null
     try {
       if (this.runtime.sendTerminalAgentPromptObservingTurn) {
         const sent = await this.runtime.sendTerminalAgentPromptObservingTurn(
@@ -512,6 +517,7 @@ export class Coordinator {
           preamble + gateContext
         )
         pendingAcceptance = sent.turnAcceptance
+        submit = sent.submit ?? null
       } else {
         await this.runtime.sendTerminalAgentPrompt(targetHandle, preamble + gateContext)
       }
@@ -535,7 +541,7 @@ export class Coordinator {
       this.runtime.ensureOrchestrationDispatchDeadlineMonitor?.()
     }
     if (pendingAcceptance) {
-      void recordTurnAcceptanceInBackground(this.db, dispatch.id, pendingAcceptance)
+      void recordTurnAcceptanceInBackground(this.db, dispatch.id, pendingAcceptance, submit)
     }
 
     this.opts.onLog(`Dispatched task ${task.id} to ${targetHandle}`)
