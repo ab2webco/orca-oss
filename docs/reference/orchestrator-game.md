@@ -798,6 +798,8 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   keeps the 11-minute first-signal deadline from failing the dispatch. After it, Orca records the
   member's `last_activity_at` every 30 s from its agent hooks (or terminal output when the agent
   has none), and the coordinator's stale warning reads heartbeat or activity, once per stale spell.
+  A federated or SSH-relayed member whose PTY is not on this host has no local activity, so it is
+  warned as stale 10 minutes after its last heartbeat: a warning only, never a failure.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,
