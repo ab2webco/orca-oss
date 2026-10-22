@@ -68,9 +68,18 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `  Run ${run('game resume')} only when the person says to resume; it relaunches nothing.`,
     `  To stop one member, ${run('game stop <ticket>')}.`,
     `- After Orca or the machine restarts, ${run('game fleet')} lists the members that were working as paused.`,
-    '  Ask the person once, naming them ("3 members were working; resume them?"). On yes run',
-    `  ${run('game resume-members')}: each reopens its own conversation, or restarts on its task, in its worktree.`,
-    `  On no, ${run('game resume-members --discard')} frees them; never \`game launch\` a paused ticket.`,
+    ...(lead.askBeforeResume === true
+      ? [
+          '  Ask the person once, naming them ("3 members were working; resume them?"). On yes run',
+          `  ${run('game resume-members')}: each reopens its own conversation, or restarts on its task, in its worktree.`,
+          `  On no, ${run('game resume-members --discard')} frees them; never \`game launch\` a paused ticket.`
+        ]
+      : [
+          `  run ${run('game resume-members')} at once, without asking: each reopens its own conversation, or restarts`,
+          '  on its task, in its worktree. Then tell the person in one line who resumed and who could not.',
+          `  Only when the person says to drop them, ${run('game resume-members --discard')} frees them;`,
+          '  never `game launch` a paused ticket.'
+        ]),
     `- Asked "qué pasó" / what happened, read ${run('game events')} and ${run('game inbox')} first`,
     '  (claims, PRs, merges, QA handoffs, parked questions, failures, stop and resume, and the mail',
     '  members left, even closed ones); `--ticket` narrows both. Answer from them, not from memory.',

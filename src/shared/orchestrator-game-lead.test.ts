@@ -14,6 +14,7 @@ describe('parseGameLead', () => {
     expect(
       parseGameLead({
         autostart: true,
+        askBeforeResume: true,
         cap: 3,
         agent: ' claude ',
         model: 'opus',
@@ -26,6 +27,7 @@ describe('parseGameLead', () => {
     ).toEqual({
       value: {
         autostart: true,
+        askBeforeResume: true,
         cap: 3,
         agent: 'claude',
         model: 'opus',
@@ -76,6 +78,7 @@ describe('parseGameLead', () => {
   it('drops each bad key with a warning and keeps the rest', () => {
     const parsed = parseGameLead({
       autostart: 'yes',
+      askBeforeResume: 'no',
       cap: GAME_LEAD_CAP_MAX + 1,
       agent: 'Claude Code',
       launchPrompt: 'Do {ticket}',
@@ -87,6 +90,7 @@ describe('parseGameLead', () => {
     expect(parsed.value).toEqual({ label: 'Lead' })
     expect(parsed.warnings).toEqual([
       'orchestratorGame.orchestrator.autostart must be true or false',
+      'orchestratorGame.orchestrator.askBeforeResume must be true or false',
       `orchestratorGame.orchestrator.cap must be a whole number from 1 to ${GAME_LEAD_CAP_MAX}`,
       'orchestratorGame.orchestrator.agent must be an agent id like claude or codex',
       'orchestratorGame.orchestrator.launchPrompt uses an unknown placeholder {ticket}',

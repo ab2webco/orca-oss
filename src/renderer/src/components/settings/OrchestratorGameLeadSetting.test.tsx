@@ -116,6 +116,25 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     fromYaml.unmount()
   })
 
+  it('keeps asking before resuming paused members on this machine, off by default', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+    expect(view.container.textContent).toContain('Ask before resuming')
+    click(view.container, '[aria-label="Ask before resuming"] button', 'On')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { orchestrator: { askBeforeResume: true } } } }
+    ])
+    view.unmount()
+
+    const fromYaml = render({}, { orchestrator: { askBeforeResume: true } })
+    expect(fromYaml.container.textContent).toContain('On · from orca.yaml')
+    fromYaml.unmount()
+
+    const offInYaml = render({}, { orchestrator: { askBeforeResume: false } })
+    expect(offInYaml.container.textContent).toContain('Off · from orca.yaml')
+    offInYaml.unmount()
+  })
+
   it('spreads members over accounts automatically on this machine, default unless set', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({}, undefined, updates)

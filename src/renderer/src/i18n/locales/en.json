@@ -11400,6 +11400,7 @@
           "description": "The session that talks to you and launches one member per ticket. orca.yaml sets the project default; these override it on this machine.",
           "yamlOnly": "The launch prompt and the project's rules live in orca.yaml under orchestratorGame.orchestrator.",
           "actions": "Lead buttons",
+          "askBeforeResume": "Ask before resuming",
           "accounts": "Member accounts",
           "accountsDefault": "Orca's account",
           "accountsAuto": "Most free quota",
