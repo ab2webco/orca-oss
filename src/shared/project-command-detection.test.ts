@@ -230,7 +230,7 @@ describe('detectProjectCommands', () => {
     ])
   })
 
-  it('detects a python repo: Makefile targets, scripts/ by interpreter and GitLab CI jobs', async () => {
+  it('detects a python repo: Makefile targets, scripts/ by interpreter and single-line GitLab CI jobs', async () => {
     const candidates = await detectProjectCommands(memoryRepo(PYTHON_REPO))
 
     expect(candidates.map(({ source, file, run, label }) => [source, file, run, label])).toEqual([
@@ -238,7 +238,6 @@ describe('detectProjectCommands', () => {
       ['makefile', 'Makefile', 'make test', 'Test'],
       ['scripts', 'scripts/bootstrap.sh', 'bash scripts/bootstrap.sh', 'Bootstrap'],
       ['scripts', 'scripts/format.py', 'python3 scripts/format.py', 'Format'],
-      ['gitlab-ci', '.gitlab-ci.yml', 'pip install -r requirements.txt\npytest -q', 'Unit tests'],
       ['gitlab-ci', '.gitlab-ci.yml', 'ruff check .', 'Lint']
     ])
   })
@@ -299,6 +298,38 @@ describe('detectProjectCommands', () => {
     )
 
     expect(candidates.map((candidate) => candidate.run)).toEqual(['make check', 'make root-again'])
+  })
+
+  it.each([
+    ['a multi-line script', ['npm ci', 'npm test']],
+    ['a $CI_ variable', ['docker build -t $CI_REGISTRY_IMAGE .']],
+    ['a ${CI_} variable', ['docker push registry/app:${CI_COMMIT_SHA}']],
+    ['sudo', ['sudo apt-get install -y libpq-dev']]
+  ])('skips a GitLab job whose script has %s', async (_case, script) => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({ '.gitlab-ci.yml': JSON.stringify({ job: { script } }) })
+    )
+
+    expect(candidates).toEqual([])
+  })
+
+  it('keeps a GitLab job whose script is one plain line', async () => {
+    const candidates = await detectProjectCommands(
+      memoryRepo({
+        '.gitlab-ci.yml': [
+          'test:',
+          '  script:',
+          '    - npm test',
+          'lint:',
+          '  script: npm run lint'
+        ].join('\n')
+      })
+    )
+
+    expect(candidates.map(({ run, label }) => [run, label])).toEqual([
+      ['npm test', 'Test'],
+      ['npm run lint', 'Lint']
+    ])
   })
 
   it('keeps one candidate per source when two sources name the same command', async () => {

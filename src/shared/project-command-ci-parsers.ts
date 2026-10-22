@@ -96,7 +96,7 @@ const GITLAB_RESERVED_KEYS: ReadonlySet<string> = new Set([
   'workflow'
 ])
 
-/** One command per job: its `script` lines in order. Hidden `.template` jobs are skipped. */
+/** Jobs whose `script` is one line that runs as typed at the repo root. Hidden `.template` jobs are skipped. */
 export function parseGitlabCiCommands(content: string): CiCommand[] {
   const config = parseYamlRecord(content)
   if (!config) {
@@ -110,9 +110,12 @@ export function parseGitlabCiCommands(content: string): CiCommand[] {
     const lines = (Array.isArray(job.script) ? job.script : [job.script]).filter(
       (line): line is string => typeof line === 'string' && line.trim().length > 0
     )
-    if (lines.length > 0) {
-      commands.push({ name: jobName, run: lines.map((line) => line.trim()).join('\n') })
+    const run = lines.length === 1 ? lines[0].trim() : ''
+    // Why: same contract as GitHub steps; $CI_ variables only resolve inside GitLab, and multi-line and sudo jobs are CI plumbing.
+    if (run.length === 0 || run.includes('\n') || /\$\{?CI_/.test(run) || /^sudo\s/.test(run)) {
+      continue
     }
+    commands.push({ name: jobName, run })
   }
   return commands
 }
