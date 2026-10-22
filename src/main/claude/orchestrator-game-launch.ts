@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { compareAppVersions } from '../../shared/app-version'
 import type { ResolvedOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
+import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 import { isPluginUiLanguage, normalizeUiLanguage, type UiLanguage } from '../../shared/ui-language'
 import {
   DEFAULT_UI_LOCALE,
@@ -74,9 +75,10 @@ export function buildOrchestratorGameLaunch(args: {
   locale?: SupportedUiLocale
 }): OrchestratorGameLaunch {
   const { config } = args.resolved
+  const mode = shownOrchestratorGameModeOf(config)
   // Why: an unknown or older Claude Code would reject or ignore the mod; plain Claude is the safe launch.
   if (
-    config.mode === 'off' ||
+    mode === 'off' ||
     args.pluginDir === null ||
     args.claudeVersion === null ||
     compareAppVersions(args.claudeVersion, ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION) < 0
@@ -87,7 +89,7 @@ export function buildOrchestratorGameLaunch(args: {
     args: ['--plugin-dir', args.pluginDir],
     env: {
       ...(args.orcaCli ? { ORCA_GAME_CLI: args.orcaCli } : {}),
-      ORCA_GAME_MODE: config.mode,
+      ORCA_GAME_MODE: mode,
       ORCA_GAME_SCENE: config.scene,
       ORCA_GAME_HUD: config.hud ? '1' : '0',
       ORCA_GAME_REWARDS: config.rewards ? '1' : '0',

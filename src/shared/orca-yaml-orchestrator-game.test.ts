@@ -29,7 +29,7 @@ describe('parseOrcaYaml orchestratorGame', () => {
 
     expect(parsed?.orchestratorGame).toEqual({ hud: false })
     expect(parsed?.orchestratorGameWarnings).toEqual([
-      'orchestratorGame.mode must be one of on, zen, off'
+      'orchestratorGame.mode must be one of on, zen, flat, off'
     ])
   })
 

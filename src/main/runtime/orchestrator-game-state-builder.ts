@@ -39,6 +39,7 @@ import {
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
+import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
@@ -183,6 +184,7 @@ export async function buildOrchestratorGameState(
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
     ...resolved.config,
+    mode: shownOrchestratorGameModeOf(resolved.config),
     ...(sceneFile?.warning === undefined ? {} : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
     timezone: desktopGameTimezoneOf(resolved.config.timezone)
   }
@@ -269,7 +271,8 @@ export async function buildOrchestratorGameState(
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {
     config,
-    sources: resolved.sources,
+    // Why: a hidden game's mode comes from the layer that hid it, not the one that chose the view.
+    sources: config.show ? resolved.sources : { ...resolved.sources, mode: resolved.sources.show },
     // Why the scene file first: the mod's note shows only the first warning, and this one changes the art.
     warnings: [
       ...(sceneFile?.warning === undefined ? [] : [sceneFile.warning]),

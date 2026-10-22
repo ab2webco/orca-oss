@@ -29,9 +29,10 @@ import {
   parseOrchestratorGameSceneFile
 } from './orchestrator-game-scene-file'
 
-export type OrchestratorGameMode = 'on' | 'zen' | 'off'
+export type OrchestratorGameMode = 'on' | 'zen' | 'flat' | 'off'
 
-export const ORCHESTRATOR_GAME_MODES: readonly OrchestratorGameMode[] = ['on', 'zen', 'off']
+// Why flat last but off: a mod older than flat reads it as unknown and keeps its launch mode.
+export const ORCHESTRATOR_GAME_MODES: readonly OrchestratorGameMode[] = ['on', 'zen', 'flat', 'off']
 
 /** Where the game's links open: Orca's own browser, or the system's where the person is signed in. */
 export type OrchestratorGameOpenLinks = 'orca' | 'system'
@@ -40,6 +41,8 @@ export const ORCHESTRATOR_GAME_OPEN_LINKS: readonly OrchestratorGameOpenLinks[] 
 
 export type OrchestratorGameConfig = {
   mode: OrchestratorGameMode
+  /** Show the game: false hides it and keeps `mode` as the default view for when it returns. */
+  show: boolean
   scene: string
   hud: boolean
   rewards: boolean
@@ -89,6 +92,7 @@ export type OrchestratorGameBuiltInScene = (typeof ORCHESTRATOR_GAME_BUILT_IN_SC
 
 export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   mode: 'on',
+  show: true,
   scene: 'quest',
   hud: true,
   rewards: true,
@@ -271,7 +275,7 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       } else {
         warnings.push(checked.warning)
       }
-    } else if (key === 'hud' || key === 'rewards' || key === 'tracker') {
+    } else if (key === 'show' || key === 'hud' || key === 'rewards' || key === 'tracker') {
       if (typeof value === 'boolean') {
         layer[key] = value
       } else {

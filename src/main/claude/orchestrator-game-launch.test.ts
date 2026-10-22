@@ -37,6 +37,16 @@ describe('buildOrchestratorGameLaunch', () => {
     })
   })
 
+  it('hands a flat pane its mode', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({ project: { mode: 'flat' } }),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR
+    })
+
+    expect(launch.env.ORCA_GAME_MODE).toBe('flat')
+  })
+
   it('hands the game its render and the timezone its day and night follow', () => {
     const launch = buildOrchestratorGameLaunch({
       resolved: resolveOrchestratorGameConfig({
@@ -87,6 +97,12 @@ describe('buildOrchestratorGameLaunch', () => {
 
   it.each([
     ['the game is off', { global: { mode: 'off' as const } }, '2.1.301', PLUGIN_DIR],
+    [
+      'Show the game is off',
+      { global: { mode: 'zen' as const }, local: { show: false } },
+      '2.1.301',
+      PLUGIN_DIR
+    ],
     ['Claude Code is older than mods', {}, '2.1.286', PLUGIN_DIR],
     ['the Claude Code version is unknown', {}, null, PLUGIN_DIR],
     ['the plugin folder is missing', {}, '2.1.301', null]

@@ -10707,6 +10707,7 @@
           "mode": "Modo del juego",
           "on": "Activado",
           "zen": "Zen",
+          "flat": "Plano",
           "off": "Desactivado",
           "hud": "HUD del equipo",
           "hudDescription": "Muestra la banda de la flota sobre el prompt de Claude.",
