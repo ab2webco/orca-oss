@@ -35,7 +35,8 @@ const GameHistoryRecordParams = z.object({
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional(),
   memberWorktreeId: z.string().optional(),
-  record: GameHistoryRecordSchema
+  record: GameHistoryRecordSchema,
+  character: z.string().max(64).optional()
 })
 
 const memberText = z.string().min(1).max(200).optional()
@@ -86,6 +87,10 @@ const GameMemberNameReserveParams = z.object({
   taken: z.array(z.string().max(200)).max(500)
 })
 
+const GameCallerParams = z
+  .object({ worktreeId: z.string().optional(), terminalHandle: z.string().optional() })
+  .optional()
+
 const GameHistoryParams = z
   .object({
     worktreeId: z.string().optional(),
@@ -109,7 +114,8 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         memberWorktreeId: params.memberWorktreeId,
-        record: params.record
+        record: params.record,
+        character: params.character
       })
   }),
   defineMethod({
@@ -145,6 +151,15 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         tickets: params.tickets
+      })
+  }),
+  defineMethod({
+    name: 'game.lessons',
+    params: GameCallerParams,
+    handler: async (params, { runtime }) =>
+      runtime.listGameLessons({
+        worktreeId: params?.worktreeId,
+        terminalHandle: params?.terminalHandle
       })
   }),
   defineMethod({

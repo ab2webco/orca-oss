@@ -1,5 +1,7 @@
 /** What a project learned from its members' outcomes, handed to the next member it launches. */
 
+import type { GameHistoryOutcome, GameHistoryRecord } from './orchestrator-game-history'
+
 export const GAME_LESSON_KINDS = ['failure', 'achievement'] as const
 export type GameLessonKind = (typeof GAME_LESSON_KINDS)[number]
 
@@ -60,7 +62,7 @@ function cleanText(value: string, max: number): string {
     .replace(/<{2,}|>{2,}/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^#+\s*/, '')
+    .replace(/^#+\s+/, '')
     .slice(0, max)
     .trim()
 }
@@ -253,4 +255,35 @@ export function gameLessonBriefOf(
     lines.push(line)
   }
   return lines.length === 0 ? '' : [BLOCK_OPEN, BLOCK_NOTE, ...lines, BLOCK_CLOSE].join('\n')
+}
+
+// Why no `stopped`: the lead chose to stop it, which says nothing about the work.
+const LESSON_OF_OUTCOME: Partial<
+  Record<GameHistoryOutcome, { kind: GameLessonKind; what: (report: string | null) => string }>
+> = {
+  failed: { kind: 'failure', what: (report) => `Member ended failed: ${report ?? 'no report'}` },
+  limited: { kind: 'failure', what: () => 'Member hit its account limit before finishing' },
+  merged: { kind: 'achievement', what: (report) => `Merged: ${report ?? 'PR merged'}` },
+  qa: { kind: 'achievement', what: (report) => `Handed to QA: ${report ?? 'ticket in review'}` }
+}
+
+/** What a freed member teaches the project; null when its outcome teaches nothing. */
+export function gameLessonSignalOfHistory(
+  record: GameHistoryRecord,
+  project: string,
+  character: string | null
+): GameLessonSignal | null {
+  const lesson = LESSON_OF_OUTCOME[record.outcome]
+  if (!lesson) {
+    return null
+  }
+  return {
+    kind: lesson.kind,
+    project,
+    ticket: record.ticket,
+    character,
+    what: lesson.what(record.lastReport),
+    evidence: record.pr,
+    at: record.endedAt
+  }
 }

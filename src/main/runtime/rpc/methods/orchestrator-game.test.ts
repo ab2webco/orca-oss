@@ -142,6 +142,59 @@ describe('game.state RPC', () => {
       { worktreeId: undefined, terminalHandle: 'h1', ticket: 'CIN-1', since: '2026-10-01' }
     ])
   })
+
+  it("passes the freed member's character on for its lesson", async () => {
+    const recorded: { character?: unknown }[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      recordGameHistory: async (args: { character?: unknown }) => {
+        recorded.push(args)
+        return { recorded: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const record = {
+      ticket: 'CIN-1',
+      repo: null,
+      branch: null,
+      agent: 'claude',
+      account: null,
+      launchedAt: null,
+      endedAt: '2026-10-16T10:00:00.000Z',
+      outcome: 'failed',
+      pr: null,
+      lastReport: null
+    }
+    await dispatcher.dispatch({
+      id: 'c',
+      authToken: 'test',
+      method: 'game.historyRecord',
+      params: { worktreeId: 'wt1', record, character: 'Mario' }
+    })
+    expect(recorded[0]?.character).toBe('Mario')
+  })
+
+  it("lists the caller project's lessons", async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      listGameLessons: async (args: unknown) => {
+        asked.push(args)
+        return { lessons: [] }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await expect(
+      dispatcher.dispatch({
+        id: 'ls',
+        authToken: 'test',
+        method: 'game.lessons',
+        params: { worktreeId: 'wt1' }
+      })
+    ).resolves.toMatchObject({ ok: true, result: { lessons: [] } })
+    expect(asked).toEqual([{ worktreeId: 'wt1', terminalHandle: undefined }])
+  })
 })
 
 describe('game.memberRecord RPC', () => {

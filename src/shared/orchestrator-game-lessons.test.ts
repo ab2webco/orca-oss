@@ -8,9 +8,11 @@ import {
   mergeGameLesson,
   mergeGameLessonLists,
   parseGameLesson,
+  gameLessonSignalOfHistory,
   type GameLesson,
   type GameLessonSignal
 } from './orchestrator-game-lessons'
+import type { GameHistoryRecord } from './orchestrator-game-history'
 
 const NOW = Date.parse('2026-10-20T12:00:00.000Z')
 const ago = (ms: number): string => new Date(NOW - ms).toISOString()
@@ -180,5 +182,46 @@ describe('game lessons', () => {
         budgetBytes: bytes(one) - 1
       })
     ).toBe('')
+  })
+})
+
+describe('lessons from a freed member', () => {
+  const record = (overrides: Partial<GameHistoryRecord> = {}): GameHistoryRecord => ({
+    ticket: 'ORCA-12',
+    repo: 'orca-oss',
+    branch: 'orca-12',
+    agent: 'claude',
+    account: null,
+    launchedAt: null,
+    endedAt: ago(0),
+    outcome: 'failed',
+    pr: '#41 open',
+    lastReport: 'CI went red on the e2e shard after I reported it green',
+    ...overrides
+  })
+
+  it('turns a failed member into a failure lesson with its facts', () => {
+    expect(gameLessonSignalOfHistory(record(), 'orca-oss', 'Mario')).toEqual({
+      kind: 'failure',
+      project: 'orca-oss',
+      ticket: 'ORCA-12',
+      character: 'Mario',
+      what: 'Member ended failed: CI went red on the e2e shard after I reported it green',
+      evidence: '#41 open',
+      at: ago(0)
+    })
+  })
+
+  it('records a limit as a failure and a merge as an achievement', () => {
+    expect(gameLessonSignalOfHistory(record({ outcome: 'limited' }), 'p', null)?.kind).toBe(
+      'failure'
+    )
+    expect(gameLessonSignalOfHistory(record({ outcome: 'merged' }), 'p', null)?.kind).toBe(
+      'achievement'
+    )
+  })
+
+  it('learns nothing from a member the lead stopped', () => {
+    expect(gameLessonSignalOfHistory(record({ outcome: 'stopped' }), 'p', null)).toBeNull()
   })
 })
