@@ -13,6 +13,7 @@ import {
   type GameSetupQueue
 } from './orchestrator-game-setup-queue'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
+import type { RuntimeTerminalSend } from '../../shared/runtime-types'
 import type {
   GameMemberResumeOutcome,
   GameMemberResumeTarget,
@@ -23,8 +24,10 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameResumedMember = {
   ticket: string
-  result: 'resumed' | 'relaunched' | 'finished' | 'skipped' | 'failed'
+  result: 'resumed' | 'relaunched' | 'submitted' | 'finished' | 'skipped' | 'failed'
   dispatchId?: string
+  /** The open terminal Enter was pressed in, for `submitted`. */
+  terminal?: string
   setupQueue?: GameSetupQueue
   reason?: string
   note?: string
@@ -113,6 +116,38 @@ async function resumeOne(client: Client, from: string, ticket: string): Promise<
   }
 }
 
+/**
+ * A member whose terminal is still open is never resumed over (ORCA-754): an unsubmitted brief
+ * gets Enter, never re-typed; one that stopped reporting is left for the person to check.
+ */
+async function settleOpenTerminal(
+  client: Client,
+  member: GamePausedMember
+): Promise<GameResumedMember | null> {
+  if (!member.terminal || member.cause === undefined) {
+    return null
+  }
+  if (member.cause === 'terminal-open') {
+    return {
+      ticket: member.ticket,
+      result: 'skipped',
+      reason: `its terminal ${member.terminal} is still open; check it, or \`--discard\` stops it`
+    }
+  }
+  const { result } = await client.call<{ send: RuntimeTerminalSend }>('terminal.send', {
+    terminal: member.terminal,
+    enter: true,
+    client: { id: 'orca-cli', type: 'desktop' }
+  })
+  return result.send.accepted
+    ? { ticket: member.ticket, result: 'submitted', terminal: member.terminal }
+    : {
+        ticket: member.ticket,
+        result: 'failed',
+        reason: result.send.refusedReason ?? `${member.terminal} did not take the Enter`
+      }
+}
+
 /** Binds the run that owns the paused members' tasks, unless the lead already runs live members elsewhere. */
 async function bindRunOf(
   client: Client,
@@ -137,6 +172,7 @@ async function bindRunOf(
 const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
   resumed: 'its conversation reopened',
   relaunched: 'a new agent started on its task',
+  submitted: 'Enter pressed in its terminal',
   finished: 'already finished, forgotten',
   skipped: 'skipped',
   failed: 'failed'
@@ -148,7 +184,7 @@ export const formatResumedMembers = (result: { members: GameResumedMember[] }): 
     : result.members
         .map(
           (one) =>
-            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
+            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.terminal ? ` (${one.terminal})` : ''}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
         )
         .join('\n')
 
@@ -213,15 +249,25 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     let running = liveMembers
     // Why one at a time: N agents reopening at once can exhaust a small machine's memory.
     for (const member of paused) {
-      if (running >= fleet.cap) {
-        members.push({
-          ticket: member.ticket,
-          result: 'skipped',
-          reason: `cap: ${fleet.cap} members already run`
-        })
-        continue
-      }
       try {
+        // Why before the cap: its agent already runs, so it holds a slot whatever happens here.
+        const settled = await settleOpenTerminal(client, member)
+        if (settled) {
+          members.push(settled)
+          running += 1
+          if (settled.result === 'failed') {
+            process.exitCode = 1
+          }
+          continue
+        }
+        if (running >= fleet.cap) {
+          members.push({
+            ticket: member.ticket,
+            result: 'skipped',
+            reason: `cap: ${fleet.cap} members already run`
+          })
+          continue
+        }
         const refused = await bindRunOf(client, from, member, running)
         if (refused) {
           members.push({ ticket: member.ticket, result: 'skipped', reason: refused })
