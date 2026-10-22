@@ -1,0 +1,157 @@
+import type { CommandHandler } from '../dispatch'
+import { printResult } from '../format'
+import { RuntimeClientError } from '../runtime-client'
+import {
+  callGameBoard,
+  gameBoardCaller,
+  optionalText,
+  sinceOf
+} from './orchestrator-game-board-call'
+import { GAME_EVENTS_MAX, parseGameEvent } from '../../shared/orchestrator-game-events'
+import { GAME_HISTORY_MAX, parseGameHistoryRecord } from '../../shared/orchestrator-game-history'
+import { computeGameMetrics, type GameMetrics } from '../../shared/orchestrator-game-metrics'
+
+const WIDTH = 80
+const LABEL = 15
+
+function untilOf(flags: Map<string, string | boolean>): string | undefined {
+  const until = optionalText(flags, 'until')
+  if (until !== undefined && Number.isNaN(Date.parse(until))) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--until must be a date like 2026-10-20 or 2026-10-20T09:00, not "${until}".`
+    )
+  }
+  return until
+}
+
+export function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1) {
+    return '<1m'
+  }
+  if (minutes < 60) {
+    return `${minutes}m`
+  }
+  const hours = Math.floor(minutes / 60)
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return hours < 24
+    ? `${hours}h ${pad(minutes % 60)}m`
+    : `${Math.floor(hours / 24)}d ${pad(hours % 24)}h`
+}
+
+/** `label` then `parts` joined by ` · `, wrapped under the label so no line passes 80 columns. */
+function row(label: string, parts: readonly string[]): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const part of parts) {
+    const next = line === '' ? part : `${line} · ${part}`
+    if (line !== '' && LABEL + next.length > WIDTH) {
+      lines.push(line)
+      line = part
+    } else {
+      line = next
+    }
+  }
+  return [...lines, line].map((one, index) => `${(index === 0 ? label : '').padEnd(LABEL)}${one}`)
+}
+
+function windowOf(metrics: GameMetrics): string {
+  const { since, until, ticket } = metrics.window
+  const range = [since ? `since ${since}` : null, until ? `until ${until}` : null]
+    .filter(Boolean)
+    .join(' ')
+  return [range || 'all recorded time', ticket ?? 'all tickets'].join(' · ')
+}
+
+export function formatGameMetrics(metrics: GameMetrics): string {
+  const { leadTime } = metrics
+  const lines = [`Game metrics · ${windowOf(metrics)}`]
+  lines.push(...row('Tickets done', [String(metrics.ticketsDone.length), ...metrics.ticketsDone]))
+  if (leadTime.medianMs === null || leadTime.meanMs === null) {
+    lines.push(...row('Lead time', ['no data']))
+  } else {
+    lines.push(
+      ...row('Lead time', [
+        `median ${formatDuration(leadTime.medianMs)}`,
+        `mean ${formatDuration(leadTime.meanMs)}`,
+        `${leadTime.tickets.length} measured`
+      ])
+    )
+    for (const one of leadTime.tickets) {
+      const notes = [
+        formatDuration(one.ms),
+        ...(one.claims > 1 ? [`${one.claims} claims`] : []),
+        ...(one.endsAt === 'member_freed' ? ['ends when freed'] : [])
+      ]
+      lines.push(`  ${one.ticket.padEnd(LABEL - 2)}${notes.join(' · ')}`)
+    }
+  }
+  if (leadTime.unmeasured.length > 0) {
+    lines.push(...row('  no claim', leadTime.unmeasured))
+  }
+  lines.push(
+    ...row(
+      'Freed members',
+      Object.entries(metrics.outcomes).map(([outcome, count]) => `${outcome} ${count}`)
+    )
+  )
+  const events = Object.entries(metrics.events).filter(([, count]) => count > 0)
+  lines.push(
+    ...row(
+      'Events',
+      events.length === 0 ? ['none'] : events.map(([kind, count]) => `${kind} ${count}`)
+    )
+  )
+  const width = Math.max(...metrics.notRecorded.map((one) => one.label.length))
+  lines.push('Not recorded yet:')
+  for (const one of metrics.notRecorded) {
+    lines.push(`  ${one.label.padEnd(width)}  not recorded · needs ${one.needs}`)
+  }
+  if (metrics.truncated.events) {
+    lines.push(
+      `Note: only the last ${GAME_EVENTS_MAX} events are kept; this window starts before them.`
+    )
+  }
+  if (metrics.truncated.history) {
+    lines.push(
+      `Note: only the last ${GAME_HISTORY_MAX} freed members are kept; the window starts before.`
+    )
+  }
+  return lines.join('\n')
+}
+
+export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> = {
+  'game metrics': async ({ flags, client, json }) => {
+    if (flags.has('character')) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--character needs per-character records, which Orca Lab does not keep yet.'
+      )
+    }
+    const ticket = optionalText(flags, 'ticket')
+    const since = sinceOf(flags)
+    const until = untilOf(flags)
+    // Why unfiltered: a claim before --since still starts the lead time of a merge inside it.
+    const events = await callGameBoard<{ events: unknown[] }>(
+      client,
+      'game.events',
+      gameBoardCaller(),
+      'events'
+    )
+    const history = await callGameBoard<{ records: unknown[] }>(
+      client,
+      'game.history',
+      gameBoardCaller(),
+      'history'
+    )
+    const metrics = computeGameMetrics(
+      {
+        events: events.result.events.map(parseGameEvent).filter((one) => one !== null),
+        history: history.result.records.map(parseGameHistoryRecord).filter((one) => one !== null)
+      },
+      { ticket, since, until }
+    )
+    printResult({ ...history, result: metrics }, json, formatGameMetrics)
+  }
+}

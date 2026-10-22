@@ -509,6 +509,17 @@ The lead's verbs, run from the lead's terminal
   ([`orchestrator-game-history-store.ts`](../../src/main/runtime/orchestrator-game-history-store.ts)).
   They are written through `game.historyRecord` and read through `game.history`, two RPC methods a
   host older than this does not have; `game history` then says to update Orca.
+- `orca game metrics [--since <date>] [--until <date>] [--ticket <id>]` — the project's delivery
+  numbers, computed client-side from the whole `game.events` and `game.history` stores (no new RPC,
+  so an older host answers too): tickets done (a `merged` event, or a member freed as `merged` or
+  with a merged PR), lead time per ticket from its first `claimed` to its last merge (falling back
+  to the history's `launchedAt`, which is UTC; a ticket with no `merged` event ends when its member
+  was freed, marked `ends when freed`), freed members by outcome and event counts. Metrics
+  whose fact is not recorded yet (first-time-green, rework, PR size, cleanup, tracker drift, XP,
+  achievements) print `not recorded` with what they need, never 0; a note says when a store's cap
+  (500 events, 200 records) no longer reaches the window's start. `--character` is refused until
+  characters are recorded per member
+  ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
 - `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
   reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
   usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
