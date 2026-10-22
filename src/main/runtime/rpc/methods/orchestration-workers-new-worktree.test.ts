@@ -368,6 +368,31 @@ describe('orchestration new-worktree workers', () => {
     )
   })
 
+  it('records a setup success on the Dispatch without mailing the lead', async () => {
+    mockCreatedWorktree({
+      terminals: [
+        { handle: 'term_worker', title: 'Codex' },
+        { handle: 'term_setup', title: 'Setup' }
+      ]
+    })
+    let finishSetup: ((result: { exitCode: number | null }) => void) | undefined
+    vi.mocked(runtime.waitForSetupTerminalCompletion).mockImplementation(
+      async () =>
+        await new Promise((resolve) => {
+          finishSetup = resolve
+        })
+    )
+
+    const { result } = await startWorker()
+    const dispatchId = (result as { dispatchId: string }).dispatchId
+    finishSetup?.({ exitCode: 0 })
+
+    await vi.waitFor(() => expect(db.getWorkerDispatch(dispatchId)?.setup_state).toBe('succeeded'))
+    expect(
+      db.getInbox(10).filter((message) => message.run_id === runId && message.type === 'status')
+    ).toEqual([])
+  })
+
   it('uses the exact setup handle instead of a configured tab title', async () => {
     mockCreatedWorktree({
       setupTerminalHandle: 'term_actual_setup',

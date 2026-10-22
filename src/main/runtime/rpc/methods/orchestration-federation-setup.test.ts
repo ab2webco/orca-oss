@@ -26,7 +26,7 @@ describe('orchestration federated setup evidence', () => {
     return { db, runtime }
   }
 
-  it('records remote setup evidence once without changing attachment lifecycle', async () => {
+  function monitorRemoteSetupTwice(exitCode: number): { db: OrchestrationDb; dispatchId: string } {
     const { db, runtime } = createRuntime()
     const dispatchId = 'ctx_remote_setup'
     const effects = [
@@ -71,7 +71,7 @@ describe('orchestration federated setup evidence', () => {
       effects
     })
     db.markRemoteAttachmentReady(dispatchId)
-    vi.spyOn(runtime, 'waitForSetupTerminalCompletion').mockResolvedValue({ exitCode: 1 })
+    vi.spyOn(runtime, 'waitForSetupTerminalCompletion').mockResolvedValue({ exitCode })
     const monitorArgs = {
       runtime,
       db,
@@ -91,6 +91,11 @@ describe('orchestration federated setup evidence', () => {
 
     monitorFederatedSetup(monitorArgs)
     monitorFederatedSetup(monitorArgs)
+    return { db, dispatchId }
+  }
+
+  it('records remote setup evidence once without changing attachment lifecycle', async () => {
+    const { db, dispatchId } = monitorRemoteSetupTwice(1)
 
     await vi.waitFor(() =>
       expect(db.getRemoteDispatchAttachment(dispatchId)).toMatchObject({
@@ -106,6 +111,17 @@ describe('orchestration federated setup evidence', () => {
       expect.arrayContaining([
         expect.objectContaining({ kind: 'dispatch_input', state: 'accepted' })
       ])
+    )
+  })
+
+  it('records a remote setup success without relaying mail to the lead', async () => {
+    const { db, dispatchId } = monitorRemoteSetupTwice(0)
+
+    await vi.waitFor(() =>
+      expect(db.getRemoteDispatchAttachment(dispatchId)?.setup_state).toBe('succeeded')
+    )
+    expect(db.listFederationRelay({ dispatchId, direction: 'to_home', afterSequence: 0 })).toEqual(
+      []
     )
   })
 
