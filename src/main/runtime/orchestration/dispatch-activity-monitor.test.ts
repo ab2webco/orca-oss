@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Database from '../../sqlite/sync-database'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrchestrationDb } from './db'
 import {
@@ -109,5 +113,29 @@ describe('recordDispatchActivities (ORCA-746)', () => {
 
     expect(activityOf(live)).toBe(iso(minutesAgo(2)))
     expect(activityOf(done)).toBe(iso(minutesAgo(2)))
+  })
+
+  it('adds the column to a database an older build stamped v35, keeping its dispatches', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-746-v35-'))
+    try {
+      const path = join(dir, 'orchestration.db')
+      const older = new OrchestrationDb(path)
+      const task = older.createTask({ spec: 'from an older build' })
+      const dispatchId = older.createDispatchContext(task.id, 'term_old').id
+      older.close()
+      const raw = new Database(path)
+      raw.exec('ALTER TABLE dispatch_contexts DROP COLUMN last_activity_at')
+      raw.pragma('user_version = 35')
+      raw.close()
+
+      db = new OrchestrationDb(path)
+      db.recordDispatchActivity(dispatchId, iso(minutesAgo(1)))
+
+      expect(activityOf(dispatchId)).toBe(iso(minutesAgo(1)))
+    } finally {
+      db?.close()
+      db = undefined
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
