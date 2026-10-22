@@ -7,6 +7,7 @@ import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-re
 import { readJevAdvisor } from './advisor-state'
 import { cliInvocationOf } from './cli-invocation'
 import {
+  gameFleetArgvOf,
   gameStateArgvOf,
   openLinkArgvOf,
   tabCreateArgvOf,
@@ -107,6 +108,13 @@ export async function readGameStateOutput($: EngineInterface): Promise<GameState
     return { kind: 'failed', reason: `exit ${out.exitCode}${line === '' ? '' : `: ${line}`}` }
   }
   return { kind: 'ok', stdout: out.stdout }
+}
+
+/** What `orca game fleet` prints for this pane's project; undefined when Orca could not answer. */
+export async function readFleetText($: EngineInterface): Promise<string | undefined> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, gameFleetArgvOf(cli))
+  return out?.exitCode === 0 && out.stdout.trim() !== '' ? out.stdout.trim() : undefined
 }
 
 /** Brings a teammate's Orca pane forward; false when Orca could not. */
