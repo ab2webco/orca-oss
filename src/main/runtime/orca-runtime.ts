@@ -679,6 +679,12 @@ import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { gameMemberAccountOf } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
+import {
+  GameLessonStore,
+  GameLessons,
+  type GameLessonProject
+} from './orchestrator-game-lesson-store'
+import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
 import {
@@ -707,6 +713,7 @@ import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
+import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   GAME_MEMBER_ADVISOR_VERSION,
@@ -3665,6 +3672,12 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  // Why Engram as a mirror: lessons must survive without it, and reads merge what either holds.
+  private readonly gameLessons = new GameLessons({
+    store: new GameLessonStore(() => join(app.getPath('userData'), 'orchestrator-game-lessons')),
+    // Why not under E2E: a spec must never write the developer's own Engram.
+    mirror: process.env.ORCA_E2E_USER_DATA_DIR ? null : new EngramLessonMirror(engramRequestOf())
+  })
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
@@ -30438,7 +30451,13 @@ export class OrcaRuntimeService {
       (args.terminalHandle
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
-    const repoId = worktreeId ? worktreesById.get(worktreeId)?.repoId : undefined
+    // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
+    // keyed `no-project` then would split the project's history and lessons in two.
+    const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
+    const repoId = worktreeId
+      ? (worktreesById.get(worktreeId)?.repoId ??
+        (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined))
+      : undefined
     return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
   }
 
@@ -30509,6 +30528,8 @@ export class OrcaRuntimeService {
     terminalHandle?: string
     memberWorktreeId?: string
     record: GameHistoryRecord
+    /** The member's character, which the lesson it leaves names. */
+    character?: string
   }): Promise<{ recorded: true; count: number }> {
     const { key, worktreesById } = await this.gameHistoryProjectOf(args)
     const memberRepoId = args.memberWorktreeId
@@ -30518,6 +30539,12 @@ export class OrcaRuntimeService {
       args.record.repo ??
       (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
     const records = await this.gameHistory.append(key, { ...args.record, repo })
+    const project = this.gameLessonProjectOf(key)
+    const signal = gameLessonSignalOfHistory(args.record, project.name, args.character ?? null)
+    // Why never throw: a lesson that cannot be kept must not cost the member its history.
+    if (signal) {
+      await this.gameLessons.record(project, signal).catch(() => undefined)
+    }
     // Why: a member freed by sweep or stop is done, so a restart must not offer to resume it.
     if (args.record.ticket) {
       await this.gamePausedMembers.forget(key, [args.record.ticket]).catch(() => undefined)
@@ -30661,6 +30688,26 @@ export class OrcaRuntimeService {
       return accounts.find((one) => one.id === accountId)?.email ?? accountId
     } catch {
       return accountId
+    }
+  }
+
+  /** The project's lessons for a member's brief, from Orca's store and Engram when it answers. */
+  async listGameLessons(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{ lessons: GameLesson[] }> {
+    const { key } = await this.gameHistoryProjectOf(args)
+    return { lessons: await this.gameLessons.list(this.gameLessonProjectOf(key)) }
+  }
+
+  // Why the repo's name: Engram files a project's memories under it, as its own hooks do.
+  private gameLessonProjectOf(key: string): GameLessonProject {
+    const repoId = key.startsWith('repo:') ? key.slice('repo:'.length) : null
+    const repo = repoId ? this.store?.getRepo(repoId) : undefined
+    return {
+      key,
+      name: (repo?.displayName ?? key).trim().toLowerCase(),
+      directory: repo?.path ?? null
     }
   }
 

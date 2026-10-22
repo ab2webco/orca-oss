@@ -26,6 +26,7 @@ const AUDITED_GLOBAL_FETCH_LINES = new Map<string, number>([
   // Plugin-owned bodies are confined to a supervised child, never Electron main.
   ['main/plugins/plugin-host-preload.ts', 1],
   ['main/rate-limits/codex-fetcher.ts', 3],
+  ['main/runtime/orchestrator-game-lesson-engram.ts', 1],
   ['main/runtime/relay/relay-http-client.ts', 2],
   ['main/source-control/hosted-review-api-request.ts', 1],
   ['main/speech/openai-transcription-client.ts', 1],
