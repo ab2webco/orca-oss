@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isHttpUrl } from '../../../../shared/orchestrator-game-integrations'
 import {
+  ORCHESTRATOR_GAME_VIEWS,
+  ORCHESTRATOR_GAME_VIEW_SCOPES
+} from '../../../../shared/orchestrator-game-view'
+import {
   parseGameHistoryRecord,
   type GameHistoryRecord
 } from '../../../../shared/orchestrator-game-history'
@@ -15,6 +19,13 @@ const GameStateParams = z
     advisor: z.unknown().optional()
   })
   .optional()
+
+const GameSetViewParams = z.object({
+  view: z.enum(ORCHESTRATOR_GAME_VIEWS.map((view) => view.id)),
+  scope: z.enum(ORCHESTRATOR_GAME_VIEW_SCOPES),
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional()
+})
 
 // Why http(s) only: any CLI caller reaches this, and it opens on the person's desktop.
 const GameOpenLinkParams = z.object({
@@ -105,6 +116,17 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
     name: 'game.openLink',
     params: GameOpenLinkParams,
     handler: async (params, { runtime }) => runtime.openGameLinkInSystemBrowser(params.url)
+  }),
+  defineMethod({
+    name: 'game.setView',
+    params: GameSetViewParams,
+    handler: async (params, { runtime }) =>
+      runtime.setOrchestratorGameView({
+        view: params.view,
+        scope: params.scope,
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle
+      })
   }),
   defineMethod({
     name: 'game.historyRecord',

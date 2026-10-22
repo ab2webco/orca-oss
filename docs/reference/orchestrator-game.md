@@ -147,7 +147,16 @@ the 3D views join with ORCA-683. A view is stored as the `mode` and `render` key
 and mods keep working: `2d-classic` is `mode: on` + `render: classic`, `2d-hd` is `mode: on` +
 `render: hd` (an `hd-compact` look is kept), and the others set `mode` alone. The suggested view is
 one rule on the host's memory in `suggestedOrchestratorGameView`: `flat` at 8 GiB or less, or
-under 2 GiB free; `2d-classic` up to 16 GiB; `2d-hd` above.
+under 2 GiB free; `2d-classic` up to 16 GiB; `2d-hd` above. `orca game state` carries it as
+`suggestedView` (read at most once a minute) next to `viewScopes`, the scopes the host can store a
+view in for this pane: `project` only when the pane's worktree has a repo, and `global`.
+
+`orca game view <view> --scope project|global` (RPC `game.setView`) stores a view beyond the pane:
+`project` writes the repo's own layer on this machine (`orchestratorGameProjects[repoId]`, what
+Settings → the project edits, shown as `this machine`), `global` writes the global Settings layer.
+It never writes `orca.yaml`. Picking a view other than `off` also sets `show: true` in that layer
+when the game was hidden there. An open Settings page shows the change at once
+(`settings:changed`); panes see it on their next `game state` poll.
 
 ```yaml
 # orca.yaml

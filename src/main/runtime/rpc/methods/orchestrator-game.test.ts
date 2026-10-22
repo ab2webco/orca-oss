@@ -3,6 +3,7 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
+import { ORCHESTRATOR_GAME_VIEWS } from '../../../../shared/orchestrator-game-view'
 
 function request(params?: unknown): RpcRequest {
   return { id: 'game-state-test', authToken: 'test', method: 'game.state', params }
@@ -295,5 +296,50 @@ describe('game.memberNameReserve RPC', () => {
     await expect(send(params)).resolves.toMatchObject({ ok: true, result: { name: 'Merlin' } })
     await expect(send({ ...params, ticket: '../x' })).resolves.toMatchObject({ ok: false })
     expect(asked).toEqual([params])
+  })
+})
+
+describe('game.setView RPC', () => {
+  it('stores a known view for a known scope and refuses anything else', async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      setOrchestratorGameView: async (args: unknown) => {
+        calls.push(args)
+        return { view: 'flat', scope: 'global', layer: 'global' }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const set = (params: unknown) =>
+      dispatcher.dispatch({ id: 'v', authToken: 'test', method: 'game.setView', params })
+
+    await expect(set({ view: 'flat', scope: 'global', worktreeId: 'w1' })).resolves.toMatchObject({
+      ok: true,
+      result: { view: 'flat', layer: 'global' }
+    })
+    await expect(set({ view: '3d-band', scope: 'global' })).resolves.toMatchObject({ ok: false })
+    await expect(set({ view: 'flat', scope: 'pane' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      { view: 'flat', scope: 'global', worktreeId: 'w1', terminalHandle: undefined }
+    ])
+  })
+
+  it('accepts every view the table lists', async () => {
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      setOrchestratorGameView: async (args: { view: string }) => args
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    for (const { id } of ORCHESTRATOR_GAME_VIEWS) {
+      await expect(
+        dispatcher.dispatch({
+          id: id,
+          authToken: 'test',
+          method: 'game.setView',
+          params: { view: id, scope: 'project' }
+        })
+      ).resolves.toMatchObject({ ok: true, result: { view: id } })
+    }
   })
 })

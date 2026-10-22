@@ -124,6 +124,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
+import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
@@ -673,6 +674,15 @@ import {
   type OrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { createGameSuggestedView } from './orchestrator-game-suggested-view'
+import {
+  orchestratorGameViewSettingsOf,
+  type OrchestratorGameViewWrite
+} from '../../shared/orchestrator-game-view-settings'
+import type {
+  OrchestratorGameViewId,
+  OrchestratorGameViewScope
+} from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
 import {
@@ -3677,6 +3687,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameSuggestedView = createGameSuggestedView()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
     read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
@@ -30497,6 +30508,39 @@ export class OrcaRuntimeService {
     return { opened: true }
   }
 
+  /** Stores a game view for the caller's repo on this machine or for every project; Settings shows it live. */
+  async setOrchestratorGameView(args: {
+    view: OrchestratorGameViewId
+    scope: OrchestratorGameViewScope
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<OrchestratorGameViewWrite> {
+    if (!this.store?.getSettings || !this.store.updateSettings) {
+      throw new Error('runtime_unavailable')
+    }
+    const { key, worktree } = await this.gameHistoryProjectOf(args)
+    const repoId = key.startsWith('repo:') ? key.slice('repo:'.length) : null
+    // Why: an orca.yaml that hides the game would keep hiding the view this project just saved.
+    const yaml =
+      args.scope === 'project' && worktree
+        ? await readWorktreeOrcaYaml(
+            worktree.path,
+            this.store.getRepo?.(worktree.repoId)?.connectionId ?? null
+          )
+        : null
+    const updates = orchestratorGameViewSettingsOf(this.store.getSettings(), {
+      ...args,
+      repoId,
+      project: yaml?.orchestratorGame
+    })
+    this.store.updateSettings(updates, { notifyListeners: true })
+    return {
+      view: args.view,
+      scope: args.scope,
+      layer: args.scope === 'global' ? 'global' : 'local'
+    }
+  }
+
   // Why the lead's repo: history is the project's, kept on this Orca host for local, SSH and folder repos alike.
   private async gameHistoryProjectOf(args: {
     worktreeId?: string
@@ -30504,6 +30548,7 @@ export class OrcaRuntimeService {
   }): Promise<{
     key: string
     worktreesById: Awaited<ReturnType<OrcaRuntimeService['getResolvedWorktreeMap']>>
+    worktree: ResolvedWorktree | undefined
   }> {
     const worktreesById = await this.getResolvedWorktreeMap()
     const worktreeId =
@@ -30511,14 +30556,13 @@ export class OrcaRuntimeService {
       (args.terminalHandle
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
+    const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
     // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
     // keyed `no-project` then would split the project's history and lessons in two.
     const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
-    const repoId = worktreeId
-      ? (worktreesById.get(worktreeId)?.repoId ??
-        (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined))
-      : undefined
-    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById }
+    const repoId =
+      worktree?.repoId ?? (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
+    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById, worktree }
   }
 
   getGameBoard(): GameBoard {
@@ -30997,6 +31041,7 @@ export class OrcaRuntimeService {
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
+      suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
       readInboxes: () =>
