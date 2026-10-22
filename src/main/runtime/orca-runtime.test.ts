@@ -2700,6 +2700,70 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it("records a live dispatch's terminal output on the runtime that owns the PTY, for local, SSH-fed and folder-workspace terminals (ORCA-746)", async () => {
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getFolderWorkspaces: () => [makeFolderWorkspace()],
+      getProjectGroups: () => [makeFolderProjectGroup()]
+    } as never)
+    const db = new OrchestrationDb(':memory:')
+    runtime.setOrchestrationDb(db)
+    runtime.attachWindow(1)
+    const leaf = (tabId: string, worktreeId: string, ptyId: string, paneRuntimeId: number) => ({
+      tab: { tabId, worktreeId, title: 'Codex', activeLeafId: 'pane:1', layout: null },
+      leaf: { tabId, worktreeId, leafId: 'pane:1', paneRuntimeId, ptyId }
+    })
+    const panes = [
+      leaf('tab-local', 'repo-1::/tmp/worktree-a', 'pty-local', 1),
+      leaf('tab-ssh', 'repo-1::/tmp/worktree-a', 'pty-ssh', 2),
+      leaf('tab-folder', TEST_FOLDER_WORKSPACE_KEY, 'pty-folder', 3)
+    ]
+    runtime.syncWindowGraph(1, {
+      tabs: panes.map((pane) => pane.tab),
+      leaves: panes.map((pane) => pane.leaf)
+    })
+    const localAt = Date.parse('2026-10-22T11:58:00.000Z')
+    const sshAt = Date.parse('2026-10-22T11:57:00.000Z')
+    const folderAt = Date.parse('2026-10-22T11:56:00.000Z')
+    runtime.onPtyData('pty-local', 'compiling\n', localAt)
+    // Why: the SSH output intake admits remote PTY bytes through this entry point.
+    runtime.acceptPtyDataBounded('pty-ssh', 'remote build\n', sshAt)
+    runtime.onPtyData('pty-folder', 'testing\n', folderAt)
+    const handleOf = new Map(
+      (await runtime.listTerminals()).terminals.map((terminal) => [terminal.ptyId, terminal.handle])
+    )
+    const dispatchOn = (handle: string) =>
+      db.createDispatchContext(db.createTask({ spec: handle }).id, handle).id
+    const dispatches = {
+      local: dispatchOn(handleOf.get('pty-local') as string),
+      ssh: dispatchOn(handleOf.get('pty-ssh') as string),
+      folder: dispatchOn(handleOf.get('pty-folder') as string),
+      unknown: dispatchOn('term_gone')
+    }
+
+    try {
+      runtime.ensureOrchestrationDispatchDeadlineMonitor()
+
+      const activityOf = (id: string) => db.getDispatchContextById(id)?.last_activity_at ?? null
+      expect({
+        local: activityOf(dispatches.local),
+        ssh: activityOf(dispatches.ssh),
+        folder: activityOf(dispatches.folder),
+        unknown: activityOf(dispatches.unknown)
+      }).toEqual({
+        local: new Date(localAt).toISOString(),
+        ssh: new Date(sshAt).toISOString(),
+        folder: new Date(folderAt).toISOString(),
+        unknown: null
+      })
+    } finally {
+      for (const id of Object.values(dispatches)) {
+        db.completeDispatch(id)
+      }
+      db.close()
+    }
+  })
+
   it('routes a launch-draft resolution to the handle-owning local and remote renderers', async () => {
     const runtime = new OrcaRuntimeService(store)
     const nativeChatLaunchDraftResolved = vi.fn()

@@ -295,6 +295,8 @@ export type DispatchContextRow = {
   completed_at: string | null
   created_at: string
   last_heartbeat_at: string | null
+  // Why (ORCA-746): the worker's latest activity the host saw itself (hooks, terminal output); NULL = unknown, never dead.
+  last_activity_at: string | null
   // Why: 1 only for dispatches briefed with the typed worker_done envelope, so
   // rows written by an older runtime keep completing on the prose contract.
   envelope_contract: number

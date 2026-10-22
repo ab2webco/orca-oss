@@ -129,6 +129,10 @@ import { OrchestrationDb } from './orchestration/db'
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
+import {
+  DispatchActivityMonitor,
+  type DispatchActivityObservation
+} from './orchestration/dispatch-activity-monitor'
 import { ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS } from './orchestration/dispatch-lifecycle-deadline'
 import { ORCHESTRATION_DB_REOPEN_BACKOFF_MS } from './orchestration/orchestration-startup'
 import {
@@ -3105,6 +3109,10 @@ export class OrcaRuntimeService {
   private readonly orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport | null
   private readonly orchestrationFederationTimers = new Map<string, ReturnType<typeof setInterval>>()
   private orchestrationDeadlineTimer: ReturnType<typeof setInterval> | null = null
+  private readonly orchestrationActivityMonitor = new DispatchActivityMonitor(
+    () => this.getOrchestrationDb(),
+    (handle) => this.observeDispatchActivity(handle)
+  )
   private orchestrationDbOpenFailure: { error: unknown; at: number } | null = null
   private orchestrationTerminalHistoryRecoveryTimer: ReturnType<typeof setTimeout> | null = null
   private orchestrationTerminalHistoryRecoveryInFlight: Promise<void> | null = null
@@ -5462,6 +5470,8 @@ export class OrcaRuntimeService {
    * a runtime restart — the armed rows are in the DB, not in this timer.
    */
   ensureOrchestrationDispatchDeadlineMonitor(): void {
+    // Why (ORCA-746): every deadline arming point is also where a dispatch goes live.
+    this.orchestrationActivityMonitor.ensure()
     // Why: `orchestration.check` calls this on every poll — once the timer owns
     // the scan there is nothing to do, so the hot path costs one field read.
     if (this.orchestrationDeadlineTimer) {
@@ -5500,6 +5510,20 @@ export class OrcaRuntimeService {
     if (this.orchestrationDeadlineTimer) {
       clearInterval(this.orchestrationDeadlineTimer)
       this.orchestrationDeadlineTimer = null
+    }
+  }
+
+  // Why: an exited or unknown terminal is unknown, not active — a crashed agent's last hook can still read `working`.
+  private observeDispatchActivity(handle: string): DispatchActivityObservation {
+    let ptyId: string
+    try {
+      ptyId = this.getTerminalAgentStatusPtyId(handle)
+    } catch {
+      return { hook: null, lastOutputAt: null }
+    }
+    return {
+      hook: this.getFreshExplicitAgentStatusForHandle(handle),
+      lastOutputAt: this.getPtyLastOutputAt(ptyId)
     }
   }
 
