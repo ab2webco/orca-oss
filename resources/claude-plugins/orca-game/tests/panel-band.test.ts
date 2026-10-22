@@ -170,14 +170,16 @@ describe('the band with the Panel closed or behind another tab', () => {
 
 // The spinner draws the scene while a turn runs; its stage count can lag or drop, so the band must not draw a second one.
 describe('the pet strip while a turn runs', () => {
-  for (const render of ['classic', 'hd']) {
-    test(`${render}: no second scene beside the spinner, even before it registers its stage`, async ($, on) => {
-      await start($, on, [], { ORCA_GAME_RENDER: render })
-      const ui = await band($, 160, true)
-      await ui.press({ key: 'band-pet' })
-      expect(await ui.find({ type: 'Raster', key: 'band-pet-scene' })).toBeUndefined()
-      await ui.unmount()
-    })
+  for (const mode of ['on', 'zen']) {
+    for (const render of ['classic', 'hd']) {
+      test(`${mode} ${render}: no second scene beside the spinner, even before it registers its stage`, async ($, on) => {
+        await start($, on, [], { ORCA_GAME_MODE: mode, ORCA_GAME_RENDER: render })
+        const ui = await band($, 160, true)
+        await ui.press({ key: 'band-pet' })
+        expect(await ui.find({ type: 'Raster', key: 'band-pet-scene' })).toBeUndefined()
+        await ui.unmount()
+      })
+    }
   }
 
   test('the idle band keeps the pet strip and drops it once a turn starts', async ($, on) => {
