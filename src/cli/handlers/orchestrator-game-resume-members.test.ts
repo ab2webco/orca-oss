@@ -42,6 +42,7 @@ function fakeClient(args: {
   outcomes?: Record<string, GameMemberResumeOutcome>
   capabilities?: string[]
   start?: Record<string, unknown>
+  workers?: unknown[]
 }) {
   const calls: [string, Record<string, unknown>][] = []
   const client = {
@@ -65,6 +66,9 @@ function fakeClient(args: {
         },
         'status.get': { capabilities: args.capabilities ?? [] },
         'terminal.send': { send: { handle: params.terminal, accepted: true, bytesWritten: 1 } },
+        'orchestration.workerList': { workers: args.workers ?? [] },
+        'orchestration.workerStop': { state: 'stopped', processAction: 'closed_agent_terminal' },
+        'terminal.close': { closed: true },
         'orchestration.workerStart': args.start ?? {
           runId: 'run_1',
           taskId: `task_${String(params.task).replace('task_', '')}`,
@@ -446,5 +450,56 @@ describe('orca game resume-members', () => {
       { ticket: 'POP-486', result: 'submitted', terminal: 'term_486' },
       { ticket: 'POP-489', result: 'skipped', reason: 'cap: 1 members already run' }
     ])
+  })
+
+  // Why (ORCA-754): --discard freed the record and left the stuck agent running, so a
+  // relaunch put two live members on one ticket.
+  it("--discard stops the discarded member's open terminal and says which", async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [
+        paused('POP-486', { cause: 'unsubmitted', terminal: 'term_486' }),
+        paused('POP-488')
+      ],
+      workers: [
+        {
+          dispatchId: 'ctx_31a9fd1e796c',
+          agentTerminalHandle: 'term_486',
+          workerState: 'ready',
+          terminalState: 'owned'
+        }
+      ]
+    })
+
+    await run(client, [
+      ['discard', true],
+      ['tickets', 'POP-486,POP-488']
+    ])
+
+    expect(calls.find(([m]) => m === 'orchestration.workerStop')?.[1]).toEqual({
+      dispatch: 'ctx_31a9fd1e796c'
+    })
+    expect(calls.some(([m]) => m === 'terminal.close')).toBe(false)
+    expect(printed()).toMatchObject({
+      discarded: ['POP-486', 'POP-488'],
+      stopped: [
+        expect.objectContaining({
+          ticket: 'POP-486',
+          outcome: 'stopped',
+          dispatchId: 'ctx_31a9fd1e796c'
+        })
+      ]
+    })
+  })
+
+  it("--discard leaves a restarted member's missing terminal alone", async () => {
+    const { client, calls } = fakeClient({ pausedMembers: [paused('POP-488')] })
+
+    await run(client, [
+      ['discard', true],
+      ['tickets', 'POP-488']
+    ])
+
+    expect(calls.some(([m]) => m === 'orchestration.workerList')).toBe(false)
+    expect(printed()).toMatchObject({ discarded: ['POP-488'], stopped: [] })
   })
 })
