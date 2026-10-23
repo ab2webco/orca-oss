@@ -32,4 +32,17 @@ describe('packaged hang watchdog worker contract', () => {
     expect(smokeSource).not.toContain('app.quit()')
     expect(smokeSource).toContain('if (!smokeSucceeded(result, SUCCESS_LINE))')
   })
+
+  // Why: the slowest healthy hosted-runner start on main measured 8693 ms (run 39880120548),
+  // and two cold starts were killed at 15 s; keep at least 3x the slowest measured start.
+  it('budgets the packaged worker spawn at least 3x the slowest measured cold start', () => {
+    const smokeSource = readFileSync(
+      'config/scripts/smoke-packaged-hang-watchdog-worker.mjs',
+      'utf8'
+    )
+    const [, budget] = smokeSource.match(/const SPAWN_BUDGET_MS = ([\d_]+)/)
+    const slowestMeasuredMs = 8693
+
+    expect(Number(budget.replaceAll('_', ''))).toBeGreaterThanOrEqual(3 * slowestMeasuredMs)
+  })
 })
