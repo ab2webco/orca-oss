@@ -15,6 +15,7 @@ import {
 import { isLaunchUnderway, launchGameMember, readCallerGameState } from './orchestrator-game-launch'
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
+import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { formatStop, stopGameMembers } from './orchestrator-game-stop'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 import {
@@ -195,7 +196,8 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
               member,
               freedBy: 'sweep',
               workers: result.workers,
-              dispatch: liveDispatchOf(entry.row.terminalHandle, result.workers)
+              dispatch: liveDispatchOf(entry.row.terminalHandle, result.workers),
+              roster: memberRosterOf(response.result)
             })
           : null
         sweep.finished.push({

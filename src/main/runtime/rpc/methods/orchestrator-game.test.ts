@@ -170,9 +170,9 @@ describe('game.state RPC', () => {
       id: 'c',
       authToken: 'test',
       method: 'game.historyRecord',
-      params: { worktreeId: 'wt1', record, character: 'Mario' }
+      params: { worktreeId: 'wt1', record, character: 'Arturo', characterKey: 'arthur' }
     })
-    expect(recorded[0]?.character).toBe('Mario')
+    expect(recorded[0]).toMatchObject({ character: 'Arturo', characterKey: 'arthur' })
   })
 
   it("lists the caller project's lessons", async () => {

@@ -166,20 +166,47 @@ export function memberRosterOf(state: RosterSource): readonly GameMemberName[] {
     : ORCHESTRATOR_GAME_BUILT_IN_ROSTERS.quest
 }
 
-/** The first roster name no live member holds, in `locale` when the roster has it; null when all are taken. */
+const shownIn = (name: GameMemberName, locale: string): string =>
+  typeof name === 'string' ? name : locale === 'es' && name.es ? name.es : name.en
+
+const numbered = (variant: string, n: number): string =>
+  `${variant.slice(0, GAME_MEMBER_NAME_MAX - String(n).length - 1).trimEnd()} ${n}`
+
+/**
+ * The first roster name no live member holds, in `locale` when the roster has it. Once all are
+ * taken, a numbered one (`Arthur 2`); null only without a roster.
+ */
 export function nextMemberName(
   roster: readonly GameMemberName[],
   inUse: readonly string[],
   locale: string
 ): string | null {
   const taken = new Set(inUse.map((one) => one.toLowerCase()))
-  const free = roster.find((name) =>
-    variantsOf(name).every((variant) => !taken.has(variant.toLowerCase()))
-  )
-  if (free === undefined) {
-    return null
+  const isFree = (variants: readonly string[]): boolean =>
+    variants.every((variant) => !taken.has(variant.toLowerCase()))
+  const free = roster.find((name) => isFree(variantsOf(name)))
+  if (free !== undefined) {
+    return shownIn(free, locale)
   }
-  return typeof free === 'string' ? free : locale === 'es' && free.es ? free.es : free.en
+  // Why: the roster sets the scene's names, not how many members the machine can run.
+  for (let n = 2; n <= taken.size + 2; n += 1) {
+    for (const name of roster) {
+      const variants = variantsOf(name).map((variant) => numbered(variant, n))
+      if (isFree(variants) && variants.every((variant) => variantIssueOf(variant) === null)) {
+        return numbered(shownIn(name, locale), n)
+      }
+    }
+  }
+  return null
+}
+
+/** One key for every language variant of a roster name, so a character's progress is not split. */
+export function characterKeyOf(roster: readonly GameMemberName[], shown: string): string {
+  const wanted = shown.trim().toLowerCase()
+  const entry = roster.find((name) =>
+    variantsOf(name).some((variant) => variant.toLowerCase() === wanted)
+  )
+  return entry === undefined ? wanted : (variantsOf(entry)[0] ?? shown).toLowerCase()
 }
 
 /** `<name> · <ticket title>` cut to `max`, never into `ticket`; the base alone without a name. */

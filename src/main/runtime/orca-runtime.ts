@@ -739,6 +739,7 @@ import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
+import { freedCharacterOf } from '../../shared/orchestrator-game-characters'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   GAME_MEMBER_ADVISOR_VERSION,
@@ -30696,8 +30697,9 @@ export class OrcaRuntimeService {
     terminalHandle?: string
     memberWorktreeId?: string
     record: GameHistoryRecord
-    /** The member's character, which the lesson it leaves names. */
+    /** The member's character, which the lesson it leaves names and whose progress it adds to. */
     character?: string
+    characterKey?: string
   }): Promise<{ recorded: true; count: number }> {
     const { key, worktreesById } = await this.gameHistoryProjectOf(args)
     const memberRepoId = args.memberWorktreeId
@@ -30706,7 +30708,11 @@ export class OrcaRuntimeService {
     const repo =
       args.record.repo ??
       (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
-    const records = await this.gameHistory.append(key, { ...args.record, repo })
+    const records = await this.gameHistory.append(
+      key,
+      { ...args.record, repo },
+      freedCharacterOf({ projectKey: key, ...args }) ?? undefined
+    )
     const project = this.gameLessonProjectOf(key)
     const signal = gameLessonSignalOfHistory(args.record, project.name, args.character ?? null)
     // Why never throw: a lesson that cannot be kept must not cost the member its history.

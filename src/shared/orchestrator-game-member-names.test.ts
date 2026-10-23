@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ORCHESTRATOR_GAME_BUILT_IN_ROSTERS,
+  characterKeyOf,
   memberDisplayNameOf,
   memberNameOf,
   memberRosterIssues,
@@ -23,10 +24,26 @@ describe('nextMemberName', () => {
     expect(nextMemberName(ROSTER, [], 'fr')).toBe('Arthur')
   })
 
-  it('frees a name once its member is gone, and falls back to none when all are taken', () => {
+  it('frees a name once its member is gone, and names none without a roster', () => {
     expect(nextMemberName(ROSTER, ['Merlin', 'Lancelot'], 'en')).toBe('Arthur')
-    expect(nextMemberName(ROSTER, ['Arthur', 'Merlin', 'Lancelot'], 'en')).toBeNull()
     expect(nextMemberName([], [], 'en')).toBeNull()
+  })
+
+  it('makes up a new name when every roster name is taken', () => {
+    const all = ['Arthur', 'Merlin', 'Lancelot']
+    expect(nextMemberName(ROSTER, all, 'en')).toBe('Arthur 2')
+    expect(nextMemberName(ROSTER, [...all, 'Arturo 2'], 'en')).toBe('Merlin 2')
+    expect(nextMemberName(ROSTER, [...all, 'Arthur 2'], 'es')).toBe('Merlin 2')
+  })
+
+  it('makes up only names a roster would accept', () => {
+    const long = 'A'.repeat(32)
+    const generated = nextMemberName([long, 'R2-D2'], [long, 'R2-D2'], 'en')
+
+    expect(generated).toBe(`${'A'.repeat(30)} 2`)
+    expect(memberRosterIssues([generated ?? ''])).toEqual([])
+    // Why: a contributed scene's roster is not validated, so its names can look like tickets.
+    expect(nextMemberName(['Unit-7', 'Ann'], ['Unit-7', 'Ann'], 'en')).toBe('Ann 2')
   })
 })
 
@@ -91,5 +108,17 @@ describe('memberRosterIssues', () => {
     expect(memberRosterIssues(['A · B'])).toEqual(['0: must not contain " · "'])
     expect(memberRosterIssues(['Ann', { en: 'Ann' }])).toEqual(['1: "Ann" is listed twice'])
     expect(memberRosterIssues(['bad\u0007'])).toEqual(['0: must not contain control characters'])
+  })
+})
+
+describe('characterKeyOf', () => {
+  it('keys every language variant of a roster name as one character', () => {
+    expect(characterKeyOf(ROSTER, 'Arturo')).toBe('arthur')
+    expect(characterKeyOf(ROSTER, 'arthur')).toBe('arthur')
+    expect(characterKeyOf(ROSTER, 'Merlin')).toBe('merlin')
+  })
+
+  it('keys a name the roster no longer lists by the name itself', () => {
+    expect(characterKeyOf(ROSTER, 'Percival')).toBe('percival')
   })
 })

@@ -55,6 +55,40 @@ describe('GameHistoryStore', () => {
     expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1', 'CIN-2'])
   })
 
+  it('folds a freed member into its character and reads it back after a restart', async () => {
+    const { store: first, dir } = store()
+    await first.append(
+      'repo-a',
+      { ...record('CIN-1'), outcome: 'merged', pr: '#41 merged' },
+      { key: 'arthur', name: 'Arthur' }
+    )
+    await first.append('repo-a', record('CIN-2'), { key: 'arthur', name: 'Arthur' })
+
+    const again = new GameHistoryStore(() => dir)
+    expect(await again.characters('repo-a')).toEqual([
+      expect.objectContaining({
+        key: 'arthur',
+        tickets: 2,
+        prsMerged: 1,
+        outcomes: expect.objectContaining({ merged: 1, stopped: 1 }),
+        xp: 100
+      })
+    ])
+    expect(await again.characters('repo-b')).toEqual([])
+  })
+
+  it('counts a task once when the same member is recorded twice', async () => {
+    const { store: history } = store()
+    const arthur = { key: 'arthur', name: 'Arthur' }
+    await Promise.all([
+      history.append('repo-a', record('CIN-1'), arthur),
+      history.append('repo-a', record('CIN-1'), arthur)
+    ])
+
+    expect((await history.characters('repo-a')).map((one) => one.tickets)).toEqual([1])
+    expect(await history.list('repo-a')).toHaveLength(2)
+  })
+
   it('reads a damaged file as empty, sets it aside, and starts it over', async () => {
     const { store: history, dir } = store()
     await history.append('repo-a', record('CIN-1'))
