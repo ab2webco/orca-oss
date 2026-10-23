@@ -7,6 +7,7 @@ import {
   pausedMembersOf,
   queuedMembersOf,
   serializeGameMemberSessions,
+  unlistedMembersOf,
   type GameMemberSession
 } from './orchestrator-game-member-sessions'
 
@@ -150,6 +151,28 @@ describe('pausedMembersOf', () => {
     })
     expect(paused[2]).not.toHaveProperty('cause')
     expect(paused[2]).not.toHaveProperty('terminal')
+  })
+})
+
+// Why (ORCA-764): a member whose agent runs but whose lead does not list it was dropped silently.
+describe('unlistedMembersOf', () => {
+  it('names saved members whose worktree has a live agent the lead does not list', () => {
+    const members = [
+      member('ORCA-1', { worktreeId: 'wt-1', branch: 'orca-1', name: 'Daisy · ORCA-1' }),
+      member('ORCA-2', { worktreeId: 'wt-2', lastState: 'finished' }),
+      member('ORCA-3', { worktreeId: 'wt-3' }),
+      member('ORCA-4', { worktreeId: 'wt-4' }),
+      member('ORCA-5', { worktreeId: 'wt-5' }),
+      member('ORCA-6')
+    ]
+    const live = {
+      tickets: new Set(['ORCA-3']),
+      worktreeIds: new Set(['wt-1', 'wt-2', 'wt-3', 'wt-5'])
+    }
+
+    expect(unlistedMembersOf(members, live, new Set(['task_ORCA-5']))).toEqual([
+      { ticket: 'ORCA-1', name: 'Daisy · ORCA-1', branch: 'orca-1', worktreeId: 'wt-1' }
+    ])
   })
 })
 

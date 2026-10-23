@@ -7,7 +7,9 @@ import {
   type GamePausedCauseOf,
   type GamePausedMember,
   type GameQueuedMember,
-  type GameSetupQueueEntry
+  type GameSetupQueueEntry,
+  type GameUnlistedMember,
+  unlistedMembersOf
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
@@ -15,6 +17,7 @@ import type { GameMemberSessionStore } from './orchestrator-game-member-session-
 export type GamePausedMembersView = {
   paused: GamePausedMember[]
   queued: GameQueuedMember[]
+  unlisted: GameUnlistedMember[]
   error: string | null
 }
 
@@ -62,17 +65,14 @@ export class GamePausedMembers {
     }
     const read = await this.deps.store.read(projectKey)
     if (!read.ok) {
-      return { paused: [], queued: [], error: read.reason }
+      return { paused: [], queued: [], unlisted: [], error: read.reason }
     }
     const tickets = new Set(live.map((one) => one.ticket))
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
+    const liveNow = { tickets, worktreeIds: liveWorktreeIds }
     return {
-      paused: pausedMembersOf(
-        read.members,
-        { tickets, worktreeIds: liveWorktreeIds },
-        starting,
-        this.deps.causeOf
-      ),
+      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf),
+      unlisted: unlistedMembersOf(read.members, liveNow, starting),
       queued: queuedMembersOf(read.members, setup.queued),
       error
     }

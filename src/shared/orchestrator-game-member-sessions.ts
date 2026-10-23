@@ -255,6 +255,31 @@ export function pausedMembersOf(
     }))
 }
 
+/** A saved member whose worktree runs an agent this lead does not list; never resumed over it. */
+export type GameUnlistedMember = {
+  ticket: string
+  name: string | null
+  branch: string | null
+  worktreeId: string
+}
+
+// Why apart from paused: "Would resume: none" read as no member at all (ORCA-764).
+export function unlistedMembersOf(
+  members: readonly GameMemberSession[],
+  live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> },
+  startingTaskIds: ReadonlySet<string> = new Set()
+): GameUnlistedMember[] {
+  return members.flatMap((one) =>
+    one.lastState !== 'finished' &&
+    !live.tickets.has(one.ticket) &&
+    !startingTaskIds.has(one.taskId) &&
+    one.worktreeId !== null &&
+    live.worktreeIds.has(one.worktreeId)
+      ? [{ ticket: one.ticket, name: one.name, branch: one.branch, worktreeId: one.worktreeId }]
+      : []
+  )
+}
+
 /**
  * Upserts one member by ticket. Returns `members` itself when nothing changed, so a caller can skip
  * the write; a member it does not hold yet is only added with its task and run.

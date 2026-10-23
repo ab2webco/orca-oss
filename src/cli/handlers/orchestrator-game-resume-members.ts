@@ -21,7 +21,8 @@ import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import type {
   GameMemberResumeOutcome,
   GameMemberResumeTarget,
-  GamePausedMember
+  GamePausedMember,
+  GameUnlistedMember
 } from '../../shared/orchestrator-game-member-sessions'
 
 type Client = Parameters<CommandHandler>[0]['client']
@@ -151,6 +152,9 @@ const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
   failed: 'failed'
 }
 
+const unlistedReason = (one: GameUnlistedMember): string =>
+  `its agent runs in ${one.branch ?? one.worktreeId}, but this lead does not list it`
+
 export const formatResumedMembers = (result: { members: GameResumedMember[] }): string =>
   result.members.length === 0
     ? 'No paused members.'
@@ -204,6 +208,9 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     const paused = (state.pausedMembers ?? []).filter(
       (one) => named.length === 0 || named.includes(one.ticket)
     )
+    const unlisted = (state.unlistedMembers ?? []).filter(
+      (one) => named.length === 0 || named.includes(one.ticket)
+    )
     const fleet = gameFleetReportOf({ ...state, pausedMembers: [] })
     const liveMembers = fleet.running
     if (flags.get('dry-run') === true) {
@@ -221,18 +228,23 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
             submit: ticketsWith('unsubmitted'),
             openTerminal: ticketsWith('terminal-open'),
             resume: closed.slice(0, free).map((one) => one.ticket),
-            overCap: closed.slice(free).map((one) => one.ticket)
+            overCap: closed.slice(free).map((one) => one.ticket),
+            ...(unlisted.length > 0 ? { unlisted } : {})
           }
         },
         json,
         (plan) =>
-          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}`
+          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}${plan.unlisted ? ` · running but not listed by this lead: ${plan.unlisted.map((one) => `${one.ticket} (${one.branch ?? one.worktreeId})`).join(', ')}` : ''}`
       )
       return
     }
     refuseWhileStopped(state, 'resuming members')
     const from = await resolveCoordinatorTerminalHandle(flags, cwd, client)
-    const members: GameResumedMember[] = []
+    const members: GameResumedMember[] = unlisted.map((one) => ({
+      ticket: one.ticket,
+      result: 'skipped',
+      reason: unlistedReason(one)
+    }))
     let running = liveMembers
     // Why one at a time: N agents reopening at once can exhaust a small machine's memory.
     for (const member of paused) {

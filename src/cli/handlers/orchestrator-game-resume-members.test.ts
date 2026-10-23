@@ -35,6 +35,7 @@ const LEAD = { paneKey: 'tab:lead', state: 'idle', isLeader: true, displayName: 
 
 function fakeClient(args: {
   pausedMembers?: unknown[]
+  unlistedMembers?: unknown[]
   pausedMembersError?: string
   agents?: unknown[]
   cap?: number
@@ -54,6 +55,7 @@ function fakeClient(args: {
           agents: args.agents ?? [LEAD],
           lead: { autostart: false, cap: args.cap ?? 4, agent: 'claude' },
           ...(args.pausedMembers ? { pausedMembers: args.pausedMembers } : {}),
+          ...(args.unlistedMembers ? { unlistedMembers: args.unlistedMembers } : {}),
           ...(args.pausedMembersError ? { pausedMembersError: args.pausedMembersError } : {})
         },
         'terminal.show': { terminal: { handle: 'h1' } },
@@ -407,6 +409,41 @@ describe('orca game resume-members', () => {
       openTerminal: ['POP-487'],
       resume: [],
       overCap: ['CIN-1']
+    })
+  })
+
+  // Why (ORCA-764): "Would resume: none" hid a member whose agent runs but this lead does not list.
+  describe('a saved member running in a live worktree this lead does not list', () => {
+    const unlisted = {
+      ticket: 'ORCA-746',
+      name: 'Daisy · ORCA-746',
+      branch: 'orca-746',
+      worktreeId: 'wt-746'
+    }
+
+    it('is named on --dry-run instead of a bare "none"', async () => {
+      const { client } = fakeClient({ pausedMembers: [], unlistedMembers: [unlisted] })
+
+      await run(client, [['dry-run', true]], false)
+
+      expect(output.join('\n')).toBe(
+        'Would resume: none · running but not listed by this lead: ORCA-746 (orca-746)'
+      )
+    })
+
+    it('is reported as skipped, never resumed over its live agent', async () => {
+      const { client, calls } = fakeClient({ pausedMembers: [], unlistedMembers: [unlisted] })
+
+      await run(client)
+
+      expect(calls.map(([m]) => m)).not.toContain('game.memberResume')
+      expect(printed().members).toEqual([
+        {
+          ticket: 'ORCA-746',
+          result: 'skipped',
+          reason: 'its agent runs in orca-746, but this lead does not list it'
+        }
+      ])
     })
   })
 

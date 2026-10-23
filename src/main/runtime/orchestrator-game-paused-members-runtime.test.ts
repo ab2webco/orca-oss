@@ -107,6 +107,30 @@ describe("a lead's members across a restart, through the runtime", () => {
     expect(after.pausedMembersError).toBeUndefined()
   })
 
+  // Why (ORCA-764): a live member the lead no longer lists was neither listed nor paused.
+  it('names a saved member whose worktree runs an agent this lead does not list', async () => {
+    await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
+      worktreeId: 'wt-lead',
+      paneKey: 'tab-1:lead'
+    })
+    const orphaned = { ...memberWorktree, agents: [agentRow('tab-4:member', null)] }
+
+    const after = await runtimeWith([leadWorktree, orphaned]).getOrchestratorGameState({
+      worktreeId: 'wt-lead',
+      paneKey: 'tab-1:lead'
+    })
+
+    expect(after.pausedMembers).toEqual([])
+    expect(after.unlistedMembers).toEqual([
+      {
+        ticket: 'ORCA-609',
+        name: 'Merlin · ORCA-609 Cartelera',
+        branch: 'fabolivark/orca-609',
+        worktreeId: 'wt-member'
+      }
+    ])
+  })
+
   it('shows nothing paused to a member pane', async () => {
     const member = await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
       worktreeId: 'wt-member',

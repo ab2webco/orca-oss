@@ -31249,6 +31249,7 @@ export class OrcaRuntimeService {
       ...state,
       pausedMembers: view.paused,
       ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
+      ...(view.unlisted.length > 0 ? { unlistedMembers: view.unlisted } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }

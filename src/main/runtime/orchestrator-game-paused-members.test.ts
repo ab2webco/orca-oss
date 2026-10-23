@@ -59,6 +59,7 @@ describe('GamePausedMembers.note', () => {
     expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
       paused: [],
       queued: [],
+      unlisted: [],
       error: null
     })
     expect(await store.read('repo:a')).toEqual({
@@ -111,6 +112,7 @@ describe('GamePausedMembers.note', () => {
       queued: [
         { ticket: 'ORCA-2', name: 'Merlin · ORCA-2', position: 1, waitingOn: 'Arthur · ORCA-1' }
       ],
+      unlisted: [],
       error: null
     })
   })
@@ -126,7 +128,7 @@ describe('GamePausedMembers.note', () => {
 
     expect(
       await paused.note('repo:a', [], new Set(), { queued: [], starting: ['task_ORCA-2'] })
-    ).toEqual({ paused: [], queued: [], error: null })
+    ).toEqual({ paused: [], queued: [], unlisted: [], error: null })
   })
 
   it('never lists a member that finished: merged PR or a completed dispatch', async () => {
@@ -157,6 +159,7 @@ describe('GamePausedMembers.note', () => {
     expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
       paused: [],
       queued: [],
+      unlisted: [],
       error: 'the saved members file is damaged (not JSON)'
     })
     expect((await store.read('repo:a')).ok).toBe(false)
@@ -175,6 +178,7 @@ describe('GamePausedMembers.note on a host that cannot reach its folder', () => 
     expect(await paused.note('repo:a', [member('ORCA-1')])).toEqual({
       paused: [],
       queued: [],
+      unlisted: [],
       error: 'the saved members file cannot be read (Error: no userData)'
     })
   })
