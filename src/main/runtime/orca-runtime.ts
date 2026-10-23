@@ -135,6 +135,10 @@ import {
   DispatchActivityMonitor,
   type DispatchActivityObservation
 } from './orchestration/dispatch-activity-monitor'
+import {
+  isOrphanedSilenceFailure,
+  settledDispatchSeenAtMs
+} from './orchestration/dispatch-silence-reattach'
 import { ORCHESTRATION_DEADLINE_SCAN_INTERVAL_MS } from './orchestration/dispatch-lifecycle-deadline'
 import { ORCHESTRATION_DB_REOPEN_BACKOFF_MS } from './orchestration/orchestration-startup'
 import {
@@ -20294,11 +20298,12 @@ export class OrcaRuntimeService {
       if (!summary) {
         continue
       }
-      const taskTitle = orchestrationByPaneKey?.[src.paneKey]?.taskTitle ?? null
-      const displayName = orchestrationByPaneKey?.[src.paneKey]?.displayName ?? null
+      const orchestration = orchestrationByPaneKey?.[src.paneKey]
+      const taskTitle = orchestration?.taskTitle ?? null
+      const displayName = orchestration?.displayName ?? null
       const row: RuntimeWorktreeAgentRow = {
         paneKey: src.paneKey,
-        parentPaneKey: orchestrationByPaneKey?.[src.paneKey]?.parentPaneKey ?? null,
+        parentPaneKey: orchestration?.parentPaneKey ?? null,
         state: src.state,
         agentType: src.agentType,
         prompt: src.prompt,
@@ -20310,7 +20315,9 @@ export class OrcaRuntimeService {
         interrupted: src.interrupted,
         stateStartedAt: src.stateStartedAt,
         updatedAt: src.updatedAt,
-        ...(src.restoredUnconfirmed ? { restoredUnconfirmed: true } : {})
+        ...(src.restoredUnconfirmed ? { restoredUnconfirmed: true } : {}),
+        ...(orchestration?.lastActivityAt ? { lastActivityAt: orchestration.lastActivityAt } : {}),
+        ...(orchestration?.orphaned ? { orphaned: true } : {})
       }
       // Why: SSH/runtime projections can spell an equivalent path differently;
       // bucket by the canonical summary id so mobile keeps the agent activity.
@@ -35518,7 +35525,9 @@ export class OrcaRuntimeService {
       ...(parentTerminalHandle ? { parentTerminalHandle } : {}),
       ...(parentPaneKey ? { parentPaneKey } : {}),
       ...(coordinatorHandle ? { coordinatorHandle } : {}),
-      ...(orchestrationRunId ? { orchestrationRunId } : {})
+      ...(orchestrationRunId ? { orchestrationRunId } : {}),
+      ...(dispatch.last_activity_at ? { lastActivityAt: dispatch.last_activity_at } : {}),
+      ...(isOrphanedSilenceFailure(dispatch) ? { orphaned: true } : {})
     }
   }
 
@@ -35534,15 +35543,12 @@ export class OrcaRuntimeService {
     ) {
       return undefined
     }
-    const completedAtMs = Date.parse(
-      dispatch.completed_at.includes('T')
-        ? dispatch.completed_at
-        : `${dispatch.completed_at.replace(' ', 'T')}Z`
-    )
-    if (!Number.isFinite(completedAtMs)) {
+    // Why (ORCA-658): a member failed for silence that keeps working stays its lead's member.
+    const seenAtMs = settledDispatchSeenAtMs(dispatch)
+    if (!Number.isFinite(seenAtMs)) {
       return undefined
     }
-    return Date.now() - completedAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
+    return Date.now() - seenAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
   }
 
   private getTerminalHandleForPaneKey(paneKey: string): string | null {

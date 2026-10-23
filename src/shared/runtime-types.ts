@@ -828,6 +828,10 @@ export type RuntimeWorktreeAgentRow = {
   updatedAt: number
   /** See AgentStatusEntry.restoredUnconfirmed — set for hydrated nonterminal rows so clients don't render them as confirmed activity. */
   restoredUnconfirmed?: boolean
+  /** Its dispatch's host-observed activity (ORCA-746); absent outside dispatch or from an older host. */
+  lastActivityAt?: string
+  /** Its dispatch failed for silence yet it keeps working, unreopened (ORCA-658). */
+  orphaned?: boolean
 }
 
 export type RuntimeWorktreePsSummary = {

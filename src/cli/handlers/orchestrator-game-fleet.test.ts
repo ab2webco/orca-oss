@@ -339,6 +339,27 @@ describe('orca game fleet verbs', () => {
     ])
   })
 
+  it("fleet text shows each member's last host-observed activity and an orphaned member's next step", () => {
+    const now = Date.parse('2026-10-22T12:10:00.000Z')
+    const fleet = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        {
+          ...member({ displayName: 'CIN-5 Pagos' }),
+          state: 'working',
+          orphaned: true,
+          lastActivityAt: '2026-10-22T12:08:00.000Z'
+        }
+      ]
+    })
+
+    const [, header, row] = formatFleet(fleet, now).split('\n')
+
+    expect(header).toMatch(/\bACTIVE\b/)
+    expect(row).toContain('2m ago')
+    expect(row).toContain('orphaned, still working: adopt its work or stop it')
+  })
+
   it('wave names each member it launches after a different free character of the scene', async () => {
     const { client, calls } = fakeClient(
       stateWith({

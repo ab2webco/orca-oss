@@ -113,7 +113,16 @@ const formatQueued = (fleet: GameFleet): string[] =>
         ...fleet.queued.map((one) => `${one.ticket}: ${formatSetupQueue(one)}`)
       ]
 
-export function formatFleet(fleet: GameFleet): string {
+function sinceOf(at: string | null, now: number): string {
+  const ms = at ? now - Date.parse(at) : Number.NaN
+  if (!Number.isFinite(ms)) {
+    return '-'
+  }
+  const minutes = Math.max(0, Math.round(ms / 60_000))
+  return minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`
+}
+
+export function formatFleet(fleet: GameFleet, now: number = Date.now()): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
@@ -125,6 +134,7 @@ export function formatFleet(fleet: GameFleet): string {
     row.ticket ?? '-',
     row.ticketStatus ?? '-',
     row.state,
+    sinceOf(row.lastActivityAt, now),
     row.review ?? '-',
     row.ci ?? '-',
     row.branch ?? '-',
@@ -133,7 +143,18 @@ export function formatFleet(fleet: GameFleet): string {
     row.next,
     row.name
   ])
-  const header = ['PHASE', 'TICKET', 'STATUS', 'STATE', 'PR', 'CI', 'BRANCH', 'AGENT', 'ACCOUNT']
+  const header = [
+    'PHASE',
+    'TICKET',
+    'STATUS',
+    'STATE',
+    'ACTIVE',
+    'PR',
+    'CI',
+    'BRANCH',
+    'AGENT',
+    'ACCOUNT'
+  ]
   return [head, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }
 

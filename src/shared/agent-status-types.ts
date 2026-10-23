@@ -3,6 +3,7 @@
 // a narrow interrupt fallback synthesizes a final `done` when an agent misses its cancellation hook.
 
 import type { AgentProviderSessionMetadata } from './agent-session-resume'
+import type { AgentStatusOrchestrationLiveness } from './agent-status-orchestration-liveness'
 import {
   normalizeInteractivePromptField,
   normalizeOptionalField,
@@ -60,7 +61,7 @@ export type AgentStateHistoryEntry = {
 /** Maximum number of history entries kept per agent to bound memory. */
 export const AGENT_STATE_HISTORY_MAX = 20
 
-export type AgentStatusOrchestrationContext = {
+export type AgentStatusOrchestrationContext = AgentStatusOrchestrationLiveness & {
   taskId: string
   dispatchId: string
   /** Runtime-authoritative lifecycle state. Hook-only contexts may omit it. */

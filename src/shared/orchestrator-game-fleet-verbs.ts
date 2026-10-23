@@ -32,7 +32,13 @@ export type GameFleetRow = {
   account: string | null
   /** When a limited member's account resets (ISO); null when unknown or not limited. */
   limitedUntil: string | null
+  /** When the host last saw its terminal work (ISO); null when unknown. */
+  lastActivityAt: string | null
+  /** Failed for silence yet still working; its ticket has another live attempt (ORCA-658). */
+  orphaned: boolean
 }
+
+const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
 
 export type GameFleet = {
   rows: GameFleetRow[]
@@ -131,14 +137,16 @@ function rowOf(agent: GameAgent): GameFleetRow {
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next: nextOf(agent, phase),
+    next: agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : nextOf(agent, phase),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
     limitedUntil:
       agent.limit?.resetsAt === null || agent.limit === undefined
         ? null
-        : new Date(agent.limit.resetsAt).toISOString()
+        : new Date(agent.limit.resetsAt).toISOString(),
+    lastActivityAt: agent.lastActivityAt ?? null,
+    orphaned: agent.orphaned === true
   }
 }
 

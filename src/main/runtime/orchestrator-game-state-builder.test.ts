@@ -233,6 +233,41 @@ describe('buildOrchestratorGameState', () => {
     })
   })
 
+  it("carries a member's last activity and orphaned mark, never a non-member's (ORCA-658)", async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: null,
+      toolName: null,
+      lastActivityAt: '2026-10-22T12:00:00.000Z',
+      orphaned: true
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:member', parentPaneKey: 'tab-1:lead', taskTitle: 'CIN-7' }
+      ],
+      members: [],
+      leaderPaneKey: 'tab-1:lead',
+      terminalHandleOf: () => null,
+      teamHandles: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents[1]).toMatchObject({
+      isMember: true,
+      lastActivityAt: '2026-10-22T12:00:00.000Z',
+      orphaned: true
+    })
+    expect(state.agents[0]).not.toHaveProperty('orphaned')
+    expect(state.agents[0]).not.toHaveProperty('lastActivityAt')
+  })
+
   it("gives each member in its own worktree that worktree's PR, CI and ticket", async () => {
     const row = {
       state: 'working' as const,
