@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
+  defaultGameMemberCapOf,
   GAME_LEAD_CAP_MAX,
   parseGameLead,
   renderGameLaunchPrompt,
@@ -133,6 +134,38 @@ describe('resolveGameLead', () => {
 
   it('drops an effort that has no model, as worker-start would refuse it', () => {
     expect(resolveGameLead([{ effort: 'high' }])).toEqual(DEFAULT_GAME_LEAD)
+  })
+
+  it("takes the default cap from the machine, and a layer's cap still wins", () => {
+    const big = { totalMemory: 64 * GIB, cpuCoreCount: 12 }
+
+    expect(resolveGameLead([], big).cap).toBe(6)
+    expect(resolveGameLead([{ cap: 2 }], big).cap).toBe(2)
+  })
+})
+
+const GIB = 1024 ** 3
+
+describe('defaultGameMemberCapOf', () => {
+  it('gives two machines with different hardware different caps', () => {
+    expect(defaultGameMemberCapOf({ totalMemory: 16 * GIB, cpuCoreCount: 8 })).toBe(4)
+    expect(defaultGameMemberCapOf({ totalMemory: 36 * GIB, cpuCoreCount: 12 })).toBe(6)
+  })
+
+  it('is bound by whichever of memory and cores runs out first', () => {
+    expect(defaultGameMemberCapOf({ totalMemory: 8 * GIB, cpuCoreCount: 16 })).toBe(2)
+    expect(defaultGameMemberCapOf({ totalMemory: 128 * GIB, cpuCoreCount: 4 })).toBe(2)
+  })
+
+  it('stays within 1 and the cap ceiling', () => {
+    expect(defaultGameMemberCapOf({ totalMemory: 2 * GIB, cpuCoreCount: 1 })).toBe(1)
+    expect(defaultGameMemberCapOf({ totalMemory: 512 * GIB, cpuCoreCount: 96 })).toBe(
+      GAME_LEAD_CAP_MAX
+    )
+  })
+
+  it('falls back to the fixed default when the machine is unknown', () => {
+    expect(defaultGameMemberCapOf(null)).toBe(DEFAULT_GAME_LEAD.cap)
   })
 })
 

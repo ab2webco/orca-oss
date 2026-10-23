@@ -529,6 +529,44 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
   }
 })
 
+test("the project lead's member cap follows Orca's machine when no layer sets one", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? null)
+  expect(repoId, 'the harness seeds one repo').not.toBeNull()
+  // Why a bigger host than the runner's: a 16 GB / 8-core runner gets the old fixed 4 either way.
+  const real = await orcaPage.evaluate(() => window.api.memory.getSnapshot())
+  const big = { ...real, host: { ...real.host, totalMemory: 64 * 1024 ** 3, cpuCoreCount: 12 } }
+  await electronApp.evaluate(({ ipcMain }, snapshot) => {
+    ipcMain.removeHandler('memory:getSnapshot')
+    ipcMain.handle('memory:getSnapshot', async () => snapshot)
+  }, big)
+  await orcaPage.evaluate(() => window.__store!.getState().fetchMemorySnapshot())
+
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.setSettingsSearchQuery('')
+    state.openSettingsTarget({ pane: 'repo', repoId: id as string })
+    state.openSettingsPage()
+  }, repoId)
+  const lead = orcaPage.locator('[data-slot="game-lead-settings"]')
+  await expect(lead).toBeVisible({ timeout: 15_000 })
+  await expect(lead.getByText('6 · default')).toBeVisible()
+  const cap = lead.getByRole('textbox', { name: 'Member cap' })
+  await expect(cap).toHaveAttribute('placeholder', '6')
+
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await cap.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await orcaPage.screenshot({ path: testInfo.outputPath(`lead-cap-${theme}-${width}.png`) })
+    }
+  }
+})
+
 test("the project's Actions editor saves this machine's list and renders at every width", async ({
   electronApp,
   orcaPage

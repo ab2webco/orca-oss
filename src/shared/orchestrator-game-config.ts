@@ -2,6 +2,7 @@ import { parseGameActions, type OrchestratorGameAction } from './orchestrator-ga
 import {
   parseGameLead,
   resolveGameLead,
+  type GameHostProfile,
   type OrchestratorGameLead,
   type OrchestratorGameLeadLayer
 } from './orchestrator-game-lead'
@@ -202,9 +203,13 @@ export function resolveOrchestratorGameIntegrations(
 }
 
 export function resolveOrchestratorGameLead(
-  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>,
+  host: GameHostProfile | null = null
 ): OrchestratorGameLead {
-  return resolveGameLead(LAYER_ORDER.map((source) => layers[source]?.orchestrator))
+  return resolveGameLead(
+    LAYER_ORDER.map((source) => layers[source]?.orchestrator),
+    host
+  )
 }
 
 /** The layer a lead key's effective value comes from; 'default' when no layer sets a usable one. */

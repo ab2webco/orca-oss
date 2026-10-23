@@ -17,6 +17,7 @@ import {
   resolveOrchestratorGameLead,
   type ResolvedOrchestratorGameConfig
 } from '../../shared/orchestrator-game-config'
+import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
 import {
   builtInGameActivityRules,
   gameActivityOf,
@@ -72,6 +73,8 @@ export type OrchestratorGameStateInput = {
     | undefined
   /** The OS locale behind a `system` UI language. */
   systemLocale?: string
+  /** Orca's machine, which sets the member cap no layer sets. */
+  host?: GameHostProfile
   worktree: {
     id: string
     repoId: string | null
@@ -229,7 +232,7 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const lead = resolveOrchestratorGameLead(layers)
+  const lead = resolveOrchestratorGameLead(layers, input.host ?? null)
   const role = input.callerParentPaneKey ? 'member' : 'lead'
   const actions = gameStateActionsOf({
     role,
