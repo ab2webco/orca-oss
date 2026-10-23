@@ -30,13 +30,13 @@ const start = async ($: Engine, on: On, env: Record<string, string> = {}) => {
   await clock.settle()
 }
 
-const userMessage = ($: Engine, text: string) =>
+const userMessage = ($: Engine, text: string, isExpanded = false) =>
   $.ui.mount({
     plugin: 'orca-game',
     surface: 'terminal',
     component: 'UserMessage',
     viewport: VIEWPORT,
-    props: { text, origin: { kind: 'composer' }, isExpanded: false }
+    props: { text, origin: { kind: 'composer' }, isExpanded }
   })
 
 describe('brief block', () => {
@@ -59,6 +59,14 @@ describe('brief block', () => {
     await start($, on)
     const row = await userMessage($, 'Fix the build')
     expect(await row.find({ type: 'Text', text: /Brief received/ })).toBeUndefined()
+    await row.unmount()
+  })
+
+  test('ctrl+o shows the line Orca typed, in place of the block', async ($, on) => {
+    await start($, on)
+    const row = await userMessage($, BRIEF, true)
+    expect(await row.find({ type: 'Text', text: /Brief received/ })).toBeUndefined()
+    expect(await row.find({ type: 'Text', text: /Read your Orca Lab brief at/ })).toBeDefined()
     await row.unmount()
   })
 

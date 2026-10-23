@@ -284,7 +284,8 @@ const registerCards = (on: On) => {
     }
     const teller = currentScene().teller
     const { Box, Text } = $.ui.resolve(e)
-    const brief = briefPathOf(e.props.text)
+    // Why not when expanded: ctrl+o shows the line Orca typed, as for any compact row.
+    const brief = e.props.isExpanded ? null : briefPathOf(e.props.text)
     if (brief !== null) {
       return (
         <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
