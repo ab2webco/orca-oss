@@ -1,5 +1,5 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
@@ -47,6 +47,12 @@ async function shootAll(
     }
   }
 }
+
+// Why: the seeded repo is shared by the worker; a test's orca.yaml or scene files must not reach the next test.
+test.afterEach(({ testRepoPath }) => {
+  rmSync(join(testRepoPath, 'orca.yaml'), { force: true })
+  rmSync(join(testRepoPath, '.orca', 'scenes'), { recursive: true, force: true })
+})
 
 test('global and per-project Agent Teams game settings persist and render at every width', async ({
   electronApp,
