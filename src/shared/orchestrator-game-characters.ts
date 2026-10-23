@@ -110,9 +110,12 @@ function workedMsOf(record: GameHistoryRecord): number | null {
   return Number.isFinite(ms) && ms >= 0 ? ms : null
 }
 
-// Why the launch, not the end: a sweep and a stop of one task stamp different end times.
+// Why the launch, not the end: a sweep and a stop of one task stamp different end times. With no
+// launch time the ticket alone keys it; a retake of that ticket then counts once, never twice.
 const taskKeyOf = (record: GameHistoryRecord): string =>
-  `${record.ticket ?? ''}|${record.launchedAt ?? record.endedAt}`
+  record.launchedAt === null && record.ticket !== null
+    ? `${record.ticket}|`
+    : `${record.ticket ?? ''}|${record.launchedAt ?? record.endedAt}`
 
 /**
  * The stored characters with a freed member's task added to its character; null when that task is

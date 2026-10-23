@@ -88,6 +88,15 @@ describe('foldFreedMember', () => {
     expect(foldFreedMember(once, arthur, freed({ endedAt: '2026-10-20T11:31:00.000Z' }))).toBeNull()
   })
 
+  it('counts a retried free once when the launch time is unknown', () => {
+    const unknown = { launchedAt: null }
+    const once = foldFreedMember({}, arthur, freed(unknown)) ?? {}
+
+    expect(
+      foldFreedMember(once, arthur, freed({ ...unknown, endedAt: '2026-10-20T11:31:00.000Z' }))
+    ).toBeNull()
+  })
+
   it('keeps other characters and entries a newer build wrote', () => {
     const stored = { merlin: { key: 'merlin', future: true }, odd: 'not a character' }
     const next = foldFreedMember(stored, arthur, freed()) ?? {}
