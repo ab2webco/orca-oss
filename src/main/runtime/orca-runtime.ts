@@ -666,7 +666,11 @@ import {
 import { readMemoryPressure } from '../memory/memory-pressure-reading'
 import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
-import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
+import {
+  isOrchestratorGameMemberOn,
+  prepareOrchestratorGameLaunch
+} from '../claude/orchestrator-game-launch-context'
+import type { DispatchBriefTarget } from './orchestration/dispatch-brief-delivery'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import {
   orchestratorGameMemberCliOf,
@@ -31327,6 +31331,22 @@ export class OrcaRuntimeService {
       })
     } catch {
       return { args: [], env: {} }
+    }
+  }
+
+  /** Where a game member's dispatch brief goes; null keeps the full preamble (ORCA-757). */
+  async gameMemberBriefTargetFor(worktreeId: string): Promise<DispatchBriefTarget | null> {
+    try {
+      const scope = await this.resolveTerminalWorkspaceLaunchScope(`id:${worktreeId}`)
+      const isOn = await isOrchestratorGameMemberOn({
+        settings: this.store?.getSettings?.(),
+        repoId: scope.repo?.id ?? null,
+        worktreePath: scope.path,
+        connectionId: scope.connectionId
+      })
+      return isOn ? { path: scope.path, connectionId: scope.connectionId } : null
+    } catch {
+      return null
     }
   }
 

@@ -7,7 +7,10 @@ import {
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
-import { prepareOrchestratorGameLaunch } from './orchestrator-game-launch-context'
+import {
+  isOrchestratorGameMemberOn,
+  prepareOrchestratorGameLaunch
+} from './orchestrator-game-launch-context'
 
 const electronApp = vi.hoisted(() => ({
   isPackaged: false,
@@ -239,5 +242,66 @@ describe('prepareOrchestratorGameLaunch plugin dir', () => {
       '--plugin-dir',
       join(appPath, 'resources', 'claude-plugins', 'orca-game')
     ])
+  })
+})
+
+// Why its own gate: a member's one-line brief follows the project setting for any agent and host,
+// while the mod itself also needs local Claude (ORCA-757).
+describe('isOrchestratorGameMemberOn', () => {
+  it('is on by default, for a folder without orca.yaml too', async () => {
+    expect(
+      await isOrchestratorGameMemberOn({
+        settings: undefined,
+        repoId: null,
+        worktreePath: worktreeWith(null)
+      })
+    ).toBe(true)
+  })
+
+  it("is off when the project's orca.yaml turns members plain", async () => {
+    expect(
+      await isOrchestratorGameMemberOn({
+        settings: undefined,
+        repoId: 'repo1',
+        worktreePath: worktreeWith('orchestratorGame:\n  orchestrator:\n    memberGame: false\n')
+      })
+    ).toBe(false)
+  })
+
+  it("is off when this machine's project override turns members plain", async () => {
+    expect(
+      await isOrchestratorGameMemberOn({
+        settings: { orchestratorGameProjects: { repo1: { orchestrator: { memberGame: false } } } },
+        repoId: 'repo1',
+        worktreePath: worktreeWith(null)
+      })
+    ).toBe(false)
+  })
+
+  it('is off when the game mode is off', async () => {
+    expect(
+      await isOrchestratorGameMemberOn({
+        settings: { orchestratorGame: { mode: 'off' } },
+        repoId: 'repo1',
+        worktreePath: worktreeWith(null)
+      })
+    ).toBe(false)
+  })
+
+  it("reads an SSH worktree's orca.yaml from its host", async () => {
+    registerSshFilesystemProvider('ssh-1', {
+      readFile: async (_filePath: string) => ({
+        content: 'orchestratorGame:\n  orchestrator:\n    memberGame: false\n',
+        isBinary: false
+      })
+    } as IFilesystemProvider)
+    expect(
+      await isOrchestratorGameMemberOn({
+        settings: undefined,
+        repoId: 'repo1',
+        worktreePath: '/srv/repo',
+        connectionId: 'ssh-1'
+      })
+    ).toBe(false)
   })
 })

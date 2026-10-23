@@ -21,6 +21,7 @@ import {
   resolveOrchestratorGameLead
 } from '../../shared/orchestrator-game-config'
 import type { GlobalSettings } from '../../shared/types'
+import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 
 const execFileAsync = promisify(execFile)
 const VERSION_CACHE_MS = 10 * 60_000
@@ -97,15 +98,10 @@ export async function prepareOrchestratorGameLaunch(args: {
   role?: 'member'
 }): Promise<OrchestratorGameLaunch> {
   const detect = args.detectClaudeVersion ?? detectClaudeCodeVersionCached
-  const [claudeVersion, project] = await Promise.all([
+  const [claudeVersion, layers] = await Promise.all([
     detect().catch(() => null),
-    args.worktreePath ? readWorktreeOrcaYaml(args.worktreePath, args.connectionId) : null
+    orchestratorGameLayersOf(args)
   ])
-  const layers = {
-    global: args.settings?.orchestratorGame,
-    project: project?.orchestratorGame,
-    local: args.repoId ? args.settings?.orchestratorGameProjects?.[args.repoId] : undefined
-  }
   const resolved = resolveOrchestratorGameConfig(layers)
   return buildOrchestratorGameLaunch({
     resolved,
@@ -125,4 +121,35 @@ export async function prepareOrchestratorGameLaunch(args: {
       ? { role: 'member' as const, memberGame: resolveOrchestratorGameLead(layers).memberGame }
       : {})
   })
+}
+
+type OrchestratorGameLayerSource = {
+  settings:
+    | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>>
+    | undefined
+  repoId: string | null
+  worktreePath: string | null
+  connectionId?: string | null
+}
+
+async function orchestratorGameLayersOf(args: OrchestratorGameLayerSource) {
+  const project = args.worktreePath
+    ? await readWorktreeOrcaYaml(args.worktreePath, args.connectionId)
+    : null
+  return {
+    global: args.settings?.orchestratorGame,
+    project: project?.orchestratorGame,
+    local: args.repoId ? args.settings?.orchestratorGameProjects?.[args.repoId] : undefined
+  }
+}
+
+/** Whether a project's game members take the game's shape: mode not off and memberGame not false. */
+export async function isOrchestratorGameMemberOn(
+  args: OrchestratorGameLayerSource
+): Promise<boolean> {
+  const layers = await orchestratorGameLayersOf(args)
+  return (
+    shownOrchestratorGameModeOf(resolveOrchestratorGameConfig(layers).config) !== 'off' &&
+    resolveOrchestratorGameLead(layers).memberGame !== false
+  )
 }
