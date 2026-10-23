@@ -5,7 +5,11 @@ import {
   type GameHistoryRecord
 } from '../../shared/orchestrator-game-history'
 import { ticketOfMember, type GameFleetRow } from '../../shared/orchestrator-game-fleet-verbs'
-import { memberNameOf } from '../../shared/orchestrator-game-member-names'
+import {
+  characterKeyOf,
+  memberNameOf,
+  type GameMemberName
+} from '../../shared/orchestrator-game-member-names'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
 
 type Client = Parameters<CommandHandler>[0]['client']
@@ -77,8 +81,11 @@ export async function recordFreedMember(args: {
   workers: readonly GameStopWorker[]
   /** The dispatch the caller frees, when it found it its own way. */
   dispatch?: Pick<GameStopWorker, 'dispatchId' | 'workerState'>
+  /** The project's roster, which names the member's character in every language. */
+  roster: readonly GameMemberName[]
 }): Promise<string | null> {
   const { client, member } = args
+  const character = memberNameOf(member.displayName)
   const dispatch =
     args.dispatch ??
     dispatchOf(
@@ -110,7 +117,8 @@ export async function recordFreedMember(args: {
       terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
       memberWorktreeId: member.worktree?.id,
       record,
-      character: memberNameOf(member.displayName) ?? undefined
+      character: character ?? undefined,
+      characterKey: character === null ? undefined : characterKeyOf(args.roster, character)
     })
     return null
   } catch (error) {

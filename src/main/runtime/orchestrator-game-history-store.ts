@@ -13,6 +13,11 @@ import {
   type GameEvent
 } from '../../shared/orchestrator-game-events'
 import {
+  foldFreedMember,
+  listGameCharacters,
+  type GameCharacter
+} from '../../shared/orchestrator-game-characters'
+import {
   migrateGameStore,
   type GameStoreData,
   type GameStoreMigration
@@ -29,6 +34,8 @@ type ProjectLog = {
   events: unknown[]
   /** Per inbox (`lead` or a ticket), the newest orchestration message sequence the board marked read. */
   cursors: Record<string, unknown>
+  /** Per character key, its saved progress; absent until a member with a character is freed. */
+  characters: Record<string, unknown> | null
 }
 
 type LoadedLog = {
@@ -67,7 +74,8 @@ function logOf(data: GameStoreData): ProjectLog {
     data,
     records: listOf(data, 'records'),
     events: listOf(data, 'events'),
-    cursors: isRecord(data.cursors) ? data.cursors : {}
+    cursors: isRecord(data.cursors) ? data.cursors : {},
+    characters: isRecord(data.characters) ? data.characters : null
   }
 }
 
@@ -109,11 +117,22 @@ export class GameHistoryStore {
     })
   }
 
-  async append(projectKey: string, record: GameHistoryRecord): Promise<GameHistoryRecord[]> {
-    const log = await this.update(projectKey, (current) => ({
-      ...current,
-      records: appendGameHistory(current.records, record)
-    }))
+  async characters(projectKey: string): Promise<GameCharacter[]> {
+    return listGameCharacters((await this.read(projectKey)).log.characters ?? {})
+  }
+
+  /** With `character`, the same write adds the record's task to that character's progress. */
+  async append(
+    projectKey: string,
+    record: GameHistoryRecord,
+    character?: { key: string; name: string }
+  ): Promise<GameHistoryRecord[]> {
+    const log = await this.update(projectKey, (current) => {
+      const characters = character
+        ? (foldFreedMember(current.characters ?? {}, character, record) ?? current.characters)
+        : current.characters
+      return { ...current, records: appendGameHistory(current.records, record), characters }
+    })
     return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
@@ -150,7 +169,7 @@ export class GameHistoryStore {
     if (result.kind === 'frozen') {
       const fits =
         ['records', 'events'].every((key) => !(key in parsed) || Array.isArray(parsed[key])) &&
-        (!('cursors' in parsed) || isRecord(parsed.cursors))
+        ['cursors', 'characters'].every((key) => !(key in parsed) || isRecord(parsed[key]))
       return { log: logOf(parsed), before: { kind: fits ? 'none' : 'read-only' } }
     }
     return {
@@ -187,11 +206,11 @@ export class GameHistoryStore {
           // Why a copy, not a rename: until the migrated file lands, the old one stays readable.
           await copyFile(file, this.besideOf(projectKey, `v${before.from}-${fileStamp()}.backup`))
         }
-        const { data, records, events, cursors } = log
+        const { data, records, events, cursors, characters } = log
         await writeFileDurable(
           durableWriteTempPath(file),
           file,
-          JSON.stringify({ ...data, records, events, cursors })
+          JSON.stringify({ ...data, records, events, cursors, ...(characters && { characters }) })
         )
         return log
       })

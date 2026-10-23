@@ -47,7 +47,9 @@ const GameHistoryRecordParams = z.object({
   terminalHandle: z.string().optional(),
   memberWorktreeId: z.string().optional(),
   record: GameHistoryRecordSchema,
-  character: z.string().max(64).optional()
+  character: z.string().max(64).optional(),
+  /** The roster key of `character`, so its language variants count as one character. */
+  characterKey: z.string().max(64).optional()
 })
 
 const memberText = z.string().min(1).max(200).optional()
@@ -137,7 +139,8 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         terminalHandle: params.terminalHandle,
         memberWorktreeId: params.memberWorktreeId,
         record: params.record,
-        character: params.character
+        character: params.character,
+        characterKey: params.characterKey
       })
   }),
   defineMethod({

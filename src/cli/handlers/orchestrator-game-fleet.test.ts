@@ -515,6 +515,7 @@ describe('orca game fleet verbs', () => {
       terminalHandle: 'term_lead',
       memberWorktreeId: 'wt_9',
       character: 'Arthur',
+      characterKey: 'arthur',
       record: expect.objectContaining({
         ticket: 'CIN-9',
         branch: 'cin-9',

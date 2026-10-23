@@ -61,7 +61,7 @@ describe('GameMemberNameReservations', () => {
       'Merlin',
       'Lancelot'
     ])
-    expect(reserve(names, 'A-4')).toBeNull()
+    expect([reserve(names, 'A-4'), reserve(names, 'A-5')]).toEqual(['Arthur 2', 'Merlin 2'])
   })
 
   it('skips taken names in any language, and keeps projects apart', () => {

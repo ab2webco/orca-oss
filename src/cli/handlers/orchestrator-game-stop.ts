@@ -1,6 +1,7 @@
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-fleet-verbs'
+import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 
 type Client = Parameters<CommandHandler>[0]['client']
@@ -119,7 +120,7 @@ export async function stopOne(
 /** Ends every target member's agent: its dispatch first, then its terminal if one is left. */
 export async function stopGameMembers(
   client: Client,
-  state: Parameters<typeof gameStopTargetsOf>[0],
+  state: Parameters<typeof gameStopTargetsOf>[0] & Parameters<typeof memberRosterOf>[0],
   tickets: 'all' | readonly string[]
 ): Promise<GameStopResult> {
   const { targets, missing } = gameStopTargetsOf(state, tickets)
@@ -132,7 +133,13 @@ export async function stopGameMembers(
     for (const target of targets) {
       const member = agentOfRow(state, target.row)
       const history = member
-        ? await recordFreedMember({ client, member, freedBy: 'stop', workers: result.workers })
+        ? await recordFreedMember({
+            client,
+            member,
+            freedBy: 'stop',
+            workers: result.workers,
+            roster: memberRosterOf(state)
+          })
         : null
       const entry = await stopOne(client, target, result.workers)
       members.push(history ? { ...entry, history } : entry)
