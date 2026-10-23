@@ -446,6 +446,21 @@ describe('buildOrchestratorGameState', () => {
     expect(state.lead).toEqual({ autostart: true, cap: 2, agent: 'claude', rules: 'CIN flow' })
   })
 
+  it("caps members by Orca's machine when no layer sets a cap", async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: worktree(checkout('')),
+      host: { totalMemory: 64 * 1024 ** 3, cpuCoreCount: 12 },
+      agents: [],
+      leaderPaneKey: null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.lead?.cap).toBe(6)
+  })
+
   it('names the calling pane a member when a lead launched it, else the lead', async () => {
     const base = {
       settings: undefined,

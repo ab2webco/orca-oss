@@ -2,10 +2,17 @@
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
+import type { GameHostProfile } from '../../../../shared/orchestrator-game-lead'
+
+let host: GameHostProfile | null = null
+vi.mock('./use-game-host-profile', () => ({ useGameHostProfile: () => host }))
+afterEach(() => {
+  host = null
+})
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 
@@ -64,6 +71,15 @@ function commit(input: HTMLInputElement, value: string): void {
 }
 
 describe('ProjectOrchestratorGameLeadSetting', () => {
+  it('shows the cap this machine sets when no layer sets one', () => {
+    host = { totalMemory: 64 * 1024 ** 3, cpuCoreCount: 12 }
+    const view = render({}, undefined)
+
+    expect(view.container.textContent).toContain('6 · default')
+    expect(field(view.container, 'Member cap').placeholder).toBe('6')
+    view.unmount()
+  })
+
   it('shows each effective lead value with the layer it comes from', () => {
     const view = render(
       { orchestratorGameProjects: { repo1: { orchestrator: { label: 'Boss' } } } },

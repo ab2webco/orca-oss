@@ -49,7 +49,7 @@ orchestratorGame:
   orchestrator: # the lead
     autostart: true # a plain session here starts as the lead
     label: Lead # the lead's name, at most 32 characters
-    cap: 4 # members running at once, 1 to 12
+    cap: 4 # members running at once, 1 to 12; unset, Orca sizes it to the machine
     agent: claude
     model: claude-opus-5-5 # optional
     effort: medium # optional, only with model

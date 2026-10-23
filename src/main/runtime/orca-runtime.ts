@@ -120,7 +120,7 @@ import {
 import { getGitCloneFailureMessage } from '../../shared/git-clone-failure-message'
 import { GIT_FETCH_SKIP_AUTO_MAINTENANCE_CONFIG_ARGS } from '../../shared/git-fetch-auto-maintenance'
 import { createHash, randomUUID } from 'node:crypto'
-import { homedir } from 'node:os'
+import { cpus, homedir, totalmem } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
@@ -31075,6 +31075,7 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
+      host: { totalMemory: totalmem(), cpuCoreCount: Math.max(1, cpus().length) },
       worktree: worktree
         ? {
             id: worktree.id,

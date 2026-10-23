@@ -50,6 +50,28 @@ const EFFORT = /^[a-z]{1,16}$/
 
 export const DEFAULT_GAME_LEAD: OrchestratorGameLead = { autostart: false, cap: 4, agent: 'claude' }
 
+/** The machine members run on: Orca's host, as `os.totalmem()` and `os.cpus()` read it. */
+export type GameHostProfile = { totalMemory: number; cpuCoreCount: number }
+
+// Why per member: an agent, its worktree's dev tools and its terminals, measured on 16 GB / 8-core Macs.
+const MEMBER_MEMORY_BYTES = 4 * 1024 ** 3
+const MEMBER_CPU_CORES = 2
+
+/**
+ * Members a machine runs at once when no layer sets `cap`. Total memory and cores, not what is free
+ * right now, so the cap does not move while members start; low free memory has its own warning.
+ */
+export function defaultGameMemberCapOf(host: GameHostProfile | null): number {
+  if (host === null) {
+    return DEFAULT_GAME_LEAD.cap
+  }
+  const fit = Math.min(
+    Math.floor(host.totalMemory / MEMBER_MEMORY_BYTES),
+    Math.floor(host.cpuCoreCount / MEMBER_CPU_CORES)
+  )
+  return Math.min(GAME_LEAD_CAP_MAX, Math.max(1, Number.isFinite(fit) ? fit : 1))
+}
+
 export const DEFAULT_GAME_PUSH_PROMPT =
   'Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.'
 
@@ -153,9 +175,10 @@ export function parseGameLead(raw: unknown): {
 
 // Why key by key: a project sets its cap in orca.yaml while one dev picks a model in Settings.
 export function resolveGameLead(
-  layers: readonly (OrchestratorGameLeadLayer | undefined)[]
+  layers: readonly (OrchestratorGameLeadLayer | undefined)[],
+  host: GameHostProfile | null = null
 ): OrchestratorGameLead {
-  const lead: OrchestratorGameLead = { ...DEFAULT_GAME_LEAD }
+  const lead: OrchestratorGameLead = { ...DEFAULT_GAME_LEAD, cap: defaultGameMemberCapOf(host) }
   for (const layer of layers) {
     const parsed = layer === undefined ? undefined : parseGameLead(layer).value
     Object.assign(lead, parsed)

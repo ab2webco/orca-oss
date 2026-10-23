@@ -24,6 +24,7 @@ import {
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
 import { translate } from '@/i18n/i18n'
+import { useGameHostProfile } from './use-game-host-profile'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type LeadTextKey = 'cap' | 'label' | 'agent' | 'model' | 'effort'
@@ -163,8 +164,10 @@ export function ProjectOrchestratorGameLeadSetting({
   const local = settings.orchestratorGameProjects?.[repoId]
   const stored = local?.orchestrator
   const layers = { global: settings.orchestratorGame, project: projectLayer, local }
-  const lead = resolveOrchestratorGameLead(layers)
-  const inherited = resolveOrchestratorGameLead({ ...layers, local: undefined })
+  // Why the host's snapshot: Orca's machine sets the cap no layer sets, as game.state does.
+  const host = useGameHostProfile()
+  const lead = resolveOrchestratorGameLead(layers, host)
+  const inherited = resolveOrchestratorGameLead({ ...layers, local: undefined }, host)
   const set = <K extends keyof OrchestratorGameLead>(
     key: K,
     value: OrchestratorGameLead[K] | undefined

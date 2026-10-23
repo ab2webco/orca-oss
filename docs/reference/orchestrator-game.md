@@ -462,7 +462,7 @@ project Settings edits all but the two prompts and `rules`, which live in `orca.
 orchestratorGame:
   orchestrator:
     autostart: true # a plain session in this project starts as the lead
-    cap: 4 # members running at once, 1 to 12; launches past it are refused
+    cap: 4 # members running at once, 1 to 12; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1
     agent: claude # what a member runs, as `orca orchestration worker-start --agent` names it
     model: opus # optional
     effort: high # optional, used only with a model
