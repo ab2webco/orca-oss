@@ -5,10 +5,10 @@ import {
   parseOrchestratorGameLayer,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
-  gameLeadSourceOf,
   resolveOrchestratorGameLead,
   resolveOrchestratorGameRewardWeights
 } from './orchestrator-game-config'
+import { gameLeadSourceOf } from './orchestrator-game-lead-source'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import { DEFAULT_GAME_REWARD_WEIGHTS } from './orchestrator-game-reward-weights'
 

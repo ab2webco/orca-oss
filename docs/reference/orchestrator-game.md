@@ -895,6 +895,9 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   lead gets one message: "member reattached", or "orphaned member still working" (adopt its work
   or stop that terminal). The deadline still fails a silent dispatch at 11 minutes, since host
   activity never clears it in advance; a federated member has no local activity to reopen it.
+  While it keeps working, an orphaned member stays in `game fleet` and `game member` (it no longer
+  ages out 30 minutes after the failure), with NEXT "orphaned, still working: adopt its work or
+  stop it". The fleet's ACTIVE column shows each member's last host-observed activity.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,

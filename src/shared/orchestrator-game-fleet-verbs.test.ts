@@ -193,6 +193,27 @@ describe('gameFleetReportOf', () => {
     )
   })
 
+  it('keeps an orphaned member as still working, says what to do with it, and carries its last activity (ORCA-658)', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({ orphaned: true, lastActivityAt: '2026-10-22T12:00:00.000Z' }),
+        member({ paneKey: 'p2', displayName: 'CIN-2 Combos', state: 'idle' })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        ticket: 'CIN-1',
+        phase: 'working',
+        orphaned: true,
+        lastActivityAt: '2026-10-22T12:00:00.000Z',
+        next: 'orphaned, still working: adopt its work or stop it'
+      }),
+      expect.objectContaining({ ticket: 'CIN-2', orphaned: false, lastActivityAt: null })
+    ])
+  })
+
   it('names the agent and the managed account each member runs on', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

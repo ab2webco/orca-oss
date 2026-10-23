@@ -10,6 +10,25 @@ export type SilentFailureOutcome = { dispatchId: string; action: 'reattached' | 
 // Why: past this long with nothing shown, the terminal is no evidence either way.
 export const SILENT_FAILURE_WATCH_MS = AGENT_STATUS_STALE_AFTER_MS
 
+type SettledFacts = Pick<
+  DispatchContextRow,
+  'status' | 'failure_provenance' | 'completed_at' | 'last_activity_at'
+>
+
+// Why: SQLite's datetime('now') has no T and no zone; it is UTC.
+const msOf = (at: string | null): number =>
+  at ? Date.parse(at.includes('T') ? at : `${at.replace(' ', 'T')}Z`) : Number.NaN
+
+/** Failed for silence and seen working after it: left failed only because something replaced it. */
+export const isOrphanedSilenceFailure = (dispatch: SettledFacts): boolean =>
+  dispatch.status === 'failed' &&
+  dispatch.failure_provenance === 'inferred_silence' &&
+  msOf(dispatch.last_activity_at) > msOf(dispatch.completed_at)
+
+/** When a settled dispatch last mattered; an orphaned one keeps mattering while it works. */
+export const settledDispatchSeenAtMs = (dispatch: SettledFacts): number =>
+  isOrphanedSilenceFailure(dispatch) ? msOf(dispatch.last_activity_at) : msOf(dispatch.completed_at)
+
 type TaskText = { spec: string; task_title: string | null; display_name: string | null }
 
 const ticketOf = (task: TaskText | undefined): string | null =>

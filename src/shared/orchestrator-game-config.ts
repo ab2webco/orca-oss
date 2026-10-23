@@ -113,7 +113,7 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
 const KEYS = Object.keys(DEFAULT_ORCHESTRATOR_GAME_CONFIG) as (keyof OrchestratorGameConfig)[]
 
 // Why: later layers win — the repo owner's orca.yaml over global Settings, the dev's local override over both.
-const LAYER_ORDER: readonly Exclude<OrchestratorGameSource, 'default'>[] = [
+export const ORCHESTRATOR_GAME_LAYER_ORDER: readonly Exclude<OrchestratorGameSource, 'default'>[] = [
   'global',
   'project',
   'local'
@@ -129,7 +129,7 @@ export function resolveOrchestratorGameConfig(
   >
   let sceneFile: string | null = null
   const warnings: string[] = []
-  for (const source of LAYER_ORDER) {
+  for (const source of ORCHESTRATOR_GAME_LAYER_ORDER) {
     const layer = layers[source]
     if (!layer) {
       continue
@@ -187,7 +187,7 @@ export function resolveOrchestratorGameIntegrations(
     todo: null,
     reviews: {}
   }
-  for (const source of LAYER_ORDER) {
+  for (const source of ORCHESTRATOR_GAME_LAYER_ORDER) {
     const layer = layers[source]
     if (layer?.links !== undefined) {
       resolved.links = parseGameLinkTemplates(layer.links).value ?? []
@@ -214,7 +214,7 @@ export function resolveOrchestratorGameLead(
   host: GameHostProfile | null = null
 ): OrchestratorGameLead {
   return resolveGameLead(
-    LAYER_ORDER.map((source) => layers[source]?.orchestrator),
+    ORCHESTRATOR_GAME_LAYER_ORDER.map((source) => layers[source]?.orchestrator),
     host
   )
 }
@@ -222,25 +222,7 @@ export function resolveOrchestratorGameLead(
 export function resolveOrchestratorGameRewardWeights(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
 ): GameRewardWeights {
-  return resolveGameRewardWeights(LAYER_ORDER.map((source) => layers[source]?.rewardWeights))
-}
-
-/** The layer a lead key's effective value comes from; 'default' when no layer sets a usable one. */
-export function gameLeadSourceOf(
-  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>,
-  key: keyof OrchestratorGameLead
-): OrchestratorGameSource {
-  if (resolveOrchestratorGameLead(layers)[key] === undefined) {
-    return 'default'
-  }
-  let source: OrchestratorGameSource = 'default'
-  for (const name of LAYER_ORDER) {
-    const raw = layers[name]?.orchestrator
-    if (raw !== undefined && parseGameLead(raw).value?.[key] !== undefined) {
-      source = name
-    }
-  }
-  return source
+  return resolveGameRewardWeights(ORCHESTRATOR_GAME_LAYER_ORDER.map((source) => layers[source]?.rewardWeights))
 }
 
 const isMode = (value: unknown): value is OrchestratorGameMode =>

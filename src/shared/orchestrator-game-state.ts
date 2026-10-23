@@ -65,6 +65,10 @@ export type GameAgent = {
   advisor?: GameMemberAdvisor
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
   launch?: GameMemberLaunch
+  /** When the host last saw the member's terminal work (ORCA-746); absent when unknown or from an older host. */
+  lastActivityAt?: string
+  /** Failed for silence yet still working, not reopened because something replaced it (ORCA-658). */
+  orphaned?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }

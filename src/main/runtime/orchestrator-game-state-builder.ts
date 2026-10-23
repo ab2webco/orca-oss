@@ -9,14 +9,13 @@ import {
   type GameMemberWork,
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
-import { readWorktreeGameSceneFile } from '../worktree-game-scene-file'
+import { readSceneFile } from './orchestrator-game-scene-file-read'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
   resolveOrchestratorGameLead,
-  resolveOrchestratorGameRewardWeights,
-  type ResolvedOrchestratorGameConfig
+  resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
 import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
 import {
@@ -35,11 +34,8 @@ import {
 } from '../../shared/orchestrator-game-links'
 import {
   orchestratorGameScenesOf,
-  parseOrchestratorGameScene,
-  type OrchestratorGameSceneExtension,
   type OrchestratorGameSceneSource
 } from '../../shared/orchestrator-game-scene'
-import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import {
   shownOrchestratorGameModeOf,
@@ -123,42 +119,6 @@ export type OrchestratorGameStateInput = {
     todo: OrchestratorGameTodoSource | null
     workItem: GameWorkItem | null
   }) => Promise<GameProjectWork>
-}
-
-// `notes` are parts of a scene that still draws, left out; `warning` means it fell back to Quest.
-type SceneFileOutcome =
-  | { scene: OrchestratorGameSceneExtension; warning?: undefined; notes: string[] }
-  | { scene?: undefined; warning: string; notes?: undefined }
-
-// Why re-read every build: a scene being authored should redraw on the next poll, not after a restart.
-async function readSceneFile(
-  resolved: ResolvedOrchestratorGameConfig,
-  worktree: NonNullable<OrchestratorGameStateInput['worktree']> | null
-): Promise<SceneFileOutcome | null> {
-  const path = resolved.sceneFile
-  if (path === null) {
-    return null
-  }
-  const id = resolved.config.scene
-  const failed = (reason: string): SceneFileOutcome => ({
-    warning: `Scene file ${path}: ${reason}; drawing Quest`
-  })
-  if (!worktree) {
-    return failed('no worktree to read it from')
-  }
-  let text: string
-  try {
-    text = await readWorktreeGameSceneFile(worktree.path, worktree.connectionId, path)
-  } catch (error) {
-    return failed(error instanceof Error ? error.message : String(error))
-  }
-  const parsed = parseOrchestratorGameScene(text, id)
-  return parsed.ok
-    ? {
-        scene: { id, pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE, definition: parsed.definition },
-        notes: parsed.warnings.map((one) => `Scene file ${path}: ${one}; drawn without it`)
-      }
-    : failed(parsed.error)
 }
 
 export async function buildOrchestratorGameState(

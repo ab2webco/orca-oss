@@ -17,7 +17,14 @@ import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
 export type GameAgentRow = Pick<
   RuntimeWorktreeAgentRow,
-  'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
+  | 'paneKey'
+  | 'state'
+  | 'agentType'
+  | 'displayName'
+  | 'taskTitle'
+  | 'toolName'
+  | 'lastActivityAt'
+  | 'orphaned'
 > & { parentPaneKey?: string | null }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
@@ -162,7 +169,9 @@ export async function gameFleetOf(args: {
         ...(account ? { account } : {}),
         ...(limit ? { limit } : {}),
         ...(advisor ? { advisor } : {}),
-        ...(launch ? { launch } : {})
+        ...(launch ? { launch } : {}),
+        ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
+        ...(isMember && row.orphaned ? { orphaned: true as const } : {})
       }
     })
   )
