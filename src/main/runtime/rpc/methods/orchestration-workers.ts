@@ -1,11 +1,11 @@
 import type { TuiAgent } from '../../../../shared/types'
 import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
-import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { AGENT_COMPOSER_READY_TIMEOUT_MS } from '../../agent-composer-readiness'
 import { defineMethod, type RpcContext, type RpcMethod } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
+import { workerDispatchInputOf } from './orchestration-worker-dispatch-input'
 import { WorkerStartParams, type WorkerStartInput } from './orchestration-worker-start-schema'
 import {
   createExistingWorktreeWorkerTerminal,
@@ -262,17 +262,16 @@ async function startWorker(
     })
 
     failedStage = 'dispatch_input'
-    const preamble = buildDispatchPreamble({
-      taskId: task.id,
+    const input = await workerDispatchInputOf({
+      runtime,
+      params,
+      task,
       dispatchId: started.dispatch.id,
-      taskSpec: task.spec,
-      coordinatorHandle: params.from,
-      workerHandle: terminalHandle,
-      dispatchCapability: capability,
-      devMode: params.devMode,
-      cliCommand: runtime.getTerminalOrchestrationCliCommand(terminalHandle)
+      terminalHandle,
+      capability,
+      worktreeId: resolvedWorktree.id
     })
-    const sent = await runtime.sendTerminalAgentPromptObservingTurn(terminalHandle, preamble)
+    const sent = await runtime.sendTerminalAgentPromptObservingTurn(terminalHandle, input)
     effects.push({
       kind: 'dispatch_input',
       role: 'agent',

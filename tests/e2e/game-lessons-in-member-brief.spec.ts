@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
+import { BRIEF_LINE, memberWorkspaceOf } from './helpers/game-member-workspace'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
@@ -141,14 +142,20 @@ test("a failed member's lesson reaches the next member's brief", async ({
     expect(spec).toContain(BLOCK_OPEN)
     expect(spec).toContain('CI went red on PR #52 after I reported it verified')
 
-    // What the member itself was handed, not only what Orca stored.
+    // What the member itself was handed, not only what Orca stored: the brief its one line names.
     await expect
-      .poll(() => agent.readStdin(), {
+      .poll(() => BRIEF_LINE.exec(agent.readStdin())?.[1] ?? null, {
         timeout: 60_000,
-        message: 'the member agent never received a brief with the lesson'
+        message: 'the member agent never received its one-line brief'
       })
-      .toContain('CI went red on PR #52 after I reported it verified')
-    expect(agent.readStdin()).toContain(BLOCK_OPEN)
+      .not.toBeNull()
+    const named = BRIEF_LINE.exec(agent.readStdin())![1]!
+    const memberPath = await memberWorkspaceOf(client, launched.result.taskId)
+    expect(memberPath, 'the member worktree is listed').toBeTruthy()
+    const brief = readFileSync(path.join(memberPath!, named), 'utf8')
+    writeFileSync(testInfo.outputPath('brief.md'), brief)
+    expect(brief).toContain('CI went red on PR #52 after I reported it verified')
+    expect(brief).toContain(BLOCK_OPEN)
   } finally {
     agent.dispose()
   }

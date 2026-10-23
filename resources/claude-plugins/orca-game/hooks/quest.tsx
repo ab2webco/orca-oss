@@ -8,6 +8,7 @@ import {
   type GameCommand
 } from './game-commands'
 import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
+import { briefPathOf } from './brief-line'
 import {
   configuredConfig,
   currentScene,
@@ -281,9 +282,19 @@ const registerCards = (on: On) => {
     if (!isHumanOrigin(e.props.origin.kind)) {
       return hidden($, e)
     }
-    const drawn = await next(e)
     const teller = currentScene().teller
     const { Box, Text } = $.ui.resolve(e)
+    // Why not when expanded: ctrl+o shows the line Orca typed, as for any compact row.
+    const brief = e.props.isExpanded ? null : briefPathOf(e.props.text)
+    if (brief !== null) {
+      return (
+        <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
+          <Text bold color={teller.color}>{`📜 ${gameStrings().text.briefReceived}`}</Text>
+          <Text dimColor>{brief}</Text>
+        </Box>
+      )
+    }
+    const drawn = await next(e)
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
         <Text bold color={teller.color}>{`${teller.icon} ${localizedNameOf(teller.name)}`}</Text>

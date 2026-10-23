@@ -667,7 +667,11 @@ import {
 import { readMemoryPressure } from '../memory/memory-pressure-reading'
 import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
-import { prepareOrchestratorGameLaunch } from '../claude/orchestrator-game-launch-context'
+import {
+  isOrchestratorGameMemberOn,
+  prepareOrchestratorGameLaunch
+} from '../claude/orchestrator-game-launch-context'
+import type { DispatchBriefTarget } from './orchestration/dispatch-brief-delivery'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import {
   orchestratorGameMemberCliOf,
@@ -31337,6 +31341,33 @@ export class OrcaRuntimeService {
       })
     } catch {
       return { args: [], env: {} }
+    }
+  }
+
+  /** Where a game member's dispatch brief goes; null keeps the full preamble (ORCA-757). */
+  async gameMemberBriefTargetFor(
+    worktreeId: string,
+    platform: NodeJS.Platform = process.platform
+  ): Promise<DispatchBriefTarget | null> {
+    try {
+      const scope = await this.resolveTerminalWorkspaceLaunchScope(`id:${worktreeId}`)
+      // Why: only this machine's disk or the SSH provider can take the write; a WSL worktree is a UNC path here.
+      const isWritableHere =
+        scope.connectionId !== null ||
+        ((!scope.repo || getRepoExecutionHostId(scope.repo) === LOCAL_EXECUTION_HOST_ID) &&
+          (platform !== 'win32' || isWindowsAbsolutePathLike(scope.path)))
+      if (!isWritableHere) {
+        return null
+      }
+      const isOn = await isOrchestratorGameMemberOn({
+        settings: this.store?.getSettings?.(),
+        repoId: scope.repo?.id ?? null,
+        worktreePath: scope.path,
+        connectionId: scope.connectionId
+      })
+      return isOn ? { path: scope.path, connectionId: scope.connectionId } : null
+    } catch {
+      return null
     }
   }
 

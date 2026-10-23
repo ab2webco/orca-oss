@@ -6,6 +6,8 @@ import {
   getOrcaDispatchTaskId,
   isOrcaDispatchPrompt
 } from './agent-row-primary-text'
+import { dispatchBriefLineOf } from '../../../shared/orca-dispatch-brief-line'
+import { briefPathOf } from '../../../../resources/claude-plugins/orca-game/hooks/brief-line'
 
 describe('getAgentRowPrimaryText', () => {
   it('prefers orchestration display name over the raw hook prompt', () => {
@@ -282,5 +284,42 @@ Checkout race body`,
         }
       })
     ).toBe('Refactor the auth middleware')
+  })
+})
+
+describe('a one-line dispatch brief (ORCA-757)', () => {
+  const brief = 'Read your Orca Lab brief at .orca/briefs/ctx-7.md (task task-7) and follow it.'
+
+  it('is still the dispatch turn, with its task id', () => {
+    expect(isOrcaDispatchPrompt(brief)).toBe(true)
+    expect(getOrcaDispatchTaskId(brief)).toBe('task-7')
+  })
+
+  it('names the row from the matching orchestration labels', () => {
+    expect(
+      getAgentRowPrimaryText({
+        prompt: brief,
+        orchestration: { taskId: 'task-7', dispatchId: 'ctx-7', displayName: 'Fix checkout race' }
+      })
+    ).toBe('Fix checkout race')
+  })
+
+  it('keeps sticky labels of another task off the row', () => {
+    expect(
+      getAgentRowPrimaryText({
+        prompt: brief,
+        orchestration: { taskId: 'task-1', dispatchId: 'ctx-1', displayName: 'Old task' }
+      })
+    ).not.toBe('Old task')
+  })
+
+  it('shows the line itself before any label arrives, never an empty row', () => {
+    expect(getAgentRowPrimaryText({ prompt: brief })).toBe(brief)
+  })
+
+  it("is Orca's own line, the one the game mod draws as a brief received block", () => {
+    expect(dispatchBriefLineOf({ dispatchId: 'ctx-7', taskId: 'task-7' })).toBe(brief)
+    expect(briefPathOf(brief)).toBe('.orca/briefs/ctx-7.md')
+    expect(briefPathOf('Read the README')).toBeNull()
   })
 })
