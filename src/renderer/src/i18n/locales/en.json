@@ -11381,7 +11381,8 @@
           "sceneFileSshOffline": "Connect this SSH project to read its scene file.",
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
           "sceneFileNotText": "not a text file",
-          "flat": "Flat"
+          "flat": "Flat",
+          "previewFlat": "Flat draws the game as text, with no scene or characters."
         },
         "OrchestratorGameLeadSetting": {
           "cap": "Member cap",
@@ -11495,6 +11496,20 @@
         "MobileUpdateInstallSetting": {
           "title": "Update from a paired phone",
           "description": "Let a paired phone ask this computer to install the update Orca Lab already offers. A countdown you can cancel shows before Orca restarts, and requests are refused while agents are working."
+        },
+        "OrchestratorGameViewSetting": {
+          "off": "Off",
+          "flat": "Flat",
+          "zen": "Zen",
+          "classic": "2D classic",
+          "hd": "2D hd",
+          "light": "light",
+          "medium": "medium",
+          "heavy": "heavy",
+          "show": "Show the game",
+          "view": "Default view",
+          "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
+          "viewDescription": "How panes draw the game, with what it costs. Each project can change it, and one pane with /orca-game:view."
         }
       },
       "right": {

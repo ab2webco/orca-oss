@@ -10733,6 +10733,7 @@
           "previewLabel": "Vista previa de la escena",
           "previewImage": "Vista previa de {{value0}}",
           "previewOff": "El juego está desactivado, así que los paneles de Agent Teams arrancan como Claude normal.",
+          "previewFlat": "Plano dibuja el juego como texto, sin escena ni personajes.",
           "previewZen": "Zen dibuja la misma escena y además oculta las notas breves de trabajo.",
           "previewPlugin": "El arte de este plugin solo se dibuja dentro de un panel de Agent Teams.",
           "previewMissing": "No está instalada, así que el juego dibuja Quest.",
@@ -10867,6 +10868,20 @@
         "MobileUpdateInstallSetting": {
           "title": "Actualizar desde un teléfono emparejado",
           "description": "Permite que un teléfono emparejado pida a este equipo instalar la actualización que Orca Lab ya ofrece. Antes de reiniciar se muestra una cuenta atrás que puedes cancelar, y las solicitudes se rechazan mientras haya agentes trabajando."
+        },
+        "OrchestratorGameViewSetting": {
+          "off": "Apagado",
+          "flat": "Plano",
+          "zen": "Zen",
+          "classic": "2D clásico",
+          "hd": "2D hd",
+          "light": "ligera",
+          "medium": "media",
+          "heavy": "pesada",
+          "show": "Mostrar el juego",
+          "view": "Vista por defecto",
+          "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
+          "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
         }
       },
       "right": {

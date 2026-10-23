@@ -24,7 +24,7 @@ const worldOf = (patch: Partial<World> = {}): World => ({
 
 const stateOf = (world: World) => ({
   config: world.config,
-  sources: {},
+  sources: world.extra.sources ?? {},
   warnings: [],
   worktree: { id: 'wt-1', path: '/w', branch: 'feat/game', displayName: 'game' },
   agents: [
@@ -169,5 +169,21 @@ describe('/orca-game:view', () => {
     )
     expect(world.calls).toHaveLength(1)
     expect(nowOf(await run($, 'orca-game:view'))).toBe('2D classic')
+  })
+
+  test('says the project keeps its own view when every project changes under it', async ($, on) => {
+    const clock = mock.clock(on)
+    const world = worldOf({
+      extra: { viewScopes: ['project', 'global'], sources: { mode: 'local', render: 'global' } }
+    })
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.advance(POLL_MS)
+
+    expect(await run($, 'orca-game:view', 'flat global')).toBe(
+      "View: Flat, saved for every project; this project's own setting keeps Zen here."
+    )
+    expect(world.calls).toHaveLength(1)
+    expect(nowOf(await run($, 'orca-game:view'))).toBe('Zen')
   })
 })

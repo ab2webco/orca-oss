@@ -233,8 +233,9 @@ describe('the Fleet pane on a phone', () => {
       ui,
       'pane-menu-tap',
       41,
-      ['refresh', 'flat', 'pet', 'quit'],
-      1
+      ['refresh', 'flat', 'view', 'pet', 'quit'],
+      // Why two: with the view selector the five chips and their hotkeys need about 50 cells.
+      2
     )
     // Close leads: a phone shows the pane's top rows, and Close is how it leaves.
     expect(keyOf(menu?.[0])).toBe('quit')
