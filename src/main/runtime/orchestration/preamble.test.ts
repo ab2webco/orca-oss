@@ -80,17 +80,22 @@ describe('buildDispatchPreamble', () => {
     }
   )
 
-  it('includes heartbeat CLI block with taskId and dispatchId and 5-minute cadence', () => {
+  it('asks for one start heartbeat with taskId and dispatchId, and no periodic loop (ORCA-746)', () => {
     const result = buildDispatchPreamble(baseParams())
     expect(result).toContain('--type heartbeat')
     expect(result).toContain('--subject "alive"')
-    expect(result).toMatch(/5 minutes/)
+    expect(result).toMatch(/send ONE heartbeat as soon as you read this/)
+    expect(result).toMatch(/Do not send more heartbeats/)
+    expect(result).not.toMatch(/every \d+ minutes/)
+    expect(result).not.toMatch(/themselves liveness signals/)
+    // Why: the ORCA-191 deadline keeps its value; only the beat cadence changed.
+    expect(result).toMatch(/no lifecycle\n  # signal within 11 minutes is failed/)
     // Both taskId and dispatchId are rendered as structured payload flags
     // (regression guard for §5.3.4 attribution — dispatchId attribution
     // prevents the zombie-heartbeat-masks-hung-retry race).
     expect(result).toContain('--task-id task_abc123')
     expect(result).toContain('--dispatch-id ctx_def456')
-    expect(result).toContain('--phase "<short: investigating|implementing|reviewing|waiting>"')
+    expect(result).toContain('--phase "starting"')
     expect(result).toMatch(/orchestration send --from term_worker/)
   })
 

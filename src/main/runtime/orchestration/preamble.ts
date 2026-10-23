@@ -1,6 +1,6 @@
 import type { OrchestrationCliCommand } from './cli-command'
 import { MAX_ENVELOPE_CORRECTION_ATTEMPTS } from './worker-done-envelope'
-import { DISPATCH_HEARTBEAT_INTERVAL_MIN } from './dispatch-lifecycle-deadline'
+import { DISPATCH_FIRST_SIGNAL_DEADLINE_MIN } from './dispatch-lifecycle-deadline'
 
 export type PreambleParams = {
   taskId: string
@@ -107,20 +107,21 @@ Slack, GitHub comments, or any other channel to reach a human during the run.
     --files-modified "path/a,path/b" \\
     --report-path "<optional: path to the full artifact>"
 
-  # BEHAVIOR RULE: send a heartbeat every ${DISPATCH_HEARTBEAT_INTERVAL_MIN} minutes
-  # while actively working on the task. The coordinator uses this to
-  # distinguish "still thinking" from "hung / crashed." Skip heartbeats only
-  # while blocked inside \`check --wait\` or \`ask\` — those calls are
-  # themselves liveness signals.
+  # BEHAVIOR RULE: send ONE heartbeat as soon as you read this, before any
+  # other work. It proves this brief reached you: a dispatch with no lifecycle
+  # signal within ${DISPATCH_FIRST_SIGNAL_DEADLINE_MIN} minutes is failed. Do not send more heartbeats
+  # and do not start a loop or timer for them: Orca watches your terminal and
+  # agent state itself. Use \`ask\`, \`escalation\` or \`worker_done\` for anything the
+  # coordinator must act on.
   #
-  # Include BOTH taskId and dispatchId in the payload: the coordinator
-  # attributes the heartbeat to the specific dispatch context, not just
-  # the task, so a straggler heartbeat from a previously-failed dispatch
-  # cannot mask a hung retry.
+  # Include BOTH taskId and dispatchId: the coordinator attributes the
+  # heartbeat to the specific dispatch context, not just the task, so a
+  # straggler heartbeat from a previously-failed dispatch cannot mask a
+  # hung retry.
   ${cli} orchestration send --from ${params.workerHandle}${capabilityFlag} \\
     --type heartbeat --subject "alive" \\
     --task-id ${params.taskId} --dispatch-id ${params.dispatchId} \\
-    --phase "<short: investigating|implementing|reviewing|waiting>"
+    --phase "starting"
 
   # Ask the coordinator a question and block until it answers.
   #
