@@ -127,6 +127,7 @@ import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
+import { liveRunCoordinatorHandle } from './orchestration-run-coordinator-handle'
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
@@ -35334,13 +35335,18 @@ export class OrcaRuntimeService {
     }
     const contexts: Record<string, AgentStatusOrchestrationContext> = {}
     const queriedHandles = new Set<string>()
+    const coordinatorByRunId = new Map<string, string | undefined>()
     for (const leaf of this.leaves.values()) {
       if (!leaf.ptyId) {
         continue
       }
       const handle = this.issueHandle(leaf)
       queriedHandles.add(handle)
-      const context = this.getAgentStatusOrchestrationContextForHandle(handle, db)
+      const context = this.getAgentStatusOrchestrationContextForHandle(
+        handle,
+        db,
+        coordinatorByRunId
+      )
       if (context) {
         contexts[this.makeRuntimePaneKey(leaf)] = context
       }
@@ -35354,7 +35360,11 @@ export class OrcaRuntimeService {
         continue
       }
       queriedHandles.add(handle)
-      const context = this.getAgentStatusOrchestrationContextForHandle(handle, db)
+      const context = this.getAgentStatusOrchestrationContextForHandle(
+        handle,
+        db,
+        coordinatorByRunId
+      )
       if (context) {
         contexts[pty.paneKey] = context
       }
@@ -35364,7 +35374,9 @@ export class OrcaRuntimeService {
 
   private getAgentStatusOrchestrationContextForHandle(
     handle: string,
-    db = this.getOrchestrationDbIfAvailable()
+    db = this.getOrchestrationDbIfAvailable(),
+    /** One graph publish's coordinators, so a stale one scans the panes once per run. */
+    coordinatorByRunId?: Map<string, string | undefined>
   ): AgentStatusOrchestrationContext | undefined {
     // Why: active dispatch is authoritative for reused terminals; settled context stale-groups later work once its row is gone.
     const dispatch =
@@ -35384,7 +35396,16 @@ export class OrcaRuntimeService {
         : { taskTitle: '', displayName: '' }
     const owningRun =
       task?.run_id && task.run_id === dispatch.run_id ? db?.getRun?.(dispatch.run_id) : undefined
-    const runCoordinatorHandle = owningRun?.coordinator_handle ?? undefined
+    let runCoordinatorHandle: string | undefined
+    if (owningRun) {
+      runCoordinatorHandle = coordinatorByRunId?.has(owningRun.id)
+        ? coordinatorByRunId.get(owningRun.id)
+        : liveRunCoordinatorHandle(owningRun, {
+            isOpen: (one) => this.isTerminalOpenForHandle(one),
+            handleForPaneKey: (paneKey) => this.getTerminalHandleForPaneKey(paneKey)
+          })
+      coordinatorByRunId?.set(owningRun.id, runCoordinatorHandle)
+    }
     const legacyActiveRun =
       owningRun?.legacy === 1 && (dispatch.status === 'pending' || dispatch.status === 'dispatched')
         ? db?.getActiveCoordinatorRun?.()
