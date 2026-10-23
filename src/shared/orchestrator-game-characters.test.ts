@@ -3,6 +3,7 @@ import {
   foldFreedMember,
   freedCharacterOf,
   GAME_CHARACTER_RECENT_MAX,
+  gameCharacterRowsOf,
   gameCharacterLevelOf,
   listGameCharacters
 } from './orchestrator-game-characters'
@@ -144,5 +145,27 @@ describe('freedCharacterOf', () => {
     expect(freedCharacterOf({ projectKey: 'no-project', character: 'Mario' })).toBeNull()
     expect(freedCharacterOf({ projectKey: 'repo:a', character: '  ' })).toBeNull()
     expect(freedCharacterOf({ projectKey: 'repo:a' })).toBeNull()
+  })
+})
+
+describe('gameCharacterRowsOf', () => {
+  it('adds each character its level and the task its live member holds', () => {
+    const stored = foldFreedMember({}, arthur, freed({ outcome: 'qa', pr: null })) ?? {}
+    const rows = gameCharacterRowsOf(listGameCharacters(stored), [
+      { name: 'arturo', ticket: 'CIN-7' },
+      { name: 'Merlin', ticket: 'CIN-8' }
+    ])
+
+    expect(rows.map((row) => [row.name, row.level.level, row.current?.ticket ?? null])).toEqual([
+      ['Arturo', 1, 'CIN-7'],
+      ['Merlin', 1, 'CIN-8']
+    ])
+    expect(rows[1]).toMatchObject({ key: 'merlin', tickets: 0, xp: 0, recent: [] })
+  })
+
+  it('shows a character with no live member as free', () => {
+    const stored = foldFreedMember({}, arthur, freed()) ?? {}
+
+    expect(gameCharacterRowsOf(listGameCharacters(stored), [])[0]?.current).toBeNull()
   })
 })

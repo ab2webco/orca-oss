@@ -33,6 +33,13 @@ export type GameCharacter = {
 
 export type GameCharacterLevel = { level: number; into: number; need: number }
 
+/** A character as `orca game characters` and the Panel show it: its progress, level and current task. */
+export type GameCharacterRow = GameCharacter & {
+  level: GameCharacterLevel
+  /** The task its live member holds; null while the character is free. */
+  current: { ticket: string | null } | null
+}
+
 // Why outcome-only: XP rewards what landed, not activity (ORCA-686 builds on this).
 export const GAME_CHARACTER_XP: Readonly<Record<GameHistoryOutcome, number>> = {
   merged: 100,
@@ -43,6 +50,13 @@ export const GAME_CHARACTER_XP: Readonly<Record<GameHistoryOutcome, number>> = {
 }
 
 export const GAME_CHARACTER_RECENT_MAX = 20
+const EMPTY_OUTCOMES: Record<GameHistoryOutcome, number> = {
+  merged: 0,
+  qa: 0,
+  stopped: 0,
+  failed: 0,
+  limited: 0
+}
 // Why bounded: tasks already folded in, so a retried free never counts one twice.
 const APPLIED_MAX = 50
 
@@ -139,7 +153,7 @@ export function foldFreedMember(
     endedAt: record.endedAt,
     workedMs
   }
-  const outcomes = before?.outcomes ?? { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 }
+  const outcomes = before?.outcomes ?? EMPTY_OUTCOMES
   const next: GameCharacter & { applied: string[] } = {
     key: character.key,
     name: character.name,
@@ -181,4 +195,38 @@ export function gameCharacterLevelOf(xp: number): GameCharacterLevel {
     need = 100 * level
   }
   return { level, into, need }
+}
+
+// Why by key or last name: the host has no roster, so a live `Arturo` matches the record it left.
+/** Every saved character plus any live one with no record yet, each with its level and task. */
+export function gameCharacterRowsOf(
+  saved: readonly GameCharacter[],
+  live: readonly { name: string; ticket: string | null }[]
+): GameCharacterRow[] {
+  const isNamed = (character: GameCharacter, name: string): boolean =>
+    [character.key, character.name.toLowerCase()].includes(name.toLowerCase())
+  const fresh = live
+    .filter((one) => !saved.some((character) => isNamed(character, one.name)))
+    .map(
+      (one): GameCharacter => ({
+        key: one.name.toLowerCase(),
+        name: one.name,
+        tickets: 0,
+        prsOpened: 0,
+        prsMerged: 0,
+        outcomes: { ...EMPTY_OUTCOMES },
+        workedMs: 0,
+        xp: 0,
+        lastAt: '',
+        recent: []
+      })
+    )
+  return [...saved, ...fresh].map((character) => {
+    const member = live.find((one) => isNamed(character, one.name))
+    return {
+      ...character,
+      level: gameCharacterLevelOf(character.xp),
+      current: member ? { ticket: member.ticket } : null
+    }
+  })
 }

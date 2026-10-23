@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   GameMemberNameReservations,
-  liveProjectMemberNamesOf
+  liveProjectMemberNamesOf,
+  liveProjectMembersOf
 } from './orchestrator-game-member-name-reservations'
 
 const row = (paneKey: string, parentPaneKey: string | null, displayName: string | null) => ({
@@ -80,5 +81,15 @@ describe('GameMemberNameReservations', () => {
     expect(reserve(names, 'A-2')).toBe('Merlin')
     now = 11 * 60_000
     expect(reserve(names, 'A-3')).toBe('Arthur')
+  })
+})
+
+describe('liveProjectMembersOf', () => {
+  it('pairs each live member of the project with the ticket its name carries', () => {
+    expect(liveProjectMembersOf({ worktrees: WORKTREES, inProject, saved: [] })).toEqual([
+      { name: 'Arthur', ticket: 'ORCA-1' },
+      { name: 'Merlin', ticket: 'ORCA-2' },
+      { name: 'Morgana', ticket: 'ORCA-3' }
+    ])
   })
 })

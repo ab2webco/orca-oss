@@ -710,7 +710,8 @@ import { GamePausedMembers } from './orchestrator-game-paused-members'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
-  liveProjectMemberNamesOf
+  liveProjectMemberNamesOf,
+  liveProjectMembersOf
 } from './orchestrator-game-member-name-reservations'
 import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
 import { GameMemberResume } from './orchestrator-game-member-resume'
@@ -735,7 +736,11 @@ import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
-import { freedCharacterOf } from '../../shared/orchestrator-game-characters'
+import {
+  freedCharacterOf,
+  gameCharacterRowsOf,
+  type GameCharacterRow
+} from '../../shared/orchestrator-game-characters'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   GAME_MEMBER_ADVISOR_VERSION,
@@ -30703,6 +30708,28 @@ export class OrcaRuntimeService {
         taken: [...live, ...args.taken]
       })
     }
+  }
+
+  // Why the live scan: a member that crashed is never released, so busy is read, not stored.
+  async listGameCharacters(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{ characters: GameCharacterRow[] }> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.key === 'no-project') {
+      return { characters: [] }
+    }
+    const [saved, ps, sessions] = await Promise.all([
+      this.gameHistory.characters(project.key),
+      this.getWorktreePs(GAME_MEMBER_NAME_SCAN_LIMIT),
+      this.gameMemberSessions.read(project.key)
+    ])
+    const live = liveProjectMembersOf({
+      worktrees: ps.worktrees,
+      inProject: (one) => `repo:${one.repoId}` === project.key,
+      saved: sessions.ok ? sessions.members : []
+    })
+    return { characters: gameCharacterRowsOf(saved, live) }
   }
 
   async resumeGameMember(args: {

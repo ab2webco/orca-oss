@@ -159,6 +159,19 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['game', 'characters'],
+    summary:
+      "The project's characters: level, XP, current task, tickets, PRs, outcomes and time worked",
+    usage: 'orca game characters [--json]',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      "`game sweep --close` and `game stop` add each freed member's task to its character, kept per project on the Orca host across restarts.",
+      'A character is busy while a live member of the project holds its name, from any lead; it is free again once that member is gone.',
+      'Folder workspaces outside a repo keep no characters. Read-only.'
+    ],
+    examples: ['orca game characters', 'orca game characters --json']
+  },
+  {
     path: ['game', 'metrics'],
     summary:
       "The project's delivery numbers: tickets done, lead time, freed members by outcome, events",
