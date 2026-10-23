@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   dispatchBriefLineOf,
   dispatchBriefRelativePathOf,
@@ -28,6 +28,14 @@ describe('dispatch brief line', () => {
   it('does not take an ordinary prompt for a brief', () => {
     expect(parseDispatchBriefLine('Read the README and fix the build')).toBeNull()
     expect(parseDispatchBriefLine('')).toBeNull()
+  })
+
+  it('does not trim a paste-sized prompt, which runs on every status update', () => {
+    const trimSpy = vi.spyOn(String.prototype, 'trim')
+    const prompt = `Fix the build ${'large pasted text '.repeat(5000)}`
+    expect(parseDispatchBriefLine(prompt)).toBeNull()
+    expect(trimSpy.mock.contexts.some((context) => String(context).length > 1024)).toBe(false)
+    trimSpy.mockRestore()
   })
 
   it('refuses a dispatch id that is not a plain file name', () => {

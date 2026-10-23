@@ -18,7 +18,13 @@ export function dispatchBriefLineOf(args: { dispatchId: string; taskId: string }
   return `${DISPATCH_BRIEF_LINE_PREFIX}${dispatchBriefRelativePathOf(args.dispatchId)} (task ${args.taskId}) and follow it.`
 }
 
+// Why: status updates call this with paste-sized prompts; the line is far shorter.
+const BRIEF_LINE_MAX_LENGTH = 512
+
 export function parseDispatchBriefLine(text: string): { path: string; taskId: string } | null {
+  if (text.length > BRIEF_LINE_MAX_LENGTH) {
+    return null
+  }
   const match = BRIEF_LINE_PATTERN.exec(text.trim())
   return match ? { path: match[1], taskId: match[2] } : null
 }
