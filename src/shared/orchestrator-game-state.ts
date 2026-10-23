@@ -14,7 +14,11 @@ import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
-import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import type {
+  GamePausedMember,
+  GameQueuedMember,
+  GameUnlistedMember
+} from './orchestrator-game-member-sessions'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -138,6 +142,8 @@ export type OrchestratorGameState = {
   pausedMembers?: GamePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
   queuedMembers?: GameQueuedMember[]
+  /** Saved members whose worktree runs an agent this lead does not list; only for the lead, when any. */
+  unlistedMembers?: GameUnlistedMember[]
   /** Why the saved members could not be read or saved; absent when they could. */
   pausedMembersError?: string
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
