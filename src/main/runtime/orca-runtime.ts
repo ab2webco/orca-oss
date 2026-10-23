@@ -31335,9 +31335,20 @@ export class OrcaRuntimeService {
   }
 
   /** Where a game member's dispatch brief goes; null keeps the full preamble (ORCA-757). */
-  async gameMemberBriefTargetFor(worktreeId: string): Promise<DispatchBriefTarget | null> {
+  async gameMemberBriefTargetFor(
+    worktreeId: string,
+    platform: NodeJS.Platform = process.platform
+  ): Promise<DispatchBriefTarget | null> {
     try {
       const scope = await this.resolveTerminalWorkspaceLaunchScope(`id:${worktreeId}`)
+      // Why: only this machine's disk or the SSH provider can take the write; a WSL worktree is a UNC path here.
+      const isWritableHere =
+        scope.connectionId !== null ||
+        ((!scope.repo || getRepoExecutionHostId(scope.repo) === LOCAL_EXECUTION_HOST_ID) &&
+          (platform !== 'win32' || isWindowsAbsolutePathLike(scope.path)))
+      if (!isWritableHere) {
+        return null
+      }
       const isOn = await isOrchestratorGameMemberOn({
         settings: this.store?.getSettings?.(),
         repoId: scope.repo?.id ?? null,

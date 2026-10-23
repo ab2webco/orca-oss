@@ -4,7 +4,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 
-type Scope = { path: string; connectionId: string | null; repo: { id: string } | null }
+type Scope = {
+  path: string
+  connectionId: string | null
+  repo: { id: string; executionHostId?: string } | null
+}
 
 // Why the cast: the workspace scope lookup is private, and a real one needs a scanned repo.
 const withScope = (runtime: OrcaRuntimeService, scope: Scope | Error) => {
@@ -72,6 +76,35 @@ describe("a game member's brief target", () => {
     withScope(runtime, { path: workspace(), connectionId: null, repo: { id: 'repo1' } })
 
     expect(await runtime.gameMemberBriefTargetFor('repo1::wt')).toBeNull()
+  })
+
+  it('is none for a repo a remote Orca runtime hosts, whose files are not on this machine', async () => {
+    const runtime = runtimeWith({})
+    withScope(runtime, {
+      path: '/srv/remote/repo',
+      connectionId: null,
+      repo: { id: 'repo1', executionHostId: 'runtime:env-1' }
+    })
+
+    expect(await runtime.gameMemberBriefTargetFor('repo1::wt')).toBeNull()
+  })
+
+  it('is none on Windows for a local path this machine cannot write as given', async () => {
+    const runtime = runtimeWith({})
+    withScope(runtime, { path: '/home/me/repo', connectionId: null, repo: { id: 'repo1' } })
+
+    expect(await runtime.gameMemberBriefTargetFor('repo1::wt', 'win32')).toBeNull()
+  })
+
+  it('is a WSL worktree on Windows, which this machine writes through its UNC path', async () => {
+    const runtime = runtimeWith({})
+    const path = '\\\\wsl.localhost\\Ubuntu\\home\\me\\repo'
+    withScope(runtime, { path, connectionId: null, repo: { id: 'repo1' } })
+
+    expect(await runtime.gameMemberBriefTargetFor('repo1::wt', 'win32')).toEqual({
+      path,
+      connectionId: null
+    })
   })
 
   it('is none when the workspace cannot be resolved, so the member gets the full preamble', async () => {
