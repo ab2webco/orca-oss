@@ -15,6 +15,7 @@ describe('parseGameLead', () => {
       parseGameLead({
         autostart: true,
         askBeforeResume: true,
+        memberGame: false,
         cap: 3,
         agent: ' claude ',
         model: 'opus',
@@ -28,6 +29,7 @@ describe('parseGameLead', () => {
       value: {
         autostart: true,
         askBeforeResume: true,
+        memberGame: false,
         cap: 3,
         agent: 'claude',
         model: 'opus',
@@ -79,6 +81,7 @@ describe('parseGameLead', () => {
     const parsed = parseGameLead({
       autostart: 'yes',
       askBeforeResume: 'no',
+      memberGame: 'off',
       cap: GAME_LEAD_CAP_MAX + 1,
       agent: 'Claude Code',
       launchPrompt: 'Do {ticket}',
@@ -91,6 +94,7 @@ describe('parseGameLead', () => {
     expect(parsed.warnings).toEqual([
       'orchestratorGame.orchestrator.autostart must be true or false',
       'orchestratorGame.orchestrator.askBeforeResume must be true or false',
+      'orchestratorGame.orchestrator.memberGame must be true or false',
       `orchestratorGame.orchestrator.cap must be a whole number from 1 to ${GAME_LEAD_CAP_MAX}`,
       'orchestratorGame.orchestrator.agent must be an agent id like claude or codex',
       'orchestratorGame.orchestrator.launchPrompt uses an unknown placeholder {ticket}',

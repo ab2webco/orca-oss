@@ -61,6 +61,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   taskId: string
   claudeAccountId?: string
   codexAccountId?: string
+  /** A member `orca game launch` started. */
+  gameMember?: boolean
   effects: WorkerEffect[]
 }): Promise<{ handle: string; warning?: string }> {
   const terminal = await args.runtime.createTerminal(`id:${args.worktreeId}`, {
@@ -69,6 +71,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     // configured launcher instead of executing the raw id.
     startupAgent: args.agent,
     orchestrationWorker: true,
+    ...(args.gameMember ? { orchestrationGameMember: true } : {}),
     ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
     title: `worker-${args.taskId}`,
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
@@ -125,6 +128,7 @@ export async function createWorkerWorktree(args: {
     claudeAccountId?: string
     codexAccountId?: string
     from: string
+    game?: boolean
   }
   agent: TuiAgent
   launchPreferences?: AgentLaunchPreferences
@@ -153,6 +157,7 @@ export async function createWorkerWorktree(args: {
     createdWithAgent: args.agent,
     startupAgent: args.agent,
     orchestrationWorker: true,
+    ...(params.game ? { orchestrationGameMember: true } : {}),
     ...(args.launchPreferences ? { startupLaunchPreferences: args.launchPreferences } : {}),
     activate: false,
     lineage: {

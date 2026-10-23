@@ -62,9 +62,10 @@ export const registerBand = (on: On): void => {
     const palette = currentScene().band
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
     const [beneath, isPanelShown] = await Promise.all([next(e).then(beneathOf), isPaneShown($)])
-    const allies = await alliesStrip($, e, palette, columns, isPanelShown)
+    const isMember = isMemberPane(v.state)
+    const allies = await alliesStrip($, e, palette, columns, isPanelShown, isMember)
     // Why no menu, team or actions: a member reports to its lead and never runs the team.
-    if (isMemberPane(v.state)) {
+    if (isMember) {
       const { Box } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">

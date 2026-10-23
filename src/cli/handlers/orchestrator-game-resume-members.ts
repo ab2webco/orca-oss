@@ -73,7 +73,8 @@ async function startOnTask(
           agent: member.agent ?? 'claude',
           ...accountPinOf(member),
           // Why only without a worktree: only a new worktree runs setup.
-          ...(member.worktreeId ? {} : setupAdmissionOf(await runtimeCapabilitiesOf(client)))
+          ...(member.worktreeId ? {} : setupAdmissionOf(await runtimeCapabilitiesOf(client))),
+          game: true
         }
   try {
     const started = await client.call<WorkerStarted>('orchestration.workerStart', {

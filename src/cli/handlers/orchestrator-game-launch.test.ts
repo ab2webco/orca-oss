@@ -131,7 +131,8 @@ describe('orca game launch', () => {
         displayName: 'Arthur · CIN-12 Cartelera page',
         agent: 'claude',
         run: 'run_1',
-        from: 'h1'
+        from: 'h1',
+        game: true
       })
     )
     expect(JSON.parse(output.join(''))).toEqual(

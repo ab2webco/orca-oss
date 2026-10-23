@@ -29,6 +29,8 @@ export type OrchestratorGameLead = {
   rules?: string
   /** Orca's built-in lead buttons and slash commands (wave, status, push, sweep, stop); on unless false. */
   actions?: boolean
+  /** A launched Claude member loads the game in its member render; on unless false. */
+  memberGame?: boolean
   /** `auto` puts each member on the managed account of its agent with the most free quota. */
   accounts?: OrchestratorGameAccounts
   /** Names members take in order, in place of the scene's roster. */
@@ -91,7 +93,7 @@ const promptKey =
   }
 
 const switchKey =
-  (key: 'autostart' | 'actions' | 'askBeforeResume'): KeyParser =>
+  (key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame'): KeyParser =>
   (value) =>
     typeof value === 'boolean' ? { [key]: value } : `${at(key)} must be true or false`
 
@@ -105,6 +107,7 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   autostart: switchKey('autostart'),
   askBeforeResume: switchKey('askBeforeResume'),
   actions: switchKey('actions'),
+  memberGame: switchKey('memberGame'),
   cap: (value) =>
     typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= GAME_LEAD_CAP_MAX
       ? { cap: value }

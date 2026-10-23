@@ -172,7 +172,8 @@ export async function buildOrchestratorGameState(
   }
   const resolved = resolveOrchestratorGameConfig(layers)
   const integrations = resolveOrchestratorGameIntegrations(layers)
-  const tracker = resolved.config.tracker && input.worktree !== null
+  // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
+  const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
   const { readStop, readInboxes, readLeadElsewhere } = input
   const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere, suggested] =
@@ -218,6 +219,7 @@ export async function buildOrchestratorGameState(
   }
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
+  // Why `tracker`: it is already off for a member, whose band shows no project work.
   const projectWork =
     tracker && readProjectWork
       ? await settle(() => readProjectWork({ todo: integrations.todo, workItem }))

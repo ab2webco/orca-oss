@@ -181,7 +181,7 @@ export function ProjectOrchestratorGameLeadSetting({
     `${text} · ${orchestratorGameSourceLabel(gameLeadSourceOf(layers, key))}`
   const onOff = orchestratorGameModeLabels()
   const switches: {
-    key: 'autostart' | 'actions' | 'askBeforeResume'
+    key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame'
     label: string
     isOn: boolean
   }[] = [
@@ -209,6 +209,15 @@ export function ProjectOrchestratorGameLeadSetting({
         'Ask before resuming'
       ),
       isOn: lead.askBeforeResume === true
+    },
+    {
+      key: 'memberGame',
+      label: translate(
+        'auto.components.settings.OrchestratorGameLeadSetting.memberGame',
+        'Game in member panes'
+      ),
+      // Why: unset means on; a launched member loads the game unless a layer turns it off.
+      isOn: lead.memberGame !== false
     }
   ]
   const accountsText = {

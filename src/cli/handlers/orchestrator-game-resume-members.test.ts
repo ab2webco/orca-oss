@@ -155,7 +155,7 @@ describe('orca game resume-members', () => {
     await run(client)
 
     expect(calls.find(([m]) => m === 'orchestration.workerStart')?.[1]).toEqual(
-      expect.objectContaining({ worktree: 'new-child', setupAdmission: 'queue' })
+      expect.objectContaining({ worktree: 'new-child', setupAdmission: 'queue', game: true })
     )
     expect(calls.findLast(([m]) => m === 'game.memberRecord')?.[1]).toEqual(
       expect.objectContaining({ member: { ticket: 'CIN-1', lastState: 'queued' } })

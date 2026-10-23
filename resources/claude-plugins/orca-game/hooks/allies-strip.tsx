@@ -29,13 +29,14 @@ const TONE_COLORS: Readonly<Partial<Record<AllyTone, string>>> = {
   warn: 'yellow'
 }
 
-/** Jev and every intercepted status as the strip under the band, or nothing; reading both state values redraws on their writes. */
+/** Jev and every intercepted status as the strip under the band, or nothing; reading both state values redraws on their writes. A member's strip sits on its pane's colors. */
 export async function alliesStrip(
   $: EngineInterface,
   e: RenderInput,
   palette: BandPalette,
   columns: number,
-  isPanelShown: boolean
+  isPanelShown: boolean,
+  isOnPane = false
 ): Promise<RenderElement[]> {
   if (!isAbsorbing()) {
     return []
@@ -58,7 +59,7 @@ export async function alliesStrip(
     const parts = allyPartsOf(row, columns)
     return (
       <Box key={row.key} flexDirection="row" overflow="hidden">
-        <Text wrap="truncate-end" backgroundColor={palette.panel}>
+        <Text wrap="truncate-end" backgroundColor={isOnPane ? undefined : palette.panel}>
           {parts.label === undefined ? (
             ''
           ) : (
@@ -68,7 +69,10 @@ export async function alliesStrip(
               bold
             >{` ${parts.label} `}</Text>
           )}
-          <Text color={TONE_COLORS[row.tone] ?? palette.parchment} dimColor={row.tone === 'more'}>
+          <Text
+            color={TONE_COLORS[row.tone] ?? (isOnPane ? undefined : palette.parchment)}
+            dimColor={row.tone === 'more'}
+          >
             {` ${parts.text}`}
           </Text>
           {parts.badge === undefined ? '' : <Text color={palette.gold}>{` ${parts.badge} `}</Text>}

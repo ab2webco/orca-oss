@@ -7,6 +7,7 @@ import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestr
 import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
+  requiredTicket,
   type GameLaunchFlags
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
@@ -60,15 +61,6 @@ type WorkerStartResult = Pick<
 > & { effects?: { kind: string; id?: string }[] }
 
 const DISPLAY_NAME_MAX = 60
-
-function requiredTicket(flags: Map<string, string | boolean>): string {
-  const raw = flags.get('ticket')
-  const ticket = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
-  if (!/^[A-Z0-9][A-Z0-9_-]{0,39}$/.test(ticket)) {
-    throw new RuntimeClientError('invalid_argument', 'Name the ticket to launch, like CIN-12.')
-  }
-  return ticket
-}
 
 // Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
 function taskPromptOf(flags: Map<string, string | boolean>): string | null {
@@ -237,7 +229,8 @@ export async function launchGameMember(args: {
     run: runId,
     from,
     devMode: isDevCliInvocation(),
-    ...setupAdmissionOf(capabilities)
+    ...setupAdmissionOf(capabilities),
+    game: true
   }
   const worker = await callWithLaunchRetry((requestId) =>
     client.call<WorkerStartResult>(
