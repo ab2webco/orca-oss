@@ -30,9 +30,9 @@ import {
   questFleet,
   questLiveConfig
 } from './quest-runtime'
-import { fleetRewardsOf } from './fleet-rewards'
+import { earnedRewardsOf } from './fleet-rewards'
 import { RECENT_KEY, recentRewardsOf, withRecent } from './recent-rewards'
-import { awardXp, levelOf, rewardsOf, xpLedgerOf } from './rewards'
+import { awardXp, levelOf, signedXpOf, xpLedgerOf } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
 export const POLL_EVERY_MS = 30000
@@ -167,7 +167,7 @@ async function syncXp(
     $.store.get(XP_KEY).then(xpLedgerOf, () => xpLedgerOf(undefined)),
     $.store.get(RECENT_KEY).then(recentRewardsOf, () => [])
   ])
-  const earned = [...rewardsOf(before, next), ...fleetRewardsOf(before, next)]
+  const earned = earnedRewardsOf(before, next)
   const now = await $.clock.now()
   const { ledger, awarded } = awardXp(stored, earned, now)
   if (awarded.length === 0) {
@@ -177,14 +177,15 @@ async function syncXp(
   await $.store.set(XP_KEY, ledger).catch(() => undefined)
   await $.store.set(RECENT_KEY, recent).catch(() => undefined)
   for (const one of awarded) {
-    $.ui.toast(`+${one.xp} XP · ${one.label}`)
+    $.ui.toast(`${signedXpOf(one.xp)} XP · ${one.label}`)
   }
   const art = gameStrings().art
   const merged = awarded.find((one) => one.kind === 'review-merged')?.review
   if (merged !== undefined) {
     raiseTeamEvent($, 'merged', art.mergedFloat(merged))
   } else {
-    raiseTeamEvent($, 'xp', `+${awarded.reduce((sum, one) => sum + one.xp, 0)} ${art.xp}`)
+    const sum = awarded.reduce((total, one) => total + one.xp, 0)
+    raiseTeamEvent($, 'xp', `${signedXpOf(sum)} ${art.xp}`)
   }
   if (levelOf(ledger.total).level > levelOf(stored.total).level) {
     clawdReact($, 'level')

@@ -176,6 +176,9 @@ orchestratorGame:
   sceneFile: .orca/scenes/mario.json # optional: the project's own scene; wins over scene (below)
   hud: true # teammate band above the prompt
   rewards: false # XP, level-ups, celebrations
+  rewardWeights: # XP per reward, 0 to 1000; 0 turns one off (see "The scoring table" below)
+    ci-green: 10
+    member-claimed: 0
   tracker: true # follow the linked work item in the flow
   openLinks: system # orca (default) | system: where the game's links open
   render: hd # classic (default) | hd | hd-compact: see "Render: classic, hd or hd-compact" below
@@ -196,6 +199,10 @@ An invalid value is dropped and reported (Settings shows the source of every val
 For an SSH worktree the project layer is read from the host over the SSH filesystem
 ([`worktree-orca-yaml.ts`](../../src/main/worktree-orca-yaml.ts)); while the host is disconnected
 the other layers still apply.
+
+`rewardWeights` merges key by key like `orchestrator`: the project can lower one reward in
+`orca.yaml` while a dev turns another off in the project's Settings JSON. Like the lists below it
+has no Settings editor.
 
 `links` and `activity` (below) are lists, so a later layer that sets one replaces the whole list
 instead of merging it. Settings has no editor for them; `orca.yaml` is where they are written, and
@@ -290,6 +297,10 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   clear; one whose state cannot be read is `{ since: null, by: null, unreadable: true }` and counts
   as set (see [The shared board](#the-shared-board-events-stop-and-inboxes)). A host older than it
   sends none. The mod does not draw it yet.
+- `rewardWeights` (optional) — XP per reward kind after every layer (see
+  [The scoring table](#the-scoring-table-orchestratorgamerewardweights)). A host older than it
+  sends none and the mod awards the defaults; the mod keeps only known kinds with a whole number
+  from 0 to 1000.
 - `inboxes` (optional, the lead only) — `{ key, unread, last }` per inbox, the lead's (`key: lead`)
   first, then each ticket's, at most 20; `last` is `{ at, from, subject }` or `null`.
 
@@ -638,7 +649,7 @@ are saved while they run, so the team picks up where it was:
     keeps the earlier rule: ask the person once, naming the members, before resuming.
   - A ticket is resumed once even when two leads ask together: a second call within two minutes of
     the first (the time the CLI takes to bind the new dispatch) is refused with `already being
-    resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
+resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
 - **The lead's brief** (ORCA-746). When a lead's own conversation is resumed or compacted, the
   orca-game mod hands it `game fleet` as context, paused members included, so it answers from the
   host's record and not from a summary; after a compaction it also points the lead back to
@@ -705,13 +716,15 @@ A lead on the base branch has no PR or ticket of its own, so its XP comes from i
 refresh compares every member in `game state` that runs in its own worktree with the previous
 refresh, matched by that worktree's id:
 
-| Event                                           | XP  |
-| ----------------------------------------------- | --- |
-| a member appears (launched, or took a ticket)   | 10  |
-| its PR's CI turns green                         | 20  |
-| its ticket moves to a review group (QA, Review) | 50  |
-| its ticket moves to done                        | 70  |
-| its PR merges                                   | 100 |
+| Event                                           | Reward key         | XP  |
+| ----------------------------------------------- | ------------------ | --- |
+| a member appears (launched, or took a ticket)   | `member-claimed`   | 10  |
+| its PR's CI turns green                         | `ci-green`         | 20  |
+| its ticket moves to a review group (QA, Review) | `work-item-review` | 50  |
+| its ticket moves to done                        | `work-item-done`   | 70  |
+| its PR merges                                   | `review-merged`    | 100 |
+
+The XP is the default; a project changes it with `rewardWeights` (below).
 
 The first refresh of a session awards nothing, so a member launched or a PR merged while the lead
 pane was closed earns nothing. A member that leaves earns nothing more, and a launch is keyed by
@@ -722,6 +735,34 @@ counts it once. A member pane (`role: member`) earns only its own work. Toasts n
 (`+100 XP · ORCA-12 · #41 merged`), a merge floats `#41 merged!`, and `rewards: false` turns all
 of it off. The board's `claimed` event is not in `game state`, so a launch is read from the member
 appearing there instead.
+
+### The scoring table: `orchestratorGame.rewardWeights`
+
+Every reward comes from a fact Orca observes in two polls of `game state`, never from what an
+agent reports (a `worker_done` body or envelope, chat text), so a claim with no matching fact
+earns nothing. Each fact is one ledger row keyed by the fact's id, so a restart, a second poll or
+another pane that sees the same change writes no second row
+([`rewards.ts`](../../resources/claude-plugins/orca-game/hooks/rewards.ts)).
+
+| Reward key         | Earned when                                  | Fact source                                | Fact id                                   | Default |
+| ------------------ | -------------------------------------------- | ------------------------------------------ | ----------------------------------------- | ------- |
+| `review-merged`    | the worktree's review turns `merged`         | `review.state` (hosted review provider)    | `review-merged:<provider>#<n>@<worktree>` | 100     |
+| `ci-green`         | the review's CI turns `success`              | `review.ci` (aggregate checks or pipeline) | `ci-green:<provider>#<n>@<worktree>`      | 20      |
+| `work-item-review` | the linked work item moves to a review group | `workItem.statusGroup` (tracker)           | `work-item-review:<provider>:<id>`        | 50      |
+| `work-item-done`   | the linked work item moves to done           | `workItem.statusGroup` (tracker)           | `work-item-done:<provider>:<id>`          | 70      |
+| `member-claimed`   | a lead's member appears in its own worktree  | `agents` (the member's worktree id)        | `member-claimed:<worktree>`               | 10      |
+
+`rewardWeights` sets a reward's XP to a whole number from 0 to 1000; `0` turns that reward off
+(no row, no toast) and a reward left out keeps its default. An invalid value or an unknown key is
+reported in `warnings` and that reward keeps its default
+([`orchestrator-game-reward-weights.ts`](../../src/shared/orchestrator-game-reward-weights.ts)).
+A row keeps the XP it was written with, so a weight changed later only applies to new facts.
+`rewards: false` still turns every reward off. A folder workspace or a worktree with no review
+or tracker never sees those facts, so their rewards never fire and nothing is taken away.
+
+The ledger also takes rows that subtract XP, for the quality signals that will cost points
+(ORCA-686): the total can go below 0 while the level stays at 1, and the toast and the score line
+show the minus sign (`-30 XP`, in red on the flat score line).
 
 **Lead subagents.** The orchestrator lead is a session that ran the lead rules: `orca game lead`,
 whether through `/orca-game:lead`, the project's `autostart` or a Bash call of it. Only that session

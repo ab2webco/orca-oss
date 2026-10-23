@@ -6,9 +6,11 @@ import {
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
   gameLeadSourceOf,
-  resolveOrchestratorGameLead
+  resolveOrchestratorGameLead,
+  resolveOrchestratorGameRewardWeights
 } from './orchestrator-game-config'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
+import { DEFAULT_GAME_REWARD_WEIGHTS } from './orchestrator-game-reward-weights'
 
 describe('resolveOrchestratorGameConfig', () => {
   it('uses the defaults when no layer sets anything', () => {
@@ -298,5 +300,37 @@ describe('gameLeadSourceOf', () => {
         'effort'
       )
     ).toBe('local')
+  })
+})
+
+describe('orchestratorGame.rewardWeights', () => {
+  it('parses the weights and warns on a bad one, leaving the rewards switch alone', () => {
+    expect(
+      parseOrchestratorGameLayer({
+        rewards: true,
+        rewardWeights: { 'ci-green': 5, 'work-item-done': -1 }
+      })
+    ).toEqual({
+      layer: { rewards: true, rewardWeights: { 'ci-green': 5 } },
+      warnings: [
+        'orchestratorGame.rewardWeights.work-item-done must be a whole number from 0 to 1000'
+      ]
+    })
+  })
+
+  it('applies the project weights over global and the local ones over both, a bad value falling back', () => {
+    expect(
+      resolveOrchestratorGameRewardWeights({
+        global: { rewardWeights: { 'ci-green': 1 } },
+        project: { rewardWeights: { 'ci-green': 5, 'member-claimed': 0 } },
+        local: { rewardWeights: { 'review-merged': 300, 'work-item-review': 2.5 } }
+      })
+    ).toEqual({
+      ...DEFAULT_GAME_REWARD_WEIGHTS,
+      'ci-green': 5,
+      'member-claimed': 0,
+      'review-merged': 300
+    })
+    expect(resolveOrchestratorGameRewardWeights({})).toEqual(DEFAULT_GAME_REWARD_WEIGHTS)
   })
 })

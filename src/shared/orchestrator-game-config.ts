@@ -18,6 +18,11 @@ import {
   type OrchestratorGameTodoSource
 } from './orchestrator-game-project-work'
 import {
+  parseGameRewardWeights,
+  resolveGameRewardWeights,
+  type GameRewardWeights
+} from './orchestrator-game-reward-weights'
+import {
   isLookKey,
   lookFieldOf,
   ORCHESTRATOR_GAME_LOCAL_TIMEZONE,
@@ -71,6 +76,8 @@ export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
     todo?: OrchestratorGameTodoSource
     /** How the lead orchestrates; merged key by key across layers. */
     orchestrator?: OrchestratorGameLeadLayer
+    /** XP per reward; merged key by key across layers, 0 turns one off. */
+    rewardWeights?: Partial<GameRewardWeights>
     /** A scene JSON relative to the worktree root; read only from the project layers. */
     sceneFile?: string
   }
@@ -207,6 +214,12 @@ export function resolveOrchestratorGameLead(
   return resolveGameLead(LAYER_ORDER.map((source) => layers[source]?.orchestrator))
 }
 
+export function resolveOrchestratorGameRewardWeights(
+  layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
+): GameRewardWeights {
+  return resolveGameRewardWeights(LAYER_ORDER.map((source) => layers[source]?.rewardWeights))
+}
+
 /** The layer a lead key's effective value comes from; 'default' when no layer sets a usable one. */
 export function gameLeadSourceOf(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>,
@@ -298,6 +311,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         layer.orchestrator = parsed.value
+      }
+    } else if (key === 'rewardWeights') {
+      const parsed = parseGameRewardWeights(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.rewardWeights = parsed.value
       }
     } else if (key === 'reviews') {
       const parsed = parseGameReviewsSource(value)
