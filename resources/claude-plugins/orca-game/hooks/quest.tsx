@@ -1,6 +1,12 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
-import { GAME_COMMANDS, QUEST_ALIAS, gameCommandOf, type GameCommand } from './game-commands'
+import {
+  GAME_COMMANDS,
+  QUEST_ALIAS,
+  VIEW_COMMAND,
+  gameCommandOf,
+  type GameCommand
+} from './game-commands'
 import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
   configuredConfig,
@@ -24,6 +30,8 @@ import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
 import { flatPhaseLineOf } from './flat-view'
 import { shownCaption } from './quest-state'
+import { viewCommandOf, viewListOf } from './view-command'
+import { currentView, switchView, viewChoicesOf } from './view-switch'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
@@ -114,6 +122,21 @@ const registerCommand = (on: On, command: GameCommand) => {
     $.ui.invalidate('ui.render')
     await publishAbsorbing($)
     return { text: text.questShown(shownSetting('mode')) }
+  })
+}
+
+const registerView = (on: On) => {
+  on('command.run', { command: VIEW_COMMAND }, async ($, e) => {
+    await ready($)
+    const asked = viewCommandOf(e.args)
+    if ('error' in asked) {
+      return { text: asked.error }
+    }
+    if ('list' in asked) {
+      const { scopes, suggested } = await viewChoicesOf($)
+      return { text: viewListOf(currentView(), suggested, scopes) }
+    }
+    return { text: await switchView($, asked.view, asked.scope) }
   })
 }
 
@@ -275,6 +298,7 @@ export const registerQuest = (on: On): void => {
   for (const command of commands) {
     registerCommand(on, command)
   }
+  registerView(on)
   registerNotes(on)
   registerSpinner(on)
   registerQuietRows(on)
