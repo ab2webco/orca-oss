@@ -638,7 +638,7 @@ are saved while they run, so the team picks up where it was:
     keeps the earlier rule: ask the person once, naming the members, before resuming.
   - A ticket is resumed once even when two leads ask together: a second call within two minutes of
     the first (the time the CLI takes to bind the new dispatch) is refused with `already being
-    resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
+resumed`, so two agents never reopen in one worktree. Each Orca host keeps this claim in memory.
 - **The lead's brief** (ORCA-746). When a lead's own conversation is resumed or compacted, the
   orca-game mod hands it `game fleet` as context, paused members included, so it answers from the
   host's record and not from a summary; after a compaction it also points the lead back to
@@ -802,13 +802,21 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   "You have N orchestration messages" line.
 - A member's failure (failed setup, first-signal deadline, agent exit, failed `worker_done`) leaves
   the inbox and its count once the same ticket gets past it: a later succeeded `worker_done`, or any
-  message from a newer dispatch. Mail from the failed dispatch itself does not hide it.
+  message from a newer dispatch. Mail from the failed dispatch itself does not hide it, except its
+  own "member reattached" notice.
 - A member sends one heartbeat when its brief arrives and no loop (ORCA-746): that first signal
   keeps the 11-minute first-signal deadline from failing the dispatch. After it, Orca records the
   member's `last_activity_at` every 30 s from its agent hooks (or terminal output when the agent
   has none), and the coordinator's stale warning reads heartbeat or activity, once per stale spell.
   A federated or SSH-relayed member whose PTY is not on this host has no local activity, so it is
   warned as stale 10 minutes after its last heartbeat: a warning only, never a failure.
+- A member the first-signal deadline failed whose terminal keeps working (ORCA-658) is watched
+  for 30 minutes after its last activity. Activity later than the failure reopens the dispatch,
+  disarming the spent deadline, so its `worker_done` settles the task, unless the task was
+  dispatched again or another live member holds the ticket. Then it stays failed. Either way the
+  lead gets one message: "member reattached", or "orphaned member still working" (adopt its work
+  or stop that terminal). The deadline still fails a silent dispatch at 11 minutes, since host
+  activity never clears it in advance; a federated member has no local activity to reopen it.
 - `game state` gives the lead `inboxes` with unread counts; a member reads only its own ticket.
 
 **Mixed versions.** The board adds four RPC methods newer than `game.history`, `game.events`,

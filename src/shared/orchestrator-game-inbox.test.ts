@@ -135,6 +135,28 @@ describe('gameInboxesOf', () => {
     expect(lead?.unread).toBe(1)
   })
 
+  it('drops a deadline failure once the same dispatch is reattached, but not when it is only orphaned (ORCA-658)', () => {
+    sequence = 0
+    const failed = (dispatchId: string) =>
+      mail('run:run_1', `dispatch:${dispatchId}`, {
+        payload: JSON.stringify({ dispatchId, reason: 'first_signal_deadline_expired' })
+      })
+    const rows = [
+      failed('d1'),
+      failed('d2'),
+      mail('run:run_1', 'dispatch:d1', {
+        payload: JSON.stringify({ dispatchId: 'd1', reason: 'reattached_by_activity' })
+      }),
+      mail('run:run_1', 'dispatch:d2', {
+        payload: JSON.stringify({ dispatchId: 'd2', reason: 'orphaned_still_working' })
+      })
+    ]
+
+    const [lead] = gameInboxesOf(source(rows), {})
+
+    expect(lead?.messages.map((one) => one.id)).toEqual(['msg_4', 'msg_3', 'msg_2'])
+  })
+
   it("collapses a member's failure once the same ticket reports success, and keeps it while only the failed dispatch talks", () => {
     sequence = 0
     const rows = [

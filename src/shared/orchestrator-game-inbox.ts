@@ -120,6 +120,13 @@ function withoutSupersededFailures(
         return true
       }
       const dispatch = dispatchOfRow(row)
+      // Why (ORCA-658): the host reopened this very dispatch, so its failure no longer holds.
+      if (
+        dispatch === failedDispatch &&
+        payloadOf(row.payload).reason === 'reattached_by_activity'
+      ) {
+        return true
+      }
       return failedDispatch !== null && dispatch !== null && dispatch !== failedDispatch
     })
     if (passed) {

@@ -3128,7 +3128,8 @@ export class OrcaRuntimeService {
   private orchestrationDeadlineTimer: ReturnType<typeof setInterval> | null = null
   private readonly orchestrationActivityMonitor = new DispatchActivityMonitor(
     () => this.getOrchestrationDb(),
-    (handle) => this.observeDispatchActivity(handle)
+    (handle) => this.observeDispatchActivity(handle),
+    this
   )
   private orchestrationDbOpenFailure: { error: unknown; at: number } | null = null
   private orchestrationTerminalHistoryRecoveryTimer: ReturnType<typeof setTimeout> | null = null

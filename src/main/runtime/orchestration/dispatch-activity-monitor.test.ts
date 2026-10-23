@@ -79,7 +79,9 @@ describe('recordDispatchActivities (ORCA-746)', () => {
     try {
       const live = dispatchFor('term_live')
       const probe = vi.fn((): DispatchActivityObservation => ({ hook: null, lastOutputAt: null }))
-      const monitor = new DispatchActivityMonitor(() => db as OrchestrationDb, probe)
+      const monitor = new DispatchActivityMonitor(() => db as OrchestrationDb, probe, {
+        notifyMessageArrived: () => {}
+      })
 
       monitor.ensure()
       monitor.ensure()
@@ -95,6 +97,34 @@ describe('recordDispatchActivities (ORCA-746)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('keeps watching after the deadline fails its only dispatch, and reattaches it once it works (ORCA-658)', () => {
+    const dispatchId = dispatchFor('term_slow')
+    const d = db as OrchestrationDb
+    const probe = vi.fn(
+      (): DispatchActivityObservation => ({ hook: null, lastOutputAt: Date.now() + 5_000 })
+    )
+    const notified: string[] = []
+    const monitor = new DispatchActivityMonitor(() => d, probe, {
+      notifyMessageArrived: (handle) => notified.push(handle)
+    })
+    d.mintDispatchCapability({ dispatchId, paneKey: 'tab_w:pane', processIncarnation: 'inc' })
+    d.armDispatchLifecycleDeadline(dispatchId, 0)
+    expect(
+      d.expireDispatchLifecycleDeadline({
+        dispatchId,
+        nowIso: new Date(Date.now() + 60_000).toISOString(),
+        reason: 'no lifecycle signal',
+        subject: 'Dispatch failed: no lifecycle signal'
+      }).expired
+    ).toBe(true)
+
+    monitor.ensure()
+    monitor.stop()
+
+    expect(d.getDispatchContextById(dispatchId)?.status).toBe('dispatched')
+    expect(notified).toEqual([`run:${d.getDispatchContextById(dispatchId)?.run_id}`])
   })
 
   it('never moves activity backwards and never touches a finished dispatch', () => {
