@@ -5,7 +5,7 @@ import { CI_COLORS, ciShortOf } from './fleet-labels'
 import { gameLocale, gameStrings, localizedNameOf } from './game-strings'
 import { shortMemberNameOf } from './member-character'
 import { memberOf } from './party'
-import { isCiRed, reviewLabelOf } from './rewards'
+import { isCiRed, reviewLabelOf, signedXpOf } from './rewards'
 import type { SceneDefinition, ScenePhase } from './scenes/index'
 import { memberPhaseOf, ticketOf } from './state-report'
 import { stateReportWordsOf, type MemberPhase, type StateReportWords } from './state-report-words'
@@ -248,8 +248,8 @@ export const flatScoreLineOf = ({
     ...(level === undefined ? [] : [{ key: 'xp', text: xpTextOf(level), bold: true }]),
     ...recent.map((one, at) => ({
       key: `reward-${at}`,
-      text: `+${one.xp} ${one.label}`,
-      color: 'green'
+      text: `${signedXpOf(one.xp)} ${one.label}`,
+      color: one.xp < 0 ? 'red' : 'green'
     }))
   ]
   const spaced = parts.flatMap((part, at) =>

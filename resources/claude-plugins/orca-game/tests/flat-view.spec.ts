@@ -157,6 +157,15 @@ describe('flatScoreLineOf', () => {
     }
   })
 
+  it('shows a row that took XP away with its minus sign, in red', () => {
+    const recent = [{ label: '#553 reverted', xp: -30, at: 2 }]
+    const line = flatScoreLineOf({ level: levelOf(0), recent, isDemo: false, columns: 130 })
+    expect(flatTextOf(line ?? { key: '', parts: [] })).toBe(
+      'Lv 1 □□□□□ 0/100 XP · -30 #553 reverted'
+    )
+    expect(line?.parts.find((part) => part.key === 'reward-0')?.color).toBe('red')
+  })
+
   it('draws nothing with rewards off', () => {
     expect(flatScoreLineOf({ level: undefined, recent: [], isDemo: false, columns: 60 })).toBe(
       undefined

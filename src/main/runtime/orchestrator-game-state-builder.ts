@@ -15,6 +15,7 @@ import {
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
   resolveOrchestratorGameLead,
+  resolveOrchestratorGameRewardWeights,
   type ResolvedOrchestratorGameConfig
 } from '../../shared/orchestrator-game-config'
 import {
@@ -301,6 +302,7 @@ export async function buildOrchestratorGameState(
       : null,
     agents,
     lead,
+    rewardWeights: resolveOrchestratorGameRewardWeights(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
     ...(suggested ? { suggestedView: suggested } : {}),

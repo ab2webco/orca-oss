@@ -323,6 +323,8 @@ export type GameState = {
   actions?: GameAction[]
   /** How the project's lead orchestrates; absent from an older host. */
   lead?: GameLead
+  /** Absent from a host older than reward weights, which awards the baseline. */
+  rewardWeights?: RewardWeights
   /** Whether this pane leads or a lead launched it; absent from an older host. */
   role?: GameRole
   /** The project's live lead when it is another pane; absent from an older host. */
@@ -348,6 +350,16 @@ export type FleetState = {
   /** The latest rewards, newest first; absent in an atom an older mod stored. */
   recent?: readonly RecentReward[]
 }
+
+export type RewardKind =
+  | 'review-merged'
+  | 'ci-green'
+  | 'work-item-review'
+  | 'work-item-done'
+  | 'member-claimed'
+
+/** XP per reward as the project tunes it; a kind left out keeps the baseline, 0 turns it off. */
+export type RewardWeights = Readonly<Partial<Record<RewardKind, number>>>
 
 export type RecentReward = { label: string; xp: number; at: number }
 

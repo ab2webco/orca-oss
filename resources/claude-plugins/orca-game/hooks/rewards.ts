@@ -1,13 +1,8 @@
-import type { GameReview, GameState } from '../types'
+import type { GameReview, GameState, RewardKind, RewardWeights } from '../types'
 import type { Level } from './fleet-hud'
 import { gameStrings } from './game-strings'
 
-export type RewardKind =
-  | 'review-merged'
-  | 'ci-green'
-  | 'work-item-review'
-  | 'work-item-done'
-  | 'member-claimed'
+export type { RewardKind }
 
 export const XP_BY_REWARD: Readonly<Record<RewardKind, number>> = {
   'review-merged': 100,
@@ -22,12 +17,32 @@ export type Reward = { id: string; kind: RewardKind; xp: number; label: string; 
 
 export type XpLedger = { total: number; awards: Record<string, { xp: number; at: number }> }
 
-export const reward = (id: string, kind: RewardKind, label: string): Reward => ({
-  id,
-  kind,
-  xp: XP_BY_REWARD[kind],
-  label
-})
+export const reward = (
+  id: string,
+  kind: RewardKind,
+  label: string,
+  weights: RewardWeights = XP_BY_REWARD
+): Reward => ({ id, kind, xp: weights[kind] ?? XP_BY_REWARD[kind], label })
+
+const REWARD_WEIGHT_MAX = 1000
+
+const isWeight = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= REWARD_WEIGHT_MAX
+
+/** The weights `game state` hands over, read like the host validates them; none from an older host. */
+export const rewardWeightsOf = (value: unknown): { rewardWeights?: RewardWeights } => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {}
+  }
+  const known = Object.keys(XP_BY_REWARD) as RewardKind[]
+  const entries = known.flatMap((kind) => {
+    const weight: unknown = Reflect.get(value, kind)
+    return isWeight(weight) ? [[kind, weight] as const] : []
+  })
+  return { rewardWeights: Object.fromEntries(entries) }
+}
+
+export const signedXpOf = (xp: number): string => (xp < 0 ? `${xp}` : `+${xp}`)
 
 export const reviewLabelOf = (review: Pick<GameReview, 'provider' | 'number'>): string =>
   `${review.provider === 'gitlab' ? '!' : '#'}${review.number}`
@@ -40,7 +55,12 @@ export const isCiRed = (review: GameReview | null): boolean =>
 type Work = Pick<GameState, 'review' | 'workItem'>
 
 /** A worktree's review and ticket moving on; the ids are the same from any pane that sees it. */
-export const workRewardsOf = (previous: Work, next: Work, worktreeId: string): Reward[] => {
+export const workRewardsOf = (
+  previous: Work,
+  next: Work,
+  worktreeId: string,
+  weights: RewardWeights = XP_BY_REWARD
+): Reward[] => {
   const out: Reward[] = []
   const before = previous.review
   const after = next.review
@@ -55,12 +75,15 @@ export const workRewardsOf = (previous: Work, next: Work, worktreeId: string): R
     const text = gameStrings().text
     if (before.state !== 'merged' && after.state === 'merged') {
       out.push({
-        ...reward(`review-merged:${key}`, 'review-merged', text.merged(label)),
+        ...reward(`review-merged:${key}`, 'review-merged', text.merged(label), weights),
         review: label
       })
     }
     if (before.ci !== 'success' && after.ci === 'success') {
-      out.push({ ...reward(`ci-green:${key}`, 'ci-green', text.ciGreen(label)), review: label })
+      out.push({
+        ...reward(`ci-green:${key}`, 'ci-green', text.ciGreen(label), weights),
+        review: label
+      })
     }
   }
   const was = previous.workItem
@@ -74,16 +97,20 @@ export const workRewardsOf = (previous: Work, next: Work, worktreeId: string): R
   if (isSameItem && (item.statusGroup === 'review' || item.statusGroup === 'done')) {
     const kind = item.statusGroup === 'review' ? 'work-item-review' : 'work-item-done'
     const id = `${kind}:${item.provider}:${item.identifier}`
-    out.push(reward(id, kind, `${item.identifier} ${item.status}`))
+    out.push(reward(id, kind, `${item.identifier} ${item.status}`, weights))
   }
   return out
 }
 
 // Only a change seen between two polls of the same worktree earns XP, so a restart never re-awards.
-export const rewardsOf = (previous: GameState | null, next: GameState): Reward[] =>
+export const rewardsOf = (
+  previous: GameState | null,
+  next: GameState,
+  weights: RewardWeights = XP_BY_REWARD
+): Reward[] =>
   previous === null || (previous.worktree?.id ?? '') !== (next.worktree?.id ?? '')
     ? []
-    : workRewardsOf(previous, next, next.worktree?.id ?? '')
+    : workRewardsOf(previous, next, next.worktree?.id ?? '', weights)
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

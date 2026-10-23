@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
@@ -123,6 +124,8 @@ export type OrchestratorGameState = {
   actions?: GameAction[]
   /** How this project's lead orchestrates; absent from an older host. */
   lead?: OrchestratorGameLead
+  /** XP per reward after every layer; absent from an older host, whose mod uses the baseline. */
+  rewardWeights?: GameRewardWeights
   /** Whether the calling pane leads or was launched by a lead; absent from an older host. */
   role?: 'lead' | 'member'
   /** The project's live lead when it is another pane; absent when this pane is it, or none is live. */

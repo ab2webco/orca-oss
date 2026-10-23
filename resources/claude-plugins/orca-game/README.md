@@ -155,8 +155,11 @@ XP is earned only for a change seen between two polls of the same worktree, so a
 re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A lead
 (`role` not `member`) also earns the same for each member in its own worktree, plus 10 when a
 member appears; those use the ids the member's pane would, so a shared store never counts one change
-twice ([`hooks/fleet-rewards.ts`](hooks/fleet-rewards.ts)). A level needs 100 XP times the level. CI
-red hurts the working party.
+twice ([`hooks/fleet-rewards.ts`](hooks/fleet-rewards.ts)). Those are the defaults: `game state`
+hands over the project's `rewardWeights` (0 turns a reward off and writes no row), and a host
+older than that gets the defaults; the scoring table is in
+`docs/reference/orchestrator-game.md`. A level needs 100 XP times the level, and a row that takes
+XP away can lower the total but never the level below 1. CI red hurts the working party.
 
 ## Adding a scene
 

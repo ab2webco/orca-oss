@@ -11,6 +11,9 @@ orchestratorGame:
   sceneFile: .orca/scenes/my-scene.json # optional: the project's own scene; wins over scene
   hud: true # teammate band above the prompt
   rewards: true # XP, level-ups, celebrations
+  rewardWeights: # optional: XP per reward, 0 to 1000; 0 turns one off, an unset one keeps its default
+    ci-green: 10 # review-merged 100, ci-green 20, work-item-review 50, work-item-done 70, member-claimed 10
+    member-claimed: 0
   tracker: true # follow the worktree's linked work item
   render: hd # classic (5-row pixel art, the default) | hd (9 to 14-row 2D-HD scene) | hd-compact (the hd scene in 7 rows)
   timezone: America/Bogota # hd's day and night: local (the machine's clock, the default) | an IANA zone
