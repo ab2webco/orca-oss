@@ -87,6 +87,19 @@ describe('reattachSilentFailures (ORCA-658)', () => {
     expect(notices(dispatchId, 'reattached_by_activity')).toHaveLength(1)
   })
 
+  // The ticket's case: a turn running for minutes prints nothing, and only its working hook shows it.
+  it('reattaches a member mid-turn whose hook says working while its terminal stayed quiet', () => {
+    const { taskId, dispatchId } = failedBySilence('Work on ORCA-658')
+    const midTurn: DispatchActivityObservation = {
+      hook: { status: 'working', updatedAt: Date.now() - 12 * 60_000 },
+      lastOutputAt: null
+    }
+
+    expect(run({ term_worker: midTurn })).toEqual([{ dispatchId, action: 'reattached' }])
+    expect(open().getDispatchContextById(dispatchId)?.status).toBe('dispatched')
+    expect(open().getTask(taskId)?.status).toBe('dispatched')
+  })
+
   it('never reattaches a dispatch failed on evidence', () => {
     const { dispatchId } = liveDispatch('Work on ORCA-658', 'term_worker')
     open().failDispatch(dispatchId, 'worker exited with code 1')
