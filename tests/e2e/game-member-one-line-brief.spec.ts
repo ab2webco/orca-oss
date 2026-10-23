@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { createBriefReadingAgent } from './helpers/game-member-brief-agent'
+import { memberDispatchOf, memberWorkspaceOf } from './helpers/game-member-workspace'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
@@ -20,8 +21,6 @@ function runCli(userDataDir: string, env: Record<string, string>, args: string[]
     timeout: 60_000
   })
 }
-
-type DispatchRow = { id: string; assignee_handle: string | null; last_heartbeat_at: string | null }
 
 test('a launched member reads its one-line brief and sends the start heartbeat for its dispatch', async ({
   electronApp,
@@ -113,35 +112,21 @@ test('a launched member reads its one-line brief and sends the start heartbeat f
     expect(typed).not.toContain('dcap_')
     expect(typed).not.toContain('=== TASK ===')
 
-    const dispatchOf = async () =>
-      (
-        await client.call<{ dispatch: DispatchRow | null }>('orchestration.dispatchShow', {
-          task: launched.result.taskId
-        })
-      ).result.dispatch
-    const dispatch = (await dispatchOf())!
+    const dispatch = (await memberDispatchOf(client, launched.result.taskId))!
     expect(heartbeat!.args).toContain(dispatch.id)
     await expect
-      .poll(async () => (await dispatchOf())?.last_heartbeat_at ?? null, {
-        timeout: 30_000,
-        message: 'Orca never recorded the start heartbeat on the launched dispatch'
-      })
+      .poll(
+        async () =>
+          (await memberDispatchOf(client, launched.result.taskId))?.last_heartbeat_at ?? null,
+        {
+          timeout: 30_000,
+          message: 'Orca never recorded the start heartbeat on the launched dispatch'
+        }
+      )
       .not.toBeNull()
 
     // The brief itself, on the member's own workspace.
-    const memberTerminal = await client.call<{ terminal: { worktreeId: string } }>(
-      'terminal.show',
-      {
-        terminal: dispatch.assignee_handle
-      }
-    )
-    const worktrees = await client.call<{ worktrees: { id: string; path: string }[] }>(
-      'worktree.list',
-      {}
-    )
-    const memberPath = worktrees.result.worktrees.find(
-      (one) => one.id === memberTerminal.result.terminal.worktreeId
-    )?.path
+    const memberPath = await memberWorkspaceOf(client, launched.result.taskId)
     expect(memberPath, 'the member worktree is listed').toBeTruthy()
     const brief = readFileSync(path.join(memberPath!, heartbeat!.named), 'utf8')
     writeFileSync(testInfo.outputPath('brief.md'), brief)

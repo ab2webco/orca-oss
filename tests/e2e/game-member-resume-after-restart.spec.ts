@@ -8,6 +8,7 @@ import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-
 import { cleanupE2EDaemons } from './helpers/electron-process-shutdown'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
+import { BRIEF_LINE, memberWorkspaceOf } from './helpers/game-member-workspace'
 import { ensureTerminalVisible, waitForSessionReady, waitForActiveWorktree } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
@@ -290,13 +291,16 @@ test('a game member paused by a real restart is resumed on its own task and can 
 
     // AC5: a worker_done under the new dispatch's capability settles the task in the lead's run.
     const newHandle = dispatch.result.dispatch!.assignee_handle
+    // Why the file: a game member is typed one line naming its brief, which holds the capability.
+    const memberPath = await memberWorkspaceOf(secondClient, task.result.task.id)
     let capability: string | null = null
     await expect
       .poll(
         async () => {
-          const stdin = agent.readStdin().slice(stdinBeforeResume)
-          capability =
-            [...stdin.matchAll(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/g)].at(-1)?.[1] ?? null
+          const named = BRIEF_LINE.exec(agent.readStdin().slice(stdinBeforeResume))?.[1]
+          const brief =
+            named && memberPath ? readFileSync(path.join(memberPath, named), 'utf8') : ''
+          capability = /--dispatch-capability (dcap_[A-Za-z0-9_-]+)/.exec(brief)?.[1] ?? null
           return capability
         },
         { timeout: 60_000, message: 'the relaunched agent never received its dispatch capability' }
