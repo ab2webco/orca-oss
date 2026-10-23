@@ -56,6 +56,24 @@ no menu, team chips, party HUD or buttons. While the member's `orca orchestratio
 the lead, a second line shows the question (`? Asked <lead>: …`), cleared when the answer returns.
 Its replies use the same cards as the lead's, and the scene still draws above the spinner.
 
+### A member's one-line brief
+
+A member that `game launch` starts in a terminal Orca created is typed one line,
+`Read your Orca Lab brief at .orca/briefs/<dispatchId>.md (task <taskId>) and follow it.`, instead
+of the dispatch preamble. The preamble, with its lifecycle commands, IDs and capability, is written
+to that file in the member's workspace on the host that runs its PTY: the local disk, or the SSH
+connection's filesystem
+([`dispatch-brief-delivery.ts`](../../src/main/runtime/orchestration/dispatch-brief-delivery.ts)).
+The path is relative to the member's cwd, so WSL and SSH need no path translation. `.orca/briefs/`
+carries its own `.gitignore` (`*`), so the brief never shows in `git status`; locally the file is
+`0600`. This holds for any agent and host, folder workspaces included. The member's mod draws the
+line as a **Brief received** block naming the file.
+
+The full preamble is typed as before when the member is not a game member, the project turns
+**Game in member panes** off or the mode is `off`, the terminal was passed in rather than started
+by Orca, or the brief cannot be written (no workspace, no SSH filesystem, a failed write). The host
+that runs `worker-start` decides, so an older host types the preamble as it always did.
+
 ### On Windows
 
 The pane's shell parses the launch line, so `--plugin-dir` is quoted for it
