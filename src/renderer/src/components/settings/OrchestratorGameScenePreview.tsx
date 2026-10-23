@@ -54,6 +54,11 @@ const notes = {
       'auto.components.settings.OrchestratorGameSetting.previewOff',
       'The game is off, so Agent Teams panes start as plain Claude.'
     ),
+  flat: (): string =>
+    translate(
+      'auto.components.settings.OrchestratorGameSetting.previewFlat',
+      'Flat draws the game as text, with no scene or characters.'
+    ),
   zen: (): string =>
     translate(
       'auto.components.settings.OrchestratorGameSetting.previewZen',
@@ -104,7 +109,12 @@ export function OrchestratorGameScenePreview({
     [plugins, scene]
   )
   const definition =
-    mode === 'off' ? null : option.kind === 'file' ? fileSceneOf(fileScene) : previewSceneOf(option)
+    // Why flat too: a flat pane never draws the scene, so the preview must not either.
+    mode === 'off' || mode === 'flat'
+      ? null
+      : option.kind === 'file'
+        ? fileSceneOf(fileScene)
+        : previewSceneOf(option)
   const isFileFallback = option.kind === 'file' && definition !== null && fileScene?.status !== 'ok'
   const isReduced = usePrefersReducedMotion()
   const isAnimated = definition !== null && !isReduced
@@ -138,15 +148,17 @@ export function OrchestratorGameScenePreview({
   const note =
     mode === 'off'
       ? notes.off()
-      : option.kind === 'plugin'
-        ? notes.plugin()
-        : isFileFallback
-          ? notes.file()
-          : option.kind === 'missing'
-            ? notes.missing()
-            : mode === 'zen'
-              ? notes.zen()
-              : null
+      : mode === 'flat'
+        ? notes.flat()
+        : option.kind === 'plugin'
+          ? notes.plugin()
+          : isFileFallback
+            ? notes.file()
+            : option.kind === 'missing'
+              ? notes.missing()
+              : mode === 'zen'
+                ? notes.zen()
+                : null
 
   return (
     <figure

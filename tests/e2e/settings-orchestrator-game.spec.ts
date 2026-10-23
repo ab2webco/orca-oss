@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
 import type { GlobalSettings } from '../../src/shared/global-settings-types'
 import type { DiscoveredSkill, SkillDiscoveryResult } from '../../src/shared/skills'
 import {
@@ -11,8 +12,6 @@ import {
   sceneLook
 } from '../../src/shared/__fixtures__/orchestrator-game-scene'
 
-const WIDTHS = [1440, 768, 390, 320] as const
-const THEMES = ['light', 'dark'] as const
 // Zones spread across the day, so their hours differ in light whatever time the run starts.
 const HD_HOUR_ZONES = [
   'Australia/Brisbane',
@@ -20,28 +19,6 @@ const HD_HOUR_ZONES = [
   'America/Noronha',
   'Europe/Istanbul'
 ] as const
-
-async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
-  await expect
-    .poll(async () =>
-      page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
-    )
-    .toBe(theme)
-}
-
-/** The main window floors at 600px, so phone widths need the floor lifted first. */
-async function setWindowWidth(app: ElectronApplication, page: Page, width: number): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, size) => {
-    const window_ = BrowserWindow.getAllWindows()[0]
-    window_?.setMinimumSize(320, 400)
-    window_?.setSize(size, 900)
-  }, width)
-  await expect.poll(async () => page.evaluate(() => window.innerWidth)).toBe(width)
-}
 
 async function savedGameSettings(
   page: Page
@@ -84,14 +61,34 @@ test('global and per-project Agent Teams game settings persist and render at eve
     state.openSettingsTarget({ pane: 'agents', repoId: null })
     state.openSettingsPage()
   })
-  const globalSection = orcaPage.getByRole('radiogroup', { name: 'Game mode' }).first()
+  const globalSection = orcaPage.getByRole('combobox', { name: 'Default view' }).first()
   await expect(globalSection).toBeVisible({ timeout: 15_000 })
 
-  await globalSection.getByRole('radio', { name: 'Zen' }).click()
+  await globalSection.click()
+  // Why every option: Settings must list the shared view table, in order, with its costs.
+  await expect(orcaPage.getByRole('option')).toHaveText([
+    'Off · light',
+    'Flat · light',
+    'Zen · medium',
+    '2D classic · medium',
+    '2D hd · heavy'
+  ])
+  await orcaPage.getByRole('option', { name: 'Zen · medium' }).click()
   await orcaPage.getByRole('switch', { name: 'Rewards' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
     .toEqual({ mode: 'zen', rewards: false })
+  const show = orcaPage.getByRole('switch', { name: 'Show the game' }).first()
+  await show.click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ mode: 'zen', rewards: false, show: false })
+  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeDisabled()
+  await expect(globalSection).toHaveText('Zen · medium')
+  await show.click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
+    .toEqual({ mode: 'zen', rewards: false, show: true })
 
   await shootAll(electronApp, orcaPage, testInfo, 'global', globalSection)
 
@@ -104,17 +101,28 @@ test('global and per-project Agent Teams game settings persist and render at eve
     state.openSettingsPage()
   }, repoId)
 
-  const projectMode = orcaPage.getByRole('radiogroup', { name: 'Game mode' }).first()
-  await expect(projectMode).toBeVisible({ timeout: 15_000 })
+  const projectView = orcaPage.getByRole('combobox', { name: 'Default view' }).first()
+  await expect(projectView).toBeVisible({ timeout: 15_000 })
   await expect(orcaPage.getByText('Zen · global setting')).toBeVisible()
+  await expect(orcaPage.getByText('On · global setting').first()).toBeVisible()
 
-  await projectMode.getByRole('radio', { name: 'Off' }).click()
+  await projectView.click()
+  await orcaPage.getByRole('option', { name: '2D hd · heavy' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
-    .toEqual({ [repoId as string]: { mode: 'off' } })
-  await expect(orcaPage.getByText('Off · this machine')).toBeVisible()
+    .toEqual({ [repoId as string]: { mode: 'on', render: 'hd' } })
+  await expect(orcaPage.getByText('2D hd · this machine')).toBeVisible()
 
-  await shootAll(electronApp, orcaPage, testInfo, 'project', projectMode)
+  await orcaPage
+    .getByRole('radiogroup', { name: 'Show the game' })
+    .getByRole('radio', { name: 'Off' })
+    .click()
+  await expect
+    .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
+    .toEqual({ [repoId as string]: { mode: 'on', render: 'hd', show: false } })
+  await expect(orcaPage.getByText('Off · this machine').first()).toBeVisible()
+
+  await shootAll(electronApp, orcaPage, testInfo, 'project', projectView)
 })
 
 const SPACE_PACK = {
@@ -266,11 +274,7 @@ test('the game section says it is for Claude Agent Teams only and previews the p
   }
 
   await setWindowWidth(electronApp, orcaPage, 1440)
-  await orcaPage
-    .getByRole('radiogroup', { name: 'Game mode' })
-    .first()
-    .getByRole('radio', { name: 'Off' })
-    .click()
+  await orcaPage.getByRole('switch', { name: 'Show the game' }).first().click()
   await expect(nightWatch).toBeHidden()
   await expect(
     orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')
@@ -640,8 +644,8 @@ test('the render and time zone rows persist globally and per project and render 
   }, repoId)
   const projectRender = orcaPage.getByRole('radiogroup', { name: 'Render' }).first()
   await expect(projectRender).toBeVisible({ timeout: 15_000 })
-  await expect(orcaPage.getByText('HD · global setting')).toBeVisible()
-  await expect(orcaPage.getByText('America/Bogota · global setting')).toBeVisible()
+  await expect(orcaPage.getByText('HD · global setting', { exact: true })).toBeVisible()
+  await expect(orcaPage.getByText('America/Bogota · global setting', { exact: true })).toBeVisible()
   await projectRender.getByRole('radio', { name: 'Classic' }).click()
   const projectZone = orcaPage.getByRole('textbox', { name: 'Time zone' }).first()
   await projectZone.fill('Europe/Madrid')
@@ -649,7 +653,7 @@ test('the render and time zone rows persist globally and per project and render 
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({ [repoId as string]: { render: 'classic', timezone: 'Europe/Madrid' } })
-  await expect(orcaPage.getByText('Classic · this machine')).toBeVisible()
+  await expect(orcaPage.getByText('Classic · this machine', { exact: true })).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'render-project', projectZone)
 
   // ORCA-731: the short hd band is a third choice on the same row.
@@ -657,7 +661,7 @@ test('the render and time zone rows persist globally and per project and render 
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({ [repoId as string]: { render: 'hd-compact', timezone: 'Europe/Madrid' } })
-  await expect(orcaPage.getByText('HD compact · this machine')).toBeVisible()
+  await expect(orcaPage.getByText('HD compact · this machine', { exact: true })).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'render-project-compact', projectRender)
 })
 
