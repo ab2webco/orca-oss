@@ -1,23 +1,13 @@
-import type { RuntimeTerminalAgentStatusState } from '../../../shared/runtime-types'
 import type { OrchestrationDb } from './db'
+import {
+  activityAt,
+  type DispatchActivityObservation,
+  type DispatchActivityProbe
+} from './dispatch-activity-observation'
+import type { DispatchDeadlineNotifier } from './dispatch-deadline-monitor'
+import { reattachSilentFailures, SILENT_FAILURE_WATCH_MS } from './dispatch-silence-reattach'
 
-/** What the host already knows about a worker terminal, read without asking the agent. */
-export type DispatchActivityObservation = {
-  /** The freshest agent hook state for the terminal, if its agent reports hooks. */
-  hook: { status: NonNullable<RuntimeTerminalAgentStatusState>; updatedAt: number } | null
-  /** Null until the PTY prints in this app session. */
-  lastOutputAt: number | null
-}
-
-export type DispatchActivityProbe = (assigneeHandle: string) => DispatchActivityObservation
-
-// Why: a working hook means a turn is in progress; an idle one dates the turn's end, and TUI repaints after it are not progress.
-function activityAt(observation: DispatchActivityObservation, now: number): number | null {
-  if (observation.hook) {
-    return observation.hook.status === 'working' ? now : observation.hook.updatedAt
-  }
-  return observation.lastOutputAt
-}
+export type { DispatchActivityObservation, DispatchActivityProbe }
 
 /** Records each dispatched worker's latest host-observed activity (ORCA-746); no observation leaves it unknown. */
 export function recordDispatchActivities(
@@ -42,7 +32,8 @@ export class DispatchActivityMonitor {
 
   constructor(
     private readonly db: () => OrchestrationDb,
-    private readonly probe: DispatchActivityProbe
+    private readonly probe: DispatchActivityProbe,
+    private readonly notifier: DispatchDeadlineNotifier
   ) {}
 
   ensure(): void {
@@ -72,10 +63,17 @@ export class DispatchActivityMonitor {
   private scan(): boolean {
     try {
       const db = this.db()
-      if (db.listActivityWatchedDispatches().length === 0) {
+      const now = new Date()
+      // Why (ORCA-658): a dispatch the deadline just failed may still be working, so it is watched too.
+      const since = new Date(now.getTime() - SILENT_FAILURE_WATCH_MS).toISOString()
+      if (
+        db.listActivityWatchedDispatches().length === 0 &&
+        db.listWatchedSilenceFailures(since).length === 0
+      ) {
         return false
       }
-      recordDispatchActivities(db, this.probe)
+      recordDispatchActivities(db, this.probe, now)
+      reattachSilentFailures(db, this.probe, this.notifier, now)
     } catch (error) {
       console.warn('[orchestration] dispatch activity scan failed', { error })
     }

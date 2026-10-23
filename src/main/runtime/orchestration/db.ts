@@ -7569,6 +7569,8 @@ export class OrchestrationDb {
   reopenDispatchFailedByInference(params: {
     dispatchId: string
     reason: string
+    /** Clears the spent deadline; a reopen with no lifecycle signal would otherwise re-expire on the next scan (ORCA-658). */
+    disarmDeadline?: boolean
   }): DispatchContextRow | undefined {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -7580,10 +7582,11 @@ export class OrchestrationDb {
         .prepare(
           `UPDATE dispatch_contexts
            SET status = 'dispatched', last_failure = NULL, completed_at = NULL,
-               capability_revoked_at = NULL, failure_provenance = NULL
+               capability_revoked_at = NULL, failure_provenance = NULL,
+               monitor_deadline_at = CASE WHEN ? = 1 THEN NULL ELSE monitor_deadline_at END
            WHERE id = ? AND status = 'failed'`
         )
-        .run(params.dispatchId)
+        .run(params.disarmDeadline ? 1 : 0, params.dispatchId)
       if (restored.changes !== 1) {
         this.db.exec('COMMIT')
         return undefined
@@ -7610,6 +7613,85 @@ export class OrchestrationDb {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  /** Inference failures whose terminal showed something since `sinceIso`, failure time included (ORCA-658). */
+  listWatchedSilenceFailures(sinceIso: string): DispatchContextRow[] {
+    return this.db
+      .prepare(
+        `SELECT * FROM dispatch_contexts
+         WHERE status = 'failed' AND failure_provenance = 'inferred_silence'
+           AND assignee_handle IS NOT NULL AND completed_at IS NOT NULL
+           AND max(julianday(completed_at), julianday(COALESCE(last_activity_at, completed_at)))
+               >= julianday(?)`
+      )
+      .all(sinceIso) as DispatchContextRow[]
+  }
+
+  // Why: inference failures only; an evidence failure stays as final as `recordDispatchActivity` keeps it.
+  recordSilenceFailureActivity(dispatchId: string, at: string): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_contexts SET last_activity_at = ?
+         WHERE id = ? AND status = 'failed' AND failure_provenance = 'inferred_silence'
+           AND (last_activity_at IS NULL OR julianday(last_activity_at) < julianday(?))`
+      )
+      .run(at, dispatchId, at)
+  }
+
+  isActiveSinceSilenceFailure(dispatchId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM dispatch_contexts
+           WHERE id = ? AND status = 'failed' AND failure_provenance = 'inferred_silence'
+             AND last_activity_at IS NOT NULL
+             AND julianday(last_activity_at) > julianday(completed_at)`
+        )
+        .get(dispatchId)
+    )
+  }
+
+  hasNewerDispatchForTask(dispatchId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM dispatch_contexts d
+           JOIN dispatch_contexts n ON n.task_id = d.task_id AND n.rowid > d.rowid
+           WHERE d.id = ? LIMIT 1`
+        )
+        .get(dispatchId)
+    )
+  }
+
+  /** Every other pending or dispatched attempt with its task's text, to match a ticket against. */
+  listOtherLiveDispatchTasks(
+    dispatchId: string
+  ): { id: string; spec: string; task_title: string | null; display_name: string | null }[] {
+    return this.db
+      .prepare(
+        `SELECT d.id, t.spec, t.task_title, t.display_name FROM dispatch_contexts d
+         JOIN tasks t ON t.id = d.task_id
+         WHERE d.status IN ('pending', 'dispatched') AND d.id != ?`
+      )
+      .all(dispatchId) as {
+      id: string
+      spec: string
+      task_title: string | null
+      display_name: string | null
+    }[]
+  }
+
+  /** Whether this dispatch already posted a notice with this reason; survives a restart, unlike memory. */
+  hasDispatchNotice(dispatchId: string, reason: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM messages
+           WHERE from_handle = ? AND json_extract(payload, '$.reason') = ? LIMIT 1`
+        )
+        .get(`dispatch:${dispatchId}`, reason)
+    )
   }
 
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).
