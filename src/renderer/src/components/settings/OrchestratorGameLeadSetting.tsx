@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
-  gameLeadSourceOf,
   resolveOrchestratorGameLead,
   type OrchestratorGameLayer
 } from '../../../../shared/orchestrator-game-config'
+import { gameLeadSourceOf } from '../../../../shared/orchestrator-game-lead-source'
 import {
   GAME_LEAD_CAP_MAX,
   parseGameLead,
