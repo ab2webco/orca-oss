@@ -721,9 +721,8 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       connectionLost?: boolean
       legacyCompatibility?: LegacyCompatibilityResult
     }
-    let result: Awaited<ReturnType<typeof client.call<CheckResult>>>
-    try {
-      result = await callMutation<CheckResult>(client, flags, 'orchestration.check', {
+    const callCheck = () =>
+      callMutation<CheckResult>(client, flags, 'orchestration.check', {
         terminal,
         terminalPaneKey: explicitTerminal ? undefined : process.env.ORCA_PANE_KEY || undefined,
         // Why: peek also sends unread:false so pre-peek runtimes degrade to non-consuming all mode instead of destructive mark-read.
@@ -739,6 +738,13 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
         wait: wait ? true : undefined,
         timeoutMs
       })
+    let result: Awaited<ReturnType<typeof callCheck>>
+    try {
+      result = await callCheck()
+      // Why: a watch with --watch re-waits after a quiet timeout, so the caller is woken only by a delivery.
+      while (wait && flags.has('watch') && result.result.timedOut === true) {
+        result = await callCheck()
+      }
     } finally {
       stopKeepalive?.()
     }

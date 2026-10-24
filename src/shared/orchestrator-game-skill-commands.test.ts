@@ -25,6 +25,13 @@ describe('the lead skill', () => {
     expect(text).toMatch(/only this pane/)
   })
 
+  it('carries the decision bar, the decision-gate wait and the advisor step', () => {
+    const text = skillText('lead')
+    expect(text).toMatch(/decision gate/)
+    expect(text).toMatch(/only they can decide/)
+    expect(text).toMatch(/advisor/)
+  })
+
   // Why: without --terminal, `orchestration inbox` returns every project's mail on the machine.
   it('reads its mail only through game inbox', () => {
     const text = skillText('lead')
