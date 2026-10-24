@@ -860,8 +860,19 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             wakeTypes,
             keepHeartbeats: typeFilter?.includes('heartbeat') === true
           })
+        // Why: the pointer skips a batch handed to this pty, so a watch's delivery does not also wake the lead (ORCA-746 T6b).
+        const recordHandedOut = (batch: { messages: { id: string }[] } | undefined): void => {
+          const ptyId = paneKey ? runtime.getPtyIdForPaneKey(paneKey) : null
+          if (ptyId && batch) {
+            runtime.recordHandedOutMessages(
+              ptyId,
+              batch.messages.map((message) => message.id)
+            )
+          }
+        }
         let current = readDelivery(params.wait ? typeFilter : undefined)
         if (current) {
+          recordHandedOut(current)
           return {
             runId: run.id,
             deliveryId: current.delivery.id,
@@ -949,6 +960,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         }
 
         current = readDelivery(typeFilter)
+        recordHandedOut(current)
         return {
           runId: run.id,
           deliveryId: current?.delivery.id ?? null,

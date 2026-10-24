@@ -101,6 +101,51 @@ describe('orchestration timeout flag validation', () => {
     })
   })
 
+  it('with --watch, a quiet timeout waits again silently and prints only the delivery', async () => {
+    process.env.ORCA_TERMINAL_HANDLE = 'term_lead'
+    callMock
+      .mockResolvedValueOnce({
+        result: { deliveryId: null, messages: [], count: 0, timedOut: true, acknowledged: null }
+      })
+      .mockResolvedValueOnce({
+        result: {
+          deliveryId: 'dlv_2',
+          messages: [{ id: 'msg_1', from_handle: 'term_member', subject: 'done', read: 0 }],
+          count: 1,
+          timedOut: false,
+          acknowledged: null
+        }
+      })
+    vi.mocked(printResult).mockClear()
+    await invokeCheck(
+      new Map<string, string | boolean>([
+        ['wait', true],
+        ['watch', true],
+        ['types', 'worker_done,escalation,question'],
+        ['ack', 'dlv_1']
+      ])
+    )
+    // Why: the re-wait repeats the ack; a duplicate ack is a no-op, so the batch is acknowledged once.
+    expect(callMock).toHaveBeenCalledTimes(2)
+    expect(callMock.mock.calls.map((call) => call[1].ack)).toEqual(['dlv_1', 'dlv_1'])
+    expect(printResult).toHaveBeenCalledTimes(1)
+    const response = vi.mocked(printResult).mock.calls[0]?.[0] as {
+      result: { deliveryId: string; timedOut: boolean; count: number }
+    }
+    expect(response.result).toMatchObject({ deliveryId: 'dlv_2', timedOut: false, count: 1 })
+  })
+
+  it('without --watch, a timeout is returned once so the caller can re-arm', async () => {
+    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    callMock.mockResolvedValue({
+      result: { deliveryId: null, messages: [], count: 0, timedOut: true, acknowledged: null }
+    })
+    vi.mocked(printResult).mockClear()
+    await invokeCheck(new Map<string, string | boolean>([['wait', true]]))
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(printResult).toHaveBeenCalledTimes(1)
+  })
+
   it('filters already-read rows from a peek response for pre-peek runtimes', async () => {
     process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
     callMock.mockResolvedValue({
