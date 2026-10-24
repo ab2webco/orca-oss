@@ -40,7 +40,7 @@ describe('skippedReason', () => {
     const reason = skippedReason([row(null)], 'orchestration')
     expect(reason).toContain('reports the skill as already up to date')
     expect(reason).toContain(
-      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orchestration --global'
     )
   })
 
@@ -93,7 +93,7 @@ describe('skippedReason', () => {
       'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
     )
     expect(skippedReason([row('current')], 'orchestration')).toContain(
-      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orchestration --global'
     )
   })
 

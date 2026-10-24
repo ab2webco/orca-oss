@@ -27,7 +27,7 @@ import {
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
 import {
   buildAgentFeatureSkillInstallArgsByRepository,
-  buildAgentFeatureSkillUpdateArgs
+  buildAgentFeatureSkillUpdateStepArgs
 } from '../../shared/agent-feature-install-commands'
 
 function writeStdout(value: string): void {
@@ -194,9 +194,8 @@ function resolveInstallAgentKeys(flags: Map<string, string | boolean>): string[]
 }
 
 /**
- * One argv per `skills` invocation: install splits by source repo, update never
- * does — `skills update` takes no repo and re-fetches each skill from the source
- * its own lock recorded at install time.
+ * One argv per `skills` invocation: install splits by source repo; update splits
+ * Orca-shipped skills (re-added from the fork) from the rest (updated as recorded).
  */
 function buildNpxSkillsArgs(
   verb: SkillMutationVerb,
@@ -207,7 +206,7 @@ function buildNpxSkillsArgs(
   const skillArgs =
     verb === 'install'
       ? buildAgentFeatureSkillInstallArgsByRepository(skillNames, { global, yes: true, agents })
-      : [buildAgentFeatureSkillUpdateArgs(skillNames, { global, yes: true })]
+      : buildAgentFeatureSkillUpdateStepArgs(skillNames, { global, yes: true, agents })
   // Why: a cold package cache makes bare `npx` prompt before it will fetch
   // `skills`, which strands an unattended host just like the picker does.
   return skillArgs.map((args) => ['--yes', ...args])
