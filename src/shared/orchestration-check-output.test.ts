@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { prepareOrchestrationCheckOutput } from './orchestration-check-output'
+import {
+  formatOrchestrationCheckText,
+  prepareOrchestrationCheckOutput
+} from './orchestration-check-output'
+
+describe('formatOrchestrationCheckText', () => {
+  it('prints the body of a current message so a plain check is enough to act', () => {
+    const text = formatOrchestrationCheckText(
+      {
+        count: 1,
+        messages: [
+          {
+            id: 'msg_rebase',
+            run_id: 'run_adopted',
+            delivery_contract: 'current_delivery',
+            from_handle: 'term_lead',
+            to_handle: 'term_member',
+            subject: 'Rebase now',
+            type: 'status',
+            body: 'Rebase onto main and push before the release cut.'
+          }
+        ]
+      },
+      'term_member'
+    )
+
+    expect(text).toContain('msg_rebase [status] from=term_lead "Rebase now"')
+    expect(text).toContain('Rebase onto main and push before the release cut.')
+  })
+})
 
 describe('prepareOrchestrationCheckOutput', () => {
   it('keeps mixed read-only mail safe and current Run replies executable', () => {
