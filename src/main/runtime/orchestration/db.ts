@@ -4019,6 +4019,18 @@ export class OrchestrationDb {
     return question ? exposeQuestionTimestamps(question) : undefined
   }
 
+  // Why: a question stays waiting on the lead after its mail is acked, until someone answers or closes it.
+  listPendingQuestions(runId: string): MessageRow[] {
+    return this.db
+      .prepare(
+        `SELECT m.* FROM question_threads q
+           JOIN messages m ON m.id = q.message_id
+          WHERE q.run_id = ? AND q.status = 'pending'
+          ORDER BY m.sequence`
+      )
+      .all(runId) as MessageRow[]
+  }
+
   private getQuestionRaw(messageId: string): QuestionRow | undefined {
     return this.db.prepare('SELECT * FROM question_threads WHERE message_id = ?').get(messageId) as
       | QuestionRow
