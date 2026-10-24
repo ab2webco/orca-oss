@@ -95,15 +95,23 @@ export function formatOrchestrationCheckText(
     }
     return `${legacyHeader}No messages.${deliveryNotice}`
   }
+  // Why: a plain check is the only read a member does before acting; without the body it stops and asks the user.
   const rendered = prepared.messages
-    .map(
-      (message) =>
-        `${message.id}${formatMessageReadOnlyTag(
-          message,
-          compatibilityActive
-        )} [${message.type ?? 'status'}] from=${message.from_handle} "${message.subject}"`
-    )
-    .join('\n')
+    .map((message) => {
+      const header = `${message.id}${formatMessageReadOnlyTag(
+        message,
+        compatibilityActive
+      )} [${message.type ?? 'status'}] from=${message.from_handle} "${message.subject}"`
+      const lines = [header]
+      if (message.body) {
+        lines.push(formatQuotedMessageField('body', message.body))
+      }
+      if (message.payload) {
+        lines.push(formatQuotedMessageField('payload', message.payload))
+      }
+      return lines.join('\n')
+    })
+    .join('\n\n')
   const output = prepared.deliveryId ? `Delivery ${prepared.deliveryId}\n${rendered}` : rendered
   return `${legacyHeader}${output}${deliveryNotice}`
 }
