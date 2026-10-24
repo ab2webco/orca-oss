@@ -485,7 +485,7 @@ module.exports = {
       featureWallResources
     ],
     target: ['AppImage', 'deb'],
-    maintainer: 'stablyai',
+    maintainer: 'ab2webco',
     category: 'Utility'
   },
   appImage: {

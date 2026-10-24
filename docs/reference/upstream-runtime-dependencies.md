@@ -1,21 +1,24 @@
 # Upstream runtime dependencies that stay (ORCA-192, tier 3)
 
 Tiers 1 and 2 removed or re-pointed everything the fork could host itself (`4eb88fefa1`,
-`32049d1529`). Three runtime dependencies remain, and this document is the decision to keep them:
-they are **services**, not constants, and hosting them is not a build change — it is running an
+`32049d1529`). Four runtime dependencies remain, and this document is the decision to keep them.
+Three are **services**, not constants, and hosting them is not a build change — it is running an
 identity provider, an object store with a public web front end, and a global WebSocket relay fleet.
+The fourth is a static JSON file, but it is still upstream's to publish.
 
 | Constant | Host | Kept because |
 | --- | --- | --- |
 | `src/main/artifacts/artifact-cloud-config.ts:3` | `share.onorca.dev` | Public artifact hosting service |
 | `src/main/orca-profiles/profile-cloud-auth-config.ts:19` | `login.onorca.dev` | OIDC/PKCE identity provider |
 | `src/main/orca-profiles/profile-cloud-auth-config.ts:21` | `relay.onorca.dev` | Relay director + cell fleet |
+| `src/main/plugins/plugin-kill-list-service.ts:20` | `onorca.dev/plugins/kill-list.json` | Upstream marketplace revocation list |
 
-All three are behind the same gate: `getOrcaCloudAuthConfig` resolves the production host **only in a
+The first three are behind the same gate: `getOrcaCloudAuthConfig` resolves the production host **only in a
 packaged build** (`profile-cloud-auth-config.ts:78-89`). A source or dev build returns
 `configured: false` with "Orca Cloud sign-in is not configured for this build." — so every
 developer-facing check of this fork sees the clean-failure branch, and only the shipped Lab release
-resolves to upstream. That asymmetry is why this was worth auditing at all.
+resolves to upstream. That asymmetry is why this was worth auditing at all. The kill list has no such
+gate: `fetchPluginKillList` never checks whether the build is packaged (`plugin-kill-list-service.ts:129-137`).
 
 ## 1. What happens today if a Lab user uses it
 
@@ -39,6 +42,8 @@ Relay label (`mobile-pairing-connection-mode.ts:36-41`). Signed in, `RelaySessio
 exchanges the cloud access token at `login.onorca.dev/v1/desktop/auth/relay-token`, then requests a
 cell assignment from `relay.onorca.dev` (`relay-session-broker.ts:198-230`). The LAN path needs no
 account and no upstream host at all.
+
+**Plugin kill list.** `fetchPluginKillList` is a plain `GET` with `cache: 'no-store'` (`plugin-kill-list-service.ts:134`). The request carries no Orca identifiers beyond what any HTTP client sends. The response can revoke installed plugins; the fork's exemptions (`plugin-kill-list-exemptions.ts`) are applied on top, so the fork can keep a plugin alive but cannot stop upstream's list from being fetched.
 
 **Not verified.** Whether upstream's authorization server actually accepts `client_id=orca-desktop`
 from a Lab build's loopback redirect, and whether an upstream account can complete a publish — that
@@ -94,6 +99,10 @@ somewhere means operating an OIDC provider that mints these exact `/v1/desktop/a
 plus a director and cell fleet speaking the relay control protocol. That is infrastructure work, not
 configuration.
 
+The kill list is the exception that is not a service. A fork-hosted copy would be an empty file: the
+list revokes plugins from upstream's marketplace, which the fork still consumes and does not curate
+(`plugin-kill-list-service.ts:16-19`). Only the exemptions file is the fork's to own.
+
 ## Known limits of the fork
 
 1. A Lab user who signs in is authenticating against upstream's identity provider with an upstream
@@ -103,3 +112,5 @@ configuration.
 3. Relay-brokered mobile sessions transit upstream infrastructure. Contents are end-to-end
    encrypted; metadata is not. LAN pairing avoids it entirely and needs no account.
 4. Self-hosting a share endpoint is blocked by the first-party host guard, not merely unimplemented.
+5. The plugin kill list is fetched from upstream on every refresh, in source and packaged builds
+   alike. Upstream decides which plugins are revoked; the fork can only exempt its own.

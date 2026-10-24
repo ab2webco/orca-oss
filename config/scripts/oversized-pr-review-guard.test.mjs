@@ -7,58 +7,64 @@ import { afterAll, describe, expect, it } from 'vitest'
 const projectDir = resolve(import.meta.dirname, '../..')
 const hookScript = join(projectDir, '.claude/hooks/oversized-pr-review-guard.py')
 const settingsPath = join(projectDir, '.claude/settings.json')
+const DEFAULT_REPO = 'ab2webco/orca-oss'
+const SONAR_REPO = 'ab2webco/orca-sonar'
 const tempDirs = []
 
-// Why un `gh` falso y no la red: la guarda mide el diff con `gh pr view --json files`, y el
-// tamaño es justo lo que cada caso necesita fijar.
-function makeFakeGhBin({ number = '1', files = null } = {}) {
+// Why a marker file: the fake gh answers `gh repo view` for the checkout it runs in,
+// the way gh does for a real one, so a `cd` into another checkout changes the answer.
+function makeDir(repo) {
+  const dir = mkdtempSync(join(tmpdir(), 'orca-oversized-pr-guard-'))
+  tempDirs.push(dir)
+  if (repo !== undefined) {
+    writeFileSync(join(dir, 'fake-gh-repo'), repo)
+  }
+  return dir
+}
+
+// Why un `gh` falso y no la red: el tamaño es justo lo que cada caso fija. `repos` mapea
+// owner/repo a los archivos de su PR; un repo fuera del mapa es un diff ilegible.
+function makeFakeGhBin({ number = '1', files = null, repos = {} } = {}) {
   const bin = mkdtempSync(join(tmpdir(), 'orca-oversized-pr-guard-bin-'))
   tempDirs.push(bin)
+  const pulls = { [DEFAULT_REPO]: files, ...repos }
+  const toTsv = (entries) =>
+    entries.map(({ path, additions }) => `${path}\t${additions}`).join('\n')
+  const pullCases = Object.entries(pulls).map(([repo, entries], index) => {
+    if (entries === null) {
+      return `  *"repos/${repo}/pulls/"*) exit 1 ;;`
+    }
+    const all = join(bin, `pulls-${index}-all.tsv`)
+    const firstPage = join(bin, `pulls-${index}-first.tsv`)
+    writeFileSync(all, toTsv(entries))
+    writeFileSync(firstPage, toTsv(entries.slice(0, 100)))
+    // Why two pages: a fake that serves everything with or without --paginate stays green
+    // when the flag is dropped (#296).
+    return `  *"repos/${repo}/pulls/"*) case "$*" in *--paginate*) cat '${all}' ;; *) cat '${firstPage}' ;; esac ;;`
+  })
+  const numberCase = number === null ? '  *number*) exit 1 ;;' : `  *number*) echo "${number}" ;;`
+  const body = [
+    '#!/bin/sh',
+    'case "$*" in',
+    ...pullCases,
+    '  *nameWithOwner*)',
+    '    marker="$(pwd -P)/fake-gh-repo"',
+    `    if [ ! -f "$marker" ]; then echo '${DEFAULT_REPO}'; elif [ -s "$marker" ]; then cat "$marker"; else exit 1; fi ;;`,
+    numberCase,
+    '  *) exit 1 ;;',
+    'esac',
+    ''
+  ].join('\n')
   const script = join(bin, 'gh')
-  // Why dos formas y no una: `gh pr view --json files` corta en 100 entradas y usa
-  // `path`; `gh api .../pulls/N/files` pagina y usa `filename`. Un fake que sirve
-  // las dos igual no puede distinguir una guarda que pagina de una que no.
-  const truncatedJson = files === null ? null : JSON.stringify(files.slice(0, 100))
-  // `gh api --jq` aplica el filtro y emite lineas, no JSON: el fake tiene que
-  // servir lo mismo o el hook parsea algo que gh nunca le daria.
-  // Why dos paginas y no una lista entera: sin esto, el fake sirve todo con o sin
-  // --paginate, y sacar la bandera deja el suite en verde. Es lo que paso en #296.
-  const page = (entries) => entries.map(({ path, additions }) => `${path}\t${additions}`).join('\n')
-  const firstPageTsv = files === null ? null : page(files.slice(0, 100))
-  const allPagesTsv = files === null ? null : page(files)
-  const body =
-    files === null
-      ? `#!/bin/sh\ncase "$*" in *number*) echo "${number}";; *) exit 1;; esac\n`
-      : [
-          '#!/bin/sh',
-          'case "$*" in',
-          `  *number*) echo "${number}";;`,
-          // `gh api` sin --paginate devuelve solo la primera pagina, como el real.
-          `  *--paginate*) cat <<'PAGES'`,
-          allPagesTsv,
-          'PAGES',
-          '  ;;',
-          `  *api*files*) cat <<'PAGE1'`,
-          firstPageTsv,
-          'PAGE1',
-          '  ;;',
-          `  *files*) cat <<'JSON'`,
-          truncatedJson,
-          'JSON',
-          '  ;;',
-          '  *) exit 1;;',
-          'esac',
-          ''
-        ].join('\n')
   writeFileSync(script, body)
   chmodSync(script, 0o755)
   return bin
 }
 
-function runGuard(command, ghOptions) {
-  const cwd = mkdtempSync(join(tmpdir(), 'orca-oversized-pr-guard-'))
-  tempDirs.push(cwd)
+function runGuard(command, ghOptions, cwd = makeDir()) {
   const env = { ...process.env }
+  // Why: a GH_REPO exported in the developer's shell would silently retarget these cases.
+  delete env.GH_REPO
   if (ghOptions !== undefined) {
     env.PATH = `${makeFakeGhBin(ghOptions)}:${env.PATH}`
   }
@@ -88,6 +94,12 @@ const bigTests = [
   // Why sin `.test.`/`.spec.` en el nombre: es la única entrada que clasifica por directorio,
   // así que es la que muere si alguien recorta el predicado a la extensión.
   { path: 'tests/tools/probe.mjs', additions: 900 }
+]
+// The orca-sonar PR from ORCA-781: 1595 lines, 1376 of them in the lockfile, 219 authored.
+const sonarPr = [
+  { path: 'package-lock.json', additions: 1376 },
+  { path: 'plugin/src/index.ts', additions: 150 },
+  { path: 'plugin/src/manifest.ts', additions: 69 }
 ]
 
 describe('oversized-pr-review-guard', () => {
@@ -194,6 +206,18 @@ describe('oversized-pr-review-guard', () => {
     expect(result.denied).toBe(false)
   })
 
+  // Why: los lockfiles son salida de un gestor de paquetes, no código escrito a mano. ORCA-781.
+  it('does not count lockfiles toward the threshold', () => {
+    const files = [
+      { path: 'plugin/src/index.ts', additions: 10 },
+      { path: 'package-lock.json', additions: 1376 },
+      { path: 'packages/app/pnpm-lock.yaml', additions: 900 },
+      { path: 'native/Cargo.lock', additions: 500 }
+    ]
+
+    expect(runGuard('gh pr merge 1 --squash', { number: '1', files }).denied).toBe(false)
+  })
+
   it('denies when the diff cannot be read', () => {
     const result = runGuard('gh pr merge 12 --squash', { number: '12', files: null })
     expect(result.denied).toBe(true)
@@ -201,8 +225,103 @@ describe('oversized-pr-review-guard', () => {
   })
 
   it('denies when the pr number cannot be resolved', () => {
-    const result = runGuard('gh pr merge --squash')
+    const result = runGuard('gh pr merge --squash', { number: null })
     expect(result.denied).toBe(true)
     expect(result.reason).toContain('no se pudo resolver el número')
+  })
+
+  it('denies a branch selector it cannot map to a pr number', () => {
+    const result = runGuard('gh pr merge feature-x --squash', { number: '1', files: bigProd })
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('no se pudo resolver el número')
+  })
+
+  // ORCA-781: la guarda medía el PR del repo de la sesión, ignorando -R y el cd.
+  it('measures the repo named by -R, not the session repo', () => {
+    const result = runGuard(`gh pr merge 1 -R ${SONAR_REPO} --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
+    expect(result.denied).toBe(false)
+  })
+
+  it('denies an oversized pr of the repo named by -R', () => {
+    const result = runGuard(`gh pr merge 1 --repo=${SONAR_REPO} --squash`, {
+      files: sonarPr,
+      repos: { [SONAR_REPO]: bigProd }
+    })
+    expect(result.denied).toBe(true)
+  })
+
+  it('measures the repo of a leading cd, not the session repo', () => {
+    const sonarDir = makeDir(SONAR_REPO)
+    const result = runGuard(`cd ${sonarDir} && gh pr merge 1 --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
+    expect(result.denied).toBe(false)
+  })
+
+  it('measures the repo of a GH_REPO assignment', () => {
+    const result = runGuard(`GH_REPO=${SONAR_REPO} gh pr merge 1 --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
+    expect(result.denied).toBe(false)
+  })
+
+  it('measures the repo of a pr URL', () => {
+    const result = runGuard(`gh pr merge https://github.com/${SONAR_REPO}/pull/1 --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
+    expect(result.denied).toBe(false)
+  })
+
+  it('reads the -R option placed before pr merge', () => {
+    const result = runGuard(`gh -R ${SONAR_REPO} pr merge 1 --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
+    expect(result.denied).toBe(false)
+  })
+
+  it('denies an oversized merge when -R comes before pr merge', () => {
+    const result = runGuard(`gh -R ${DEFAULT_REPO} pr merge 1 --squash`, {
+      number: '1',
+      files: bigProd
+    })
+    expect(result.denied).toBe(true)
+  })
+
+  it('fails open with a clear note when the repo cannot be resolved', () => {
+    const result = runGuard('gh pr merge 1 --squash', { files: bigProd }, makeDir(''))
+    expect(result.denied).toBe(false)
+    expect(result.note).toContain('no se pudo resolver el repositorio')
+  })
+
+  it('fails open when a cd target cannot be known statically', () => {
+    const result = runGuard('cd "$HOME/orca" && gh pr merge 1 --squash', { files: bigProd })
+    expect(result.denied).toBe(false)
+    expect(result.note).toContain('no se pudo resolver el repositorio')
+  })
+
+  // ORCA-781: la guarda buscaba el texto del comando, así que una mención entre comillas
+  // en otro comando pasaba por un merge.
+  it('does not read a quoted merge mention in another command as a merge', () => {
+    const result = runGuard(
+      'orca plane comment add --id ORCA-781 --body "run gh pr merge 12 --squash after review"',
+      { number: '12', files: bigProd }
+    )
+    expect(result.denied).toBe(false)
+    expect(result.note).toBe('')
+  })
+
+  it('does not read a quoted merge mention in git commit as a merge', () => {
+    const result = runGuard('git commit -m "gh pr merge 12 --squash is not run here"', {
+      number: '12',
+      files: bigProd
+    })
+    expect(result.denied).toBe(false)
   })
 })
