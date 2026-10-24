@@ -748,3 +748,98 @@ describe('reopening a Dispatch failed by inference', () => {
     expect(db.getTask(taskId)?.status).not.toBe('completed')
   })
 })
+
+describe('renewing a completed Dispatch for a follow-up push', () => {
+  let db: OrchestrationDb
+
+  afterEach(() => db?.close())
+
+  const LEAF = '55555555-5555-4555-8555-555555555555'
+  const PANE = `tab_w:${LEAF}`
+
+  function workerDone(taskId: string, dispatchId: string) {
+    return db.insertMessage({
+      from: 'term_worker',
+      to: 'term_coordinator',
+      subject: 'Done',
+      type: 'worker_done',
+      payload: JSON.stringify({
+        taskId,
+        dispatchId,
+        outcome: 'succeeded',
+        envelope: SUCCESS_ENVELOPE
+      }),
+      senderPaneKey: PANE
+    })
+  }
+
+  function completedByWorker(): { taskId: string; dispatchId: string } {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker', PANE)
+    db.mintDispatchCapability({
+      dispatchId: dispatch.id,
+      paneKey: PANE,
+      processIncarnation: 'inc_1'
+    })
+    expect(reconcileLifecycleMessage(db, workerDone(task.id, dispatch.id)).action).toBe('completed')
+    expect(db.getDispatchContextById(dispatch.id)?.capability_revoked_at).not.toBeNull()
+    return { taskId: task.id, dispatchId: dispatch.id }
+  }
+
+  it('reopens the completed Dispatch and its task, keeping the capability hash', () => {
+    const { taskId, dispatchId } = completedByWorker()
+    const hash = db.getDispatchContextById(dispatchId)?.capability_hash
+
+    const renewed = db.renewCompletedDispatch({ dispatchId, reason: 'follow-up push' })
+
+    expect(renewed).toMatchObject({ status: 'dispatched', completed_at: null })
+    expect(renewed?.capability_revoked_at).toBeNull()
+    expect(renewed?.capability_hash).toBe(hash)
+    expect(db.getTask(taskId)?.status).toBe('dispatched')
+  })
+
+  it('settles again on the next worker_done from the same pane', () => {
+    const { taskId, dispatchId } = completedByWorker()
+    db.renewCompletedDispatch({ dispatchId, reason: 'follow-up push' })
+
+    const result = reconcileLifecycleMessage(db, workerDone(taskId, dispatchId))
+
+    expect(result.action).toBe('completed')
+    expect(db.getTask(taskId)?.status).toBe('completed')
+  })
+
+  // THE control: only a worker's own completion is renewable, so a failure stays a failure.
+  it('does NOT renew a Dispatch that failed', () => {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker', PANE)
+    db.mintDispatchCapability({
+      dispatchId: dispatch.id,
+      paneKey: PANE,
+      processIncarnation: 'inc_1'
+    })
+    db.failDispatch(dispatch.id, 'worker exited with code 1')
+
+    expect(
+      db.renewCompletedDispatch({ dispatchId: dispatch.id, reason: 'follow-up push' })
+    ).toBeUndefined()
+    expect(db.getDispatchContextById(dispatch.id)?.status).toBe('failed')
+  })
+
+  it('does NOT renew a Dispatch that is still active', () => {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker', PANE)
+    db.mintDispatchCapability({
+      dispatchId: dispatch.id,
+      paneKey: PANE,
+      processIncarnation: 'inc_1'
+    })
+
+    expect(
+      db.renewCompletedDispatch({ dispatchId: dispatch.id, reason: 'follow-up push' })
+    ).toBeUndefined()
+    expect(db.getDispatchContextById(dispatch.id)?.status).toBe('dispatched')
+  })
+})

@@ -27,6 +27,7 @@ import {
 import { TERMINAL_PANE_SPLIT_SOURCES } from '../../../../shared/feature-education-telemetry'
 import type { TerminalOscLinkRange } from '../../../../shared/terminal-osc-link-ranges'
 import { setTerminalViewAttributes } from '../../terminal-view-attribute-store'
+import { renewDispatchForFollowUpPrompt } from '../../orchestration/dispatch-follow-up-renewal'
 import type { TerminalViewAttributes } from '../../../../shared/terminal-view-attributes'
 import {
   TERMINAL_INPUT_MAX_BYTES,
@@ -1441,6 +1442,12 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         // The agent-prompt write does not carry the mobile floor handshake, so
         // taking it here would drop the claim rather than degrade politely.
         throw new InvalidArgumentError('agentPrompt is not supported for mobile input')
+      }
+      if (agentPromptText !== null) {
+        renewDispatchForFollowUpPrompt(runtime.getOrchestrationDb(), {
+          handle: params.terminal,
+          paneKey: runtime.getTerminalPaneKey(params.terminal) ?? undefined
+        })
       }
       let result
       try {

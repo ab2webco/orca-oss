@@ -7627,6 +7627,44 @@ export class OrchestrationDb {
     }
   }
 
+  /** Reopens a Dispatch its worker completed so a follow-up push can settle again (ORCA-779). The hash is kept: the worker holds it. */
+  renewCompletedDispatch(params: {
+    dispatchId: string
+    reason: string
+  }): DispatchContextRow | undefined {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const restored = this.db
+        .prepare(
+          `UPDATE dispatch_contexts
+           SET status = 'dispatched', completed_at = NULL, capability_revoked_at = NULL
+           WHERE id = ? AND status = 'completed' AND capability_hash IS NOT NULL`
+        )
+        .run(params.dispatchId)
+      if (restored.changes !== 1) {
+        this.db.exec('COMMIT')
+        return undefined
+      }
+      this.db
+        .prepare(
+          "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'completed'"
+        )
+        .run(params.dispatchId)
+      this.db
+        .prepare(
+          `UPDATE worker_dispatches
+           SET state = 'ready', stage = 'renewed_for_follow_up', last_error = ?, updated_at = datetime('now')
+           WHERE dispatch_id = ? AND state = 'succeeded'`
+        )
+        .run(params.reason, params.dispatchId)
+      this.db.exec('COMMIT')
+      return this.getDispatchContextById(params.dispatchId)
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   /** Inference failures whose terminal showed something since `sinceIso`, failure time included (ORCA-658). */
   listWatchedSilenceFailures(sinceIso: string): DispatchContextRow[] {
     return this.db
