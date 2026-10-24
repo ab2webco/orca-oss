@@ -1,6 +1,7 @@
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import {
+  execInTerminal,
   splitActiveTerminalPane,
   waitForPaneCount,
   waitForPaneIdentitySnapshot
@@ -102,6 +103,31 @@ test('agent grid groups live agents into buckets and filters them', async ({
 
   const paneKeys = snapshot.panes.map((pane) => `${snapshot.tabId}:${pane.leafId}`)
   expect(paneKeys.length, 'four panes give one agent per bucket').toBe(4)
+
+  // Neutral prompt so no user or host name reaches the recorded frames.
+  for (const pane of snapshot.panes) {
+    expect(pane.ptyId, 'every pane needs a live pty').toBeTruthy()
+    await execInTerminal(page, pane.ptyId ?? '', "PS1='$ '; clear")
+  }
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          async (ptyIds) => {
+            const readings = await window.api.agentTerminalTail?.readPtys(ptyIds, 24)
+            const tails = (readings ?? []).map((r) =>
+              r.tail && r.tail.read ? r.tail.lines.join('\n') : ''
+            )
+            return (
+              tails.length === ptyIds.length &&
+              tails.every((t) => t.includes('$') && !t.includes('@'))
+            )
+          },
+          snapshot.panes.map((pane) => pane.ptyId ?? '')
+        ),
+      { timeout: 20_000, message: 'Neutral prompt never reached every pane' }
+    )
+    .toBe(true)
 
   await seedAgentStatus(page, paneKeys[0], 'blocked', WAITING_AGENT)
   await seedAgentStatus(page, paneKeys[1], 'working', WORKING_AGENT)
