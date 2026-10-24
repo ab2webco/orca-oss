@@ -35,9 +35,8 @@ import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 import { ORCA_REPOSITORY_URL } from '../../../../shared/orca-repository-url'
+import { ORCA_CHANGELOG_URL, ORCA_DOCS_INDEX_URL } from '../../../../shared/orca-docs-urls'
 
-const DOCS_URL = 'https://www.onorca.dev/docs'
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = {
@@ -275,7 +274,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
                 'Docs'
               )}
-              url={DOCS_URL}
+              url={ORCA_DOCS_INDEX_URL}
               icon={<BookOpen className="size-3.5" />}
             />
             <ExternalMenuItem
@@ -283,7 +282,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
                 'Changelog'
               )}
-              url={CHANGELOG_URL}
+              url={ORCA_CHANGELOG_URL}
               icon={<ScrollText className="size-3.5" />}
             />
             <DropdownMenuSeparator />
