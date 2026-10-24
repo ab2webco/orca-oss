@@ -7110,7 +7110,8 @@
           "fe904ac984": "Share anonymous usage data",
           "77410e0566": "Privacy policy",
           "8bfdd23a88": "Help us figure out what to build next. Orca Lab sends anonymous counts of which features you use and where things break.",
-          "afec8b03be": "ci"
+          "afec8b03be": "ci",
+          "79ec8b8ed2": "Orca Lab builds from this repository do not send telemetry. No usage counts leave this machine."
         },
         "QuickCommandsList": {
           "noSearchMatches": "No commands match this search."

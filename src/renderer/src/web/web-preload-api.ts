@@ -977,6 +977,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     telemetrySetOptIn: () => Promise.resolve(),
     telemetryGetConsentState: () =>
       Promise.resolve({ optedIn: false, source: 'default', blockedByEnv: false } as never),
+    telemetryGetTransmitsInBuild: () => Promise.resolve(false),
     telemetryAcknowledgeBanner: () => Promise.resolve()
   }
 }

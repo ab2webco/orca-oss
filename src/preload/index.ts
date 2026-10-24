@@ -2241,6 +2241,8 @@ const api = {
     ipcRenderer.invoke('telemetry:acknowledgeBanner'),
   telemetryGetConsentState: (): Promise<TelemetryConsentState> =>
     ipcRenderer.invoke('telemetry:getConsentState'),
+  telemetryGetTransmitsInBuild: (): Promise<boolean> =>
+    ipcRenderer.invoke('telemetry:getTransmitsInBuild'),
 
   // Why: bridges are deliberately loose — main type-narrows this untrusted renderer input (see telemetry-error-tracking.md).
   diagnostics: {

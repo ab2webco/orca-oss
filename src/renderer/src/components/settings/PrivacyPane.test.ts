@@ -18,16 +18,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TelemetryConsentState } from '../../../../shared/telemetry-consent-types'
 
-const { getConsentStateMock, setOptInMock } = vi.hoisted(() => ({
+const { getConsentStateMock, getTransmitsInBuildMock, setOptInMock } = vi.hoisted(() => ({
   getConsentStateMock: vi.fn<() => Promise<TelemetryConsentState>>(),
+  getTransmitsInBuildMock: vi.fn<() => Promise<boolean>>(),
   setOptInMock: vi.fn<(optedIn: boolean) => Promise<void>>()
 }))
 vi.mock('../../lib/telemetry', () => ({
   getConsentState: getConsentStateMock,
+  getTransmitsInBuild: getTransmitsInBuildMock,
   setOptIn: setOptInMock
 }))
 
-import { PrivacyPane, computeBlockedReason, envVarNameForReason, isEnvBlocked } from './PrivacyPane'
+import {
+  PrivacyPane,
+  PrivacyStatement,
+  computeBlockedReason,
+  envVarNameForReason,
+  isEnvBlocked
+} from './PrivacyPane'
 
 function buildSettings(
   telemetry: Partial<NonNullable<GlobalSettings['telemetry']>> = {}
@@ -220,5 +228,32 @@ describe('PrivacyPane — markup respects blocked state', () => {
       })
     )
     expect(switchTag(markup)).not.toContain(' disabled=""')
+  })
+})
+
+describe('PrivacyStatement — copy follows the transport gate', () => {
+  it('claims anonymous counts only in a build that transmits', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(PrivacyStatement, { transmitsInBuild: true })
+    )
+    expect(markup).toContain('Orca Lab sends anonymous counts')
+    expect(markup).not.toContain('do not send telemetry')
+  })
+
+  it('states that no telemetry leaves the machine in a build that does not transmit', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(PrivacyStatement, { transmitsInBuild: false })
+    )
+    expect(markup).toContain('do not send telemetry')
+    expect(markup).not.toContain('sends anonymous counts')
+  })
+
+  it('keeps the privacy link in both builds', () => {
+    for (const transmitsInBuild of [true, false]) {
+      const markup = renderToStaticMarkup(
+        React.createElement(PrivacyStatement, { transmitsInBuild })
+      )
+      expect(markup).toContain('Privacy policy')
+    }
   })
 })
