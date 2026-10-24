@@ -26,6 +26,7 @@ import { hasGitHubBackedProject, type PreflightIssue } from './landing-preflight
 import { useLandingPreflightRuntime } from './landing-preflight-runtime'
 import { HostAccountLoginDialog } from './settings/HostAccountLoginDialog'
 import type { HostLoginAgent } from '@/runtime/runtime-host-login-client'
+import { ORCA_REPOSITORY_URL } from '../../../shared/orca-repository-url'
 
 type ShortcutItem = {
   id: string
@@ -34,7 +35,7 @@ type ShortcutItem = {
 }
 
 // Do not deep-link to /stargazers: GitHub 404s that page for users without repo write access.
-const ORCA_GITHUB_URL = 'https://github.com/stablyai/orca'
+const ORCA_GITHUB_URL = ORCA_REPOSITORY_URL
 
 type StarState = 'loading' | 'starred' | 'not-starred' | 'web-fallback' | 'hidden'
 

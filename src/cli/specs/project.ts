@@ -1,5 +1,6 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
+import { ORCA_REPOSITORY_SLUG, ORCA_REPOSITORY_URL } from '../../shared/orca-repository-url'
 
 export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -17,7 +18,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
     notes: ['A setup means a project is available on a host at a concrete filesystem path.'],
     examples: [
       'orca project setups',
-      'orca project setups --project github:stablyai/orca',
+      `orca project setups --project github:${ORCA_REPOSITORY_SLUG}`,
       'orca project setups --host local'
     ]
   },
@@ -32,8 +33,8 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'SSH targets are set up through the desktop UI because the desktop client owns SSH connections.'
     ],
     examples: [
-      'orca project setup-existing-folder --project github:stablyai/orca --host local --path ~/orca',
-      'orca project setup-existing-folder --project github:stablyai/orca --host runtime:gpu --path /home/me/orca --kind git --json'
+      `orca project setup-existing-folder --project github:${ORCA_REPOSITORY_SLUG} --host local --path ~/orca`,
+      `orca project setup-existing-folder --project github:${ORCA_REPOSITORY_SLUG} --host runtime:gpu --path /home/me/orca --kind git --json`
     ]
   },
   {
@@ -47,8 +48,8 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'SSH targets are cloned through the desktop UI because the desktop client owns SSH connections.'
     ],
     examples: [
-      'orca project setup-clone --project github:stablyai/orca --host local --url https://github.com/stablyai/orca.git --destination ~/src',
-      'orca project setup-clone --project github:stablyai/orca --host runtime:gpu --url https://github.com/stablyai/orca.git --destination /srv --json'
+      `orca project setup-clone --project github:${ORCA_REPOSITORY_SLUG} --host local --url ${ORCA_REPOSITORY_URL}.git --destination ~/src`,
+      `orca project setup-clone --project github:${ORCA_REPOSITORY_SLUG} --host runtime:gpu --url ${ORCA_REPOSITORY_URL}.git --destination /srv --json`
     ]
   },
   {
@@ -74,7 +75,7 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'Use setup-existing-folder when Orca Lab should import and manage an actual checkout path now.'
     ],
     examples: [
-      'orca project setup-create --project github:stablyai/orca --host runtime:gpu --state setting-up --method provisioned --json'
+      `orca project setup-create --project github:${ORCA_REPOSITORY_SLUG} --host runtime:gpu --state setting-up --method provisioned --json`
     ]
   },
   {
@@ -98,8 +99,8 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'Path and availability state changes are only supported for independent setup records.'
     ],
     examples: [
-      'orca project setup-update --setup github:stablyai/orca::gpu --display-name "GPU VM"',
-      'orca project setup-update --setup github:stablyai/orca::gpu --path /srv/orca --state ready --json'
+      `orca project setup-update --setup github:${ORCA_REPOSITORY_SLUG}::gpu --display-name "GPU VM"`,
+      `orca project setup-update --setup github:${ORCA_REPOSITORY_SLUG}::gpu --path /srv/orca --state ready --json`
     ]
   },
   {
@@ -112,6 +113,6 @@ export const PROJECT_COMMAND_SPECS: CommandSpec[] = [
       'Independent setups are removed directly.',
       'Repo-backed setups remove the registered repo compatibility record.'
     ],
-    examples: ['orca project setup-delete --setup github:stablyai/orca::gpu --json']
+    examples: [`orca project setup-delete --setup github:${ORCA_REPOSITORY_SLUG}::gpu --json`]
   }
 ]

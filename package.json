@@ -2,8 +2,8 @@
   "name": "orca",
   "version": "1.4.160-lab.107",
   "description": "Next-gen IDE for parallel agentic development",
-  "homepage": "https://github.com/stablyai/orca",
-  "author": "stablyai",
+  "homepage": "https://github.com/ab2webco/orca-oss",
+  "author": "ab2webco",
   "bin": {
     "orca": "./out/cli/index.js",
     "orca-dev": "./config/scripts/orca-dev.mjs"
