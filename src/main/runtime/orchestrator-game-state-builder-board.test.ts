@@ -39,7 +39,7 @@ describe('buildOrchestratorGameState board', () => {
 })
 
 describe('buildOrchestratorGameState inboxes', () => {
-  const inboxes = [{ key: 'lead', unread: 2, last: null }]
+  const inboxes = [{ key: 'lead', unread: 2, last: null, waiting: [] }]
 
   it("gives the lead the project's inboxes with unread counts", async () => {
     const state = await buildOrchestratorGameState({ ...base, readInboxes: async () => inboxes })

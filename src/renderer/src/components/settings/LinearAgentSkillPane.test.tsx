@@ -11,7 +11,8 @@ import {
 import { getLinearUsageExamples } from '@/lib/linear-usage-examples'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
 
-const UPDATE_COMMAND = 'npx skills update orca-linear --global'
+const UPDATE_COMMAND =
+  'npx skills add https://github.com/ab2webco/orca-oss --skill orca-linear --global'
 
 const mocks = vi.hoisted(() => ({
   panelProps: [] as Record<string, unknown>[],

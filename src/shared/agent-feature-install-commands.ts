@@ -1,9 +1,7 @@
-import { isSkillsCliAgentKeyShaped } from './skills-cli-agent-keys'
+import { isSkillsCliAgentKeyShaped, SKILLS_CLI_UNIVERSAL_AGENT_KEY } from './skills-cli-agent-keys'
+import { ORCA_REPOSITORY_URL } from './orca-repository-url'
 
-export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/stablyai/orca'
-// Why: orca-plane ships only in this lab fork, not the official Orca repo, so its
-// skill must be fetched from the fork (see PLANE skill install command below).
-export const ORCA_LAB_SKILLS_REPOSITORY_URL = 'https://github.com/ab2webco/orca-oss'
+export const ORCA_SKILLS_REPOSITORY_URL = ORCA_REPOSITORY_URL
 
 export const ORCA_CLI_SKILL_NAME = 'orca-cli'
 export const COMPUTER_USE_SKILL_NAME = 'computer-use'
@@ -19,19 +17,25 @@ export const SWITCH_ACCOUNT_AGENT_SKILL_NAMES = [SWITCH_ACCOUNT_SKILL_NAME] as c
 export const ORCA_GAME_SCENES_SKILL_NAME = 'orca-game-scenes'
 export const ORCA_GAME_SCENES_AGENT_SKILL_NAMES = [ORCA_GAME_SCENES_SKILL_NAME] as const
 
-// Why: `skills add` resolves names against the repo it is given, so a fork-only
-// skill asked for from upstream comes back "No matching skills found" — every
-// caller that builds a command from a bare name has to route by name to get here.
-const FORK_ONLY_SKILL_NAMES: ReadonlySet<string> = new Set<string>([
+// Why: every skill Orca installs comes from the fork, which ships all of them.
+// The name set is what decides `skills add` (re-points an upstream install) versus
+// `skills update` (follows whatever source the install recorded).
+export const ORCA_SHIPPED_SKILL_NAMES: ReadonlySet<string> = new Set<string>([
+  ORCA_CLI_SKILL_NAME,
+  COMPUTER_USE_SKILL_NAME,
+  ORCHESTRATION_SKILL_NAME,
+  EPHEMERAL_VMS_SKILL_NAME,
+  ORCA_LINEAR_SKILL_NAME,
+  LINEAR_TICKETS_SKILL_NAME,
   ORCA_PLANE_SKILL_NAME,
   SWITCH_ACCOUNT_SKILL_NAME,
-  ORCA_GAME_SCENES_SKILL_NAME
+  ORCA_GAME_SCENES_SKILL_NAME,
+  'orca-emulator',
+  'orca-emulator-android'
 ])
 
-export function resolveAgentFeatureSkillRepositoryUrl(skillName: string): string {
-  return FORK_ONLY_SKILL_NAMES.has(skillName)
-    ? ORCA_LAB_SKILLS_REPOSITORY_URL
-    : ORCA_SKILLS_REPOSITORY_URL
+export function resolveAgentFeatureSkillRepositoryUrl(_skillName: string): string {
+  return ORCA_SKILLS_REPOSITORY_URL
 }
 
 export type AgentFeatureSkillRepositoryGroup = {
@@ -77,8 +81,10 @@ export type AgentFeatureSkillCommandOptions = {
   global?: boolean
   yes?: boolean
   agents?: readonly string[]
-  /** Source repo for `skills add`; fork-only skills override the upstream default. */
+  /** Source repo for `skills add`; defaults to the fork. */
   repositoryUrl?: string
+  /** Unattended update: the agent homes each Orca skill sits in, so every copy is re-pointed. */
+  repointAgentsBySkill?: Readonly<Record<string, readonly string[]>>
 }
 
 export function buildAgentFeatureSkillInstallArgs(
@@ -155,6 +161,21 @@ export function buildAgentFeatureSkillUpdateArgs(
     throw new Error('A skill name is required.')
   }
   const global = options.global ?? true
+  const shipped = names.filter((name) => ORCA_SHIPPED_SKILL_NAMES.has(name))
+  if (shipped.length > 0) {
+    if (shipped.length !== names.length) {
+      throw new Error('Skills from the fork cannot share one update command with other skills.')
+    }
+    // Why: `skills update` keeps the upstream source recorded at install; re-adding from
+    // the fork is what re-points it. Unattended runs pin the canonical target, as the
+    // runner does, because `-y` without a target installs into every agent.
+    return buildAgentFeatureSkillInstallArgs(names, {
+      global,
+      yes: options.yes,
+      agents: options.yes ? [SKILLS_CLI_UNIVERSAL_AGENT_KEY] : [],
+      repositoryUrl: ORCA_SKILLS_REPOSITORY_URL
+    })
+  }
   return [
     'skills',
     'update',
@@ -169,6 +190,55 @@ export function buildAgentFeatureSkillUpdateCommand(
   options: AgentFeatureSkillCommandOptions = {}
 ): string {
   return `npx ${buildAgentFeatureSkillUpdateArgs(skillNames, options).join(' ')}`
+}
+
+/**
+ * One argv per `skills` invocation for an update of any mix of names: Orca-shipped
+ * skills are re-added from the fork, the rest are updated as their lock recorded them.
+ */
+export function buildAgentFeatureSkillUpdateStepArgs(
+  skillNames: readonly string[],
+  options: AgentFeatureSkillCommandOptions = {}
+): string[][] {
+  const names = skillNames.map((name) => name.trim()).filter((name) => name.length > 0)
+  if (names.length === 0) {
+    throw new Error('A skill name is required.')
+  }
+  const shipped = names.filter((name) => ORCA_SHIPPED_SKILL_NAMES.has(name))
+  const others = names.filter((name) => !ORCA_SHIPPED_SKILL_NAMES.has(name))
+  const steps: string[][] = []
+  // Why: an unattended re-point with no target would install into every agent.
+  const fallback = options.agents?.length ? options.agents : [SKILLS_CLI_UNIVERSAL_AGENT_KEY]
+  // Why: naming only `universal` leaves an independent provider copy on upstream bytes,
+  // so each skill names the homes it sits in. Skills sharing a target set share one
+  // command; one set for all would add a skill to homes that never had it.
+  const groups = new Map<string, { agents: readonly string[]; names: string[] }>()
+  for (const name of shipped) {
+    const agents = options.yes
+      ? [...(options.repointAgentsBySkill?.[name] ?? fallback)].sort()
+      : (options.agents ?? [])
+    const key = agents.join(' ')
+    const group = groups.get(key)
+    if (group) {
+      group.names.push(name)
+    } else {
+      groups.set(key, { agents, names: [name] })
+    }
+  }
+  for (const group of groups.values()) {
+    steps.push(
+      buildAgentFeatureSkillInstallArgs(group.names, {
+        global: options.global,
+        yes: options.yes,
+        agents: group.agents,
+        repositoryUrl: ORCA_SKILLS_REPOSITORY_URL
+      })
+    )
+  }
+  if (others.length > 0) {
+    steps.push(buildAgentFeatureSkillUpdateArgs(others, options))
+  }
+  return steps
 }
 
 export const ORCA_CLI_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
@@ -214,29 +284,23 @@ export const ORCA_LINEAR_SKILL_UPDATE_COMMAND =
 export const LINEAR_TICKETS_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(LINEAR_TICKETS_SKILL_NAME)
 
-export const ORCA_PLANE_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand(
-  [ORCA_PLANE_SKILL_NAME],
-  { repositoryUrl: ORCA_LAB_SKILLS_REPOSITORY_URL }
-)
+export const ORCA_PLANE_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
+  ORCA_PLANE_SKILL_NAME
+])
 
 export const ORCA_PLANE_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(ORCA_PLANE_SKILL_NAME)
 
-// Why the fork URL: the in-place account switch this skill drives ships only in
-// this lab fork, so the official Orca repo has no such skill to install.
-export const SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand(
-  [SWITCH_ACCOUNT_SKILL_NAME],
-  { repositoryUrl: ORCA_LAB_SKILLS_REPOSITORY_URL }
-)
+export const SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
+  SWITCH_ACCOUNT_SKILL_NAME
+])
 
 export const SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND =
   buildAgentFeatureSkillUpdateCommand(SWITCH_ACCOUNT_SKILL_NAME)
 
-// Why the fork URL: the Agent Teams game and its scene format ship only in this lab fork.
-export const ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand(
-  [ORCA_GAME_SCENES_SKILL_NAME],
-  { repositoryUrl: ORCA_LAB_SKILLS_REPOSITORY_URL }
-)
+export const ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND = buildAgentFeatureSkillInstallCommand([
+  ORCA_GAME_SCENES_SKILL_NAME
+])
 
 export const ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND = buildAgentFeatureSkillUpdateCommand(
   ORCA_GAME_SCENES_SKILL_NAME

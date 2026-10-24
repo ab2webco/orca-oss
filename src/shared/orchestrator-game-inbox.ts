@@ -23,6 +23,17 @@ export type GameInboxSource = {
   mail: readonly GameInboxMail[]
   /** Other projects' lead handles to their labels, for mail a peer lead sent. */
   peerLeads?: Readonly<Record<string, string>>
+  /** Questions of this run still awaiting an answer, whatever mail window they fall outside. */
+  pendingQuestions?: readonly GameInboxMail[]
+}
+
+/** A question a member asked that nobody has answered: it waits on the lead until it is. */
+export type GameWaitingMessage = {
+  id: string
+  /** The asking ticket, or the raw handle of a sender outside the team. */
+  from: string
+  subject: string
+  at: string
 }
 
 export type GameInboxMessage = {
@@ -42,6 +53,8 @@ export type GameInbox = {
   key: string
   unread: number
   messages: GameInboxMessage[]
+  /** Unanswered questions in this inbox, oldest first; kept past the message cap. */
+  waiting: GameWaitingMessage[]
   /** The newest sequence it holds: what `--mark-read` moves the board's read cursor to. */
   newest: number
 }
@@ -51,6 +64,7 @@ export type GameInboxSummary = {
   key: string
   unread: number
   last: { at: string; from: string; subject: string } | null
+  waiting: GameWaitingMessage[]
 }
 
 // Why 50: a lead's turn reads it whole; older mail stays in `orca orchestration inbox`.
@@ -169,10 +183,21 @@ export function gameInboxesOf(
     { key: 'lead', addresses: source.leadAddresses },
     ...source.members.map((member) => ({ key: member.ticket, addresses: member.addresses }))
   ]
+  const pending = source.pendingQuestions ?? []
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
     const rows = withoutRepeatedDone(oldestFirst.filter((row) => to.has(row.to_handle)))
+    const waiting = pending
+      .filter((row) => to.has(row.to_handle))
+      .map(
+        (row): GameWaitingMessage => ({
+          id: row.id,
+          from: labelOf.get(row.from_handle) ?? row.from_handle,
+          subject: row.subject,
+          at: row.created_at
+        })
+      )
     const messages = rows.toReversed().map(
       (row): GameInboxMessage => ({
         id: row.id,
@@ -189,6 +214,7 @@ export function gameInboxesOf(
       key,
       unread: messages.filter((one) => one.unread).length,
       messages: messages.slice(0, GAME_INBOX_MESSAGES_MAX),
+      waiting,
       newest: rows.at(-1)?.sequence ?? 0
     }
   })
