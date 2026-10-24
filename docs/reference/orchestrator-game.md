@@ -520,6 +520,9 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
+  PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
+  counts even after its member was released, which the live member count cannot see.
 - `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
   `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an

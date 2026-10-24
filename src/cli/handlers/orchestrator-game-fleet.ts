@@ -25,6 +25,7 @@ import {
   gameWavePlanOf,
   type GameSweepEntry
 } from '../../shared/orchestrator-game-fleet-verbs'
+import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import type { RuntimeTerminalSend } from '../../shared/runtime-types'
 import { observedGameEventsOf } from '../../shared/orchestrator-game-observed-events'
 import { postGameEvents } from './orchestrator-game-board-call'
@@ -128,6 +129,10 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     const state = response.result
     refuseWhileStopped(state, 'the wave')
     gameLaunchChoiceOf(overrides, state.lead ?? DEFAULT_GAME_LEAD)
+    const openPrWarning = openPrWarningOf(state)
+    if (openPrWarning) {
+      console.error(`Warning: ${openPrWarning}`)
+    }
     const { cap, free } = gameFleetReportOf(state)
     const wave: GameWaveResult = {
       dryRun,
