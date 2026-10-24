@@ -8,6 +8,7 @@ import {
   ORCA_CLI_SKILL_INSTALL_COMMAND,
   buildAgentFeatureSkillUpdateArgs,
   buildAgentFeatureSkillUpdateCommand,
+  buildAgentFeatureSkillUpdateStepArgs,
   COMPUTER_USE_SKILL_UPDATE_COMMAND,
   EPHEMERAL_VMS_SKILL_UPDATE_COMMAND,
   LINEAR_TICKETS_SKILL_UPDATE_COMMAND,
@@ -20,30 +21,31 @@ import {
   SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND,
   ORCA_GAME_SCENES_AGENT_SKILL_NAMES,
   ORCA_GAME_SCENES_SKILL_INSTALL_COMMAND,
-  ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND
+  ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND,
+  ORCA_SHIPPED_SKILL_NAMES
 } from './agent-feature-install-commands'
 
 describe('agent feature skill commands', () => {
   it('builds a global install command by default', () => {
     expect(buildAgentFeatureSkillInstallCommand(['orca-cli'])).toBe(
-      'npx skills add https://github.com/stablyai/orca --skill orca-cli --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --global'
     )
   })
 
   it('drops --global when installing locally', () => {
     expect(buildAgentFeatureSkillInstallCommand(['orca-cli'], { global: false })).toBe(
-      'npx skills add https://github.com/stablyai/orca --skill orca-cli'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli'
     )
   })
 
   it('repeats --skill per name for multi-skill installs', () => {
     expect(buildAgentFeatureSkillInstallCommand(['orca-cli', 'orchestration'])).toBe(
-      'npx skills add https://github.com/stablyai/orca --skill orca-cli --skill orchestration --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill orchestration --global'
     )
     expect(buildAgentFeatureSkillInstallArgs(['orca-cli', 'orchestration'])).toEqual([
       'skills',
       'add',
-      'https://github.com/stablyai/orca',
+      'https://github.com/ab2webco/orca-oss',
       '--skill',
       'orca-cli',
       '--skill',
@@ -85,10 +87,11 @@ describe('agent feature skill commands', () => {
     expect(
       buildAgentFeatureSkillInstallCommand(['orca-cli'], { yes: true, agents: ['universal'] })
     ).toBe(
-      'npx skills add https://github.com/stablyai/orca --skill orca-cli --global --agent universal -y'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --global --agent universal -y'
     )
+    // Why: an unattended fork update pins the canonical target, as the runner does.
     expect(buildAgentFeatureSkillUpdateCommand(['orca-cli'], { global: false, yes: true })).toBe(
-      'npx skills update orca-cli --project -y'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --agent universal -y'
     )
     expect(
       buildAgentFeatureSkillInstallArgs(['orca-cli'], { yes: true, agents: ['universal'] }).at(-1)
@@ -98,45 +101,113 @@ describe('agent feature skill commands', () => {
 
   it('builds single-skill update commands', () => {
     expect(buildAgentFeatureSkillUpdateCommand('orchestration')).toBe(
-      'npx skills update orchestration --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orchestration --global'
     )
   })
 
   it('trims and rejects blank update skill names', () => {
     expect(buildAgentFeatureSkillUpdateCommand('  orca-cli  ')).toBe(
-      'npx skills update orca-cli --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --global'
     )
     expect(() => buildAgentFeatureSkillUpdateCommand('   ')).toThrow('A skill name is required.')
   })
 
   it('builds multi-skill update commands and selects project scope for --local', () => {
     expect(buildAgentFeatureSkillUpdateCommand(['orca-cli', 'orchestration'])).toBe(
-      'npx skills update orca-cli orchestration --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill orchestration --global'
     )
     expect(buildAgentFeatureSkillUpdateCommand(['orca-cli'], { global: false })).toBe(
-      'npx skills update orca-cli --project'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli'
     )
     expect(buildAgentFeatureSkillUpdateArgs(['orca-cli'], { global: false })).toEqual([
       'skills',
-      'update',
-      'orca-cli',
-      '--project'
+      'add',
+      'https://github.com/ab2webco/orca-oss',
+      '--skill',
+      'orca-cli'
     ])
     expect(() => buildAgentFeatureSkillUpdateCommand([])).toThrow('A skill name is required.')
   })
 
-  it('exports single-skill update constants without changing install bundles', () => {
-    expect(ORCA_CLI_SKILL_UPDATE_COMMAND).toBe('npx skills update orca-cli --global')
-    expect(COMPUTER_USE_SKILL_UPDATE_COMMAND).toBe('npx skills update computer-use --global')
-    expect(ORCHESTRATION_SKILL_UPDATE_COMMAND).toBe('npx skills update orchestration --global')
-    expect(EPHEMERAL_VMS_SKILL_UPDATE_COMMAND).toBe(
-      'npx skills update orca-per-workspace-env --global'
+  it('updates Orca-shipped skills from the fork, so an upstream install re-points to it', () => {
+    // Why: `skills update` follows the source recorded at install time, so an
+    // upstream install would keep pulling upstream forever. Re-running `skills add`
+    // from the fork rewrites that recorded source.
+    expect(ORCA_CLI_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --global'
     )
-    expect(ORCA_LINEAR_SKILL_UPDATE_COMMAND).toBe('npx skills update orca-linear --global')
-    expect(LINEAR_TICKETS_SKILL_UPDATE_COMMAND).toBe('npx skills update linear-tickets --global')
+    expect(COMPUTER_USE_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill computer-use --global'
+    )
+    expect(ORCHESTRATION_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orchestration --global'
+    )
+    expect(EPHEMERAL_VMS_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-per-workspace-env --global'
+    )
+    expect(ORCA_LINEAR_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-linear --global'
+    )
+    expect(LINEAR_TICKETS_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill linear-tickets --global'
+    )
     expect(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND).toBe(
       buildAgentFeatureSkillInstallCommand(['orca-cli', 'orchestration'])
     )
+  })
+
+  it('keeps `skills update` for skills Orca does not ship', () => {
+    expect(buildAgentFeatureSkillUpdateCommand('find-skills')).toBe(
+      'npx skills update find-skills --global'
+    )
+  })
+
+  it('refuses one update command that mixes fork skills with other sources', () => {
+    expect(() => buildAgentFeatureSkillUpdateArgs(['orca-cli', 'find-skills'])).toThrow(
+      'Skills from the fork cannot share one update command with other skills.'
+    )
+  })
+
+  it('re-points each skill into every agent home that holds it, one command per target set', () => {
+    // Why: naming only `universal` leaves an independent copy in a provider home on
+    // upstream bytes; naming that home's agent makes the CLI replace it with the fork's.
+    expect(
+      buildAgentFeatureSkillUpdateStepArgs(['orca-cli', 'orchestration', 'switch-account'], {
+        global: true,
+        yes: true,
+        repointAgentsBySkill: {
+          'orca-cli': ['claude-code', 'universal'],
+          orchestration: ['universal'],
+          'switch-account': ['claude-code', 'universal']
+        }
+      }).map((args) => args.join(' '))
+    ).toEqual([
+      'skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill switch-account --global --agent claude-code --agent universal -y',
+      'skills add https://github.com/ab2webco/orca-oss --skill orchestration --global --agent universal -y'
+    ])
+  })
+
+  it('splits a mixed update into the fork re-point first, then the update', () => {
+    expect(
+      buildAgentFeatureSkillUpdateStepArgs(['find-skills', 'orca-cli'], {
+        global: true,
+        yes: true
+      })
+    ).toEqual([
+      [
+        'skills',
+        'add',
+        'https://github.com/ab2webco/orca-oss',
+        '--skill',
+        'orca-cli',
+        '--global',
+        '--agent',
+        'universal',
+        '-y'
+      ],
+      ['skills', 'update', 'find-skills', '--global', '-y']
+    ])
+    expect(() => buildAgentFeatureSkillUpdateStepArgs([' '])).toThrow('A skill name is required.')
   })
 
   it('installs orca-plane from the lab fork, not the official Orca repo', () => {
@@ -150,7 +221,9 @@ describe('agent feature skill commands', () => {
     expect(SWITCH_ACCOUNT_SKILL_INSTALL_COMMAND).toBe(
       'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
     )
-    expect(SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND).toBe('npx skills update switch-account --global')
+    expect(SWITCH_ACCOUNT_SKILL_UPDATE_COMMAND).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
+    )
   })
 
   it('installs and updates orca-game-scenes from the lab fork that ships the game', () => {
@@ -158,48 +231,32 @@ describe('agent feature skill commands', () => {
       'npx skills add https://github.com/ab2webco/orca-oss --skill orca-game-scenes --global'
     )
     expect(ORCA_GAME_SCENES_SKILL_UPDATE_COMMAND).toBe(
-      'npx skills update orca-game-scenes --global'
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-game-scenes --global'
     )
     expect(ORCA_GAME_SCENES_AGENT_SKILL_NAMES).toEqual(['orca-game-scenes'])
   })
 
-  it('routes a bare fork-only name to the fork and everything else upstream', () => {
+  it('resolves every Orca-shipped skill name to the fork repository', () => {
     // Why: callers that build from a name they were handed (skill freshness,
     // the Windows reinstall fallback) never pass repositoryUrl of their own.
-    expect(resolveAgentFeatureSkillRepositoryUrl('switch-account')).toBe(
-      'https://github.com/ab2webco/orca-oss'
-    )
-    expect(resolveAgentFeatureSkillRepositoryUrl('orca-plane')).toBe(
-      'https://github.com/ab2webco/orca-oss'
-    )
-    for (const upstream of [
-      'orca-cli',
-      'computer-use',
-      'orchestration',
-      'orca-per-workspace-env',
-      'orca-linear',
-      'linear-tickets',
-      'orca-emulator',
-      'orca-emulator-android'
-    ]) {
-      expect(resolveAgentFeatureSkillRepositoryUrl(upstream)).toBe(
-        'https://github.com/stablyai/orca'
+    for (const name of ORCA_SHIPPED_SKILL_NAMES) {
+      expect(resolveAgentFeatureSkillRepositoryUrl(name)).toBe(
+        'https://github.com/ab2webco/orca-oss'
       )
     }
-    expect(buildAgentFeatureSkillInstallCommand(['switch-account'])).toBe(
-      'npx skills add https://github.com/ab2webco/orca-oss --skill switch-account --global'
+    expect(buildAgentFeatureSkillInstallCommand(['orca-cli'])).toBe(
+      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --global'
     )
   })
 
-  it('groups a mixed request into one command per repository, in first-seen order', () => {
+  it('keeps a mixed request of fork skills in one command against the fork', () => {
     expect(
       groupAgentFeatureSkillNamesByRepository(['switch-account', 'orca-cli', 'orca-plane'])
     ).toEqual([
       {
         repositoryUrl: 'https://github.com/ab2webco/orca-oss',
-        skillNames: ['switch-account', 'orca-plane']
-      },
-      { repositoryUrl: 'https://github.com/stablyai/orca', skillNames: ['orca-cli'] }
+        skillNames: ['switch-account', 'orca-cli', 'orca-plane']
+      }
     ])
     expect(
       buildAgentFeatureSkillInstallArgsByRepository(['orca-cli', 'switch-account'], {
@@ -207,23 +264,11 @@ describe('agent feature skill commands', () => {
         agents: ['claude-code']
       }).map((args) => args.join(' '))
     ).toEqual([
-      'skills add https://github.com/stablyai/orca --skill orca-cli --global --agent claude-code -y',
-      'skills add https://github.com/ab2webco/orca-oss --skill switch-account --global --agent claude-code -y'
+      'skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill switch-account --global --agent claude-code -y'
     ])
   })
 
-  it('refuses to fold a mixed request into one command instead of dropping a skill', () => {
-    expect(() => buildAgentFeatureSkillInstallCommand(['orca-cli', 'switch-account'])).toThrow(
-      'Skills from more than one repository cannot share one install command.'
-    )
-    // An explicit repositoryUrl stays authoritative: Settings passes its own.
-    expect(
-      buildAgentFeatureSkillInstallCommand(['orca-cli', 'switch-account'], {
-        repositoryUrl: 'https://github.com/ab2webco/orca-oss'
-      })
-    ).toBe(
-      'npx skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill switch-account --global'
-    )
+  it('rejects an empty request for the per-repository builder', () => {
     expect(() => buildAgentFeatureSkillInstallArgsByRepository([])).toThrow(
       'At least one skill name is required.'
     )

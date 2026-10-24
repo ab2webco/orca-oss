@@ -17,6 +17,7 @@ import { SkillUpdateRunner } from '../skills/skill-update-run'
 import { SkillUnrecognizedRepair } from '../skills/skill-unrecognized-repair'
 import { skillUpdateFailedNames } from '../skills/skill-update-outcome'
 import { readGloballyUpdatableSkillLocks } from '../skills/skill-update-registration'
+import { findSkillRepointAgentKeys } from '../skills/skill-repoint-agent-keys'
 import {
   clearSkillDiscoveryCaches,
   discoverSkillsOnTarget,
@@ -114,7 +115,13 @@ export function registerSkillsHandlers(store: Store): void {
   ipcMain.handle(
     'skills:startUpdateRun',
     async (_event, names: string[]): Promise<SkillUpdateStartResult> => {
-      return runner.start(Array.isArray(names) ? names : [])
+      const requested = Array.isArray(names) ? names : []
+      // Why: the re-point must name every home a skill sits in, or an independent
+      // provider copy keeps upstream bytes while the lock already reads the fork.
+      const repointAgentsBySkill = await findSkillRepointAgentKeys(
+        requested.filter((name): name is string => typeof name === 'string')
+      )
+      return runner.start(requested, { repointAgentsBySkill })
     }
   )
 

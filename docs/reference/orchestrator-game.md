@@ -872,6 +872,9 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A message is unread until the agent it went to read it (`orchestration check`) or the board's own
   read cursor passed it. `--mark-read` moves that cursor and never marks orchestration mail read, so
   the lead's `orchestration check --wait` still gets every message.
+- A member's question the lead has not answered stays waiting on the lead after its mail is acked
+  (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
+  until the question is answered or closed, and `game state` lists it under the lead's inbox.
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch
