@@ -11,7 +11,7 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('Never edit code')
     expect(brief).toContain('orca game launch <ticket>')
     expect(brief).toContain('At most 3 members run at once')
-    expect(brief).toContain('worker_done,escalation,question')
+    expect(brief).toContain('worker_done,escalation,question,decision_gate')
     expect(brief).not.toContain('Project rules')
   })
 
@@ -86,7 +86,7 @@ describe('gameLeadBriefOf', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
     expect(brief).toContain(
-      '`orca orchestration check --ack <deliveryId> --wait --types worker_done,escalation,question --timeout-ms 900000 --json`'
+      '`orca orchestration check --ack <deliveryId> --wait --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json`'
     )
     expect(brief).toContain('`orca orchestration check --ack <deliveryId> --json`')
     expect(brief).toContain('replays the same messages')
@@ -192,5 +192,67 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('as if the person asked')
     expect(brief).toContain('report back to that lead once')
     expect(brief).toContain('never reply just to acknowledge')
+  })
+
+  // Why: ORCA-770's member sent a decision_gate and blocked; the lead saw it only through its own monitor.
+  it('waits on decision gates too, so a member gate reaches the lead', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '--types worker_done,escalation,question,decision_gate --timeout-ms 900000'
+    )
+  })
+
+  it('answers member questions and gates itself, falls back to a send, and records the answer', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('question or decision gate you can')
+    expect(brief).toContain('if that reply fails')
+    expect(brief).toContain(
+      '`orca orchestration send --to <member terminal handle> --subject "Answer" --body <answer>`'
+    )
+    expect(brief).toContain('If the member is idle, `orca game push` it')
+    expect(brief).toContain('Record each answer you give a member as a comment on its ticket')
+  })
+
+  it('asks the person only about what only they decide, and decides the rest itself', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('Ask the person only what only they can decide')
+    expect(brief).toContain('releases and publishing')
+    expect(brief).toContain('spending money or quota beyond the plan')
+    expect(brief).toContain('force pushes to shared branches')
+    expect(brief).toContain('changing repo visibility')
+    expect(brief).toContain('credentials')
+    expect(brief).toContain('scope or product direction')
+    expect(brief).toContain('Decide everything else yourself')
+  })
+
+  it('consults an advisor tool once for a hard call, and decides by the bar without one', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      'if your agent offers an advisor tool, consult it once for that decision'
+    )
+    expect(brief).toContain('never for a status update')
+    expect(brief).toContain('Without one, decide by the bar above')
+  })
+
+  // Why: owner rule 2026-10-23: no pile of unfinished workspaces; the lead removes merged ones at once.
+  it('removes a merged member worktree and its branch right away, never keeping them', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain("remove each merged member's worktree and its branch right away")
+    expect(brief).toContain('`orca worktree rm --worktree branch:<branch>`')
+    expect(brief).not.toContain('worktrees stay')
+  })
+
+  it('keeps members working and finishes each ticket before it starts another', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('Keep members working')
+    expect(brief).toContain('An idle member with no PR in flight is a lead failure')
+    expect(brief).toContain('Finish before starting')
+    expect(brief).toContain('new launches only fill slots freed by merged work')
   })
 })
