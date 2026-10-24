@@ -85,16 +85,8 @@
       }
     ]
   },
-  "footerLinksRegexes": ["graft/[\\w./-]+\\.md"],
-  "permissions": {
-    "allow": ["Bash(graft:*)", "Bash(npx graft:*)"]
-  },
   "statusLine": {
     "type": "command",
     "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/statusline.cjs\""
-  },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/graft-statusline.cjs\""
   }
 }

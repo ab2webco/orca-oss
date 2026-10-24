@@ -120,19 +120,15 @@ describe('root directory guard', () => {
     expect(output).not.toContain('.mcp.json')
   })
 
-  it('allows .ignore at the root but still blocks a sibling new root file', () => {
+  it('blocks a new root .ignore file now that no tool reads it', () => {
     const fixture = makeFixture()
-    const head = commitFiles(fixture.root, [
-      ['.ignore', '!graft/\n'],
-      ['.other-root.json', '{}\n']
-    ])
+    const head = commitFiles(fixture.root, [['.ignore', '*.log\n']])
 
     const result = runGuard({ ...fixture, head })
     const output = `${result.stdout}\n${result.stderr}`
 
     expect(result.status).toBe(1)
-    expect(output).toContain('.other-root.json')
-    expect(output).not.toContain('.ignore')
+    expect(output).toContain('.ignore')
   })
 
   it('rejects a new top-level directory', () => {
