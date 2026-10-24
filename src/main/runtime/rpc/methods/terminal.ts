@@ -1443,12 +1443,6 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         // taking it here would drop the claim rather than degrade politely.
         throw new InvalidArgumentError('agentPrompt is not supported for mobile input')
       }
-      if (agentPromptText !== null) {
-        renewDispatchForFollowUpPrompt(runtime.getOrchestrationDb(), {
-          handle: params.terminal,
-          paneKey: runtime.getTerminalPaneKey(params.terminal) ?? undefined
-        })
-      }
       let result
       try {
         result =
@@ -1499,6 +1493,17 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
       }
       if (result.accepted !== true) {
         mobileFloorClaim.current?.rollback()
+      }
+      if (result.accepted === true && agentPromptText !== null) {
+        try {
+          renewDispatchForFollowUpPrompt(runtime.getOrchestrationDb(), {
+            handle: params.terminal,
+            paneKey: runtime.getTerminalPaneKey(params.terminal) ?? undefined
+          })
+        } catch (error) {
+          // Why: the prompt is already delivered; a failed renewal must not report it as unsent.
+          console.warn('[orchestration] follow-up dispatch renewal failed', { error })
+        }
       }
       if (
         result.accepted === true &&
