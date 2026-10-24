@@ -41,7 +41,7 @@ const mail = (sequence: number, to: string, from: string): GameInboxMail => ({
   payload: null
 })
 
-function board(rows: GameInboxMail[]) {
+function board(rows: GameInboxMail[], pendingQuestions: GameInboxMail[] = []) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-inbox-'))
   dirs.push(dir)
   const asked: unknown[] = []
@@ -54,7 +54,8 @@ function board(rows: GameInboxMail[]) {
       return {
         leadAddresses: ['term_lead', 'run:run_1'],
         members: [{ ticket: 'CIN-1', addresses: ['term_1', 'dispatch:d1'] }],
-        mail: rows
+        mail: rows,
+        pendingQuestions
       }
     }
   })
@@ -91,6 +92,7 @@ describe('GameBoard inbox', () => {
       key: 'CIN-9',
       unread: 0,
       messages: [],
+      waiting: [],
       newest: 0
     })
   })
@@ -99,8 +101,33 @@ describe('GameBoard inbox', () => {
     const { game } = board([mail(1, 'term_1', 'term_lead'), mail(2, 'term_lead', 'term_1')])
 
     expect(await game.inboxSummary({ terminalHandle: 'term_lead' })).toEqual([
-      { key: 'lead', unread: 1, last: { at: '2026-10-16 10:00:00', from: 'CIN-1', subject: 's2' } },
-      { key: 'CIN-1', unread: 1, last: { at: '2026-10-16 10:00:00', from: 'lead', subject: 's1' } }
+      {
+        key: 'lead',
+        unread: 1,
+        last: { at: '2026-10-16 10:00:00', from: 'CIN-1', subject: 's2' },
+        waiting: []
+      },
+      {
+        key: 'CIN-1',
+        unread: 1,
+        last: { at: '2026-10-16 10:00:00', from: 'lead', subject: 's1' },
+        waiting: []
+      }
+    ])
+  })
+
+  it('lists the questions the lead has not answered as waiting on it, even after it read them (ORCA-746 T6)', async () => {
+    // Why: the question is past the window the mail read keeps, so only the pending list carries it.
+    const { game } = board([], [{ ...mail(1, 'term_lead', 'term_1'), read: 1 }])
+
+    expect(await game.inboxSummary({ terminalHandle: 'term_lead' })).toEqual([
+      {
+        key: 'lead',
+        unread: 0,
+        last: null,
+        waiting: [{ id: 'msg_1', from: 'CIN-1', subject: 's1', at: '2026-10-16 10:00:00' }]
+      },
+      { key: 'CIN-1', unread: 0, last: null, waiting: [] }
     ])
   })
 })
