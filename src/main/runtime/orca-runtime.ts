@@ -35556,6 +35556,15 @@ export class OrcaRuntimeService {
     ) {
       return undefined
     }
+    // Why (ORCA-779): a member that reported keeps its lead's follow-up work in the same process,
+    // so it stays a member until that process leaves the pane; a reused pane falls to the window.
+    if (
+      dispatch.status === 'completed' &&
+      dispatch.process_incarnation &&
+      dispatch.process_incarnation === this.getTerminalProcessIncarnation(handle)
+    ) {
+      return dispatch
+    }
     // Why (ORCA-658): a member failed for silence that keeps working stays its lead's member.
     const seenAtMs = settledDispatchSeenAtMs(dispatch)
     if (!Number.isFinite(seenAtMs)) {
