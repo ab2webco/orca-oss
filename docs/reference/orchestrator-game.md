@@ -902,6 +902,10 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and
+  returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
+- A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")
+  until the pane restarts; the watch's delivery is the one wake for that event (ORCA-746 T6b).
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch

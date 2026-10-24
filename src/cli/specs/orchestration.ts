@@ -91,6 +91,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       '  --peek: return only unread messages without marking them read.\n' +
       '  --all: return every message for the handle; does not mark read.\n' +
       '  --wait: block until a matching message arrives or --timeout-ms expires.\n' +
+      '  --watch: with --wait, a quiet timeout waits again silently; returns only on a message.\n' +
       '          Emits JSON keepalive lines to stderr every 15s so the caller can\n' +
       '          tell the process is alive. `_keepalive` is unrelated to heartbeat\n' +
       '          messages; `_heartbeat` remains as a deprecated compatibility alias.\n' +
@@ -106,6 +107,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       'types',
       'format',
       'wait',
+      'watch',
       'timeout-ms',
       'retry-request'
     ],

@@ -31,7 +31,8 @@ allowed-tools: Bash
 
 2. **Watcher.** Start the report wait from the rules in the background (Claude Code: the Monitor
    tool), so a member's `worker_done`, question or escalation reaches you while the person keeps
-   talking to you. When the watch ends or times out, start it again, silently.
+   talking to you. The watch returns only for a message; if it ends anyway (connection lost or
+   cancelled), start it again, silently.
 
 3. **Fleet.** Finish with one short status in the person's language, from
    `"$ORCA_GAME_CLI" game state --json`: each member (`isMember`) with its ticket, state,

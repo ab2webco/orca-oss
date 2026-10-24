@@ -86,12 +86,19 @@ describe('gameLeadBriefOf', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
     expect(brief).toContain(
-      '`orca orchestration check --ack <deliveryId> --wait --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json`'
+      '`orca orchestration check --ack <deliveryId> --wait --watch --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json`'
     )
     expect(brief).toContain('`orca orchestration check --ack <deliveryId> --json`')
     expect(brief).toContain('replays the same messages')
-    // Why: a timed-out wait has no deliveryId, and `--ack null` fails the watch before it waits.
-    expect(brief).toContain('no `deliveryId` (it timed out), wait again without `--ack`')
+  })
+
+  // Why: a quiet timeout used to print a result the lead had to re-arm for, one turn per window with no event (ORCA-746 T6b).
+  it('watches with --watch so a quiet window never wakes the lead', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('`orca orchestration check --wait --watch --types')
+    expect(brief).not.toContain('it timed out')
+    expect(brief).not.toContain('wait again without `--ack`')
   })
 
   it('hands a non-implementation task to a member with --prompt', () => {
