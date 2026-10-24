@@ -13,7 +13,7 @@ sweep_line() {
   cd "$ROOT" 2>/dev/null || { echo "SWEEP: repo missing at $ROOT"; return; }
 
   local prs green red pending dirty stale board
-  prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup 2>/dev/null) || prs='[]'
+  prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup,baseRefName 2>/dev/null) || prs='[]'
   local states='[.statusCheckRollup[]?|(.conclusion//.state)]'
 
   # Green means every check is conclusively good. A running check reports IN_PROGRESS or
@@ -34,7 +34,7 @@ sweep_line() {
   # Unshipped: commits past main, no PR, untouched for a day. Skipping these as "in progress"
   # left ORCA-560 finished and invisible for three days (ORCA-562).
   stale=""
-  local unshipped="" now last pr_state
+  local unshipped="" now last pr_state based tag
   now=$(date +%s)
   while read -r path branch; do
     [ -z "$branch" ] || [ "$branch" = "main" ] && continue
@@ -49,12 +49,16 @@ sweep_line() {
         continue
       fi
     fi
+    # Why: deleting this branch makes GitHub close the open PRs based on it, so name them.
+    based=$(jq -r --arg b "$branch" '[.[]|select(.baseRefName==$b)|"#\(.number)"]|join(",")' <<<"$prs" 2>/dev/null)
+    tag=""
+    [ -n "$based" ] && tag="(base-de-$based)"
     # Uncommitted work is flagged apart, never treated as safe to delete.
     if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
-      stale="$stale ${branch##*/}(sin-commitear)"
+      stale="$stale ${branch##*/}(sin-commitear)$tag"
       continue
     fi
-    stale="$stale ${branch##*/}"
+    stale="$stale ${branch##*/}$tag"
   done < <(git worktree list --porcelain 2>/dev/null |
     awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print p, $2}')
 

@@ -184,6 +184,20 @@ describe('gameInboxesOf', () => {
     expect(lead?.messages.map((one) => one.id)).toEqual(['msg_4', 'msg_2'])
   })
 
+  it('keeps an unanswered question in the lead waiting list past the 50-message cap (ORCA-746 T6)', () => {
+    sequence = 0
+    const question = mail('term_lead', 'term_1', { type: 'question', read: 1 })
+    const rows = Array.from({ length: 60 }, () => mail('term_lead', 'term_2'))
+
+    // Why: the question is outside the window the mail read keeps, as an old one is once a lead has 100 newer messages.
+    const lead = gameInboxesOf({ ...source(rows), pendingQuestions: [question] }, {})[0]
+
+    expect(lead?.messages.some((one) => one.id === 'msg_1')).toBe(false)
+    expect(lead?.waiting).toEqual([
+      { id: 'msg_1', from: 'CIN-1', subject: 's1', at: '2026-10-16 10:00:01' }
+    ])
+  })
+
   it('counts as read what the board marked read up to its cursor, or what the agent already read', () => {
     sequence = 0
     const rows = [

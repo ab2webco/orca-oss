@@ -156,7 +156,10 @@ describe('LinearAgentSkillSetupPrompt update command', () => {
     await renderPrompt()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({ installedCommand: 'npx skills update orca-linear --global' })
+      expect.objectContaining({
+        installedCommand:
+          'npx skills add https://github.com/ab2webco/orca-oss --skill orca-linear --global'
+      })
     )
   })
 
@@ -166,7 +169,10 @@ describe('LinearAgentSkillSetupPrompt update command', () => {
     await renderPrompt()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({ installedCommand: 'npx skills update linear-tickets --global' })
+      expect.objectContaining({
+        installedCommand:
+          'npx skills add https://github.com/ab2webco/orca-oss --skill linear-tickets --global'
+      })
     )
   })
 
@@ -176,7 +182,10 @@ describe('LinearAgentSkillSetupPrompt update command', () => {
     await renderPrompt()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({ installedCommand: 'npx skills update orca-linear --global' })
+      expect.objectContaining({
+        installedCommand:
+          'npx skills add https://github.com/ab2webco/orca-oss --skill orca-linear --global'
+      })
     )
   })
 })

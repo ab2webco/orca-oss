@@ -2211,6 +2211,7 @@ const MOBILE_TERMINAL_CREATE_RESULT_TTL_MS = 60_000
 // and reuses the just-created worktree instead of spawning a duplicate.
 const WORKTREE_CREATE_RESULT_TTL_MS = 60_000
 const FOREGROUND_AGENT_WRAPPER_RETRY_INTERVAL_MS = 150
+const NO_IDS: ReadonlySet<string> = new Set<string>()
 const FOREGROUND_AGENT_WRAPPER_RETRY_TIMEOUT_MS = 6_500
 const BRACKETED_PASTE_BEGIN = '\x1b[200~'
 const BRACKETED_PASTE_END = '\x1b[201~'
@@ -3279,6 +3280,8 @@ export class OrcaRuntimeService {
   private detachedPreAllocatedLeaves = new Map<string, RuntimeLeafRecord>()
   private graphSyncCallbacks: (() => void)[] = []
   private waitersByHandle = new Map<string, Set<TerminalWaiter>>()
+  // Why: messages a check handed to a pty, kept until that pty exits (ORCA-746 T6b).
+  private handedOutMessageIdsByPtyId = new Map<string, Set<string>>()
   private ptyController: RuntimePtyController | null = null
   private notifier: RuntimeNotifier | null = null
   private clientEventListeners = new Set<(event: RuntimeClientEvent) => void>()
@@ -15020,6 +15023,7 @@ export class OrcaRuntimeService {
     if (exitIncarnationId && pty?.incarnationId && exitIncarnationId !== pty.incarnationId) {
       return
     }
+    this.handedOutMessageIdsByPtyId.delete(ptyId)
     this.startupCommandWithheldPtyIds.delete(ptyId)
     const preservesAbnormalSshSurface =
       this.isSshOwnedPtyId(ptyId) && pty?.connectionId != null && exitCode < 0
@@ -17975,6 +17979,15 @@ export class OrcaRuntimeService {
 
   getPtyIdForPaneKey(paneKey: string): string | null {
     return this.getPtyRecordForPaneKey(paneKey)?.ptyId ?? null
+  }
+
+  // Why: a batch a check handed to this pty is the lead's already; the pointer must not wake it again for the same event (ORCA-746 T6b).
+  recordHandedOutMessages(ptyId: string, messageIds: readonly string[]): void {
+    const ids = this.handedOutMessageIdsByPtyId.get(ptyId) ?? new Set<string>()
+    for (const id of messageIds) {
+      ids.add(id)
+    }
+    this.handedOutMessageIdsByPtyId.set(ptyId, ids)
   }
 
   getTerminalWorktreeIdForPaneKey(paneKey: string): string | null {
@@ -36921,8 +36934,10 @@ export class OrcaRuntimeService {
           : ownsRemoteAttachment && mailboxHandle === handle
             ? [handle, `dispatch:${remoteAttachment.dispatch_id}`]
             : [mailboxHandle]
+    const handedOut = (leaf.ptyId && this.handedOutMessageIdsByPtyId.get(leaf.ptyId)) || NO_IDS
     const pending = recipientHandles
       .flatMap((recipient) => this._orchestrationDb!.getUndeliveredUnreadMessages(recipient))
+      .filter((message) => !handedOut.has(message.id))
       .sort((a, b) => a.sequence - b.sequence)
     const pendingIds = new Set(pending.map((message) => message.id))
     const pointedIds = this.pointedMessageIdsByHandle.get(mailboxHandle)
@@ -36952,6 +36967,7 @@ export class OrcaRuntimeService {
       .filter(
         (message) =>
           message.type !== 'heartbeat' &&
+          !handedOut.has(message.id) &&
           !options.reservedTypes?.has(message.type) &&
           !messageTypeHasLiveWaiter(waiters, message.type)
       ).length

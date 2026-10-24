@@ -193,6 +193,29 @@ describe('gameFleetReportOf', () => {
     )
   })
 
+  it('shows a member whose question the lead has not answered as waiting on you, with the reply to give (ORCA-746 T6)', () => {
+    const [row] = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [member({ state: 'working', workItem: ticket('CIN-1', 'in_progress') })],
+      inboxes: [
+        {
+          key: 'lead',
+          unread: 0,
+          last: null,
+          waiting: [
+            { id: 'msg_9', from: 'CIN-1', subject: 'Which branch?', at: '2026-10-23 10:00:00' }
+          ]
+        }
+      ]
+    }).rows
+
+    expect(row).toMatchObject({
+      ticket: 'CIN-1',
+      phase: 'working',
+      next: 'waiting on you: orchestration reply --id msg_9'
+    })
+  })
+
   it('keeps an orphaned member as still working, says what to do with it, and carries its last activity (ORCA-658)', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

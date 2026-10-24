@@ -136,6 +136,38 @@ describe('OrchestrationDb mutation and question state', () => {
       ).toThrow(/different answer/)
     })
 
+    it('lists only the run questions still awaiting an answer (ORCA-746 T6)', () => {
+      const d = createDb()
+      const run = d.createRun({
+        objective: 'Pending questions',
+        coordinatorHandle: 'term_coord',
+        coordinatorPaneKey: 'tab_coord:11111111-1111-4111-8111-111111111111'
+      })
+      const task = d.createTask({ spec: 'ask', runId: run.id })
+      const dispatch = d.createDispatchContext(task.id, 'term_worker')
+      const pending = d.createQuestion({
+        runId: run.id,
+        dispatchId: dispatch.id,
+        askerHandle: 'term_worker',
+        question: 'Still open?'
+      })
+      const answered = d.createQuestion({
+        runId: run.id,
+        dispatchId: dispatch.id,
+        askerHandle: 'term_worker',
+        question: 'Already answered?'
+      })
+      d.answerQuestion({
+        messageId: answered.message.id,
+        runId: run.id,
+        consumerGeneration: run.consumer_generation,
+        body: 'yes'
+      })
+
+      expect(d.listPendingQuestions(run.id).map((row) => row.id)).toEqual([pending.message.id])
+      expect(d.listPendingQuestions('run_other')).toEqual([])
+    })
+
     it('closes pending questions with their Dispatch', () => {
       const d = createDb()
       const run = d.createRun({

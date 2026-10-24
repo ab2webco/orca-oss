@@ -74,7 +74,7 @@ export class GameBoard {
       throw new Error('This member has no ticket, so it has no game inbox.')
     }
     const found = (await this.inboxesOf(project)).find((one) => one.key === key)
-    const inbox = found ?? { key, unread: 0, messages: [], newest: 0 }
+    const inbox = found ?? { key, unread: 0, messages: [], waiting: [], newest: 0 }
     if (args.markRead && inbox.newest > 0) {
       await this.deps.store.markInboxRead(project.key, key, inbox.newest)
     }
@@ -92,7 +92,8 @@ export class GameBoard {
       return {
         key: inbox.key,
         unread: inbox.unread,
-        last: last ? { at: last.at, from: last.from, subject: last.subject } : null
+        last: last ? { at: last.at, from: last.from, subject: last.subject } : null,
+        waiting: inbox.waiting
       }
     })
   }

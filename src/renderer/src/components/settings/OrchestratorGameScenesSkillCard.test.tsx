@@ -78,7 +78,8 @@ async function renderCard(): Promise<HTMLDivElement> {
 
 const INSTALL =
   'npx skills add https://github.com/ab2webco/orca-oss --skill orca-game-scenes --global'
-const UPDATE = 'npx skills update orca-game-scenes --global'
+const UPDATE =
+  'npx skills add https://github.com/ab2webco/orca-oss --skill orca-game-scenes --global'
 
 describe('OrchestratorGameScenesSkillCard', () => {
   afterEach(async () => {

@@ -231,6 +231,46 @@ describe('STA-4325 message and delivery identity', () => {
     db.close()
   })
 
+  // Why: a watch that took a batch but has not acked it still leaves those rows unread, so the pointer must skip them (ORCA-746 T6b).
+  it('does not point at messages an unacked Delivery already handed out', async () => {
+    vi.useFakeTimers()
+    const { db } = createDatabase('orca-sta-4325-handed-out-')
+    const { runtime, write } = createRuntime(db)
+    const run = db.createRun({
+      objective: 'STA-4325 handed out',
+      coordinatorHandle: TERMINAL_HANDLE,
+      coordinatorPaneKey: PANE_KEY
+    })
+    const done = db.insertMessage({
+      from: 'term_worker_c',
+      to: `run:${run.id}`,
+      subject: 'worker complete',
+      type: 'worker_done',
+      runId: run.id,
+      deliveryContract: 'current_delivery'
+    })
+
+    const handed = await check(runtime)
+    expect(handed).toMatchObject({ count: 1, replayed: false })
+    expect(handed.messages.map((message) => message.id)).toEqual([done.id])
+
+    await driveToLiveIdle(runtime)
+    expect(pointerPayloads(write)).toEqual([])
+
+    const question = db.insertMessage({
+      from: 'term_worker_d',
+      to: `run:${run.id}`,
+      subject: 'needs a decision',
+      type: 'question',
+      runId: run.id,
+      deliveryContract: 'current_delivery'
+    })
+    runtime.notifyMessageArrived(TERMINAL_HANDLE, question.type)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(pointerPayloads(write)).toEqual([expect.stringContaining('1 orchestration message')])
+    db.close()
+  })
+
   it('replays one outstanding Delivery across restart and wakes a filtered waiter once', async () => {
     vi.useFakeTimers()
     const fixture = createDatabase('orca-sta-4325-restart-')
@@ -304,8 +344,8 @@ describe('STA-4325 message and delivery identity', () => {
       count: 1,
       messages: [expect.objectContaining({ id: done.id })]
     })
+    // Why: the filtered waiter took the worker_done as its one delivery, so only the replay after restart points (ORCA-746 T6b).
     expect(pointerPayloads(restarted.write)).toEqual([
-      expect.stringContaining('1 orchestration message'),
       expect.stringContaining('1 orchestration message')
     ])
     reopened.close()

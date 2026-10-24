@@ -3,6 +3,7 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
+import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
 import {
   gameLaunchChoiceOf,
@@ -302,6 +303,10 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
         'cap_reached',
         `${running} of ${cap} members are running; close one before launching ${ticket}.`
       )
+    }
+    const openPrWarning = openPrWarningOf(response.result)
+    if (openPrWarning) {
+      console.error(`Warning: ${openPrWarning}`)
     }
     const launched = await launchGameMember({
       client,
