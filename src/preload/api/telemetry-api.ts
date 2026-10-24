@@ -60,6 +60,8 @@ export type TelemetryApi = {
   diagnostics: DiagnosticsApi
   /** Read-only effective consent state (+ reason if disabled) — env vars are main-side state the renderer can't read directly. */
   telemetryGetConsentState: () => Promise<TelemetryConsentState>
+  /** Whether this build can transmit telemetry at all (release identity + write key present). */
+  telemetryGetTransmitsInBuild: () => Promise<boolean>
   /** Banner ✕ — persist `optedIn = true` silently. Separate channel from `telemetrySetOptIn`,
    *  whose `via` derivation would wrongly fire `telemetry_opted_in`. Same per-session rate limit. */
   telemetryAcknowledgeBanner: () => Promise<void>

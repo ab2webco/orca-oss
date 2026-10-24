@@ -98,6 +98,7 @@ export type PreloadApi = {
   telemetrySetOptIn: TelemetryApi['telemetrySetOptIn']
   diagnostics: DiagnosticsApi
   telemetryGetConsentState: TelemetryApi['telemetryGetConsentState']
+  telemetryGetTransmitsInBuild: TelemetryApi['telemetryGetTransmitsInBuild']
   telemetryAcknowledgeBanner: TelemetryApi['telemetryAcknowledgeBanner']
   settings: SettingsApi
   agentAwake: AgentAwakeApi

@@ -63,6 +63,17 @@ export async function getConsentState(): Promise<TelemetryConsentState> {
   }
 }
 
+// Fails closed to `false`: when unknown, the Privacy pane must not claim that usage counts are sent.
+export async function getTransmitsInBuild(): Promise<boolean> {
+  try {
+    const result = await window.api?.telemetryGetTransmitsInBuild?.()
+    return result === true
+  } catch (err) {
+    console.warn('[telemetry] IPC getTransmitsInBuild failed', err)
+    return false
+  }
+}
+
 // Banner ✕ = silent persisted opt-in: unlike setOptIn(true) it must NOT emit telemetry_opted_in (user declined to intervene, didn't opt in).
 // Returns a Promise (resolves, never rejects) so callers can await ordering a settings fetch after the acknowledge persists.
 export function acknowledgeBanner(): Promise<void> {

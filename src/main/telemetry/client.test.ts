@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommonProps } from '../../shared/telemetry-events'
 import type { Store } from '../persistence'
-import { _setShuttingDownForTests, track, trackAppOpenedOnce } from './client'
+import { _setShuttingDownForTests, isTransmittingBuild, track, trackAppOpenedOnce } from './client'
 import {
   BASE_COMMON,
   cleanupTelemetryClientTest,
@@ -12,6 +12,12 @@ import {
   type MockPostHog,
   type TelemetryClientTestState
 } from './client-test-harness'
+
+describe('isTransmittingBuild()', () => {
+  it('is false in a non-official build, so the Privacy pane does not claim transmission', () => {
+    expect(isTransmittingBuild()).toBe(false)
+  })
+})
 
 describe('track()', () => {
   let state: TelemetryClientTestState
