@@ -30,13 +30,45 @@ The agent grid puts every live agent of every project on one screen, grouped by 
 
 [Worktrees →](docs/user/model/worktrees.md) · [Terminal →](docs/user/terminal.md)
 
-## Play the team, or switch the game off
+## Lead a team of agents as a game
 
-Claude Agent Teams panes can draw the fleet as a small game: a lead, members as characters, XP for verified work. Settings → Agents picks how it looks, and what it costs your machine, from five views: **Off**, **Flat** (plain text, no scene), **Zen**, **2D classic** and **2D hd**. Each project can override the default, and one pane can switch with `/orca-game:view`.
+A Claude Agent Teams lead launches one member per ticket, each in its own worktree. The game band under the lead's prompt draws the party, says who is waiting on you, and opens the **Panel**: one card per member with its ticket, branch, pull request and CI. XP comes from verified work only: CI going green, a pull request merging, a ticket reaching Done.
+
+<p align="center">
+  <img src="docs/assets/readme/game-band-panel.gif" alt="The game band under a Claude Code lead: three members, one waiting on you; the Panel lists each member's ticket, branch, PR and CI; a merged PR and green CI award XP and a level-up" width="960" />
+</p>
+
+Settings → Agents picks how it looks, and what it costs your machine, from five views: **Off**, **Flat** (plain text, no scene), **Zen**, **2D classic** and **2D hd**. Each project can override the default, and one pane can switch with `/orca-game:view`.
 
 <p align="center">
   <img src="docs/assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: the five views, then Flat and Off turning the scene preview off" width="960" />
 </p>
+
+## Switch Claude accounts without losing the session
+
+Add several Claude accounts and pick the active one in Settings → AI Provider Accounts. Orca Lab swaps the login in place and tells you which live terminals to restart; a worktree can also be pinned to its own account.
+
+<p align="center">
+  <img src="docs/assets/readme/claude-accounts-switch.gif" alt="Settings → AI Provider Accounts: three Claude accounts, the Active badge moving from one to the next with a confirmation toast" width="960" />
+</p>
+
+## Work from your Plane board
+
+Connect a Plane workspace and its projects become a task source: a board with one column per state, or a list grouped by state, with priority and assignee on every work item.
+
+<p align="center">
+  <img src="docs/assets/readme/plane-board.gif" alt="The Tasks page on a Plane project: Todo, In Progress, In Review and Done as board columns, then the same work items as a list" width="960" />
+</p>
+
+## Extend it with plugins
+
+A plugin is a folder with an `orca-plugin.json`. Nothing runs until you review what it asks for; then its panel, settings and worker go live. The [worklog example](examples/plugins/worklog) exercises all of it.
+
+<p align="center">
+  <img src="docs/assets/readme/worklog-plugin.gif" alt="Settings → Plugins: the Worklog plugin needs review, the consent dialog lists its capabilities and its scheduled automation, then its panel shows recent entries and settings" width="960" />
+</p>
+
+<sub>People, accounts, projects and tickets in these recordings are invented demo data on example.com.</sub>
 
 ## How it fits together
 
@@ -49,7 +81,7 @@ The window is an Electron main process plus a React renderer. Terminals live in 
 
 ## What Orca Lab adds
 
-Everything below is in the product history since the fork from Orca (1,273 commits, 249 of them features). The two scenes above were recorded from the real build; the rest is listed from the commit log and release notes, and has no recording yet.
+Everything below is in the product history since the fork from Orca (1,273 commits, 249 of them features). The scenes above were recorded from the real build by E2E specs under `tests/e2e/*-showcase.spec.ts`; the rest is listed from the commit log and release notes, and has no recording yet.
 
 - **Accounts per worktree.** Pin a Claude or Codex account to a worktree, fail over when quota runs out, switch a running terminal with `orca account switch`, and use custom endpoints.
 - **Sturdier orchestration.** Typed `worker_done` reports, a dispatch watchdog, restart recovery, and paused members that resume where they stopped.
