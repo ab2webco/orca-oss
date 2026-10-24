@@ -61,7 +61,7 @@ esac
     `#!/bin/sh
 case "$*" in
   *"--state merged"*) echo 6 ;;
-  ${basedOnPr ? `*mergeStateStatus*) echo '[{"number":${basedOnPr},"mergeStateStatus":"CLEAN","statusCheckRollup":[],"baseRefName":"feat/merged-squash"}]' ;;` : ''}
+  ${basedOnPr ? `*mergeStateStatus*) echo '[{"number":${String(basedOnPr)},"mergeStateStatus":"CLEAN","statusCheckRollup":[],"baseRefName":"feat/merged-squash"}]' ;;` : ''}
   *) true ;;
 esac
 `
