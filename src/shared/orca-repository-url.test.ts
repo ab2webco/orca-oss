@@ -37,4 +37,12 @@ describe('Orca Lab user-facing repository links', () => {
     expect(read('config/electron-builder.config.cjs')).toContain("maintainer: 'ab2webco'")
     expect(read('config/electron-builder.config.cjs')).not.toContain("maintainer: 'stablyai'")
   })
+
+  // Why: example.com is RFC 2606 reserved, so the demo accounts name no real owner.
+  it('shows reserved example.com demo accounts on the mobile home slide', () => {
+    const slide = read('src/renderer/src/components/mobile/slides/HomeSlide.tsx')
+    expect(slide).toContain('email="claude@example.com"')
+    expect(slide).toContain('email="codex@example.com"')
+    expect(slide).not.toContain('stably.ai')
+  })
 })
