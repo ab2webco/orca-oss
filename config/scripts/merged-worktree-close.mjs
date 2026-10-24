@@ -5,6 +5,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
+import { retargetChildPrs } from './merged-worktree-child-prs.mjs'
 
 const RUN_TIMEOUT_MS = 20_000
 const ACTIVE_TERMINAL_MS = 10 * 60_000
@@ -230,7 +231,7 @@ function readMergedPrs(repo, branch) {
       '--head',
       branch,
       '--json',
-      'number,headRefOid'
+      'number,headRefOid,baseRefName'
     ],
     repo
   )
@@ -360,8 +361,22 @@ export function deleteRemoteBranch(repo, remote, branch, expectedHead) {
   )
 }
 
-/** `mergedHead` is the head the PR shipped: a worktree behind it leaves the remote there. */
-function closeEntry(repo, entry, mergedHead, remover, log) {
+/** Retargets the PRs open on `branch` before it is deleted; a remote that is not GitHub has none. */
+function retargetChildren(repo, remote, branch, mergedPr) {
+  const slug = githubSlug(run('git', ['remote', 'get-url', remote], repo).stdout)
+  if (!slug) {
+    return { ok: true, retargeted: [] }
+  }
+  return retargetChildPrs({
+    gh: (args) => run('gh', args, repo),
+    slug,
+    branch,
+    base: mergedPr.baseRefName
+  })
+}
+
+/** `mergedPr` is the PR the branch shipped in: a worktree behind its head leaves the remote there. */
+function closeEntry(repo, entry, mergedPr, remover, log) {
   const remote = branchRemote(repo, entry.branch)
   const removed = removeWorktree(repo, entry.path, remover)
   if (!removed.ok) {
@@ -382,10 +397,16 @@ function closeEntry(repo, entry, mergedHead, remover, log) {
   const remoteHead = remoteRef.ok ? remoteRef.stdout.split(/\s/)[0] : ''
   if (!remoteRef.ok) {
     notes.push(`remote branch not deleted: ${oneLine(remoteRef.stderr)}`)
-  } else if (remoteHead && (remoteHead === entry.head || remoteHead === mergedHead)) {
-    const deleted = deleteRemoteBranch(repo, remote, entry.branch, remoteHead)
-    if (!deleted.ok) {
-      notes.push(`remote branch not deleted: ${oneLine(deleted.stderr)}`)
+  } else if (remoteHead && (remoteHead === entry.head || remoteHead === mergedPr.headRefOid)) {
+    const children = retargetChildren(repo, remote, entry.branch, mergedPr)
+    if (!children.ok) {
+      notes.push(children.note)
+    } else {
+      notes.push(...children.retargeted)
+      const deleted = deleteRemoteBranch(repo, remote, entry.branch, remoteHead)
+      if (!deleted.ok) {
+        notes.push(`remote branch not deleted: ${oneLine(deleted.stderr)}`)
+      }
     }
   } else if (remoteHead) {
     log(`remote ${entry.branch} moved after the merge; left on ${remote}`)
@@ -588,8 +609,9 @@ function closeWithinBudget(cwd, options, log) {
     } else if (budgetSpent()) {
       unverified.set(entry.branch, BUDGET_EXHAUSTED)
     } else {
-      const mergedHead = (behindMerged.get(entry.path) ?? { headRefOid: entry.head }).headRefOid
-      if (!closeEntry(repo, entry, mergedHead, options.remover, log)) {
+      const mergedPr =
+        behindMerged.get(entry.path) ?? mergedPrs[entry.branch].find((pr) => pr.number === entry.pr)
+      if (!closeEntry(repo, entry, mergedPr, options.remover, log)) {
         stillOpen++
       }
     }
