@@ -18,7 +18,7 @@ function writeStub(bin, name, body) {
  * A repo whose feature branch has a live terminal and commits main lacks
  * (the shape a squash-merged branch leaves behind), with its PR reported MERGED.
  */
-function makeMergedBranchFixture() {
+function makeMergedBranchFixture({ basedOnPr = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'orca-sweep-repo-'))
   const bin = mkdtempSync(join(tmpdir(), 'orca-sweep-bin-'))
   tempDirs.push(root, bin)
@@ -61,6 +61,7 @@ esac
     `#!/bin/sh
 case "$*" in
   *"--state merged"*) echo 6 ;;
+  ${basedOnPr ? `*mergeStateStatus*) echo '[{"number":${String(basedOnPr)},"mergeStateStatus":"CLEAN","statusCheckRollup":[],"baseRefName":"feat/merged-squash"}]' ;;` : ''}
   *) true ;;
 esac
 `
@@ -91,5 +92,12 @@ describe('coordinator-sweep leftover worktrees', () => {
   it('flags a merged branch even while a terminal is still open on it', () => {
     const line = sweepLine(makeMergedBranchFixture())
     expect(line).toMatch(/leftover-worktrees:.*merged-squash/)
+  })
+
+  // The defect: the coordinator deletes a leftover branch that an open PR is based on,
+  // and GitHub then closes that PR. The line must name the PR so nobody deletes it blind.
+  it('names the open PR based on a leftover branch', () => {
+    const line = sweepLine(makeMergedBranchFixture({ basedOnPr: 7 }))
+    expect(line).toMatch(/leftover-worktrees:.*merged-squash\(base-de-#7\)/)
   })
 })

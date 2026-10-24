@@ -11,6 +11,7 @@ export type GameInboxDb = {
   }) => { dispatchId: string; taskId: string; agentTerminalHandle: string | null }[]
   getTask: (id: string) => { task_title: string | null; display_name: string | null } | undefined
   getAllMessagesForHandle: (handle: string, limit?: number) => GameInboxMail[]
+  listPendingQuestions: (runId: string) => GameInboxMail[]
 }
 
 // Why 100: what `orca orchestration inbox` reads per address; older mail stays there.
@@ -49,5 +50,7 @@ export function gameInboxSourceOf(
   const mail = [...leadAddresses, ...members.flatMap((member) => member.addresses)].flatMap(
     (address) => db.getAllMessagesForHandle(address, MAIL_PER_ADDRESS)
   )
-  return { leadAddresses, members, mail, peerLeads }
+  // Why: read apart from the mail window, so an old question still waits after a hundred newer messages.
+  const pendingQuestions = run ? db.listPendingQuestions(run.id) : []
+  return { leadAddresses, members, mail, peerLeads, pendingQuestions }
 }

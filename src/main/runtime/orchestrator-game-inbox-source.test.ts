@@ -28,6 +28,7 @@ function fakeDb(): { db: GameInboxDb; asked: string[] } {
       id === 't1'
         ? { task_title: 'CIN-1 Cartelera', display_name: null }
         : { task_title: 'Docs', display_name: null },
+    listPendingQuestions: (runId) => (runId === 'run_1' ? [row('msg_1', 'term_lead')] : []),
     getAllMessagesForHandle: (handle) => {
       asked.push(handle)
       return handle === 'dispatch:d1b'
@@ -59,6 +60,14 @@ describe('gameInboxSourceOf', () => {
       'dispatch:d1',
       'dispatch:d1b'
     ])
+  })
+
+  it("carries the ids of the run's questions still awaiting an answer (ORCA-746 T6)", () => {
+    const { db } = fakeDb()
+
+    expect(
+      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).pendingQuestions
+    ).toEqual([row('msg_1', 'term_lead')])
   })
 
   it('has only the lead terminal when the lead has no run yet', () => {

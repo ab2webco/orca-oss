@@ -1,7 +1,7 @@
 // Why: single source of truth for the fork's own repository in user-facing
-// surfaces (help links, onboarding, the gh PR/issue attribution footer). Only
-// for destinations that should point at us — upstream-owned things (the skills
-// repo, the plugin marketplace, upstream's mobile builds) keep stablyai/orca.
+// surfaces (help links, onboarding, the gh PR/issue attribution footer, the
+// agent skills source). Upstream-owned things (the plugin marketplace, upstream's
+// mobile builds) keep stablyai/orca.
 
 /** owner/name form for `gh api` paths. */
 export const ORCA_REPOSITORY_SLUG = 'ab2webco/orca-oss'

@@ -22,6 +22,8 @@ function makeRunner(
     buildSpawnArgs?: (command: string, args: string[]) => { spawnCmd: string; spawnArgs: string[] }
   } = {}
 ) {
+  // Why: each spawn gets its own child so a multi-step run's listeners never share an emitter.
+  const children: FakeChild[] = []
   const child = new FakeChild()
   const spawnCalls: { command: string; args: string[]; options: Record<string, unknown> }[] = []
   const states: SkillUpdateRun[] = []
@@ -35,10 +37,12 @@ function makeRunner(
     onState: (run) => states.push(run),
     spawnProcess: ((command: string, args: string[], options: Record<string, unknown>) => {
       spawnCalls.push({ command, args, options })
-      return child as never
+      const next = children.length === 0 ? child : new FakeChild()
+      children.push(next)
+      return next as never
     }) as never
   })
-  return { runner, child, spawnCalls, states }
+  return { runner, child, children, spawnCalls, states }
 }
 
 async function flush(): Promise<void> {
@@ -49,7 +53,7 @@ describe('SkillUpdateRunner', () => {
   it('passes both non-interactive flags and the sorted skill names', () => {
     const { runner, spawnCalls } = makeRunner()
 
-    expect(runner.start(['orchestration', 'orca-cli'])).toEqual({ started: true })
+    expect(runner.start(['hyperframes', 'find-skills'])).toEqual({ started: true })
     expect(spawnCalls[0].command).toBe('/usr/local/bin/npx')
     // `npx --yes` skips the install prompt; `skills -y` takes the CLI's own
     // non-interactive branch. Dropping either can wedge the run.
@@ -57,11 +61,93 @@ describe('SkillUpdateRunner', () => {
       '--yes',
       'skills',
       'update',
-      'orca-cli',
-      'orchestration',
+      'find-skills',
+      'hyperframes',
       '--global',
       '-y'
     ])
+  })
+
+  it('re-points Orca-shipped skills to the fork instead of updating the recorded source', () => {
+    // Why: `skills update` follows the source recorded at install time, so an upstream
+    // install would keep pulling upstream. `skills add` from the fork rewrites that source.
+    const { runner, spawnCalls } = makeRunner()
+
+    expect(runner.start(['orchestration', 'orca-cli'])).toEqual({ started: true })
+    expect(spawnCalls[0].args).toEqual([
+      '--yes',
+      'skills',
+      'add',
+      'https://github.com/ab2webco/orca-oss',
+      '--skill',
+      'orca-cli',
+      '--skill',
+      'orchestration',
+      '--global',
+      '--agent',
+      'universal',
+      '-y'
+    ])
+  })
+
+  it('re-points the agent homes that hold the skill, not only the canonical copy', () => {
+    const { runner, spawnCalls } = makeRunner()
+
+    expect(
+      runner.start(['orca-cli'], {
+        repointAgentsBySkill: { 'orca-cli': ['claude-code', 'universal'] }
+      })
+    ).toEqual({ started: true })
+    expect(spawnCalls[0].args).toEqual([
+      '--yes',
+      'skills',
+      'add',
+      'https://github.com/ab2webco/orca-oss',
+      '--skill',
+      'orca-cli',
+      '--global',
+      '--agent',
+      'claude-code',
+      '--agent',
+      'universal',
+      '-y'
+    ])
+  })
+
+  it('runs the fork re-point and then the update for a mixed request', () => {
+    const { runner, children, spawnCalls } = makeRunner()
+
+    expect(runner.start(['find-skills', 'orca-cli'])).toEqual({ started: true })
+    expect(spawnCalls).toHaveLength(1)
+    children[0].emit('close', 0)
+
+    expect(spawnCalls).toHaveLength(2)
+    expect(spawnCalls[1].args).toEqual([
+      '--yes',
+      'skills',
+      'update',
+      'find-skills',
+      '--global',
+      '-y'
+    ])
+    children[1].emit('close', 0)
+    expect(runner.getState()).toMatchObject({
+      state: 'success',
+      names: ['find-skills', 'orca-cli']
+    })
+  })
+
+  it('stops a mixed request at the first failed step instead of running the next', () => {
+    const { runner, children, spawnCalls } = makeRunner()
+
+    runner.start(['find-skills', 'orca-cli'])
+    children[0].emit('close', 1)
+
+    expect(spawnCalls).toHaveLength(1)
+    expect(runner.getState()).toMatchObject({
+      state: 'error',
+      failedNames: ['find-skills', 'orca-cli']
+    })
   })
 
   it('ignores stdin so the CLI sees a non-TTY', () => {

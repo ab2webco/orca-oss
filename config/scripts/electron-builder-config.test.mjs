@@ -166,7 +166,8 @@ describe('electron-builder config', () => {
         'out/package.json',
         'out/cli/**',
         'out/shared/**',
-        'out/main/claude-accounts/keychain.js'
+        'out/main/claude-accounts/keychain.js',
+        'out/main/skills/skill-repoint-agent-keys.js'
       ])
     )
   })

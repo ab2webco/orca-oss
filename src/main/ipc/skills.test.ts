@@ -9,8 +9,12 @@ const {
   repairRunMock,
   getDefaultWslDistroMock,
   getWslHomeMock,
-  parseWslPathMock
+  parseWslPathMock,
+  runnerStartMock,
+  findRepointAgentsMock
 } = vi.hoisted(() => ({
+  runnerStartMock: vi.fn(),
+  findRepointAgentsMock: vi.fn(),
   handleMock: vi.fn(),
   discoverSkillsMock: vi.fn(),
   discoverSkillsInWslMock: vi.fn(),
@@ -49,6 +53,20 @@ vi.mock('../skills/skill-unrecognized-repair', () => ({
     preview = repairPreviewMock
     repair = repairRunMock
   }
+}))
+
+// Why: a real runner would spawn `npx skills`; the handler's job is what it passes in.
+vi.mock('../skills/skill-update-run', () => ({
+  SkillUpdateRunner: class {
+    start = runnerStartMock
+    cancel = vi.fn()
+    acknowledge = vi.fn()
+    getState = vi.fn()
+  }
+}))
+
+vi.mock('../skills/skill-repoint-agent-keys', () => ({
+  findSkillRepointAgentKeys: findRepointAgentsMock
 }))
 
 vi.mock('../wsl', () => ({
@@ -103,6 +121,22 @@ describe('registerSkillsHandlers', () => {
     if (originalPlatform) {
       Object.defineProperty(process, 'platform', originalPlatform)
     }
+  })
+
+  it('starts an update run naming the agent homes each Orca skill sits in', async () => {
+    findRepointAgentsMock.mockResolvedValue({ 'orca-cli': ['claude-code', 'universal'] })
+    runnerStartMock.mockReturnValue({ started: true })
+    registerSkillsHandlers(store as never)
+    const call = handleMock.mock.calls.find(
+      (entry: unknown[]) => entry[0] === 'skills:startUpdateRun'
+    )
+    const handler = call?.[1] as (event: unknown, names: unknown) => Promise<unknown>
+
+    await expect(handler({}, ['orca-cli', 'find-skills'])).resolves.toEqual({ started: true })
+    expect(findRepointAgentsMock).toHaveBeenCalledWith(['orca-cli', 'find-skills'])
+    expect(runnerStartMock).toHaveBeenCalledWith(['orca-cli', 'find-skills'], {
+      repointAgentsBySkill: { 'orca-cli': ['claude-code', 'universal'] }
+    })
   })
 
   function getDiscoverHandler() {

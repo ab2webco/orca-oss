@@ -99,6 +99,27 @@ describe('orca game launch', () => {
     process.exitCode = undefined
   })
 
+  // Why: a released member's open PR leaves no live row, so only the project's PR list counts it.
+  it('warns on stderr when open PRs reach the cap, and still starts the member', async () => {
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { client, calls } = fakeClient(
+      stateWith({
+        project: {
+          reviews: { provider: 'github', total: 2, url: null, items: [] },
+          todo: { provider: 'jira', total: 1, url: null, items: [TODO_ITEM] }
+        }
+      })
+    )
+
+    await launch(client)
+
+    expect(warn).toHaveBeenCalledWith(
+      'Warning: 2 open PRs reach the cap of 2: finish them to merge before launching another ticket'
+    )
+    expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
+    warn.mockRestore()
+  })
+
   it('starts one member for a To Do ticket in its own child worktree, with the project prompt', async () => {
     const { client, calls } = fakeClient(stateWith())
 

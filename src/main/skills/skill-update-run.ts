@@ -1,5 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import {
+  buildAgentFeatureSkillUpdateStepArgs,
+  type AgentFeatureSkillCommandOptions
+} from '../../shared/agent-feature-install-commands'
+import {
   canonicalizeSkillUpdateNames,
   type SkillUpdateRun,
   type SkillUpdateStartResult
@@ -80,7 +84,10 @@ export class SkillUpdateRunner {
     this.deps.onState?.(next)
   }
 
-  start(names: readonly string[]): SkillUpdateStartResult {
+  start(
+    names: readonly string[],
+    options: Pick<AgentFeatureSkillCommandOptions, 'repointAgentsBySkill'> = {}
+  ): SkillUpdateStartResult {
     if (this.run.state === 'running') {
       return { started: false, reason: 'already-running' }
     }
@@ -92,13 +99,16 @@ export class SkillUpdateRunner {
     const resolveCommand = this.deps.resolveCommand ?? ((name: string) => resolveCliCommand(name))
     const spawnProcess = this.deps.spawnProcess ?? spawn
     const npxCommand = resolveCommand('npx')
-    const npxArgs = ['--yes', 'skills', 'update', ...canonicalNames, '--global', '-y']
+    const steps = buildAgentFeatureSkillUpdateStepArgs(canonicalNames, {
+      global: true,
+      yes: true,
+      repointAgentsBySkill: options.repointAgentsBySkill
+    })
 
-    let spawnCmd: string
-    let spawnArgs: string[]
+    let spawnSteps: { spawnCmd: string; spawnArgs: string[] }[]
     try {
       const buildSpawnArgs = this.deps.buildSpawnArgs ?? getSpawnArgsForWindows
-      ;({ spawnCmd, spawnArgs } = buildSpawnArgs(npxCommand, npxArgs))
+      spawnSteps = steps.map((step) => buildSpawnArgs(npxCommand, ['--yes', ...step]))
     } catch {
       // Why: the names are already canonical here, so this is the cmd.exe rail
       // rejecting the resolved npx *path*. Publishing the failure keeps the dialog
@@ -123,62 +133,74 @@ export class SkillUpdateRunner {
     this.settling = false
     this.publish({ state: 'running', names: canonicalNames, startedAt, output: '' })
 
-    const child = spawnProcess(spawnCmd, spawnArgs, {
-      // Why: stdin ignored keeps `process.stdin.isTTY` falsy in the child, which
-      // is the second half of the CLI's non-interactive gate.
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-      env: process.env
-    })
-    this.child = child
+    // Why: each step is one `npx skills` process; a mixed request runs its fork
+    // re-point first, then its update, and a failed step ends the run.
+    const launch = (stepIndex: number): void => {
+      const { spawnCmd, spawnArgs } = spawnSteps[stepIndex]
+      const child = spawnProcess(spawnCmd, spawnArgs, {
+        // Why: stdin ignored keeps `process.stdin.isTTY` falsy in the child, which
+        // is the second half of the CLI's non-interactive gate.
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: process.env
+      })
+      this.child = child
 
-    // Why: `stripAnsi` turns each \r progress frame into its own line, so an npm
-    // install emits many chunks a second — and every publish structured-clones
-    // the whole buffer to every window. Coalesce into one push per tick.
-    let flushTimer: ReturnType<typeof setTimeout> | null = null
-    let pendingOutput = ''
-    const flush = (): void => {
-      flushTimer = null
-      if (token !== this.runToken || this.run.state !== 'running' || !pendingOutput) {
-        return
+      // Why: `stripAnsi` turns each \r progress frame into its own line, so an npm
+      // install emits many chunks a second — and every publish structured-clones
+      // the whole buffer to every window. Coalesce into one push per tick.
+      let flushTimer: ReturnType<typeof setTimeout> | null = null
+      let pendingOutput = ''
+      const flush = (): void => {
+        flushTimer = null
+        if (token !== this.runToken || this.run.state !== 'running' || !pendingOutput) {
+          return
+        }
+        const appended = pendingOutput
+        pendingOutput = ''
+        this.publish({ ...this.run, output: clampOutput(this.run.output + appended) })
       }
-      const appended = pendingOutput
-      pendingOutput = ''
-      this.publish({ ...this.run, output: clampOutput(this.run.output + appended) })
-    }
-    const append = (chunk: Buffer): void => {
-      if (token !== this.runToken || this.run.state !== 'running') {
-        return
+      const append = (chunk: Buffer): void => {
+        if (token !== this.runToken || this.run.state !== 'running') {
+          return
+        }
+        pendingOutput = clampOutput(pendingOutput + stripAnsi(chunk.toString('utf8')))
+        if (!flushTimer) {
+          flushTimer = setTimeout(flush, OUTPUT_FLUSH_MS)
+          flushTimer.unref?.()
+        }
       }
-      pendingOutput = clampOutput(pendingOutput + stripAnsi(chunk.toString('utf8')))
-      if (!flushTimer) {
-        flushTimer = setTimeout(flush, OUTPUT_FLUSH_MS)
-        flushTimer.unref?.()
+      child.stdout?.on('data', append)
+      child.stderr?.on('data', append)
+      // The tail matters most on failure, so never let a pending chunk die with the
+      // process — drain it before the exit handlers settle the run.
+      const drain = (): void => {
+        if (flushTimer) {
+          clearTimeout(flushTimer)
+        }
+        flush()
       }
-    }
-    child.stdout?.on('data', append)
-    child.stderr?.on('data', append)
-    // The tail matters most on failure, so never let a pending chunk die with the
-    // process — drain it before the exit handlers settle the run.
-    const drain = (): void => {
-      if (flushTimer) {
-        clearTimeout(flushTimer)
-      }
-      flush()
-    }
 
-    child.on('error', (error) => {
-      drain()
-      this.settle(token, canonicalNames, error.message)
-    })
-    child.on('close', (code) => {
-      drain()
-      this.settle(
-        token,
-        canonicalNames,
-        code === 0 ? null : `skills update exited with code ${code}`
-      )
-    })
+      child.on('error', (error) => {
+        drain()
+        this.settle(token, canonicalNames, error.message)
+      })
+      child.on('close', (code) => {
+        drain()
+        if (code === 0 && stepIndex + 1 < spawnSteps.length) {
+          if (token === this.runToken) {
+            launch(stepIndex + 1)
+          }
+          return
+        }
+        this.settle(
+          token,
+          canonicalNames,
+          code === 0 ? null : `skills command exited with code ${code}`
+        )
+      })
+    }
+    launch(0)
 
     return { started: true }
   }

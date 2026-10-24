@@ -4,13 +4,15 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   deleteRemoteBranch,
@@ -518,5 +520,130 @@ describe('merged-worktree-close CLI', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`would close fix/a (#12) ${feature.path}`)
     expect(existsSync(feature.path)).toBe(true)
+  })
+})
+
+/**
+ * Moves the bare origin under a path ending in github.com/o/r.git: the closer reads that as o/r,
+ * and git still pushes to the local repo. Returns the new origin path.
+ */
+function asGitHubRemote(root, repo, localOrigin) {
+  const origin = join(root, 'github.com', 'o', 'r.git')
+  mkdirSync(join(root, 'github.com', 'o'), { recursive: true })
+  renameSync(localOrigin, origin)
+  git(repo, 'remote', 'set-url', 'origin', origin)
+  return origin
+}
+
+/**
+ * A `gh` on PATH that logs every call. `routes` are [shell case pattern, shell body] pairs;
+ * the first pattern matching the call's arguments runs its body, any other call fails.
+ */
+function ghStub(root, routes) {
+  const bin = join(root, 'gh-bin')
+  const log = join(root, 'gh.log')
+  mkdirSync(bin)
+  const cases = routes.map(([pattern, body]) => `  *${pattern}*) ${body} ;;`).join('\n')
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/sh\necho "$*" >> '${log}'\ncase "$*" in\n${cases}\n  *) echo "unexpected gh call: $*" >&2; exit 1 ;;\nesac\n`
+  )
+  chmodSync(join(bin, 'gh'), 0o755)
+  return { path: bin, log }
+}
+
+function runCliWithGh(cwd, gh, args) {
+  return spawnSync('node', [script, '--remover', 'git', ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...cliEnv(), PATH: `${gh.path}${delimiter}${process.env.PATH}` }
+  })
+}
+
+describe('merged-worktree-close and PRs based on the merged branch', () => {
+  // The defect: GitHub closes every open PR whose base is a branch deleted here (#630, #640).
+  it('retargets the open PR based on the merged branch before deleting it', () => {
+    const { root, repo, origin: localOrigin, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+    const origin = asGitHubRemote(root, repo, localOrigin)
+    const gh = ghStub(root, [
+      ['"pr edit"', 'exit 0'],
+      [
+        '"--state merged"',
+        `echo '[{"number":12,"headRefOid":"${feature.head}","baseRefName":"main"}]'`
+      ],
+      ['"--state open"', `echo '[{"number":641}]'`]
+    ])
+
+    const result = runCliWithGh(repo, gh, [])
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`closed fix/a (#12) ${feature.path}; retargeted #641 to main`)
+    expect(readFileSync(gh.log, 'utf8')).toContain('pr edit 641 -R o/r --base main')
+    expect(git(origin, 'branch', '--list', 'fix/a')).toBe('')
+  })
+
+  it('keeps the remote branch and names the open PR it could not retarget', () => {
+    const { root, repo, origin: localOrigin, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+    const origin = asGitHubRemote(root, repo, localOrigin)
+    const gh = ghStub(root, [
+      ['"pr edit"', 'echo "cannot edit" >&2; exit 1'],
+      [
+        '"--state merged"',
+        `echo '[{"number":12,"headRefOid":"${feature.head}","baseRefName":"main"}]'`
+      ],
+      ['"--state open"', `echo '[{"number":641}]'`]
+    ])
+
+    const result = runCliWithGh(repo, gh, [])
+    const line = result.stdout.split('\n').find((l) => l.startsWith('closed fix/a'))
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(line).toContain(
+      'remote branch kept: could not retarget open PR #641 to main: cannot edit'
+    )
+    expect(git(origin, 'branch', '--list', 'fix/a')).not.toBe('')
+  })
+
+  it('keeps the remote branch when the PRs based on it cannot be listed', () => {
+    const { root, repo, origin: localOrigin, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+    const origin = asGitHubRemote(root, repo, localOrigin)
+    const gh = ghStub(root, [
+      [
+        '"--state merged"',
+        `echo '[{"number":12,"headRefOid":"${feature.head}","baseRefName":"main"}]'`
+      ],
+      ['"--state open"', 'echo "rate limited" >&2; exit 1']
+    ])
+
+    const result = runCliWithGh(repo, gh, [])
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(
+      'remote branch kept: could not list PRs based on it (rate limited)'
+    )
+    expect(git(origin, 'branch', '--list', 'fix/a')).not.toBe('')
+  })
+
+  it('deletes the remote branch when no open PR is based on it', () => {
+    const { root, repo, origin: localOrigin, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+    const origin = asGitHubRemote(root, repo, localOrigin)
+    const gh = ghStub(root, [
+      [
+        '"--state merged"',
+        `echo '[{"number":12,"headRefOid":"${feature.head}","baseRefName":"main"}]'`
+      ],
+      ['"--state open"', `echo '[]'`]
+    ])
+
+    const result = runCliWithGh(repo, gh, [])
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`closed fix/a (#12) ${feature.path}`)
+    expect(readFileSync(gh.log, 'utf8')).not.toContain('pr edit')
+    expect(git(origin, 'branch', '--list', 'fix/a')).toBe('')
   })
 })

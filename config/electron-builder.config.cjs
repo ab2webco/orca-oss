@@ -180,6 +180,8 @@ module.exports = {
     'out/main/antigravity/**',
     'out/main/claude/**',
     'out/main/claude-accounts/keychain.js',
+    // Why: `orca skills update` loads it from the CLI to find every agent home holding a skill.
+    'out/main/skills/skill-repoint-agent-keys.js',
     'out/main/codex/**',
     'out/main/copilot/**',
     'out/main/cursor/**',

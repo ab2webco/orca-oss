@@ -3,6 +3,7 @@ import {
   DEFAULT_GAME_PUSH_PROMPT,
   renderGameLaunchPrompt
 } from './orchestrator-game-lead'
+import type { GameWaitingMessage } from './orchestrator-game-inbox'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
@@ -55,7 +56,7 @@ export type GameFleet = {
 }
 
 type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
-  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers'>
+  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
 
 export function isFinishedMember(agent: GameAgent): boolean {
   const group = agent.workItem?.statusGroup
@@ -126,7 +127,7 @@ function idleNextOf(review: GameAgent['review']): string {
   return review.ci === 'pending' ? 'wait for CI' : `review PR #${review.number}`
 }
 
-function rowOf(agent: GameAgent): GameFleetRow {
+function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
   const phase = memberPhaseOf(agent)
   return {
     name: agent.displayName ?? agent.paneKey,
@@ -137,7 +138,7 @@ function rowOf(agent: GameAgent): GameFleetRow {
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next: agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : nextOf(agent, phase),
+    next: nextWithQuestionOf(agent, phase, question),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
@@ -150,6 +151,18 @@ function rowOf(agent: GameAgent): GameFleetRow {
   }
 }
 
+// Why (ORCA-746 T6): an unanswered question outlives its acked mail, so the fleet keeps asking for the reply.
+function nextWithQuestionOf(
+  agent: GameAgent,
+  phase: GameMemberPhase,
+  question: GameWaitingMessage | undefined
+): string {
+  if (question && phase !== 'finished') {
+    return `waiting on you: orchestration reply --id ${question.id}`
+  }
+  return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : nextOf(agent, phase)
+}
+
 const membersOf = (state: FleetInput): GameAgent[] =>
   state.agents.filter((agent) => agent.isMember && !agent.isLeader)
 
@@ -160,7 +173,17 @@ const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
     .map(({ item }) => item)
 
 export function gameFleetReportOf(state: FleetInput): GameFleet {
-  const rows = byPhase(membersOf(state).map(rowOf), (row) => row.phase)
+  // Why: questions reach the lead's inbox, and each asking member is one ticket there.
+  const waiting = state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? []
+  const rows = byPhase(
+    membersOf(state).map((agent) =>
+      rowOf(
+        agent,
+        waiting.find((question) => question.from === ticketOfMember(agent))
+      )
+    ),
+    (row) => row.phase
+  )
   const counts = { 'needs-you': 0, limited: 0, working: 0, idle: 0, finished: 0 }
   for (const row of rows) {
     counts[row.phase] += 1

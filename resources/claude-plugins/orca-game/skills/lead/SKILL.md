@@ -31,7 +31,8 @@ allowed-tools: Bash
 
 2. **Watcher.** Start the report wait from the rules in the background (Claude Code: the Monitor
    tool), so a member's `worker_done`, question or escalation reaches you while the person keeps
-   talking to you. When the watch ends or times out, start it again, silently.
+   talking to you. The watch returns only for a message; if it ends anyway (connection lost or
+   cancelled), start it again, silently.
 
 3. **Fleet.** Finish with one short status in the person's language, from
    `"$ORCA_GAME_CLI" game state --json`: each member (`isMember`) with its ticket, state,
@@ -43,3 +44,8 @@ allowed-tools: Bash
    a difference between them is the person's choice, not a discrepancy. Read your mail only with
    `"$ORCA_GAME_CLI" game inbox` (your project's lead and ticket addresses), never with a bare
    `orchestration inbox`, which without `--terminal` returns every project's mail on the machine.
+
+5. **Decisions.** Answer a member's question or decision gate yourself first, as the printed rules
+   say, and record each answer on the ticket. Ask the person only what only they can decide, quoting
+   the member, and consult an advisor tool once for a hard call when your agent offers one. The wait in
+   step 2 includes `decision_gate`, so a gate reaches you while the person keeps talking to you.

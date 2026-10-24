@@ -520,6 +520,9 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
+  PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
+  counts even after its member was released, which the live member count cannot see.
 - `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
   `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
@@ -563,7 +566,8 @@ The lead's verbs, run from the lead's terminal
   per status heading and counts the rest in "+N more".
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` records each in `game history`, then releases each one's dispatch, or closes its terminal when no
-  dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
+  dispatch owns it; an unproven release is reported, never followed by a close. It leaves the worktrees; the lead's
+  rules then remove each merged member's worktree and branch with `orca worktree rm`.
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
 - `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn
@@ -618,6 +622,29 @@ The lead's verbs, run from the lead's terminal
   have it read events and inbox before answering "qué pasó".
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
+
+### Decisions, the wait and the owner's rules
+
+The lead answers what its members ask, and the person hears only what only they can decide. The
+lead's rules ([`orchestrator-game-lead-brief.ts`](../../src/shared/orchestrator-game-lead-brief.ts))
+state the bar:
+
+- **The wait** includes `decision_gate` beside `worker_done`, `escalation` and `question`, so a
+  member that blocks on a gate reaches the lead without a second monitor.
+- **Answers.** The lead answers a question or a gate with `orca orchestration reply`. If that fails, it
+  sends the answer to the member's terminal handle with `orca orchestration send --to`, and runs
+  `orca game push` when the member is idle. Each answer is recorded as a comment on the member's ticket.
+- **The person decides** releases and publishing, spending money or quota beyond the plan,
+  hard-to-reverse or outward-facing actions (force pushes to shared branches, deleting work,
+  credentials, repo visibility), and scope or product direction. Everything else the lead decides
+  itself and records on the ticket.
+- **The advisor.** When the lead's agent offers an advisor tool, the lead consults it once for a hard
+  technical call, never for a status update. Without one, the lead decides by the bar above.
+- **Members keep working.** An idle member with no PR in flight is a lead failure: the lead gives it
+  its next step or frees its slot.
+- **Finish before starting.** The lead drives each member to merge before it launches another ticket;
+  new launches only fill slots freed by merged work. The lead removes a merged member's worktree and
+  branch right away, so no unfinished or merged workspaces pile up.
 
 ### One setup at a time
 
@@ -872,6 +899,13 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A message is unread until the agent it went to read it (`orchestration check`) or the board's own
   read cursor passed it. `--mark-read` moves that cursor and never marks orchestration mail read, so
   the lead's `orchestration check --wait` still gets every message.
+- A member's question the lead has not answered stays waiting on the lead after its mail is acked
+  (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
+  until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and
+  returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
+- A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")
+  until the pane restarts; the watch's delivery is the one wake for that event (ORCA-746 T6b).
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch
