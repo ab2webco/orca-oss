@@ -619,6 +619,28 @@ The lead's verbs, run from the lead's terminal
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
 
+### Decisions, the wait and the owner's rules
+
+The lead answers what its members ask, and the person hears only what only they can decide. The
+lead's rules ([`orchestrator-game-lead-brief.ts`](../../src/shared/orchestrator-game-lead-brief.ts))
+state the bar:
+
+- **The wait** includes `decision_gate` beside `worker_done`, `escalation` and `question`, so a
+  member that blocks on a gate reaches the lead without a second monitor.
+- **Answers.** The lead answers a question or a gate with `orca orchestration reply`. If that fails, it
+  sends the answer to the member's terminal handle with `orca orchestration send --to`, and runs
+  `orca game push` when the member is idle. Each answer is recorded as a comment on the member's ticket.
+- **The person decides** releases and publishing, spending money or quota beyond the plan,
+  hard-to-reverse or outward-facing actions (force pushes to shared branches, deleting work,
+  credentials, repo visibility), and scope or product direction. Everything else the lead decides
+  itself and records on the ticket.
+- **The advisor.** When the lead's agent offers an advisor tool, the lead consults it once for a hard
+  technical call, never for a status update. Without one, the lead decides by the bar above.
+- **Members keep working.** An idle member with no PR in flight is a lead failure: the lead gives it
+  its next step or frees its slot.
+- **Finish before starting.** The lead drives each member to merge before it launches another ticket;
+  new launches only fill slots freed by merged work.
+
 ### One setup at a time
 
 A member's new worktree runs the project's setup (`pnpm install` and the like). Four of them at once
