@@ -2,10 +2,18 @@ import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as CodexCliCommandModule from '../shared/node-cli-command-resolution'
 
-const { detectCommandsMock, resolveCliCommandMock, spawnMock } = vi.hoisted(() => ({
-  detectCommandsMock: vi.fn(() => new Set<string>(['claude'])),
-  resolveCliCommandMock: vi.fn(() => 'npx'),
-  spawnMock: vi.fn()
+const { detectCommandsMock, findRepointAgentsMock, resolveCliCommandMock, spawnMock } = vi.hoisted(
+  () => ({
+    detectCommandsMock: vi.fn(() => new Set<string>(['claude'])),
+    findRepointAgentsMock: vi.fn(async (): Promise<Record<string, string[]>> => ({})),
+    resolveCliCommandMock: vi.fn(() => 'npx'),
+    spawnMock: vi.fn()
+  })
+)
+
+// Why: the real lookup reads this machine's agent homes; the test pins what it finds.
+vi.mock('../main/skills/skill-repoint-agent-keys', () => ({
+  findSkillRepointAgentKeys: findRepointAgentsMock
 }))
 
 vi.mock('../shared/local-agent-install-dir-detection', () => ({
@@ -83,6 +91,8 @@ describe('orca skills install source repository routing', () => {
     detectCommandsMock.mockReset()
     detectCommandsMock.mockReturnValue(new Set<string>(['claude']))
     spawnMock.mockReset()
+    findRepointAgentsMock.mockReset()
+    findRepointAgentsMock.mockResolvedValue({})
     process.exitCode = undefined
   })
 
@@ -220,6 +230,22 @@ describe('orca skills install source repository routing', () => {
       global: true,
       executed: false
     })
+  })
+
+  it('re-points the agent homes that hold each skill, so no provider copy keeps upstream bytes', async () => {
+    findRepointAgentsMock.mockResolvedValue({
+      'orca-cli': ['claude-code', 'universal'],
+      'orca-plane': ['universal'],
+      'switch-account': ['universal']
+    })
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+    await main(['skills', 'update', '--all', '--dry-run', '--json'], '/tmp/repo')
+
+    expect(JSON.parse(stdoutText(stdoutSpy)).commands).toEqual([
+      `npx --yes skills add ${FORK_URL} --skill orca-cli --global --agent claude-code --agent universal -y`,
+      `npx --yes skills add ${FORK_URL} --skill orca-plane --skill switch-account --global --agent universal -y`
+    ])
   })
 
   it('reports the exit code of the re-point command', async () => {

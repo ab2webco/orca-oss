@@ -107,6 +107,9 @@
     // project's serve spec; the module has no imports, so listing it pulls in nothing else.
     "../src/main/startup/serve-mode-argv.ts",
     "../src/main/runtime/runtime-metadata.ts",
+    // Why: `orca skills update` re-points every agent home holding a skill.
+    "../src/main/skills/skill-discovery-sources.ts",
+    "../src/main/skills/skill-repoint-agent-keys.ts",
     "../src/main/sqlite/sync-database.ts",
     "../src/main/win32-utils.ts"
   ],

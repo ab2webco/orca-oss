@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { buildAgentFeatureSkillUpdateStepArgs } from '../../shared/agent-feature-install-commands'
+import {
+  buildAgentFeatureSkillUpdateStepArgs,
+  type AgentFeatureSkillCommandOptions
+} from '../../shared/agent-feature-install-commands'
 import {
   canonicalizeSkillUpdateNames,
   type SkillUpdateRun,
@@ -81,7 +84,10 @@ export class SkillUpdateRunner {
     this.deps.onState?.(next)
   }
 
-  start(names: readonly string[]): SkillUpdateStartResult {
+  start(
+    names: readonly string[],
+    options: Pick<AgentFeatureSkillCommandOptions, 'repointAgentsBySkill'> = {}
+  ): SkillUpdateStartResult {
     if (this.run.state === 'running') {
       return { started: false, reason: 'already-running' }
     }
@@ -93,7 +99,11 @@ export class SkillUpdateRunner {
     const resolveCommand = this.deps.resolveCommand ?? ((name: string) => resolveCliCommand(name))
     const spawnProcess = this.deps.spawnProcess ?? spawn
     const npxCommand = resolveCommand('npx')
-    const steps = buildAgentFeatureSkillUpdateStepArgs(canonicalNames, { global: true, yes: true })
+    const steps = buildAgentFeatureSkillUpdateStepArgs(canonicalNames, {
+      global: true,
+      yes: true,
+      repointAgentsBySkill: options.repointAgentsBySkill
+    })
 
     let spawnSteps: { spawnCmd: string; spawnArgs: string[] }[]
     try {

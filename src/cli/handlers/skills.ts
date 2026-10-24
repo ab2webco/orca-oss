@@ -25,6 +25,7 @@ import {
   WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL
 } from '../../shared/windows-batch-spawn'
 import { isSkillsCliAgentKeyShaped, toSkillsCliAgentKeys } from '../../shared/skills-cli-agent-keys'
+import { findSkillRepointAgentKeys } from '../../main/skills/skill-repoint-agent-keys'
 import {
   buildAgentFeatureSkillInstallArgsByRepository,
   buildAgentFeatureSkillUpdateStepArgs
@@ -201,12 +202,18 @@ function buildNpxSkillsArgs(
   verb: SkillMutationVerb,
   skillNames: string[],
   global: boolean,
-  agents: string[]
+  agents: string[],
+  repointAgentsBySkill: Readonly<Record<string, readonly string[]>> = {}
 ): string[][] {
   const skillArgs =
     verb === 'install'
       ? buildAgentFeatureSkillInstallArgsByRepository(skillNames, { global, yes: true, agents })
-      : buildAgentFeatureSkillUpdateStepArgs(skillNames, { global, yes: true, agents })
+      : buildAgentFeatureSkillUpdateStepArgs(skillNames, {
+          global,
+          yes: true,
+          agents,
+          repointAgentsBySkill
+        })
   // Why: a cold package cache makes bare `npx` prompt before it will fetch
   // `skills`, which strands an unattended host just like the picker does.
   return skillArgs.map((args) => ['--yes', ...args])
@@ -259,7 +266,11 @@ function createSkillMutationHandler(verb: SkillMutationVerb): CommandHandler {
     const global = flags.get('local') !== true
     // Why: install scopes its targets; update only refreshes what is already placed.
     const agents = verb === 'install' ? resolveInstallAgentKeys(flags) : []
-    const npxArgs = buildNpxSkillsArgs(verb, skillNames, global, agents)
+    // Why: a global re-point names every agent home holding the skill, so an
+    // independent provider copy does not keep upstream bytes.
+    const repointAgentsBySkill =
+      verb === 'update' && global ? await findSkillRepointAgentKeys(skillNames) : {}
+    const npxArgs = buildNpxSkillsArgs(verb, skillNames, global, agents, repointAgentsBySkill)
     const commands = npxArgs.map(formatNpxCommand)
     const dryRun = flags.get('dry-run') === true
 

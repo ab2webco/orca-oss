@@ -90,6 +90,30 @@ describe('SkillUpdateRunner', () => {
     ])
   })
 
+  it('re-points the agent homes that hold the skill, not only the canonical copy', () => {
+    const { runner, spawnCalls } = makeRunner()
+
+    expect(
+      runner.start(['orca-cli'], {
+        repointAgentsBySkill: { 'orca-cli': ['claude-code', 'universal'] }
+      })
+    ).toEqual({ started: true })
+    expect(spawnCalls[0].args).toEqual([
+      '--yes',
+      'skills',
+      'add',
+      'https://github.com/ab2webco/orca-oss',
+      '--skill',
+      'orca-cli',
+      '--global',
+      '--agent',
+      'claude-code',
+      '--agent',
+      'universal',
+      '-y'
+    ])
+  })
+
   it('runs the fork re-point and then the update for a mixed request', () => {
     const { runner, children, spawnCalls } = makeRunner()
 

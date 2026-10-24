@@ -168,6 +168,25 @@ describe('agent feature skill commands', () => {
     )
   })
 
+  it('re-points each skill into every agent home that holds it, one command per target set', () => {
+    // Why: naming only `universal` leaves an independent copy in a provider home on
+    // upstream bytes; naming that home's agent makes the CLI replace it with the fork's.
+    expect(
+      buildAgentFeatureSkillUpdateStepArgs(['orca-cli', 'orchestration', 'switch-account'], {
+        global: true,
+        yes: true,
+        repointAgentsBySkill: {
+          'orca-cli': ['claude-code', 'universal'],
+          orchestration: ['universal'],
+          'switch-account': ['claude-code', 'universal']
+        }
+      }).map((args) => args.join(' '))
+    ).toEqual([
+      'skills add https://github.com/ab2webco/orca-oss --skill orca-cli --skill switch-account --global --agent claude-code --agent universal -y',
+      'skills add https://github.com/ab2webco/orca-oss --skill orchestration --global --agent universal -y'
+    ])
+  })
+
   it('splits a mixed update into the fork re-point first, then the update', () => {
     expect(
       buildAgentFeatureSkillUpdateStepArgs(['find-skills', 'orca-cli'], {

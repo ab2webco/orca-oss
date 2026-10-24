@@ -1,4 +1,4 @@
-import { isSkillsCliAgentKeyShaped } from './skills-cli-agent-keys'
+import { isSkillsCliAgentKeyShaped, SKILLS_CLI_UNIVERSAL_AGENT_KEY } from './skills-cli-agent-keys'
 import { ORCA_REPOSITORY_URL } from './orca-repository-url'
 
 export const ORCA_SKILLS_REPOSITORY_URL = ORCA_REPOSITORY_URL
@@ -33,10 +33,6 @@ export const ORCA_SHIPPED_SKILL_NAMES: ReadonlySet<string> = new Set<string>([
   'orca-emulator',
   'orca-emulator-android'
 ])
-
-// Why: the agent target Orca uses for every fork-backed install or re-point. `universal`
-// is the only target that writes the canonical copy; provider aliases follow it.
-export const ORCA_SKILL_CANONICAL_AGENT = 'universal'
 
 export function resolveAgentFeatureSkillRepositoryUrl(_skillName: string): string {
   return ORCA_SKILLS_REPOSITORY_URL
@@ -85,8 +81,10 @@ export type AgentFeatureSkillCommandOptions = {
   global?: boolean
   yes?: boolean
   agents?: readonly string[]
-  /** Source repo for `skills add`; fork-only skills override the upstream default. */
+  /** Source repo for `skills add`; defaults to the fork. */
   repositoryUrl?: string
+  /** Unattended update: the agent homes each Orca skill sits in, so every copy is re-pointed. */
+  repointAgentsBySkill?: Readonly<Record<string, readonly string[]>>
 }
 
 export function buildAgentFeatureSkillInstallArgs(
@@ -174,7 +172,7 @@ export function buildAgentFeatureSkillUpdateArgs(
     return buildAgentFeatureSkillInstallArgs(names, {
       global,
       yes: options.yes,
-      agents: options.yes ? [ORCA_SKILL_CANONICAL_AGENT] : [],
+      agents: options.yes ? [SKILLS_CLI_UNIVERSAL_AGENT_KEY] : [],
       repositoryUrl: ORCA_SKILLS_REPOSITORY_URL
     })
   }
@@ -209,14 +207,30 @@ export function buildAgentFeatureSkillUpdateStepArgs(
   const shipped = names.filter((name) => ORCA_SHIPPED_SKILL_NAMES.has(name))
   const others = names.filter((name) => !ORCA_SHIPPED_SKILL_NAMES.has(name))
   const steps: string[][] = []
-  if (shipped.length > 0) {
-    // Why: an unattended re-point with no target would install into every agent.
-    const agents = options.agents?.length ? options.agents : [ORCA_SKILL_CANONICAL_AGENT]
+  // Why: an unattended re-point with no target would install into every agent.
+  const fallback = options.agents?.length ? options.agents : [SKILLS_CLI_UNIVERSAL_AGENT_KEY]
+  // Why: naming only `universal` leaves an independent provider copy on upstream bytes,
+  // so each skill names the homes it sits in. Skills sharing a target set share one
+  // command; one set for all would add a skill to homes that never had it.
+  const groups = new Map<string, { agents: readonly string[]; names: string[] }>()
+  for (const name of shipped) {
+    const agents = options.yes
+      ? [...(options.repointAgentsBySkill?.[name] ?? fallback)].sort()
+      : (options.agents ?? [])
+    const key = agents.join(' ')
+    const group = groups.get(key)
+    if (group) {
+      group.names.push(name)
+    } else {
+      groups.set(key, { agents, names: [name] })
+    }
+  }
+  for (const group of groups.values()) {
     steps.push(
-      buildAgentFeatureSkillInstallArgs(shipped, {
+      buildAgentFeatureSkillInstallArgs(group.names, {
         global: options.global,
         yes: options.yes,
-        agents: options.yes ? agents : (options.agents ?? []),
+        agents: group.agents,
         repositoryUrl: ORCA_SKILLS_REPOSITORY_URL
       })
     )
