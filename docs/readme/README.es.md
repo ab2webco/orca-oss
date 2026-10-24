@@ -30,13 +30,45 @@ La cuadrícula de agentes reúne en una pantalla a todos los agentes activos de 
 
 [Worktrees →](../user/model/worktrees.md) · [Terminal →](../user/terminal.md)
 
-## Juega con el equipo, o apaga el juego
+## Dirige un equipo de agentes como un juego
 
-Los paneles de Claude Agent Teams pueden dibujar la flota como un pequeño juego: un líder, miembros como personajes y XP por el trabajo verificado. En Settings → Agents eliges cómo se ve, y cuánto cuesta a tu equipo, entre cinco vistas: **Off**, **Flat** (texto plano, sin escena), **Zen**, **2D classic** y **2D hd**. Cada proyecto puede cambiar la vista por defecto, y un panel puede cambiarla con `/orca-game:view`.
+Un líder de Claude Agent Teams lanza un miembro por ticket, cada uno en su propio worktree. La banda del juego, bajo el prompt del líder, dibuja al grupo, dice quién te está esperando y abre el **Panel**: una tarjeta por miembro con su ticket, rama, pull request y CI. La XP sale solo del trabajo verificado: CI en verde, un pull request mergeado, un ticket que llega a Done.
+
+<p align="center">
+  <img src="../assets/readme/game-band-panel.gif" alt="La banda del juego bajo un líder de Claude Code: tres miembros, uno esperándote; el Panel muestra el ticket, la rama, el PR y el CI de cada miembro; un PR mergeado y un CI en verde dan XP y una subida de nivel" width="960" />
+</p>
+
+En Settings → Agents eliges cómo se ve, y cuánto cuesta a tu equipo, entre cinco vistas: **Off**, **Flat** (texto plano, sin escena), **Zen**, **2D classic** y **2D hd**. Cada proyecto puede cambiar la vista por defecto, y un panel puede cambiarla con `/orca-game:view`.
 
 <p align="center">
   <img src="../assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: las cinco vistas, y Flat y Off apagando la vista previa de la escena" width="960" />
 </p>
+
+## Cambia de cuenta de Claude sin perder la sesión
+
+Añade varias cuentas de Claude y elige la activa en Settings → AI Provider Accounts. Orca Lab cambia el login en el sitio y te dice qué terminales en marcha reiniciar; un worktree también puede fijarse a su propia cuenta.
+
+<p align="center">
+  <img src="../assets/readme/claude-accounts-switch.gif" alt="Settings → AI Provider Accounts: tres cuentas de Claude y la insignia Active pasando de una a otra con un aviso de confirmación" width="960" />
+</p>
+
+## Trabaja desde tu tablero de Plane
+
+Conecta un workspace de Plane y sus proyectos pasan a ser una fuente de tareas: un tablero con una columna por estado, o una lista agrupada por estado, con prioridad y responsable en cada work item.
+
+<p align="center">
+  <img src="../assets/readme/plane-board.gif" alt="La página Tasks sobre un proyecto de Plane: Todo, In Progress, In Review y Done como columnas del tablero, y luego los mismos work items como lista" width="960" />
+</p>
+
+## Amplíalo con plugins
+
+Un plugin es una carpeta con un `orca-plugin.json`. Nada se ejecuta hasta que revisas lo que pide; entonces se activan su panel, sus ajustes y su worker. El [ejemplo worklog](../../examples/plugins/worklog) lo usa todo.
+
+<p align="center">
+  <img src="../assets/readme/worklog-plugin.gif" alt="Settings → Plugins: el plugin Worklog necesita revisión, el diálogo de consentimiento lista sus capacidades y su automatización programada, y su panel muestra las entradas recientes y los ajustes" width="960" />
+</p>
+
+<sub>Las personas, cuentas, proyectos y tickets de estas grabaciones son datos de demostración inventados en example.com.</sub>
 
 ## Cómo encaja todo
 
@@ -49,7 +81,7 @@ La ventana es un proceso principal de Electron más un renderer de React. Las te
 
 ## Lo que añade Orca Lab
 
-Todo lo siguiente está en el historial del producto desde el fork de Orca (1.273 commits, 249 de ellos funcionalidades). Las dos escenas de arriba se grabaron desde la app real; el resto sale del registro de commits y de las notas de versión, y aún no tiene grabación.
+Todo lo siguiente está en el historial del producto desde el fork de Orca (1.273 commits, 249 de ellos funcionalidades). Las escenas de arriba se grabaron desde la app real con specs E2E en `tests/e2e/*-showcase.spec.ts`; el resto sale del registro de commits y de las notas de versión, y aún no tiene grabación.
 
 - **Cuentas por worktree.** Fija una cuenta de Claude o Codex a un worktree, conmuta cuando se acaba la cuota, cambia la cuenta de una terminal en marcha con `orca account switch` y usa endpoints personalizados.
 - **Orquestación más robusta.** Reportes `worker_done` tipados, un watchdog de despachos, recuperación tras reinicios y miembros en pausa que retoman donde quedaron.
