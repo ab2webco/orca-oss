@@ -27,6 +27,7 @@ import {
 import { TERMINAL_PANE_SPLIT_SOURCES } from '../../../../shared/feature-education-telemetry'
 import type { TerminalOscLinkRange } from '../../../../shared/terminal-osc-link-ranges'
 import { setTerminalViewAttributes } from '../../terminal-view-attribute-store'
+import { renewDispatchForFollowUpPrompt } from '../../orchestration/dispatch-follow-up-renewal'
 import type { TerminalViewAttributes } from '../../../../shared/terminal-view-attributes'
 import {
   TERMINAL_INPUT_MAX_BYTES,
@@ -1492,6 +1493,17 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
       }
       if (result.accepted !== true) {
         mobileFloorClaim.current?.rollback()
+      }
+      if (result.accepted === true && agentPromptText !== null) {
+        try {
+          renewDispatchForFollowUpPrompt(runtime.getOrchestrationDb(), {
+            handle: params.terminal,
+            paneKey: runtime.getTerminalPaneKey(params.terminal) ?? undefined
+          })
+        } catch (error) {
+          // Why: the prompt is already delivered; a failed renewal must not report it as unsent.
+          console.warn('[orchestration] follow-up dispatch renewal failed', { error })
+        }
       }
       if (
         result.accepted === true &&
