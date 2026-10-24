@@ -238,6 +238,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('Without one, decide by the bar above')
   })
 
+  // Why: owner rule 2026-10-23: no pile of unfinished workspaces; the lead removes merged ones at once.
+  it('removes a merged member worktree and its branch right away, never keeping them', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain("remove each merged member's worktree and its branch right away")
+    expect(brief).toContain('`orca worktree rm --worktree branch:<branch>`')
+    expect(brief).not.toContain('worktrees stay')
+  })
+
   it('keeps members working and finishes each ticket before it starts another', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 

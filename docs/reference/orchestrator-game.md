@@ -563,7 +563,8 @@ The lead's verbs, run from the lead's terminal
   per status heading and counts the rest in "+N more".
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` records each in `game history`, then releases each one's dispatch, or closes its terminal when no
-  dispatch owns it; an unproven release is reported, never followed by a close. Worktrees stay.
+  dispatch owns it; an unproven release is reported, never followed by a close. It leaves the worktrees; the lead's
+  rules then remove each merged member's worktree and branch with `orca worktree rm`.
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
 - `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn
@@ -639,7 +640,8 @@ state the bar:
 - **Members keep working.** An idle member with no PR in flight is a lead failure: the lead gives it
   its next step or frees its slot.
 - **Finish before starting.** The lead drives each member to merge before it launches another ticket;
-  new launches only fill slots freed by merged work.
+  new launches only fill slots freed by merged work. The lead removes a merged member's worktree and
+  branch right away, so no unfinished or merged workspaces pile up.
 
 ### One setup at a time
 
