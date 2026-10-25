@@ -1,12 +1,11 @@
-import { execFileSync } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { execInTerminal, getTerminalContent, waitForActivePanePtyId } from './helpers/terminal'
+import { claudeVersionOk, clickTerminalText } from './helpers/orca-game-terminal'
 
 // Source frames for the README game GIF. The band and Panel are drawn by the
 // orca-game mod inside a real Claude Code, so this needs `claude` on PATH and is
@@ -16,23 +15,7 @@ import { execInTerminal, getTerminalContent, waitForActivePanePtyId } from './he
 const WINDOW_WIDTH = 1440
 const WINDOW_HEIGHT = 900
 const HOLD_MS = 1_500
-const MIN_CLAUDE = [2, 1, 287]
 const DEMO_KEY = 'sk-ant-api03-readme-demo-000000000000000000000000000000000000'
-
-function claudeVersionOk(): boolean {
-  try {
-    const out = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 15_000 })
-    const parts = (/(\d+)\.(\d+)\.(\d+)/.exec(out) ?? []).slice(1).map(Number)
-    for (let i = 0; i < 3; i++) {
-      if ((parts[i] ?? 0) !== MIN_CLAUDE[i]) {
-        return (parts[i] ?? 0) > MIN_CLAUDE[i]!
-      }
-    }
-    return true
-  } catch {
-    return false
-  }
-}
 
 const member = (
   name: string,
@@ -114,39 +97,6 @@ const gameState = (step: 1 | 2) => ({
   role: 'lead',
   locale: 'en'
 })
-
-async function clickTerminalText(page: Page, text: string): Promise<void> {
-  const point = await page.evaluate((needle) => {
-    for (const manager of window.__paneManagers?.values() ?? []) {
-      const pane = manager.getActivePane?.()
-      if (!pane) {
-        continue
-      }
-      const terminal = pane.terminal
-      const buffer = terminal.buffer.active
-      const screen = pane.container.querySelector<HTMLElement>('.xterm-screen')
-      if (!screen) {
-        continue
-      }
-      const rect = screen.getBoundingClientRect()
-      const cellWidth = rect.width / terminal.cols
-      const cellHeight = rect.height / terminal.rows
-      for (let row = terminal.rows - 1; row >= 0; row--) {
-        const line = buffer.getLine(buffer.viewportY + row)?.translateToString() ?? ''
-        const col = line.indexOf(needle)
-        if (col !== -1) {
-          return {
-            x: rect.left + (col + needle.length / 2) * cellWidth,
-            y: rect.top + (row + 0.5) * cellHeight
-          }
-        }
-      }
-    }
-    return null
-  }, text)
-  expect(point, `"${text}" is not on the terminal screen`).not.toBeNull()
-  await page.mouse.click(point!.x, point!.y)
-}
 
 test('the game band and Panel draw a lead with three members', async ({
   electronApp,
