@@ -50,6 +50,13 @@ describe('orca game help', () => {
     }
   })
 
+  it('prints the game file validator usage under `game game`', async () => {
+    const help = await helpOf(['game', 'game', 'validate', '--help'])
+    expect(help).not.toContain('Unknown command')
+    expect(help).toContain('Usage: orca game game validate <file> [--json]')
+    expect(process.exitCode).toBeUndefined()
+  })
+
   it('names the game in the root help', async () => {
     expect(await helpOf(['--help'])).toContain('game                      ')
   })

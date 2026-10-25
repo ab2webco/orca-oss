@@ -1,0 +1,16 @@
+{
+  "engine": "runner",
+  "name": { "en": "Endless run", "es": "Carrera sin fin" },
+  "fps": 12,
+  "speed": { "start": 12, "max": 28, "rampPerMinute": 6 },
+  "difficulty": { "minGap": 22, "maxGap": 48 },
+  "jump": { "rows": 4, "ms": 650 },
+  "obstacles": [
+    { "from": "scene", "weight": 1 },
+    {
+      "rows": [".RR.", "RRrR", "RrRR"],
+      "colors": { "R": "#6b6b73", "r": "#9a9aa3" },
+      "weight": 0.35
+    }
+  ]
+}

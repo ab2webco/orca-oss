@@ -267,5 +267,18 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'Finds .orca/scenes/ in this folder or the nearest parent that has one.'
     ],
     examples: ['orca game scene list --json']
+  },
+  {
+    path: ['game', 'game', 'validate'],
+    summary: 'Check an arcade game file with the same rules the game applies',
+    usage: 'orca game game validate <file> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'file'],
+    positionalArgs: ['file'],
+    notes: [
+      'Runs locally without contacting the Orca Lab runtime.',
+      'Lists every problem as `path: message`; exits 1 when there is any.',
+      'A game file is data for a built-in engine (runner): speed, gaps, jump, obstacles and an optional theme, at most 16 KB and 15 fps.'
+    ],
+    examples: ['orca game game validate .orca/games/runner.json --json']
   }
 ]

@@ -91,5 +91,11 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
     keys: ['game scene new', 'game scene validate', 'game scene list'],
     load: async () =>
       (await import('./handlers/orchestrator-game-scenes.js')).ORCHESTRATOR_GAME_SCENE_HANDLERS
+  },
+  {
+    name: 'orchestrator-game-arcade',
+    keys: ['game game validate'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-arcade.js')).ORCHESTRATOR_GAME_ARCADE_HANDLERS
   }
 ]
