@@ -314,7 +314,12 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 - `review` — the hosted review for the branch from any supported provider (GitHub, GitLab,
   Bitbucket, Azure DevOps, Gitea) with its aggregate CI status. `verdict` (optional) is the
   host's review decision — `approved`, `changes_requested` or `review_required` (GitHub only;
-  absent without a decision);
+  absent without a decision). GitHub reviews also carry, read together in one GraphQL query per
+  PR version: `ciHistory` (`{ headSha, ci }` per pushed head, oldest first, including heads a
+  force-push replaced), `commentCount` (review comment threads; conversation comments are left
+  out, since bots post there) and `reopenCount`. Another provider, an unreadable repository or a
+  failed read leaves all three out. `perfectMerge` (optional) is the perfect-merge decision the
+  arcade reads (see [The perfect merge](#the-perfect-merge));
 - `workItem` — the linked item with a live status for Plane, Linear, Jira, GitHub and GitLab, and
   a `statusGroup` (`backlog`, `todo`, `in_progress`, `review`, `done`, `cancelled`, `unknown`)
   so the game never needs to know the tracker. `tracker: false` leaves it out;
@@ -829,6 +834,23 @@ or tracker never sees those facts, so their rewards never fire and nothing is ta
 The ledger also takes rows that subtract XP, for the quality signals that will cost points
 (ORCA-686): the total can go below 0 while the level stays at 1, and the toast and the score line
 show the minus sign (`-30 XP`, in red on the flat score line).
+
+### The perfect merge
+
+`review.perfectMerge` is the owner's quality gate (ORCA-686), and the arcade (ORCA-775) reads it to
+unlock a play ([`orchestrator-game-state.ts`](../../src/shared/orchestrator-game-state.ts)). It is
+absent until the review is `merged` and every GitHub fact above was read, so an open PR, another
+provider or a failed read never counts as perfect. Once merged it is `true` only when all of these
+hold, and `false` otherwise:
+
+- CI is `success` and no head in `ciHistory` was ever `failure` (a red run before a rebase still
+  counts, read from the force-push events);
+- the review found nothing to fix: `verdict` is not `changes_requested` and `commentCount` is 0.
+  `approved` is not required, since the lead and its members share one GitHub identity and an
+  author cannot approve their own PR;
+- `reopenCount` is 0;
+- the ticket's acceptance is met. The host has no fact for that, so the merge stands for it: the
+  lead merges only after checking acceptance.
 
 **Lead subagents.** The orchestrator lead is a session that ran the lead rules: `orca game lead`,
 whether through `/orca-game:lead`, the project's `autostart` or a Bash call of it. Only that session
