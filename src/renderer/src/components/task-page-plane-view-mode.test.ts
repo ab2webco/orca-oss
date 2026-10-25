@@ -38,7 +38,10 @@ describe('planeViewMode persistence contract', () => {
     // Why asserted against the source: the normalizer is main-side and the default
     // must not drift from what the renderer seeds itself with.
     const { readFileSync } = await import('node:fs')
-    const persistence = readFileSync('src/main/persistence.ts', 'utf-8')
+    const persistence = readFileSync(
+      'src/main/persistence/applying-settings/task-view-and-failover-settings.ts',
+      'utf-8'
+    )
     expect(persistence).toContain("return value === 'list' ? 'list' : 'board'")
     expect(persistence).toContain('planeViewMode: normalizePlaneViewMode(')
 

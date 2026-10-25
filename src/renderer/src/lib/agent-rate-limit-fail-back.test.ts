@@ -284,7 +284,10 @@ describe('fail-back mode default', () => {
     // Why asserted here: the default lives in three places (persistence
     // normalizer, settings pane, watcher hook) and they must not drift apart.
     const { readFileSync } = await import('node:fs')
-    const normalizer = readFileSync('src/main/persistence.ts', 'utf-8')
+    const normalizer = readFileSync(
+      'src/main/persistence/applying-settings/task-view-and-failover-settings.ts',
+      'utf-8'
+    )
     expect(normalizer).toContain("value === 'off' || value === 'notify' ? value : 'auto'")
 
     for (const path of [
