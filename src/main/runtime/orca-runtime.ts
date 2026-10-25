@@ -2074,6 +2074,8 @@ type RuntimePtyController = {
     /** Launch-scoped managed-account override; beats the worktree pin. */
     claudeAccountId?: string
     codexAccountId?: string
+    /** A game member launch refuses a Claude that its account config has not trusted (ORCA-776). */
+    requireClaudeFolderTrust?: boolean
     preAllocatedHandle?: string
     tabId?: string
     leafId?: string
@@ -28342,6 +28344,9 @@ export class OrcaRuntimeService {
             worktreeId: workspace.id,
             ...(opts.claudeAccountId ? { claudeAccountId: opts.claudeAccountId } : {}),
             ...(opts.codexAccountId ? { codexAccountId: opts.codexAccountId } : {}),
+            ...(opts.orchestrationGameMember && launchOpts.launchAgent === 'claude'
+              ? { requireClaudeFolderTrust: true }
+              : {}),
             preAllocatedHandle,
             tabId,
             leafId,

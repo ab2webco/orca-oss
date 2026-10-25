@@ -109,6 +109,12 @@ import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-au
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
 import {
+  claudeConfigFilePathOf,
+  claudeFolderTrustPathsOf,
+  claudeFolderTrustRequiredMessage,
+  isClaudeFolderTrusted
+} from '../claude-accounts/claude-folder-trust'
+import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
   isLiveSharedClaudePty,
@@ -5128,6 +5134,27 @@ export function registerPtyHandlers(
       env = stripSequencedStartupResumeArgv(env, codexResumeLaunch)
       if (args.preAllocatedHandle) {
         env = { ...env, ORCA_TERMINAL_HANDLE: args.preAllocatedHandle }
+      }
+      if (
+        args.requireClaudeFolderTrust === true &&
+        isClaudeLaunch &&
+        !isExistingSharedClaudeSession &&
+        claudeAuth?.runtime !== 'wsl'
+      ) {
+        // Why: the file Claude reads for this account; an untrusted folder would park the member on the trust prompt.
+        if (!cwd) {
+          throw new Error(
+            'Claude Code has no folder to launch in, so its folder trust cannot be checked.'
+          )
+        }
+        const configFilePath = claudeConfigFilePathOf({ ...process.env, ...env })
+        const trusted = await isClaudeFolderTrusted({
+          configFilePath,
+          folderPaths: claudeFolderTrustPathsOf(cwd)
+        })
+        if (!trusted) {
+          throw new Error(claudeFolderTrustRequiredMessage(cwd, configFilePath))
+        }
       }
       let selectedCodexHomePath = resolveSelectedCodexHomeOrRefuseSpawn(() =>
         !preAdoptedStablePane && !args.connectionId
