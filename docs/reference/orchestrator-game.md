@@ -378,8 +378,8 @@ collapsed Review keeps its CI color. The `Needs you` lines above the sections ar
 On a phone-width pane each section also gets a touch-sized chip under the menu, and the catalog is
 a row of such chips.
 
-A widget that is not shown does no work: its data is not read and its rows are not built, so To Do
-and Actions cost nothing until added.
+A widget that is not shown is not drawn: its rows, buttons and hotkeys are gone until it is added.
+Its data still arrives with `game state`.
 
 `/orca-game:layout` lists the sections with their state and takes `reset`, `add <section>`,
 `remove <section>` and `move <section> up|down` (Spanish words work too: `añadir tareas`,
