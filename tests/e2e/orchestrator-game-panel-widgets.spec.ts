@@ -82,19 +82,13 @@ const gameState = {
   locale: 'en'
 }
 
-// A press into the Panel can be dropped (cause not verified): press again until the drawn text shows it.
-async function pressUntilDrawn(page: Page, chip: string, drawn: string): Promise<void> {
-  for (let press = 0; press < 3; press++) {
-    await clickTerminalText(page, chip)
-    const isDrawn = await expect
-      .poll(async () => visibleTerminalText(page), { timeout: 5_000 })
-      .toContain(drawn)
-      .then(() => true)
-      .catch(() => false)
-    if (isDrawn) {
-      return
-    }
-  }
+// Why: Claude Code's terminal loses a click that lands while a pane redraws (on main too; keys are
+// not lost), so each chip is clicked once, after the redraw that drew it.
+const REDRAW_MS = 1_000
+
+async function clickOnceRedrawn(page: Page, chip: string): Promise<void> {
+  await page.waitForTimeout(REDRAW_MS)
+  await clickTerminalText(page, chip)
 }
 
 test('the Panel shows Team alone until a person adds To Do, at every width and theme', async ({
@@ -184,15 +178,18 @@ test('the Panel shows Team alone until a person adds To Do, at every width and t
     await expect
       .poll(async () => getTerminalContent(orcaPage, 20_000), { timeout: 60_000 })
       .toContain('Wren')
-    await pressUntilDrawn(orcaPage, 'Panel', '▾ Team')
+    await clickOnceRedrawn(orcaPage, 'Panel')
     await expect
       .poll(async () => visibleTerminalText(orcaPage), { timeout: 20_000 })
       .toContain('▾ Team')
     // The band's chip reads "To Do 12"; only the Panel's section heading would read "▾ To Do".
     expect(await visibleTerminalText(orcaPage)).not.toContain('▾ To Do')
 
-    await pressUntilDrawn(orcaPage, 'Widgets', '○ To Do')
-    await pressUntilDrawn(orcaPage, '○ To Do', TODO_HEADING)
+    await clickOnceRedrawn(orcaPage, 'Widgets')
+    await expect
+      .poll(async () => visibleTerminalText(orcaPage), { timeout: 20_000 })
+      .toContain('○ To Do')
+    await clickOnceRedrawn(orcaPage, '○ To Do')
     await expect
       .poll(async () => visibleTerminalText(orcaPage), { timeout: 20_000 })
       .toContain(TODO_HEADING)
