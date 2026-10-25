@@ -1,16 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../shared/setup-agent-sequencing'
-import type { PtyHandler } from './pty-handler'
-import {
-  beginPtyHandlerTest,
-  createPtyRequestHelpers,
-  endPtyHandlerTest,
-  type MockDispatcher
-} from './pty-handler-test-harness'
-
 import * as ptyShellUtils from './pty-shell-utils'
 
 const { mockPtySpawn, mockPtyInstance, mockCreateShellPromptReadinessProbe } = vi.hoisted(() => ({
@@ -43,6 +35,14 @@ vi.mock('../main/pty/posix-pty-process-groups', () => ({
 vi.mock('../main/shell-prompt-readiness-probe', () => ({
   createShellPromptReadinessProbe: mockCreateShellPromptReadinessProbe
 }))
+
+import type { PtyHandler } from './pty-handler'
+import {
+  beginPtyHandlerTest,
+  createPtyRequestHelpers,
+  endPtyHandlerTest
+} from './pty-handler-test-harness'
+import type { MockDispatcher } from './pty-handler-test-harness'
 
 describe('PtyHandler', () => {
   let dispatcher: MockDispatcher

@@ -1,3 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   cleanupRuntimeAuthTestState,
   createClaudeAccount,
@@ -12,9 +15,6 @@ import {
   resetRuntimeAuthTestState,
   testState
 } from './runtime-auth-service-test-harness'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 vi.mock('electron', () => createElectronMock())
 

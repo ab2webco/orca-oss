@@ -1,13 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { PTY_STARTUP_INGRESS_VERSION } from '../shared/pty-startup-ingress'
-import { RelayDispatcher } from './dispatcher'
-import { encodeJsonRpcFrame } from './protocol'
-import { PtyHandler } from './pty-handler'
-import {
-  beginPtyHandlerTest,
-  endPtyHandlerTest,
-  type MockDispatcher
-} from './pty-handler-test-harness'
 
 const { mockPtySpawn, mockPtyInstance, mockCreateShellPromptReadinessProbe } = vi.hoisted(() => ({
   mockPtySpawn: vi.fn(),
@@ -39,6 +31,12 @@ vi.mock('../main/pty/posix-pty-process-groups', () => ({
 vi.mock('../main/shell-prompt-readiness-probe', () => ({
   createShellPromptReadinessProbe: mockCreateShellPromptReadinessProbe
 }))
+
+import { PtyHandler } from './pty-handler'
+import { RelayDispatcher } from './dispatcher'
+import { encodeJsonRpcFrame } from './protocol'
+import { beginPtyHandlerTest, endPtyHandlerTest } from './pty-handler-test-harness'
+import type { MockDispatcher } from './pty-handler-test-harness'
 
 describe('PtyHandler', () => {
   let dispatcher: MockDispatcher

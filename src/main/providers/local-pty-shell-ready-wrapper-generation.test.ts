@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { getBashShellReadyRcfileContent } from './local-pty-shell-ready-bash-rcfile'
-import { getZshShellReadyRcfileContent } from './local-pty-shell-ready-wrapper-generation'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { getBashShellReadyRcfileContent } from './local-pty-shell-ready-bash-rcfile'
 import {
   describePosix,
   importFreshLocalPtyShellReady,
   restoreUserDataPathAfterEach,
   setTestUserDataPath
 } from './local-pty-shell-ready-test-harness'
+import { getZshShellReadyRcfileContent } from './local-pty-shell-ready-wrapper-generation'
 
 // Why: rcfile content is pure, so a static import is equivalent to the fresh-module import used for wrapper writing.
 

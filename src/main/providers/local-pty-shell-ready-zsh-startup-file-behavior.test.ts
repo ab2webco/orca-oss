@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import {
   describeIfZsh,
   describePosix,

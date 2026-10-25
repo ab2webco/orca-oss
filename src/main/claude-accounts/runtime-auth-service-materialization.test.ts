@@ -1,3 +1,17 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
+import { join } from 'node:path'
+import type { GlobalSettings } from '../../shared/global-settings-types'
 import {
   cleanupRuntimeAuthTestState,
   createClaudeAccount,
@@ -15,20 +29,6 @@ import {
   setPlatform,
   testState
 } from './runtime-auth-service-test-harness'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  chmodSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-  writeFileSync
-} from 'node:fs'
-import { join } from 'node:path'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 
 vi.mock('electron', () => createElectronMock())
 
