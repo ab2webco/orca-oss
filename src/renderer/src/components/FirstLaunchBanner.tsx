@@ -11,11 +11,14 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
 type FirstLaunchBannerProps = {
+  // Same gate as the transport, so a build that cannot send never claims usage counts.
+  transmitsInBuild: boolean
   onResolve: () => void
   fetchSettings: () => Promise<void>
 }
 
 export function FirstLaunchBanner({
+  transmitsInBuild,
   onResolve,
   fetchSettings
 }: FirstLaunchBannerProps): React.JSX.Element {
@@ -66,36 +69,48 @@ export function FirstLaunchBanner({
     // Fixed non-modal overlay; centered + narrow so it clears the macOS traffic lights.
     // `relative` is load-bearing: the absolutely-positioned ✕ anchors to this container.
     <div
-      className="fixed left-1/2 top-2 z-40 flex w-[min(44.625rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-4 rounded-lg border border-border bg-card/95 py-3 pl-4 pr-3 shadow-lg backdrop-blur"
+      className="fixed left-1/2 top-2 z-40 flex flex-wrap w-[min(44.625rem,calc(100vw-2rem))] -translate-x-1/2 items-start gap-4 rounded-lg border border-border bg-card/95 py-3 pl-4 pr-3 shadow-lg backdrop-blur"
       role="region"
       aria-label={translate('auto.components.FirstLaunchBanner.fcbee32f08', 'Telemetry notice')}
       aria-live="polite"
     >
-      {/* Text column — flex-1 so the action column never wraps the copy. */}
-      <div className="flex-1 space-y-0.5 pr-1 text-sm">
+      {/* Text column — the 16rem basis wraps the actions below it on narrow windows instead of squeezing the copy. */}
+      <div className="min-w-0 flex-1 basis-64 space-y-0.5 pr-4 text-sm">
         <p className="font-medium leading-snug">
-          {translate(
-            'auto.components.FirstLaunchBanner.9784b4d7bc',
-            'Help us decide what to build next'
-          )}
+          {transmitsInBuild
+            ? translate(
+                'auto.components.FirstLaunchBanner.9784b4d7bc',
+                'Help us decide what to build next'
+              )
+            : translate(
+                'auto.components.FirstLaunchBanner.5be574ac7f',
+                'This Orca Lab build sends no telemetry'
+              )}
         </p>
         <p className="text-xs leading-snug text-muted-foreground">
-          {translate(
-            'auto.components.FirstLaunchBanner.958d2cc31b',
-            'Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.'
-          )}{' '}
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
-          >
-            {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}
-          </button>
-          .
+          {transmitsInBuild
+            ? translate(
+                'auto.components.FirstLaunchBanner.958d2cc31b',
+                'Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.'
+              )
+            : translate(
+                'auto.components.FirstLaunchBanner.0290fdfcab',
+                'Orca Lab builds from this repository do not send usage counts or any other telemetry. You can review this anytime in Settings -> Privacy & Telemetry.'
+              )}{' '}
+          <span className="whitespace-nowrap">
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-foreground"
+              onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
+            >
+              {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}
+            </button>
+            .
+          </span>
         </p>
       </div>
       {/* Action column — "Got it" primary reads as the easy path; "Turn off" outline marks the explicit opt-out. */}
-      <div className="flex shrink-0 items-center gap-2 self-center pr-6">
+      <div className="ml-auto flex shrink-0 items-center gap-2 self-center pr-6">
         <Button
           variant="outline"
           size="sm"

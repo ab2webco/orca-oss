@@ -961,7 +961,9 @@
         "d1deebb050": "Política de privacidad",
         "958d2cc31b": "Los recuentos anónimos de las funciones que usas nos ayudan a priorizar qué crear. Sin contenido de archivos, prompts, salida de terminal ni nada que te identifique. Puedes cambiarlo en cualquier momento en Ajustes -> Privacidad y telemetría.",
         "9784b4d7bc": "Ayúdanos a decidir qué crear a continuación",
-        "fcbee32f08": "Aviso de telemetría"
+        "fcbee32f08": "Aviso de telemetría",
+        "5be574ac7f": "Esta compilación de Orca Lab no envía telemetría",
+        "0290fdfcab": "Las compilaciones de Orca Lab de este repositorio no envían recuentos de uso ni ningún otro tipo de telemetría. Puedes revisarlo en cualquier momento en Ajustes -> Privacidad y telemetría."
       },
       "GitHubItemDialog": {
         "3ab6ac0fc8": "Previsualiza y edita el issue o pull request de GitHub seleccionado.",
@@ -8938,7 +8940,7 @@
             "b021b9cb81": "anónimo",
             "79c319948b": "uso",
             "77d3180def": "telemetría",
-            "b707cc3981": "Ayude a mejorar Orca Lab enviando eventos anónimos de uso de funciones.",
+            "240c86ae00": "Elige si se comparten eventos anónimos de uso de funciones.",
             "57b283461a": "Compartir datos de uso anónimos",
             "2b5a5c312f": "posthog",
             "4104f6f0f3": "analíticas",

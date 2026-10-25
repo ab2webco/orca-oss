@@ -1086,7 +1086,9 @@
         "d1deebb050": "Privacy policy",
         "958d2cc31b": "Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.",
         "9784b4d7bc": "Help us decide what to build next",
-        "fcbee32f08": "Telemetry notice"
+        "fcbee32f08": "Telemetry notice",
+        "5be574ac7f": "This Orca Lab build sends no telemetry",
+        "0290fdfcab": "Orca Lab builds from this repository do not send usage counts or any other telemetry. You can review this anytime in Settings -> Privacy & Telemetry."
       },
       "GitHubItemDialog": {
         "3ab6ac0fc8": "Preview and edit the selected GitHub issue or pull request.",
@@ -9376,7 +9378,7 @@
             "b021b9cb81": "anonymous",
             "79c319948b": "usage",
             "77d3180def": "telemetry",
-            "b707cc3981": "Help improve Orca Lab by sending anonymous feature-usage events.",
+            "240c86ae00": "Choose whether anonymous feature-usage events are shared.",
             "57b283461a": "Share Anonymous Usage Data",
             "2b5a5c312f": "posthog",
             "4104f6f0f3": "analytics",
