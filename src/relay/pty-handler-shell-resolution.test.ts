@@ -1,4 +1,11 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PtyHandler } from './pty-handler'
+import {
+  beginPtyHandlerTest,
+  endPtyHandlerTest,
+  type MockDispatcher
+} from './pty-handler-test-harness'
+
 import * as gitBash from '../main/git-bash'
 import * as ptyShellUtils from './pty-shell-utils'
 
@@ -32,10 +39,6 @@ vi.mock('../main/pty/posix-pty-process-groups', () => ({
 vi.mock('../main/shell-prompt-readiness-probe', () => ({
   createShellPromptReadinessProbe: mockCreateShellPromptReadinessProbe
 }))
-
-import type { PtyHandler } from './pty-handler'
-import { beginPtyHandlerTest, endPtyHandlerTest } from './pty-handler-test-harness'
-import type { MockDispatcher } from './pty-handler-test-harness'
 
 describe('PtyHandler', () => {
   let dispatcher: MockDispatcher
