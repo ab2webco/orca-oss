@@ -314,8 +314,7 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 - `review` — the hosted review for the branch from any supported provider (GitHub, GitLab,
   Bitbucket, Azure DevOps, Gitea) with its aggregate CI status. `verdict` (optional) is the
   host's review decision — `approved`, `changes_requested` or `review_required` (GitHub only;
-  absent without a decision). `ciHistory`, `commentCount` and `reopenCount` (optional) are
-  reserved for the perfect-merge rule and absent until the host reads them;
+  absent without a decision);
 - `workItem` — the linked item with a live status for Plane, Linear, Jira, GitHub and GitLab, and
   a `statusGroup` (`backlog`, `todo`, `in_progress`, `review`, `done`, `cancelled`, `unknown`)
   so the game never needs to know the tracker. `tracker: false` leaves it out;

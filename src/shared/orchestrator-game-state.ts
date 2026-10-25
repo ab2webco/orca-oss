@@ -77,8 +77,6 @@ export type GameMemberWorktree = { id: string; branch: string; displayName: stri
 
 export type GameReviewVerdict = 'approved' | 'changes_requested' | 'review_required'
 
-export type GameReviewHeadCi = { headSha: string; ci: CheckStatus | 'none' }
-
 export type GameReview = {
   provider: Exclude<HostedReviewProvider, 'unsupported'>
   number: number
@@ -88,12 +86,6 @@ export type GameReview = {
   ci: CheckStatus | 'none'
   /** The host's review decision; absent without one (GitLab) or from an older host (ORCA-686). */
   verdict?: GameReviewVerdict
-  /** CI per pushed head, oldest first; absent until the host reads check runs per head. */
-  ciHistory?: GameReviewHeadCi[]
-  /** Review comments on the PR; absent until the host reads them. */
-  commentCount?: number
-  /** Times the PR was reopened; absent until the host reads its timeline. */
-  reopenCount?: number
 }
 
 const REVIEW_VERDICT: Record<PRReviewDecision, GameReviewVerdict> = {
