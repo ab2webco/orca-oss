@@ -1272,6 +1272,33 @@ with `id` namespaced `<publisher>.<id>/<scene id>`, and lists dropped ones in `w
 be per language (`{ "en": …, "es": … }`); the mod shows the `ORCA_GAME_LOCALE` one. The file
 format, limits and consent rules are in [Game scenes](./plugin-development.md#game-scenes).
 
+## Arcade game files
+
+A game the arcade offers after a perfect merge is data for one of the game's built-in engines,
+never code. The only engine is `runner` (one key to jump), and the built-in runner is
+`src/shared/orchestrator-game-arcade-runner.json`. `orca game game validate <file> [--json]`
+checks a file with the rules in `src/shared/orchestrator-game-arcade-file.ts`, lists every problem
+as `path: message` and exits 1 while any remain.
+
+| Key          | What it sets                                                                     |
+| ------------ | -------------------------------------------------------------------------------- |
+| `engine`     | `runner`                                                                         |
+| `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                           |
+| `fps`        | Frame cap, a whole number from 5 to 15                                           |
+| `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`    |
+| `difficulty` | `{ minGap, maxGap }`, columns of ground between obstacles (8 to 120)             |
+| `jump`       | `{ rows, ms }`: height 2 to 8 rows, time in the air 200 to 2000 ms               |
+| `obstacles`  | 1 to 8, each `{ "from": "scene" }` or a sprite `{ rows, colors }`, with `weight` |
+| `theme`      | Optional. Look colors (`skyTop`, `ground`, …) drawn over the active scene's      |
+
+- `{ "from": "scene" }` is the active scene's ground decoration (`plantKind`), so a custom scene
+  restyles the game with no extra work. A scene whose `plantKind` is `none` has none, so the list
+  must hold at least one sprite obstacle.
+- A sprite is 1 to 6 rows of the same width, 1 to 6 printable ASCII glyphs each; `.` is
+  transparent and every other glyph needs a `#rrggbb` (or integer) color.
+- `weight` (0.05 to 1, default 1) is how often an obstacle is picked against the others.
+- The file is at most 16 KB. Unknown keys are ignored, so a newer file still loads.
+
 ## Other plugins in a game pane
 
 Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,

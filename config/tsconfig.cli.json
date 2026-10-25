@@ -5,6 +5,8 @@
     "../src/shared/**/*",
     // Why: `orca game scene new` writes this template; JSON is only in a project when listed.
     "../src/shared/orchestrator-game-scene-template.json",
+    // Why: the arcade's built-in runner is read the same way.
+    "../src/shared/orchestrator-game-arcade-runner.json",
     "../src/main/agent-state-file-reader.ts",
     "../src/main/agent-hooks/hook-config-types.ts",
     "../src/main/agent-hooks/hook-stdin-contract.ts",
