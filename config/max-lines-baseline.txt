@@ -18,7 +18,6 @@ inline src/main/browser/cdp-bridge.ts
 inline src/main/browser/grab-guest-script.ts
 inline src/main/claude-accounts/runtime-auth-service.test.ts
 inline src/main/claude-accounts/runtime-auth-service.ts
-inline src/main/claude-accounts/service.test.ts
 inline src/main/claude-accounts/service.ts
 inline src/main/claude-usage/store.ts
 inline src/main/cli/cli-installer.ts
