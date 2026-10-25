@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type * as pty from 'node-pty'
 import { writeStartupCommandWhenShellReady } from './local-pty-shell-ready-startup-command'
+
+import type * as pty from 'node-pty'
 
 type DataCb = (data: string) => void
 type ExitCb = (info: { exitCode: number }) => void
