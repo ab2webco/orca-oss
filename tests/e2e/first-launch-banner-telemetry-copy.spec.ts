@@ -74,10 +74,17 @@ test('states that a Lab build sends no telemetry at every width and theme', asyn
     await setWindowWidth(electronApp, orcaPage, width)
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(orcaPage, theme)
+      // setTheme stores main's settings, which drop the seeded cohort.
+      await seedUndecidedExistingUser(orcaPage)
       await expect(banner(orcaPage)).toBeInViewport({ ratio: 1 })
       for (const name of ['Opt out', 'Got it', 'Privacy policy']) {
         await expect(banner(orcaPage).getByRole('button', { name })).toBeInViewport({ ratio: 1 })
       }
+      // The actions wrap below the copy at narrow widths instead of squeezing it to a sliver.
+      const bodyBox = await banner(orcaPage).getByText(NO_TRANSMIT_BODY).boundingBox()
+      expect(bodyBox?.width ?? 0, `body copy width at ${width}px`).toBeGreaterThanOrEqual(
+        Math.min(width - 80, 400)
+      )
       const overflowsSideways = await orcaPage.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth
       )
