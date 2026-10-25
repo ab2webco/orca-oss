@@ -91,6 +91,8 @@ describe('orca game launch', () => {
     process.env.ORCA_WORKTREE_ID = 'wt1'
     process.env.ORCA_TERMINAL_HANDLE = 'h1'
     process.env.ORCA_PANE_KEY = 'tab:leaf'
+    // Why: an Orca pane exports the host's ORCA_GAME_LOCALE; the names must not follow it.
+    delete process.env.ORCA_GAME_LOCALE
   })
 
   afterEach(() => {
