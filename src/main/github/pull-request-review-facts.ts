@@ -126,7 +126,7 @@ type CachedFacts = { version: string; value: PullRequestReviewFacts | null; retr
 const cache = new Map<string, CachedFacts>()
 const inFlight = new Map<string, Promise<PullRequestReviewFacts | null>>()
 
-type ReviewFactsDeps = { fetch?: typeof fetchReviewFacts; now?: () => number }
+type ReviewFactsDeps = { readFacts?: typeof fetchReviewFacts; now?: () => number }
 
 /** One GraphQL read per pull request version (`updatedAt`, head and CI status); null when unreadable. */
 export async function getGitHubPullRequestReviewFacts(
@@ -137,7 +137,7 @@ export async function getGitHubPullRequestReviewFacts(
     ghOptions: GitHubRepoExecOptions
     executionScope?: string
   },
-  { fetch = fetchReviewFacts, now = Date.now }: ReviewFactsDeps = {}
+  { readFacts = fetchReviewFacts, now = Date.now }: ReviewFactsDeps = {}
 ): Promise<PullRequestReviewFacts | null> {
   const key = `${args.executionScope ?? 'default'}\0${githubRepoIdentityKey(args.repository)}#${args.number}`
   const cached = cache.get(key)
@@ -149,7 +149,7 @@ export async function getGitHubPullRequestReviewFacts(
   if (existing) {
     return existing
   }
-  const request = fetch(args.repository, args.number, args.ghOptions)
+  const request = readFacts(args.repository, args.number, args.ghOptions)
   inFlight.set(flightKey, request)
   try {
     const value = await request

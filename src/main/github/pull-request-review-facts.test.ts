@@ -96,7 +96,7 @@ describe('getGitHubPullRequestReviewFacts', () => {
     const reads: number[] = []
     return {
       reads,
-      fetch: async (_repository: unknown, number: number) => {
+      readFacts: async (_repository: unknown, number: number) => {
         reads.push(number)
         return value
       }
@@ -104,11 +104,11 @@ describe('getGitHubPullRequestReviewFacts', () => {
   }
 
   it('reads a pull request once per version and again when it changes', async () => {
-    const { reads, fetch } = reader(clean)
+    const { reads, readFacts } = reader(clean)
     const read = (version: string) =>
       getGitHubPullRequestReviewFacts(
         { repository, number: 101, version, ghOptions: {} },
-        { fetch }
+        { readFacts }
       )
 
     expect(await read('v1')).toEqual(clean)
@@ -120,11 +120,11 @@ describe('getGitHubPullRequestReviewFacts', () => {
   })
 
   it('shares one read between polls that ask at the same time', async () => {
-    const { reads, fetch } = reader(clean)
+    const { reads, readFacts } = reader(clean)
     const read = () =>
       getGitHubPullRequestReviewFacts(
         { repository, number: 102, version: 'v1', ghOptions: {} },
-        { fetch }
+        { readFacts }
       )
 
     await Promise.all([read(), read(), read()])
@@ -133,12 +133,12 @@ describe('getGitHubPullRequestReviewFacts', () => {
   })
 
   it('retries a failed read only after a short wait', async () => {
-    const { reads, fetch } = reader(null)
+    const { reads, readFacts } = reader(null)
     let now = 1_000
     const read = () =>
       getGitHubPullRequestReviewFacts(
         { repository, number: 103, version: 'v1', ghOptions: {} },
-        { fetch, now: () => now }
+        { readFacts, now: () => now }
       )
 
     expect(await read()).toBeNull()
