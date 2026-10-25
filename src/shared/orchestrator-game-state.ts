@@ -1,5 +1,5 @@
 import type { AgentStatusState } from './agent-status-types'
-import type { CheckStatus } from './github/pull-request-types'
+import type { CheckStatus, PRReviewDecision } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestrator-game-config'
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
@@ -75,6 +75,10 @@ export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; emai
 
 export type GameMemberWorktree = { id: string; branch: string; displayName: string }
 
+export type GameReviewVerdict = 'approved' | 'changes_requested' | 'review_required'
+
+export type GameReviewHeadCi = { headSha: string; ci: CheckStatus | 'none' }
+
 export type GameReview = {
   provider: Exclude<HostedReviewProvider, 'unsupported'>
   number: number
@@ -82,6 +86,20 @@ export type GameReview = {
   url: string
   state: HostedReviewState
   ci: CheckStatus | 'none'
+  /** The host's review decision; absent without one (GitLab) or from an older host (ORCA-686). */
+  verdict?: GameReviewVerdict
+  /** CI per pushed head, oldest first; absent until the host reads check runs per head. */
+  ciHistory?: GameReviewHeadCi[]
+  /** Review comments on the PR; absent until the host reads them. */
+  commentCount?: number
+  /** Times the PR was reopened; absent until the host reads its timeline. */
+  reopenCount?: number
+}
+
+const REVIEW_VERDICT: Record<PRReviewDecision, GameReviewVerdict> = {
+  APPROVED: 'approved',
+  CHANGES_REQUESTED: 'changes_requested',
+  REVIEW_REQUIRED: 'review_required'
 }
 
 export type GameWorkItem = {
@@ -236,6 +254,7 @@ export function gameReviewOf(
     url: string
     state: HostedReviewState
     status: CheckStatus
+    reviewDecision?: PRReviewDecision | null
   } | null
 ): GameReview | null {
   if (!review || review.provider === 'unsupported') {
@@ -247,6 +266,7 @@ export function gameReviewOf(
     title: review.title,
     url: review.url,
     state: review.state,
-    ci: review.status
+    ci: review.status,
+    ...(review.reviewDecision ? { verdict: REVIEW_VERDICT[review.reviewDecision] } : {})
   }
 }
