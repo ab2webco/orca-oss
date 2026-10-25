@@ -32,7 +32,6 @@ inline src/main/codex/hook-service.ts
 inline src/main/daemon/daemon-init.ts
 inline src/main/daemon/daemon-pty-adapter.ts
 inline src/main/daemon/daemon-server.ts
-inline src/main/daemon/pty-subprocess.test.ts
 inline src/main/daemon/pty-subprocess.ts
 inline src/main/daemon/session.ts
 inline src/main/daemon/shell-ready.ts
