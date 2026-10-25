@@ -120,6 +120,7 @@ docs/**
 !docs/reference/upstream-pr-adoption.md
 !docs/reference/upstream-runtime-dependencies.md
 !docs/reference/remote-wire-compatibility.md
+!docs/reference/remote-host-placement.md
 !docs/reference/timing-budget-assertions.md
 !docs/reference/renderer-agent-status-performance.md
 !docs/reference/windows-setup-shell.md
