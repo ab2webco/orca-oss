@@ -77,6 +77,8 @@ export type TextStrings = {
   layoutHeading: string
   layoutStates: Readonly<Record<'shown' | 'collapsed' | 'hidden', string>>
   layoutUsage: string
+  /** The Panel menu's chip that opens the widget catalog. */
+  catalogMenu: string
   layoutUnknownSection: (asked: string, sections: string) => string
   /** Toast once a prompt is queued for the lead's next turn. */
   sentToLead: (label: string) => string
@@ -226,7 +228,8 @@ const EN: GameStrings = {
     layoutHeading: 'Panel layout for this project:',
     layoutStates: { shown: 'shown', collapsed: 'collapsed', hidden: 'hidden' },
     layoutUsage:
-      'Change it with /orca-game:layout reset, show <section>, hide <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.',
+      'Change it with /orca-game:layout reset, add <section>, remove <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.',
+    catalogMenu: 'Widgets',
     layoutUnknownSection: (asked, sections) => `Unknown section "${asked}". Sections: ${sections}.`,
     sentToLead: (label) => `Sent to the lead: ${label}`,
     couldNotSend: (label) => `Could not send ${label}`,

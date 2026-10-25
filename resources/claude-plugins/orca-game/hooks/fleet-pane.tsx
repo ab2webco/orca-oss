@@ -15,7 +15,7 @@ import { chipRowsOf, type PlacedChip } from './chip-rows'
 import { memberHeadingOf } from './fleet-labels'
 import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
-import { projectRowsOf, type SectionMarks } from './fleet-project'
+import { projectRowsOf } from './fleet-project'
 import { reviewSectionOf } from './fleet-review-section'
 import { focusTerminal, openGameLink, viewOf } from './fleet-sync'
 import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
@@ -28,8 +28,9 @@ import { countsOf, memberOf, needsOf } from './party'
 import { animate } from './quest'
 import { currentScene, gameConfig, isSceneShown, ready } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
-import { projectKeyOf, toggleSection, type PanelSection } from './panel-layout'
-import { changeFleetLayout, hintLayoutOnce, readFleetLayout } from './panel-layout-store'
+import { projectKeyOf, type PanelSection } from './panel-layout'
+import { catalogPickerOf, sectionChipsOf, sectionMarksOf } from './panel-widgets'
+import { hintLayoutOnce, readFleetLayout } from './panel-layout-store'
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
@@ -173,20 +174,10 @@ export const registerFleetPane = (on: On): void => {
     const state = v.state
     const project = projectKeyOf(state.worktree?.id)
     const layout = await readFleetLayout($, project)
-    const isCollapsed = (section: PanelSection) => layout.collapsed.includes(section)
-    const togglePressOf = (section: PanelSection) => () =>
-      void changeFleetLayout($, project, (now) => toggleSection(now, section)).catch(
-        () => undefined
-      )
-    // Why a separate mark: the To Do and My PRs headings already open their list or run an action.
-    const marks: SectionMarks = {
-      isCollapsed,
-      markOf: (section) => (
-        <Button key={`layout-toggle-${section}`} plain onPress={togglePressOf(section)}>
-          <Text dimColor>{`${isCollapsed(section) ? '▸' : '▾'} `}</Text>
-        </Button>
-      )
-    }
+    const isShown = (section: PanelSection) => layout.shown.includes(section)
+    const catalog = catalogPickerOf($, e, palette, columns, project, layout)
+    const marks = sectionMarksOf($, e, project, layout)
+    const { isCollapsed } = marks
     const members = state.agents.map((agent) => ({
       agent,
       member: memberOf(agent, state, config.rewards)
@@ -203,14 +194,22 @@ export const registerFleetPane = (on: On): void => {
         rows: HUD_ROWS,
         draw: (at: number) => hudCellsOf(scene, party, columns, at, extras)
       },
-      ...members.map(({ member }) => ({
-        key: `tile-${member.key}`,
-        columns: TILE_COLUMNS,
-        rows: TILE_ROWS,
-        draw: (at: number) =>
-          tileCellsOf(scene, member.isDone ? 'handed' : member.phase, member.state, at, member.mood)
-      })),
-      ...advisorTiles
+      ...(isShown('team')
+        ? members.map(({ member }) => ({
+            key: `tile-${member.key}`,
+            columns: TILE_COLUMNS,
+            rows: TILE_ROWS,
+            draw: (at: number) =>
+              tileCellsOf(
+                scene,
+                member.isDone ? 'handed' : member.phase,
+                member.state,
+                at,
+                member.mood
+              )
+          }))
+        : []),
+      ...(isShown('team') ? advisorTiles : [])
     ])
     const counts = countsOf(state.agents)
     const fleetChipOf = (chip: PlacedChip): RenderElement => {
@@ -295,36 +294,47 @@ export const registerFleetPane = (on: On): void => {
         {links.map(linkButton)}
       </Box>
     )
-    const projectSections = await projectRowsOf($, e, state, palette, v.isDemo, columns, marks)
+    const projectSections = await projectRowsOf(
+      $,
+      e,
+      state,
+      palette,
+      v.isDemo,
+      columns,
+      marks,
+      isShown
+    )
     const flatScore = flatScoreLineOf({ level, recent: v.recent ?? [], isDemo: v.isDemo, columns })
-    const cards = isFlat
-      ? flatPaneMembers($, e, {
-          state,
-          palette,
-          columns,
-          isTap,
-          viewLabel: text.view,
-          pressOf: viewPressOf,
-          hotkeyOf: viewHotkeyOf
-        })
-      : members.flatMap(({ agent, member }, index) => [
-          memberCard($, e, agent, member, {
-            scene,
-            room: cardRoom,
-            leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
-            cardState: cardStateOf(agent, state),
-            tile: art.get(`tile-${member.key}`),
-            view:
-              agent.terminalHandle === undefined || isTap
-                ? undefined
-                : view(agent, agent.terminalHandle, index),
-            advisorRows: advisorRowsOf(agent),
-            link
-          }),
-          ...(agent.terminalHandle === undefined || !isTap
-            ? []
-            : [tapView(agent, agent.terminalHandle, index)])
-        ])
+    const cards = !isShown('team')
+      ? []
+      : isFlat
+        ? flatPaneMembers($, e, {
+            state,
+            palette,
+            columns,
+            isTap,
+            viewLabel: text.view,
+            pressOf: viewPressOf,
+            hotkeyOf: viewHotkeyOf
+          })
+        : members.flatMap(({ agent, member }, index) => [
+            memberCard($, e, agent, member, {
+              scene,
+              room: cardRoom,
+              leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
+              cardState: cardStateOf(agent, state),
+              tile: art.get(`tile-${member.key}`),
+              view:
+                agent.terminalHandle === undefined || isTap
+                  ? undefined
+                  : view(agent, agent.terminalHandle, index),
+              advisorRows: advisorRowsOf(agent),
+              link
+            }),
+            ...(agent.terminalHandle === undefined || !isTap
+              ? []
+              : [tapView(agent, agent.terminalHandle, index)])
+          ])
     const team = (
       <Box key="section-team" flexDirection="column">
         <Box key="layout-header-team" flexDirection="row">
@@ -339,33 +349,22 @@ export const registerFleetPane = (on: On): void => {
     )
     const drawn: Readonly<Partial<Record<PanelSection, RenderElement>>> = {
       team,
-      ...reviewSectionOf($, e, state, marks, link),
+      ...(isShown('review') ? reviewSectionOf($, e, state, marks, link) : {}),
       ...projectSections
     }
     const shown = layout.order.filter(
-      (section) => !layout.hidden.includes(section) && drawn[section] != null
+      (section) => layout.shown.includes(section) && drawn[section] != null
     )
     const sections = shown.map((section) => drawn[section])
     // A one-cell mark is too small to tap, so a phone also gets a chip per section.
     const sectionChips = isTap
-      ? tapButtonsOf(
-          $,
-          e,
-          'layout-tap',
-          shown.map((section) =>
-            tapOf({
-              key: `layout-tap-${section}`,
-              labels: [`${isCollapsed(section) ? '▸' : '▾'} ${text.layoutSections[section]}`],
-              onPress: togglePressOf(section)
-            })
-          ),
-          columns
-        )
+      ? sectionChipsOf($, e, palette, columns, project, shown, isCollapsed)
       : null
     return (
       <Box flexDirection="column">
         {isFlat ? flatScore !== undefined && flatLine($, e, flatScore, palette) : art.get(HUD_KEY)}
         {isTap && menuRow}
+        {isTap && catalog}
         {sectionChips}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           {isTap
@@ -403,6 +402,7 @@ export const registerFleetPane = (on: On): void => {
         {sections}
         {links.length > 0 && linksRow}
         {!isTap && menuRow}
+        {!isTap && catalog}
       </Box>
     )
   })

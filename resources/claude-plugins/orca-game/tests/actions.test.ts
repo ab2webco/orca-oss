@@ -3,6 +3,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { allWidgetsStore } from './all-widgets-store'
+
 const ORCA_CLI = '/opt/orca/bin/orca'
 
 const STATE = {
@@ -84,7 +86,9 @@ const engine = (on: On, world: World) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', ($s, e) => ({
+    value: e.key === 'panel-layout' ? allWidgetsStore(['repo-1', 'demo']) : undefined
+  }))
   on('store.set', () => ({ value: undefined }))
   on('ui.toast', ($s, e) => {
     world.toasts.push(e.text)

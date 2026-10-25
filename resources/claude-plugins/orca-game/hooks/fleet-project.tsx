@@ -1,6 +1,7 @@
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type {
+  ActionRuns,
   GameAction,
   GameLinkTone,
   GameProjectItem,
@@ -42,12 +43,14 @@ export async function projectRowsOf(
   palette: BandPalette,
   isDemo: boolean,
   columns: number,
-  marks: SectionMarks
+  marks: SectionMarks,
+  isShown: (section: PanelSection) => boolean
 ): Promise<ProjectSections> {
   const { Box, Text, Button } = $.ui.resolve(e)
   const worktreeId = state.worktree?.id ?? ''
   const text = gameStrings().text
-  const runs = await actionRunsOf($)
+  // Why: a closed Actions widget reads no run log.
+  const runs: ActionRuns = isShown('actions') ? await actionRunsOf($) : {}
   const itemRow = (key: string, one: GameProjectItem) => (
     <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
       {one.prompt !== undefined && (
@@ -208,7 +211,7 @@ export async function projectRowsOf(
   )
   const isActionsCollapsed = marks.isCollapsed('actions')
   return {
-    ...(reviews === null
+    ...(reviews === null || !isShown('reviews')
       ? {}
       : {
           reviews: listRows(
@@ -218,10 +221,10 @@ export async function projectRowsOf(
             listActionOf(state, 'reviews')
           )
         }),
-    ...(todo === null
+    ...(todo === null || !isShown('todo')
       ? {}
       : { todo: listRows('todo', text.todo(todo.total), todo, listActionOf(state, 'todo')) }),
-    ...(actions.length === 0
+    ...(actions.length === 0 || !isShown('actions')
       ? {}
       : {
           actions: (

@@ -60,6 +60,18 @@ const worldOf = (seeded?: unknown): World => ({
   toasts: []
 })
 
+const DEFAULT_ORDER = ['team', 'review', 'reviews', 'todo', 'actions']
+
+// A version 2 layout for the project; the fields given replace the default ones.
+const fleetStore = (fleet: Record<string, unknown>) => ({
+  version: 2,
+  projects: {
+    'repo-1': {
+      fleet: { order: DEFAULT_ORDER, collapsed: [], shown: ['team', 'reviews'], ...fleet }
+    }
+  }
+})
+
 const engine = (on: On, world: World, locale: string) => {
   mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: locale })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
@@ -130,41 +142,27 @@ const cardsOf = async (ui: Mounted) =>
   (await ui.findAll({ type: 'Box' })).filter((one) => one.key?.startsWith('card-tab-1:'))
 
 describe('panel layout', () => {
-  test('an untouched layout draws every section expanded and stores nothing', async ($, on) => {
+  test('an untouched layout draws Team, keeps To Do in the catalog and stores nothing', async ($, on) => {
     const world = worldOf()
     await start($, on, world)
     const ui = await pane($)
     expect(await headerOf(ui, 'team')).toBe('▾ Team 3')
-    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
     expect((await cardsOf(ui)).length).toBe(3)
-    expect(shownOf(await ui.find({ type: 'Box', key: 'project-todo' }))).toContain('ORCA-1')
+    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
+    expect(await ui.find({ type: 'Box', key: 'project-todo' })).toBeUndefined()
     expect(world.writes).toEqual([])
     await ui.unmount()
   })
 
   test('pressing a section header collapses it to one line and stores it for the project', async ($, on) => {
-    const world = worldOf()
+    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
     await start($, on, world)
     const ui = await pane($)
     await ui.press({ key: 'layout-toggle-todo' })
     expect(await headerOf(ui, 'todo')).toBe('▸ To Do 12')
     expect(shownOf(await ui.find({ type: 'Box', key: 'project-todo' }))).not.toContain('ORCA-1')
     expect(world.writes).toEqual([
-      [
-        LAYOUT_KEY,
-        {
-          version: 1,
-          projects: {
-            'repo-1': {
-              fleet: {
-                order: ['team', 'review', 'reviews', 'todo', 'actions'],
-                collapsed: ['todo'],
-                hidden: []
-              }
-            }
-          }
-        }
-      ]
+      [LAYOUT_KEY, fleetStore({ collapsed: ['todo'], shown: ['team', 'reviews', 'todo'] })]
     ])
     await ui.press({ key: 'layout-toggle-team' })
     expect(await headerOf(ui, 'team')).toBe('▸ Team 3')
@@ -174,13 +172,10 @@ describe('panel layout', () => {
     await ui.unmount()
   })
 
-  test('a stored layout comes back: collapsed, hidden and moved sections', async ($, on) => {
-    const world = worldOf({
-      version: 1,
-      projects: {
-        'repo-1': { fleet: { order: ['todo', 'team'], collapsed: ['team'], hidden: ['review'] } }
-      }
-    })
+  test('a stored layout comes back: collapsed, catalog and moved sections', async ($, on) => {
+    const world = worldOf(
+      fleetStore({ order: ['todo', 'team'], collapsed: ['team'], shown: ['todo', 'team'] })
+    )
     await start($, on, world)
     const ui = await pane($)
     expect(await headerOf(ui, 'team')).toBe('▸ Team 3')
@@ -194,7 +189,7 @@ describe('panel layout', () => {
   })
 
   test('on a phone each section toggles from a touch-sized chip', async ($, on) => {
-    const world = worldOf()
+    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
     await start($, on, world)
     const ui = await pane($, 40)
     const chip = await ui.find({ type: 'Button', key: 'layout-tap-todo' })
@@ -208,10 +203,7 @@ describe('panel layout', () => {
   })
 
   test('a collapsed review still says CI is failing', async ($, on) => {
-    const world = worldOf({
-      version: 1,
-      projects: { 'repo-1': { fleet: { order: [], collapsed: ['review'], hidden: [] } } }
-    })
+    const world = worldOf(fleetStore({ collapsed: ['review'], shown: ['review'] }))
     await start($, on, world)
     const ui = await pane($)
     expect(await headerOf(ui, 'review')).toBe('▸ Review #42 open · CI failing')
@@ -227,6 +219,67 @@ describe('panel layout', () => {
     await ui.press({ key: 'layout-toggle-team' })
     expect(world.writes).toEqual([])
     expect(world.toasts.at(-1)).toContain('newer')
+    await ui.unmount()
+  })
+
+  test('a version 1 layout keeps every section it drew and stores nothing until changed', async ($, on) => {
+    const world = worldOf({
+      version: 1,
+      projects: { 'repo-1': { fleet: { order: DEFAULT_ORDER, collapsed: [], hidden: ['review'] } } }
+    })
+    await start($, on, world)
+    const ui = await pane($)
+    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(await ui.find({ type: 'Box', key: 'layout-header-review' })).toBeUndefined()
+    expect(world.writes).toEqual([])
+    await ui.unmount()
+  })
+
+  test('a widget added from the Panel menu shows at once and is still there after a reopen', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'widgets' })
+    await ui.press({ key: 'catalog-todo' })
+    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(fleetIn(world)).toEqual({
+      order: DEFAULT_ORDER,
+      collapsed: [],
+      shown: ['team', 'reviews', 'todo']
+    })
+    await ui.press({ key: 'widgets' })
+    await ui.unmount()
+    const reopened = await pane($)
+    expect(await headerOf(reopened, 'todo')).toBe('▾ To Do 12')
+    await reopened.unmount()
+  })
+
+  test('the catalog removes a shown widget and moves one up or down', async ($, on) => {
+    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
+    await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'widgets' })
+    await ui.press({ key: 'catalog-down-team' })
+    await ui.press({ key: 'catalog-todo' })
+    expect(fleetIn(world)).toEqual({
+      order: ['review', 'team', 'reviews', 'todo', 'actions'],
+      collapsed: [],
+      shown: ['team', 'reviews']
+    })
+    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
+    await ui.press({ key: 'widgets' })
+    await ui.unmount()
+  })
+
+  test('on a phone the Widgets chip opens a catalog of touch-sized chips', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    const ui = await pane($, 40)
+    await ui.press({ key: 'widgets' })
+    const chip = await ui.find({ type: 'Button', key: 'catalog-todo' })
+    expect(shownOf(chip)).toContain('○ To Do')
+    expect(shownOf(chip).split('\n')).toHaveLength(3)
+    await ui.press({ key: 'widgets' })
     await ui.unmount()
   })
 })
@@ -262,7 +315,7 @@ describe('/orca-game:layout', () => {
         '3. Review (review): shown',
         '4. My PRs (reviews): shown',
         '5. Actions (actions): hidden',
-        'Change it with /orca-game:layout reset, show <section>, hide <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.'
+        'Change it with /orca-game:layout reset, add <section>, remove <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.'
       ].join('\n')
     )
     expect(world.writes).toEqual([])
@@ -276,7 +329,7 @@ describe('/orca-game:layout', () => {
     expect(fleetIn(world)).toEqual({
       order: ['team', 'review', 'todo', 'reviews', 'actions'],
       collapsed: [],
-      hidden: ['team']
+      shown: ['reviews']
     })
     const ui = await pane($)
     expect(await ui.find({ type: 'Box', key: 'layout-header-team' })).toBeUndefined()
@@ -295,9 +348,9 @@ describe('/orca-game:layout', () => {
     await start($, on, world)
     await layout($, 'reset')
     expect(fleetIn(world)).toEqual({
-      order: ['team', 'review', 'reviews', 'todo', 'actions'],
+      order: DEFAULT_ORDER,
       collapsed: [],
-      hidden: []
+      shown: ['team', 'reviews']
     })
   })
 
@@ -317,6 +370,19 @@ describe('/orca-game:layout', () => {
     const answer = await layout($, 'ocultar equipo')
     expect(answer.text.split('\n')[0]).toBe('Diseño del Panel de este proyecto:')
     expect(answer.text).toContain('Equipo (team): oculta')
+  })
+
+  test('add and remove take the place of show and hide, in English and Spanish', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    await layout($, 'add todo')
+    expect(fleetIn(world)).toMatchObject({ shown: ['team', 'reviews', 'todo'] })
+    await layout($, 'remove team')
+    expect(fleetIn(world)).toMatchObject({ shown: ['reviews', 'todo'] })
+    await layout($, 'añadir actions')
+    expect(fleetIn(world)).toMatchObject({ shown: ['reviews', 'todo', 'actions'] })
+    await layout($, 'quitar reviews')
+    expect(fleetIn(world)).toMatchObject({ shown: ['todo', 'actions'] })
   })
 })
 

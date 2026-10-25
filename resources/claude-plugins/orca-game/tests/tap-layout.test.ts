@@ -3,6 +3,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { allWidgetsStore } from './all-widgets-store'
+
 import { cellWidthOf } from '../hooks/cell-width'
 import { HOTKEY_CELLS, TAP_LAYOUT_COLUMNS, TAP_MIN_CELLS, TAP_ROWS } from '../hooks/tap-layout'
 
@@ -61,7 +63,9 @@ const engine = (on: On, state: object) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', ($s, e) => ({
+    value: e.key === 'panel-layout' ? allWidgetsStore(['wt-1']) : undefined
+  }))
   on('store.set', () => ({ value: undefined }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
   on('ui.status', () => ({ value: undefined }))
@@ -233,9 +237,9 @@ describe('the Fleet pane on a phone', () => {
       ui,
       'pane-menu-tap',
       41,
-      ['refresh', 'flat', 'view', 'pet', 'quit'],
-      // Why two: with the view selector the five chips and their hotkeys need about 50 cells.
-      2
+      ['refresh', 'flat', 'view', 'widgets', 'pet', 'quit'],
+      // Why three: the view and Widgets chips with their hotkeys need more than two rows at 41 columns.
+      3
     )
     // Close leads: a phone shows the pane's top rows, and Close is how it leaves.
     expect(keyOf(menu?.[0])).toBe('quit')
