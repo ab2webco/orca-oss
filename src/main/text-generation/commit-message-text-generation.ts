@@ -122,7 +122,7 @@ export type CommitMessageGenerationTarget =
 
 type ResolveCommitMessageSettingsResult =
   | { ok: true; params: GenerateCommitMessageParams }
-  | { ok: false; error: string }
+  | { ok: false; error: string; reason?: 'no-agent' }
 
 type InternalTextGenerationResult =
   | { success: true; rawOutput: string; agentLabel?: string }
