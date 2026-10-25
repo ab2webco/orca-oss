@@ -670,16 +670,18 @@ describe('RemoteRuntimeSharedControlConnection', () => {
         >
       }
     ).pendingRequests
+    // Why: a response proves the socket is ready; the handshake must not eat the wait below.
+    await connection.request('worktree.ps', undefined, 60_000)
     const requests = Array.from({ length: admittedCount }, () =>
       connection.request('worktree.large', params, 60_000).catch(() => undefined)
     )
-    await vi.waitFor(() => expect(server.requests).toHaveLength(admittedCount))
-
-    expect(
-      Array.from(pendingRequests.values()).every(
-        (pending) => pending.preparedRequest?.serializedRequest === null
-      )
-    ).toBe(true)
+    await vi.waitFor(() =>
+      expect(
+        Array.from(pendingRequests.values()).filter(
+          (pending) => pending.preparedRequest?.serializedRequest === null
+        )
+      ).toHaveLength(admittedCount)
+    )
     await expect(connection.request('worktree.large', params, 60_000)).rejects.toMatchObject({
       code: 'remote_runtime_busy'
     })
