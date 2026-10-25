@@ -1,6 +1,6 @@
 # E2E test counts per Playwright project.
 # This is a ratchet: update intentionally when specs are added or removed.
 
-electron-headless 704
+electron-headless 706
 electron-ondemand 6
 electron-headful 46

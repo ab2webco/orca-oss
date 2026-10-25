@@ -161,6 +161,11 @@ function waitForCaptureEnqueue(client: PostHog, event: EventName, uuid: string):
 }
 
 // No-op in contributor / non-official builds; only official stable/rc builds (CI-injected `ORCA_BUILD_IDENTITY` + `ORCA_POSTHOG_WRITE_KEY`) transmit.
+// Same gate `track()` enforces; the Privacy pane reads it so its statement cannot drift from transport.
+export function isTransmittingBuild(): boolean {
+  return TELEMETRY_ENABLED && IS_OFFICIAL_BUILD
+}
+
 export function track<N extends EventName>(name: N, props: EventProps<N>): void {
   if (!testTransportEnabled && (!IS_OFFICIAL_BUILD || !TELEMETRY_ENABLED)) {
     return

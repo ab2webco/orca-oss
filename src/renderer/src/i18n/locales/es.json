@@ -6700,7 +6700,8 @@
           "fe904ac984": "Compartir datos de uso anónimos",
           "77410e0566": "Política de privacidad",
           "8bfdd23a88": "Ayúdanos a descubrir qué crear a continuación. Orca Lab envía recuentos anónimos de qué funciones usas y dónde fallan las cosas.",
-          "afec8b03be": "ci"
+          "afec8b03be": "ci",
+          "79ec8b8ed2": "Las compilaciones de Orca Lab de este repositorio no envían telemetría. Ningún recuento de uso sale de esta máquina."
         },
         "QuickCommandsPane": {
           "8764c6e9e4": "Quitar {{value0}}",

@@ -12,7 +12,8 @@ const {
   persistBannerAcknowledgeMock,
   consumeConsentMutationTokenMock,
   getCohortAtEmitMock,
-  getOnboardingCohortAtEmitMock
+  getOnboardingCohortAtEmitMock,
+  isTransmittingBuildMock
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   trackMock: vi.fn(),
@@ -20,14 +21,16 @@ const {
   persistBannerAcknowledgeMock: vi.fn(),
   consumeConsentMutationTokenMock: vi.fn(),
   getCohortAtEmitMock: vi.fn(),
-  getOnboardingCohortAtEmitMock: vi.fn()
+  getOnboardingCohortAtEmitMock: vi.fn(),
+  isTransmittingBuildMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: handleMock } }))
 vi.mock('../telemetry/client', () => ({
   track: trackMock,
   setOptIn: setOptInMock,
-  persistBannerAcknowledgeWithoutEmitting: persistBannerAcknowledgeMock
+  persistBannerAcknowledgeWithoutEmitting: persistBannerAcknowledgeMock,
+  isTransmittingBuild: isTransmittingBuildMock
 }))
 vi.mock('../telemetry/burst-cap', () => ({
   consumeConsentMutationToken: consumeConsentMutationTokenMock
@@ -104,6 +107,17 @@ describe('telemetry IPC handlers', () => {
     expect(handlers.has('telemetry:setOptIn')).toBe(true)
     expect(handlers.has('telemetry:acknowledgeBanner')).toBe(true)
     expect(handlers.has('telemetry:getConsentState')).toBe(true)
+    expect(handlers.has('telemetry:getTransmitsInBuild')).toBe(true)
+  })
+
+  // The Privacy pane's statement must read the same gate track() enforces, so it cannot drift.
+  it('getTransmitsInBuild returns the transport gate, not a renderer-side guess', () => {
+    registerWith({ installId: 'x', existedBeforeTelemetryRelease: false, optedIn: true })
+    const handler = handlers.get('telemetry:getTransmitsInBuild')!
+    isTransmittingBuildMock.mockReturnValue(false)
+    expect(handler({})).toBe(false)
+    isTransmittingBuildMock.mockReturnValue(true)
+    expect(handler({})).toBe(true)
   })
 
   // ── telemetry:track ──────────────────────────────────────────────────

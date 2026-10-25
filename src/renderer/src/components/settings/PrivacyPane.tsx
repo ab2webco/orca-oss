@@ -5,7 +5,12 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TelemetryConsentState } from '../../../../shared/telemetry-consent-types'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
-import { PRIVACY_URL, getConsentState, setOptIn as telemetrySetOptIn } from '../../lib/telemetry'
+import {
+  PRIVACY_URL,
+  getConsentState,
+  getTransmitsInBuild,
+  setOptIn as telemetrySetOptIn
+} from '../../lib/telemetry'
 import { useAppStore } from '../../store'
 import { PrivacyDiagnosticsSection } from './PrivacyDiagnosticsSection'
 import { translate } from '@/i18n/i18n'
@@ -50,6 +55,7 @@ export function computeBlockedReason(consent: TelemetryConsentState | null): Blo
 
 export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
   const [consent, setConsent] = useState<TelemetryConsentState | null>(null)
+  const [transmitsInBuild, setTransmitsInBuild] = useState(false)
   const [inFlight, setInFlight] = useState(false)
   const mountedRef = useMountedRef()
   const fetchSettings = useAppStore((s) => s.fetchSettings)
@@ -65,6 +71,18 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
       stale = true
     }
   }, [settings.telemetry?.optedIn])
+
+  useEffect(() => {
+    let stale = false
+    void getTransmitsInBuild().then((value) => {
+      if (!stale) {
+        setTransmitsInBuild(value)
+      }
+    })
+    return () => {
+      stale = true
+    }
+  }, [])
 
   const blocked = computeBlockedReason(consent)
   const toggleChecked = settings.telemetry?.optedIn === true
@@ -97,20 +115,7 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
               )}
             </Label>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {translate(
-              'auto.components.settings.PrivacyPane.8bfdd23a88',
-              'Help us figure out what to build next. Orca Lab sends anonymous counts of which features you use and where things break.'
-            )}{' '}
-            <button
-              type="button"
-              className="underline underline-offset-2 hover:text-foreground"
-              onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
-            >
-              {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
-            </button>
-            .
-          </p>
+          <PrivacyStatement transmitsInBuild={transmitsInBuild} />
         </div>
         <Switch
           checked={toggleChecked}
@@ -127,6 +132,35 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
       {blocked ? <BlockedHelper blocked={blocked} id={PRIVACY_PANE_BLOCKED_HELPER_ID} /> : null}
       <PrivacyDiagnosticsSection />
     </div>
+  )
+}
+
+// The statement follows the transport gate, so a build that cannot send never claims it does.
+export function PrivacyStatement({
+  transmitsInBuild
+}: {
+  transmitsInBuild: boolean
+}): React.JSX.Element {
+  return (
+    <p className="text-xs text-muted-foreground">
+      {transmitsInBuild
+        ? translate(
+            'auto.components.settings.PrivacyPane.8bfdd23a88',
+            'Help us figure out what to build next. Orca Lab sends anonymous counts of which features you use and where things break.'
+          )
+        : translate(
+            'auto.components.settings.PrivacyPane.79ec8b8ed2',
+            'Orca Lab builds from this repository do not send telemetry. No usage counts leave this machine.'
+          )}{' '}
+      <button
+        type="button"
+        className="underline underline-offset-2 hover:text-foreground"
+        onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
+      >
+        {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
+      </button>
+      .
+    </p>
   )
 }
 

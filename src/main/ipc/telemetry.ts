@@ -11,7 +11,12 @@
 
 import { ipcMain } from 'electron'
 import { consumeConsentMutationToken } from '../telemetry/burst-cap'
-import { persistBannerAcknowledgeWithoutEmitting, setOptIn, track } from '../telemetry/client'
+import {
+  isTransmittingBuild,
+  persistBannerAcknowledgeWithoutEmitting,
+  setOptIn,
+  track
+} from '../telemetry/client'
 import { getCohortAtEmit } from '../telemetry/cohort-classifier'
 import { getOnboardingCohortAtEmit } from '../telemetry/onboarding-cohort-classifier'
 import { resolveConsent, type ConsentState } from '../telemetry/consent'
@@ -104,6 +109,9 @@ export function registerTelemetryHandlers(store: Store): void {
     }
     return resolveConsent(storeRef.getSettings())
   })
+
+  // Read-only: whether this build can transmit at all, independent of the user's choice.
+  ipcMain.handle('telemetry:getTransmitsInBuild', (): boolean => isTransmittingBuild())
 
   ipcMain.handle('telemetry:acknowledgeBanner', (_event): Promise<void> | void => {
     // Banner ✕: persist optedIn=true WITHOUT emitting — routing through setOptIn would fire telemetry_opted_in, which the silent-acknowledge contract forbids.
