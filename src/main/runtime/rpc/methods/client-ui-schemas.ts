@@ -22,6 +22,7 @@ import type { TaskProvider } from '../../../../shared/types'
 import { GitHubProjectSettings } from './client-github-project-schemas'
 import { ClientUiWorkspaceFilterFields } from './client-ui-workspace-filter-fields'
 import { TaskResumeState } from './task-resume-state-schema'
+import { WorkspaceCleanup } from './workspace-cleanup-ui-schema'
 import { omitUndefinedValues, tolerateUnknownValues } from './ui-update-value-tolerance'
 import { WorktreeVisibilityDefaultsUpdate } from './worktree-visibility-defaults-schema'
 
@@ -79,19 +80,6 @@ const WorkspaceStatusDefinition = z.object({
   color: z.string().optional(),
   icon: z.string().optional()
 })
-const WorkspaceCleanupDismissal = z
-  .object({
-    worktreeId: z.string(),
-    dismissedAt: z.number().finite(),
-    fingerprint: z.string(),
-    classifierVersion: z.number().finite()
-  })
-  .strict()
-const WorkspaceCleanup = z
-  .object({
-    dismissals: z.record(z.string(), WorkspaceCleanupDismissal)
-  })
-  .strict()
 const FeatureInteractionRecord = z
   .object({
     firstInteractedAt: z.number().finite().nonnegative(),

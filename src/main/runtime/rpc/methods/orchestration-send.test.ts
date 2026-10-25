@@ -465,6 +465,7 @@ describe('orchestration RPC methods', () => {
         title: opts.title ?? null,
         connected: opts.connected ?? true,
         writable: opts.writable ?? true,
+        liveness: opts.liveness ?? ((opts.connected ?? true) ? 'running' : 'gone'),
         lastOutputAt: opts.lastOutputAt ?? null,
         preview: opts.preview ?? ''
       }
