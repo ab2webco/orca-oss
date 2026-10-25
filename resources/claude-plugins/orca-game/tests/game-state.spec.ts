@@ -313,3 +313,15 @@ describe('parseGameState', () => {
     expect(parseGameState(JSON.stringify({ ok: false, result: 'boom' }))).toBeUndefined()
   })
 })
+
+describe('The perfect-merge decision on the wire', () => {
+  it("keeps a review's perfectMerge only as a boolean", () => {
+    const withFlag = (perfectMerge: unknown) =>
+      parseGameState(JSON.stringify({ ...STATE, review: { ...STATE.review, perfectMerge } }))
+        ?.review
+
+    expect(withFlag(true)?.perfectMerge).toBe(true)
+    expect(withFlag(false)?.perfectMerge).toBe(false)
+    expect(withFlag('yes')).not.toHaveProperty('perfectMerge')
+  })
+})

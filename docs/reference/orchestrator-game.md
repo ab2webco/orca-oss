@@ -794,6 +794,7 @@ refresh, matched by that worktree's id:
 | its ticket moves to a review group (QA, Review) | `work-item-review` | 50  |
 | its ticket moves to done                        | `work-item-done`   | 70  |
 | its PR merges                                   | `review-merged`    | 100 |
+| its merged PR turns perfect                     | `perfect-merge`    | 100 |
 
 The XP is the default; a project changes it with `rewardWeights` (below).
 
@@ -815,13 +816,14 @@ earns nothing. Each fact is one ledger row keyed by the fact's id, so a restart,
 another pane that sees the same change writes no second row
 ([`rewards.ts`](../../resources/claude-plugins/orca-game/hooks/rewards.ts)).
 
-| Reward key         | Earned when                                  | Fact source                                | Fact id                                   | Default |
-| ------------------ | -------------------------------------------- | ------------------------------------------ | ----------------------------------------- | ------- |
-| `review-merged`    | the worktree's review turns `merged`         | `review.state` (hosted review provider)    | `review-merged:<provider>#<n>@<worktree>` | 100     |
-| `ci-green`         | the review's CI turns `success`              | `review.ci` (aggregate checks or pipeline) | `ci-green:<provider>#<n>@<worktree>`      | 20      |
-| `work-item-review` | the linked work item moves to a review group | `workItem.statusGroup` (tracker)           | `work-item-review:<provider>:<id>`        | 50      |
-| `work-item-done`   | the linked work item moves to done           | `workItem.statusGroup` (tracker)           | `work-item-done:<provider>:<id>`          | 70      |
-| `member-claimed`   | a lead's member appears in its own worktree  | `agents` (the member's worktree id)        | `member-claimed:<worktree>`               | 10      |
+| Reward key         | Earned when                                  | Fact source                                 | Fact id                                   | Default |
+| ------------------ | -------------------------------------------- | ------------------------------------------- | ----------------------------------------- | ------- |
+| `review-merged`    | the worktree's review turns `merged`         | `review.state` (hosted review provider)     | `review-merged:<provider>#<n>@<worktree>` | 100     |
+| `ci-green`         | the review's CI turns `success`              | `review.ci` (aggregate checks or pipeline)  | `ci-green:<provider>#<n>@<worktree>`      | 20      |
+| `work-item-review` | the linked work item moves to a review group | `workItem.statusGroup` (tracker)            | `work-item-review:<provider>:<id>`        | 50      |
+| `work-item-done`   | the linked work item moves to done           | `workItem.statusGroup` (tracker)            | `work-item-done:<provider>:<id>`          | 70      |
+| `member-claimed`   | a lead's member appears in its own worktree  | `agents` (the member's worktree id)         | `member-claimed:<worktree>`               | 10      |
+| `perfect-merge`    | the merged review turns perfect              | `review.perfectMerge` (GitHub review facts) | `perfect-merge:<provider>#<n>@<worktree>` | 100     |
 
 `rewardWeights` sets a reward's XP to a whole number from 0 to 1000; `0` turns that reward off
 (no row, no toast) and a reward left out keeps its default. An invalid value or an unknown key is
@@ -851,6 +853,9 @@ hold, and `false` otherwise:
 - `reopenCount` is 0;
 - the ticket's acceptance is met. The host has no fact for that, so the merge stands for it: the
   lead merges only after checking acceptance.
+
+It earns the `perfect-merge` reward on top of `review-merged` when it turns `true`, which can be a
+refresh after the merge, since the facts are read once the PR changes.
 
 **Lead subagents.** The orchestrator lead is a session that ran the lead rules: `orca game lead`,
 whether through `/orca-game:lead`, the project's `autostart` or a Bash call of it. Only that session
