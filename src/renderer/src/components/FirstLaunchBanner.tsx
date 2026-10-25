@@ -11,11 +11,14 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
 type FirstLaunchBannerProps = {
+  // Same gate as the transport, so a build that cannot send never claims usage counts.
+  transmitsInBuild: boolean
   onResolve: () => void
   fetchSettings: () => Promise<void>
 }
 
 export function FirstLaunchBanner({
+  transmitsInBuild,
   onResolve,
   fetchSettings
 }: FirstLaunchBannerProps): React.JSX.Element {
@@ -74,16 +77,26 @@ export function FirstLaunchBanner({
       {/* Text column — flex-1 so the action column never wraps the copy. */}
       <div className="flex-1 space-y-0.5 pr-1 text-sm">
         <p className="font-medium leading-snug">
-          {translate(
-            'auto.components.FirstLaunchBanner.9784b4d7bc',
-            'Help us decide what to build next'
-          )}
+          {transmitsInBuild
+            ? translate(
+                'auto.components.FirstLaunchBanner.9784b4d7bc',
+                'Help us decide what to build next'
+              )
+            : translate(
+                'auto.components.FirstLaunchBanner.5be574ac7f',
+                'This Orca Lab build sends no telemetry'
+              )}
         </p>
         <p className="text-xs leading-snug text-muted-foreground">
-          {translate(
-            'auto.components.FirstLaunchBanner.958d2cc31b',
-            'Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.'
-          )}{' '}
+          {transmitsInBuild
+            ? translate(
+                'auto.components.FirstLaunchBanner.958d2cc31b',
+                'Anonymous counts of which features you use help us prioritize what to build. No file contents, prompts, terminal output, or anything that identifies you. Change anytime in Settings -> Privacy & Telemetry.'
+              )
+            : translate(
+                'auto.components.FirstLaunchBanner.0290fdfcab',
+                'Orca Lab builds from this repository do not send usage counts or any other telemetry. You can review this anytime in Settings -> Privacy & Telemetry.'
+              )}{' '}
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"

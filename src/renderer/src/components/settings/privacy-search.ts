@@ -31,8 +31,8 @@ export const getPrivacyPaneSearchEntries = createLocalizedCatalog(() => [
       'Share Anonymous Usage Data'
     ),
     description: translate(
-      'auto.components.settings.privacy.search.b707cc3981',
-      'Help improve Orca Lab by sending anonymous feature-usage events.'
+      'auto.components.settings.privacy.search.240c86ae00',
+      'Choose whether anonymous feature-usage events are shared.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.privacy.search.77d3180def', 'telemetry'),
