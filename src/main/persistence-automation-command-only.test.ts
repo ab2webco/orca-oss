@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import type { AutomationCreateInput } from '../shared/automations-types'
 import { testState, createStore, writeDataFile, makeRepo } from './persistence-test-harness'
 
 vi.mock('electron', () => ({
@@ -63,6 +64,22 @@ describe('Store automations: command-only rows and pane targets', () => {
       claudeAccountId: null,
       codexAccountId: null
     })
+  })
+
+  it('runs the command when a legacy payload declares both a command and an agent', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo())
+    const legacyPayload = {
+      name: 'Legacy',
+      prompt: 'Summarize',
+      agentId: 'claude',
+      command: { command: 'echo ok', timeoutSeconds: 30 },
+      projectId: 'r1',
+      workspaceMode: 'new_per_run',
+      ...schedule
+    } as unknown as AutomationCreateInput
+
+    expect(store.createAutomation(legacyPayload).agentId).toBeNull()
   })
 
   it('keeps a pane target only while the row reuses a session in an existing workspace', async () => {
