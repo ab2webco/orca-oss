@@ -84,7 +84,6 @@ inline src/main/runtime/orca-runtime.test.ts
 inline src/main/runtime/orca-runtime.ts
 inline src/main/runtime/orchestration/coordinator.ts
 inline src/main/runtime/orchestration/db.ts
-inline src/main/runtime/rpc/methods/orchestration.test.ts
 inline src/main/runtime/rpc/methods/orchestration.ts
 inline src/main/runtime/rpc/methods/terminal.ts
 inline src/main/runtime/runtime-rpc.ts
