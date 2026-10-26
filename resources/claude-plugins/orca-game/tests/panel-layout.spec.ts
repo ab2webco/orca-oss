@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_FLEET_LAYOUT,
   PANEL_LAYOUT_VERSION,
+  catalogOf,
   fleetLayoutOf,
   hideSection,
   moveSection,
@@ -19,14 +20,32 @@ const stored = (fleet: unknown, extra: Record<string, unknown> = {}) => ({
   ...extra
 })
 
+// Version 1 as the build before ORCA-773 wrote it: `hidden` listed what the Panel did not draw.
+const VERSION_1_STORE = {
+  version: 1,
+  projects: {
+    'repo-1': {
+      fleet: {
+        order: ['todo', 'team', 'review', 'reviews', 'actions'],
+        collapsed: ['todo'],
+        hidden: ['review']
+      }
+    },
+    'repo-2': {
+      fleet: { order: ['team', 'review', 'reviews', 'todo', 'actions'], collapsed: [], hidden: [] }
+    }
+  }
+}
+
 describe('panel layout', () => {
   it('defaults to today order with every section expanded and shown', () => {
     expect(DEFAULT_FLEET_LAYOUT).toEqual({
       order: ['team', 'review', 'reviews', 'todo', 'actions'],
       collapsed: [],
-      hidden: []
+      shown: ['team', 'review', 'reviews', 'todo', 'actions']
     })
     expect(fleetLayoutOf(undefined, 'repo-1')).toEqual(DEFAULT_FLEET_LAYOUT)
+    expect(catalogOf(DEFAULT_FLEET_LAYOUT)).toEqual([])
   })
 
   it('keys a layout by the repo of the worktree, so every worktree of a project shares it', () => {
@@ -37,10 +56,10 @@ describe('panel layout', () => {
   })
 
   it('falls back to the default for a corrupt value or one from a newer build', () => {
-    for (const value of [null, 'x', 7, [], { version: 'one' }, { version: 1, projects: [] }]) {
+    for (const value of [null, 'x', 7, [], { version: 'one' }, { version: 2, projects: [] }]) {
       expect(fleetLayoutOf(value, 'repo-1')).toEqual(DEFAULT_FLEET_LAYOUT)
     }
-    const newer = { ...stored({ order: ['todo'], collapsed: ['todo'], hidden: [] }), version: 99 }
+    const newer = { ...stored({ order: ['todo'], collapsed: ['todo'], shown: [] }), version: 3 }
     expect(fleetLayoutOf(newer, 'repo-1')).toEqual(DEFAULT_FLEET_LAYOUT)
   })
 
@@ -48,13 +67,36 @@ describe('panel layout', () => {
     const value = stored({
       order: ['todo', 'quests', 'team', 'todo'],
       collapsed: ['todo', 'quests', 5],
-      hidden: 'team'
+      shown: 'team'
     })
     expect(fleetLayoutOf(value, 'repo-1')).toEqual({
       order: ['todo', 'actions', 'team', 'review', 'reviews'],
       collapsed: ['todo'],
-      hidden: []
+      shown: ['todo', 'actions', 'team', 'review', 'reviews']
     })
+  })
+
+  it('a section a later build adds starts in the catalog, not on the Panel', () => {
+    const value = stored({ order: ['team'], collapsed: [], shown: ['team'] })
+    const layout = fleetLayoutOf(value, 'repo-1')
+    expect(layout.shown).toEqual(['team'])
+    expect(catalogOf(layout)).toEqual(['review', 'reviews', 'todo', 'actions'])
+  })
+
+  it('reads a version 1 layout and keeps every section it showed', () => {
+    expect(fleetLayoutOf(VERSION_1_STORE, 'repo-1')).toEqual({
+      order: ['todo', 'team', 'review', 'reviews', 'actions'],
+      collapsed: ['todo'],
+      shown: ['todo', 'team', 'reviews', 'actions']
+    })
+    expect(fleetLayoutOf(VERSION_1_STORE, 'repo-2').shown).toEqual([
+      'team',
+      'review',
+      'reviews',
+      'todo',
+      'actions'
+    ])
+    expect(fleetLayoutOf(VERSION_1_STORE, 'repo-3')).toEqual(DEFAULT_FLEET_LAYOUT)
   })
 
   it('reads a value written before versions as version 1', () => {
@@ -64,16 +106,19 @@ describe('panel layout', () => {
     expect(fleetLayoutOf(legacy, 'repo-1').collapsed).toEqual(['team'])
   })
 
-  it('toggles, hides, shows and moves one section at a time', () => {
-    const collapsed = toggleSection(DEFAULT_FLEET_LAYOUT, 'todo')
-    expect(collapsed.collapsed).toEqual(['todo'])
-    expect(toggleSection(collapsed, 'todo').collapsed).toEqual([])
-    const hidden = hideSection(DEFAULT_FLEET_LAYOUT, 'review')
-    expect(hidden.hidden).toEqual(['review'])
-    expect(hideSection(hidden, 'review')).toEqual(hidden)
-    expect(showSection(hidden, 'review').hidden).toEqual([])
-    // Showing a collapsed section opens it: "show" means the person wants to see it.
-    expect(showSection(collapsed, 'todo').collapsed).toEqual([])
+  it('toggles, shows, hides and moves one section at a time', () => {
+    const collapsed = toggleSection(DEFAULT_FLEET_LAYOUT, 'team')
+    expect(collapsed.collapsed).toEqual(['team'])
+    expect(toggleSection(collapsed, 'team').collapsed).toEqual([])
+    const hidden = hideSection(DEFAULT_FLEET_LAYOUT, 'reviews')
+    expect(hidden.shown).toEqual(['team', 'review', 'todo', 'actions'])
+    expect(hideSection(hidden, 'reviews')).toEqual(hidden)
+    const shown = showSection(hidden, 'reviews')
+    expect(shown.shown).toEqual(DEFAULT_FLEET_LAYOUT.shown)
+    expect(showSection(shown, 'reviews')).toEqual(shown)
+    // Showing a collapsed section opens it: "show" means the person wants to see its rows.
+    const opened = showSection(toggleSection(DEFAULT_FLEET_LAYOUT, 'team'), 'team')
+    expect(opened.collapsed).toEqual([])
     expect(moveSection(DEFAULT_FLEET_LAYOUT, 'todo', 'up').order).toEqual([
       'team',
       'review',
@@ -85,9 +130,9 @@ describe('panel layout', () => {
     expect(moveSection(DEFAULT_FLEET_LAYOUT, 'actions', 'down')).toEqual(DEFAULT_FLEET_LAYOUT)
   })
 
-  it('writes one project and keeps the other projects and keys it does not know', () => {
+  it('writes one project as version 2 and keeps the other projects and keys it does not know', () => {
     const before = {
-      ...stored({ order: [], collapsed: ['team'], hidden: [] }, { view: 'flat' }),
+      ...stored({ order: [], collapsed: ['team'], shown: ['team'] }, { view: 'flat' }),
       projects: { 'repo-2': { fleet: DEFAULT_FLEET_LAYOUT, view: 'zen' } }
     }
     const next = withFleetLayout(before, 'repo-1', toggleSection(DEFAULT_FLEET_LAYOUT, 'todo'))
@@ -98,6 +143,19 @@ describe('panel layout', () => {
         'repo-2': { fleet: DEFAULT_FLEET_LAYOUT, view: 'zen' },
         'repo-1': { fleet: { ...DEFAULT_FLEET_LAYOUT, collapsed: ['todo'] } }
       }
+    })
+  })
+
+  it('upgrades every project of a version 1 store on the first write and keeps what each showed', () => {
+    const next = withFleetLayout(VERSION_1_STORE, 'repo-1', DEFAULT_FLEET_LAYOUT) as {
+      version: number
+      projects: Record<string, { fleet: unknown }>
+    }
+    expect(next.version).toBe(PANEL_LAYOUT_VERSION)
+    expect(next.projects['repo-2']?.fleet).toEqual({
+      order: ['team', 'review', 'reviews', 'todo', 'actions'],
+      collapsed: [],
+      shown: ['team', 'review', 'reviews', 'todo', 'actions']
     })
   })
 
@@ -114,7 +172,7 @@ describe('panel layout', () => {
     const projects = Object.fromEntries(
       Array.from({ length: 50 }, (_, at) => [`repo-${at}`, { fleet: DEFAULT_FLEET_LAYOUT }])
     )
-    const next = withFleetLayout({ version: 1, projects }, 'repo-new', DEFAULT_FLEET_LAYOUT)
+    const next = withFleetLayout({ version: 2, projects }, 'repo-new', DEFAULT_FLEET_LAYOUT)
     const keys = Object.keys((next as { projects: object }).projects)
     expect(keys).toHaveLength(50)
     expect(keys[0]).toBe('repo-1')

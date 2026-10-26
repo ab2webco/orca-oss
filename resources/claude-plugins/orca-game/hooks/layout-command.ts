@@ -30,9 +30,14 @@ const VERBS: Readonly<Record<string, Verb>> = {
   reset: 'reset',
   restablecer: 'reset',
   show: 'show',
+  add: 'show',
   mostrar: 'show',
+  añadir: 'show',
+  agregar: 'show',
   hide: 'hide',
+  remove: 'hide',
   ocultar: 'hide',
+  quitar: 'hide',
   move: 'move',
   mover: 'move'
 }
@@ -85,7 +90,7 @@ export const layoutRequestOf = (args: string): LayoutRequest => {
 const listingOf = (layout: FleetLayout): string => {
   const text = gameStrings().text
   const stateOf = (section: PanelSection) =>
-    layout.hidden.includes(section)
+    !layout.shown.includes(section)
       ? text.layoutStates.hidden
       : layout.collapsed.includes(section)
         ? text.layoutStates.collapsed

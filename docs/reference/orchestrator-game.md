@@ -382,16 +382,19 @@ headings keep their own link or action, and a collapsed Team turns red while a t
 collapsed Review keeps its CI color. The `Needs you` lines above the sections are never hidden.
 On a phone-width pane each section also gets a touch-sized chip under the menu.
 
-`/orca-game:layout` lists the sections with their state and takes `reset`, `show <section>`,
-`hide <section>` and `move <section> up|down` (Spanish words work too: `ocultar equipo`). The
-first time a person opens the Panel a toast says how to collapse sections.
+`/orca-game:layout` lists the sections with their state and takes `reset`, `add <section>`,
+`remove <section>` and `move <section> up|down` (Spanish words work too: `añadir tareas`,
+`quitar equipo`; the older `show` and `hide` still work). The first time a person opens the Panel
+a toast says how to collapse sections.
 
-The layout is kept in the mod's `$.store` under `panel-layout`: `{ version: 1, projects: {
-<repoId>: { fleet: { order, collapsed, hidden } } } }`, so every worktree of one repo shares it
-and other people keep their own. Nothing is written until the person changes the layout. A damaged
-value draws the default; one a newer build wrote is drawn as the default and never overwritten
-(see [Game data migrations](./game-data-migrations.md)). Later view settings belong in the same
-key, next to `fleet`.
+The layout is kept in the mod's `$.store` under `panel-layout`: `{ version: 2, projects: {
+<repoId>: { fleet: { order, collapsed, shown } } } }`, so every worktree of one repo shares it
+and other people keep their own. `shown` lists what the Panel draws; a section a later build adds
+starts hidden until the person adds it. Nothing is written until the person changes the layout. A version 1 value
+is upgraded on the next write, keeping every section it drew. A damaged value draws the default;
+one a newer build wrote is drawn as the default and never overwritten (see
+[Game data migrations](./game-data-migrations.md)). Later view settings belong in the same key,
+next to `fleet`.
 
 ## My PRs and To Do
 
