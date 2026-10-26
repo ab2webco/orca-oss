@@ -41,6 +41,8 @@ async function setTheme(
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
     )
     .toBe(theme)
+  // ORCA-753: the panel frame is re-created on a theme change; wait for the new document, since a raw evaluate into the old one throws.
+  await expect(panelFrame(page).locator('html')).toHaveClass(theme)
 }
 
 /** The main window floors at 600px, so phone widths need the floor lifted. */
@@ -244,13 +246,28 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
       panelFrame(orcaPage)
         .locator('body')
         .evaluate((body) => body.ownerDocument.documentElement.clientWidth)
+    // Why: innerWidth reaches the target before the sidebar re-clamps from it, so an
+    // early read is stale and the correction overshoots; wait for the width to stop moving.
+    const settledFrameWidthOf = async (): Promise<number> => {
+      let last = await frameWidthOf()
+      let stableReads = 0
+      await expect
+        .poll(async () => {
+          const next = await frameWidthOf()
+          stableReads = next === last ? stableReads + 1 : 0
+          last = next
+          return stableReads
+        })
+        .toBeGreaterThanOrEqual(3)
+      return last
+    }
 
     for (const frameWidth of SCREENSHOT_WIDTHS) {
       let windowWidth = frameWidth + 360
       let achieved = 0
       for (let attempt = 0; attempt < 4; attempt++) {
         await setWindowWidth(electronApp, orcaPage, Math.round(windowWidth))
-        achieved = await frameWidthOf()
+        achieved = await settledFrameWidthOf()
         if (Math.abs(achieved - frameWidth) <= 2) {
           break
         }
