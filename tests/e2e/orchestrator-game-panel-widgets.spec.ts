@@ -102,6 +102,18 @@ async function scrollPanelTo(page: Page, heading: string): Promise<void> {
   expect(await screenText(page)).toContain(heading)
 }
 
+// Why: startup UI hydration can reopen the right sidebar after the band starts, squeezing the Panel.
+async function closeSidebars(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const store = window.__store!
+    store.getState().setSidebarOpen(false)
+    store.getState().setRightSidebarOpen(false)
+  })
+  await expect
+    .poll(async () => page.evaluate(() => window.__store!.getState().rightSidebarOpen))
+    .toBe(false)
+}
+
 /**
  * One screenshot per theme and width, `<name>-<theme>-<width>.png`, plus a `-scrolled` one where
  * the docked Panel is too short to show `heading` unscrolled.
@@ -117,6 +129,7 @@ async function captureEveryWidth(
     await setTheme(page, theme)
     for (const width of WIDTHS) {
       await setWindowWidth(electronApp, page, width)
+      await closeSidebars(page)
       await page.waitForTimeout(HOLD_MS)
       const shot = `${name}-${theme}-${width}`
       await page.screenshot({ path: testInfo.outputPath(`${shot}.png`), animations: 'disabled' })
