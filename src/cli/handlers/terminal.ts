@@ -50,6 +50,11 @@ import {
 // long waits instead of failing at the generic 15s transport cap.
 const DEFAULT_TERMINAL_WAIT_RPC_TIMEOUT_MS = 5 * 60 * 1000
 
+// Why: raw argv names no agent, so the account would be dropped and the
+// terminal would run on the global login (ORCA-804).
+const COMMAND_WITH_ACCOUNT_ERROR =
+  '--command cannot launch on a managed account: it runs raw argv on the global login. Use --agent claude --claude-account <email|id> or --agent codex --codex-account <email|id> instead.'
+
 function getRequestedTuiAgent(
   flags: Map<string, string | boolean>,
   command: string | undefined
@@ -182,6 +187,9 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     }
     const command = getOptionalStringFlag(flags, 'command')
     const agent = getRequestedTuiAgent(flags, command)
+    if (command !== undefined && (flags.has('claude-account') || flags.has('codex-account'))) {
+      throw new RuntimeClientError('invalid_argument', COMMAND_WITH_ACCOUNT_ERROR)
+    }
     if (flags.has('task') && agent === undefined) {
       throw new RuntimeClientError(
         'invalid_argument',
