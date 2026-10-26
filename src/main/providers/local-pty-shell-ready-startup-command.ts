@@ -18,8 +18,12 @@ export function writeStartupCommandWhenShellReady(
   startupCommand: string,
   onExit: (cleanup: () => void) => void,
   // Why: only shells with bracketed-paste active (see isBracketedPasteSafeShell) accept the wrapper; others use the raw path so ESC[200~ isn't echoed.
-  options: { bracketedPasteSafe?: boolean } = {}
+  options: { bracketedPasteSafe?: boolean; onDelivered?: () => void } = {}
 ): void {
+  // Why the caller resolves this promise only on the marker (ORCA-210): a shell
+  // that is still showing a startup prompt eats the command's first character as
+  // the answer, leaving a pane with a shell and no agent that looks identical to
+  // a healthy one.
   let sent = false
   let postReadyTimer: ReturnType<typeof setTimeout> | null = null
   let postReadyDataDisposable: { dispose: () => void } | null = null
@@ -55,6 +59,7 @@ export function writeStartupCommandWhenShellReady(
         bracketedPasteSafe: options.bracketedPasteSafe === true
       })
     )
+    options.onDelivered?.()
   }
 
   const schedulePostReadyFlush = (): void => {

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { OrchestrationDb } from '../../orchestration/db'
 import type { RpcContext } from '../core'
 import { createOrchestrationRpcHarness } from './orchestration-rpc-test-harness'
-import type { OrchestrationDb } from '../../orchestration/db'
-import type { OrcaRuntimeService } from '../../orca-runtime'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 
 describe('orchestration RPC methods', () => {
   const h = createOrchestrationRpcHarness()
@@ -524,6 +524,98 @@ describe('orchestration RPC methods', () => {
         ])
       )
       expect(runtime.createTerminal).not.toHaveBeenCalled()
+    })
+
+    it('marks the worker terminal of a game launch as a game member', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'game member' })
+
+      await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        game: true
+      })
+
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({ startupAgent: 'claude', orchestrationGameMember: true })
+      )
+    })
+
+    it('passes launch-scoped account overrides to the created worker terminal', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'account-pinned worker' })
+
+      const result = (await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'claude',
+        claudeAccountId: 'acct-claude-1',
+        codexAccountId: 'acct-codex-1'
+      })) as { state: string }
+
+      expect(result).toMatchObject({ state: 'ready' })
+      // Why startupAgent, not command: worker-start launches the configured agent CLI rather
+      // than the raw agent id (#12148); the account pins still ride the same create.
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({
+          startupAgent: 'claude',
+          claudeAccountId: 'acct-claude-1',
+          codexAccountId: 'acct-codex-1'
+        })
+      )
+    })
+
+    it('rejects account pins when --terminal reuses an existing agent', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      const task = db.createTask({ spec: 'reused terminal with pin' })
+
+      await expect(
+        call('orchestration.workerStart', {
+          task: task.id,
+          from: 'term_coord',
+          terminal: 'term_worker',
+          claudeAccountId: 'acct-claude-1'
+        })
+      ).rejects.toThrow('--claude-account')
+      expect(runtime.createTerminal).not.toHaveBeenCalled()
+    })
+
+    it('rejects account pins on remote worker-start placements', async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'remote pinned worker' })
+      const method = h.findMethod('orchestration.workerStart')
+
+      await expect(
+        method.handler(
+          method.params!.parse({
+            task: task.id,
+            from: 'term_coord',
+            on: 'windows',
+            worktree: 'new-top-level',
+            name: 'remote-work',
+            repo: 'id:windows-repo',
+            agent: 'codex',
+            claudeAccountId: 'acct-claude-1'
+          }),
+          {
+            runtime,
+            orchestrationMutation: {
+              callerFingerprint: 'caller',
+              requestId: 'remote_start_pin',
+              method: 'orchestration.workerStart',
+              payloadHash: 'payload'
+            }
+          } as never
+        )
+      ).rejects.toThrow('--claude-account')
     })
   })
 })

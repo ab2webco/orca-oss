@@ -6,7 +6,7 @@ import {
   escapeWslShCommandForWindows,
   quotePosixShell
 } from '../../shared/wsl-login-shell-command'
-import { ensureShellReadyWrappersAt } from './local-pty-shell-ready'
+import { ensureShellReadyWrappersAt } from './local-pty-shell-ready-wrapper-generation'
 import {
   encodePowerShellCommand,
   getPowerShellOsc133Bootstrap

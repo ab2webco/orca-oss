@@ -16,9 +16,7 @@ inline src/main/browser/browser-cookie-import.ts
 inline src/main/browser/browser-manager.ts
 inline src/main/browser/cdp-bridge.ts
 inline src/main/browser/grab-guest-script.ts
-inline src/main/claude-accounts/runtime-auth-service.test.ts
 inline src/main/claude-accounts/runtime-auth-service.ts
-inline src/main/claude-accounts/service.test.ts
 inline src/main/claude-accounts/service.ts
 inline src/main/claude-usage/store.ts
 inline src/main/cli/cli-installer.ts
@@ -34,7 +32,6 @@ inline src/main/codex/hook-service.ts
 inline src/main/daemon/daemon-init.ts
 inline src/main/daemon/daemon-pty-adapter.ts
 inline src/main/daemon/daemon-server.ts
-inline src/main/daemon/pty-subprocess.test.ts
 inline src/main/daemon/pty-subprocess.ts
 inline src/main/daemon/session.ts
 inline src/main/daemon/shell-ready.ts
@@ -67,14 +64,12 @@ inline src/main/linear/projects.ts
 inline src/main/memory/collector.ts
 inline src/main/opencode/hook-service.ts
 inline src/main/persistence.test.ts
-inline src/main/persistence.ts
+inline src/main/persistence/loading-store/store.ts
 inline src/main/ports/advertised-url-watcher.ts
 inline src/main/ports/local-workspace-port-scanner.ts
 inline src/main/project-groups/nested-repo-discovery.ts
 inline src/main/providers/local-pty-provider.test.ts
 inline src/main/providers/local-pty-provider.ts
-inline src/main/providers/local-pty-shell-ready.test.ts
-inline src/main/providers/local-pty-shell-ready.ts
 inline src/main/providers/ssh-git-provider.ts
 inline src/main/rate-limits/claude-fetcher.test.ts
 inline src/main/rate-limits/claude-fetcher.ts
@@ -89,7 +84,6 @@ inline src/main/runtime/orca-runtime.test.ts
 inline src/main/runtime/orca-runtime.ts
 inline src/main/runtime/orchestration/coordinator.ts
 inline src/main/runtime/orchestration/db.ts
-inline src/main/runtime/rpc/methods/orchestration.test.ts
 inline src/main/runtime/rpc/methods/orchestration.ts
 inline src/main/runtime/rpc/methods/terminal.ts
 inline src/main/runtime/runtime-rpc.ts
@@ -110,7 +104,6 @@ inline src/preload/index.ts
 inline src/relay/dispatcher.ts
 inline src/relay/external-automations-handler.ts
 inline src/relay/git-handler.ts
-inline src/relay/pty-handler.test.ts
 inline src/relay/pty-handler.ts
 inline src/relay/relay.ts
 inline src/relay/workspace-space-scan.ts

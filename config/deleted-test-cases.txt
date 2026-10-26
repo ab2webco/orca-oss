@@ -13,3 +13,11 @@ config/scripts/locale-translation-policy.ja-round5.test.mjs # Japanese repair ru
 config/scripts/locale-translation-policy.zh-round5.test.mjs # Chinese repair rules
 config/scripts/locale-translation-policy.zh-status-bar-usage.test.mjs # Chinese status-bar repairs
 config/scripts/locale-count-fragment-separator.test.mjs # zh/ja/ko count-fragment key overrides
+
+# ORCA-550: sync #8 kept these monolith suites beside upstream's split files, so their cases
+# ran twice. Every title still runs once in the split suites named after each parent.
+src/main/claude-accounts/runtime-auth-service.test.ts # runtime-auth-service-*.test.ts
+src/main/claude-accounts/service.test.ts # claude-account-service-*.test.ts
+src/main/providers/local-pty-shell-ready.test.ts # local-pty-shell-ready-*.test.ts
+src/main/runtime/rpc/methods/orchestration.test.ts # orchestration-*.test.ts
+src/relay/pty-handler.test.ts # pty-handler-*.test.ts
