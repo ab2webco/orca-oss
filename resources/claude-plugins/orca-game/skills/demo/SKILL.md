@@ -2,8 +2,9 @@
 name: demo
 description: |
   Play a scripted fake party in this pane: every phase, action and reaction and one level-up,
-  without running any command or writing XP. /orca-game:mode on returns to real data. The game
-  mod answers it, with no model turn. Run it as /orca-game:demo.
+  without running any command or writing XP. /orca-game:mode on returns to real data. With the word
+  arcade it opens a practice run of the arcade's runner instead, which keeps no points. The game
+  mod answers it, with no model turn. Run it as /orca-game:demo or /orca-game:demo arcade.
 user_invocable: true
 disable-model-invocation: true
 ---
