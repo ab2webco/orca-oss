@@ -1,8 +1,9 @@
 import type { AgentTrustPreset } from './agent-trust-presets'
+import { withClaudeFolderTrust } from './claude-accounts/claude-folder-trust'
 import { upsertProjectTrustLevelInContent } from './codex/config-toml-trust'
 import { getActiveMultiplexer } from './ipc/ssh'
 import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import type { FileReadResult, IFilesystemProvider } from './providers/types'
+import type { FileReadResult, FileStat, IFilesystemProvider } from './providers/types'
 import { isENOENT } from './ipc/filesystem-path-containment'
 import {
   isWindowsAbsolutePathLike,
@@ -28,6 +29,72 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
   } else if (args.preset === 'copilot') {
     await markRemoteCopilotFolderTrusted(fsProvider, home, workspacePath)
   }
+}
+
+/** Pre-accepts Claude's folder trust on the remote host; false when the config is left as it was. */
+export async function markRemoteClaudeFolderTrusted(args: {
+  connectionId: string
+  workspacePath: string
+  configDir?: string
+}): Promise<boolean> {
+  const home = await resolveRemoteHome(args.connectionId)
+  const fsProvider = getSshFilesystemProvider(args.connectionId)
+  if (!home || !fsProvider) {
+    return false
+  }
+  const configDir = args.configDir?.trim()
+    ? normalizeRuntimePathSeparators(args.configDir.trim()).replace(/\/$/, '')
+    : home
+  const configPath = `${configDir}/.claude.json`
+  const workspacePath = await canonicalizeRemoteWorkspacePath(fsProvider, args.workspacePath)
+  // Why: the host's platform decides Claude's key shape, not this desktop's.
+  const projectKey = isWindowsAbsolutePathLike(workspacePath)
+    ? normalizeRuntimePathSeparators(workspacePath)
+    : workspacePath
+  // Why: the relay replace keeps the config's mode (it holds account data) and refuses if Claude saved in between.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let configStat: FileStat
+    try {
+      configStat = await fsProvider.stat(configPath)
+    } catch (error) {
+      // Why: no relay write can create it 0600, and a host Claude never ran on stops at onboarding anyway.
+      if (isRemoteENOENT(error)) {
+        return false
+      }
+      throw error
+    }
+    const realConfigPath = await fsProvider.realpath(configPath)
+    const existing = await readRemoteTextFile(fsProvider, realConfigPath)
+    const updated = withClaudeFolderTrust(existing, [projectKey])
+    if (updated === null || !fsProvider.writeTerminalArtifact) {
+      return false
+    }
+    if (updated === existing) {
+      return true
+    }
+    try {
+      await fsProvider.writeTerminalArtifact(realConfigPath, updated, {
+        expectedRealPath: realConfigPath,
+        expectedStatIdentity: remoteStatIdentity(configStat),
+        maxBytes: Math.max(Buffer.byteLength(updated, 'utf8'), configStat.size)
+      })
+      return true
+    } catch (error) {
+      if (!(error instanceof Error && error.message === 'terminal_file_grant_stale')) {
+        throw error
+      }
+    }
+  }
+  return false
+}
+
+/** The relay's dev:ino:nlink:size:mtime identity for its compare-before-rename. */
+function remoteStatIdentity(stat: FileStat): string | null {
+  const mtimeMs = stat.mtimeMs ?? stat.mtime
+  if (typeof stat.dev === 'number' && typeof stat.ino === 'number') {
+    return `${stat.dev}:${stat.ino}:${stat.nlink ?? 'unknown'}:${stat.size}:${mtimeMs}`
+  }
+  return `${stat.size}:${mtimeMs}`
 }
 
 async function resolveRemoteHome(connectionId: string): Promise<string | null> {
