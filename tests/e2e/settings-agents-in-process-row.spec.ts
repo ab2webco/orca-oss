@@ -1,4 +1,5 @@
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
+import type { TuiAgent } from '../../src/shared/tui-agent'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { THEMES, WIDTHS, setTheme, setWindowWidth } from './helpers/settings-window'
@@ -28,7 +29,7 @@ async function stubWindowsHostRuntime(app: ElectronApplication, page: Page): Pro
   }, status)
 }
 
-async function setDetectedAgents(page: Page, ids: string[]): Promise<void> {
+async function setDetectedAgents(page: Page, ids: TuiAgent[]): Promise<void> {
   await page.evaluate((next) => {
     window.__store!.setState({ detectedAgentIds: next })
   }, ids)
