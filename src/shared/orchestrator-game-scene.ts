@@ -12,6 +12,10 @@ import {
   uncoloredGlyphOf
 } from './orchestrator-game-scene-values'
 import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
+import {
+  orchestratorGameScene3dOf,
+  type OrchestratorGameScene3d
+} from './orchestrator-game-scene-3d'
 
 /** Scenes a plugin contributes to the Agent Teams game: inert JSON the bundled mod draws. */
 
@@ -155,6 +159,8 @@ export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & 
   roster?: GameMemberName[]
   /** Palette variants the band shows one a day, in turn with the plain looks. */
   themes?: OrchestratorGameSceneTheme[]
+  /** What the WebGL panel draws; without it the scene is 2D only. */
+  scene3d?: OrchestratorGameScene3d
 }
 
 type SceneParse =
@@ -219,7 +225,8 @@ export function orchestratorGameSceneIssues(text: string): string[] {
         )),
     ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
     ...rosterOf(raw).issues,
-    ...themesOf(raw).issues
+    ...themesOf(raw).issues,
+    ...orchestratorGameScene3dOf(raw).issues
   ]
 }
 
@@ -242,6 +249,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
   const { roster, issues: rosterIssues } = rosterOf(raw)
   const { themes, issues: themeIssues } = themesOf(raw)
+  const { scene3d, issues: scene3dIssues } = orchestratorGameScene3dOf(raw)
   return {
     ok: true,
     definition: {
@@ -249,9 +257,10 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
       ...(cast === undefined ? {} : { cast }),
       ...(roster === undefined ? {} : { roster }),
       ...(themes === undefined ? {} : { themes }),
+      ...(scene3d === undefined ? {} : { scene3d }),
       id
     },
-    warnings: [...issues, ...rosterIssues, ...themeIssues]
+    warnings: [...issues, ...rosterIssues, ...themeIssues, ...scene3dIssues]
   }
 }
 

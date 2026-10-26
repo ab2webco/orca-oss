@@ -77,6 +77,27 @@ describe('orca game scene', () => {
     expect(process.exitCode).toBe(1)
   })
 
+  it('validate names the failing key of a broken 3D block and passes a good one', async () => {
+    const scene = JSON.parse(ORCHESTRATOR_GAME_SCENE_TEMPLATE) as Record<string, unknown>
+    writeFileSync(
+      join(dir, 'good3d.json'),
+      JSON.stringify({ ...scene, scene3d: { figure: 'torus', nodes: 800 } })
+    )
+    await run('game scene validate', dir, { file: 'good3d.json' })
+    expect(out).toContain('good3d.json: valid')
+    expect(process.exitCode).toBeUndefined()
+
+    out = ''
+    writeFileSync(
+      join(dir, 'bad3d.json'),
+      JSON.stringify({ ...scene, scene3d: { figure: 'torus', nodes: 5000 } })
+    )
+    await run('game scene validate', dir, { file: 'bad3d.json' })
+    expect(out).toContain('bad3d.json: 1 problem(s)')
+    expect(out).toContain('  scene3d.nodes: must be a whole number from 50 to 1600')
+    expect(process.exitCode).toBe(1)
+  })
+
   it('validate refuses a file too large for Orca to read', async () => {
     writeFileSync(join(dir, 'big.json'), ' '.repeat(70 * 1024))
     await run('game scene validate', dir, { file: 'big.json' })
