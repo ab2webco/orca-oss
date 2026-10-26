@@ -3,7 +3,7 @@ export const PANEL_SECTIONS = ['team', 'review', 'reviews', 'todo', 'actions'] a
 export type PanelSection = (typeof PANEL_SECTIONS)[number]
 
 /** What a new Panel shows; every other section waits in the catalog until a person adds it. */
-const DEFAULT_SHOWN: readonly PanelSection[] = PANEL_SECTIONS
+const DEFAULT_SHOWN: readonly PanelSection[] = ['team', 'reviews']
 
 /** One `$.store` key for every game layout, so a later view mode adds a field, not a second key. */
 export const PANEL_LAYOUT_KEY = 'panel-layout'

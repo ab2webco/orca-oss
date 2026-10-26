@@ -38,14 +38,14 @@ const VERSION_1_STORE = {
 }
 
 describe('panel layout', () => {
-  it('defaults to today order with every section expanded and shown', () => {
+  it('shows Team and My PRs by default and keeps the rest in the catalog', () => {
     expect(DEFAULT_FLEET_LAYOUT).toEqual({
       order: ['team', 'review', 'reviews', 'todo', 'actions'],
       collapsed: [],
-      shown: ['team', 'review', 'reviews', 'todo', 'actions']
+      shown: ['team', 'reviews']
     })
     expect(fleetLayoutOf(undefined, 'repo-1')).toEqual(DEFAULT_FLEET_LAYOUT)
-    expect(catalogOf(DEFAULT_FLEET_LAYOUT)).toEqual([])
+    expect(catalogOf(DEFAULT_FLEET_LAYOUT)).toEqual(['review', 'todo', 'actions'])
   })
 
   it('keys a layout by the repo of the worktree, so every worktree of a project shares it', () => {
@@ -72,7 +72,7 @@ describe('panel layout', () => {
     expect(fleetLayoutOf(value, 'repo-1')).toEqual({
       order: ['todo', 'actions', 'team', 'review', 'reviews'],
       collapsed: ['todo'],
-      shown: ['todo', 'actions', 'team', 'review', 'reviews']
+      shown: ['team', 'reviews']
     })
   })
 
@@ -110,12 +110,12 @@ describe('panel layout', () => {
     const collapsed = toggleSection(DEFAULT_FLEET_LAYOUT, 'team')
     expect(collapsed.collapsed).toEqual(['team'])
     expect(toggleSection(collapsed, 'team').collapsed).toEqual([])
+    const shown = showSection(DEFAULT_FLEET_LAYOUT, 'todo')
+    expect(shown.shown).toEqual(['team', 'reviews', 'todo'])
+    expect(showSection(shown, 'todo')).toEqual(shown)
     const hidden = hideSection(DEFAULT_FLEET_LAYOUT, 'reviews')
-    expect(hidden.shown).toEqual(['team', 'review', 'todo', 'actions'])
+    expect(hidden.shown).toEqual(['team'])
     expect(hideSection(hidden, 'reviews')).toEqual(hidden)
-    const shown = showSection(hidden, 'reviews')
-    expect(shown.shown).toEqual(DEFAULT_FLEET_LAYOUT.shown)
-    expect(showSection(shown, 'reviews')).toEqual(shown)
     // Showing a collapsed section opens it: "show" means the person wants to see its rows.
     const opened = showSection(toggleSection(DEFAULT_FLEET_LAYOUT, 'team'), 'team')
     expect(opened.collapsed).toEqual([])
