@@ -590,7 +590,7 @@ The lead's verbs, run from the lead's terminal
   ([`orchestrator-game-history-store.ts`](../../src/main/runtime/orchestrator-game-history-store.ts)).
   They are written through `game.historyRecord` and read through `game.history`, two RPC methods a
   host older than this does not have; `game history` then says to update Orca.
-- `orca game metrics [--since <date>] [--until <date>] [--ticket <id>]` — the project's delivery
+- `orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>]` — the project's delivery
   numbers, computed client-side from the whole `game.events` and `game.history` stores (no new RPC,
   so an older host answers too): tickets done (a `merged` event, or a member freed as `merged` or
   with a merged PR), lead time per ticket from its first `claimed` to its last merge (falling back
@@ -598,9 +598,14 @@ The lead's verbs, run from the lead's terminal
   was freed, marked `ends when freed`), freed members by outcome and event counts. Metrics
   whose fact is not recorded yet (first-time-green, rework, PR size, cleanup, tracker drift, XP,
   achievements) print `not recorded` with what they need, never 0; a note says when a store's cap
-  (500 events, 200 records) no longer reaches the window's start. `--character` is refused until
-  characters are recorded per member
-  ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
+  (500 events, 200 records) no longer reaches the window's start. `--character <name>` reads the
+  project's saved characters through `game.characters` (only then, so plain metrics still work
+  against an older host) and keeps that character's own tasks, the last 20 its progress holds:
+  outcomes count its tasks, events are those on its tickets, and a ticket is done only when its own
+  task on it is, so a ticket it stopped and another character merged is not credited to it. Lead
+  time still runs from the ticket's first claim. It adds the character's level and XP, drops XP from
+  `not recorded`, and notes when older tasks are no longer kept. An unknown name is refused with the
+  known ones ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
 - `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
   reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
   usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
