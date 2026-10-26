@@ -1,7 +1,7 @@
 import { killWithDescendantSweep } from '../pty-descendant-termination'
 import type { Session } from './session'
 
-type AgentTeardownOperation = {
+type SessionTeardownOperation = {
   promise: Promise<void>
   immediate: boolean
   rootSignalled: boolean
@@ -9,10 +9,10 @@ type AgentTeardownOperation = {
   session: Session
 }
 
-/** Owns agent teardown by session id until descendant capture and root
+/** Owns session teardown by session id until descendant capture and root
  * signalling finish, even when the root exits and its Session is reaped. */
 export class TerminalSessionTeardown {
-  private operations = new Map<string, AgentTeardownOperation>()
+  private operations = new Map<string, SessionTeardownOperation>()
 
   constructor(private sessions: ReadonlyMap<string, Session>) {}
 
@@ -33,44 +33,13 @@ export class TerminalSessionTeardown {
     return pending?.promise
   }
 
-  killSession(sessionId: string, session: Session, immediate: boolean): void | Promise<void> {
-    if (session.launchAgent) {
-      return this.killAgentSession(sessionId, session, immediate)
-    }
-    if (immediate) {
-      return this.forceKillPlainShellSession(sessionId, session)
-    }
-    session.kill()
-  }
-
   /**
-   * Immediate teardown of a non-agent shell. On Windows, closing the ConPTY does not
-   * reap orphaned children (node-pty `useConptyDll` skips the console-process reap), so a
-   * live `pnpm i`/`node` survives shell exit, keeps the ConPTY console non-empty, and holds
-   * the worktree cwd — failing destructive worktree removal with "Failed to physically stop
-   * every PTY". Tree-kill only when the OS identity probe returns `own`; `unknown`/`foreign`/
-   * `absent` skip taskkill and rely on root close alone. Mirrors the agent path
-   * (#10004/#10100). POSIX shells already reach their child pgroup on forceKill, so they
-   * stay on the plain force-kill path.
+   * Every session sweeps its descendant tree before the root signal: nohup/setsid jobs outlive
+   * the shell's SIGHUP and the tty pgroup force-kill (ORCA-678), and on Windows ConPTY close does
+   * not reap orphans that hold the worktree cwd (#10004/#10100) — taskkill runs only when the OS
+   * identity probe returns `own`.
    */
-  private async forceKillPlainShellSession(sessionId: string, session: Session): Promise<void> {
-    if (process.platform === 'win32') {
-      // Why: forceKillAndWaitForExit claims termination synchronously; awaiting the sweep
-      // ahead of it would leave attach open on a doomed session for the taskkill's duration.
-      session.beginTermination()
-      await killWithDescendantSweep(session.pid, () => {}, {
-        // Why: the descendant tree is only ours while this Session still owns the live root PID.
-        ownsRoot: () => this.sessions.get(sessionId) === session && session.isAlive
-      })
-    }
-    await session.forceKillAndWaitForExit()
-  }
-
-  private killAgentSession(
-    sessionId: string,
-    session: Session,
-    immediate: boolean
-  ): void | Promise<void> {
+  killSession(sessionId: string, session: Session, immediate: boolean): void | Promise<void> {
     const pending = this.operations.get(sessionId)
     if (pending) {
       // Why: an immediate caller is a stronger teardown request and must not
@@ -91,7 +60,7 @@ export class TerminalSessionTeardown {
       session.scheduleForceDisposeFallback()
     }
 
-    const entry: AgentTeardownOperation = {
+    const entry: SessionTeardownOperation = {
       promise: Promise.resolve(),
       immediate,
       rootSignalled: false,

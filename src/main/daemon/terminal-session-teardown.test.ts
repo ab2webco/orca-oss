@@ -12,9 +12,11 @@ function createPlainShellSession(overrides: Partial<Session> = {}): Session {
     launchAgent: undefined,
     pid: 4242,
     isAlive: true,
+    isTerminating: false,
     forceKillAndWaitForExit: vi.fn(async () => {}),
     beginTermination: vi.fn(() => true),
-    kill: vi.fn(),
+    scheduleForceDisposeFallback: vi.fn(),
+    signalTerminationRoot: vi.fn(),
     ...overrides
   } as unknown as Session
 }
@@ -43,6 +45,12 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     // non-empty, and holds the worktree cwd — failing destructive removal (#10004/#10100).
     setPlatform('win32')
     const session = createPlainShellSession()
+    const forceKill = session.forceKillAndWaitForExit as unknown as ReturnType<typeof vi.fn>
+    let forcedBeforeSweepEnded = true
+    killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
+      forcedBeforeSweepEnded = forceKill.mock.calls.length > 0
+      killRoot()
+    })
     const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
 
     await teardown.killSession('s1', session, true)
@@ -52,10 +60,8 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
       expect.any(Function),
       expect.objectContaining({ ownsRoot: expect.any(Function) })
     )
-    expect(session.forceKillAndWaitForExit).toHaveBeenCalled()
-    // The sweep owns the taskkill; the killRoot callback is a no-op so force-kill drives exit.
-    const killRoot = killWithDescendantSweepMock.mock.calls[0][1] as () => void
-    expect(() => killRoot()).not.toThrow()
+    expect(forcedBeforeSweepEnded).toBe(false)
+    expect(forceKill).toHaveBeenCalled()
   })
 
   it('win32 immediate kill claims termination before awaiting the sweep', async () => {
@@ -94,26 +100,31 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     expect(ownsRoot()).toBe(false)
   })
 
-  it('non-win32 immediate kill skips the tree kill (pgroup force-kill suffices)', async () => {
-    setPlatform('linux')
-    const session = createPlainShellSession()
-    const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
+  it.each([true, false])(
+    'non-win32 kill sweeps descendants before signalling the root (immediate=%s)',
+    async (immediate) => {
+      // Why: nohup jobs ignore SIGHUP and setsid jobs leave the tty pgroups (ORCA-678).
+      setPlatform('linux')
+      const session = createPlainShellSession()
+      const order: string[] = []
+      killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
+        order.push('sweep')
+        killRoot()
+      })
+      const forceKill = session.forceKillAndWaitForExit as unknown as ReturnType<typeof vi.fn>
+      forceKill.mockImplementation(async () => {
+        order.push('force')
+      })
+      ;(session.signalTerminationRoot as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+        () => {
+          order.push('graceful')
+        }
+      )
+      const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
 
-    await teardown.killSession('s1', session, true)
+      await teardown.killSession('s1', session, immediate)
 
-    expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
-    expect(session.forceKillAndWaitForExit).toHaveBeenCalled()
-  })
-
-  it('non-immediate (graceful) kill uses the plain kill path without a sweep', async () => {
-    setPlatform('win32')
-    const session = createPlainShellSession()
-    const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
-
-    await teardown.killSession('s1', session, false)
-
-    expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
-    expect(session.forceKillAndWaitForExit).not.toHaveBeenCalled()
-    expect(session.kill).toHaveBeenCalled()
-  })
+      expect(order).toEqual(['sweep', immediate ? 'force' : 'graceful'])
+    }
+  )
 })

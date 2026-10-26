@@ -11,6 +11,11 @@ import type { SubprocessHandle } from './session-subprocess-handle'
 import { getDaemonPidPath, getDaemonSocketPath, serializeDaemonPidFile } from './daemon-spawner'
 import { waitForEndpointUnreachable } from './daemon-endpoint-reachability-test-harness'
 
+// Why: the fake pid could name a real host process; never let a kill test sweep its tree.
+vi.mock('../pty-descendant-termination', () => ({
+  killWithDescendantSweep: async (_pid: number, killRoot: () => void) => killRoot()
+}))
+
 const confirmForegroundProcessMock = vi.fn(async () => 'droid')
 
 function createTestDir(): string {

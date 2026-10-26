@@ -1933,23 +1933,26 @@ describe('LocalPtyProvider', () => {
       )
     })
 
-    it('win32 graceful shutdown of a plain shell does not taskkill the tree', async () => {
-      Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
-      const { id } = await provider.spawn({ cols: 80, rows: 24 })
+    it.each([
+      ['win32', false],
+      ['linux', false],
+      ['linux', true]
+    ] as const)(
+      '%s shutdown of a plain shell sweeps descendants (immediate=%s)',
+      async (platform, immediate) => {
+        // Why: closing a tab must reap nohup/setsid jobs and ConPTY orphans too (ORCA-678).
+        Object.defineProperty(process, 'platform', { configurable: true, value: platform })
+        const { id } = await provider.spawn({ cols: 80, rows: 24 })
 
-      await provider.shutdown(id, { immediate: false })
+        await provider.shutdown(id, { immediate })
 
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
-    })
-
-    it('non-win32 immediate shutdown of a plain shell skips the tree kill', async () => {
-      // beforeEach pins platform to linux; POSIX force-kill already reaches the child pgroup.
-      const { id } = await provider.spawn({ cols: 80, rows: 24 })
-
-      await provider.shutdown(id, { immediate: true })
-
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
-    })
+        expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+          mockProc.pid,
+          expect.any(Function),
+          expect.objectContaining({ ownsRoot: expect.any(Function) })
+        )
+      }
+    )
   })
 
   describe('hasChildProcesses', () => {

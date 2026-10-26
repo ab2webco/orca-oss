@@ -55,28 +55,24 @@ export class SessionTerminationController {
     if (!this.beginTermination()) {
       return
     }
-    if (!this.deps.launchAgent) {
-      this.signalTerminationRoot()
-    } else {
-      // Why: agent tool children live in detached process groups a dying shell's SIGHUP never reaches, so sweep them.
-      void Promise.resolve(
-        killWithDescendantSweep(
-          this.deps.subprocess.pid,
-          () => {
-            this.signalTerminationRoot()
-          },
-          {
-            // Why: if the root exits during ps its PID can be recycled; never apply that stale snapshot to a different process tree.
-            ownsRoot: () => !this.deps.isExited()
-          }
-        )
-      ).catch((error) => {
-        if (!this.deps.isExited()) {
-          this.resetTerminationAfterSignalFailure()
+    // Why: nohup jobs and agent tool children ignore or never receive the dying shell's SIGHUP, so sweep them (ORCA-678).
+    void Promise.resolve(
+      killWithDescendantSweep(
+        this.deps.subprocess.pid,
+        () => {
+          this.signalTerminationRoot()
+        },
+        {
+          // Why: if the root exits during ps its PID can be recycled; never apply that stale snapshot to a different process tree.
+          ownsRoot: () => !this.deps.isExited()
         }
-        console.warn('[Session] descendant-aware graceful kill failed:', error)
-      })
-    }
+      )
+    ).catch((error) => {
+      if (!this.deps.isExited()) {
+        this.resetTerminationAfterSignalFailure()
+      }
+      console.warn('[Session] descendant-aware graceful kill failed:', error)
+    })
     this.scheduleForceDisposeFallback()
   }
 

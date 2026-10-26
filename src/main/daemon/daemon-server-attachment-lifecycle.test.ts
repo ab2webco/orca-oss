@@ -9,6 +9,11 @@ import { getDaemonSocketPath } from './daemon-spawner'
 import type { SubprocessHandle } from './session-subprocess-handle'
 import type { CreateOrAttachOptions, CreateOrAttachResult } from './terminal-host'
 
+// Why: the fake pid could name a real host process; never let a kill test sweep its tree.
+vi.mock('../pty-descendant-termination', () => ({
+  killWithDescendantSweep: async (_pid: number, killRoot: () => void) => killRoot()
+}))
+
 function createMockSubprocess(): SubprocessHandle {
   let onExit: ((code: number) => void) | undefined
   return {
