@@ -1,9 +1,14 @@
+import type { Terminal } from '@xterm/xterm'
 import { describe, expect, it, vi } from 'vitest'
 import { copyTerminalSelection } from './terminal-selection-copy'
 
 function makeTerminal(selection: string) {
   return {
     getSelection: vi.fn(() => selection),
+    getSelectionPosition: vi.fn(() => undefined),
+    buffer: { active: { type: 'normal' } } as unknown as Terminal['buffer'],
+    rows: 24,
+    cols: 80,
     clearSelection: vi.fn()
   }
 }

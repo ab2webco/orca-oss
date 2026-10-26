@@ -87,6 +87,7 @@ import {
   showOsc52ClipboardFailedToast
 } from './osc52-clipboard-toast'
 import { copyTerminalSelection } from './terminal-selection-copy'
+import { terminalSelectionText } from './claude-dock-selection'
 import { parseOsc7 } from './parse-osc7'
 import { guardParserHandler } from './terminal-parser-handler-guard'
 import { resolveTerminalJisYenInput } from './terminal-jis-yen-input'
@@ -1234,7 +1235,7 @@ export function useTerminalPaneLifecycle({
               if (terminalSelectionExceedsPrimaryLimit(pane.terminal)) {
                 return
               }
-              const selection = pane.terminal.getSelection()
+              const selection = terminalSelectionText(pane.terminal)
               if (selection) {
                 setPrimarySelectionText(selection)
               }
