@@ -312,7 +312,9 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
   pane's **View** button (hotkeys `1`–`9` by tile order) runs `terminal focus` on that handle;
   a row without one gets no button;
 - `review` — the hosted review for the branch from any supported provider (GitHub, GitLab,
-  Bitbucket, Azure DevOps, Gitea) with its aggregate CI status;
+  Bitbucket, Azure DevOps, Gitea) with its aggregate CI status. `verdict` (optional) is the
+  host's review decision — `approved`, `changes_requested` or `review_required` (GitHub only;
+  absent without a decision);
 - `workItem` — the linked item with a live status for Plane, Linear, Jira, GitHub and GitLab, and
   a `statusGroup` (`backlog`, `todo`, `in_progress`, `review`, `done`, `cancelled`, `unknown`)
   so the game never needs to know the tracker. `tracker: false` leaves it out;

@@ -103,3 +103,29 @@ describe('gameReviewOf', () => {
     ).toBeNull()
   })
 })
+
+describe('gameReviewOf verdict', () => {
+  const review = {
+    provider: 'github' as const,
+    number: 9,
+    title: 'Game',
+    url: 'https://github.com/o/r/pull/9',
+    state: 'open' as const,
+    status: 'success' as const
+  }
+
+  it('maps the host review decision to a verdict', () => {
+    expect(gameReviewOf({ ...review, reviewDecision: 'APPROVED' })?.verdict).toBe('approved')
+    expect(gameReviewOf({ ...review, reviewDecision: 'CHANGES_REQUESTED' })?.verdict).toBe(
+      'changes_requested'
+    )
+    expect(gameReviewOf({ ...review, reviewDecision: 'REVIEW_REQUIRED' })?.verdict).toBe(
+      'review_required'
+    )
+  })
+
+  it('leaves the verdict out when the provider reports no decision', () => {
+    expect(gameReviewOf({ ...review, reviewDecision: null })).not.toHaveProperty('verdict')
+    expect(gameReviewOf(review)).not.toHaveProperty('verdict')
+  })
+})
