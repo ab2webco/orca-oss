@@ -17,6 +17,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   ...PLANE_HANDLER_GROUPS,
   ...ORCHESTRATOR_GAME_HANDLER_GROUPS,
   {
+    name: 'sonar',
+    keys: ['sonar'],
+    load: async () => (await import('./handlers/sonar.js')).SONAR_HANDLERS
+  },
+  {
     name: 'speech',
     keys: ['speech transcribe', 'speech models list', 'speech models download'],
     load: async () => (await import('./handlers/speech.js')).SPEECH_HANDLERS

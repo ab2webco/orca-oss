@@ -18,6 +18,7 @@ import { PLANE_COMMAND_SPECS } from './plane'
 import { VM_COMMAND_SPECS } from './vm'
 import { SKILL_COMMAND_SPECS } from './skills'
 import { SPEECH_COMMAND_SPECS } from './speech'
+import { SONAR_COMMAND_SPECS } from './sonar'
 import { ARTIFACT_COMMAND_SPECS } from './artifacts'
 import { DASHBOARD_POPOUT_COMMAND_SPECS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_COMMAND_SPECS } from './orchestrator-game'
@@ -44,6 +45,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...LINEAR_COMMAND_SPECS,
   ...PLANE_COMMAND_SPECS,
   ...VM_COMMAND_SPECS,
+  ...SONAR_COMMAND_SPECS,
   ...EMULATOR_COMMAND_SPECS,
   ...SKILL_COMMAND_SPECS,
   ...SPEECH_COMMAND_SPECS

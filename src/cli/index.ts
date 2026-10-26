@@ -61,6 +61,10 @@ export async function main(
     await runClaudeTeams(argv.slice(1), cwd)
     return
   }
+  if (argv[0] === 'sonar') {
+    await runSonar(argv.slice(1), cwd)
+    return
+  }
   const parsed = normalizeCommandPositionals(COMMAND_SPECS, parseArgs(argv, COMMAND_PATHS))
   const helpPath = resolveHelpPath(parsed)
   if (helpPath !== null) {
@@ -133,6 +137,24 @@ async function runClaudeTeams(argv: string[], cwd: string): Promise<void> {
     })
   } catch (error) {
     reportCliError(error, false, { commandPath: ['claude-teams'] })
+    process.exitCode = 1
+  }
+}
+
+async function runSonar(argv: string[], cwd: string): Promise<void> {
+  try {
+    // Why: everything after `orca sonar` belongs to the orca-sonar CLI, so its
+    // flags and subcommands never reach Orca's own parser.
+    const client = new (await loadRuntimeClientClass())(undefined, undefined, null, null)
+    await dispatch(['sonar'], {
+      flags: new Map(),
+      client,
+      cwd,
+      json: false,
+      rawArgs: argv
+    })
+  } catch (error) {
+    reportCliError(error, false, { commandPath: ['sonar'] })
     process.exitCode = 1
   }
 }
