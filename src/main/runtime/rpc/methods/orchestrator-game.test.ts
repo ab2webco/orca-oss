@@ -196,6 +196,28 @@ describe('game.state RPC', () => {
     ).resolves.toMatchObject({ ok: true, result: { lessons: [] } })
     expect(asked).toEqual([{ worktreeId: 'wt1', terminalHandle: undefined }])
   })
+
+  it("lists the caller project's characters", async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      listGameCharacters: async (args: unknown) => {
+        asked.push(args)
+        return { characters: [] }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await expect(
+      dispatcher.dispatch({
+        id: 'ch',
+        authToken: 'test',
+        method: 'game.characters',
+        params: { terminalHandle: 'h1' }
+      })
+    ).resolves.toMatchObject({ ok: true, result: { characters: [] } })
+    expect(asked).toEqual([{ worktreeId: undefined, terminalHandle: 'h1' }])
+  })
 })
 
 describe('game.memberRecord RPC', () => {

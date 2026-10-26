@@ -24,15 +24,64 @@ const RECORDS = [
   }
 ]
 
-function fakeClient(fail = false) {
+// Luigi stopped CIN-3 after Peach merged CIN-1; Peach's first task is no longer kept.
+const CHARACTERS = [
+  {
+    key: 'peach',
+    name: 'Peach',
+    tickets: 2,
+    prsOpened: 1,
+    prsMerged: 1,
+    outcomes: { merged: 2, qa: 0, stopped: 0, failed: 0, limited: 0 },
+    workedMs: 0,
+    xp: 200,
+    lastAt: '2026-10-19T12:00:00.000Z',
+    recent: [
+      {
+        ticket: 'CIN-1',
+        outcome: 'merged',
+        pr: '#41 merged',
+        endedAt: '2026-10-19T12:00:00.000Z',
+        workedMs: null
+      }
+    ]
+  },
+  {
+    key: 'luigi',
+    name: 'Luigi',
+    tickets: 1,
+    prsOpened: 0,
+    prsMerged: 0,
+    outcomes: { merged: 0, qa: 0, stopped: 1, failed: 0, limited: 0 },
+    workedMs: 0,
+    xp: 0,
+    lastAt: '2026-10-20T12:00:00.000Z',
+    recent: [
+      {
+        ticket: 'CIN-3',
+        outcome: 'stopped',
+        pr: null,
+        endedAt: '2026-10-20T12:00:00.000Z',
+        workedMs: null
+      }
+    ]
+  }
+]
+
+function fakeClient(fail = false, characters: unknown[] | 'unknown' = CHARACTERS) {
   const calls: [string, unknown][] = []
   const client = {
     call: async (method: string, params: unknown) => {
       calls.push([method, params])
-      if (fail) {
+      if (fail || (method === 'game.characters' && characters === 'unknown')) {
         throw new RuntimeClientError('method_not_found', `Unknown method: ${method}`)
       }
-      const result = method === 'game.events' ? { events: EVENTS } : { records: RECORDS }
+      const result =
+        method === 'game.events'
+          ? { events: EVENTS }
+          : method === 'game.characters'
+            ? { characters }
+            : { records: RECORDS }
       return { id: '1', ok: true, result, _meta: { runtimeId: 'rt' } }
     }
   } as unknown as RuntimeClient
@@ -81,7 +130,12 @@ describe('orca game metrics', () => {
       'CIN-1',
       'CIN-3'
     ])
-    expect(metrics.window).toEqual({ since: '2026-10-13', until: null, ticket: null })
+    expect(metrics.window).toEqual({
+      since: '2026-10-13',
+      until: null,
+      ticket: null,
+      character: null
+    })
   })
 
   it('drops an event kind it does not know instead of counting it', async () => {
@@ -114,11 +168,64 @@ describe('orca game metrics', () => {
     expect(calls).toEqual([])
   })
 
-  it('refuses --character until characters are recorded', async () => {
+  it("narrows --character to that character's own tasks, by name in any case", async () => {
     const { client, calls } = fakeClient()
-    await expect(run(client, [['character', 'Merlin']])).rejects.toThrow(/--character/)
-    await expect(run(client, [['character', true]])).rejects.toThrow(/--character/)
-    expect(calls).toEqual([])
+
+    await run(client, [['character', 'luigi']])
+
+    const caller = { worktreeId: 'wt1', terminalHandle: 'term_lead' }
+    expect(calls[0]).toEqual(['game.characters', caller])
+    const metrics = JSON.parse(output.join('')).result
+    expect(metrics.window.character).toBe('Luigi')
+    // CIN-3 was merged, but by its event alone; Luigi's own task on it was stopped.
+    expect(metrics.ticketsDone).toEqual([])
+    expect(metrics.outcomes.stopped).toBe(1)
+    expect(metrics.character).toMatchObject({ name: 'Luigi', xp: 0, tasksKept: 1 })
+  })
+
+  it('refuses an unknown character and names the ones it knows', async () => {
+    const { client, calls } = fakeClient()
+
+    await expect(run(client, [['character', 'Merlin']])).rejects.toThrow(
+      'No character "Merlin" in this project. Known: Peach, Luigi.'
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.characters'])
+  })
+
+  it('refuses --character without a name, and when no character is recorded yet', async () => {
+    const empty = fakeClient(false, [])
+    await expect(run(empty.client, [['character', true]])).rejects.toThrow(
+      '--character needs a name'
+    )
+    expect(empty.calls).toEqual([])
+    await expect(run(empty.client, [['character', 'Peach']])).rejects.toThrow(
+      'No character has been recorded in this project yet'
+    )
+  })
+
+  it('maps an Orca without game characters to incompatible_runtime, only for --character', async () => {
+    const { client, calls } = fakeClient(false, 'unknown')
+
+    await expect(run(client, [['character', 'Peach']])).rejects.toMatchObject({
+      code: 'incompatible_runtime'
+    })
+    await run(client, [])
+    expect(calls.filter(([method]) => method === 'game.characters')).toHaveLength(1)
+  })
+
+  it("prints the character's level and says when its oldest tasks are no longer kept", async () => {
+    const { client } = fakeClient()
+
+    await run(client, [['character', 'Peach']], false)
+
+    const text = output.join('\n')
+    expect(text).toContain('Game metrics · all recorded time · all tickets · Peach')
+    expect(text).toContain('Character      Peach · level 2 · 200 XP')
+    expect(text).toContain(
+      "Note: only Peach's last 1 of 2 tasks are kept; older ones do not count."
+    )
+    expect(text).not.toMatch(/^ +XP +not recorded/m)
+    expect(Math.max(...text.split('\n').map((line) => line.length))).toBeLessThanOrEqual(80)
   })
 
   it('maps an Orca without game events or history to incompatible_runtime', async () => {

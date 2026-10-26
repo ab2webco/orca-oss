@@ -747,6 +747,7 @@ import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
+import type { GameCharacter } from '../../shared/orchestrator-game-characters'
 import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
 import { freedCharacterOf } from '../../shared/orchestrator-game-characters'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
@@ -30939,6 +30940,14 @@ export class OrcaRuntimeService {
       name: (repo?.displayName ?? key).trim().toLowerCase(),
       directory: repo?.path ?? null
     }
+  }
+
+  async listGameCharacters(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{ characters: GameCharacter[] }> {
+    const { key } = await this.gameHistoryProjectOf(args)
+    return { characters: await this.gameHistory.characters(key) }
   }
 
   async listGameHistory(args: {

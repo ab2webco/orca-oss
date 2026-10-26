@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computeGameMetrics, GAME_METRICS_NOT_RECORDED } from './orchestrator-game-metrics'
 import { GAME_EVENTS_MAX, type GameEvent, type GameEventKind } from './orchestrator-game-events'
 import { GAME_HISTORY_MAX, type GameHistoryRecord } from './orchestrator-game-history'
+import type { GameCharacter, GameCharacterTask } from './orchestrator-game-characters'
 
 const event = (at: string, kind: GameEventKind, ticket: string | null): GameEvent => ({
   at,
@@ -56,6 +57,45 @@ const HISTORY: GameHistoryRecord[] = [
 ]
 
 const HOUR = 3_600_000
+
+const task = (
+  ticket: string,
+  outcome: GameCharacterTask['outcome'],
+  endedAt: string,
+  extra: Partial<GameCharacterTask> = {}
+): GameCharacterTask => ({ ticket, outcome, pr: null, endedAt, workedMs: null, ...extra })
+
+const character = (
+  name: string,
+  recent: GameCharacterTask[],
+  extra: Partial<GameCharacter> = {}
+): GameCharacter => ({
+  key: name.toLowerCase(),
+  name,
+  tickets: recent.length,
+  prsOpened: 0,
+  prsMerged: 0,
+  outcomes: { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 },
+  workedMs: 0,
+  xp: 0,
+  lastAt: recent.at(-1)?.endedAt ?? '',
+  recent,
+  ...extra
+})
+
+// Steve stopped ORCA-3 and Alex merged it; Alex's oldest task fell out of `recent`.
+const STEVE = character('Steve', [
+  task('ORCA-2', 'failed', '2026-10-19T11:05:00.000Z'),
+  task('ORCA-3', 'stopped', '2026-10-20T12:00:00.000Z', { workedMs: 2 * HOUR })
+])
+const ALEX = character(
+  'Alex',
+  [
+    task('ORCA-4', 'merged', '2026-10-20T08:00:00.000Z', { pr: '#9 merged', workedMs: 6 * HOUR }),
+    task('ORCA-3', 'merged', '2026-10-20T15:05:00.000Z', { pr: '#8 merged', workedMs: 3 * HOUR })
+  ],
+  { xp: 300, tickets: 3, outcomes: { merged: 3, qa: 0, stopped: 0, failed: 0, limited: 0 } }
+)
 
 describe('computeGameMetrics', () => {
   afterEach(() => {
@@ -188,6 +228,56 @@ describe('computeGameMetrics', () => {
       'achievements'
     ])
     expect(metrics.notRecorded).toBe(GAME_METRICS_NOT_RECORDED)
+    expect(metrics.character).toBeNull()
+  })
+
+  it("counts a character's own tasks and the tickets it finished", () => {
+    const metrics = computeGameMetrics(
+      { events: EVENTS, history: HISTORY },
+      { since: '2026-10-13', character: ALEX }
+    )
+
+    expect(metrics.window.character).toBe('Alex')
+    expect(metrics.ticketsDone).toEqual(['ORCA-3', 'ORCA-4'])
+    // ORCA-3 runs from the ticket's first claim, Steve's attempt included; ORCA-4 from Alex's launch.
+    expect(metrics.leadTime.tickets.map(({ ticket, ms, endsAt }) => [ticket, ms, endsAt])).toEqual([
+      ['ORCA-3', 5 * HOUR, 'merged_event'],
+      ['ORCA-4', 6 * HOUR, 'member_freed']
+    ])
+    expect(metrics.outcomes).toEqual({ merged: 2, qa: 0, stopped: 0, failed: 0, limited: 0 })
+    expect(metrics.events.claimed).toBe(1)
+    expect(metrics.events.merged).toBe(1)
+    expect(metrics.character).toEqual({
+      key: 'alex',
+      name: 'Alex',
+      xp: 300,
+      level: { level: 3, into: 0, need: 300 },
+      tasksKept: 2,
+      tasksTotal: 3
+    })
+    expect(metrics.notRecorded.map((one) => one.metric)).not.toContain('xp')
+  })
+
+  it('never credits a character with a ticket another character merged after it stopped', () => {
+    const metrics = computeGameMetrics({ events: EVENTS, history: HISTORY }, { character: STEVE })
+
+    expect(metrics.ticketsDone).toEqual([])
+    expect(metrics.leadTime.tickets).toEqual([])
+    expect(metrics.outcomes).toEqual({ merged: 0, qa: 0, stopped: 1, failed: 1, limited: 0 })
+    // Events are the ones on its tickets, so ORCA-3's merge still shows there.
+    expect(metrics.events.claimed).toBe(2)
+    expect(metrics.events.merged).toBe(1)
+    expect(metrics.character).toMatchObject({ tasksKept: 2, tasksTotal: 2 })
+  })
+
+  it('narrows a character to one of its tickets', () => {
+    const metrics = computeGameMetrics(
+      { events: EVENTS, history: HISTORY },
+      { character: ALEX, ticket: 'orca-4' }
+    )
+
+    expect(metrics.ticketsDone).toEqual(['ORCA-4'])
+    expect(metrics.events.claimed).toBe(0)
   })
 
   it('says a full store whose oldest entry is inside the window may have lost the start', () => {

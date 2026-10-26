@@ -10,10 +10,32 @@ import {
   type GameHistoryOutcome,
   type GameHistoryRecord
 } from './orchestrator-game-history'
+import {
+  gameCharacterLevelOf,
+  type GameCharacter,
+  type GameCharacterLevel,
+  type GameCharacterTask
+} from './orchestrator-game-characters'
 
 /** A project's delivery numbers from its game events and history: `orca game metrics`. */
 
-export type GameMetricsFilter = { since?: string; until?: string; ticket?: string }
+export type GameMetricsFilter = {
+  since?: string
+  until?: string
+  ticket?: string
+  /** Narrows to its own tasks; a ticket counts as done only when its own task on it is. */
+  character?: GameCharacter
+}
+
+export type GameMetricsCharacter = {
+  key: string
+  name: string
+  xp: number
+  level: GameCharacterLevel
+  /** Its tasks the host still keeps; fewer than `tasksTotal` means the oldest are not counted. */
+  tasksKept: number
+  tasksTotal: number
+}
 
 export type GameLeadTime = {
   ticket: string
@@ -29,7 +51,13 @@ export type GameLeadTime = {
 export type GameMetricNotRecorded = { metric: string; label: string; needs: string }
 
 export type GameMetrics = {
-  window: { since: string | null; until: string | null; ticket: string | null }
+  window: {
+    since: string | null
+    until: string | null
+    ticket: string | null
+    character: string | null
+  }
+  character: GameMetricsCharacter | null
   /** Tickets with a merged event, or freed as merged or with a merged PR, in the window. */
   ticketsDone: string[]
   leadTime: {
@@ -61,7 +89,7 @@ export const GAME_METRICS_NOT_RECORDED: readonly GameMetricNotRecorded[] = [
     needs: 'branch and worktree removal facts'
   },
   { metric: 'trackerDrift', label: 'tracker drift', needs: 'a tracker status fact' },
-  { metric: 'xp', label: 'XP', needs: 'XP on the Orca host (ORCA-684)' },
+  { metric: 'xp', label: 'XP', needs: '--character (XP is per character)' },
   { metric: 'achievements', label: 'achievements', needs: 'an achievement record' }
 ]
 
@@ -102,8 +130,38 @@ function isTruncated(times: readonly number[], max: number, since: number): bool
   return Number.isNaN(since) || oldest > since
 }
 
-const isDoneRecord = (one: GameHistoryRecord): boolean =>
+const isDoneRecord = (one: Pick<GameHistoryRecord, 'outcome' | 'pr'>): boolean =>
   one.outcome === 'merged' || (one.pr !== null && MERGED_PR.test(one.pr))
+
+function taskRecordOf(task: GameCharacterTask): GameHistoryRecord {
+  const launched = task.workedMs === null ? Number.NaN : Date.parse(task.endedAt) - task.workedMs
+  return {
+    ticket: task.ticket,
+    repo: null,
+    branch: null,
+    agent: null,
+    account: null,
+    launchedAt: Number.isNaN(launched) ? null : new Date(launched).toISOString(),
+    endedAt: task.endedAt,
+    outcome: task.outcome,
+    pr: task.pr,
+    lastReport: null
+  }
+}
+
+function characterSummaryOf(character: GameCharacter): GameMetricsCharacter {
+  return {
+    key: character.key,
+    name: character.name,
+    xp: character.xp,
+    level: gameCharacterLevelOf(character.xp),
+    tasksKept: character.recent.length,
+    tasksTotal: Math.max(
+      character.recent.length,
+      Object.values(character.outcomes).reduce((sum, count) => sum + count, 0)
+    )
+  }
+}
 
 /** `events` and `history` are the whole stores: a claim before the window still starts its lead time. */
 export function computeGameMetrics(
@@ -116,16 +174,28 @@ export function computeGameMetrics(
   const inWindow = (at: number): boolean =>
     (Number.isNaN(since) || at >= since) && (Number.isNaN(until) || at < until)
   const ofTicket = (one: { ticket: string | null }): boolean => !ticket || one.ticket === ticket
+  const character = filter.character ?? null
+  const ownTasks = character?.recent.map(taskRecordOf) ?? null
+  const ownTickets = new Set(ownTasks?.flatMap((one) => one.ticket ?? []))
+  const ownDone = new Set(ownTasks?.filter(isDoneRecord).flatMap((one) => one.ticket ?? []))
+  const ofCharacter = (one: { ticket: string | null }): boolean =>
+    !character || (one.ticket !== null && ownTickets.has(one.ticket))
 
-  const events = stores.events.filter(ofTicket)
-  const history = stores.history.filter(ofTicket)
+  const events = stores.events.filter(ofTicket).filter(ofCharacter)
+  const history = (ownTasks ?? stores.history).filter(ofTicket)
   const windowEvents = events.filter((one) => inWindow(Date.parse(one.at)))
   const windowHistory = history.filter((one) => inWindow(Date.parse(one.endedAt)))
 
   const mergedAt = new Map<string, number>()
   for (const one of windowEvents) {
     const at = Date.parse(one.at)
-    if (one.kind === 'merged' && one.ticket && at > (mergedAt.get(one.ticket) ?? -Infinity)) {
+    const own = !character || (one.ticket !== null && ownDone.has(one.ticket))
+    if (
+      one.kind === 'merged' &&
+      one.ticket &&
+      own &&
+      at > (mergedAt.get(one.ticket) ?? -Infinity)
+    ) {
       mergedAt.set(one.ticket, at)
     }
   }
@@ -173,7 +243,13 @@ export function computeGameMetrics(
   const durations = leadTimes.map((one) => one.ms)
 
   return {
-    window: { since: filter.since ?? null, until: filter.until ?? null, ticket },
+    window: {
+      since: filter.since ?? null,
+      until: filter.until ?? null,
+      ticket,
+      character: character?.name ?? null
+    },
+    character: character && characterSummaryOf(character),
     ticketsDone,
     leadTime: {
       tickets: leadTimes,
@@ -192,7 +268,9 @@ export function computeGameMetrics(
       GAME_EVENT_KINDS,
       windowEvents.map((one) => one.kind)
     ),
-    notRecorded: GAME_METRICS_NOT_RECORDED,
+    notRecorded: character
+      ? GAME_METRICS_NOT_RECORDED.filter((one) => one.metric !== 'xp')
+      : GAME_METRICS_NOT_RECORDED,
     truncated: {
       events: isTruncated(
         stores.events.map((one) => Date.parse(one.at)),
@@ -200,7 +278,7 @@ export function computeGameMetrics(
         since
       ),
       history: isTruncated(
-        stores.history.map((one) => Date.parse(one.endedAt)),
+        (ownTasks ?? stores.history).map((one) => Date.parse(one.endedAt)),
         GAME_HISTORY_MAX,
         since
       )

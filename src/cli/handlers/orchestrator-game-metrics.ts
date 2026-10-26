@@ -10,6 +10,7 @@ import {
 import { GAME_EVENTS_MAX, parseGameEvent } from '../../shared/orchestrator-game-events'
 import { GAME_HISTORY_MAX, parseGameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { computeGameMetrics, type GameMetrics } from '../../shared/orchestrator-game-metrics'
+import type { GameCharacter } from '../../shared/orchestrator-game-characters'
 
 const WIDTH = 80
 const LABEL = 15
@@ -57,16 +58,62 @@ function row(label: string, parts: readonly string[]): string[] {
 }
 
 function windowOf(metrics: GameMetrics): string {
-  const { since, until, ticket } = metrics.window
+  const { since, until, ticket, character } = metrics.window
   const range = [since ? `since ${since}` : null, until ? `until ${until}` : null]
     .filter(Boolean)
     .join(' ')
-  return [range || 'all recorded time', ticket ?? 'all tickets'].join(' · ')
+  return [
+    range || 'all recorded time',
+    ticket ?? 'all tickets',
+    ...(character ? [character] : [])
+  ].join(' · ')
+}
+
+/** The stored character `--character` names, by its key or the name it was last shown under. */
+async function characterOf(
+  client: Parameters<CommandHandler>[0]['client'],
+  flags: Map<string, string | boolean>
+): Promise<GameCharacter | undefined> {
+  if (!flags.has('character')) {
+    return undefined
+  }
+  const wanted = optionalText(flags, 'character')
+  if (wanted === undefined) {
+    throw new RuntimeClientError('invalid_argument', '--character needs a name, like Merlin.')
+  }
+  const { result } = await callGameBoard<{ characters: GameCharacter[] }>(
+    client,
+    'game.characters',
+    gameBoardCaller(),
+    'characters'
+  )
+  if (result.characters.length === 0) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'No character has been recorded in this project yet: one is once the lead frees a member.'
+    )
+  }
+  const lower = wanted.toLowerCase()
+  const found = result.characters.find(
+    (one) => one.key === lower || one.name.toLowerCase() === lower
+  )
+  if (!found) {
+    const known = result.characters.map((one) => one.name).join(', ')
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `No character "${wanted}" in this project. Known: ${known}.`
+    )
+  }
+  return found
 }
 
 export function formatGameMetrics(metrics: GameMetrics): string {
   const { leadTime } = metrics
   const lines = [`Game metrics · ${windowOf(metrics)}`]
+  if (metrics.character) {
+    const { name, level, xp } = metrics.character
+    lines.push(...row('Character', [name, `level ${level.level}`, `${xp} XP`]))
+  }
   lines.push(...row('Tickets done', [String(metrics.ticketsDone.length), ...metrics.ticketsDone]))
   if (leadTime.medianMs === null || leadTime.meanMs === null) {
     lines.push(...row('Lead time', ['no data']))
@@ -118,20 +165,21 @@ export function formatGameMetrics(metrics: GameMetrics): string {
       `Note: only the last ${GAME_HISTORY_MAX} freed members are kept; the window starts before.`
     )
   }
+  const own = metrics.character
+  if (own && own.tasksKept < own.tasksTotal) {
+    lines.push(
+      `Note: only ${own.name}'s last ${own.tasksKept} of ${own.tasksTotal} tasks are kept; older ones do not count.`
+    )
+  }
   return lines.join('\n')
 }
 
 export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> = {
   'game metrics': async ({ flags, client, json }) => {
-    if (flags.has('character')) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        '--character needs per-character records, which Orca Lab does not keep yet.'
-      )
-    }
     const ticket = optionalText(flags, 'ticket')
     const since = sinceOf(flags)
     const until = untilOf(flags)
+    const character = await characterOf(client, flags)
     // Why unfiltered: a claim before --since still starts the lead time of a merge inside it.
     const events = await callGameBoard<{ events: unknown[] }>(
       client,
@@ -150,7 +198,7 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
         events: events.result.events.map(parseGameEvent).filter((one) => one !== null),
         history: history.result.records.map(parseGameHistoryRecord).filter((one) => one !== null)
       },
-      { ticket, since, until }
+      { ticket, since, until, character }
     )
     printResult({ ...history, result: metrics }, json, formatGameMetrics)
   }

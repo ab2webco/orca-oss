@@ -188,6 +188,15 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       })
   }),
   defineMethod({
+    name: 'game.characters',
+    params: GameCallerParams,
+    handler: async (params, { runtime }) =>
+      runtime.listGameCharacters({
+        worktreeId: params?.worktreeId,
+        terminalHandle: params?.terminalHandle
+      })
+  }),
+  defineMethod({
     name: 'game.history',
     params: GameHistoryParams,
     handler: async (params, { runtime }) =>
