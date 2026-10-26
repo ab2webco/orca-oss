@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { RuntimeClientError } from './runtime/types'
-import { resolveSonarCli, type SonarCliLookup } from './sonar-cli-location'
+import { resolveSonarCli, type SonarCliLookup } from '../shared/sonar-cli-location'
 
 export type SonarProcessRunner = (
   command: string,
