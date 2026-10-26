@@ -33,7 +33,7 @@ export function scheduleSonarIndexWarmup(options: ScheduleSonarIndexWarmupOption
       return
     }
     const start = options.spawn ?? spawnChild
-    const child = start('node', [lookup.cliPath, 'index', '--root', worktreePath], {
+    const child = start('node', [lookup.cliPath, 'index', '--warmup', '--root', worktreePath], {
       env: { ...process.env, ORCA_USER_DATA_PATH: userDataDir },
       stdio: 'ignore'
     })

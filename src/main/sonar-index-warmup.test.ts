@@ -75,7 +75,7 @@ describe('scheduleSonarIndexWarmup', () => {
     expect(result).toBeUndefined()
     expect(spawn).toHaveBeenCalledWith(
       'node',
-      [cliPath, 'index', '--root', worktreePath],
+      [cliPath, 'index', '--warmup', '--root', worktreePath],
       expect.objectContaining({
         stdio: 'ignore',
         env: expect.objectContaining({ ORCA_USER_DATA_PATH: userDataDir })
