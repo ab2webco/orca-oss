@@ -104,6 +104,44 @@ describe('PtyHandler', () => {
     expect(callArgs.env.ORCA_SHELL_STARTUP_IDENTITY).toBe('0')
   })
 
+  it('revive keeps the worktree slug when the SSH spawn stripped the worktree id', async () => {
+    await dispatcher.callRequest('pty.spawn', {
+      cols: 90,
+      rows: 30,
+      cwd: '/tmp',
+      env: { ORCA_WORKTREE_SLUG: 'feature_0a1b2c3d' }
+    })
+    const state = (await dispatcher.callRequest('pty.serialize', { ids: ['pty-1'] })) as string
+    await handler.dispose({ waitForPhysicalExit: false })
+    mockPtySpawn.mockClear()
+    dispatcher = createMockDispatcher()
+    handler = new PtyHandler(dispatcher as unknown as RelayDispatcher)
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    try {
+      await dispatcher.callRequest('pty.revive', { state })
+    } finally {
+      killSpy.mockRestore()
+    }
+
+    const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
+    expect(callArgs.env.ORCA_WORKTREE_SLUG).toBe('feature_0a1b2c3d')
+  })
+
+  it('revive drops a serialized slug that is not database-safe', async () => {
+    const state = JSON.stringify([
+      { id: 'pty-8', pid: process.pid, cols: 80, rows: 24, cwd: '/tmp', worktreeSlug: 'x; rm -rf' }
+    ])
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    try {
+      await dispatcher.callRequest('pty.revive', { state })
+    } finally {
+      killSpy.mockRestore()
+    }
+
+    const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
+    expect(callArgs.env.ORCA_WORKTREE_SLUG).toBeUndefined()
+  })
+
   it('fences both revived worktree identity and cwd with rollback', async () => {
     const finishSiblingAdmission = vi.fn()
     const beginWorktreePtySpawn = vi.fn((operationPath: string) => {

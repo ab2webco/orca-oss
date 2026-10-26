@@ -119,11 +119,13 @@ describe('createPtySubprocess', () => {
     const saved = {
       ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
       ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+      ORCA_WORKTREE_SLUG: process.env.ORCA_WORKTREE_SLUG
     }
     process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
     process.env.ORCA_TAB_ID = 'parent-tab'
     process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.ORCA_WORKTREE_SLUG = 'parent_worktree_00000000'
 
     try {
       createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
@@ -141,6 +143,7 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_PANE_KEY).toBeUndefined()
     expect(env.ORCA_TAB_ID).toBeUndefined()
     expect(env.ORCA_WORKTREE_ID).toBeUndefined()
+    expect(env.ORCA_WORKTREE_SLUG).toBeUndefined()
   })
 
   it('preserves explicit child Orca Lab pane identity over parent env', () => {
@@ -149,11 +152,13 @@ describe('createPtySubprocess', () => {
     const saved = {
       ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
       ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+      ORCA_WORKTREE_SLUG: process.env.ORCA_WORKTREE_SLUG
     }
     process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
     process.env.ORCA_TAB_ID = 'parent-tab'
     process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.ORCA_WORKTREE_SLUG = 'parent_worktree_00000000'
 
     try {
       createPtySubprocess({
@@ -163,7 +168,8 @@ describe('createPtySubprocess', () => {
         env: {
           ORCA_PANE_KEY: 'child-tab:child-leaf',
           ORCA_TAB_ID: 'child-tab',
-          ORCA_WORKTREE_ID: 'child-worktree'
+          ORCA_WORKTREE_ID: 'child-worktree',
+          ORCA_WORKTREE_SLUG: 'child_worktree_11111111'
         }
       })
     } finally {
@@ -180,6 +186,7 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
     expect(env.ORCA_TAB_ID).toBe('child-tab')
     expect(env.ORCA_WORKTREE_ID).toBe('child-worktree')
+    expect(env.ORCA_WORKTREE_SLUG).toBe('child_worktree_11111111')
   })
 
   it('does not inherit ELECTRON_RUN_AS_NODE from the daemon process env', () => {

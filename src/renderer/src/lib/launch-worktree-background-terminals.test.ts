@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { worktreeSlugOf } from '../../../shared/worktree/slug'
 
 const mockSpawn = vi.fn()
 const mockKill = vi.fn()
@@ -143,7 +144,10 @@ describe('launchWorktreeBackgroundTerminals', () => {
       2,
       expect.objectContaining({
         command: 'bash /tmp/setup.sh',
-        env: expect.objectContaining({ ORCA_WORKTREE_PATH: '/repo/worktree' }),
+        env: expect.objectContaining({
+          ORCA_WORKTREE_PATH: '/repo/worktree',
+          ORCA_WORKTREE_SLUG: worktreeSlugOf('wt-1')
+        }),
         tabId: 'tab-2',
         leafId: '00000000-0000-4000-8000-000000000002'
       })

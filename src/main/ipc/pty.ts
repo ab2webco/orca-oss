@@ -170,6 +170,7 @@ import {
 } from '../../shared/terminal-startup-cwd'
 import { isWslUncPath, toWindowsWslPath } from '../../shared/wsl-paths'
 import { splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
+import { worktreeSlugEnv } from '../../shared/worktree/slug'
 import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
 import {
   agentSessionOwnerBindingsEqual,
@@ -7060,6 +7061,9 @@ export function registerPtyHandlers(
           delete baseEnv.ORCA_TAB_ID
           delete baseEnv.ORCA_WORKTREE_ID
           delete baseEnv.ORCA_AGENT_LAUNCH_TOKEN
+        }
+        if (baseEnv && typeof args.worktreeId === 'string') {
+          Object.assign(baseEnv, worktreeSlugEnv(args.worktreeId))
         }
         // Why: main may only trust a launch token it can see the child actually receiving. Accepting
         // the renderer's claim on its own would let any spawn mint an identity for a pane it does not own.

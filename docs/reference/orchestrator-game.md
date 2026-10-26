@@ -304,7 +304,9 @@ is in that project's own `orca.yaml`.
 
 The plugin polls this every 30 seconds and after each turn. It resolves the calling pane from
 `ORCA_WORKTREE_ID`, `ORCA_TERMINAL_HANDLE` and `ORCA_PANE_KEY`
-([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)):
+([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)). Members also get
+`ORCA_WORKTREE_SLUG` to keep parallel test suites apart
+([pattern](./worktree-test-resources.md)). The state contains:
 
 - `config`, `sources`, `warnings` — the resolved layers above;
 - `agents` — the worktree's agent rows (`working`, `waiting`, `idle`, `done`, current tool,

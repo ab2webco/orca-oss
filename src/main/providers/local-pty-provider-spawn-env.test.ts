@@ -458,11 +458,13 @@ describe('LocalPtyProvider', () => {
       const saved = {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-        ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+        ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+        ORCA_WORKTREE_SLUG: process.env.ORCA_WORKTREE_SLUG
       }
       process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
       process.env.ORCA_TAB_ID = 'parent-tab'
       process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+      process.env.ORCA_WORKTREE_SLUG = 'parent_worktree_00000000'
 
       try {
         await provider.spawn({ cols: 80, rows: 24 })
@@ -480,17 +482,20 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_PANE_KEY).toBeUndefined()
       expect(spawnCall[2].env.ORCA_TAB_ID).toBeUndefined()
       expect(spawnCall[2].env.ORCA_WORKTREE_ID).toBeUndefined()
+      expect(spawnCall[2].env.ORCA_WORKTREE_SLUG).toBeUndefined()
     })
 
     it('preserves explicit child Orca Lab pane identity over parent env', async () => {
       const saved = {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-        ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+        ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+        ORCA_WORKTREE_SLUG: process.env.ORCA_WORKTREE_SLUG
       }
       process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
       process.env.ORCA_TAB_ID = 'parent-tab'
       process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+      process.env.ORCA_WORKTREE_SLUG = 'parent_worktree_00000000'
 
       try {
         await provider.spawn({
@@ -499,7 +504,8 @@ describe('LocalPtyProvider', () => {
           env: {
             ORCA_PANE_KEY: 'child-tab:child-leaf',
             ORCA_TAB_ID: 'child-tab',
-            ORCA_WORKTREE_ID: 'child-worktree'
+            ORCA_WORKTREE_ID: 'child-worktree',
+            ORCA_WORKTREE_SLUG: 'child_worktree_11111111'
           }
         })
       } finally {
@@ -516,6 +522,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
       expect(spawnCall[2].env.ORCA_TAB_ID).toBe('child-tab')
       expect(spawnCall[2].env.ORCA_WORKTREE_ID).toBe('child-worktree')
+      expect(spawnCall[2].env.ORCA_WORKTREE_SLUG).toBe('child_worktree_11111111')
     })
   })
 })

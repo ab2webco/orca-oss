@@ -14,6 +14,7 @@ import {
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
+import { worktreeSlugEnv } from '../../shared/worktree/slug'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { sortDirEntries } from '../../shared/file-name-sort'
 import {
@@ -32535,7 +32536,8 @@ export class OrcaRuntimeService {
       ...this.buildAgentHookPtyEnv?.(),
       ORCA_PANE_KEY: paneKey,
       ORCA_TAB_ID: tabId,
-      ORCA_WORKTREE_ID: scope.id
+      ORCA_WORKTREE_ID: scope.id,
+      ...worktreeSlugEnv(scope.id)
     }
     if (!scope.folderWorkspace) {
       return env
