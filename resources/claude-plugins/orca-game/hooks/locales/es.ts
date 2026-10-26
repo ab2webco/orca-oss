@@ -89,6 +89,7 @@ export const ES: GameCatalog = {
     layoutStates: { shown: 'visible', collapsed: 'plegada', hidden: 'oculta' },
     layoutUsage:
       'Cámbialo con /orca-game:layout restablecer, añadir <sección>, quitar <sección> o mover <sección> arriba|abajo. Pulsa ▾ o ▸ en el Panel para plegar una sección.',
+    catalogMenu: 'Widgets',
     layoutUnknownSection: (asked, sections) =>
       `Sección desconocida "${asked}". Secciones: ${sections}.`,
     sentToLead: (label) => `Enviado al líder: ${label}`,
