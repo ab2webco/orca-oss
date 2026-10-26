@@ -375,12 +375,18 @@ popover.
 ## Panel layout
 
 The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
-item rows), My PRs, To Do and Actions, in that order. Each heading starts with a mark: `▾` while
-it is expanded, `▸` once collapsed to its heading line (`▸ To Do 12`). A click, a tap or Tab and
-Enter on the mark toggles it; every letter is already a Panel hotkey, so sections take none. The
+item rows), My PRs, To Do and Actions, in that order. A new Panel shows only Team and My PRs; the
+other three are widgets a person adds with `/orca-game:layout add <section>` and removes the same
+way. Each heading starts with a mark: `▾` while it is expanded, `▸` once collapsed to its heading
+line (`▸ To Do 12`). A click, a tap or Tab and Enter on the mark toggles it; every letter is
+already a Panel hotkey, so sections take none. The
 headings keep their own link or action, and a collapsed Team turns red while a teammate waits; a
 collapsed Review keeps its CI color. The `Needs you` lines above the sections are never hidden.
 On a phone-width pane each section also gets a touch-sized chip under the menu.
+
+A widget that is not shown is not drawn: its rows, buttons, hotkeys and Team's animated tiles are
+gone until it is added, and a closed Actions widget reads no run log. Its data still arrives with
+`game state`.
 
 `/orca-game:layout` lists the sections with their state and takes `reset`, `add <section>`,
 `remove <section>` and `move <section> up|down` (Spanish words work too: `añadir tareas`,

@@ -3,6 +3,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { allWidgetsStore } from './all-widgets-store'
+
 import { cellWidthOf } from '../hooks/cell-width'
 import { HOTKEY_CELLS, TAP_LAYOUT_COLUMNS, TAP_MIN_CELLS, TAP_ROWS } from '../hooks/tap-layout'
 
@@ -61,7 +63,9 @@ const engine = (on: On, state: object) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', ($s, e) => ({
+    value: e.key === 'panel-layout' ? allWidgetsStore(['wt-1']) : undefined
+  }))
   on('store.set', () => ({ value: undefined }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
   on('ui.status', () => ({ value: undefined }))

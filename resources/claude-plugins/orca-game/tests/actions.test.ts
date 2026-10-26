@@ -3,6 +3,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { allWidgetsStore } from './all-widgets-store'
+
 const ORCA_CLI = '/opt/orca/bin/orca'
 
 const STATE = {
@@ -68,6 +70,7 @@ type World = {
   state?: unknown
   env?: Record<string, string>
   registered: string[]
+  isDefaultLayout?: boolean
 }
 
 const engine = (on: On, world: World) => {
@@ -84,7 +87,12 @@ const engine = (on: On, world: World) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', ($s, e) => ({
+    value:
+      e.key === 'panel-layout' && world.isDefaultLayout !== true
+        ? allWidgetsStore(['repo-1', 'demo'])
+        : undefined
+  }))
   on('store.set', () => ({ value: undefined }))
   on('ui.toast', ($s, e) => {
     world.toasts.push(e.text)
@@ -158,6 +166,20 @@ const worldOf = (patch: Partial<World> = {}): World => ({
 })
 
 describe('project actions in the Panel', () => {
+  test('a Panel without the Actions widget draws no action and keeps no action hotkey', async ($, on) => {
+    const world = worldOf({ isDefaultLayout: true })
+    await start($, on, world)
+    const ui = await pane($)
+    expect(await ui.find({ type: 'Button', key: 'action-action-0' })).toBeUndefined()
+    expect(await ui.find({ type: 'Button', key: 'action-action-1' })).toBeUndefined()
+    const hotkeys = (await ui.findAll({ type: 'Button' })).map(
+      (one) => (one.props as { hotkey?: unknown }).hotkey
+    )
+    expect(hotkeys).not.toContain('e')
+    expect(hotkeys).not.toContain('f')
+    await ui.unmount()
+  })
+
   test('a prompt action sends its prompt to the lead on e and says so', async ($, on) => {
     const world = worldOf()
     await start($, on, world)
