@@ -1110,6 +1110,14 @@ orchestratorGame:
   `skyTop`, `skyBottom`, `frame`, `text`, `dim` (the second line of each teammate) and `star`, all
   six required when `hud` is present. Without it the band keeps Quest's night sky, so only the
   characters and the chips (`band`) take the scene's colors.
+- **3D block.** The optional `scene3d` object is what Orca's WebGL panel draws (ORCA-683), parsed
+  apart in [`orchestrator-game-scene-3d.ts`](../../src/shared/orchestrator-game-scene-3d.ts):
+  `figure` (`sphere`, `torus`, `helix`, `wave` or `clusters`) and `nodes` (50 to 1600, the cap that
+  keeps any project's file inside the memory budget) are required; `links` per node (0 to 4,
+  default 3), `spin` (0 to 1, default 0.3), `pulses` (default `true`) and `colors.node`, `.link`,
+  `.glow` (default: the scene's own looks) are optional. `orca game scene validate` reports a bad
+  block as `scene3d.<key>: <message>` and exits 1, but the game only drops the block with a warning
+  and draws the scene as 2D. An Orca build or mod older than the block ignores the key.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
 relative to the project root; a path leaving the project is refused inline) and three actions:

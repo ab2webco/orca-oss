@@ -250,3 +250,58 @@ describe('orchestratorGameScenesOf', () => {
     expect(warnings).toEqual(['game scene acme.pack/space dropped: duplicate scene id'])
   })
 })
+
+describe('the scene3d block', () => {
+  const scene3d = { figure: 'sphere', nodes: 600 }
+
+  it('reads a 3D block with its defaults filled in', () => {
+    const parsed = parse(scene({ scene3d: { ...scene3d, colors: { node: '#7fa86a' } } }))
+    expect(parsed.ok && parsed.definition.scene3d).toEqual({
+      figure: 'sphere',
+      nodes: 600,
+      links: 3,
+      spin: 0.3,
+      pulses: true,
+      colors: { node: 0x7fa86a }
+    })
+    expect(parsed.ok && parsed.warnings).toEqual([])
+  })
+
+  it('leaves the 3D block out of a scene that has none', () => {
+    const parsed = parse(scene())
+    expect(parsed.ok && 'scene3d' in parsed.definition).toBe(false)
+  })
+
+  // Why: an older Orca has no scene3d schema; the non-strict top level must ignore the key.
+  it('draws a scene with a 3D block as 2D when the block is not understood', () => {
+    const parsed = parse(scene({ scene3d: { figure: 'tesseract', nodes: 1e9 } }))
+    expect(parsed.ok).toBe(true)
+    expect(parsed.ok && 'scene3d' in parsed.definition).toBe(false)
+    expect(parsed.ok && parsed.warnings).toEqual([
+      expect.stringMatching(/^scene3d\.figure: /),
+      expect.stringMatching(/^scene3d\.nodes: /)
+    ])
+  })
+
+  it.each([
+    ['an unknown figure', { ...scene3d, figure: 'tesseract' }, 'scene3d.figure'],
+    ['too many nodes for the memory budget', { ...scene3d, nodes: 1601 }, 'scene3d.nodes'],
+    ['too few nodes', { ...scene3d, nodes: 10 }, 'scene3d.nodes'],
+    ['a fractional node count', { ...scene3d, nodes: 600.5 }, 'scene3d.nodes'],
+    ['too many links per node', { ...scene3d, links: 9 }, 'scene3d.links'],
+    ['a spin outside 0 to 1', { ...scene3d, spin: 2 }, 'scene3d.spin'],
+    [
+      'a node color that is not a color',
+      { ...scene3d, colors: { node: 'red' } },
+      'scene3d.colors.node'
+    ],
+    ['a block that is not an object', 'sphere', 'scene3d']
+  ])('names the failing key of %s', (_label, block, path) => {
+    const issues = orchestratorGameSceneIssues(JSON.stringify(scene({ scene3d: block })))
+    expect(issues).toEqual([expect.stringMatching(new RegExp(`^${path.replaceAll('.', '\\.')}: `))])
+  })
+
+  it('finds no issue in a valid 3D block', () => {
+    expect(orchestratorGameSceneIssues(JSON.stringify(scene({ scene3d })))).toEqual([])
+  })
+})
