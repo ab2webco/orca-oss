@@ -16927,6 +16927,57 @@ describe('OrcaRuntimeService', () => {
     expect(cleared?.startupCommandWithheld).toBeUndefined()
   })
 
+  it('never reads a shell whose launch command was withheld mid-wait as an idle agent (ORCA-792)', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        // A slow shell startup child (oh-my-zsh) owns the tty: neither a shell nor an agent.
+        getForegroundProcess: async () => 'git'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData('pty-bg', 'loading oh-my-zsh...\r\n', Date.now())
+      const wait = runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 20_000 })
+      const settled = vi.fn()
+      wait.then(settled, settled)
+
+      // The shell-ready budget elapses after the waiter started, so its entry check saw nothing.
+      await vi.advanceTimersByTimeAsync(1_500)
+      runtime.noteStartupCommandDelivery('pty-bg', 'withheld')
+      expect(runtime.isTerminalStartupCommandWithheld(handle)).toBe(true)
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(settled).not.toHaveBeenCalled()
+      await expect(runtime.isTerminalRunningAgent(handle)).resolves.toBe(false)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await expect(wait).rejects.toThrow('timeout')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports a withheld launch command as delivered once the slow shell catches up (ORCA-792)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'zsh'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    expect(runtime.isTerminalStartupCommandWithheld(handle)).toBe(false)
+    runtime.noteStartupCommandDelivery('pty-bg', 'withheld')
+    expect(runtime.isTerminalStartupCommandWithheld(handle)).toBe(true)
+    // A shell at its prompt is not an agent, whatever the launch was meant to start.
+    await expect(runtime.isTerminalRunningAgent(handle)).resolves.toBe(false)
+    runtime.noteStartupCommandDelivery('pty-bg', 'delivered')
+    expect(runtime.isTerminalStartupCommandWithheld(handle)).toBe(false)
+    expect(runtime.isTerminalStartupCommandWithheld('term_missing')).toBe(false)
+  })
+
   it('returns a blocked wait result for Codex workspace trust prompts', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({

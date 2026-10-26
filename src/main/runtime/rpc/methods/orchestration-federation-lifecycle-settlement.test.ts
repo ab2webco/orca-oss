@@ -12,6 +12,7 @@ import { waitForFederatedLifecycleSettlement } from '../../orchestration/federat
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { createFederationWorkerStartRequest as startRequest } from './orchestration-federation-test-request'
+import { mockFederatedAgentReady } from './orchestration-federation-worker-runtime-mocks'
 
 describe('orchestration federation lifecycle settlement', () => {
   let homeDb: OrchestrationDb
@@ -112,6 +113,7 @@ describe('orchestration federation lifecycle settlement', () => {
       status: 'running',
       exitCode: null
     })
+    mockFederatedAgentReady(workerRuntime)
     vi.spyOn(workerRuntime, 'getTerminalPaneKey').mockReturnValue(
       'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
     )

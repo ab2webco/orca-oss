@@ -34,6 +34,7 @@ export function configureWorkerRuntime(runtime: OrcaRuntimeService): void {
     status: 'running',
     exitCode: null
   })
+  mockFederatedAgentReady(runtime)
   vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(
     'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
   )
@@ -60,4 +61,16 @@ export function configureWorkerRuntime(runtime: OrcaRuntimeService): void {
     handle: 'term_windows_worker',
     closed: true
   } as never)
+}
+
+// Why: the remote start refuses to paste unless an agent owns the pane (ORCA-792).
+export function mockFederatedAgentReady(runtime: OrcaRuntimeService): void {
+  vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+  vi.spyOn(runtime, 'waitForAgentComposerReady').mockResolvedValue({
+    ready: true,
+    proven: true,
+    state: 'ready',
+    signal: null,
+    waitedMs: 0
+  })
 }

@@ -10,6 +10,7 @@ import type { OrchestrationEnvironmentTransport } from '../../orchestration/envi
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATION_METHODS } from './orchestration'
+import { mockFederatedAgentReady } from './orchestration-federation-worker-runtime-mocks'
 
 describe('orchestration federated worker output', () => {
   const databases: OrchestrationDb[] = []
@@ -142,6 +143,7 @@ describe('orchestration federated worker output', () => {
       status: 'running',
       exitCode: null
     })
+    mockFederatedAgentReady(runtime)
     vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(
       'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
     )
