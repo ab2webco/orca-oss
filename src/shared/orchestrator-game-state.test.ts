@@ -129,3 +129,49 @@ describe('gameReviewOf verdict', () => {
     expect(gameReviewOf(review)).not.toHaveProperty('verdict')
   })
 })
+
+describe('gameReviewOf perfect merge', () => {
+  const merged = {
+    provider: 'github' as const,
+    number: 652,
+    title: 'Game',
+    url: 'https://github.com/o/r/pull/652',
+    state: 'merged' as const,
+    status: 'success' as const,
+    ciHistory: [
+      { headSha: 'aaa', ci: 'success' as const },
+      { headSha: 'bbb', ci: 'success' as const }
+    ],
+    commentCount: 0,
+    reopenCount: 0
+  }
+
+  it('carries the review facts and calls a clean merge perfect', () => {
+    expect(gameReviewOf(merged)).toMatchObject({
+      ciHistory: merged.ciHistory,
+      commentCount: 0,
+      reopenCount: 0,
+      perfectMerge: true
+    })
+  })
+
+  it('is not perfect after a red head, a review comment, a reopen or requested changes', () => {
+    const red = [{ headSha: 'aaa', ci: 'failure' as const }, ...merged.ciHistory]
+    expect(gameReviewOf({ ...merged, ciHistory: red })?.perfectMerge).toBe(false)
+    expect(gameReviewOf({ ...merged, commentCount: 1 })?.perfectMerge).toBe(false)
+    expect(gameReviewOf({ ...merged, reopenCount: 1 })?.perfectMerge).toBe(false)
+    expect(gameReviewOf({ ...merged, reviewDecision: 'CHANGES_REQUESTED' })?.perfectMerge).toBe(
+      false
+    )
+    expect(gameReviewOf({ ...merged, status: 'failure' })?.perfectMerge).toBe(false)
+  })
+
+  it('decides nothing before the merge or without every fact', () => {
+    expect(gameReviewOf({ ...merged, state: 'open' })).not.toHaveProperty('perfectMerge')
+    const { ciHistory: _ci, commentCount: _comments, reopenCount: _reopens, ...gitlab } = merged
+    const unread = gameReviewOf({ ...gitlab, provider: 'gitlab' })
+    expect(unread).not.toHaveProperty('perfectMerge')
+    expect(unread).not.toHaveProperty('ciHistory')
+    expect(gameReviewOf({ ...merged, reopenCount: undefined })).not.toHaveProperty('perfectMerge')
+  })
+})
