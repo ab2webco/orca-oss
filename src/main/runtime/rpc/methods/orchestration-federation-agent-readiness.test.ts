@@ -170,7 +170,34 @@ describe('federated worker agent readiness (ORCA-792)', () => {
     expect(wait).toHaveBeenCalledTimes(1)
     expect(send).not.toHaveBeenCalled()
     expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
-    expect(result.lastError).toContain('shell-startup-command-withheld')
+    expect(result.lastError).toMatch(/^agent_not_started: .*shell-startup-command-withheld/)
+  })
+
+  it('names the failure when the wait times out on a pane that never left the shell', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runtime = createRemoteRuntime(db)
+    // The runtime no longer reads a withheld shell as idle, so the wait runs out instead.
+    vi.spyOn(runtime, 'waitForTerminal').mockRejectedValue(new Error('timeout'))
+    vi.spyOn(runtime, 'isTerminalStartupCommandWithheld').mockReturnValue(true)
+    const send = vi.spyOn(runtime, 'sendTerminalAgentPrompt')
+
+    const result = await attach(runtime, 300)
+
+    expect(send).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
+    expect(result.lastError).toMatch(/^agent_not_started: .*withheld/)
+  })
+
+  it('keeps a plain timeout when an agent owns the pane but never went idle', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runtime = createRemoteRuntime(db)
+    vi.spyOn(runtime, 'waitForTerminal').mockRejectedValue(new Error('timeout'))
+    vi.spyOn(runtime, 'isTerminalStartupCommandWithheld').mockReturnValue(false)
+    vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+
+    const result = await attach(runtime, 300)
+
+    expect(result).toMatchObject({ state: 'failed', lastError: 'timeout' })
   })
 
   it('reports the input as written but unproven when the composer marker never came', async () => {

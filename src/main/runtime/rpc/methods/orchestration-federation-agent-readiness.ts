@@ -23,18 +23,13 @@ export async function awaitFederatedAgentReadiness(args: {
 }): Promise<FederatedAgentReadiness> {
   const { runtime, terminalHandle } = args
   const deadline = Date.now() + args.budgetMs
-  let wait = await runtime.waitForTerminal(terminalHandle, {
-    condition: 'tui-idle',
-    timeoutMs: args.budgetMs
-  })
+  let wait = await waitForIdleAgent(runtime, terminalHandle, args.budgetMs)
   // Why: a slow shell still delivers the launch command once it reaches its prompt.
   if (!wait.satisfied && wait.blockedReason === 'shell-startup-command-withheld') {
-    if (await waitForStartupCommandDelivery(runtime, terminalHandle, deadline)) {
-      wait = await runtime.waitForTerminal(terminalHandle, {
-        condition: 'tui-idle',
-        timeoutMs: Math.max(1, deadline - Date.now())
-      })
+    if (!(await waitForStartupCommandDelivery(runtime, terminalHandle, deadline))) {
+      throw agentNotStarted(WITHHELD_REASON)
     }
+    wait = await waitForIdleAgent(runtime, terminalHandle, Math.max(1, deadline - Date.now()))
   }
   if (!wait.satisfied) {
     return { wait, composerReadyProven: false }
@@ -42,15 +37,39 @@ export async function awaitFederatedAgentReadiness(args: {
   const composer = await runtime.waitForAgentComposerReady(terminalHandle, {
     timeoutMs: Math.max(0, Math.min(AGENT_COMPOSER_READY_TIMEOUT_MS, deadline - Date.now()))
   })
+  await assertAgentOwnsPane(runtime, terminalHandle)
+  return { wait, composerReadyProven: composer.proven }
+}
+
+const WITHHELD_REASON =
+  'the launch command is still withheld behind the shell startup (shell-startup-command-withheld)'
+
+async function waitForIdleAgent(
+  runtime: OrcaRuntimeService,
+  terminalHandle: string,
+  timeoutMs: number
+): Promise<RuntimeTerminalWait> {
+  try {
+    return await runtime.waitForTerminal(terminalHandle, { condition: 'tui-idle', timeoutMs })
+  } catch (error) {
+    // Why: a pane that never left its shell runs the wait out; say so instead of `timeout`.
+    if (error instanceof Error && error.message === 'timeout') {
+      await assertAgentOwnsPane(runtime, terminalHandle)
+    }
+    throw error
+  }
+}
+
+async function assertAgentOwnsPane(
+  runtime: OrcaRuntimeService,
+  terminalHandle: string
+): Promise<void> {
   if (runtime.isTerminalStartupCommandWithheld(terminalHandle)) {
-    throw agentNotStarted(
-      'the launch command is still withheld behind the shell startup (shell-startup-command-withheld)'
-    )
+    throw agentNotStarted(WITHHELD_REASON)
   }
   if (!(await runtime.isTerminalRunningAgent(terminalHandle))) {
     throw agentNotStarted('no agent owns the pane; it is still a shell')
   }
-  return { wait, composerReadyProven: composer.proven }
 }
 
 function agentNotStarted(reason: string): OrchestrationError {
