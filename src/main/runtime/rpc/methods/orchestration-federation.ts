@@ -1,8 +1,10 @@
+import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
+import { awaitFederatedAgentReadiness } from './orchestration-federation-agent-readiness'
 import {
   appendFederationSetupEffect,
   appendFederationTerminalEffects,
@@ -195,9 +197,10 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
         }
         persistFederatedReadinessStage(setupStage)
         failedStage = 'agent_readiness'
-        const wait = await runtime.waitForTerminal(terminalHandle, {
-          condition: 'tui-idle',
-          timeoutMs: params.timeoutMs ?? 60_000
+        const { wait, composerReadyProven } = await awaitFederatedAgentReadiness({
+          runtime,
+          terminalHandle,
+          budgetMs: params.timeoutMs ?? 60_000
         })
         persistFederatedSetupWaitOutcome({ ...setupStage, wait })
         if (!wait.satisfied) {
@@ -242,7 +245,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           kind: 'dispatch_input',
           role: 'agent',
           id: terminalHandle,
-          state: 'accepted'
+          state: composerReadyProven ? 'accepted' : DISPATCH_INPUT_WRITTEN_UNPROVEN
         })
         const attachment = db.markRemoteAttachmentReady(params.dispatchId, effects)
         monitorFederatedSetup({ ...setupStage, runtime })

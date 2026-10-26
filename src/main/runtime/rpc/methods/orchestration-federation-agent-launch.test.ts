@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
 import { ORCHESTRATION_METHODS } from './orchestration'
+import { mockFederatedAgentReady } from './orchestration-federation-worker-runtime-mocks'
 
 // Why: a federated worker terminal is created from an agent id. Passing that id
 // as a shell command launched Cursor's desktop app instead of `cursor-agent`
@@ -37,6 +38,7 @@ describe('federated worker agent launch', () => {
     })
     // Why: without a stable pane the handler bails at agent_readiness, so the
     // assertions below would pass against a worker that never actually started.
+    mockFederatedAgentReady(runtime)
     vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab_remote:leaf_remote')
     vi.spyOn(runtime, 'getTerminalProcessIncarnation').mockReturnValue(
       'runtime_test:term_remote_worker:1'
