@@ -137,8 +137,10 @@ export async function installTranscriptWatcher(
   }
 
   async function drainOnce(): Promise<void> {
-    const current = await readTranscriptFileVersion(filePath, gateAbort.signal)
+    // Why: boundary before stat, so `current` is never older than the content judged replaced;
+    // a stale start version would make the next drain replay the same replacement (ORCA-522).
     const currentBoundary = await boundaryFingerprint(filePath, state.offset, gateAbort.signal)
+    const current = await readTranscriptFileVersion(filePath, gateAbort.signal)
     if (closed) {
       return
     }
