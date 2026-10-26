@@ -20,6 +20,8 @@ contributes automations, skills, keybindings, VM recipes or agent profiles, so t
 re-prompt on every update), the panel bridge's message budget, and the publishing flow are in
 [`docs/reference/plugin-development.md`](./docs/reference/plugin-development.md).
 
+The orca-sonar wiring (`orca sonar`, the index warm-up and the remote refusal) is in [`docs/reference/orca-sonar.md`](./docs/reference/orca-sonar.md).
+
 [`examples/plugins/worklog`](./examples/plugins/worklog) is the template that exercises all of it;
 `examples/plugins/hello-orca` stays as the minimal demo.
 
