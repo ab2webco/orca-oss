@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { runnerOf, runnerStartOf, runnerStepOf } from '../hooks/arcade-runner'
+import { ARCADE_FPS_MAX, ARCADE_RUNNER } from '../hooks/arcade-runner-data'
+import { ARCADE_ROWS, arcadeGridOf, arcadeShapesOf } from '../hooks/arcade-runner-frame'
 import { forgetFrames, isNewFrame, rememberFrame } from '../hooks/frame-gate'
 import { base64Of, cellsOf, UPPER_HALF } from '../hooks/pixel-canvas'
 import { sceneGridOf } from '../hooks/scene'
@@ -49,5 +52,28 @@ describe('the frame gate', () => {
     expect(isNewFrame('r1', 'scene', 'CCCC')).toBe(false)
     forgetFrames('r1')
     expect(isNewFrame('r1', 'scene', 'CCCC')).toBe(true)
+  })
+})
+
+describe('a runner frame at the frame cap', () => {
+  it('keeps a game in play under a quarter of one core at the widest band', () => {
+    const scene = sceneOf('vigilante')
+    const runner = runnerOf(ARCADE_RUNNER, arcadeShapesOf(ARCADE_RUNNER, scene.looks.working))
+    const columns = 160
+    let state = runnerStartOf(runner, 1)
+    const frameMs = (): number => {
+      const started = performance.now()
+      for (let i = 0; i < ARCADE_FPS_MAX; i += 1) {
+        state = runnerStepOf(runner, state, 1000 / ARCADE_FPS_MAX, i % 9 === 0)
+        cellsOf(arcadeGridOf({ scene, runner, state, columns, rows: ARCADE_ROWS, tick: i }))
+      }
+      return (performance.now() - started) / ARCADE_FPS_MAX
+    }
+    frameMs()
+    const rounds = Array.from({ length: 9 }, frameMs).sort((a, b) => a - b)
+    // Why a quarter: one second of play is ARCADE_FPS_MAX frames of ~0.95 ms at 160 columns (median of 9
+    // on an M-series Mac), 1.4% of a core: the ceiling leaves ~17x for a loaded CI runner.
+    const share = (rounds[4]! * ARCADE_FPS_MAX) / 1000
+    expect(share).toBeLessThan(0.25)
   })
 })

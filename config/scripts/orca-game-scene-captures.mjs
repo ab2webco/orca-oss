@@ -9,7 +9,12 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
-import { captureOptionsOf, scenePhasesOf, sceneShotsOf } from './orca-game-scene-capture-plan.mjs'
+import {
+  arcadeShotsOf,
+  captureOptionsOf,
+  scenePhasesOf,
+  sceneShotsOf
+} from './orca-game-scene-capture-plan.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const mod = join(root, 'resources/claude-plugins/orca-game/hooks')
@@ -27,6 +32,10 @@ import { advisorOf, allyPartsOf, allyRowsOf } from './allies'
 import { TILE_COLUMNS, tileGridOf } from './fleet-tiles'
 import { gameStrings, setGameLocale } from './game-strings'
 import { memberAdvisorLinesOf } from './member-advisor'
+import { HERO_LEFT, runnerOf, runnerStartOf } from './arcade-runner'
+import { ARCADE_RUNNER } from './arcade-runner-data'
+import { ARCADE_ROWS, arcadeGridOf, arcadeShapesOf } from './arcade-runner-frame'
+import { arcadeCaptionOf } from './arcade-loop'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 export const SCENE_IDS = Object.keys(SCENES)
 export const sceneOfFile = (text) => {
@@ -51,6 +60,21 @@ export const gridOf = ({ scene, phase, render, columns, tick, hour, caption, ges
     ? hdSceneGridOf({ scene: definition, phase, columns, rows: 9, tick, caption, since: 0,
         action: 'edit', light: daylightAt(hour), party: PARTY, lead: 'Lead', advisor })
     : sceneGridOf(definition, phase, columns, tick, caption, 0, undefined, false, 'edit', advisor)
+}
+// A runner frame mid-jump, the hero over the scene's own decoration with the next one coming.
+export const arcadeOf = ({ scene, columns, hour, screen }) => {
+  setGameLocale('en')
+  const definition = SCENES[scene]
+  const runner = runnerOf(ARCADE_RUNNER, arcadeShapesOf(ARCADE_RUNNER, definition.looks.working))
+  const start = runnerStartOf(runner, 4)
+  const first = start.obstacles.find((one) => one.shape === 0) ?? start.obstacles[0]
+  const distance = first.x - HERO_LEFT - 5
+  const isOver = screen === 'over'
+  const state = { ...start, distance, score: Math.floor(distance / 10), isOver,
+    jumpMs: isOver ? undefined : ARCADE_RUNNER.jump.ms / 2 }
+  const caption = screen === undefined ? undefined : arcadeCaptionOf(screen, state.score)
+  return arcadeGridOf({ scene: definition, runner, state, columns, rows: ARCADE_ROWS, tick: 41,
+    light: daylightAt(hour), caption })
 }
 const JEV = { version: 1, locale: 'es', line: 'jev · 2 agentes', model: 'glm-5.3', modelId: 'glm-5.3',
   effort: 'high', subagents: [], ci: [{ id: 'c1', status: 'success', text: 'CI main (abc1234) paso en 22 min' }],
@@ -221,7 +245,7 @@ const main = async () => {
     outfile: bundle,
     logLevel: 'warning'
   })
-  const { SCENE_IDS, gridOf, cardsOf, memberCardOf, stripOf, sceneOfFile } = await import(
+  const { SCENE_IDS, arcadeOf, gridOf, cardsOf, memberCardOf, stripOf, sceneOfFile } = await import(
     pathToFileURL(bundle).href
   )
   const custom = sceneFile === undefined ? [] : [sceneOfFile(await readFile(sceneFile, 'utf8'))]
@@ -263,6 +287,14 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
       await sheetOf(`${id}-${phase}`, names)
     }
   }
+  const arcadeShots = shots.length
+  for (const shot of arcadeShotsOf(SCENE_IDS)) {
+    await shoot(shot.name, arcadeOf(shot), shot.columns)
+  }
+  await sheetOf(
+    'arcade',
+    shots.slice(arcadeShots).map((path) => path.slice(out.length + 1, -'.png'.length))
+  )
   const cardShots = shots.length
   for (const scene of [...SCENE_IDS, ...custom]) {
     const id = typeof scene === 'string' ? scene : 'scene-file'
