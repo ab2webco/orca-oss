@@ -18,6 +18,7 @@ export type QuestCommand =
   | { error: string }
   | { show: true }
   | { demo: true }
+  | { arcade: true }
 
 export const questCommandOf = (args: string): QuestCommand => {
   const words = args.trim().toLowerCase().split(/\s+/)
@@ -26,7 +27,7 @@ export const questCommandOf = (args: string): QuestCommand => {
     return { show: true }
   }
   if (asked === 'demo') {
-    return { demo: true }
+    return words[1] === 'arcade' ? { arcade: true } : { demo: true }
   }
   if (asked === 'render') {
     const render = words[1] ?? ''
