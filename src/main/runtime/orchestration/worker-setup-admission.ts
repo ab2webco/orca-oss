@@ -93,6 +93,21 @@ export class WorkerSetupAdmission {
     return queuedAdmission(this.placeOf(request.host, request.taskId)!)
   }
 
+  /** Claims the slot only when it is free now; never queues (a remote start refuses instead). */
+  async claimIfFree(
+    request: Omit<SetupAdmissionRequest, 'start'>
+  ): Promise<{ admitted: true; release: () => void } | { admitted: false; waitingOn: string }> {
+    const memoryHold = await this.memoryHoldFor(request.host)
+    const holder = this.holders.get(request.host)
+    if (!holder && this.queueOf(request.host).length === 0 && !memoryHold) {
+      return { admitted: true, release: this.claim({ ...request, start: () => {} }) }
+    }
+    return {
+      admitted: false,
+      waitingOn: holder?.label ?? memoryHold ?? this.queueOf(request.host)[0]?.label ?? 'setup'
+    }
+  }
+
   /** Tasks whose start holds a slot: starting, or running their setup. */
   startingTaskIds(): string[] {
     return [...this.holders.values()].map((holder) => holder.taskId)

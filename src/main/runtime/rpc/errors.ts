@@ -91,6 +91,8 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'dashboard_popout_disabled',
   'invalid_runtime_response',
   'capability_unsupported',
+  // Why: placement reads `data.host` to try another host (ORCA-792, ORCA-795).
+  'setup_slot_busy',
   'relay_quota_exceeded',
   'dispatch_capability_invalid',
   'agent_unconfigured',

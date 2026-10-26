@@ -64,6 +64,23 @@ describe('WorkerSetupAdmission', () => {
     start
   })
 
+  it('claims a free slot without queueing and refuses a busy or low-memory one (ORCA-792)', async () => {
+    const first = await admission.claimIfFree({ host: 'local', taskId: 'a', label: 'A' })
+    expect(first).toMatchObject({ admitted: true })
+    await expect(
+      admission.claimIfFree({ host: 'local', taskId: 'b', label: 'B' })
+    ).resolves.toEqual({ admitted: false, waitingOn: 'A' })
+    expect(admission.queued()).toEqual([])
+    if (first.admitted) {
+      first.release()
+    }
+    memory = reading({ availableMemory: GIB })
+    await expect(
+      admission.claimIfFree({ host: 'local', taskId: 'c', label: 'C' })
+    ).resolves.toMatchObject({ admitted: false, waitingOn: expect.stringContaining('memory') })
+    expect(admission.startingTaskIds()).toEqual([])
+  })
+
   it('runs four setups on one host one at a time, in order', async () => {
     const starts = ['b', 'c', 'd'].map(() => vi.fn())
     const results = await Promise.all([

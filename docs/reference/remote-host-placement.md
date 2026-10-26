@@ -74,8 +74,10 @@ Signals readable today:
   must come from `federated_dispatches` (Q3).
 - **Memory.** A remote host's `diagnostics.memory` returns `availableMemory` (Q-facts table). The
   admission thresholds in `worker-setup-admission.ts:11-20` read the local host only. A federated
-  start does not forward `setupAdmission`, so the home queue does not admit a remote setup. Whether
-  the remote admits its own setup is **unverified** (child 2 checks it).
+  start does not admit a remote setup in the home queue. Since ORCA-792 the home forwards
+  `setupAdmission` to a host with `orchestration.federation-game-member.v1`, and that host claims its
+  own setup slot only if it is free now. A busy host refuses with `setup_slot_busy` and
+  `data: { host, waitingOn }`, and starts nothing; it never queues (O3).
 - **Account quota.** Read from the roster of the host that runs the member. A remote quota comes from
   the remote roster, not the home one.
 - **ORCA-706** (memory impact signals) is still Todo. Placement does not depend on it.
@@ -155,7 +157,7 @@ host (decision O3).
   that depends on an old remote honoring `game: true` would start a non-game worker silently. That is
   the Rule 1 trap, and Rules 2 and 3 apply
   (`docs/reference/remote-wire-compatibility.md`).
-- Proposal: a new capability, `orchestration.federation-game-member.v1` (name proposed), listed beside
+- Built in ORCA-792: the capability `orchestration.federation-game-member.v1`, listed beside
   the existing ones (`src/shared/protocol-version.ts:64-78`). The home sends `game` and
   `setupAdmission` only after the remote confirms the capability. An older host is refused for game
   placement with a named error. Plain `worker-start --on` keeps working on older hosts.
