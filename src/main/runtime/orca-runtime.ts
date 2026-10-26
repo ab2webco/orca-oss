@@ -11062,6 +11062,15 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** True while this pane's launch command sits unwritten behind a slow shell. */
+  isTerminalStartupCommandWithheld(handle: string): boolean {
+    try {
+      return this.buildStartupCommandWithheldWaitResult(handle, 'tui-idle') !== null
+    } catch {
+      return false
+    }
+  }
+
   private getStartupCommandWithheldMetadata(
     ptyId: string | null
   ): Pick<RuntimeTerminalSummary, 'startupCommandWithheld'> {
@@ -36709,9 +36718,11 @@ export class OrcaRuntimeService {
           return
         }
         // Foreground fallback: a reported non-shell process with quiet output is treated as idle.
+        // Why not while withheld: that process is the shell's own startup, never the agent (ORCA-792).
         if (
           leaf.lastAgentStatus === null &&
           leaf.ptyId &&
+          !this.startupCommandWithheldPtyIds.has(leaf.ptyId) &&
           this.ptyController &&
           !foregroundPollInFlight
         ) {
@@ -36780,7 +36791,12 @@ export class OrcaRuntimeService {
           this.resolveWaiter(waiter, buildPtyTerminalWaitResult(waiter.handle, 'tui-idle', pty))
           return
         }
-        if (pty.lastAgentStatus === null && this.ptyController && !foregroundPollInFlight) {
+        if (
+          pty.lastAgentStatus === null &&
+          !this.startupCommandWithheldPtyIds.has(pty.ptyId) &&
+          this.ptyController &&
+          !foregroundPollInFlight
+        ) {
           foregroundPollInFlight = true
           startedForegroundPoll = true
           const fg = await this.ptyController.getForegroundProcess(pty.ptyId)
