@@ -86,7 +86,27 @@ export type GameReview = {
   ci: CheckStatus | 'none'
   /** The host's review decision; absent without one (GitLab) or from an older host (ORCA-686). */
   verdict?: GameReviewVerdict
+  /** CI per pushed head, oldest first; these three are read together, GitHub only. */
+  ciHistory?: GameReviewHeadCi[]
+  /** Review comment threads on the PR. */
+  commentCount?: number
+  /** Times the PR was reopened. */
+  reopenCount?: number
+  /** Set once merged with every fact read: no red head, CI green, nothing to fix, never reopened. */
+  perfectMerge?: boolean
 }
+
+export type GameReviewHeadCi = { headSha: string; ci: CheckStatus }
+
+type GameReviewFacts = Pick<Required<GameReview>, 'ciHistory' | 'commentCount' | 'reopenCount'>
+
+// Why: the lead merges only after checking acceptance, so a merge stands for "acceptance met".
+const isPerfectMerge = (review: GameReview, facts: GameReviewFacts): boolean =>
+  review.ci === 'success' &&
+  review.verdict !== 'changes_requested' &&
+  facts.commentCount === 0 &&
+  facts.reopenCount === 0 &&
+  facts.ciHistory.every((head) => head.ci !== 'failure')
 
 const REVIEW_VERDICT: Record<PRReviewDecision, GameReviewVerdict> = {
   APPROVED: 'approved',
@@ -247,12 +267,15 @@ export function gameReviewOf(
     state: HostedReviewState
     status: CheckStatus
     reviewDecision?: PRReviewDecision | null
+    ciHistory?: readonly GameReviewHeadCi[]
+    commentCount?: number
+    reopenCount?: number
   } | null
 ): GameReview | null {
   if (!review || review.provider === 'unsupported') {
     return null
   }
-  return {
+  const out: GameReview = {
     provider: review.provider,
     number: review.number,
     title: review.title,
@@ -260,5 +283,15 @@ export function gameReviewOf(
     state: review.state,
     ci: review.status,
     ...(review.reviewDecision ? { verdict: REVIEW_VERDICT[review.reviewDecision] } : {})
+  }
+  const { ciHistory, commentCount, reopenCount } = review
+  if (ciHistory === undefined || commentCount === undefined || reopenCount === undefined) {
+    return out
+  }
+  const facts = { ciHistory: [...ciHistory], commentCount, reopenCount }
+  return {
+    ...out,
+    ...facts,
+    ...(review.state === 'merged' ? { perfectMerge: isPerfectMerge(out, facts) } : {})
   }
 }

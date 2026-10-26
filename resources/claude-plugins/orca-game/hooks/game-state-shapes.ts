@@ -38,7 +38,15 @@ export const reviewOf = (value: unknown): GameReview | null => {
     return null
   }
   const ci = oneOf(value.ci, CI_STATES) ?? 'none'
-  return { provider, number: value.number, title: str(value.title) ?? '', url, state, ci }
+  return {
+    provider,
+    number: value.number,
+    title: str(value.title) ?? '',
+    url,
+    state,
+    ci,
+    ...(typeof value.perfectMerge === 'boolean' ? { perfectMerge: value.perfectMerge } : {})
+  }
 }
 
 export const workItemOf = (value: unknown): GameWorkItem | null => {

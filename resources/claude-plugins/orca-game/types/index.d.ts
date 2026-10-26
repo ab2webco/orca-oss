@@ -92,6 +92,8 @@ export type GameReview = {
   url: string
   state: 'open' | 'draft' | 'merged' | 'closed'
   ci: GameCi
+  /** The host's perfect-merge decision; absent before the merge or without every fact. */
+  perfectMerge?: boolean
 }
 
 export type GameStatusGroup =
@@ -357,6 +359,7 @@ export type RewardKind =
   | 'work-item-review'
   | 'work-item-done'
   | 'member-claimed'
+  | 'perfect-merge'
 
 /** XP per reward as the project tunes it; a kind left out keeps the baseline, 0 turns it off. */
 export type RewardWeights = Readonly<Partial<Record<RewardKind, number>>>

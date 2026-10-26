@@ -863,6 +863,7 @@ import type {
   HostedReviewInfo
 } from '../../shared/hosted-review'
 import { getHostedReviewForBranch as getHostedReviewForBranchFromRepo } from '../source-control/hosted-review'
+import { withGameReviewFacts } from './orchestrator-game-review-facts'
 import {
   createHostedReview as createHostedReviewFromRepo,
   getHostedReviewCreationEligibility as getHostedReviewCreationEligibilityFromRepo
@@ -21864,6 +21865,16 @@ export class OrcaRuntimeService {
     return review
   }
 
+  // Why: only the game reads these facts, so the sidebar's hot review path stays one call.
+  private async getGameReviewForBranch(
+    args: Parameters<OrcaRuntimeService['getHostedReviewForBranch']>[0]
+  ): ReturnType<typeof withGameReviewFacts> {
+    const review = await this.getHostedReviewForBranch(args)
+    return review
+      ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
+      : null
+  }
+
   async getHostedReviewCreationEligibility(
     args: Omit<HostedReviewCreationEligibilityArgs, 'repoPath'> & {
       repoSelector: string
@@ -31127,7 +31138,7 @@ export class OrcaRuntimeService {
           }
           const review =
             member.repoId && memberSummary?.branch
-              ? await this.getHostedReviewForBranch({
+              ? await this.getGameReviewForBranch({
                   repoSelector: `id:${member.repoId}`,
                   branch: memberSummary.branch,
                   linkedGitHubPR: memberSummary.linkedPR?.number ?? null,
@@ -31187,7 +31198,7 @@ export class OrcaRuntimeService {
       },
       readReview: async () =>
         worktree?.repoId && summary?.branch
-          ? await this.getHostedReviewForBranch({
+          ? await this.getGameReviewForBranch({
               repoSelector: `id:${worktree.repoId}`,
               branch: summary.branch,
               linkedGitHubPR: summary.linkedPR?.number ?? null,
