@@ -152,3 +152,11 @@ describe('A row that takes XP away', () => {
     expect(signedXpOf(20)).toBe('+20')
   })
 })
+
+describe('The perfect-merge weight', () => {
+  it('is read from the wire like any other reward', () => {
+    const parsed = parseGameState(JSON.stringify({ rewardWeights: { 'perfect-merge': 40 } }))
+
+    expect(parsed?.rewardWeights).toEqual({ 'perfect-merge': 40 })
+  })
+})

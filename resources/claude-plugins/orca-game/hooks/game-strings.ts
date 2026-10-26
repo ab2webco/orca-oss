@@ -53,6 +53,7 @@ export type TextStrings = {
   couldNotOpenLink: (label: string) => string
   merged: (review: string) => string
   ciGreen: (review: string) => string
+  perfectMerge: (review: string) => string
   memberLaunched: (member: string) => string
   questDescription: string
   questModesHelp: string
@@ -194,6 +195,7 @@ const EN: GameStrings = {
     couldNotOpenLink: (label) => `Could not open ${label}`,
     merged: (review) => `${review} merged`,
     ciGreen: (review) => `${review} CI is green`,
+    perfectMerge: (review) => `${review} perfect merge`,
     memberLaunched: (member) => `${member} launched`,
     questDescription:
       'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',

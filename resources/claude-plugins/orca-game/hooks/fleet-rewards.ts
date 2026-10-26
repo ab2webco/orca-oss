@@ -36,7 +36,7 @@ export const fleetRewardsOf = (
       workItem: agent.workItem ?? null
     })
     return workRewardsOf(work(was), work(member), id, weights).map((one) =>
-      one.kind === 'review-merged' || one.kind === 'ci-green'
+      one.kind === 'review-merged' || one.kind === 'perfect-merge' || one.kind === 'ci-green'
         ? { ...one, label: `${nameOf(member)} · ${one.label}` }
         : one
     )
