@@ -1,10 +1,11 @@
 import { hash, mix, mod } from './pixel-canvas'
 import type { HdFrame } from './scene-hd-land'
+import type { Look } from './scenes/index'
 import { hdSkyPixel } from './scene-hd-sky'
 
 // hd's props on the ground line: a plant every few columns and a pond mirroring the sky.
 
-const PLANT_EVERY = 19
+export const PLANT_EVERY = 19
 const TRUNK = 0x3e2c1f
 const BEACON = 0xff4a4a
 const BEACON_OFF = 0x5a1a1a
@@ -16,8 +17,16 @@ export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | und
   if (look.plantKind === 'none' || hash(Math.floor(px / PLANT_EVERY), 9) % 3 === 0) {
     return undefined
   }
-  const slot = mod(px, PLANT_EVERY)
-  const h = ground - 1 - y
+  return hdPlantShapePixel(look, mod(px, PLANT_EVERY), ground - 1 - y, frame.tick)
+}
+
+/** One plant's colour at `slot` of its PLANT_EVERY columns, `h` pixels above the ground line. */
+export const hdPlantShapePixel = (
+  look: Look,
+  slot: number,
+  h: number,
+  tick: number
+): number | undefined => {
   const lit = slot < 9 ? 0.12 : 0
   switch (look.plantKind) {
     case 'tree':
@@ -43,7 +52,7 @@ export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | und
         return look.plant
       }
       return slot === 9 && h === 8
-        ? Math.floor(frame.tick / 6) % 2 === 0
+        ? Math.floor(tick / 6) % 2 === 0
           ? BEACON
           : BEACON_OFF
         : undefined
@@ -56,6 +65,8 @@ export const hdPlantPixel = (frame: HdFrame, x: number, y: number): number | und
         return mix(look.near, 0x000000, 0.2)
       }
       return h === 1 && (slot === 4 || slot === 12) ? look.plant : undefined
+    case 'none':
+      return undefined
   }
 }
 
