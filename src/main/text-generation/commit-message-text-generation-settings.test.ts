@@ -225,4 +225,21 @@ describe('resolveCommitMessageSettings', () => {
       error: 'Custom command is empty. Add one in Settings -> Git -> Source Control AI.'
     })
   })
+
+  it('tags a missing agent with reason no-agent so callers can skip quietly', () => {
+    const settings = getDefaultSettings('/tmp')
+    settings.commitMessageAi = {
+      enabled: true,
+      agentId: null,
+      selectedModelByAgent: {},
+      selectedThinkingByModel: {},
+      customPrompt: '',
+      customAgentCommand: ''
+    }
+    settings.defaultTuiAgent = null
+    settings.disabledTuiAgents = ['claude']
+    syncSourceControlAiFromLegacy(settings)
+
+    expect(resolveCommitMessageSettings(settings)).toMatchObject({ ok: false, reason: 'no-agent' })
+  })
 })

@@ -64,7 +64,7 @@ export type ResolvedSourceControlAiOperation = {
 
 export type ResolveSourceControlAiResult =
   | { ok: true; value: ResolvedSourceControlAiOperation }
-  | { ok: false; error: string }
+  | { ok: false; error: string; reason?: 'no-agent' }
 
 type ResolveSourceControlAiInput = {
   settings: Pick<
@@ -1223,6 +1223,7 @@ export function resolveSourceControlAiForOperation(
   if (!agentChoice) {
     return {
       ok: false,
+      reason: 'no-agent',
       error: `Choose a supported Source Control AI agent for this action in Settings -> Git -> Source Control AI. ${supportedSourceControlAiAgentSummary()}`
     }
   }
@@ -1271,6 +1272,7 @@ export function resolveSourceControlAiForOperation(
   if (!resolvedActionAgentId || isCustomAgentId(resolvedActionAgentId)) {
     return {
       ok: false,
+      reason: 'no-agent',
       error: `Choose a supported Source Control AI agent for this action. ${supportedSourceControlAiAgentSummary()}`
     }
   }

@@ -169,14 +169,23 @@ describe('maybeAutoRenameBranchOnFirstWork', () => {
     expect(setRenameError).not.toHaveBeenCalledWith(WORKTREE_ID, expect.any(String))
   })
 
-  it('leaves a user-customized display name untouched while still renaming the branch', async () => {
-    const { deps, setDisplayName } = makeDeps({ getCurrentDisplayName: () => 'My cool feature' })
+  it('never runs the auto-rename on a worktree that already has a chosen display name', async () => {
+    generateBranchNameMock.mockResolvedValue({
+      success: false,
+      error: 'Claude CLI command failed with code 1.'
+    })
+    const { deps, setDisplayName, setRenameError } = makeDeps({
+      getCurrentDisplayName: () => 'Alex · ORCA-724'
+    })
     await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['branch', '-m', 'you/fix-auth'],
-      expect.objectContaining({ cwd: '/repo/wt' })
+    expect(generateBranchNameMock).not.toHaveBeenCalled()
+    expect(gitExecFileAsyncMock).not.toHaveBeenCalledWith(
+      ['branch', '-m', expect.any(String)],
+      expect.anything()
     )
     expect(setDisplayName).not.toHaveBeenCalled()
+    expect(setRenameError).not.toHaveBeenCalledWith(WORKTREE_ID, expect.any(String))
+    expect(setRenameError).toHaveBeenCalledWith(WORKTREE_ID, null)
   })
 
   it('resolves the worktree from the tab when the hook payload omits worktreeId', async () => {
@@ -350,14 +359,29 @@ describe('maybeAutoRenameBranchOnFirstWork', () => {
     expect(setRenameError).toHaveBeenCalledWith(WORKTREE_ID, 'agent not ready', failureOutput)
   })
 
-  it('records a user-facing error when no generation agent is configured', async () => {
+  it('skips quietly when no source-control AI agent is configured', async () => {
     resolveTextGenerationParamsMock.mockReturnValueOnce({
       ok: false,
-      error: 'No agent configured.'
+      error: 'No agent configured.',
+      reason: 'no-agent'
     })
     const { deps, setRenameError } = makeDeps()
     await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
-    expect(setRenameError).toHaveBeenCalledWith(WORKTREE_ID, 'No agent configured.')
+    expect(generateBranchNameMock).not.toHaveBeenCalled()
+    expect(setRenameError).not.toHaveBeenCalledWith(WORKTREE_ID, expect.any(String))
+  })
+
+  it('still records a user-facing error for a broken generation setup', async () => {
+    resolveTextGenerationParamsMock.mockReturnValueOnce({
+      ok: false,
+      error: 'Command template is empty for branch names.'
+    })
+    const { deps, setRenameError } = makeDeps()
+    await maybeAutoRenameBranchOnFirstWork(workingEvent(), deps)
+    expect(setRenameError).toHaveBeenCalledWith(
+      WORKTREE_ID,
+      'Command template is empty for branch names.'
+    )
   })
 
   it('clears any stale error after a successful rename', async () => {
