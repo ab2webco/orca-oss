@@ -87,7 +87,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .register({
       name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|flat|demo|demo arcade|render classic|hd|hd-compact]',
+      argumentHint: '[off|on|zen|flat|demo|demo arcade|demo offer|render classic|hd|hd-compact]',
       immediate: true
     })
     .catch(() => undefined)
@@ -112,8 +112,8 @@ const registerCommand = (on: On, command: GameCommand) => {
       return { text: text.questRenderShown(shownSetting('render')) }
     }
     if ('arcade' in asked) {
-      await openArcade($)
-      return { text: arcadeWords().opened }
+      await openArcade($, asked.isOffer === true)
+      return { text: asked.isOffer === true ? arcadeWords().offered : arcadeWords().opened }
     }
     if ('demo' in asked) {
       startDemo()
