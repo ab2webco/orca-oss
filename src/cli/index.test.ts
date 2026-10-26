@@ -3350,47 +3350,6 @@ describe('orca cli worktree awareness', () => {
       }
     })
 
-  it('resolves --claude-account by email and keeps the create on the background path', async () => {
-    queueFixtures(
-      callMock,
-      accountsSnapshotFixture(),
-      okFixture('req_terminal_create', {
-        terminal: {
-          handle: 'term_1',
-          worktreeId: 'repo-1::/tmp/repo/feature',
-          title: 'Claude'
-        }
-      })
-    )
-    vi.spyOn(console, 'log').mockImplementation(() => {})
-
-    await main(
-      [
-        'terminal',
-        'create',
-        '--worktree',
-        'path:/tmp/repo/feature',
-        '--command',
-        'claude',
-        '--claude-account',
-        'work@example.com',
-        '--json'
-      ],
-      '/tmp/repo'
-    )
-
-    expect(callMock).toHaveBeenNthCalledWith(1, 'accounts.snapshot')
-    // Why: no rendererBacked despite an interactive Claude command — the
-    // launch-account override only applies on the background spawn path.
-    expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.create', {
-      worktree: 'path:/tmp/repo/feature',
-      command: 'claude',
-      title: undefined,
-      focus: false,
-      claudeAccountId: 'acc-claude-work'
-    })
-  })
-
   it('resolves --codex-account by id on terminal.create', async () => {
     queueFixtures(
       callMock,
@@ -3411,7 +3370,7 @@ describe('orca cli worktree awareness', () => {
         'create',
         '--worktree',
         'path:/tmp/repo/feature',
-        '--command',
+        '--agent',
         'codex',
         '--codex-account',
         'acc-codex-work',
@@ -3422,7 +3381,8 @@ describe('orca cli worktree awareness', () => {
 
     expect(callMock).toHaveBeenNthCalledWith(2, 'terminal.create', {
       worktree: 'path:/tmp/repo/feature',
-      command: 'codex',
+      command: undefined,
+      agent: 'codex',
       title: undefined,
       focus: false,
       codexAccountId: 'acc-codex-work'
@@ -3614,7 +3574,7 @@ describe('orca cli worktree awareness', () => {
         'create',
         '--worktree',
         'path:/tmp/repo/feature',
-        '--command',
+        '--agent',
         'claude',
         '--claude-account',
         'nobody@example.com',

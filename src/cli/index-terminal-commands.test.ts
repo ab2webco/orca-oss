@@ -529,6 +529,54 @@ describe('orca cli worktree awareness', () => {
     })
   })
 
+  it.each([
+    { flag: '--claude-account', agent: 'claude', runtime: [] as string[], env: undefined },
+    { flag: '--codex-account', agent: 'codex', runtime: [] as string[], env: undefined },
+    {
+      flag: '--claude-account',
+      agent: 'claude',
+      runtime: ['--pairing-code', 'remote-runtime'],
+      env: undefined
+    },
+    { flag: '--claude-account', agent: 'claude', runtime: [] as string[], env: 'remote-env' }
+  ])(
+    'refuses --command with $flag ($runtime $env) instead of launching on another account',
+    async ({ flag, agent, runtime, env }) => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const priorExitCode = process.exitCode
+      if (env) {
+        vi.stubEnv('ORCA_ENVIRONMENT', env)
+      }
+
+      try {
+        await main(
+          [
+            'terminal',
+            'create',
+            '--worktree',
+            'path:/tmp/repo/feature',
+            '--command',
+            agent,
+            flag,
+            'work@example.com',
+            ...runtime,
+            '--json'
+          ],
+          '/tmp/repo'
+        )
+
+        expect(callMock).not.toHaveBeenCalled()
+        const output = [...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')
+        expect(output).toContain(`--agent ${agent} ${flag}`)
+        expect(process.exitCode).toBe(1)
+      } finally {
+        vi.unstubAllEnvs()
+        process.exitCode = priorExitCode
+      }
+    }
+  )
+
   it('rejects implicit remote terminal create instead of resolving from client cwd', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

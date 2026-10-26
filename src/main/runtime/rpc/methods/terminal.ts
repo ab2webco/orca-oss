@@ -1016,6 +1016,19 @@ const TerminalCreateParams = z
     message:
       'Pass either agent or command, not both. agent applies the configured agent defaults; command launches raw argv without them.'
   })
+  // Why: a raw command names no agent, so the spawn would drop the account and
+  // run on the global login (ORCA-804). launchAgent is the renderer's expanded agent.
+  .refine(
+    (params) =>
+      params.command === undefined ||
+      params.agent !== undefined ||
+      params.launchAgent !== undefined ||
+      (params.claudeAccountId === undefined && params.codexAccountId === undefined),
+    {
+      message:
+        'command cannot launch on a managed account. Pass agent (claude or codex) with claudeAccountId or codexAccountId instead.'
+    }
+  )
 
 const TerminalSplit = TerminalHandle.extend({
   direction: z
