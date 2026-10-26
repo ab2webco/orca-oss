@@ -5616,6 +5616,8 @@
           "d83834f5e6": "Detectando agents instalados…",
           "024bd95089": "agents",
           "e8da2af684": "Disponible para instalar",
+          "runsInProcessTitle": "Se ejecuta en proceso",
+          "runsInProcessNote": "Se ejecuta en proceso en {{value0}}: los compañeros de equipo quedan en el mismo panel de Claude. No hay nada que instalar.",
           "ed3e110e61": "detectado",
           "02e0143be5": "Instalado",
           "110b74b022": "Sin agente (terminal en blanco)",

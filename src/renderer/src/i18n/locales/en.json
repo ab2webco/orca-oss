@@ -5972,6 +5972,8 @@
           "d83834f5e6": "Detecting installed agents…",
           "024bd95089": "agents",
           "e8da2af684": "Available to install",
+          "runsInProcessTitle": "Runs in-process",
+          "runsInProcessNote": "Runs in-process on {{value0}}: teammates stay in the same Claude pane. Nothing to install.",
           "ed3e110e61": "detected",
           "03e1a5081a": "on {{value0}}",
           "25a41a9aad": "Re-detect agents installed on the active server",
