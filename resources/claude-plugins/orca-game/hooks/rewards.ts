@@ -9,7 +9,8 @@ export const XP_BY_REWARD: Readonly<Record<RewardKind, number>> = {
   'ci-green': 20,
   'work-item-review': 50,
   'work-item-done': 70,
-  'member-claimed': 10
+  'member-claimed': 10,
+  'perfect-merge': 100
 }
 
 /** `review` is the `#N` label of the review a reward is for, which a merge floats. */
@@ -76,6 +77,12 @@ export const workRewardsOf = (
     if (before.state !== 'merged' && after.state === 'merged') {
       out.push({
         ...reward(`review-merged:${key}`, 'review-merged', text.merged(label), weights),
+        review: label
+      })
+    }
+    if (before.perfectMerge !== true && after.perfectMerge === true) {
+      out.push({
+        ...reward(`perfect-merge:${key}`, 'perfect-merge', text.perfectMerge(label), weights),
         review: label
       })
     }

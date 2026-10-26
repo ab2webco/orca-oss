@@ -54,6 +54,7 @@ export const ES: GameCatalog = {
     couldNotOpenLink: (label) => `No se pudo abrir ${label}`,
     merged: (review) => `${review} mergeado`,
     ciGreen: (review) => `${review}: CI en verde`,
+    perfectMerge: (review) => `${review}: merge perfecto`,
     memberLaunched: (member) => `${member} en marcha`,
     questDescription:
       'Modo quest, forma corta de /orca-game:quest: un Claude animado, tarjetas de personaje por fase del flujo y filas de herramientas discretas',

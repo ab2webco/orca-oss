@@ -4,7 +4,8 @@ export const GAME_REWARD_KINDS = [
   'ci-green',
   'work-item-review',
   'work-item-done',
-  'member-claimed'
+  'member-claimed',
+  'perfect-merge'
 ] as const
 
 export type GameRewardKind = (typeof GAME_REWARD_KINDS)[number]
@@ -16,7 +17,8 @@ export const DEFAULT_GAME_REWARD_WEIGHTS: Readonly<GameRewardWeights> = {
   'ci-green': 20,
   'work-item-review': 50,
   'work-item-done': 70,
-  'member-claimed': 10
+  'member-claimed': 10,
+  'perfect-merge': 100
 }
 
 export const GAME_REWARD_WEIGHT_MAX = 1000

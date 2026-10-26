@@ -52,7 +52,8 @@ describe('resolveGameRewardWeights', () => {
       'ci-green': 20,
       'work-item-review': 50,
       'work-item-done': 70,
-      'member-claimed': 10
+      'member-claimed': 10,
+      'perfect-merge': 100
     })
     expect(resolveGameRewardWeights([undefined, undefined])).toEqual(DEFAULT_GAME_REWARD_WEIGHTS)
   })

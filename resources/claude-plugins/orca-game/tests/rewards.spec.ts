@@ -104,3 +104,28 @@ describe('isCiRed', () => {
     expect(isCiRed(null)).toBe(false)
   })
 })
+
+describe('The perfect merge', () => {
+  const merged = review({ state: 'merged', ci: 'success' })
+
+  // Why: the host reads the facts after the merge, so the flag can land a poll later.
+  it('awards it when the merged review turns perfect, even a poll after the merge', () => {
+    const before = state({ review: merged })
+    const after = state({ review: { ...merged, perfectMerge: true } })
+
+    expect(rewardsOf(before, after).map((one) => [one.id, one.kind, one.xp])).toEqual([
+      ['perfect-merge:github#7@wt-1', 'perfect-merge', 100]
+    ])
+  })
+
+  it('awards it with the merge in one poll, and never for a merge that is not perfect', () => {
+    const open = state({ review: review({ ci: 'success' }) })
+
+    expect(
+      rewardsOf(open, state({ review: { ...merged, perfectMerge: true } })).map((one) => one.kind)
+    ).toEqual(['review-merged', 'perfect-merge'])
+    expect(
+      rewardsOf(open, state({ review: { ...merged, perfectMerge: false } })).map((one) => one.kind)
+    ).toEqual(['review-merged'])
+  })
+})

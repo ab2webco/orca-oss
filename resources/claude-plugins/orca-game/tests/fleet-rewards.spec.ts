@@ -143,3 +143,24 @@ describe('fleetRewardsOf', () => {
     expect(merged?.review).toBe('#41')
   })
 })
+
+describe("A member's perfect merge", () => {
+  it('earns its lead the perfect-merge reward when the merged PR turns perfect', () => {
+    const merged = member({ review: review({ state: 'merged', ci: 'success' }) })
+    const perfect = member({
+      review: review({ state: 'merged', ci: 'success', perfectMerge: true })
+    })
+
+    expect(kinds(leadState([merged]), leadState([perfect]))).toEqual([['perfect-merge', 100]])
+  })
+
+  it("names the member's ticket like its merged toast", () => {
+    const merged = member({ review: review({ state: 'merged', ci: 'success' }) })
+    const perfect = member({
+      review: review({ state: 'merged', ci: 'success', perfectMerge: true })
+    })
+
+    const [one] = fleetRewardsOf(leadState([merged]), leadState([perfect]))
+    expect(one?.label).toBe('ORCA-12 · #41 perfect merge')
+  })
+})
