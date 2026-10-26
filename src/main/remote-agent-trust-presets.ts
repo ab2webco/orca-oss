@@ -1,10 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import type { AgentTrustPreset } from './agent-trust-presets'
 import { withClaudeFolderTrust } from './claude-accounts/claude-folder-trust'
 import { upsertProjectTrustLevelInContent } from './codex/config-toml-trust'
 import { getActiveMultiplexer } from './ipc/ssh'
 import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import type { FileReadResult, IFilesystemProvider } from './providers/types'
+import type { FileReadResult, FileStat, IFilesystemProvider } from './providers/types'
 import { isENOENT } from './ipc/filesystem-path-containment'
 import {
   isWindowsAbsolutePathLike,
@@ -52,19 +51,50 @@ export async function markRemoteClaudeFolderTrusted(args: {
   const projectKey = isWindowsAbsolutePathLike(workspacePath)
     ? normalizeRuntimePathSeparators(workspacePath)
     : workspacePath
-  const existing = await readRemoteTextFile(fsProvider, configPath)
-  const updated = withClaudeFolderTrust(existing, [projectKey])
-  if (updated === null) {
-    return false
+  // Why: the relay replace keeps the config's mode (it holds account data) and refuses if Claude saved in between.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let configStat: FileStat
+    try {
+      configStat = await fsProvider.stat(configPath)
+    } catch (error) {
+      // Why: no relay write can create it 0600, and a host Claude never ran on stops at onboarding anyway.
+      if (isRemoteENOENT(error)) {
+        return false
+      }
+      throw error
+    }
+    const realConfigPath = await fsProvider.realpath(configPath)
+    const existing = await readRemoteTextFile(fsProvider, realConfigPath)
+    const updated = withClaudeFolderTrust(existing, [projectKey])
+    if (updated === null || !fsProvider.writeTerminalArtifact) {
+      return false
+    }
+    if (updated === existing) {
+      return true
+    }
+    try {
+      await fsProvider.writeTerminalArtifact(realConfigPath, updated, {
+        expectedRealPath: realConfigPath,
+        expectedStatIdentity: remoteStatIdentity(configStat),
+        maxBytes: Math.max(Buffer.byteLength(updated, 'utf8'), configStat.size)
+      })
+      return true
+    } catch (error) {
+      if (!(error instanceof Error && error.message === 'terminal_file_grant_stale')) {
+        throw error
+      }
+    }
   }
-  if (updated === existing) {
-    return true
+  return false
+}
+
+/** The relay's dev:ino:nlink:size:mtime identity for its compare-before-rename. */
+function remoteStatIdentity(stat: FileStat): string | null {
+  const mtimeMs = stat.mtimeMs ?? stat.mtime
+  if (typeof stat.dev === 'number' && typeof stat.ino === 'number') {
+    return `${stat.dev}:${stat.ino}:${stat.nlink ?? 'unknown'}:${stat.size}:${mtimeMs}`
   }
-  const tmpPath = `${configPath}.${randomUUID()}.tmp`
-  await fsProvider.createDir(configDir)
-  await fsProvider.writeFile(tmpPath, updated)
-  await fsProvider.rename(tmpPath, configPath)
-  return true
+  return `${stat.size}:${mtimeMs}`
 }
 
 async function resolveRemoteHome(connectionId: string): Promise<string | null> {
