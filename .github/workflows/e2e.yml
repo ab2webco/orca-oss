@@ -312,8 +312,9 @@ jobs:
               E2E_PROJECT_ARGS+=(--project=electron-ondemand)
             fi
           fi
-          xvfb-run --auto-servernum env "${E2E_ENV[@]}" \
-            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"
+          xvfb-run --auto-servernum env "${E2E_ENV[@]}" DEBUG=pw:protocol \
+            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}" \
+            2> >(grep --line-buffered -E '"error":\{' | cut -c1-1500 | sed 's/^/[pw-protocol-error] /' >&2)
 
       - name: Upload E2E JSON report
         if: always()
