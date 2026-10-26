@@ -1,5 +1,5 @@
 import type { QuestCommand } from './quest-policy'
-import { isQuestMode, questCommandOf } from './quest-policy'
+import { arcadeCommandOf, isQuestMode, questCommandOf } from './quest-policy'
 import { gameStrings } from './game-strings'
 
 // Why skills: the engine refuses a `:` in a name a mod registers, and plugin skills get `orca-game:`.
@@ -31,7 +31,7 @@ export const gameCommandOf = (command: GameCommand, args: string): QuestCommand 
   const asked = args.trim().toLowerCase().split(/\s+/)[0] ?? ''
   switch (command) {
     case 'orca-game:demo':
-      return asked === 'arcade' ? { arcade: true } : { demo: true }
+      return arcadeCommandOf(asked) ?? { demo: true }
     case 'orca-game:mode':
       if (asked === '' || isQuestMode(asked)) {
         return questCommandOf(asked)

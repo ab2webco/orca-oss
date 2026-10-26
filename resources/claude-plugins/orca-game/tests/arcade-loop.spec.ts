@@ -1,42 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { arcadeLoopOf, type ArcadeClock, type ArcadeScreen } from '../hooks/arcade-loop'
+import { arcadeLoopOf, type ArcadeScreen } from '../hooks/arcade-loop'
 import { runnerOf, type RunnerState } from '../hooks/arcade-runner'
 import { ARCADE_FPS_MAX, ARCADE_RUNNER } from '../hooks/arcade-runner-data'
+import { fakeClock } from './arcade-clock'
 
-// A clock the test advances by hand: every timer fires on its own period, in time order.
-const fakeClock = () => {
-  let now = 0
-  const timers = new Set<{ ms: number; next: number; fn: () => void }>()
-  const clock: ArcadeClock = {
-    now: async () => now,
-    every: (ms, fn) => {
-      const timer = { ms, next: now + ms, fn }
-      timers.add(timer)
-      return { cancel: () => void timers.delete(timer) }
-    }
-  }
-  const advance = async (ms: number) => {
-    const end = now + ms
-    for (;;) {
-      const due = [...timers].sort((a, b) => a.next - b.next)[0]
-      if (due === undefined || due.next > end) {
-        break
-      }
-      now = due.next
-      due.next += due.ms
-      due.fn()
-      // Why several turns: a tick awaits the pane's focus and the clock before it draws.
-      for (let turn = 0; turn < 10; turn += 1) {
-        await Promise.resolve()
-      }
-    }
-    now = end
-  }
-  return { clock, advance, timers }
-}
-
-const loopFor = (fps: number, isFocused = () => true) => {
+const loopFor = (fps: number, isFocused = () => true, isHeld = () => false) => {
   const { clock, advance, timers } = fakeClock()
   const frames: { state: RunnerState; screen: ArcadeScreen }[] = []
   const loop = arcadeLoopOf({
@@ -44,6 +13,7 @@ const loopFor = (fps: number, isFocused = () => true) => {
     seed: 1,
     clock,
     isActive: async () => isFocused(),
+    isHeld,
     draw: (state, screen) => frames.push({ state, screen })
   })
   return { loop, advance, timers, frames }
@@ -112,5 +82,31 @@ describe('the arcade loop', () => {
     await advance(100)
     expect(frames.at(-1)!.state.isOver).toBe(false)
     expect(frames.at(-1)!.state.distance).toBeLessThan(5)
+  })
+
+  it('freezes a run while someone needs the user, with no frames, and goes on by itself once answered', async () => {
+    let isHeld = false
+    const { loop, advance, timers, frames } = loopFor(
+      12,
+      () => true,
+      () => isHeld
+    )
+    loop.press()
+    await advance(500)
+    isHeld = true
+    await advance(200)
+    const held = frames.at(-1)!
+    expect(held.screen).toBe('held')
+    expect(timers.size).toBe(1)
+    loop.press()
+    await advance(5000)
+    expect(frames.at(-1)).toBe(held)
+    expect(held.state.jumpMs).toBeUndefined()
+    isHeld = false
+    await advance(1100)
+    expect(frames.at(-1)!.screen).toBe('running')
+    expect(frames.at(-1)!.state.distance).toBeGreaterThan(held.state.distance)
+    loop.stop()
+    expect(timers.size).toBe(0)
   })
 })

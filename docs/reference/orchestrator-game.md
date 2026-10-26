@@ -1361,6 +1361,19 @@ out of the backdrop, since anything on the ground line reads as something to jum
 the only way to open the runner until a perfect merge offers a play: it earns no points or XP, writes
 nothing to Orca or the store, adds no setting, and closing the pane drops the run.
 
+`/orca-game:demo offer` (or `/quest demo offer`) plays the offer a perfect merge will make
+([`arcade-offer.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), keeping
+nothing either:
+
+- The scene celebrates (the merge float and the level-up stars, drawn in the band while idle) and
+  the arcade pane opens without taking the keyboard, so the prompt keeps what the user is typing.
+- A line under the frame counts down 15 seconds. `j` (or a click on Play) takes the keyboard and
+  starts the run; `n`, Esc or the end of the countdown closes the pane and drops the offer.
+- While a teammate waits on the user (the band's "Needs you"), or a member's own question waits on
+  its lead, the countdown stands still and a run in play holds with no frames; both go on by
+  themselves once it is answered.
+- Points a real offer's run earns stay apart from member XP; a demo offer writes none.
+
 ## Other plugins in a game pane
 
 Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,

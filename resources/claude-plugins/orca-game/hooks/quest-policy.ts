@@ -18,7 +18,15 @@ export type QuestCommand =
   | { error: string }
   | { show: true }
   | { demo: true }
-  | { arcade: true }
+  | { arcade: true; isOffer?: true }
+
+/** The demo's arcade words: a practice run, or the offer a verified merge would make. */
+export const arcadeCommandOf = (word: string | undefined): QuestCommand | undefined =>
+  word === 'arcade'
+    ? { arcade: true }
+    : word === 'offer'
+      ? { arcade: true, isOffer: true }
+      : undefined
 
 export const questCommandOf = (args: string): QuestCommand => {
   const words = args.trim().toLowerCase().split(/\s+/)
@@ -27,7 +35,7 @@ export const questCommandOf = (args: string): QuestCommand => {
     return { show: true }
   }
   if (asked === 'demo') {
-    return words[1] === 'arcade' ? { arcade: true } : { demo: true }
+    return arcadeCommandOf(words[1]) ?? { demo: true }
   }
   if (asked === 'render') {
     const render = words[1] ?? ''
