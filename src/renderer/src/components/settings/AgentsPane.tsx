@@ -63,6 +63,11 @@ import { useAgentCliSelfUpdate } from './use-agent-cli-self-update'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { parseAgentDefaultEnvDraft, stringifyAgentDefaultEnvDraft } from './agent-default-env-draft'
 import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
+import { normalizeGlobalWindowsRuntimeDefault } from '../../../../shared/project-execution-runtime'
+import {
+  partitionAgentCatalogForPane,
+  resolveAgentsPaneDetectionRuntime
+} from './agent-in-process-runtime'
 
 export { getAgentsPaneSearchEntries } from './agents-search'
 
@@ -91,6 +96,8 @@ type AgentRowProps = {
   defaultArgs: string
   defaultEnv: Record<string, string>
   isDetected: boolean
+  /** Set for agents that run in-process on this runtime: replaces the command line and the install link. */
+  inProcessNote?: string
   isEnabled: boolean
   isDefault: boolean
   cmdOverride: string | undefined
@@ -493,6 +500,7 @@ function AgentRow({
   defaultArgs,
   defaultEnv,
   isDetected,
+  inProcessNote,
   isEnabled,
   isDefault,
   cmdOverride,
@@ -527,18 +535,22 @@ function AgentRow({
               </SettingsBadge>
             )}
           </div>
-          <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-            {cmdOverride ? (
-              <span>
-                <span className="text-muted-foreground/60 line-through">{defaultCmd}</span>
-                <span className="ml-1.5 text-foreground/80">{cmdOverride}</span>
-              </span>
-            ) : (
-              defaultCmd
-            )}
-            {argsOverride && <span className="ml-1.5 text-foreground/70">{argsOverride}</span>}
-            {envSummary && <span className="ml-1.5 text-foreground/60">{envSummary}</span>}
-          </div>
+          {inProcessNote ? (
+            <div className="mt-1 text-[11px] text-muted-foreground">{inProcessNote}</div>
+          ) : (
+            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+              {cmdOverride ? (
+                <span>
+                  <span className="text-muted-foreground/60 line-through">{defaultCmd}</span>
+                  <span className="ml-1.5 text-foreground/80">{cmdOverride}</span>
+                </span>
+              ) : (
+                defaultCmd
+              )}
+              {argsOverride && <span className="ml-1.5 text-foreground/70">{argsOverride}</span>}
+              {envSummary && <span className="ml-1.5 text-foreground/60">{envSummary}</span>}
+            </div>
+          )}
         </div>
 
         {/* Why flex below sm: the fixed column grid is wider than a phone-width card. */}
@@ -576,7 +588,7 @@ function AgentRow({
             target="_blank"
             rel="noopener noreferrer"
             title={
-              isDetected
+              isDetected || inProcessNote
                 ? translate('auto.components.settings.AgentsPane.fe4d630c94', 'Docs')
                 : translate('auto.components.settings.AgentsPane.f95b5c79b8', 'Install')
             }
@@ -801,14 +813,26 @@ export function AgentsPane({
   // Why: null means detection is in flight, not "all agents are installed".
   // Showing the full catalog here makes the default-agent picker flash invalid
   // options while switching between Windows and WSL detection contexts.
-  const detectedAgents =
-    detectedIds === null ? [] : getAgentCatalog().filter((agent) => detectedIds.has(agent.id))
+  // Why: agents that run in-process on this Windows/WSL runtime are not installable, so they get their own list.
+  const detectionRuntime = resolveAgentsPaneDetectionRuntime({
+    hostIsWindows: wslSupportedPlatform === true,
+    activeServerEnvironmentId,
+    localWindowsRuntimeDefault: normalizeGlobalWindowsRuntimeDefault(
+      settings.localWindowsRuntimeDefault
+    )
+  })
+  const agentsPartition = partitionAgentCatalogForPane({
+    catalog: getAgentCatalog(),
+    detectedIds,
+    runtime: detectionRuntime
+  })
+  const detectedAgents = agentsPartition.detected
   const enabledDetectedAgents = detectedAgents.filter((agent) =>
     isTuiAgentEnabled(agent.id, disabledAgents)
   )
-  const undetectedAgents = getAgentCatalog().filter(
-    (a) => detectedIds !== null && !detectedIds.has(a.id)
-  )
+  const inProcessAgents = agentsPartition.inProcess
+  const undetectedAgents = agentsPartition.available
+  const inProcessRuntimeLabel = detectionRuntime === 'wsl' ? 'WSL' : 'Windows'
 
   // Why: 'blank' is an explicit no-agent preference, not an auto fallback,
   // so the Auto pill should only light up when the default is null OR when a
@@ -972,6 +996,55 @@ export function AgentsPane({
                   onRepair={selfUpdate.repair}
                 />
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {inProcessAgents.length > 0 && (
+        <section className="space-y-3">
+          <SettingsSubsectionHeader
+            title={
+              <span className="flex items-center gap-2 text-muted-foreground">
+                {translate(
+                  'auto.components.settings.AgentsPane.runsInProcessTitle',
+                  'Runs in-process'
+                )}
+                <SettingsBadge tone="muted">
+                  {inProcessAgents.length}{' '}
+                  {translate('auto.components.settings.AgentsPane.024bd95089', 'agents')}
+                </SettingsBadge>
+              </span>
+            }
+          />
+
+          <div className="divide-y divide-border/40">
+            {inProcessAgents.map((agent) => (
+              <AgentRow
+                key={agent.id}
+                agentId={agent.id}
+                label={agent.label}
+                homepageUrl={agent.homepageUrl}
+                defaultCmd={agent.cmd}
+                defaultArgs={getTuiAgentDefaultArgs(agent.id)}
+                defaultEnv={getTuiAgentDefaultEnv(agent.id)}
+                isDetected={false}
+                inProcessNote={translate(
+                  'auto.components.settings.AgentsPane.runsInProcessNote',
+                  'Runs in-process on {{value0}}: teammates stay in the same Claude pane. Nothing to install.',
+                  { value0: inProcessRuntimeLabel }
+                )}
+                isEnabled={isTuiAgentEnabled(agent.id, disabledAgents)}
+                isDefault={false}
+                cmdOverride={undefined}
+                argsOverride={resolveTuiAgentLaunchArgs(agent.id, agentDefaultArgs)}
+                envOverride={resolveTuiAgentLaunchEnv(agent.id, agentDefaultEnv)}
+                onSetDefault={() => {}}
+                onSetEnabled={(enabled) => setAgentEnabled(agent.id, enabled)}
+                onSaveOverride={() => {}}
+                onSaveArgs={(v) => saveAgentArgs(agent.id, v)}
+                onSaveEnv={(v) => saveAgentEnv(agent.id, v)}
+              />
             ))}
           </div>
         </section>
