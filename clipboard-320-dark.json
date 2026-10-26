@@ -1,0 +1,4 @@
+{
+  "xtermSelection": "git fetch origin\n     git rebase origin/main\n     git push --force-with-lease",
+  "clipboard": "git fetch origin\n     git rebase origin/main\n     git push --force-with-lease"
+}
