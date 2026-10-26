@@ -112,8 +112,11 @@ export const registerArcade = (on: On): void => {
     const words = arcadeWords()
     const own = arcade
     if (own === undefined || e.surface !== 'terminal') {
-      // A pane that outlived its run (a reload) has nothing to play: it closes.
-      void $.ui.close({ id: ARCADE_PANE }).catch(() => undefined)
+      // A pane that outlived its run (a reload) has nothing to play: it closes. Another surface
+      // only names it, since closing there would end the terminal's run too.
+      if (own === undefined) {
+        void $.ui.close({ id: ARCADE_PANE }).catch(() => undefined)
+      }
       const { Text } = $.ui.resolve(e)
       return <Text dimColor>{words.title}</Text>
     }
