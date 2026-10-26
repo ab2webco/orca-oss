@@ -525,6 +525,7 @@ import {
   markCursorWorkspaceTrusted
 } from '../agent-trust-presets'
 import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
+import { claudeLaunchRequiresFolderTrust } from '../claude-accounts/claude-folder-trust'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
 import { recordManagedHookInstallFailure } from '../agent-hooks/install-telemetry'
 import {
@@ -28365,7 +28366,11 @@ export class OrcaRuntimeService {
             worktreeId: workspace.id,
             ...(opts.claudeAccountId ? { claudeAccountId: opts.claudeAccountId } : {}),
             ...(opts.codexAccountId ? { codexAccountId: opts.codexAccountId } : {}),
-            ...(opts.orchestrationGameMember && launchOpts.launchAgent === 'claude'
+            ...(claudeLaunchRequiresFolderTrust({
+              launchAgent: launchOpts.launchAgent,
+              orchestrationWorker: opts.orchestrationWorker,
+              orchestrationGameMember: opts.orchestrationGameMember
+            })
               ? { requireClaudeFolderTrust: true }
               : {}),
             preAllocatedHandle,

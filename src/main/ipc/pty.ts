@@ -108,12 +108,7 @@ import {
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
 import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
-import {
-  claudeConfigFilePathOf,
-  claudeFolderTrustPathsOf,
-  claudeFolderTrustRequiredMessage,
-  isClaudeFolderTrusted
-} from '../claude-accounts/claude-folder-trust'
+import { ensureClaudeFolderTrustForSpawn } from './pty-claude-folder-trust'
 import {
   getLiveInjectedClaudePtyAccountId,
   getLiveSharedClaudePtyAccountId,
@@ -170,6 +165,7 @@ import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import { parseTerminalKittyKeyboardFlags } from '../../shared/terminal-kitty-keyboard-flags'
 import {
   resolveTerminalStartupCwdForWorkspace,
+  resolveTerminalWorkspacePath,
   type TerminalStartupCwdMissingDirFallback
 } from '../../shared/terminal-startup-cwd'
 import { isWslUncPath, toWindowsWslPath } from '../../shared/wsl-paths'
@@ -4644,6 +4640,12 @@ export function registerPtyHandlers(
         store?.getFolderWorkspace(folderWorkspaceId)?.folderPath
     })
 
+  const resolvePtySpawnWorkspaceRoot = (worktreeId: string | undefined): string | null =>
+    resolveTerminalWorkspacePath(
+      worktreeId,
+      (folderWorkspaceId) => store?.getFolderWorkspace(folderWorkspaceId)?.folderPath
+    )
+
   const localStartupCwdDirectoryExists = (path: string): boolean => {
     // Why: Win32 statSync on \\wsl.localhost 9P shares can falsely report ENOENT; defer to the provider's WSL-aware validation.
     if (isWslUncPath(path)) {
@@ -5136,25 +5138,20 @@ export function registerPtyHandlers(
         env = { ...env, ORCA_TERMINAL_HANDLE: args.preAllocatedHandle }
       }
       if (
-        args.requireClaudeFolderTrust === true &&
-        isClaudeLaunch &&
+        !preAdoptedStablePane &&
+        isClaudeLaunchCommand(args.command) &&
         !isExistingSharedClaudeSession &&
-        claudeAuth?.runtime !== 'wsl'
+        claudeAuth?.runtime !== 'wsl' &&
+        !(cwd && isWslUncPath(cwd))
       ) {
-        // Why: the file Claude reads for this account; an untrusted folder would park the member on the trust prompt.
-        if (!cwd) {
-          throw new Error(
-            'Claude Code has no folder to launch in, so its folder trust cannot be checked.'
-          )
-        }
-        const configFilePath = claudeConfigFilePathOf({ ...process.env, ...env })
-        const trusted = await isClaudeFolderTrusted({
-          configFilePath,
-          folderPaths: claudeFolderTrustPathsOf(cwd)
+        // Why: env is final here, so a pinned account's CLAUDE_CONFIG_DIR picks the config Claude reads.
+        await ensureClaudeFolderTrustForSpawn({
+          cwd,
+          workspaceRoot: resolvePtySpawnWorkspaceRoot(args.worktreeId),
+          connectionId: args.connectionId,
+          env,
+          requireTrust: args.requireClaudeFolderTrust === true
         })
-        if (!trusted) {
-          throw new Error(claudeFolderTrustRequiredMessage(cwd, configFilePath))
-        }
       }
       let selectedCodexHomePath = resolveSelectedCodexHomeOrRefuseSpawn(() =>
         !preAdoptedStablePane && !args.connectionId
@@ -6934,6 +6931,21 @@ export function registerPtyHandlers(
         const baseEnvWithAuth = claudeAuth
           ? { ...sshSourceEnv, ...claudeAuth.envPatch }
           : sshSourceEnv
+        if (
+          !preAdoptedStablePane &&
+          isClaudeLaunchCommand(args.command) &&
+          !isExistingSharedClaudeSession &&
+          claudeAuth?.runtime !== 'wsl' &&
+          !(cwd && isWslUncPath(cwd))
+        ) {
+          await ensureClaudeFolderTrustForSpawn({
+            cwd,
+            workspaceRoot: resolvePtySpawnWorkspaceRoot(args.worktreeId),
+            connectionId: args.connectionId,
+            env: baseEnvWithAuth,
+            requireTrust: false
+          })
+        }
         const spawnPaneKey = baseEnvWithAuth?.ORCA_PANE_KEY
         const parsedSpawnPaneKey = parseValidPaneKey(spawnPaneKey)
         const verifiedPaneKey =

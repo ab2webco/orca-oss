@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,7 +61,9 @@ type RuntimeSpawn = (args: {
   requireClaudeFolderTrust?: boolean
 }) => Promise<unknown>
 
-describe('runtime PTY spawn Claude folder trust (ORCA-776)', () => {
+type FixtureConfig = 'trusted' | 'untrusted' | 'unparsable' | 'missing'
+
+describe('runtime PTY spawn Claude folder trust (ORCA-776, ORCA-792)', () => {
   const { mainWindow } = setupPtyIpcSuite()
   const tempRoots: string[] = []
 
@@ -72,26 +74,39 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776)', () => {
   })
 
   afterEach(async () => {
+    vi.unstubAllEnvs()
     await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
   })
 
-  /** A worktree folder and the account config dir Claude reads for it; the config trusts the folder only when asked. */
+  /** A worktree folder and the account config dir Claude reads for it, seeded as asked. */
   async function memberFixture(
-    trustFolder: boolean
-  ): Promise<{ configDir: string; worktree: string }> {
+    config: FixtureConfig
+  ): Promise<{ configDir: string; worktree: string; root: string }> {
     const root = await mkdtemp(join(tmpdir(), 'orca-776-trust-'))
     tempRoots.push(root)
     const configDir = join(root, 'account')
     const worktree = join(root, 'worktree')
-    await mkdir(configDir, { recursive: true })
     await mkdir(worktree, { recursive: true })
-    const projects = trustFolder ? { [worktree]: { hasTrustDialogAccepted: true } } : {}
-    await writeFile(join(configDir, '.claude.json'), JSON.stringify({ projects }))
-    return { configDir, worktree }
+    if (config !== 'missing') {
+      await mkdir(configDir, { recursive: true })
+      const projects = config === 'trusted' ? { [worktree]: { hasTrustDialogAccepted: true } } : {}
+      await writeFile(
+        join(configDir, '.claude.json'),
+        config === 'unparsable' ? '{not json' : JSON.stringify({ numStartups: 3, projects })
+      )
+    }
+    return { configDir, worktree, root }
+  }
+
+  async function readConfig(configDir: string): Promise<{
+    numStartups?: number
+    projects?: Record<string, { hasTrustDialogAccepted?: boolean }>
+  }> {
+    return JSON.parse(await readFile(join(configDir, '.claude.json'), 'utf8'))
   }
 
   /** The runtime's own PTY spawn: the path a worker terminal takes, captured from the controller registration. */
-  function runtimeSpawn(): RuntimeSpawn {
+  function runtimeSpawn(prepareClaudeAuth?: unknown): RuntimeSpawn {
     let captured: RuntimeSpawn | undefined
     const methods: Record<string, unknown> = {
       setPtyController: (controller: { spawn?: RuntimeSpawn }) => {
@@ -102,7 +117,13 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776)', () => {
     const runtime = new Proxy(methods, {
       get: (target, key: string) => target[key] ?? (() => undefined)
     })
-    registerPtyHandlers(mainWindow as never, runtime as never)
+    registerPtyHandlers(
+      mainWindow as never,
+      runtime as never,
+      undefined,
+      undefined,
+      prepareClaudeAuth as never
+    )
     if (!captured) {
       throw new Error('runtime PTY controller was not registered')
     }
@@ -111,26 +132,69 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776)', () => {
 
   function spawnClaude(args: {
     cwd: string
-    configDir: string
+    configDir?: string
     requireClaudeFolderTrust?: boolean
+    prepareClaudeAuth?: unknown
   }): Promise<unknown> {
-    return runtimeSpawn()({
+    return runtimeSpawn(args.prepareClaudeAuth)({
       cols: 80,
       rows: 24,
       cwd: args.cwd,
       connectionId: null,
       worktreeId: `repo-776::${args.cwd}`,
       command: 'claude',
-      env: { CLAUDE_CONFIG_DIR: args.configDir },
+      env: args.configDir ? { CLAUDE_CONFIG_DIR: args.configDir } : {},
       ...(args.requireClaudeFolderTrust === undefined
         ? {}
         : { requireClaudeFolderTrust: args.requireClaudeFolderTrust })
     })
   }
 
-  it('refuses a game member launch whose account config does not trust the folder', async () => {
+  it('trusts a new worktree in the config dir Claude will read before it starts', async () => {
     spawnMock.mockClear()
-    const { configDir, worktree } = await memberFixture(false)
+    const { configDir, worktree } = await memberFixture('missing')
+
+    await spawnClaude({ cwd: worktree, configDir, requireClaudeFolderTrust: true })
+
+    expect((await readConfig(configDir)).projects?.[worktree]?.hasTrustDialogAccepted).toBe(true)
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the other keys of an existing config', async () => {
+    spawnMock.mockClear()
+    const { configDir, worktree } = await memberFixture('untrusted')
+
+    await spawnClaude({ cwd: worktree, configDir, requireClaudeFolderTrust: true })
+
+    const config = await readConfig(configDir)
+    expect(config.numStartups).toBe(3)
+    expect(config.projects?.[worktree]?.hasTrustDialogAccepted).toBe(true)
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('writes a pinned managed account trust into its own config dir, not the default', async () => {
+    spawnMock.mockClear()
+    const { configDir, worktree, root } = await memberFixture('missing')
+    const defaultDir = join(root, 'default')
+    await mkdir(defaultDir)
+    vi.stubEnv('CLAUDE_CONFIG_DIR', defaultDir)
+    const prepareClaudeAuth = vi.fn(async () => ({
+      configDir,
+      envPatch: { CLAUDE_CONFIG_DIR: configDir },
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }))
+
+    await spawnClaude({ cwd: worktree, requireClaudeFolderTrust: true, prepareClaudeAuth })
+
+    expect(prepareClaudeAuth).toHaveBeenCalledTimes(1)
+    expect((await readConfig(configDir)).projects?.[worktree]?.hasTrustDialogAccepted).toBe(true)
+    await expect(readFile(join(defaultDir, '.claude.json'), 'utf8')).rejects.toThrow(/ENOENT/)
+  })
+
+  it('refuses a worker launch whose config still does not trust the folder', async () => {
+    spawnMock.mockClear()
+    const { configDir, worktree } = await memberFixture('unparsable')
 
     await expect(
       spawnClaude({ cwd: worktree, configDir, requireClaudeFolderTrust: true })
@@ -138,18 +202,18 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776)', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('launches a game member whose account config trusts the folder', async () => {
+  it('launches a worker whose account config already trusts the folder', async () => {
     spawnMock.mockClear()
-    const { configDir, worktree } = await memberFixture(true)
+    const { configDir, worktree } = await memberFixture('trusted')
 
     await spawnClaude({ cwd: worktree, configDir, requireClaudeFolderTrust: true })
 
     expect(spawnMock).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves an interactive Claude launch to Claude own trust prompt', async () => {
+  it('leaves an interactive launch to Claude own prompt when the trust cannot be written', async () => {
     spawnMock.mockClear()
-    const { configDir, worktree } = await memberFixture(false)
+    const { configDir, worktree } = await memberFixture('unparsable')
 
     await spawnClaude({ cwd: worktree, configDir })
 
