@@ -10,7 +10,14 @@ import { hdFloorPixel } from './hd-backdrop'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
 import { hdBakedGroundOf, hdBakedLandOf, hdLandBakeOf } from './hd-land-bake'
 import { lightnessOf } from './hd-lightness'
-import { costumeSpriteOf, hdSpritePixel } from './hd-sprite'
+import { figureEdgeOf } from './hd-readability'
+import {
+  costumeSpriteOf,
+  frameSpriteOf,
+  hdSpritePixel,
+  isHdHaloAt,
+  type HdSprite
+} from './hd-sprite'
 import { glyphCell, mix, UPPER_HALF } from './pixel-canvas'
 import { hdFrameOf } from './scene-hd-land'
 import { hdPlantShapePixel, PLANT_EVERY } from './scene-hd-props'
@@ -25,12 +32,17 @@ import type { Costume, Look, SceneDefinition } from './scenes/index'
 /** A scene decoration is cut to this so a timed jump clears it at max speed (see HERO_HITBOX). */
 export const ARCADE_SHAPE_MAX_HEIGHT = 4
 export const ARCADE_SHAPE_MAX_COLUMNS = 5
+/** Room for the hero's peak under the score: 3 ground pixels, a 9-pixel hero and an 8-pixel jump. */
+export const ARCADE_ROWS = 12
+const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PLANT_MAX_HEIGHT = 16
 const SHADOW = 0.38
 
 export type ArcadeShape = RunnerShape & {
   /** The colour `h` pixels above the ground in the shape's `column`, unlit. */
   pixelAt: (column: number, h: number, tick: number) => number | undefined
+  /** Drawn outlined like a character, so it parts from a land of its own colour. */
+  sprite: HdSprite
 }
 
 const shapeOf = (
@@ -48,7 +60,23 @@ const shapeOf = (
     }
     return top
   })
-  return { heights, weight, pixelAt }
+  const colors: Record<string, number> = {}
+  const glyphOf = new Map<number, string>()
+  const rows = Array.from({ length: height }, (_, row) =>
+    heights
+      .map((_, column) => {
+        const color = pixelAt(column, height - 1 - row, 0)
+        if (color === undefined) {
+          return '.'
+        }
+        const glyph = glyphOf.get(color) ?? GLYPHS[glyphOf.size % GLYPHS.length] ?? 'z'
+        glyphOf.set(color, glyph)
+        colors[glyph] = color
+        return glyph
+      })
+      .join('')
+  )
+  return { heights, weight, pixelAt, sprite: frameSpriteOf(rows, colors) }
 }
 
 // Why drop empty columns first: a flower's two stems sit eight columns apart.
@@ -75,7 +103,13 @@ const sceneShapeOf = (look: Look, weight: number): ArcadeShape | undefined => {
     const slot = slots[Math.floor(((column + 0.5) * slots.length) / columns)]
     return slot === undefined || column >= columns || h >= height
       ? undefined
-      : hdPlantShapePixel(look, slot, Math.floor((h * natural) / height), tick)
+      : // Why to the top: an antenna's beacon and a crystal's tip are what make it read as one.
+        hdPlantShapePixel(
+          look,
+          slot,
+          height === 1 ? 0 : Math.round((h * (natural - 1)) / (height - 1)),
+          tick
+        )
   })
 }
 
@@ -138,22 +172,24 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
   const sprite = costumeSpriteOf(input.costume ?? scene.costumes.working, legs, false)
   const top = ground - sprite.rows.length + 1 - lift
   const figureLight = look.isNight ? NOON : { ...frame.light, night: frame.light.night * 0.5 }
-  const shown = state.obstacles.map((one) => ({
-    left: Math.round(one.x - state.distance),
-    shape: runner.shapes[one.shape]
-  }))
-  const at = (x: number, y: number): number => {
-    const hero = hdSpritePixel(sprite, x, y, HERO_LEFT, top)
-    if (hero !== undefined) {
-      return landInLight(hero, figureLight)
-    }
+  // Front to back: the hero, then each obstacle, its outline's bottom on the ground like the hero's.
+  const placed: { sprite: HdSprite; left: number; top: number }[] = [
+    { sprite, left: HERO_LEFT, top },
+    ...state.obstacles.flatMap((one) => {
+      const shape = runner.shapes[one.shape]
+      return shape === undefined
+        ? []
+        : [
+            {
+              sprite: shape.sprite,
+              left: Math.round(one.x - state.distance) - 1,
+              top: ground - shape.sprite.rows.length + 1
+            }
+          ]
+    })
+  ]
+  const backdropAt = (x: number, y: number): number => {
     if (y < ground) {
-      for (const { left, shape } of shown) {
-        const color = shape?.pixelAt(x - left, ground - 1 - y, tick)
-        if (color !== undefined) {
-          return landInLight(color, frame.light, frame.dayLift, look.isNight)
-        }
-      }
       return hdBakedLandOf(land, frame, x, y) ?? hdSkyPixel(frame, x, y)
     }
     if (y > ground) {
@@ -161,6 +197,24 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
     }
     const isUnder = lift === 0 && x > HERO_LEFT && x < HERO_LEFT + sprite.width - 1
     return mix(hdFloorPixel(frame, land, x), 0x000000, isUnder ? SHADOW : 0)
+  }
+  const at = (x: number, y: number): number => {
+    for (const one of placed) {
+      const color = hdSpritePixel(one.sprite, x, y, one.left, one.top)
+      if (color !== undefined) {
+        return landInLight(color, figureLight)
+      }
+    }
+    const behind = backdropAt(x, y)
+    if (y > ground) {
+      return behind
+    }
+    const rimmed = placed.find((one) => isHdHaloAt(one.sprite, x, y, one.left, one.top))
+    if (rimmed === undefined) {
+      return behind
+    }
+    const ink = landInLight(rimmed.sprite.outline, figureLight)
+    return figureEdgeOf(ink, behind, look) === ink ? behind : figureEdgeOf(ink, behind, look)
   }
   const grid: number[][] = []
   for (let row = 0; row < rows; row += 1) {

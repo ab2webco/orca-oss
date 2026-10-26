@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { runnerOf, runnerStartOf, runnerStepOf } from '../hooks/arcade-runner'
 import { ARCADE_FPS_MAX, ARCADE_RUNNER } from '../hooks/arcade-runner-data'
-import { arcadeGridOf, arcadeShapesOf } from '../hooks/arcade-runner-frame'
+import { ARCADE_ROWS, arcadeGridOf, arcadeShapesOf } from '../hooks/arcade-runner-frame'
 import { forgetFrames, isNewFrame, rememberFrame } from '../hooks/frame-gate'
 import { base64Of, cellsOf, UPPER_HALF } from '../hooks/pixel-canvas'
 import { sceneGridOf } from '../hooks/scene'
@@ -65,7 +65,7 @@ describe('a runner frame at the frame cap', () => {
       const started = performance.now()
       for (let i = 0; i < ARCADE_FPS_MAX; i += 1) {
         state = runnerStepOf(runner, state, 1000 / ARCADE_FPS_MAX, i % 9 === 0)
-        cellsOf(arcadeGridOf({ scene, runner, state, columns, rows: 9, tick: i }))
+        cellsOf(arcadeGridOf({ scene, runner, state, columns, rows: ARCADE_ROWS, tick: i }))
       }
       return (performance.now() - started) / ARCADE_FPS_MAX
     }

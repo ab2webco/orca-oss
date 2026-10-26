@@ -55,3 +55,18 @@ export const sceneShotsOf = (id, phases, widths = COLUMNS) =>
       }))
     ])
   )
+
+// 1440, 768, 390 and 320 px at 9 px a cell; the game's look has a day and a night, no app theme.
+const ARCADE_COLUMNS = [160, 85, 43, 35]
+
+export const arcadeShotsOf = (ids) =>
+  ids.flatMap((scene) =>
+    [TIMES[1], TIMES[3]].flatMap(([time, hour]) =>
+      ARCADE_COLUMNS.map((columns) => ({
+        name: `arcade-${scene}-${time}-${columns}`,
+        scene,
+        hour,
+        columns
+      }))
+    )
+  )

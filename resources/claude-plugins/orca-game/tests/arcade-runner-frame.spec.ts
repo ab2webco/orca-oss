@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { runnerOf, runnerStartOf, type RunnerState } from '../hooks/arcade-runner'
 import { ARCADE_RUNNER } from '../hooks/arcade-runner-data'
 import {
+  ARCADE_ROWS,
   ARCADE_SHAPE_MAX_COLUMNS,
   ARCADE_SHAPE_MAX_HEIGHT,
   arcadeGridOf,
@@ -11,7 +12,7 @@ import {
 import { glyphs } from './grid-digest'
 import { SCENES, sceneOf } from '../hooks/scenes/index'
 
-const ROWS = 9
+const ROWS = ARCADE_ROWS
 // 1440, 768, 390 and 320 px at 9 px a cell.
 const WIDTHS = [160, 85, 43, 35]
 
@@ -77,7 +78,8 @@ describe('a runner frame', () => {
       }
     })
     expect(changed.size).toBeGreaterThan(0)
-    expect([...changed].every((x) => x >= 40 && x < 40 + ARCADE_SHAPE_MAX_COLUMNS)).toBe(true)
+    // Its columns, its outline either side and the rim past that.
+    expect([...changed].every((x) => x >= 38 && x <= 41 + ARCADE_SHAPE_MAX_COLUMNS)).toBe(true)
   })
 
   it('lifts the hero off the ground while it jumps', () => {

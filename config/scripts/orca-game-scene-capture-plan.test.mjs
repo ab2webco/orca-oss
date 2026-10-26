@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { captureOptionsOf, scenePhasesOf, sceneShotsOf } from './orca-game-scene-capture-plan.mjs'
+import {
+  arcadeShotsOf,
+  captureOptionsOf,
+  scenePhasesOf,
+  sceneShotsOf
+} from './orca-game-scene-capture-plan.mjs'
 
 const ALL = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 
@@ -60,5 +65,22 @@ describe('orca-game scene capture plan', () => {
     ])
     expect(new Set(shots.map((shot) => shot.name)).size).toBe(20)
     expect(shots.filter((shot) => shot.columns === 60)).toHaveLength(10)
+  })
+
+  it('shoots the runner in each scene by day and by night at 1440, 768, 390 and 320 px', () => {
+    const shots = arcadeShotsOf(['quest', 'vigilante'])
+    expect(shots).toHaveLength(16)
+    expect(shots.slice(0, 4).map((shot) => shot.name)).toEqual([
+      'arcade-quest-day-160',
+      'arcade-quest-day-85',
+      'arcade-quest-day-43',
+      'arcade-quest-day-35'
+    ])
+    expect(shots.at(-1)).toEqual({
+      name: 'arcade-vigilante-night-35',
+      scene: 'vigilante',
+      hour: 23,
+      columns: 35
+    })
   })
 })
