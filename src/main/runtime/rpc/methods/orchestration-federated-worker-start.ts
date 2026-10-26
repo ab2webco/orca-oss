@@ -1,26 +1,17 @@
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
-import {
-  ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
-  ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
-  ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
-  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
-  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
-  ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY
-} from '../../../../shared/protocol-version'
-import { orchestrationMigrationData } from '../../../../shared/orchestration-rpc-contract'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { OrchestrationDb } from '../../orchestration/db'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { WorkerStartInput } from './orchestration-worker-start-schema'
 import {
-  assertWorkerLaunchPreferencesRuntimeSupported,
   assertWorkerLaunchPreferencesCreateTerminal,
   createPendingWorkerLaunchReceipt,
   resolveFederatedWorkerLaunchReceipt,
   type OrchestrationWorkerLaunchReceipt
 } from './orchestration-worker-launch-preferences'
 import { validateFederatedWorkerStartPlacement } from './orchestration-worker-start-validation'
+import { negotiateFederatedWorkerStart } from './orchestration-federated-worker-capabilities'
 
 export async function startFederatedWorker(args: {
   params: WorkerStartInput
@@ -65,35 +56,11 @@ export async function startFederatedWorker(args: {
     undefined,
     params.timeoutMs
   )) as RuntimeStatus
-  if (!status.capabilities?.includes(ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY)) {
-    throw new OrchestrationError(
-      'orchestration_migration_required',
-      `Connected server ${server.name} does not support the current orchestration contract. No effects were applied.`,
-      orchestrationMigrationData('runtime_capability_missing')
-    )
-  }
-  if (!status.capabilities?.includes(ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY)) {
-    throw new OrchestrationError(
-      'capability_unsupported',
-      `Connected server ${server.name} does not support orchestration federation.`
-    )
-  }
-  assertWorkerLaunchPreferencesRuntimeSupported({
-    model: params.model,
-    effort: params.effort,
-    capabilities: status.capabilities,
-    serverName: server.name
+  const { federationProtocolVersion, gameMember } = negotiateFederatedWorkerStart({
+    status,
+    serverName: server.name,
+    params
   })
-  const supportsControlMail = status.capabilities?.includes(
-    ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY
-  )
-  const federationProtocolVersion =
-    supportsControlMail &&
-    status.capabilities?.includes(ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY)
-      ? ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
-      : supportsControlMail
-        ? ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
-        : 1
 
   const setupDecision = createsWorktree ? (params.setup ?? 'run') : 'not_applicable'
   const started = db.createStartingWorkerDispatch({
@@ -153,7 +120,8 @@ export async function startFederatedWorker(args: {
         model: params.model,
         effort: params.effort,
         timeoutMs: params.timeoutMs,
-        devMode: params.devMode
+        devMode: params.devMode,
+        ...gameMember
       },
       (params.timeoutMs ?? 60_000) + 15_000,
       { orchestrationRequestId: orchestrationMutation.requestId }
@@ -242,6 +210,8 @@ export async function startFederatedWorker(args: {
         server: { environmentId: server.environmentId, name: server.name },
         failedStage: worker.stage,
         lastError: worker.last_error,
+        // Why: machine-readable so placement can try another host (ORCA-795).
+        refusal: { code: error.code, ...(error.data ? { data: error.data } : {}) },
         launch: requestedLaunch,
         effects: [],
         residualResources: []
@@ -272,7 +242,8 @@ function isKnownRemoteStartFailure(code: string): boolean {
     'agent_unconfigured',
     'worktree_not_found_on_server',
     'terminal_worktree_mismatch',
-    'capability_unsupported'
+    'capability_unsupported',
+    'setup_slot_busy'
   ].includes(code)
 }
 

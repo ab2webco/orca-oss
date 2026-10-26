@@ -17,8 +17,10 @@ import {
   persistFederatedSetupSpawnFailure,
   persistFederatedSetupWaitOutcome
 } from './orchestration-federation-setup'
+import { claimFederatedSetupSlot } from './orchestration-federation-setup-admission'
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
+import { holdSlotForSetup } from './orchestration-worker-setup-queue'
 import { prepareFederationAttachmentWorkerStart } from './orchestration-worker-start-validation'
 
 export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
@@ -51,6 +53,8 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           existingPlacement: 'an exact existing folder workspace'
         })
       }
+      const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
+      const gameMember = params.game ? { orchestrationGameMember: true } : {}
 
       const db = runtime.getOrchestrationDb()
       db.createRemoteDispatchAttachment({
@@ -96,6 +100,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             observeSetupCompletion: true,
             createdWithAgent: agent as TuiAgent,
             startupAgent: agent as TuiAgent,
+            ...gameMember,
             ...(launch.preferences ? { startupLaunchPreferences: launch.preferences } : {}),
             activate: false,
             lineage: { noParent: true }
@@ -130,6 +135,9 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             created.setupReceipt?.terminalHandle
           )
           appendFederationSetupEffect(effects, setup)
+          if (setupSlot) {
+            holdSlotForSetup(runtime, setupSlot, setup, effects)
+          }
         } else {
           worktree = await runtime.showManagedTerminalWorkspace(params.worktree).catch(() => {
             throw new OrchestrationError(
@@ -167,6 +175,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               // Why: agent ids are not shell commands (`cursor` is the desktop app,
               // its CLI is `cursor-agent`); resolve through the TUI agent config.
               startupAgent: agent as TuiAgent,
+              ...gameMember,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
               title: `worker-${params.taskId}`,
               presentation: 'background'
@@ -262,6 +271,9 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           residualResources: []
         }
       } catch (error) {
+        if (setupSlot && !setupSlot.watching) {
+          setupSlot.release()
+        }
         return failFederatedAttachmentWithReceipt({
           db,
           dispatchId: params.dispatchId,

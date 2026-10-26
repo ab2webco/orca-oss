@@ -20,7 +20,10 @@ export const FederationAttachStartParams = z.object({
   model: OptionalWorkerLaunchPreference,
   effort: OptionalWorkerLaunchPreference,
   timeoutMs: OptionalFiniteNumber,
-  devMode: z.boolean().optional()
+  devMode: z.boolean().optional(),
+  // Why optional: the home sends both only to a host advertising the game-member capability.
+  game: z.boolean().optional(),
+  setupAdmission: z.enum(['queue']).optional()
 })
 
 export type FederationAttachStartInput = z.infer<typeof FederationAttachStartParams>
