@@ -344,7 +344,7 @@ export const registerFleetPane = (on: On): void => {
       ...projectSections
     }
     const shown = layout.order.filter(
-      (section) => !layout.hidden.includes(section) && drawn[section] != null
+      (section) => layout.shown.includes(section) && drawn[section] != null
     )
     const sections = shown.map((section) => drawn[section])
     // A one-cell mark is too small to tap, so a phone also gets a chip per section.
