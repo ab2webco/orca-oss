@@ -153,4 +153,14 @@ describe("A member's perfect merge", () => {
 
     expect(kinds(leadState([merged]), leadState([perfect]))).toEqual([['perfect-merge', 100]])
   })
+
+  it("names the member's ticket like its merged toast", () => {
+    const merged = member({ review: review({ state: 'merged', ci: 'success' }) })
+    const perfect = member({
+      review: review({ state: 'merged', ci: 'success', perfectMerge: true })
+    })
+
+    const [one] = fleetRewardsOf(leadState([merged]), leadState([perfect]))
+    expect(one?.label).toBe('ORCA-12 · #41 perfect merge')
+  })
 })
