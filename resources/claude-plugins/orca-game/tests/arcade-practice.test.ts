@@ -155,4 +155,53 @@ describe('/orca-game:demo arcade', () => {
       before.runs.filter((one) => !one.startsWith('game state'))
     )
   })
+
+  // Why no key press: a test cannot raise the engine's Esc; it is the same ui.close the quit key raises.
+  test('asks the engine to close the pane on Esc', async ($, on) => {
+    const { world } = await start($, on)
+    await $.command.run({ command: 'orca-game:demo', args: 'arcade' } as never)
+    expect(world.opened).toMatchObject([{ id: ARCADE_PANE, closeOnEscape: true }])
+  })
+
+  // Why redraw before the clock moves: only the ui.close hook, Esc's path too, can have ended the run.
+  test('the quit key q closes the pane at once and keeps no run behind', async ($, on) => {
+    const { clock, world, writes, blits } = await start($, on)
+    const before = [...writes]
+    await $.command.run({ command: 'orca-game:demo', args: 'arcade' } as never)
+    const ui = await arcadePane($, 35)
+    const quit = await ui.find({ type: 'Button', key: 'arcade-close' })
+    expect(quit?.props.hotkey).toBe('q')
+    await ui.press({ key: 'arcade-jump' })
+    await clock.advance(1000)
+    await ui.press({ key: 'arcade-close' })
+    await ui.unmount()
+    expect(world.closed).toEqual([ARCADE_PANE])
+    const left = await arcadePane($, 35)
+    expect(await left.find({ type: 'Raster' })).toBeUndefined()
+    await left.unmount()
+    const closed = blits.length
+    await clock.advance(5000)
+    expect(blits.length).toBe(closed)
+    expect(writes).toEqual(before)
+  })
+
+  test('a close the hook never hears still ends the run on its next frame', async ($, on) => {
+    const { clock, world, writes, blits } = await start($, on)
+    const before = [...writes]
+    await $.command.run({ command: 'orca-game:demo', args: 'arcade' } as never)
+    const ui = await arcadePane($, 85)
+    await ui.press({ key: 'arcade-jump' })
+    await clock.advance(1000)
+    await ui.unmount()
+    world.panes = []
+    await clock.advance(1000)
+    const gone = blits.length
+    await clock.advance(5000)
+    expect(blits.length).toBe(gone)
+    const left = await arcadePane($, 85)
+    expect(await left.find({ type: 'Raster' })).toBeUndefined()
+    await left.unmount()
+    expect(world.closed).toEqual([ARCADE_PANE])
+    expect(writes).toEqual(before)
+  })
 })
