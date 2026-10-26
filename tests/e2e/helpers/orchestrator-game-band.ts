@@ -110,7 +110,7 @@ export type GameBand = {
 export async function startGameBand(
   page: Page,
   testRepoPath: string,
-  options: { state: unknown; theme: 'dark' | 'light'; locale: 'en' | 'es' }
+  options: { state: unknown; theme: 'dark' | 'light'; locale: 'en' | 'es'; scene?: string }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
   const projectDir = join(root, 'lumen-app')
@@ -160,7 +160,7 @@ export async function startGameBand(
     CLAUDE_CODE_NO_FLICKER: '1',
     ORCA_GAME_CLI: cli,
     ORCA_GAME_MODE: 'on',
-    ORCA_GAME_SCENE: 'quest',
+    ORCA_GAME_SCENE: options.scene ?? 'quest',
     ORCA_GAME_HUD: '1',
     ORCA_GAME_REWARDS: '1',
     ORCA_GAME_RENDER: 'hd',
