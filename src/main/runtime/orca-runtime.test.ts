@@ -38,6 +38,7 @@ import {
   removeWorktree
 } from '../git/worktree'
 import * as gitRunner from '../git/runner'
+import * as hooksPathCheck from '../git/worktree-hooks-path-check'
 import {
   WORKTREE_PROCESS_SWEEP_TIMEOUT_MS,
   WORKTREE_TEARDOWN_RPC_MARGIN_MS
@@ -45693,6 +45694,44 @@ describe('OrcaRuntimeService', () => {
     expect(result.setupReceipt).toMatchObject({ requested: 'skip', state: 'skipped' })
     expect(createSetupRunnerScript).not.toHaveBeenCalled()
     expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns CLI-created worktrees whose hooks dir skips the shipped pre-commit', async () => {
+    const metaById: Record<string, WorktreeMeta> = {}
+    const runtimeStore = {
+      ...store,
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
+      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
+        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
+        return metaById[worktreeId]
+      }
+    }
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    runtime.setNotifier({ worktreesChanged: vi.fn() } as never)
+    const worktreePath = '/tmp/workspaces/runtime-cli-hooks-path'
+    computeWorktreePathMock.mockReturnValue(worktreePath)
+    ensurePathWithinWorkspaceMock.mockReturnValue(worktreePath)
+    vi.mocked(listWorktrees).mockResolvedValue([
+      { path: worktreePath, head: 'def', branch: 'hooks', isBare: false, isMainWorktree: false }
+    ])
+    const probeSpy = vi.spyOn(hooksPathCheck, 'createLocalWorktreeHooksPathProbe').mockReturnValue({
+      readHooksPath: async () => '.husky/_\n',
+      pathExists: async (path) => path === `${worktreePath}/.husky/pre-commit`
+    })
+
+    try {
+      const result = await runtime.createManagedWorktree({
+        repoSelector: 'id:repo-1',
+        name: 'runtime-cli-hooks-path'
+      })
+
+      expect(probeSpy).toHaveBeenCalledWith(worktreePath, {})
+      expect(result.warning).toContain('".husky/_"')
+      expect(result.warning).toContain('".husky/pre-commit"')
+    } finally {
+      probeSpy.mockRestore()
+    }
   })
 
   it('materializes default tabs for inactive local managed worktree creates', async () => {

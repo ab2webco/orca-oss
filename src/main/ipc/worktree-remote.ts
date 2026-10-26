@@ -109,6 +109,11 @@ import {
 } from './worktree-symlinks'
 import { formatWorktreeIncludeCopyWarning } from './worktree-include-copy-budget'
 import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
+import {
+  createLocalWorktreeHooksPathProbe,
+  createRemoteWorktreeHooksPathProbe,
+  findWorktreeHooksPathWarning
+} from '../git/worktree-hooks-path-check'
 import { resolveWorktreeSharedDirectories } from '../git/worktree-shared-directories'
 import { normalizeSparseDirectories } from './sparse-checkout-directories'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
@@ -1926,6 +1931,16 @@ export async function createRemoteWorktree(
     })
   }
 
+  const hooksPathWarning = fsProvider
+    ? await timing.time('check_hooks_path', () =>
+        findWorktreeHooksPathWarning(
+          created.path,
+          createRemoteWorktreeHooksPathProbe(created.path, provider, fsProvider),
+          { setupWillRun: setup !== undefined }
+        )
+      )
+    : undefined
+
   notifyWorktreesChanged(mainWindow, repo.id)
   return {
     worktree: { ...worktree, workspaceLineage },
@@ -1935,6 +1950,7 @@ export async function createRemoteWorktree(
     ...(localBaseRefRefresh ? { localBaseRefRefresh } : {}),
     ...(localBaseRefUpdateSuggestion ? { localBaseRefUpdateSuggestion } : {}),
     ...(baseFallback ? { baseFallback } : {}),
+    ...(hooksPathWarning ? { warning: hooksPathWarning } : {}),
     timing: timing.finish()
   }
 }
@@ -2616,6 +2632,14 @@ export async function createLocalWorktree(
     }
   })
 
+  const hooksPathWarning = await timing.time('check_hooks_path', () =>
+    findWorktreeHooksPathWarning(
+      worktreePath,
+      createLocalWorktreeHooksPathProbe(worktreePath, localWorktreeGitOptions),
+      { setupWillRun: setup !== undefined }
+    )
+  )
+
   const stagedStartup = await timing.time('spawn_startup_terminal', () =>
     spawnLocalStartupAndSetupTerminals({
       runtime,
@@ -2627,6 +2651,10 @@ export async function createLocalWorktree(
       createdWithAgent: args.createdWithAgent
     })
   )
+
+  const createWarning = [includeCopyWarning, hooksPathWarning, stagedStartup.warning]
+    .filter((warning): warning is string => warning !== undefined)
+    .reduce<string | undefined>(appendWorktreeCreateWarning, undefined)
 
   notifyWorktreesChanged(mainWindow, repo.id)
   return {
@@ -2646,11 +2674,7 @@ export async function createLocalWorktree(
       : {}),
     ...(stagedStartup.startupTerminal ? { startupTerminal: stagedStartup.startupTerminal } : {}),
     ...(baseFallback ? { baseFallback } : {}),
-    ...(stagedStartup.warning
-      ? { warning: appendWorktreeCreateWarning(includeCopyWarning, stagedStartup.warning) }
-      : includeCopyWarning
-        ? { warning: includeCopyWarning }
-        : {}),
+    ...(createWarning ? { warning: createWarning } : {}),
     timing: timing.finish()
   }
 }
