@@ -51,8 +51,6 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     const settings = await window.api.settings.set({ theme: next })
     const store = window.__store!
     store.setState({ settings })
-    store.getState().setSidebarOpen(false)
-    store.getState().setRightSidebarOpen(false)
   }, theme)
   await expect
     .poll(async () =>
@@ -60,6 +58,21 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     )
     .toBe(theme)
 }
+
+// Why per width: a late startup write can reopen the right sidebar, squeezing the terminal to ~11 cols at 320.
+async function closeSidebars(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const store = window.__store!
+    store.getState().setSidebarOpen(false)
+    store.getState().setRightSidebarOpen(false)
+  })
+}
+
+const sidebarsOpenOf = (page: Page): Promise<boolean> =>
+  page.evaluate(() => {
+    const state = window.__store!.getState()
+    return state.sidebarOpen || state.rightSidebarOpen
+  })
 
 /** The main window floors at 600px, so phone widths need the floor lifted first. */
 async function setWindowWidth(app: ElectronApplication, page: Page, width: number): Promise<void> {
@@ -175,12 +188,14 @@ for (const theme of ['light', 'dark'] as const) {
 
       // Each width opens its own pane: a resize is redrawn late, so hints read right after one are stale.
       for (const width of WIDTHS) {
+        await closeSidebars(orcaPage)
         const before = await columnsOf(orcaPage)
         await setWindowWidth(electronApp, orcaPage, width)
         if (width !== WIDTHS[0]) {
           await expect.poll(() => columnsOf(orcaPage), { timeout: 10_000 }).not.toBe(before)
         }
         await orcaPage.waitForTimeout(1_000)
+        expect(await sidebarsOpenOf(orcaPage), `a sidebar reopened at ${width}px`).toBe(false)
         await orcaPage.keyboard.type('/orca-game:demo arcade')
         await expect.poll(() => screenOf(orcaPage), { timeout: 20_000 }).toContain('demo arcade')
         // Why Enter again: an Enter that lands while the composer still settles the text is dropped.
