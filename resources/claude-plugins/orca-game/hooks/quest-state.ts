@@ -5,7 +5,7 @@ import { demoFrameOf, type DemoFrame } from './demo'
 import { DEFAULT_GAME_CONFIG, effectiveConfigOf, isAbsorbingConfig } from './game-config'
 import { dayOf, daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
-import type { HdMember, March } from './hd-party'
+import { crownedLeadOf, type HdMember, type March } from './hd-party'
 import type { LeadState } from './lead-state'
 import { isSceneMode, type Action, type FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
@@ -124,6 +124,8 @@ export const shownResting = (): boolean => {
   }
   return quest.leadState === undefined ? quest.isDone : quest.leadState === 'sleeping'
 }
+
+export const shownLead = (): string | undefined => crownedLeadOf(quest.lead, quest.isDemo)
 
 export const shownAction = (): Action | undefined =>
   quest.isDemo ? demoNow().action : quest.action

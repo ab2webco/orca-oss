@@ -1,6 +1,7 @@
 import { actionPixel } from './action-props'
 import { fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import { crownAtOf, crownPixel } from './hd-party'
 import { shortMemberNameOf } from './member-character'
 import {
   IDLE,
@@ -50,7 +51,13 @@ export type HudMember = {
 
 export type Level = { level: number; into: number; need: number }
 
-export type HudExtras = { isHeroWorking?: boolean; level?: Level; isDemo?: boolean }
+export type HudExtras = {
+  isHeroWorking?: boolean
+  level?: Level
+  isDemo?: boolean
+  /** This pane's lead title, as the band's `quest.lead`; the hero wears the crown only when set. */
+  lead?: string
+}
 
 const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => {
   if (y === 0 || y === HUD_PIXELS - 1) {
@@ -63,6 +70,11 @@ const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => 
 
 type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number }
 
+const spriteTopOf = (sprite: Sprite, tick: number): number =>
+  2 -
+  (sprite.state === 'waiting' && isBlink(tick) ? 1 : 0) +
+  (isRestingOf(sprite.state, sprite.mood) ? 1 : 0)
+
 const hudSprite = (
   scene: SceneDefinition,
   sprite: Sprite,
@@ -74,7 +86,7 @@ const hudSprite = (
   const isFoeTurn = sprite.mood === 'hurt' && Math.floor(tick / 6) % 2 === 1
   const costume = (isFoeTurn ? scene.foe : undefined) ?? scene.costumes[sprite.phase]
   const isResting = isRestingOf(sprite.state, sprite.mood)
-  const top = 2 - (sprite.state === 'waiting' && isBlink(tick) ? 1 : 0) + (isResting ? 1 : 0)
+  const top = spriteTopOf(sprite, tick)
   const column = x - sprite.at
   const last = top + costume.rows.length
   const isOutside = column < 0 || column >= SPRITE_WIDTH || y < top || y > last
@@ -140,9 +152,19 @@ export const hudGridOf = (
   const heroAt = heroState === 'idle' ? 2 : 2 + (Math.floor(tick / 8) % 2)
   const hero: Sprite = { phase: 'working', state: heroState, at: heroAt }
   const hud = scene.hud ?? QUEST_HUD
+  const placed =
+    extras.lead === undefined
+      ? undefined
+      : crownAtOf(scene.costumes.working.rows, heroAt, spriteTopOf(hero, tick))
+  // Why the clamp: row 0 is the frame, so a crown over a costume's top row sits on the head instead.
+  const crown = placed === undefined ? undefined : { ...placed, top: Math.max(1, placed.top) }
   const pixel = (x: number, y: number): number => {
     if (x === 0 || x === columns - 1) {
       return hud.frame
+    }
+    const crowned = crown === undefined ? undefined : crownPixel(x, y, crown.left, crown.top)
+    if (crowned !== undefined) {
+      return crowned
     }
     const heroPixel = hudSprite(scene, hero, x, y, tick)
     if (heroPixel !== undefined) {

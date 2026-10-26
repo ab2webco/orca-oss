@@ -21,6 +21,7 @@ export {
   isClawdReacting,
   isSceneShown,
   quest,
+  shownLead,
   shownPhase,
   type Animated,
   type Stage

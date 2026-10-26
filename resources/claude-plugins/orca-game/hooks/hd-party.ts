@@ -126,6 +126,10 @@ const JEWEL = 0xd83a2e
 export const CROWN_WIDTH = CROWN[0].length
 export const LEAD_GOLD = GOLD
 
+/** The lead title the hero's crown follows, in the band and the Panel alike; the demo crowns nobody. */
+export const crownedLeadOf = (lead: string | undefined, isDemo: boolean): string | undefined =>
+  isDemo ? undefined : lead
+
 // Why `:` too: it backs a gap with ink, so it is no art the crown can stand on.
 const spanOf = (row: string): number => row.replace(/[.#:]/g, '').length
 
