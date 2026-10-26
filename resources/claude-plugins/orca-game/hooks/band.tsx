@@ -24,6 +24,7 @@ import {
   isClawdReacting,
   isSceneShown,
   petScene,
+  shownLead,
   ready
 } from './quest-runtime'
 import { levelOf } from './rewards'
@@ -153,7 +154,8 @@ export const registerBand = (on: On): void => {
         hudCellsOf(currentScene(), party, columns, at, {
           isHeroWorking: isSceneShown(),
           level,
-          isDemo: v.isDemo
+          isDemo: v.isDemo,
+          lead: shownLead()
         })
     }
     const isFramed = columns >= HUD_MIN_COLUMNS

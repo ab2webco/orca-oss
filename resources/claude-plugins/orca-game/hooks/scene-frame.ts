@@ -13,6 +13,7 @@ import {
   reactionAt,
   shownAction,
   shownCaption,
+  shownLead,
   shownPhase,
   shownResting,
   type Animated,
@@ -60,7 +61,7 @@ export const stageCellsOf = (stage: Stage): string => {
         party: quest.isDemo ? demoPartyOf(gameConfig().rewards) : quest.hdParty,
         leavers: quest.isDemo ? [] : quest.leavers,
         marches: quest.isDemo ? new Map() : quest.marches,
-        lead: quest.isDemo ? undefined : quest.lead,
+        lead: shownLead(),
         event: teamEventAt(quest.tick)
       })
     )
