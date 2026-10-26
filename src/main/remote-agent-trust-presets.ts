@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import type { AgentTrustPreset } from './agent-trust-presets'
+import { withClaudeFolderTrust } from './claude-accounts/claude-folder-trust'
 import { upsertProjectTrustLevelInContent } from './codex/config-toml-trust'
 import { getActiveMultiplexer } from './ipc/ssh'
 import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
@@ -28,6 +30,41 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
   } else if (args.preset === 'copilot') {
     await markRemoteCopilotFolderTrusted(fsProvider, home, workspacePath)
   }
+}
+
+/** Pre-accepts Claude's folder trust on the remote host; false when the config is left as it was. */
+export async function markRemoteClaudeFolderTrusted(args: {
+  connectionId: string
+  workspacePath: string
+  configDir?: string
+}): Promise<boolean> {
+  const home = await resolveRemoteHome(args.connectionId)
+  const fsProvider = getSshFilesystemProvider(args.connectionId)
+  if (!home || !fsProvider) {
+    return false
+  }
+  const configDir = args.configDir?.trim()
+    ? normalizeRuntimePathSeparators(args.configDir.trim()).replace(/\/$/, '')
+    : home
+  const configPath = `${configDir}/.claude.json`
+  const workspacePath = await canonicalizeRemoteWorkspacePath(fsProvider, args.workspacePath)
+  // Why: the host's platform decides Claude's key shape, not this desktop's.
+  const projectKey = isWindowsAbsolutePathLike(workspacePath)
+    ? normalizeRuntimePathSeparators(workspacePath)
+    : workspacePath
+  const existing = await readRemoteTextFile(fsProvider, configPath)
+  const updated = withClaudeFolderTrust(existing, [projectKey])
+  if (updated === null) {
+    return false
+  }
+  if (updated === existing) {
+    return true
+  }
+  const tmpPath = `${configPath}.${randomUUID()}.tmp`
+  await fsProvider.createDir(configDir)
+  await fsProvider.writeFile(tmpPath, updated)
+  await fsProvider.rename(tmpPath, configPath)
+  return true
 }
 
 async function resolveRemoteHome(connectionId: string): Promise<string | null> {

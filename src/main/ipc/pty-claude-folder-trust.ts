@@ -5,6 +5,7 @@ import {
   isClaudeFolderTrusted,
   markClaudeFolderTrusted
 } from '../claude-accounts/claude-folder-trust'
+import { markRemoteClaudeFolderTrusted } from '../remote-agent-trust-presets'
 
 /**
  * Trusts the Orca workspace root for the Claude config this launch reads, then,
@@ -19,7 +20,18 @@ export async function ensureClaudeFolderTrustForSpawn(args: {
   requireTrust: boolean
 }): Promise<void> {
   if (args.connectionId) {
-    // Why: the remote host's Claude reads the remote config, which this desktop cannot write yet.
+    // Why: the remote host's Claude reads its own home; the pane env is the only hint of a different config dir.
+    const trusted = args.workspaceRoot
+      ? await markRemoteClaudeFolderTrusted({
+          connectionId: args.connectionId,
+          workspacePath: args.workspaceRoot,
+          configDir: args.env?.CLAUDE_CONFIG_DIR
+        }).catch(() => false)
+      : false
+    if (args.requireTrust && !trusted) {
+      const folder = args.cwd ?? args.workspaceRoot ?? 'this workspace'
+      throw new Error(claudeFolderTrustRequiredMessage(folder, 'the remote Claude config'))
+    }
     return
   }
   const configFilePath = claudeConfigFilePathOf({ ...process.env, ...args.env })

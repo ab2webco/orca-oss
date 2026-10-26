@@ -13,7 +13,8 @@ vi.mock('./providers/ssh-filesystem-dispatch', () => ({
   getSshFilesystemProvider: mocks.getSshFilesystemProvider
 }))
 
-const { markRemoteAgentWorkspaceTrusted } = await import('./remote-agent-trust-presets')
+const { markRemoteAgentWorkspaceTrusted, markRemoteClaudeFolderTrusted } =
+  await import('./remote-agent-trust-presets')
 
 function makeFsProvider(overrides: Record<string, unknown> = {}) {
   return {
@@ -21,6 +22,7 @@ function makeFsProvider(overrides: Record<string, unknown> = {}) {
     readFile: vi.fn(async () => ({ content: '', isBinary: false })),
     createDir: vi.fn(async () => undefined),
     writeFile: vi.fn(async () => undefined),
+    rename: vi.fn(async () => undefined),
     stat: vi.fn(async () => {
       throw new Error('missing')
     }),
@@ -213,5 +215,82 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
       '/home/u/.codex/config.toml',
       '[projects."/real/repo"]\ntrust_level = "trusted"\n'
     )
+  })
+})
+
+describe('markRemoteClaudeFolderTrusted', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getActiveMultiplexer.mockReturnValue({
+      request: vi.fn(async () => ({ resolvedPath: '/home/u/' }))
+    })
+  })
+
+  function writtenConfig(fsProvider: ReturnType<typeof makeFsProvider>): {
+    path: string
+    config: { numStartups?: number; projects: Record<string, { hasTrustDialogAccepted: boolean }> }
+  } {
+    const [tmpPath, content] = fsProvider.writeFile.mock.calls[0] as unknown as [string, string]
+    const [from, to] = fsProvider.rename.mock.calls[0] as unknown as [string, string]
+    expect(from).toBe(tmpPath)
+    return { path: to, config: JSON.parse(content) }
+  }
+
+  it('trusts the canonical worktree in the remote home config and keeps its keys', async () => {
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({ content: '{"numStartups":4}', isBinary: false }))
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await expect(
+      markRemoteClaudeFolderTrusted({ connectionId: 'ssh-1', workspacePath: '/repo/worktree' })
+    ).resolves.toBe(true)
+
+    const { path, config } = writtenConfig(fsProvider)
+    expect(path).toBe('/home/u/.claude.json')
+    expect(config.numStartups).toBe(4)
+    expect(config.projects['/real/repo/worktree'].hasTrustDialogAccepted).toBe(true)
+  })
+
+  it('writes into the config dir the remote pane is pointed at', async () => {
+    const fsProvider = makeFsProvider()
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteClaudeFolderTrusted({
+      connectionId: 'ssh-1',
+      workspacePath: '/repo/worktree',
+      configDir: '/home/u/vaults/work'
+    })
+
+    expect(writtenConfig(fsProvider).path).toBe('/home/u/vaults/work/.claude.json')
+  })
+
+  it('keys a Windows remote worktree with forward slashes', async () => {
+    const fsProvider = makeFsProvider({ realpath: vi.fn(async () => 'C:\\Users\\alice\\wt') })
+    mocks.getActiveMultiplexer.mockReturnValue({
+      request: vi.fn(async () => ({ resolvedPath: 'C:\\Users\\alice\\' }))
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteClaudeFolderTrusted({
+      connectionId: 'ssh-windows',
+      workspacePath: 'C:\\Users\\alice\\wt'
+    })
+
+    const { path, config } = writtenConfig(fsProvider)
+    expect(path).toBe('C:/Users/alice/.claude.json')
+    expect(config.projects['C:/Users/alice/wt'].hasTrustDialogAccepted).toBe(true)
+  })
+
+  it('leaves a remote config it cannot parse untouched', async () => {
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({ content: '{not json', isBinary: false }))
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await expect(
+      markRemoteClaudeFolderTrusted({ connectionId: 'ssh-1', workspacePath: '/repo/worktree' })
+    ).resolves.toBe(false)
+    expect(fsProvider.writeFile).not.toHaveBeenCalled()
   })
 })
