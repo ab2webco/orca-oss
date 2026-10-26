@@ -66,7 +66,7 @@ export function resolveTerminalStartupCwdForWorkspace(args: {
   return resolveTerminalStartupCwd(workspacePath, args.requestedCwd, args.missingDirFallback)
 }
 
-function resolveTerminalWorkspacePath(
+export function resolveTerminalWorkspacePath(
   workspaceId: string | undefined,
   resolveFolderWorkspacePath: ((folderWorkspaceId: string) => string | null | undefined) | undefined
 ): string | null {
