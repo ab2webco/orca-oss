@@ -99,9 +99,9 @@ test('a game member branch named after its ticket never shows the rename-failed 
   }
 
   const endpoint = await readHookEndpoint(electronApp)
-  const emitFirstPrompt = (worktreeId: string, prompt: string) =>
+  const emitFirstPrompt = (worktreeId: string, branch: string, prompt: string) =>
     emitCodexHookStatus(endpoint, {
-      paneKey: `e2e-${worktreeId}:${randomUUID()}`,
+      paneKey: `e2e-${branch}:${randomUUID()}`,
       worktreeId,
       state: 'working',
       prompt
@@ -109,30 +109,37 @@ test('a game member branch named after its ticket never shows the rename-failed 
 
   // Missing agent: the gate runs and clears the stale badge instead of raising a new one.
   // Only the clear proves the hook reached the gate; "no badge" alone proves nothing.
-  await emitFirstPrompt(noAgentId, UNNAMEABLE_PROMPT)
+  await emitFirstPrompt(noAgentId, NO_AGENT_BRANCH, UNNAMEABLE_PROMPT)
   await expect.poll(() => readRenameError(orcaPage, noAgentId), { timeout: 30_000 }).toBeNull()
   await expect(worktreeRow(orcaPage, noAgentId).locator(RENAME_FAILED_BADGE)).toHaveCount(0)
 
   // Configured agent whose generation fails: an eligible branch still raises the badge.
   await orcaPage.evaluate(async (binary) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
+    const current = (await window.api.settings.get()).sourceControlAi
+    if (!current) {
+      throw new Error('Source Control AI settings are unavailable')
     }
-    await store.getState().updateSettings({
+    // Why: the branchName action recipe wins over the global agent, so pin it there too.
+    const settings = await window.api.settings.set({
       sourceControlAi: {
-        ...store.getState().settings.sourceControlAi,
+        ...current,
         enabled: true,
-        agentId: 'custom' as const,
-        customAgentCommand: binary
+        agentId: 'custom',
+        customAgentCommand: binary,
+        actions: {
+          ...current.actions,
+          branchName: { ...current.actions?.branchName, agentId: 'custom' }
+        }
       }
     })
+    window.__store?.setState({ settings })
   }, MISSING_AGENT_BINARY)
 
   for (const [index, id] of gameIds.entries()) {
-    await emitFirstPrompt(id, `Work on ${GAME_BRANCHES[index].toUpperCase()}`)
+    const branch = GAME_BRANCHES[index]
+    await emitFirstPrompt(id, branch, `Work on ${branch.toUpperCase()}`)
   }
-  await emitFirstPrompt(failingAgentId, UNNAMEABLE_PROMPT)
+  await emitFirstPrompt(failingAgentId, FAILING_AGENT_BRANCH, UNNAMEABLE_PROMPT)
 
   await expect
     .poll(() => readRenameError(orcaPage, failingAgentId), { timeout: 30_000 })
