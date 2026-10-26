@@ -312,16 +312,21 @@ jobs:
               E2E_PROJECT_ARGS+=(--project=electron-ondemand)
             fi
           fi
+          mkdir -p tests/test-results
           xvfb-run --auto-servernum env "${E2E_ENV[@]}" DEBUG=pw:protocol \
-            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}" \
-            2> >(grep --line-buffered -E '"error":\{' | cut -c1-1500 | sed 's/^/[pw-protocol-error] /' >&2)
+            pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}" 2>&1 \
+            | tee >(grep -a -E '"error":\{|Execution context was destroyed|✘' | cut -c1-2000 > tests/test-results/protocol-errors.log) \
+            | grep -a -v 'pw:protocol'
+          exit "${PIPESTATUS[0]}"
 
       - name: Upload E2E JSON report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: e2e-json-report-changed-attempt-${{ github.run_attempt }}
-          path: tests/test-results/e2e-report.json
+          path: |
+            tests/test-results/e2e-report.json
+            tests/test-results/protocol-errors.log
           retention-days: 30
           if-no-files-found: warn
 
