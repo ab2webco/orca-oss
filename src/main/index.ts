@@ -350,6 +350,7 @@ import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
+import { scheduleSonarIndexWarmup } from './sonar-index-warmup'
 import { wirePluginAgentStatusEvents } from './plugins/plugin-agent-status-event'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
 import { forwardOrcaNotificationsToPlugins } from './plugins/plugin-notification-event-bridge'
@@ -457,6 +458,18 @@ let pluginKillListService: PluginKillListService | null = null
 let pluginMarketplaceService: PluginMarketplaceService | null = null
 let pluginMarketplaceInstaller: PluginMarketplaceInstaller | null = null
 let keybindings: KeybindingService | null = null
+
+// Why: best-effort warm-up only; a failure must never fail the worktree create that triggered it.
+function warmSonarIndexOnWorktreeCreate(event: RuntimeWorktreeLifecycleEvent): void {
+  if (event.kind !== 'created') {
+    return
+  }
+  scheduleSonarIndexWarmup({
+    userDataDir: app.getPath('userData'),
+    worktreePath: event.path,
+    debug: (message, error) => console.debug(message, error)
+  })
+}
 
 function emitPluginWorktreeLifecycle(event: RuntimeWorktreeLifecycleEvent): void {
   pluginService?.emitEvent(
@@ -1687,6 +1700,7 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       onWorktreeLifecycle: (event) => {
         runtime?.noteIpcWorktreeLifecycle(event)
         emitPluginWorktreeLifecycle(event)
+        warmSonarIndexOnWorktreeCreate(event)
       }
     },
     (target) => claudeRuntimeAuth!.hasInjectedAccountOverride(target)
@@ -3169,6 +3183,7 @@ void app.whenReady().then(async () => {
   })
   runtimeService.onWorktreeLifecycle((event) => {
     emitPluginWorktreeLifecycle(event)
+    warmSonarIndexOnWorktreeCreate(event)
   })
   starNag = new StarNagService(store, stats)
   starNag.start()

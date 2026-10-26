@@ -1,0 +1,58 @@
+import { spawn as spawnChild, type ChildProcess, type SpawnOptions } from 'node:child_process'
+import { statSync } from 'node:fs'
+import { resolveSonarCli } from '../shared/sonar-cli-location'
+
+export const SONAR_WARMUP_TIMEOUT_MS = 30_000
+
+export type SonarWarmupChild = Pick<ChildProcess, 'kill' | 'unref'> & {
+  on(event: 'exit' | 'error', listener: (...args: unknown[]) => void): unknown
+}
+
+export type SonarWarmupSpawn = (
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions
+) => SonarWarmupChild
+
+export type ScheduleSonarIndexWarmupOptions = {
+  userDataDir: string
+  worktreePath: string
+  spawn?: SonarWarmupSpawn
+  debug: (message: string, error: unknown) => void
+}
+
+/** Starts `orca-sonar index` for a new worktree in the background. Never awaited, never throws. */
+export function scheduleSonarIndexWarmup(options: ScheduleSonarIndexWarmupOptions): void {
+  const { userDataDir, worktreePath, debug } = options
+  try {
+    if (!isDirectory(worktreePath)) {
+      return
+    }
+    const lookup = resolveSonarCli(userDataDir)
+    if (!lookup.ok) {
+      return
+    }
+    const start = options.spawn ?? spawnChild
+    const child = start('node', [lookup.cliPath, 'index', '--root', worktreePath], {
+      env: { ...process.env, ORCA_USER_DATA_PATH: userDataDir },
+      stdio: 'ignore'
+    })
+    const timer = setTimeout(() => child.kill(), SONAR_WARMUP_TIMEOUT_MS)
+    child.on('exit', () => clearTimeout(timer))
+    child.on('error', (error: unknown) => {
+      clearTimeout(timer)
+      debug('orca-sonar warm-up failed', error)
+    })
+    child.unref()
+  } catch (error) {
+    debug('orca-sonar warm-up could not start', error)
+  }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
