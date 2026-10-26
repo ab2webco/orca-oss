@@ -6,7 +6,11 @@ import { hash } from './pixel-canvas'
 /** An obstacle's height in pixels above the ground, one per column; `weight` is how often it comes. */
 export type RunnerShape = { heights: readonly number[]; weight: number }
 
-export type Runner = { game: ArcadeRunner; shapes: readonly RunnerShape[]; totalWeight: number }
+export type Runner<S extends RunnerShape = RunnerShape> = {
+  game: ArcadeRunner
+  shapes: readonly S[]
+  totalWeight: number
+}
 
 /** `x` is the world column of the obstacle's left edge; the screen shows `distance` onwards. */
 export type RunnerObstacle = { x: number; shape: number }
@@ -37,7 +41,10 @@ const FIRST_GAP = 40
 const MAX_STEP_MS = 100
 const POINTS_PER_COLUMN = 0.1
 
-export const runnerOf = (game: ArcadeRunner, shapes: readonly RunnerShape[]): Runner => ({
+export const runnerOf = <S extends RunnerShape>(
+  game: ArcadeRunner,
+  shapes: readonly S[]
+): Runner<S> => ({
   game,
   shapes,
   totalWeight: shapes.reduce((sum, one) => sum + one.weight, 0)

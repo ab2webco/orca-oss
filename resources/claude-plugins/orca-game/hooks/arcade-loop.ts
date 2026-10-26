@@ -1,15 +1,32 @@
 import { runnerStartOf, runnerStepOf, type Runner, type RunnerState } from './arcade-runner'
 import { ARCADE_FPS_MAX } from './arcade-runner-data'
+import { arcadeWords } from './arcade-words'
 
 // The runner's clock: one timer only while a run moves, none before the first press, while paused
 // or after the run ends, so an open game that nobody plays costs nothing.
 
 export type ArcadeClock = {
   now: () => Promise<number>
-  every: (ms: number, fn: () => void) => () => void
+  /** As `$.clock.every`: a timer `cancel()` stops. */
+  every: (ms: number, fn: () => void) => { cancel: () => void }
 }
 
 export type ArcadeScreen = 'ready' | 'running' | 'paused' | 'over'
+
+/** The line over the sky on each screen but a run in play: what the one key does now. */
+export const arcadeCaptionOf = (screen: ArcadeScreen, score: number): string | undefined => {
+  const words = arcadeWords()
+  switch (screen) {
+    case 'ready':
+      return words.ready
+    case 'paused':
+      return words.paused
+    case 'over':
+      return words.over(score)
+    case 'running':
+      return undefined
+  }
+}
 
 export type ArcadeLoop = {
   /** The one game key: starts, resumes, jumps, or starts over after a run ends. */
@@ -30,14 +47,14 @@ export const arcadeLoopOf = (args: {
   const periodMs = 1000 / Math.min(runner.game.fps, ARCADE_FPS_MAX)
   let state = runnerStartOf(runner, args.seed)
   let runs = 0
-  let cancel: (() => void) | undefined
+  let timer: { cancel: () => void } | undefined
   let last: number | undefined
   let isJump = false
   let isTicking = false
 
   const halt = () => {
-    cancel?.()
-    cancel = undefined
+    timer?.cancel()
+    timer = undefined
     last = undefined
   }
   const tick = async () => {
@@ -66,7 +83,7 @@ export const arcadeLoopOf = (args: {
   args.draw(state, 'ready')
   return {
     press: () => {
-      if (cancel !== undefined) {
+      if (timer !== undefined) {
         isJump = true
         return
       }
@@ -74,7 +91,7 @@ export const arcadeLoopOf = (args: {
         runs += 1
         state = runnerStartOf(runner, args.seed + runs)
       }
-      cancel = clock.every(periodMs, () => void tick())
+      timer = clock.every(periodMs, () => void tick())
     },
     stop: halt
   }

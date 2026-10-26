@@ -13,7 +13,7 @@ const fakeClock = () => {
     every: (ms, fn) => {
       const timer = { ms, next: now + ms, fn }
       timers.add(timer)
-      return () => timers.delete(timer)
+      return { cancel: () => void timers.delete(timer) }
     }
   }
   const advance = async (ms: number) => {
@@ -26,7 +26,10 @@ const fakeClock = () => {
       now = due.next
       due.next += due.ms
       due.fn()
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      // Why several turns: a tick awaits the pane's focus and the clock before it draws.
+      for (let turn = 0; turn < 10; turn += 1) {
+        await Promise.resolve()
+      }
     }
     now = end
   }

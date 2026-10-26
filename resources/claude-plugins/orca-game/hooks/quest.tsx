@@ -27,6 +27,8 @@ import { gameStrings, localizedNameOf } from './game-strings'
 import { SCENE_KEY, sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
+import { openArcade } from './arcade-pane'
+import { arcadeWords } from './arcade-words'
 import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
 import { flatPhaseLineOf } from './flat-view'
@@ -85,7 +87,7 @@ export async function questSessionStart($: EngineInterface): Promise<void> {
     .register({
       name: QUEST_ALIAS,
       description: gameStrings().text.questDescription,
-      argumentHint: '[off|on|zen|flat|demo|render classic|hd|hd-compact]',
+      argumentHint: '[off|on|zen|flat|demo|demo arcade|render classic|hd|hd-compact]',
       immediate: true
     })
     .catch(() => undefined)
@@ -108,6 +110,10 @@ const registerCommand = (on: On, command: GameCommand) => {
       quest.renderOverride = asked.render
       $.ui.invalidate('ui.render')
       return { text: text.questRenderShown(shownSetting('render')) }
+    }
+    if ('arcade' in asked) {
+      await openArcade($)
+      return { text: arcadeWords().opened }
     }
     if ('demo' in asked) {
       startDemo()

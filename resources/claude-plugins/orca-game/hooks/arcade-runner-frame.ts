@@ -129,7 +129,7 @@ export const arcadeShapesOf = (game: ArcadeRunner, look: Look): ArcadeShape[] =>
 
 export type ArcadeFrameInput = {
   scene: SceneDefinition
-  runner: Runner & { shapes: readonly ArcadeShape[] }
+  runner: Runner<ArcadeShape>
   state: RunnerState
   columns: number
   rows: number

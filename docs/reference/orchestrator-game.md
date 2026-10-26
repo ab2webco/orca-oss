@@ -1309,6 +1309,26 @@ as `path: message` and exits 1 while any remain.
 - `weight` (0.05 to 1, default 1) is how often an obstacle is picked against the others.
 - The file is at most 16 KB. Unknown keys are ignored, so a newer file still loads.
 
+### The runner
+
+The mod plays its own copy of the built-in runner
+([`arcade-runner-data.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-runner-data.ts)); a spec
+holds it equal to the JSON Orca validates. A run is drawn as an hd band of the active scene, 12 rows
+tall: its sky, clouds, far range, hills and ground behind, the scene's working costume as the hero and
+its own decoration (`plantKind`) as obstacles, cut to at most 4 pixels by 5 columns and outlined like a
+character so a timed jump clears one even at `speed.max`. The scene's scattered plants and pond are left
+out of the backdrop, since anything on the ground line reads as something to jump.
+
+- One key, `j`: it starts a run, jumps, resumes a paused run and starts again after a crash. `q` (or
+  Esc) closes the pane.
+- The run ticks on its own timer at `fps`, never above 15, and only while it moves: none before the
+  first press, none once the pane is hidden or loses the keyboard (it pauses), none after a crash.
+- At 160 columns a frame costs about 1 ms, so a run in play takes under 2% of a core.
+
+`/orca-game:demo arcade` (or `/quest demo arcade`) opens a practice run in a pane of its own. It is
+the only way to open the runner until a perfect merge offers a play: it earns no points or XP, writes
+nothing to Orca or the store, adds no setting, and closing the pane drops the run.
+
 ## Other plugins in a game pane
 
 Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,

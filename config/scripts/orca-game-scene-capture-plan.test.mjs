@@ -69,18 +69,24 @@ describe('orca-game scene capture plan', () => {
 
   it('shoots the runner in each scene by day and by night at 1440, 768, 390 and 320 px', () => {
     const shots = arcadeShotsOf(['quest', 'vigilante'])
-    expect(shots).toHaveLength(16)
+    expect(shots).toHaveLength(20)
     expect(shots.slice(0, 4).map((shot) => shot.name)).toEqual([
       'arcade-quest-day-160',
       'arcade-quest-day-85',
       'arcade-quest-day-43',
       'arcade-quest-day-35'
     ])
-    expect(shots.at(-1)).toEqual({
+    expect(shots[15]).toEqual({
       name: 'arcade-vigilante-night-35',
       scene: 'vigilante',
       hour: 23,
       columns: 35
     })
+    expect(shots.slice(16).map((shot) => [shot.name, shot.screen])).toEqual([
+      ['arcade-quest-over-43', 'over'],
+      ['arcade-quest-paused-35', 'paused'],
+      ['arcade-vigilante-over-43', 'over'],
+      ['arcade-vigilante-paused-35', 'paused']
+    ])
   })
 })

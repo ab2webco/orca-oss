@@ -35,6 +35,7 @@ import { memberAdvisorLinesOf } from './member-advisor'
 import { HERO_LEFT, runnerOf, runnerStartOf } from './arcade-runner'
 import { ARCADE_RUNNER } from './arcade-runner-data'
 import { ARCADE_ROWS, arcadeGridOf, arcadeShapesOf } from './arcade-runner-frame'
+import { arcadeCaptionOf } from './arcade-loop'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 export const SCENE_IDS = Object.keys(SCENES)
 export const sceneOfFile = (text) => {
@@ -61,14 +62,19 @@ export const gridOf = ({ scene, phase, render, columns, tick, hour, caption, ges
     : sceneGridOf(definition, phase, columns, tick, caption, 0, undefined, false, 'edit', advisor)
 }
 // A runner frame mid-jump, the hero over the scene's own decoration with the next one coming.
-export const arcadeOf = ({ scene, columns, hour }) => {
+export const arcadeOf = ({ scene, columns, hour, screen }) => {
+  setGameLocale('en')
   const definition = SCENES[scene]
   const runner = runnerOf(ARCADE_RUNNER, arcadeShapesOf(ARCADE_RUNNER, definition.looks.working))
   const start = runnerStartOf(runner, 4)
   const first = start.obstacles.find((one) => one.shape === 0) ?? start.obstacles[0]
   const distance = first.x - HERO_LEFT - 5
-  const state = { ...start, distance, score: Math.floor(distance / 10), jumpMs: ARCADE_RUNNER.jump.ms / 2 }
-  return arcadeGridOf({ scene: definition, runner, state, columns, rows: ARCADE_ROWS, tick: 41, light: daylightAt(hour) })
+  const isOver = screen === 'over'
+  const state = { ...start, distance, score: Math.floor(distance / 10), isOver,
+    jumpMs: isOver ? undefined : ARCADE_RUNNER.jump.ms / 2 }
+  const caption = screen === undefined ? undefined : arcadeCaptionOf(screen, state.score)
+  return arcadeGridOf({ scene: definition, runner, state, columns, rows: ARCADE_ROWS, tick: 41,
+    light: daylightAt(hour), caption })
 }
 const JEV = { version: 1, locale: 'es', line: 'jev · 2 agentes', model: 'glm-5.3', modelId: 'glm-5.3',
   effort: 'high', subagents: [], ci: [{ id: 'c1', status: 'success', text: 'CI main (abc1234) paso en 22 min' }],

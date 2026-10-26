@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
+import { registerArcade } from './arcade-pane'
 import { dropAdvisorCall } from './advisor-state'
 import { actOutGate, registerAdvisor } from './advisor-sync'
 import { clearAllies, registerAllies } from './allies-strip'
@@ -30,6 +31,7 @@ export const register: Register = (on) => {
   registerAllies(on)
   registerAdvisor(on)
   registerFleetPane(on)
+  registerArcade(on)
   registerLeadName(on)
   registerLeadBrief(on)
   registerActionCommands(on)

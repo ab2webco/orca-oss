@@ -31,7 +31,7 @@ export const gameCommandOf = (command: GameCommand, args: string): QuestCommand 
   const asked = args.trim().toLowerCase().split(/\s+/)[0] ?? ''
   switch (command) {
     case 'orca-game:demo':
-      return { demo: true }
+      return asked === 'arcade' ? { arcade: true } : { demo: true }
     case 'orca-game:mode':
       if (asked === '' || isQuestMode(asked)) {
         return questCommandOf(asked)
