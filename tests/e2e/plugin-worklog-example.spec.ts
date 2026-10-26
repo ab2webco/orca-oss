@@ -41,6 +41,8 @@ async function setTheme(
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
     )
     .toBe(theme)
+  // ORCA-753: the panel frame is re-created on a theme change; wait for the new document, since a raw evaluate into the old one throws.
+  await expect(panelFrame(page).locator('html')).toHaveClass(theme)
 }
 
 /** The main window floors at 600px, so phone widths need the floor lifted. */
