@@ -6,6 +6,7 @@ import { getTabIdsAwaitingHostHydrationRemount } from '@/lib/parked-terminal-hos
 import { applyWorktreeHeadIdentities } from './worktree-head-identity-apply'
 import { getWorktreeMapFromState, getRepoMapFromState } from '@/store/selectors'
 import { applyUIZoom } from '@/lib/ui-zoom'
+import { overlayPendingPersistedUIWrite } from '@/lib/persisted-ui-pending-write'
 import { activateAndRevealWorktree, activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { runWorktreeDelete } from '@/components/sidebar/delete-worktree-flow'
@@ -1294,7 +1295,7 @@ export function useIpcEvents(): void {
     // Why: UI view-state is shared with mobile via ui.set; re-hydrate so mobile changes reflect live in the desktop sidebar.
     unsubs.push(
       window.api.ui.onStateChanged((ui) => {
-        useAppStore.getState().hydratePersistedUI(ui, 'sync')
+        useAppStore.getState().hydratePersistedUI(overlayPendingPersistedUIWrite(ui), 'sync')
       })
     )
 
