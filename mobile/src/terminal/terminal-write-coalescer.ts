@@ -13,6 +13,7 @@ export function createTerminalWriteCoalescer(deliver: (data: string) => void) {
   // Why: initialized expired so the first write after construction or clear() takes
   // the leading edge — never a silent first-chunk delay.
   let lastFlushAt = Number.NEGATIVE_INFINITY
+  let paused = false
 
   const cancelTimer = () => {
     if (flushTimer !== null) {
@@ -34,7 +35,7 @@ export function createTerminalWriteCoalescer(deliver: (data: string) => void) {
   }
 
   const write = (data: string) => {
-    if (data === '') {
+    if (data === '' || paused) {
       return
     }
     const now = Date.now()
@@ -69,5 +70,13 @@ export function createTerminalWriteCoalescer(deliver: (data: string) => void) {
     lastFlushAt = Number.NEGATIVE_INFINITY
   }
 
-  return { clear, flushNow, write }
+  // Why: paused output is dropped, not buffered; the caller restores it from a fresh snapshot.
+  const setPaused = (next: boolean) => {
+    if (next) {
+      clear()
+    }
+    paused = next
+  }
+
+  return { clear, flushNow, setPaused, write }
 }

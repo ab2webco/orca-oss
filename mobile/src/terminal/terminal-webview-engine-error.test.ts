@@ -11,7 +11,7 @@ const nativeWebViewMethods = vi.hoisted(() => ({
 }))
 
 vi.mock('react-native', () => ({
-  AppState: { currentState: 'active' },
+  AppState: { currentState: 'active', addEventListener: () => ({ remove: () => {} }) },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   StyleSheet: {

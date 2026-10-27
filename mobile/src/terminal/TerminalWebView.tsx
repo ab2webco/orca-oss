@@ -13,6 +13,7 @@ import { XTERM_WEBVIEW_SOURCE } from './terminal-webview-html'
 import type { TerminalWebViewCommand } from './terminal-webview-messages'
 import { createTerminalWebViewPendingMessages } from './terminal-webview-pending-messages'
 import { dispatchTerminalWebViewNotification } from './terminal-webview-notification-dispatch'
+import { usePauseTerminalOutputWhileInactive } from './terminal-output-app-state-gate'
 import { routeTerminalQueryReply } from './terminal-webview-query-reply-routing'
 import { createTerminalWriteCoalescer } from './terminal-write-coalescer'
 
@@ -98,6 +99,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
       writeCoalescer.clear()
     }
   }, [writeCoalescer])
+
+  usePauseTerminalOutputWhileInactive(writeCoalescer.setPaused)
 
   const confirmWebReady = useCallback(
     (notifyParent: boolean) => {
