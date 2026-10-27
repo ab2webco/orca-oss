@@ -1,5 +1,10 @@
 import type { Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import { test as base, expect } from './helpers/orca-app'
+import {
+  type ContextLifecycleRecorder,
+  reportContextLifecycle,
+  startContextLifecycleRecording
+} from './helpers/execution-context-lifecycle'
 import {
   splitActiveTerminalPane,
   waitForActiveTerminalManager,
@@ -36,6 +41,15 @@ type SplitGroupTerminal = {
   groupId: string
   tabId: string
 }
+
+// ORCA-753: beforeEach lost its main-window context with no navigation, reload or crash; this names what replaced it.
+const test = base.extend<{ lifecycle: ContextLifecycleRecorder }>({
+  lifecycle: async ({ orcaPage }, provideFixture, testInfo) => {
+    const lifecycle = await startContextLifecycleRecording(orcaPage)
+    await provideFixture(lifecycle)
+    await reportContextLifecycle(lifecycle, testInfo)
+  }
+})
 
 function agentsSidebarButton(page: Page) {
   return page.getByRole('button', { name: /^Agents(?:\s+\d+)?$/ }).first()
@@ -252,10 +266,14 @@ async function createTerminalInNewSplitGroup(page: Page): Promise<SplitGroupTerm
 }
 
 test.describe('Activity Agent Pane Isolation', () => {
-  test.beforeEach(async ({ orcaPage }) => {
+  test.beforeEach(async ({ orcaPage, lifecycle }) => {
+    lifecycle.mark('waitForSessionReady')
     await waitForSessionReady(orcaPage)
+    lifecycle.mark('enableActivityAgentsView')
     await enableActivityAgentsView(orcaPage)
+    lifecycle.mark('waitForActiveWorktree')
     await waitForActiveWorktree(orcaPage)
+    lifecycle.mark('ensureTerminalVisible')
     await ensureTerminalVisible(orcaPage)
     const hasPaneManager = await waitForActiveTerminalManager(orcaPage, 30_000)
       .then(() => true)

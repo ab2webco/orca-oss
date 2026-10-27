@@ -237,6 +237,26 @@ describe('AgentsPane', () => {
     expect(agentRuntimeSettingMock.lastRefresh).not.toBe(detectedAgentsMock.refresh)
   })
 
+  it('lists Claude Agent Teams as runs in-process on WSL instead of available to install', () => {
+    const markup = renderPane(
+      {
+        ...getDefaultSettings('/tmp'),
+        localWindowsRuntimeDefault: { kind: 'wsl', distro: 'Ubuntu' }
+      },
+      { wslSupportedPlatform: true, wslAvailable: true, wslDistros: ['Ubuntu'] }
+    )
+
+    expect(markup).toContain('Runs in-process on WSL')
+    expect(markup.match(/title="Install"/g)?.length).toBe(AGENT_CATALOG.length - 2)
+  })
+
+  it('keeps Claude Agent Teams in the install list on macOS', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    expect(markup).not.toContain('Runs in-process')
+    expect(markup.match(/title="Install"/g)?.length).toBe(AGENT_CATALOG.length - 1)
+  })
+
   it('renders the keep-awake modes from settings', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 

@@ -94,6 +94,24 @@ describe('RPC optional pipe schemas', () => {
       agent: 'claude',
       command: 'claude'
     })
+    // Why: a raw command carries no agent identity, so the account would be dropped (ORCA-804).
+    expectRejects(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      command: 'claude',
+      claudeAccountId: 'account-claude'
+    })
+    expectRejects(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      command: 'codex',
+      codexAccountId: 'account-codex'
+    })
+    // The renderer's legacy launch expands the agent into a command and names it in launchAgent.
+    expectParses(methodParams(TERMINAL_METHODS, 'terminal.create'), {
+      worktree: 'active',
+      command: 'claude --model opus',
+      launchAgent: 'claude',
+      claudeAccountId: 'account-claude'
+    })
     expectParses(methodParams(WORKTREE_METHODS, 'worktree.create'), { repo: 'repo-1' })
     expectParses(methodParams(WORKTREE_METHODS, 'worktree.set'), {
       worktree: 'id:wt-1',

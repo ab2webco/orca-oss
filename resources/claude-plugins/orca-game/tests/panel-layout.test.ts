@@ -3,6 +3,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { SCENE_TICK_MS } from '../hooks/scene'
+
 const ORCA_CLI = '/opt/orca/bin/orca'
 const LAYOUT_KEY = 'panel-layout'
 
@@ -116,6 +118,7 @@ const start = async ($: Engine, on: On, world: World, locale = 'en') => {
   engine(on, world, locale)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
+  return clock
 }
 
 const pane = ($: Engine, columns = 120) =>
@@ -136,20 +139,36 @@ const pane = ($: Engine, columns = 120) =>
   })
 
 type Mounted = Awaited<ReturnType<typeof pane>>
+
+/** How many member-tile frames the Panel sends over 30 animation ticks. */
+const tileBlitsOf = async ($: Engine, on: On, world: World) => {
+  const blits: string[] = []
+  on('ui.blit', ($s, e) => {
+    blits.push(e.key)
+    return { value: {} }
+  })
+  const clock = await start($, on, world)
+  const ui = await pane($)
+  blits.length = 0
+  await clock.advance(SCENE_TICK_MS * 30)
+  await ui.unmount()
+  return blits.filter((key) => key.startsWith('tile-')).length
+}
+
 const headerOf = async (ui: Mounted, section: string) =>
   shownOf(await ui.find({ type: 'Box', key: `layout-header-${section}` }))
 const cardsOf = async (ui: Mounted) =>
   (await ui.findAll({ type: 'Box' })).filter((one) => one.key?.startsWith('card-tab-1:'))
 
 describe('panel layout', () => {
-  test('an untouched layout draws every section expanded and stores nothing', async ($, on) => {
+  test('an untouched layout draws Team, leaves To Do off the Panel and stores nothing', async ($, on) => {
     const world = worldOf()
     await start($, on, world)
     const ui = await pane($)
     expect(await headerOf(ui, 'team')).toBe('▾ Team 3')
-    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
     expect((await cardsOf(ui)).length).toBe(3)
-    expect(shownOf(await ui.find({ type: 'Box', key: 'project-todo' }))).toContain('ORCA-1')
+    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
+    expect(await ui.find({ type: 'Box', key: 'project-todo' })).toBeUndefined()
     expect(world.writes).toEqual([])
     await ui.unmount()
   })
@@ -222,6 +241,14 @@ describe('panel layout', () => {
     await ui.unmount()
   })
 
+  test('a closed Team widget animates no member tile', async ($, on) => {
+    expect(await tileBlitsOf($, on, worldOf(fleetStore({ shown: ['reviews'] })))).toBe(0)
+  })
+
+  test('an open Team widget animates its member tiles', async ($, on) => {
+    expect(await tileBlitsOf($, on, worldOf())).toBeGreaterThan(0)
+  })
+
   test('a version 1 layout keeps every section it drew and stores nothing until changed', async ($, on) => {
     const world = worldOf({
       version: 1,
@@ -281,7 +308,7 @@ describe('/orca-game:layout', () => {
     expect(fleetIn(world)).toEqual({
       order: ['team', 'review', 'todo', 'reviews', 'actions'],
       collapsed: [],
-      shown: ['review', 'reviews', 'todo', 'actions']
+      shown: ['reviews']
     })
     const ui = await pane($)
     expect(await ui.find({ type: 'Box', key: 'layout-header-team' })).toBeUndefined()
@@ -302,7 +329,7 @@ describe('/orca-game:layout', () => {
     expect(fleetIn(world)).toEqual({
       order: DEFAULT_ORDER,
       collapsed: [],
-      shown: DEFAULT_ORDER
+      shown: ['team', 'reviews']
     })
   })
 
