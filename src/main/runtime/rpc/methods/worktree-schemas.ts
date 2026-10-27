@@ -50,6 +50,11 @@ export const WorktreeSelector = z.object({
     .pipe(z.string().min(1, 'Missing worktree selector'))
 })
 
+export const WorktreeProcesses = WorktreeSelector.extend({
+  stop: OptionalBoolean,
+  callerPid: z.number().int().positive().optional()
+})
+
 export const WorktreeActivate = WorktreeSelector.extend({
   notifyClients: OptionalBoolean,
   navigation: z.enum(RUNTIME_NAVIGATION_TARGETS).optional()

@@ -25,6 +25,7 @@ import {
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isWorkspaceKey, worktreeWorkspaceKey } from '../../shared/workspace-scope'
 import { printLineageSummary } from './worktree-lineage-summary'
+import { rethrowWithProcessesHoldingWorktree, worktreeProcessesHandler } from './worktree-processes'
 import {
   assertWorkspaceTargetFlagsCompatible,
   hasWorkspaceProjectTarget,
@@ -182,6 +183,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     })
     printResult(result, json, formatWorktreeShow)
   },
+  'worktree processes': worktreeProcessesHandler,
   'worktree current': async ({ client, cwd, json }) => {
     const result = await client.call<{ worktree: RuntimeWorktreeRecord }>('worktree.show', {
       worktree: await resolveCurrentWorktreeSelector(cwd, client)
@@ -290,14 +292,17 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, formatWorktreeShow)
   },
   'worktree rm': async ({ flags, client, cwd, json }) => {
-    const result = await client.call<RuntimeWorktreeRemoveResult>('worktree.rm', {
-      worktree: await getRequiredWorktreeSelector(flags, 'worktree', cwd, client),
-      force: flags.get('force') === true,
-      // Why (#11960): --force is explicit here, so it may also waive PTY-stop proof.
-      allowUnverifiedPtyStop: flags.get('force') === true,
-      runHooks: flags.get('run-hooks') === true,
-      allowGameMember: flags.get('force-member') === true
-    })
+    const worktree = await getRequiredWorktreeSelector(flags, 'worktree', cwd, client)
+    const result = await client
+      .call<RuntimeWorktreeRemoveResult>('worktree.rm', {
+        worktree,
+        force: flags.get('force') === true,
+        // Why (#11960): --force is explicit here, so it may also waive PTY-stop proof.
+        allowUnverifiedPtyStop: flags.get('force') === true,
+        runHooks: flags.get('run-hooks') === true,
+        allowGameMember: flags.get('force-member') === true
+      })
+      .catch((error: unknown) => rethrowWithProcessesHoldingWorktree(error, client, worktree))
     printHookWarning(result.result, json)
     printPreservedBranchWarning(result.result, json)
     printResult(result, json, (value) => `removed: ${value.removed}`)

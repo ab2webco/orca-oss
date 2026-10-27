@@ -71,6 +71,7 @@ Worktrees:
   worktree set              Update Orca Lab metadata for a worktree
   worktree rm               Remove a worktree from Orca Lab and git
   worktree ps               Show a compact orchestration summary across worktrees
+  worktree processes        List (or --stop) the processes whose cwd is inside a worktree
 
 Files:
   file open                 Open a workspace file in the Orca Lab editor
@@ -248,6 +249,7 @@ Common Commands:
   orca worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--linear-issue <identifier-or-url|null>] [--comment <text>] [--workspace-status <id>] [--parent-worktree <selector>|--no-parent] [--json]
   orca worktree rm --worktree <selector> [--force] [--run-hooks] [--json]
   orca worktree ps [--limit <n>] [--json]
+  orca worktree processes --worktree <selector> [--stop] [--json]
   orca file open <path> [--worktree <selector>] [--json]
   orca file diff <path> [--staged] [--worktree <selector>] [--json]
   orca file open-changed [--mode edit|diff|both] [--worktree <selector>] [--json]
@@ -360,6 +362,7 @@ Examples:
   $ orca worktree set --worktree active --comment "waiting on review"
   $ orca worktree set --worktree active --linear-issue null
   $ orca worktree ps --limit 10
+  $ orca worktree processes --worktree active --stop
   $ orca file open-changed --mode diff
   $ orca file open src/App.tsx
   $ orca terminal create --worktree active --agent codex
