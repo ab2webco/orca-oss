@@ -48,19 +48,16 @@ vi.mock('lucide-react-native', () => ({
 
 const mutableAppState = AppState as { currentState: string }
 const mutablePlatform = Platform as { OS: string }
-let activeRenderer: ReactTestRenderer | null = null
+const activeRenderers: ReactTestRenderer[] = []
 
 function renderReadyTerminal() {
   const terminalRef = createRef<TerminalWebViewHandle>()
-  let renderer: ReactTestRenderer | null = null
+  let renderer!: ReactTestRenderer
   act(() => {
     renderer = create(createElement(TerminalWebView, { ref: terminalRef }))
   })
-  if (!renderer) {
-    throw new Error('TerminalWebView did not render')
-  }
-  activeRenderer = renderer
-  const webView = (renderer as ReactTestRenderer).root.findByType('WebView')
+  activeRenderers.push(renderer)
+  const webView = renderer.root.findByType('WebView')
   act(() => {
     webView.props.onMessage({ nativeEvent: { data: JSON.stringify({ type: 'web-ready' }) } })
   })
@@ -99,9 +96,10 @@ describe('terminal output while the app is not active (ORCA-811)', () => {
 
   afterEach(() => {
     act(() => {
-      activeRenderer?.unmount()
+      for (const renderer of activeRenderers.splice(0)) {
+        renderer.unmount()
+      }
     })
-    activeRenderer = null
     appStateListeners.clear()
     nativeWebViewMethods.postMessage.mockReset()
     vi.useRealTimers()
@@ -186,9 +184,10 @@ describe('terminal output while the app is not active (ORCA-811)', () => {
     expect(appStateListeners.size).toBe(1)
 
     act(() => {
-      activeRenderer?.unmount()
+      for (const renderer of activeRenderers.splice(0)) {
+        renderer.unmount()
+      }
     })
-    activeRenderer = null
 
     expect(appStateListeners.size).toBe(0)
   })
