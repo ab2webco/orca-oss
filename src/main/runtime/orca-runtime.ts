@@ -1188,6 +1188,10 @@ import {
 import { formatWorktreeIncludeCopyWarning } from '../ipc/worktree-include-copy-budget'
 import { resolveWorktreeIncludePaths } from '../git/worktree-include-file'
 import {
+  createLocalWorktreeHooksPathProbe,
+  findWorktreeHooksPathWarning
+} from '../git/worktree-hooks-path-check'
+import {
   getWorktreeSharedLinkPaths,
   resolveWorktreeSharedDirectories
 } from '../git/worktree-shared-directories'
@@ -24990,6 +24994,14 @@ export class OrcaRuntimeService {
       const setupSkipped = `orca.yaml setup hook skipped for ${worktreePath}; pass --setup run to run it.`
       warning = warning ? `${warning} Also ${setupSkipped}` : setupSkipped
       console.warn(`[hooks] ${setupSkipped}`)
+    }
+    const hooksPathWarning = await findWorktreeHooksPathWarning(
+      worktreePath,
+      createLocalWorktreeHooksPathProbe(worktreePath, localWorktreeGitOptions),
+      { setupWillRun: Boolean(shouldRunSetup) }
+    )
+    if (hooksPathWarning) {
+      warning = warning ? `${warning} Also ${hooksPathWarning}` : hooksPathWarning
     }
 
     this.invalidateResolvedWorktreeCache()
