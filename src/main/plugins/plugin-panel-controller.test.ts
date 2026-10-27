@@ -28,9 +28,13 @@ async function createPlugin(): Promise<ValidDiscoveredPlugin> {
       version: '1.0.0',
       engines: { orca: '>=1.0.0' },
       pluginApi: 1,
+      main: 'main.mjs',
       contributes: {
         panels: [{ id: 'dashboard', title: 'Dashboard', entry: 'panel.html' }],
-        commands: [],
+        commands: [
+          { id: 'demo.refresh', title: 'Demo: Refresh' },
+          { id: 'demo.settings', title: 'Demo: Settings', action: 'view.tasks' }
+        ],
         events: []
       },
       capabilities: [{ kind: 'notifications:show' }]
@@ -274,5 +278,97 @@ describe('PluginPanelController panel.close', () => {
       ok: false,
       code: 'rate_limited'
     })
+  })
+})
+
+describe('PluginPanelController panel.runCommand', () => {
+  async function openDashboard(
+    overrides: { runCommand?: (pluginKey: string, commandId: string) => Promise<void> } = {}
+  ) {
+    const plugin = await createPlugin()
+    const runCommand = vi.fn(overrides.runCommand ?? (async () => undefined))
+    const executeHostCall = vi.fn()
+    const controller = new PluginPanelController({
+      resolveApprovedPlugin: () => plugin,
+      contentVerifier: { verify: vi.fn().mockResolvedValue(undefined) },
+      executeHostCall,
+      runCommand,
+      log: vi.fn()
+    })
+    const entry = await controller.open('renderer:1', plugin.pluginKey, 'dashboard')
+    return { plugin, controller, runCommand, executeHostCall, sessionToken: entry!.sessionToken }
+  }
+
+  it("runs one of the panel's own plugin commands and answers once it finished", async () => {
+    const { plugin, controller, runCommand, executeHostCall, sessionToken } = await openDashboard()
+
+    await expect(
+      controller.execute(
+        'renderer:1',
+        { sessionToken, action: 'panel.runCommand', params: { commandId: 'demo.refresh' } },
+        { canRunCommands: true }
+      )
+    ).resolves.toEqual({ ok: true, value: { ran: true } })
+    expect(runCommand).toHaveBeenCalledWith(plugin.pluginKey, 'demo.refresh')
+    expect(executeHostCall).not.toHaveBeenCalled()
+  })
+
+  it('runs nothing for a command the plugin does not contribute or that is a built-in alias', async () => {
+    const { controller, runCommand, sessionToken } = await openDashboard()
+
+    for (const commandId of ['other.refresh', 'demo.settings']) {
+      await expect(
+        controller.execute(
+          'renderer:1',
+          { sessionToken, action: 'panel.runCommand', params: { commandId } },
+          { canRunCommands: true }
+        )
+      ).resolves.toMatchObject({ ok: false, code: 'invalid_params' })
+    }
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('rejects params other than one command id', async () => {
+    const { controller, runCommand, sessionToken } = await openDashboard()
+
+    for (const params of [undefined, {}, { commandId: 'demo.refresh', args: [1] }]) {
+      await expect(
+        controller.execute(
+          'renderer:1',
+          { sessionToken, action: 'panel.runCommand', params },
+          { canRunCommands: true }
+        )
+      ).resolves.toMatchObject({ ok: false, code: 'invalid_params' })
+    }
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('is unavailable to panels hosted over a remote connection', async () => {
+    const { controller, runCommand, sessionToken } = await openDashboard()
+
+    await expect(
+      controller.execute('renderer:1', {
+        sessionToken,
+        action: 'panel.runCommand',
+        params: { commandId: 'demo.refresh' }
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'unavailable' })
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it("reports the command's failure to the panel", async () => {
+    const { controller, sessionToken } = await openDashboard({
+      runCommand: async () => {
+        throw new Error('index is busy')
+      }
+    })
+
+    await expect(
+      controller.execute(
+        'renderer:1',
+        { sessionToken, action: 'panel.runCommand', params: { commandId: 'demo.refresh' } },
+        { canRunCommands: true }
+      )
+    ).resolves.toEqual({ ok: false, code: 'action_failed', error: 'index is busy' })
   })
 })

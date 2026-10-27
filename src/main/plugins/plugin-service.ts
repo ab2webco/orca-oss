@@ -37,7 +37,7 @@ import { PluginContentPackRegistry } from './plugin-content-pack-registry'
 import type { PluginServiceOptions } from './plugin-service-options'
 import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
 import { PluginRefreshQueue } from './plugin-refresh-settlement'
-import { assertPluginWorkerCommand } from './plugin-command-invocation'
+import { runPluginWorkerCommand } from './plugin-command-invocation'
 import { deliverPluginEvent } from './plugin-event-delivery'
 
 export type { PluginRuntimeDelegate } from './plugin-host-service-bindings'
@@ -77,6 +77,7 @@ export class PluginService {
       contentVerifier: this.contentVerifier,
       executeHostCall: (pluginKey, method, params) =>
         this.executeHostCall(pluginKey, method, params, { viaPanel: true }),
+      runCommand: (pluginKey, commandId) => this.invokeCommand(pluginKey, commandId),
       log: (pluginKey, line) => this.logBuffer.append(pluginKey, 'error', line)
     })
     this.workerController = new PluginWorkerController({
@@ -276,12 +277,7 @@ export class PluginService {
     if (!plugin || !this.isRuntimeApproved(plugin)) {
       throw new Error(`plugin ${pluginKey} is not enabled`)
     }
-    assertPluginWorkerCommand(plugin, commandId)
-    const handle = await this.workerController.ensure(plugin)
-    if (!handle.commands.includes(commandId)) {
-      throw new Error(`plugin ${pluginKey} registered no handler for ${commandId}`)
-    }
-    return handle.invokeCommand(commandId, args)
+    return runPluginWorkerCommand(plugin, this.workerController, commandId, args)
   }
 
   emitEvent(event: PluginEventName, payload: unknown): void {

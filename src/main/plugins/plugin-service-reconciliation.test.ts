@@ -687,3 +687,27 @@ describe('PluginService worker restore after approval', () => {
     expect(harness.factory).not.toHaveBeenCalled()
   })
 })
+
+describe('PluginService panel commands', () => {
+  it("starts the plugin's stopped worker and runs the command a panel asked for", async () => {
+    const root = await pluginRoot()
+    const harness = createHarness(root)
+    await harness.service.initialize()
+    const opened = await harness.service.panels.open('renderer:1', pluginKey, 'panel')
+    expect(harness.factory).not.toHaveBeenCalled()
+
+    await expect(
+      harness.service.panels.execute(
+        'renderer:1',
+        {
+          sessionToken: opened!.sessionToken,
+          action: 'panel.runCommand',
+          params: { commandId: 'run' }
+        },
+        { canRunCommands: true }
+      )
+    ).resolves.toEqual({ ok: true, value: { ran: true } })
+    expect(harness.factory).toHaveBeenCalledOnce()
+    expect(harness.workers[0]!.invokeCommand).toHaveBeenCalledWith('run', undefined)
+  })
+})
