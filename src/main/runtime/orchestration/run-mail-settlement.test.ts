@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type Database from '../../sqlite/sync-database'
 import { OrchestrationDb } from './db'
+import { summarizeRetiredRunMail, type RetiredReportReview } from './run-mail-settlement'
 import type { RunRow } from './types'
 
 const PREVIOUS_LEAD_PANE = 'tab_old:11111111-1111-4111-8111-111111111111'
@@ -252,5 +253,68 @@ describe('Run mail a previous lead already settled (ORCA-824)', () => {
     expect(replay).toMatchObject({ replayed: true })
     expect(replay?.delivery.id).toBe(held.delivery.id)
     expect(replay?.messages.map((message) => message.id)).toEqual([question])
+  })
+})
+
+describe('the notice a check gives for retired mail (ORCA-824)', () => {
+  it('lists only retired member reports whose PR is not merged or closed', async () => {
+    const reports: Record<string, RetiredReportReview | null> = {
+      ctx_open: { ticket: 'ORCA-805', pr: { number: 701, state: 'open' } },
+      ctx_merged: { ticket: 'ORCA-675', pr: { number: 702, state: 'merged' } },
+      ctx_no_pr: { ticket: 'ORCA-681', pr: null },
+      ctx_cleaned: null
+    }
+
+    const notice = await summarizeRetiredRunMail(
+      [
+        { id: 'm1', type: 'worker_done', dispatchId: 'ctx_open' },
+        { id: 'm2', type: 'worker_done', dispatchId: 'ctx_merged' },
+        { id: 'm3', type: 'worker_done', dispatchId: 'ctx_no_pr' },
+        { id: 'm4', type: 'worker_done', dispatchId: 'ctx_cleaned' },
+        { id: 'm5', type: 'question', dispatchId: 'ctx_open' },
+        { id: 'm6', type: 'worker_done', dispatchId: 'ctx_open' }
+      ],
+      async (dispatchId) => reports[dispatchId] ?? null
+    )
+
+    expect(notice).toEqual({
+      count: 6,
+      unverified: [
+        { ticket: 'ORCA-805', pr: '#701 open' },
+        { ticket: 'ORCA-681', pr: null }
+      ]
+    })
+  })
+
+  it('reports what the retire step moved to history', () => {
+    const d = new OrchestrationDb(':memory:')
+    const run = d.createRun({
+      objective: 'Lead mailbox',
+      coordinatorHandle: 'term_old_lead',
+      coordinatorPaneKey: PREVIOUS_LEAD_PANE
+    })
+    const task = d.createTask({ spec: 'member', runId: run.id })
+    const dispatch = d.createDispatchContext(task.id, 'term_member').id
+    const done = d.insertMessage({
+      from: 'term_member',
+      to: `run:${run.id}`,
+      subject: 'PR open',
+      type: 'worker_done',
+      payload: JSON.stringify({ dispatchId: dispatch }),
+      runId: run.id
+    }).id
+    d.completeDispatch(dispatch)
+    sqliteFor(d).prepare("UPDATE messages SET created_at = '2026-10-26 16:00:00'").run()
+    d.bindRun({
+      runId: run.id,
+      coordinatorHandle: 'term_new_lead',
+      coordinatorPaneKey: NEW_LEAD_PANE
+    })
+
+    expect(d.retireSettledRunMail(run.id)).toEqual([
+      { id: done, type: 'worker_done', dispatchId: dispatch }
+    ])
+    expect(d.retireSettledRunMail(run.id)).toEqual([])
+    d.close()
   })
 })

@@ -69,7 +69,7 @@ import {
   releaseContextOnlyDispatch,
   type ContextOnlyDispatchReleaseResult
 } from './context-only-dispatch-release'
-import { retireSettledRunMail } from './run-mail-settlement'
+import { retireSettledRunMail, type RetiredRunMail } from './run-mail-settlement'
 import {
   ensureMutationReceiptCapacity,
   migrateMutationReceiptCapacity
@@ -3854,6 +3854,10 @@ export class OrchestrationDb {
         )
         .all(toHandle) as MessageRow[]
     )
+  }
+
+  retireSettledRunMail(runId: string): RetiredRunMail[] {
+    return retireSettledRunMail(this.db, runId)
   }
 
   // Why: the pointer counts these reads, so settled Run mail must leave them too, not only the check batch (ORCA-824).
