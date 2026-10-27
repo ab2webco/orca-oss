@@ -53,8 +53,10 @@ export type GameAgent = {
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older Orca. */
   launch?: GameMemberLaunch
   /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
-  remote?: { host: string; stateKnown: boolean }
+  remote?: GameMemberRemote
 }
+
+export type GameMemberRemote = { host: string; stateKnown: boolean }
 
 export type GameMemberLaunch = { model: string | null; effort: string | null }
 

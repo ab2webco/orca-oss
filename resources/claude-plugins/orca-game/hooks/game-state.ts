@@ -24,7 +24,7 @@ import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
-import { memberAccountOf, memberLimitOf } from './member-tags'
+import { memberAccountOf, memberLimitOf, memberRemoteOf } from './member-tags'
 import { memberAdvisorOf, memberLaunchOf } from './member-advisor'
 import { GAME_LOCALES } from './game-strings'
 
@@ -213,6 +213,7 @@ const agentOf = (value: unknown): GameAgent[] => {
   const account = memberAccountOf(value.account)
   const advisor = memberAdvisorOf(value.advisor)
   const launch = memberLaunchOf(value.launch)
+  const remote = memberRemoteOf(value.remote)
   return [
     {
       paneKey,
@@ -230,7 +231,8 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(limit === undefined ? {} : { limit }),
       ...(account === undefined ? {} : { account }),
       ...(advisor === undefined ? {} : { advisor }),
-      ...(launch === undefined ? {} : { launch })
+      ...(launch === undefined ? {} : { launch }),
+      ...(remote === undefined ? {} : { remote })
     }
   ]
 }
