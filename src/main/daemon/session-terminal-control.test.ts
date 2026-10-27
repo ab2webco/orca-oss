@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Session } from './session'
 import { PRODUCER_PAUSE_FAILSAFE_MS } from './session-producer-pause'
 
+// Why: the fake pid could name a real host process; never let a kill test sweep its tree.
+vi.mock('../pty-descendant-termination', () => ({
+  killWithDescendantSweep: (_pid: number, killRoot: () => void) => killRoot()
+}))
+
 function createRecordingSubprocess() {
   const written: string[] = []
   let onData: ((data: string) => void) | null = null

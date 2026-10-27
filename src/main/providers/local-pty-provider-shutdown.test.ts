@@ -498,23 +498,35 @@ describe('LocalPtyProvider', () => {
       )
     })
 
-    it('win32 graceful shutdown of a plain shell does not taskkill the tree', async () => {
+    it('win32 graceful shutdown of a plain shell taskkills the descendant tree', async () => {
+      // Why: closing a tab must reap its background jobs on every platform (ORCA-678).
       Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
       const { id } = await provider.spawn({ cols: 80, rows: 24 })
 
       await provider.shutdown(id, { immediate: false })
 
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
+      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+        mockProc.pid,
+        expect.any(Function),
+        expect.objectContaining({ ownsRoot: expect.any(Function) })
+      )
     })
 
-    it('non-win32 immediate shutdown of a plain shell skips the tree kill', async () => {
-      // beforeEach pins platform to linux; POSIX force-kill already reaches the child pgroup.
-      const { id } = await provider.spawn({ cols: 80, rows: 24 })
+    it.each([true, false])(
+      'non-win32 shutdown of a plain shell sweeps descendants (immediate=%s)',
+      async (immediate) => {
+        // Why: nohup/setsid jobs ignore SIGHUP or left the tty pgroups the force-kill reaches.
+        const { id } = await provider.spawn({ cols: 80, rows: 24 })
 
-      await provider.shutdown(id, { immediate: true })
+        await provider.shutdown(id, { immediate })
 
-      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
-    })
+        expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+          mockProc.pid,
+          expect.any(Function),
+          expect.objectContaining({ ownsRoot: expect.any(Function) })
+        )
+      }
+    )
   })
 
   describe('killAll', () => {

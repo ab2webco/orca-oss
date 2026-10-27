@@ -145,6 +145,11 @@ vi.mock('fs', () => ({
   }
 }))
 
+// Why: the fake pids could name real host processes; never let a kill test sweep their trees.
+vi.mock('../pty-descendant-termination', () => ({
+  killWithDescendantSweep: async (_pid: number, killRoot: () => void) => killRoot()
+}))
+
 vi.mock('node-pty', () => ({
   spawn: spawnMock
 }))

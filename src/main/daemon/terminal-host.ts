@@ -114,9 +114,17 @@ export class TerminalHost {
       )
     }
     const session = this.getAliveSession(sessionId)
-    const killed = this.sessionTeardown.killSession(sessionId, session, opts.immediate === true)
+    const killed = Promise.resolve(
+      this.sessionTeardown.killSession(sessionId, session, opts.immediate === true)
+    )
     this.killedTombstones.record(sessionId)
-    return Promise.resolve(killed)
+    // Why: a rejected root signal reopens the session for retry, so it was never killed.
+    killed.catch(() => {
+      if (session.isAlive && !session.isTerminating) {
+        this.killedTombstones.clearForCreate(sessionId)
+      }
+    })
+    return killed
   }
 
   // Why: dispose a dead session's emulator so exited terminals don't pin their scrollback window for the daemon's life.

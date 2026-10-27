@@ -387,7 +387,14 @@ describe('TerminalHost', () => {
   })
 
   describe('kill', () => {
+    const runSweepThenRoot = (): void => {
+      killWithDescendantSweepMock.mockImplementation(async (_pid: number, finish: () => void) =>
+        finish()
+      )
+    }
+
     it('kills the session and tombstones it', async () => {
+      runSweepThenRoot()
       await host.createOrAttach({
         sessionId: 'session-1',
         cols: 80,
@@ -407,11 +414,12 @@ describe('TerminalHost', () => {
         rows: 24,
         streamClient: { onData: vi.fn(), onExit: vi.fn() }
       })
+      runSweepThenRoot()
       lastSubprocess.kill = vi.fn(() => {
         throw new Error('signal rejected')
       })
 
-      expect(() => host.kill('session-1')).toThrow('signal rejected')
+      await expect(host.kill('session-1')).rejects.toThrow('signal rejected')
       expect(host.isKilled('session-1')).toBe(false)
       await expect(
         host.createOrAttach({
@@ -423,10 +431,11 @@ describe('TerminalHost', () => {
       ).resolves.toMatchObject({ isNew: false })
     })
 
-    // Plain-shell immediate force-kill (POSIX no-sweep + Windows taskkill tree) is covered in
+    // Plain-shell immediate force-kill (POSIX sweep + Windows taskkill tree) is covered in
     // terminal-host-session-reaping-leak.test.ts and terminal-session-teardown.test.ts.
 
     it('escalates an already-graceful termination and joins its physical exit', async () => {
+      runSweepThenRoot()
       await host.createOrAttach({
         sessionId: 'session-1',
         cols: 80,
@@ -454,6 +463,7 @@ describe('TerminalHost', () => {
     })
 
     it('retains an immediate-kill session when physical exit times out', async () => {
+      runSweepThenRoot()
       vi.useFakeTimers()
       try {
         await host.createOrAttach({

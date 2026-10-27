@@ -13,6 +13,10 @@ import { registerPtyHandlers, setLocalPtyProvider, getLocalPtyProvider } from '.
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))
 vi.mock('node-pty', () => import('./pty-ipc-mock-registry').then((m) => m.nodePtyModuleMock()))
+// Why: the fake pids could name real host processes; never let a kill test sweep their trees.
+vi.mock('../pty-descendant-termination', () => ({
+  killWithDescendantSweep: async (_pid: number, killRoot: () => void) => killRoot()
+}))
 vi.mock('node:child_process', async (importOriginal) =>
   (await import('./pty-ipc-mock-registry')).childProcessModuleMock(await importOriginal())
 )

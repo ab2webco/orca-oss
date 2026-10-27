@@ -99,8 +99,6 @@ const PANE_IDENTITY_ENV_KEYS = [
 let ptyCounter = 0
 const ptyProcesses = new Map<string, pty.IPty>()
 const ptyIncarnations = new Map<string, string>()
-// Why: agent sessions always sweep descendant trees; plain terminals preserve nohup children except on immediate win32 shutdown.
-const ptyAgentSessionIds = new Set<string>()
 // Why: descendant capture is async, so reattach/duplicate shutdown must wait for the original owner, not return a dying PTY.
 type PtyShutdownOperation = {
   promise: Promise<void>
@@ -280,7 +278,6 @@ function clearPtyState(id: string): void {
   disposePtyExitListener(id)
   ptyProcesses.delete(id)
   ptyIncarnations.delete(id)
-  ptyAgentSessionIds.delete(id)
   ptyShellName.delete(id)
   ptyAgentForegroundContextPaths.delete(id)
   ptyLastRecognizedForeground.delete(id)
@@ -928,10 +925,6 @@ export class LocalPtyProvider implements IPtyProvider {
     if (spawnedWslDistro !== undefined) {
       ptyWslDistroById.set(id, spawnedWslDistro)
     }
-    // Why both: launchAgent is explicit intent that survives command rewrites; recognition catches bare agent command lines.
-    if (args.launchAgent || startupAgentRecognition) {
-      ptyAgentSessionIds.add(id)
-    }
     ptyShellName.set(id, getSpawnedShellName(shellPath))
     if (finalEnv.ORCA_TERMINAL_HANDLE) {
       ptyTerminalHandle.set(id, finalEnv.ORCA_TERMINAL_HANDLE)
@@ -1251,24 +1244,12 @@ export class LocalPtyProvider implements IPtyProvider {
       operation.rootSignalled = true
       this.requestTrackedPtyShutdown(id, proc, operation.immediate)
     }
-    if (ptyAgentSessionIds.has(id)) {
-      // Why: POSIX needs a pre-kill descendant snapshot; Windows tree-kills only when the
-      // identity probe returns `own` so agent/MCP orphans cannot hold the worktree cwd
-      // (#10004). `unknown`/`foreign`/`absent` skip taskkill and rely on root close alone.
-      await killWithDescendantSweep(proc.pid, signalRoot, {
-        ownsRoot: () => ptyProcesses.get(id) === proc
-      })
-    } else if (process.platform === 'win32' && operation.immediate) {
-      // Why: a plain shell's ConPTY teardown doesn't reap orphaned children (useConptyDll
-      // skips the console reap), so a live `pnpm i`/`node` keeps the ConPTY console alive and
-      // holds the worktree cwd. Tree kill runs only when the OS identity probe returns `own`;
-      // otherwise root close alone, and detached children may block physical stop (#10004).
-      await killWithDescendantSweep(proc.pid, signalRoot, {
-        ownsRoot: () => ptyProcesses.get(id) === proc
-      })
-    } else {
-      signalRoot()
-    }
+    // Why: nohup/setsid jobs and agent tool children outlive the root's SIGHUP, so every close sweeps the
+    // tree (ORCA-678). POSIX needs the snapshot before the root dies; Windows taskkills only when the
+    // identity probe returns `own` (#10004), else root close alone.
+    await killWithDescendantSweep(proc.pid, signalRoot, {
+      ownsRoot: () => ptyProcesses.get(id) === proc
+    })
     await waitForPtyPhysicalExit(id, physicalExit)
   }
 
