@@ -14,8 +14,8 @@ describe.skipIf(!hasSh)('processRunState', () => {
   })
 
   it('tells a running process, a zombie and a reaped pid apart', async () => {
-    // Why: `exec sleep` replaces the shell that forked `sleep 0`, and sleep never reaps it.
-    const holder = spawn('/bin/sh', ['-c', 'sleep 0 & echo $!; exec sleep 30'], {
+    // Why: the child outlives the shell's `exec`, so its parent is `sleep`, which never reaps it.
+    const holder = spawn('/bin/sh', ['-c', 'sleep 1 & echo $!; exec sleep 30'], {
       stdio: ['ignore', 'pipe', 'ignore']
     })
     cleanups.push(() => holder.kill('SIGKILL'))

@@ -134,7 +134,11 @@ describe('listWorktreeProcesses', () => {
         while (processRunState(pid) === 'running' && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
-        expect(processRunState(pid), describeProcessForFailure(pid)).not.toBe('running')
+        const orphanState = processRunState(pid)
+        expect(
+          orphanState,
+          orphanState === 'running' ? describeProcessForFailure(pid) : ''
+        ).not.toBe('running')
         expect(processRunState(ownedPid)).toBe('running')
         expect(owned.signalCode).toBeNull()
       } finally {
