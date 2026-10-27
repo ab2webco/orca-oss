@@ -195,6 +195,7 @@ describe('the persistent STOP', () => {
     const { client, methods } = fakeClient({
       'game.state': state(null),
       'game.stopSwitch': () => (++reads > 1 ? { stopped: STOP } : { stopped: null }),
+      'worktree.list': { worktrees: [] },
       'terminal.show': { terminal: { handle: 'term_lead' } },
       'orchestration.runCurrent': { run: { id: 'run_1' } },
       'orchestration.taskCreate': { task: { id: 'task_1' } },

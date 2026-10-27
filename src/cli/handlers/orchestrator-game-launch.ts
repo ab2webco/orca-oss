@@ -9,19 +9,16 @@ import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
   requiredTicket,
+  taskPromptOf,
   type GameLaunchFlags
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
-import {
-  GAME_PROMPT_MAX,
-  GAME_WORK_PROMPT_PLACEHOLDERS,
-  unknownPlaceholderOf
-} from '../../shared/orchestrator-game-actions'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import {
   memberDisplayNameOf,
@@ -62,29 +59,6 @@ type WorkerStartResult = Pick<
 > & { effects?: { kind: string; id?: string }[] }
 
 const DISPLAY_NAME_MAX = 60
-
-// Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
-function taskPromptOf(flags: Map<string, string | boolean>): string | null {
-  if (!flags.has('prompt')) {
-    return null
-  }
-  const raw = flags.get('prompt')
-  const text = typeof raw === 'string' ? raw.trim() : ''
-  if (text.length === 0 || text.length > GAME_PROMPT_MAX) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `--prompt must be 1 to ${GAME_PROMPT_MAX} characters.`
-    )
-  }
-  const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
-  if (unknown !== null) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `--prompt uses an unknown placeholder {${unknown}}; use {id}, {title}, {url} or {status}.`
-    )
-  }
-  return text
-}
 
 async function boundRunId(client: Client, from: string, objective: string): Promise<string> {
   const current = await client.call<{ run: { id: string } | null }>('orchestration.runCurrent', {
@@ -164,6 +138,7 @@ export async function launchGameMember(args: {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
+  const where = await memberWorktreeParamsOf({ client, state, ticket, repo })
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
   const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
@@ -220,8 +195,7 @@ export async function launchGameMember(args: {
   })
   const workerParams = {
     task: task.result.task.id,
-    // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
-    ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
+    ...where,
     name: ticket.toLowerCase(),
     displayName: title,
     agent: choice.agent,
