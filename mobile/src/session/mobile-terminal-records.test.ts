@@ -4,6 +4,7 @@ import {
   mergeTerminalListWithKnownRecords,
   mergeTerminalRecordsByCurrentOrder,
   mobileSessionTabsEqual,
+  scopeTerminalListToWorktree,
   type MobileTerminalSessionTab,
   type TerminalRecord
 } from './mobile-terminal-records'
@@ -149,5 +150,29 @@ describe('mobile terminal records', () => {
         ]
       )
     ).toBe(false)
+  })
+})
+
+describe('scopeTerminalListToWorktree', () => {
+  // Why: ids as a host sends them; hosts before the ORCA-811 fix add other worktrees' sleeping agents.
+  const worktreeId =
+    '8e9e530d-ec22-4e5c-b2fb-10ed00fac102::/Users/me/orca/workspaces/orca-oss/onetab'
+  const otherWorktreeId = '8e9e530d-ec22-4e5c-b2fb-10ed00fac102::/Users/me/Projects/whmcs'
+
+  it('drops rows the host listed for another worktree', () => {
+    const rows = [
+      { handle: 'term_own', title: 'shell', isActive: true, worktreeId },
+      { handle: 'term_sleeping', title: 'agent', isActive: false, worktreeId: otherWorktreeId }
+    ]
+
+    expect(scopeTerminalListToWorktree(rows, worktreeId).map((row) => row.handle)).toEqual([
+      'term_own'
+    ])
+  })
+
+  it('keeps rows that carry no worktree id', () => {
+    const rows = [{ handle: 'term_unscoped', title: 'shell', isActive: true }]
+
+    expect(scopeTerminalListToWorktree(rows, worktreeId)).toEqual(rows)
   })
 })

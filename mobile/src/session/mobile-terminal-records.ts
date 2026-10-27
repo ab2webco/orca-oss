@@ -175,6 +175,17 @@ export function getTerminalRecordsFromSessionTabs(
   })
 }
 
+// Why: each listed row mounts a WKWebView; older hosts leak other worktrees' sleeping
+// agents into a scoped terminal.list, and dozens of WebViews trip the iOS watchdog (ORCA-811).
+export function scopeTerminalListToWorktree<T extends { worktreeId?: string }>(
+  terminalList: readonly T[],
+  worktreeId: string
+): T[] {
+  return terminalList.filter(
+    (terminal) => terminal.worktreeId === undefined || terminal.worktreeId === worktreeId
+  )
+}
+
 export function mergeTerminalListWithKnownRecords(
   terminalList: TerminalRecord[],
   currentTerminals: TerminalRecord[],

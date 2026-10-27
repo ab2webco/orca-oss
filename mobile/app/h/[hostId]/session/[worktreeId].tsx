@@ -181,6 +181,7 @@ import {
   mergeTerminalListWithKnownRecords,
   mergeTerminalRecordsByCurrentOrder,
   mobileSessionTabsEqual,
+  scopeTerminalListToWorktree,
   terminalRecordsEqual
 } from '../../../../src/session/mobile-terminal-records'
 import {
@@ -1602,17 +1603,20 @@ export default function SessionScreen() {
           includeVisualLayouts: false
         })
         if (response.ok) {
-          const result = (response as RpcSuccess).result as { terminals: Terminal[] }
-          if (result.terminals.length === 0 && !allowEmptyLoaded) {
+          const result = (response as RpcSuccess).result as {
+            terminals: (Terminal & { worktreeId?: string })[]
+          }
+          const listedTerminals = scopeTerminalListToWorktree(result.terminals, worktreeId)
+          if (listedTerminals.length === 0 && !allowEmptyLoaded) {
             return
           }
           // Why: require two consecutive empties before trusting 0, so transient empty responses don't flash the UI empty.
-          if (result.terminals.length === 0 && lastKnownTerminalCountRef.current > 0) {
+          if (listedTerminals.length === 0 && lastKnownTerminalCountRef.current > 0) {
             lastKnownTerminalCountRef.current = 0
             return
           }
 
-          const liveHandles = new Set(result.terminals.map((terminal) => terminal.handle))
+          const liveHandles = new Set(listedTerminals.map((terminal) => terminal.handle))
           const pruneContext = {
             liveHandles,
             showNativeChat: showNativeChatRef.current,
@@ -1642,10 +1646,10 @@ export default function SessionScreen() {
           // Why: same absence-gated refill for the viewport-fit budget — a handle that
           // left the list and returned may converge now, so it earns fresh attempts.
           viewportResubscribeBudgetRef.current.notifyListedHandles(liveHandles)
-          lastKnownTerminalCountRef.current = result.terminals.length
+          lastKnownTerminalCountRef.current = listedTerminals.length
           // Why: dedupe duplicate handles (rename/split race) to avoid a React duplicate-key throw; keep first for tab-strip order.
           const seen = new Set<string>()
-          const deduped = result.terminals.filter((t) => {
+          const deduped = listedTerminals.filter((t) => {
             if (seen.has(t.handle)) {
               return false
             }
