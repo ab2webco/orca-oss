@@ -47,6 +47,7 @@ import {
 import { isTuiAgent } from '../shared/tui-agent-config'
 import type { TuiAgent } from '../shared/tui-agent'
 import { forceKillPosixPtyProcessGroups } from '../main/pty/posix-pty-process-groups'
+import { sweepEndedSessionOrphans } from '../main/pty/ended-session-orphan-sweep'
 import { stripInheritedBuildModeEnv } from '../main/pty/build-mode-env'
 import { stripInheritedClaudeSessionEnv } from '../main/pty/claude-session-env'
 import {
@@ -156,6 +157,8 @@ type ManagedPty = {
   explicitTerm?: string
   shellPath?: string
   shellCwd?: string
+  /** Set for agent PTYs; consumed once on exit to reap the worktree orphans the agent left (ORCA-678). */
+  orphanSweep?: { root: string; startedAtMs: number }
   shellPathEnv?: string
   envToDelete: string[]
   gitCredentialPromptGuarded: boolean
@@ -781,6 +784,18 @@ export class PtyHandler {
     })
     managed.pty.onExit(({ exitCode }: { exitCode: number }) => {
       managed.physicalExit?.markExited()
+      // Why: double-forked agent pollers are reparented before the root dies, out of every ppid sweep (ORCA-678).
+      const orphanSweep = managed.orphanSweep
+      if (orphanSweep) {
+        managed.orphanSweep = undefined
+        void sweepEndedSessionOrphans(orphanSweep.root, orphanSweep.startedAtMs).then((result) => {
+          if (result.status === 'skipped') {
+            console.warn(
+              `[relay-pty] orphan sweep skipped for ${orphanSweep.root}: ${result.reason}`
+            )
+          }
+        })
+      }
       if (managed.disposed) {
         return
       }
@@ -1619,6 +1634,9 @@ export class PtyHandler {
       gitCredentialPromptGuarded,
       shellPath: shell,
       shellCwd: cwd,
+      ...(launchAgent && process.platform !== 'win32'
+        ? { orphanSweep: { root: cwd, startedAtMs: Date.now() } }
+        : {}),
       shellPathEnv: spawnEnv.PATH,
       ownerBackend: resolvePtyOwnerBackend({
         platform: process.platform,
