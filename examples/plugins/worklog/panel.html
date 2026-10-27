@@ -232,12 +232,14 @@
         <h2>Settings</h2>
         <p class="hint">
           <code>settings.*</code> is worker-only, so the worker mirrors the resolved values into a
-          storage key this panel can read. Absent until the worker has run once.
+          storage key this panel can read. <code>panel.runCommand</code> runs that worker command
+          from here, starting the worker if it is stopped.
         </p>
         <dl id="settings"></dl>
-        <p class="empty" id="settings-empty" hidden>
-          Not published yet — run "Worklog: Publish settings to the panel" once.
-        </p>
+        <p class="empty" id="settings-empty" hidden>Not published yet.</p>
+        <div class="row">
+          <button id="publish" class="secondary" type="button" disabled>Publish now</button>
+        </div>
       </section>
 
       <section class="card">
@@ -380,10 +382,10 @@
                 if (attempt < MAX_ATTEMPTS) {
                   if (owner === undefined || ownsSurface(owner)) {
                     setStatus(
-                    'Too many requests just now — retrying (' +
-                      attempt +
-                      ' of ' +
-                      (MAX_ATTEMPTS - 1) +
+                      'Too many requests just now — retrying (' +
+                        attempt +
+                        ' of ' +
+                        (MAX_ATTEMPTS - 1) +
                         ')…'
                     )
                   }
@@ -575,9 +577,21 @@
           .catch(reportUnexpected)
       })
 
+      document.getElementById('publish').addEventListener('click', function () {
+        var mine = claimSurface()
+        setStatus('Publishing…')
+        request('panel.runCommand', { commandId: 'worklog.publish-settings' }, mine)
+          .then(function (result) {
+            if (!ownsSurface(mine)) return false
+            if (!result.ok) return fail(result)
+            return load()
+          })
+          .catch(reportUnexpected)
+      })
+
       // Last line of wiring: from here the controls can actually do what they
       // offer. Before it they are inert, and saying so is the point.
-      ;['entry', 'add', 'refresh', 'context', 'notify'].forEach(function (id) {
+      ;['entry', 'add', 'refresh', 'publish', 'context', 'notify'].forEach(function (id) {
         document.getElementById(id).disabled = false
       })
 
