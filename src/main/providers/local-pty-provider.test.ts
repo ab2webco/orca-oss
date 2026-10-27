@@ -1933,26 +1933,34 @@ describe('LocalPtyProvider', () => {
       )
     })
 
-    it.each([
-      ['win32', false],
-      ['linux', false],
-      ['linux', true]
-    ] as const)(
-      '%s shutdown of a plain shell sweeps descendants (immediate=%s)',
-      async (platform, immediate) => {
-        // Why: closing a tab must reap nohup/setsid jobs and ConPTY orphans too (ORCA-678).
-        Object.defineProperty(process, 'platform', { configurable: true, value: platform })
-        const { id } = await provider.spawn({ cols: 80, rows: 24 })
+    async function expectPlainShutdownSweep(
+      platform: NodeJS.Platform,
+      immediate: boolean
+    ): Promise<void> {
+      // Why: closing a tab must reap nohup/setsid jobs and ConPTY orphans too (ORCA-678).
+      Object.defineProperty(process, 'platform', { configurable: true, value: platform })
+      const { id } = await provider.spawn({ cols: 80, rows: 24 })
 
-        await provider.shutdown(id, { immediate })
+      await provider.shutdown(id, { immediate })
 
-        expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
-          mockProc.pid,
-          expect.any(Function),
-          expect.objectContaining({ ownsRoot: expect.any(Function) })
-        )
-      }
-    )
+      expect(killWithDescendantSweepMock).toHaveBeenCalledWith(
+        mockProc.pid,
+        expect.any(Function),
+        expect.objectContaining({ ownsRoot: expect.any(Function) })
+      )
+    }
+
+    it('win32 graceful shutdown of a plain shell taskkills the descendant tree', async () => {
+      await expectPlainShutdownSweep('win32', false)
+    })
+
+    it('non-win32 graceful shutdown of a plain shell sweeps descendants', async () => {
+      await expectPlainShutdownSweep('linux', false)
+    })
+
+    it('non-win32 immediate shutdown of a plain shell sweeps descendants', async () => {
+      await expectPlainShutdownSweep('linux', true)
+    })
   })
 
   describe('hasChildProcesses', () => {

@@ -100,31 +100,37 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     expect(ownsRoot()).toBe(false)
   })
 
-  it.each([true, false])(
-    'non-win32 kill sweeps descendants before signalling the root (immediate=%s)',
-    async (immediate) => {
-      // Why: nohup jobs ignore SIGHUP and setsid jobs leave the tty pgroups (ORCA-678).
-      setPlatform('linux')
-      const session = createPlainShellSession()
-      const order: string[] = []
-      killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
-        order.push('sweep')
-        killRoot()
-      })
-      const forceKill = session.forceKillAndWaitForExit as unknown as ReturnType<typeof vi.fn>
-      forceKill.mockImplementation(async () => {
-        order.push('force')
-      })
-      ;(session.signalTerminationRoot as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-        () => {
-          order.push('graceful')
-        }
-      )
-      const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
+  async function expectSweepBeforeRoot(immediate: boolean): Promise<void> {
+    setPlatform('linux')
+    const session = createPlainShellSession()
+    const order: string[] = []
+    killWithDescendantSweepMock.mockImplementation(async (_pid: number, killRoot: () => void) => {
+      order.push('sweep')
+      killRoot()
+    })
+    const forceKill = session.forceKillAndWaitForExit as unknown as ReturnType<typeof vi.fn>
+    forceKill.mockImplementation(async () => {
+      order.push('force')
+    })
+    ;(session.signalTerminationRoot as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        order.push('graceful')
+      }
+    )
+    const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
 
-      await teardown.killSession('s1', session, immediate)
+    await teardown.killSession('s1', session, immediate)
 
-      expect(order).toEqual(['sweep', immediate ? 'force' : 'graceful'])
-    }
-  )
+    expect(order).toEqual(['sweep', immediate ? 'force' : 'graceful'])
+  }
+
+  it('non-win32 immediate kill sweeps descendants before force-kill', async () => {
+    // Why: setsid/nohup jobs that left the tty survive the pgroup force-kill (ORCA-678).
+    await expectSweepBeforeRoot(true)
+  })
+
+  it('non-immediate (graceful) kill sweeps descendants before the root signal', async () => {
+    // Why: nohup jobs ignore the dying shell's SIGHUP (ORCA-678).
+    await expectSweepBeforeRoot(false)
+  })
 })
