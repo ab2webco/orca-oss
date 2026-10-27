@@ -237,6 +237,33 @@ describe('gameFleetReportOf', () => {
     ])
   })
 
+  it('names the host a remote member runs on, and asks to check it while the host is silent (ORCA-824)', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({ remote: { host: 'imac', stateKnown: true } }),
+        member({
+          paneKey: 'remote:ctx_2',
+          displayName: 'CIN-2 Combos',
+          state: 'idle',
+          remote: { host: 'imac', stateKnown: false }
+        }),
+        member({ paneKey: 'p3', displayName: 'CIN-3 Local' })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({ ticket: 'CIN-1', host: 'imac', stateKnown: true }),
+      expect.objectContaining({ ticket: 'CIN-3', host: null, stateKnown: true }),
+      expect.objectContaining({
+        ticket: 'CIN-2',
+        host: 'imac',
+        stateKnown: false,
+        next: 'imac does not answer: orca orchestration worker-show --dispatch ctx_2'
+      })
+    ])
+  })
+
   it('names the agent and the managed account each member runs on', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

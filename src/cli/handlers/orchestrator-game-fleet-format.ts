@@ -133,11 +133,12 @@ export function formatFleet(fleet: GameFleet, now: number = Date.now()): string 
     row.phase,
     row.ticket ?? '-',
     row.ticketStatus ?? '-',
-    row.state,
+    row.stateKnown ? row.state : 'unknown',
     sinceOf(row.lastActivityAt, now),
     row.review ?? '-',
     row.ci ?? '-',
     row.branch ?? '-',
+    row.host ?? 'local',
     row.agent ?? '-',
     row.account ?? '-',
     row.next,
@@ -152,6 +153,7 @@ export function formatFleet(fleet: GameFleet, now: number = Date.now()): string 
     'PR',
     'CI',
     'BRANCH',
+    'HOST',
     'AGENT',
     'ACCOUNT'
   ]

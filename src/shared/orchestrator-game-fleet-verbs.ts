@@ -1,3 +1,4 @@
+import { idleNextOf, silentHostNextOf } from './orchestrator-game-member-next'
 import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
@@ -37,6 +38,10 @@ export type GameFleetRow = {
   lastActivityAt: string | null
   /** Failed for silence yet still working; its ticket has another live attempt (ORCA-658). */
   orphaned: boolean
+  /** The paired host a remote member runs on; null when local (ORCA-824). */
+  host: string | null
+  /** False while a remote member's host does not answer: `state` is then a guess. */
+  stateKnown: boolean
 }
 
 const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
@@ -111,22 +116,6 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
 const limitedNextOf = (agent: GameAgent): string =>
   `game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}, or wait for the reset`
 
-function idleNextOf(review: GameAgent['review']): string {
-  if (!review) {
-    return 'push'
-  }
-  if (review.state === 'merged') {
-    return 'move the ticket to review'
-  }
-  if (review.state === 'closed') {
-    return `check: PR #${review.number} closed`
-  }
-  if (review.ci === 'failure') {
-    return 'push: CI failing'
-  }
-  return review.ci === 'pending' ? 'wait for CI' : `review PR #${review.number}`
-}
-
 function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
   const phase = memberPhaseOf(agent)
   return {
@@ -138,7 +127,10 @@ function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next: nextWithQuestionOf(agent, phase, question),
+    next:
+      agent.remote?.stateKnown === false
+        ? silentHostNextOf(agent.remote.host, agent.paneKey)
+        : nextWithQuestionOf(agent, phase, question),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
@@ -147,7 +139,9 @@ function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
         ? null
         : new Date(agent.limit.resetsAt).toISOString(),
     lastActivityAt: agent.lastActivityAt ?? null,
-    orphaned: agent.orphaned === true
+    orphaned: agent.orphaned === true,
+    host: agent.remote?.host ?? null,
+    stateKnown: agent.remote?.stateKnown !== false
   }
 }
 

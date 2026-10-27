@@ -190,6 +190,14 @@ import {
 } from './orchestration/federation-ack-checkpoints'
 import { syncFederatedDispatch } from './orchestration/federation-sync'
 import { formatMessagePointer } from './orchestration/formatter'
+import {
+  listRemoteGameMemberSources,
+  remoteGameMembersOf,
+  type RemoteGameMemberShow
+} from './orchestrator-game-remote-members'
+
+// Why short: a silent host must not hold the lead's game state; its member shows as unknown.
+const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
 import {
   selectExactWorkerProviderSession,
@@ -31325,12 +31333,44 @@ export class OrcaRuntimeService {
         return null
       }
     })
-    return await this.withPausedGameMembers(state, {
+    const withPaused = await this.withPausedGameMembers(state, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
       liveWorktreeIds: new Set(
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
+    return await this.withRemoteGameMembers(withPaused, args.paneKey, worktree?.repoId)
+  }
+
+  // Why after the paused view: remote members have no local session to save or resume (ORCA-824).
+  private async withRemoteGameMembers(
+    state: OrchestratorGameState,
+    leadPaneKey: string | undefined,
+    repoId: string | undefined
+  ): Promise<OrchestratorGameState> {
+    const run = leadPaneKey ? this._orchestrationDb?.getCurrentRunForPane?.(leadPaneKey) : undefined
+    if (state.role !== 'lead' || !run || !this._orchestrationDb) {
+      return state
+    }
+    const sources = listRemoteGameMemberSources(this._orchestrationDb, run.id)
+    if (sources.length === 0) {
+      return state
+    }
+    const remote = await remoteGameMembersOf(sources, {
+      // Why federationShow: every federation-capable host already answers it, so no wire change.
+      showOf: async (source) => {
+        const shown = (await this.callOrchestrationWorkerServer(
+          source.environmentId,
+          'orchestration.federationShow',
+          { dispatchId: source.dispatchId },
+          REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+        )) as { terminal: RemoteGameMemberShow | null }
+        return shown.terminal
+      },
+      reviewOf: async (branch) =>
+        repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null
+    })
+    return { ...state, agents: [...state.agents, ...remote] }
   }
 
   // Why only a lead pane: it is the one whose members are saved, and the one that resumes them.

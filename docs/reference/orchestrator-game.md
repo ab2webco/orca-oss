@@ -949,6 +949,14 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
+  its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
+  their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`
+  reports. A host that does not answer within 3 s keeps its member listed with state `unknown`
+  and NEXT `worker-show --dispatch <id>`. The fleet holds the lead Run's live remote dispatches and
+  those that finished since the current lead claimed the Run. A remote agent started any other way
+  (a plain terminal on the host) has no record on the lead's machine and cannot be listed;
+  `game launch` has no `--on` yet.
 - The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and
   returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
 - A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")
