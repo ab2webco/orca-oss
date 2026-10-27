@@ -96,6 +96,18 @@ describe('GamePausedMembers.note', () => {
     expect((await paused.note('repo:a', [], new Set(['wt-ORCA-1']))).paused).toEqual([])
   })
 
+  // ORCA-677: liveness comes from the pane, so a leftover heartbeat loop cannot keep a gone member listed as live.
+  it('lists a member whose pane is gone as paused while its dispatch is still dispatched', async () => {
+    const contexts = { 'term-ORCA-1': context('ORCA-1') }
+    const { paused } = setup(contexts)
+    await paused.note('repo:a', [member('ORCA-1')])
+
+    const after = await paused.note('repo:a', [])
+
+    expect(contexts['term-ORCA-1'].dispatchStatus).toBe('dispatched')
+    expect(after.paused.map((one) => one.ticket)).toEqual(['ORCA-1'])
+  })
+
   it('lists a member whose start waits for the setup in flight as queued, not paused', async () => {
     const { paused } = setup()
     await paused.record('repo:a', {
