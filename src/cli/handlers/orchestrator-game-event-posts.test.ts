@@ -52,6 +52,7 @@ function fakeClient(gameState: unknown, boardFails = false) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': gameState,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },

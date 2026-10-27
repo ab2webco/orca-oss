@@ -2,6 +2,11 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import {
+  GAME_PROMPT_MAX,
+  GAME_WORK_PROMPT_PLACEHOLDERS,
+  unknownPlaceholderOf
+} from '../../shared/orchestrator-game-actions'
 
 const LEAD_KEY_PREFIX = 'orchestratorGame.orchestrator.'
 
@@ -101,4 +106,27 @@ export function gameLaunchChoiceOf(
     ...(model === undefined || effort === undefined ? {} : { effort }),
     account: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
   }
+}
+
+// Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
+export function taskPromptOf(flags: Map<string, string | boolean>): string | null {
+  if (!flags.has('prompt')) {
+    return null
+  }
+  const raw = flags.get('prompt')
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  if (text.length === 0 || text.length > GAME_PROMPT_MAX) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt must be 1 to ${GAME_PROMPT_MAX} characters.`
+    )
+  }
+  const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
+  if (unknown !== null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt uses an unknown placeholder {${unknown}}; use {id}, {title}, {url} or {status}.`
+    )
+  }
+  return text
 }

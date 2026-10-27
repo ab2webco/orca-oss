@@ -58,6 +58,7 @@ function fakeClient(state: unknown, snapshot: unknown, refreshed: unknown = snap
     'game.state': state,
     'accounts.snapshot': snapshot,
     'accounts.list': refreshed,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'h1' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },

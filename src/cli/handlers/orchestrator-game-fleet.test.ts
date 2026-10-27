@@ -69,6 +69,7 @@ function fakeClient(state: unknown, overrides: Record<string, unknown> = {}) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },

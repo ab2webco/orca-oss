@@ -41,6 +41,7 @@ function fakeClient(
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': {
       capabilities: [
@@ -129,6 +130,7 @@ describe('orca game launch', () => {
 
     expect(calls.map(([method]) => method)).toEqual([
       'game.state',
+      'worktree.list',
       'game.memberNameReserve',
       'terminal.show',
       'status.get',
@@ -140,12 +142,12 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[6]?.[1]).toEqual({
+    expect(calls[7]?.[1]).toEqual({
       spec: 'Implement CIN-12: Cartelera page',
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[8]?.[1]).toEqual(
+    expect(calls[9]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
