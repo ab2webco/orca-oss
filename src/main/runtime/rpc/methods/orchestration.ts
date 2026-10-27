@@ -17,6 +17,11 @@ import {
   reconcileLifecycleMessage
 } from '../../orchestration/lifecycle-reconciliation'
 import { waitForFederatedLifecycleSettlement } from '../../orchestration/federation-lifecycle-settlement'
+import {
+  describeDeadHeartbeatSender,
+  logHeartbeatRejection,
+  rejectHeartbeatQuietly
+} from '../../orchestration/dead-heartbeat-sender'
 import { abbreviateOrchestrationTasks } from '../../../../shared/orchestration-task-summary'
 import {
   ORCHESTRATION_LEGACY_RUN_ID,
@@ -469,10 +474,15 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             processIncarnation
           })
         ) {
-          throw new OrchestrationError(
-            'dispatch_capability_invalid',
-            'The remote Dispatch capability or exact worker process is invalid.'
-          )
+          const reason = 'The remote Dispatch capability or exact worker process is invalid.'
+          if (params.type === 'heartbeat') {
+            logHeartbeatRejection(
+              { from_handle: from, sender_pane_key: senderPaneKey ?? null },
+              remoteAttachment.dispatch_id,
+              reason
+            )
+          }
+          throw new OrchestrationError('dispatch_capability_invalid', reason)
         }
         const type = (params.type ?? 'status') as MessageType
         const payload = parseRemoteWorkerPayload(params.payload)
@@ -667,6 +677,28 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         if (msg.type === 'escalation' && dispatch && hasLifecycleAuthority(dispatch, msg)) {
           db.recordDispatchLifecycleSignal(dispatch.id, msg.created_at)
         }
+        // Why (ORCA-677): a loop that outlived its terminal still presents the pane key, so the
+        // beat must also come from the pane's live process — checked before the ORCA-299 reopen.
+        const deadSender =
+          msg.type === 'heartbeat' && dispatch && hasLifecycleAuthority(dispatch, msg)
+            ? describeDeadHeartbeatSender(
+                dispatch.process_incarnation,
+                attestedCaller?.processIncarnation ??
+                  runtime.getTerminalProcessIncarnation(
+                    // Why: the pane outranks the claimed handle, which a remint leaves stale.
+                    (senderPaneKey
+                      ? runtime.getAgentStatusTerminalHandleForPaneKey(senderPaneKey)
+                      : null) ?? from
+                  )
+              )
+            : null
+        if (dispatch && deadSender) {
+          return rejectHeartbeatQuietly(db, msg, dispatch.id, {
+            action: 'rejected',
+            code: 'sender_not_assignee',
+            reason: `heartbeat not recorded: ${deadSender}`
+          })
+        }
         // Why (ORCA-299): the first-signal expiry revokes the capability, and the
         // check below rejects every heartbeat and worker_done while that is set —
         // so the reopen has to land *before* it, or a live worker refuting the
@@ -710,6 +742,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
                 'dispatch_capability_invalid',
                 authority.reason
               ) ?? msg
+            if (msg.type === 'heartbeat') {
+              logHeartbeatRejection(msg, capabilityDispatch.id, authority.reason)
+            }
             runtime.notifyMessageArrived(to, rejection.type)
             return {
               message: rejection,
@@ -730,7 +765,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           }
           if (reconciled.action === 'rejected') {
             const rejection = db.getMessageById(msg.id) ?? msg
-            runtime.notifyMessageArrived(to, rejection.type)
+            if (msg.type === 'heartbeat') {
+              logHeartbeatRejection(msg, routing.dispatchId, reconciled.reason)
+            }
+            // Why: a rejection reconcile already archived (inactive dispatch) has nothing to wake a waiter for.
+            if (!rejection.read) {
+              runtime.notifyMessageArrived(to, rejection.type)
+            }
             return { message: rejection, lifecycle: reconciled }
           }
           runtime.notifyMessageArrived(to, msg.type)
