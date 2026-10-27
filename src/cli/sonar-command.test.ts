@@ -48,6 +48,19 @@ describe('runSonarCommand', () => {
     })
   })
 
+  it('refuses on a remote Orca host before looking for the install', async () => {
+    installTree()
+    const run = vi.fn(async () => 0)
+
+    await expect(
+      runSonarCommand(['find', 'Tab'], { userDataDir, run, remote: true })
+    ).rejects.toMatchObject({
+      code: 'sonar_remote_unavailable',
+      message: expect.stringContaining('remote Orca host')
+    })
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('returns the CLI exit code unchanged', async () => {
     installTree()
 

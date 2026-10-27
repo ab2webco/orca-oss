@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { RuntimeClientError } from './runtime/types'
-import { resolveSonarCli, type SonarCliLookup } from './sonar-cli-location'
+import { resolveSonarCli, type SonarCliLookup } from '../shared/sonar-cli-location'
 
 export type SonarProcessRunner = (
   command: string,
@@ -11,6 +11,8 @@ export type SonarProcessRunner = (
 export type SonarCommandOptions = {
   userDataDir: string
   run: SonarProcessRunner
+  // Why: a remote host's files are not on this machine, so a local index would answer for the wrong tree.
+  remote?: boolean
 }
 
 /** Runs the installed orca-sonar CLI with the caller's arguments and returns its exit code. */
@@ -18,6 +20,12 @@ export async function runSonarCommand(
   args: readonly string[],
   options: SonarCommandOptions
 ): Promise<number> {
+  if (options.remote) {
+    throw new RuntimeClientError(
+      'sonar_remote_unavailable',
+      'orca sonar is not available on a remote Orca host: orca-sonar is not installed there and remote installs are not supported yet.'
+    )
+  }
   const lookup = resolveSonarCli(options.userDataDir)
   if (!lookup.ok) {
     throw new RuntimeClientError('sonar_not_installed', notInstalledMessage(lookup))
