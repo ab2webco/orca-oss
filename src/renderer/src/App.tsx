@@ -156,6 +156,11 @@ import {
   hydratePersistedUIAfterStartupRead
 } from './lib/startup-ui-hydration'
 import {
+  clearPendingPersistedUIWrite,
+  setPendingPersistedUIWrite
+} from './lib/persisted-ui-pending-write'
+import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
+import {
   logRendererStartupDiagnostic,
   timeRendererStartupStep,
   timeRendererStartupSyncStep
@@ -1425,45 +1430,50 @@ function App(): React.JSX.Element {
       return
     }
 
+    const write: Partial<PersistedUIState> = {
+      sidebarWidth,
+      rightSidebarOpen,
+      rightSidebarTab,
+      rightSidebarExplorerView,
+      rightSidebarWidth,
+      markdownTocPanelWidth,
+      combinedDiffFileTreeWidth,
+      groupBy,
+      sortBy,
+      projectOrderBy,
+      showActiveOnly: false,
+      hideSleepingWorkspaces: !showSleepingWorkspaces,
+      showSleepingWorkspaces,
+      hideDefaultBranchWorkspace,
+      hideAutomationGeneratedWorkspaces,
+      hideCliCreatedWorkspaces,
+      hideDetachedHeadWorkspaces,
+      hideWorkspacesFromOtherDevices,
+      alwaysShowDefaultBranchWorkspace,
+      showDotfilesByWorktree,
+      // Why: the store keeps this readonly for identity stability, but PersistedUI crosses to
+      // main, which owns a mutable array — copy at the boundary rather than widening the wire type.
+      filterRepoIds: [...filterRepoIds],
+      // Why (#9002): activeView is deliberately NOT included here. It used to
+      // ride this same 150ms writer (#8265), which meant every top-level view
+      // switch scheduled a full durable-state save. The narrow preference
+      // effect below persists it without touching the recovery snapshot.
+      // Why: rides the same debounced save so dashboard auto-acks (which fire
+      // on focus/visibility) and the in-memory ack cleanup paths in
+      // agent-status.ts (close/dismiss) both flow to disk through map
+      // identity changes. Without persisting, agent rows that survive
+      // restart come back bold even when the user had already visited them.
+      acknowledgedAgentsByPaneKey
+    }
+    setPendingPersistedUIWrite(write)
     const timer = window.setTimeout(() => {
-      void window.api.ui.set({
-        sidebarWidth,
-        rightSidebarOpen,
-        rightSidebarTab,
-        rightSidebarExplorerView,
-        rightSidebarWidth,
-        markdownTocPanelWidth,
-        combinedDiffFileTreeWidth,
-        groupBy,
-        sortBy,
-        projectOrderBy,
-        showActiveOnly: false,
-        hideSleepingWorkspaces: !showSleepingWorkspaces,
-        showSleepingWorkspaces,
-        hideDefaultBranchWorkspace,
-        hideAutomationGeneratedWorkspaces,
-        hideCliCreatedWorkspaces,
-        hideDetachedHeadWorkspaces,
-        hideWorkspacesFromOtherDevices,
-        alwaysShowDefaultBranchWorkspace,
-        showDotfilesByWorktree,
-        // Why: the store keeps this readonly for identity stability, but PersistedUI crosses to
-        // main, which owns a mutable array — copy at the boundary rather than widening the wire type.
-        filterRepoIds: [...filterRepoIds],
-        // Why (#9002): activeView is deliberately NOT included here. It used to
-        // ride this same 150ms writer (#8265), which meant every top-level view
-        // switch scheduled a full durable-state save. The narrow preference
-        // effect below persists it without touching the recovery snapshot.
-        // Why: rides the same debounced save so dashboard auto-acks (which fire
-        // on focus/visibility) and the in-memory ack cleanup paths in
-        // agent-status.ts (close/dismiss) both flow to disk through map
-        // identity changes. Without persisting, agent rows that survive
-        // restart come back bold even when the user had already visited them.
-        acknowledgedAgentsByPaneKey
-      })
+      void window.api.ui.set(write).finally(() => clearPendingPersistedUIWrite(write))
     }, 150)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      clearPendingPersistedUIWrite(write)
+    }
   }, [
     persistedUIReady,
     sidebarWidth,

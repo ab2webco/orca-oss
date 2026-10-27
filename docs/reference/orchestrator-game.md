@@ -376,13 +376,15 @@ popover.
 
 The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
 item rows), My PRs, To Do and Actions, in that order. A new Panel shows only Team and My PRs; the
-other three are widgets a person adds with `/orca-game:layout add <section>` and removes the same
-way. Each heading starts with a mark: `▾` while it is expanded, `▸` once collapsed to its heading
-line (`▸ To Do 12`). A click, a tap or Tab and Enter on the mark toggles it; every letter is
-already a Panel hotkey, so sections take none. The
-headings keep their own link or action, and a collapsed Team turns red while a teammate waits; a
-collapsed Review keeps its CI color. The `Needs you` lines above the sections are never hidden.
-On a phone-width pane each section also gets a touch-sized chip under the menu.
+other three are widgets in the catalog that a person adds from the **Widgets** menu chip or with
+`/orca-game:layout add <section>`, and removes the same way. In the catalog `●` marks a shown
+widget and `○` one that waits; a shown widget also gets `↑` and `↓` chips that move it. Each
+heading starts with a mark: `▾` while it is expanded, `▸` once collapsed to its heading line
+(`▸ To Do 12`). A click, a tap or Tab and Enter on the mark toggles it; every letter is already a
+Panel hotkey, so sections take none. The headings keep their own link or action, and a collapsed
+Team turns red while a teammate waits; a collapsed Review keeps its CI color. The `Needs you` lines above the sections are never hidden.
+On a phone-width pane each section also gets a touch-sized chip under the menu, and the catalog is
+a row of such chips. The Widgets chip has no hotkey: every letter and digit is already taken.
 
 A widget that is not shown is not drawn: its rows, buttons, hotkeys and Team's animated tiles are
 gone until it is added, and a closed Actions widget reads no run log. Its data still arrives with
@@ -396,7 +398,7 @@ a toast says how to collapse sections.
 The layout is kept in the mod's `$.store` under `panel-layout`: `{ version: 2, projects: {
 <repoId>: { fleet: { order, collapsed, shown } } } }`, so every worktree of one repo shares it
 and other people keep their own. `shown` lists what the Panel draws; a section a later build adds
-starts hidden until the person adds it. Nothing is written until the person changes the layout. A version 1 value
+starts in the catalog. Nothing is written until the person changes the layout. A version 1 value
 is upgraded on the next write, keeping every section it drew. A damaged value draws the default;
 one a newer build wrote is drawn as the default and never overwritten (see
 [Game data migrations](./game-data-migrations.md)). Later view settings belong in the same key,
