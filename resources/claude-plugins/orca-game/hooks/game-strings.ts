@@ -98,6 +98,8 @@ export type TextStrings = {
   actionCommandGone: (command: string) => string
   /** A member stopped by its account's usage limit; `backIn` like "1h 30m", null when unknown. */
   limited: (backIn: string | null) => string
+  /** The paired host a remote member runs on, or that it does not answer (ORCA-824). */
+  remoteHost: (host: string, answering: boolean) => string
   /** Which of a member's model and effort Orca pinned at launch; empty for neither. */
   advisorPinned: (pinned: { model: boolean; effort: boolean }) => string
   /** One model in the fleet's summary of what Jev has the members on. */
@@ -252,6 +254,7 @@ const EN: GameStrings = {
       `/${command} is taken by another command; use its button in the band or the Panel`,
     actionCommandGone: (command) => `/${command} is no longer one of this project's actions`,
     limited: (backIn) => (backIn === null ? 'limited' : `limited · back in ${backIn}`),
+    remoteHost: (host, answering) => (answering ? `on ${host}` : `${host} not answering`),
     advisorPinned: ({ model, effort }) =>
       model && effort
         ? 'model and effort pinned'

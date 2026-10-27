@@ -30,6 +30,8 @@ export type GameMemberReport = {
   account: string | null
   branch: string | null
   terminalHandle: string | null
+  /** The paired host it runs on; null when local (ORCA-824). */
+  host: string | null
   now: {
     state: GameAgent['state']
     phase: GameMemberPhase
@@ -121,6 +123,7 @@ export function gameMemberReportOf(input: GameMemberReportInput): GameMemberRepo
     account: agent.account?.email ?? null,
     branch: agent.worktree?.branch ?? null,
     terminalHandle: agent.terminalHandle ?? null,
+    host: agent.remote?.host ?? null,
     now: {
       state: agent.state,
       phase: memberPhaseOf(agent),

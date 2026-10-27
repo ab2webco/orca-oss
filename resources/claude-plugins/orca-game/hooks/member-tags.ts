@@ -1,4 +1,4 @@
-import type { GameAgent, GameMemberAccount, GameMemberLimit } from '../types'
+import type { GameAgent, GameMemberAccount, GameMemberLimit, GameMemberRemote } from '../types'
 import { cellWidthOf } from './cell-width'
 import { gameStrings } from './game-strings'
 
@@ -50,17 +50,39 @@ export const memberAccountOf = (value: unknown): GameMemberAccount | undefined =
 
 const SHORT_LOCAL = 3
 
+export const memberRemoteOf = (value: unknown): GameMemberRemote | undefined =>
+  isShape(value) && typeof value.host === 'string' && value.host !== ''
+    ? { host: value.host, stateKnown: value.stateKnown !== false }
+    : undefined
+
 /** `codex · ana@…`: the domain never shows, and the name shortens before the account is dropped. */
 export const agentTagOf = (
-  agent: { agentType: GameAgent['agentType']; account?: GameMemberAccount },
+  agent: {
+    agentType: GameAgent['agentType']
+    account?: GameMemberAccount
+    remote?: GameMemberRemote
+  },
   room: number
 ): string => {
+  const { remote } = agent
+  // Why `host ?`: a narrow card would ellipsize `imac not answering` into `imac no…`.
+  const hosts = remote
+    ? [
+        gameStrings().text.remoteHost(remote.host, remote.stateKnown),
+        remote.stateKnown ? remote.host : `${remote.host} ?`
+      ]
+    : ['']
+  const bases = [
+    ...hosts.map((host) => [agent.agentType, host].filter(Boolean).join(' · ')),
+    hosts.at(-1) || agent.agentType
+  ]
+  const base = bases[0]!
   const local = agent.account?.email.split('@')[0] ?? ''
   const tags = local
     ? [
-        `${agent.agentType} · ${local}@…`,
-        `${agent.agentType} · ${local.slice(0, SHORT_LOCAL)}${local.length > SHORT_LOCAL ? '…' : ''}@…`
+        `${base} · ${local}@…`,
+        `${base} · ${local.slice(0, SHORT_LOCAL)}${local.length > SHORT_LOCAL ? '…' : ''}@…`
       ]
     : []
-  return tags.find((tag) => cellWidthOf(tag) <= room) ?? agent.agentType
+  return [...tags, ...bases].find((tag) => cellWidthOf(tag) <= room) ?? bases.at(-1)!
 }

@@ -48,3 +48,35 @@ describe('fleet text for a member that is not live (ORCA-754)', () => {
     expect(text).toContain('Paused since Orca or the machine restarted: 1')
   })
 })
+
+describe('formatFleet with remote members (ORCA-824)', () => {
+  it('prints each member’s host, and unknown for a host that does not answer', () => {
+    const member = {
+      displayName: 'ORCA-805 gate',
+      agentType: null,
+      toolName: null,
+      isLeader: false,
+      isMember: true,
+      terminalHandle: 'term_imac'
+    }
+    const text = formatFleet(
+      gameFleetReportOf({
+        lead: DEFAULT_GAME_LEAD,
+        agents: [
+          {
+            ...member,
+            paneKey: 'remote:ctx_805',
+            state: 'idle',
+            remote: { host: 'imac', stateKnown: false }
+          },
+          { ...member, paneKey: 'p', displayName: 'ORCA-900 local', state: 'working' }
+        ]
+      })
+    )
+
+    const [header, local, remote] = text.split('\n').slice(1)
+    expect(header).toMatch(/BRANCH +HOST +AGENT/)
+    expect(local).toMatch(/ORCA-900 .* working .* local /)
+    expect(remote).toMatch(/ORCA-805 .* unknown .* imac /)
+  })
+})

@@ -70,3 +70,34 @@ describe('member agent and account tag', () => {
     expect(agentTagOf({ agentType: 'gemini' }, 40)).toBe('gemini')
   })
 })
+
+describe('member host tag (ORCA-824)', () => {
+  it('keeps the paired host a member runs on and drops a malformed one', () => {
+    expect(
+      parseGameState(stateWith({ remote: { host: 'imac', stateKnown: false } }))?.agents[0]?.remote
+    ).toEqual({ host: 'imac', stateKnown: false })
+    expect(parseGameState(stateWith({ remote: { host: '' } }))?.agents[0]?.remote).toBeUndefined()
+  })
+
+  it('names the host beside the agent, and says when it does not answer, in the session language', () => {
+    setGameLocale('en')
+    expect(agentTagOf({ agentType: '', remote: { host: 'imac', stateKnown: true } }, 40)).toBe(
+      'on imac'
+    )
+    expect(
+      agentTagOf({ agentType: 'claude', remote: { host: 'imac', stateKnown: false } }, 40)
+    ).toBe('claude · imac not answering')
+    // Why: at 320 the long tag ellipsizes to `imac no…` and loses what it says.
+    expect(agentTagOf({ agentType: '', remote: { host: 'imac', stateKnown: false } }, 9)).toBe(
+      'imac ?'
+    )
+    expect(agentTagOf({ agentType: '', remote: { host: 'imac', stateKnown: true } }, 6)).toBe(
+      'imac'
+    )
+    setGameLocale('es')
+    expect(agentTagOf({ agentType: '', remote: { host: 'imac', stateKnown: true } }, 40)).toBe(
+      'en imac'
+    )
+    setGameLocale('en')
+  })
+})

@@ -69,7 +69,11 @@ export type GameAgent = {
   lastActivityAt?: string
   /** Failed for silence yet still working, not reopened because something replaced it (ORCA-658). */
   orphaned?: true
+  /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */
+  remote?: GameRemoteHost
 }
+
+export type GameRemoteHost = { host: string; stateKnown: boolean }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 
