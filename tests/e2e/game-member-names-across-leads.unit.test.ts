@@ -72,6 +72,7 @@ function projectRuntime(): OrcaRuntimeService {
 }
 
 const ORCHESTRATION_RESULTS: Record<string, unknown> = {
+  'worktree.list': { worktrees: [] },
   'terminal.show': { terminal: { handle: 'term_lead_b' } },
   'orchestration.runCurrent': { run: { id: 'run_b' } },
   'accounts.snapshot': { claude: { accounts: [], activeAccountId: null } },
