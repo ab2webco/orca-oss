@@ -379,6 +379,11 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       probePtyLiveness: async () => null
     })
 
+    stub.insert('unclaimed status')
+    runtime.notifyMessageArrived(handle, 'status')
+    // Why the watch starts after the push: a pending Run watch suppresses the pointer (ORCA-824),
+    // so the probe must already be in flight when the check arrives.
+    await Promise.resolve()
     const pulled: string[] = []
     const checkResumed = runtime
       .waitForMessage(stub.runMailbox, { typeFilter: ['worker_done'], timeoutMs: 60_000 })
@@ -390,13 +395,8 @@ describe('push-on-idle orchestration delivery absence gate', () => {
           }
         }
       })
-
-    stub.insert('unclaimed status')
-    runtime.notifyMessageArrived(handle, 'status')
     // Land the completion while the probe chain is mid-flight — the slot where
     // the continuation would otherwise overtake the check's resumption.
-    await Promise.resolve()
-    await Promise.resolve()
     stub.insert('worker completion', 'worker_done')
     runtime.notifyMessageArrived(handle, 'worker_done')
 

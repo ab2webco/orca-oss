@@ -953,6 +953,9 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
 - A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")
   until the pane restarts; the watch's delivery is the one wake for that event (ORCA-746 T6b).
+- While the lead's watch is pending, nothing is pointed at, not even mail outside its `--types`:
+  that mail rides in the watch's next batch, ahead of the message that wakes it (ORCA-824). Without
+  a pending watch, Run mail is pointed at as before.
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch

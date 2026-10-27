@@ -37000,6 +37000,10 @@ export class OrcaRuntimeService {
     // still-blocked case; reservedTypes carries the notify-time snapshot for a
     // waiter resolved later in the same drain, which is already gone from the map.
     const waiters = this.messageWaitersByHandle.get(mailboxHandle)
+    // Why: a lead watch's next batch carries older Run mail with its wake, so a pointer for other types only interrupts (ORCA-824).
+    if (mailboxHandle.startsWith('run:') && waiters && waiters.size > 0) {
+      return
+    }
     const recipientHandles =
       run && mailboxHandle === `run:${run.id}`
         ? [handle, mailboxHandle]
