@@ -1,5 +1,6 @@
 import { useAppStore } from '@/store'
 import { makePaneKey, type PaneKey } from '../../../shared/stable-pane-id'
+import { worktreeSlugEnv } from '../../../shared/worktree/slug'
 import type { AgentType } from '../../../shared/agent-status-types'
 import { bindAutomationTerminal } from '@/lib/automation-terminal-ownership'
 import { createBrowserUuid } from '@/lib/browser-uuid'
@@ -47,6 +48,7 @@ export function reserveAgentBackgroundSessionIdentity(args: {
       ORCA_PANE_KEY: paneKey,
       ORCA_TAB_ID: reservedTabId,
       ORCA_WORKTREE_ID: args.worktreeId,
+      ...worktreeSlugEnv(args.worktreeId),
       ORCA_AGENT_LAUNCH_TOKEN: launchToken
     }
   }
