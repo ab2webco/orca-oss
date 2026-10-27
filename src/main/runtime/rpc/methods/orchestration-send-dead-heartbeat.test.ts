@@ -125,4 +125,29 @@ describe('orchestration.send heartbeats from a dead member (ORCA-677)', () => {
     expect(result.lifecycle).toMatchObject({ action: 'rejected' })
     expect(db.getDispatchContextById(dispatch.id)?.status).toBe('failed')
   })
+
+  it('records a live worker whose handle was reminted, judged by its pane, not the stale claim', async () => {
+    setup()
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker_before', PANE)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(runtime, 'getAgentStatusTerminalHandleForPaneKey').mockImplementation((paneKey) =>
+      paneKey === PANE ? 'term_worker_after' : undefined
+    )
+    vi.mocked(runtime.getTerminalProcessIncarnation).mockImplementation((handle) =>
+      handle === 'term_worker_after' ? 'runtime_test:term_worker_after:1' : null
+    )
+
+    const result = (await call('orchestration.send', {
+      from: 'term_worker_before',
+      to: 'term_coord',
+      subject: 'alive',
+      type: 'heartbeat',
+      senderPaneKey: PANE,
+      payload: JSON.stringify({ dispatchId: dispatch.id })
+    })) as { lifecycle?: { action: string } }
+
+    expect(result.lifecycle).toBeUndefined()
+    expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).not.toBeNull()
+  })
 })

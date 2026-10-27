@@ -683,7 +683,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           msg.type === 'heartbeat' && dispatch && hasLifecycleAuthority(dispatch, msg)
             ? describeDeadHeartbeatSender(
                 dispatch.process_incarnation,
-                attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from)
+                attestedCaller?.processIncarnation ??
+                  runtime.getTerminalProcessIncarnation(
+                    // Why: the pane outranks the claimed handle, which a remint leaves stale.
+                    (senderPaneKey
+                      ? runtime.getAgentStatusTerminalHandleForPaneKey(senderPaneKey)
+                      : null) ?? from
+                  )
               )
             : null
         if (dispatch && deadSender) {
