@@ -57,7 +57,8 @@ async function runInteractiveBashPty(args: {
     cols: 100,
     rows: 30,
     cwd: args.cwd,
-    env: args.env
+    // Why: assertions match bash's English `type` output, which a host locale would translate.
+    env: { ...args.env, LC_ALL: 'C' }
   })
 
   let output = ''
