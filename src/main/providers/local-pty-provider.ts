@@ -9,6 +9,7 @@ import {
 } from './windows-powershell'
 import { buildWindowsPowerShellSpawnAttempts } from './windows-shell-fallback-chain'
 import { resolveProcessCwd } from './process-cwd'
+import { sweepEndedSessionOrphans } from '../pty/ended-session-orphan-sweep'
 import { existsSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { getDefaultWslDistro, parseWslPath, isWslAvailableAsync } from '../wsl'
@@ -923,6 +924,10 @@ export class LocalPtyProvider implements IPtyProvider {
     createPtyPhysicalExit(id)
     ptyProcesses.set(id, proc)
     ptyInitialCwd.set(id, cwd)
+    const orphanSweep =
+      args.launchAgent && process.platform !== 'win32'
+        ? { root: cwd, startedAtMs: Date.now() }
+        : null
     if (spawnedWslDistro !== undefined) {
       ptyWslDistroById.set(id, spawnedWslDistro)
     }
@@ -1087,6 +1092,16 @@ export class LocalPtyProvider implements IPtyProvider {
     const onExitDisposable = proc.onExit(({ exitCode }) => {
       const wasTerminationRequested = ptyTerminationMode.has(id)
       ptyPhysicalExits.get(id)?.markExited()
+      // Why: double-forked agent pollers are reparented before the root dies, out of every ppid sweep (ORCA-678).
+      if (orphanSweep) {
+        void sweepEndedSessionOrphans(orphanSweep.root, orphanSweep.startedAtMs).then((result) => {
+          if (result.status === 'skipped') {
+            console.warn(
+              `[local-pty] orphan sweep skipped for ${orphanSweep.root}: ${result.reason}`
+            )
+          }
+        })
+      }
       // Why: neutralize proc.kill before destroy — node-pty SIGHUPs on socket 'close', which can race here and signal a reaped/recycled pid.
       if (process.platform !== 'win32') {
         ;(proc as unknown as { kill: (sig?: string) => void }).kill = () => {}

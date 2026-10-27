@@ -22,6 +22,7 @@ import { killWithDescendantSweep } from '../pty-descendant-termination'
 import type { TuiAgent } from '../../shared/types'
 import { randomUUID } from 'node:crypto'
 import { PhysicalExitTracker } from '../../shared/physical-exit-tracker'
+import { sweepEndedSessionOrphans } from '../pty/ended-session-orphan-sweep'
 import {
   PtyStartupIngress,
   type PtyIngressEmission,
@@ -160,12 +161,15 @@ export class Session {
   private forceKillSent = false
   private subprocessDisposed = false
   private readonly physicalExit = new PhysicalExitTracker()
+  private readonly startedAtMs = Date.now()
+  private orphanSweepRoot: string | null
   private readonly startupIngress: PtyStartupIngress
 
   constructor(opts: SessionOptions) {
     this.sessionId = opts.sessionId
     this.terminalHandle = opts.terminalHandle ?? null
     this.launchAgent = opts.launchAgent ?? null
+    this.orphanSweepRoot = opts.launchAgent ? (opts.subprocess.shellCwd ?? null) : null
     this.wslDistro = opts.wslDistro ?? null
     this.subprocess = opts.subprocess
     this.onSessionExit = opts.onExit
@@ -767,8 +771,23 @@ export class Session {
     }
   }
 
+  // Why: double-forked agent pollers are reparented before the root dies, out of every ppid sweep (ORCA-678).
+  private sweepOrphansLeftInWorktree(): void {
+    if (!this.orphanSweepRoot || process.platform === 'win32') {
+      return
+    }
+    const root = this.orphanSweepRoot
+    this.orphanSweepRoot = null
+    void sweepEndedSessionOrphans(root, this.startedAtMs).then((result) => {
+      if (result.status === 'skipped') {
+        console.warn(`[Session] orphan sweep skipped for ${root}: ${result.reason}`)
+      }
+    })
+  }
+
   private handleSubprocessExit(code: number): void {
     this.physicalExit.markExited()
+    this.sweepOrphansLeftInWorktree()
     if (this._disposed) {
       return
     }

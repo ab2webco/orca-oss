@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -101,11 +101,19 @@ describe.skipIf(!hasBash)('an agent session that ends (ORCA-678 2/3)', () => {
         }
       })
       expect(isProcessAlive(pollerPid)).toBe(true)
+      // Why: same cwd and start window, but its parent (this test) is alive, so it has an owner.
+      const owned = spawn('sleep', ['300'], { cwd: dir, stdio: 'ignore' })
+      cleanups.push(() => owned.kill('SIGKILL'))
+      const ownedPid = owned.pid ?? 0
+      expect(ownedPid).toBeGreaterThan(0)
 
       await endSession(session, sessionId)
 
       expect(await pollUntil(() => !session.isAlive, POLL_CEILING_MS)).toBe(true)
       expect(await pollUntil(() => !isProcessAlive(pollerPid), POLL_CEILING_MS)).toBe(true)
+      // Past the sweep's SIGKILL grace window, the owned process must still be running.
+      await new Promise((resolve) => setTimeout(resolve, 2_500))
+      expect(isProcessAlive(ownedPid)).toBe(true)
     },
     45_000
   )
