@@ -69,6 +69,7 @@ import {
   releaseContextOnlyDispatch,
   type ContextOnlyDispatchReleaseResult
 } from './context-only-dispatch-release'
+import { retireSettledRunMail, type RetiredRunMail } from './run-mail-settlement'
 import {
   ensureMutationReceiptCapacity,
   migrateMutationReceiptCapacity
@@ -2938,6 +2939,7 @@ export class OrchestrationDb {
     this.db.exec('BEGIN IMMEDIATE')
     try {
       this.requireCurrentConsumer(params.runId, params.consumerGeneration)
+      retireSettledRunMail(this.db, params.runId)
       const address = `run:${params.runId}`
       const terminalHandle = params.terminalHandle ?? address
       // Why: a heartbeat's liveness is recorded at send; batching it only replays "alive" ahead of real mail.
@@ -3778,6 +3780,7 @@ export class OrchestrationDb {
   }
 
   getUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+    this.retireSettledMailFor(toHandle)
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
@@ -3827,6 +3830,7 @@ export class OrchestrationDb {
 
   // Why: delivered_at IS NULL filter — push-on-idle delivers each row at most once; read (set only by check) wouldn't prevent replay.
   getUndeliveredUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+    this.retireSettledMailFor(toHandle)
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
@@ -3850,6 +3854,17 @@ export class OrchestrationDb {
         )
         .all(toHandle) as MessageRow[]
     )
+  }
+
+  retireSettledRunMail(runId: string): RetiredRunMail[] {
+    return retireSettledRunMail(this.db, runId)
+  }
+
+  // Why: the pointer counts these reads, so settled Run mail must leave them too, not only the check batch (ORCA-824).
+  private retireSettledMailFor(toHandle: string): void {
+    if (toHandle.startsWith('run:')) {
+      retireSettledRunMail(this.db, toHandle.slice('run:'.length))
+    }
   }
 
   getUndeliveredUnreadMailboxHandles(): string[] {

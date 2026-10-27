@@ -33,7 +33,8 @@ import {
   formatOrchestrationCheckText,
   prepareOrchestrationCheckOutput,
   type LegacyCompatibilityResult,
-  type OrchestrationMessageSummary as MessageSummary
+  type OrchestrationMessageSummary as MessageSummary,
+  type RetiredRunMailNotice
 } from '../../shared/orchestration-check-output'
 import { orchestrationMutationRecoveryError } from '../orchestration-mutation-recovery'
 
@@ -720,6 +721,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       cancelled?: boolean
       connectionLost?: boolean
       legacyCompatibility?: LegacyCompatibilityResult
+      retired?: RetiredRunMailNotice
     }
     const callCheck = () =>
       callMutation<CheckResult>(client, flags, 'orchestration.check', {

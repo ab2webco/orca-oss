@@ -964,6 +964,12 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - While the lead's watch is pending, nothing is pointed at, not even mail outside its `--types`:
   that mail rides in the watch's next batch, ahead of the message that wakes it (ORCA-824). Without
   a pending watch, Run mail is pointed at as before.
+- A Run's mailbox outlives its lead, so before a check builds a batch (and before the pointer counts),
+  mail already settled moves to history: a question answered or closed, or whose dispatch is gone;
+  and a `worker_done`, escalation or status from a finished member, sent before the current lead
+  claimed the Run (ORCA-824). The check that retired them carries `retired: { count, unverified }`
+  and the text output says it in one line; `unverified` lists the retired reports whose PR is not
+  merged or closed, so the new lead still verifies them. `check --all` shows the retired mail.
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch

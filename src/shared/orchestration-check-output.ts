@@ -40,6 +40,28 @@ export type OrchestrationCheckOutput = {
   cancelled?: boolean
   connectionLost?: boolean
   legacyCompatibility?: LegacyCompatibilityResult
+  retired?: RetiredRunMailNotice
+}
+
+/** Run mail a check moved to history because a previous lead's era settled it (ORCA-824). */
+export type RetiredRunMailNotice = {
+  count: number
+  /** Retired member reports whose PR is not merged or closed yet. */
+  unverified: { ticket: string; pr: string | null }[]
+}
+
+function formatRetiredNotice(retired: RetiredRunMailNotice | undefined): string {
+  if (!retired || retired.count === 0) {
+    return ''
+  }
+  const noun = retired.count === 1 ? 'message' : 'messages'
+  const unverified =
+    retired.unverified.length > 0
+      ? ` Still unverified: ${retired.unverified
+          .map((report) => `${report.ticket} (${report.pr ? `PR ${report.pr}` : 'no PR'})`)
+          .join(', ')}.`
+      : ''
+  return `${retired.count} inherited ${noun} retired to history (check --all).${unverified}\n`
 }
 
 export function formatMessageReadOnlyTag(
@@ -80,6 +102,15 @@ export function formatOrchestrationCheckText(
         : '[LEGACY COMPATIBILITY]\n'
     : ''
   const deliveryNotice = formatCurrentDeliveryNotice(prepared.legacyCompatibility?.currentDelivery)
+  return `${formatRetiredNotice(prepared.retired)}${formatCheckBody(prepared, legacyHeader, deliveryNotice, compatibilityActive)}`
+}
+
+function formatCheckBody(
+  prepared: OrchestrationCheckOutput,
+  legacyHeader: string,
+  deliveryNotice: string,
+  compatibilityActive: boolean
+): string {
   if (prepared.formatted) {
     return `${legacyHeader}${prepared.formatted}${deliveryNotice}`
   }

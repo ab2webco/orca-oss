@@ -198,6 +198,8 @@ import {
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
+import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
 import {
   selectExactWorkerProviderSession,
@@ -21907,6 +21909,36 @@ export class OrcaRuntimeService {
     return review
       ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
       : null
+  }
+
+  // Why: a retired worker_done must not hide a member whose PR still waits for the lead (ORCA-824).
+  async summarizeRetiredRunMail(retired: readonly RetiredRunMail[]): Promise<RetiredRunMailNotice> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    const db = this._orchestrationDb
+    return summarizeRetiredRunMail(retired, async (dispatchId) => {
+      const worktreeId = db?.getWorkerDispatch(dispatchId)?.worktree_id
+      const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
+      if (!worktree) {
+        return null
+      }
+      const task = db?.getTask(db.getDispatchContextById(dispatchId)?.task_id ?? '')
+      const linked = worktree.linkedWorkItem
+      const ticket =
+        linked?.planeIdentifier ??
+        linked?.jiraIdentifier ??
+        linked?.linearIdentifier ??
+        task?.task_title ??
+        worktree.displayName ??
+        dispatchId
+      const review =
+        worktree.repoId && worktree.branch
+          ? await this.getHostedReviewForBranch({
+              repoSelector: `id:${worktree.repoId}`,
+              branch: worktree.branch
+            }).catch(() => null)
+          : null
+      return { ticket, pr: review ? { number: review.number, state: review.state } : null }
+    })
   }
 
   async getHostedReviewCreationEligibility(

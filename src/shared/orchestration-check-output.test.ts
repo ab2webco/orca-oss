@@ -5,6 +5,34 @@ import {
 } from './orchestration-check-output'
 
 describe('formatOrchestrationCheckText', () => {
+  // Why: a new lead sees one line for the previous lead's settled backlog, never the backlog (ORCA-824).
+  it('names what it retired and which of those still wait for verification', () => {
+    const text = formatOrchestrationCheckText(
+      {
+        count: 0,
+        messages: [],
+        retired: {
+          count: 44,
+          unverified: [
+            { ticket: 'ORCA-805', pr: '#701 open' },
+            { ticket: 'ORCA-681', pr: null }
+          ]
+        }
+      },
+      'term_lead'
+    )
+
+    expect(text).toBe(
+      '44 inherited messages retired to history (check --all). Still unverified: ORCA-805 (PR #701 open), ORCA-681 (no PR).\nNo messages.'
+    )
+  })
+
+  it('prints nothing extra when nothing was retired', () => {
+    expect(formatOrchestrationCheckText({ count: 0, messages: [] }, 'term_lead')).toBe(
+      'No messages.'
+    )
+  })
+
   it('prints the body of a current message so a plain check is enough to act', () => {
     const text = formatOrchestrationCheckText(
       {

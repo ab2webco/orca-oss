@@ -911,6 +911,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             )
           }
         }
+        // Why: a new lead gets one line for its predecessor's settled backlog, not the backlog (ORCA-824).
+        const retired = db.retireSettledRunMail(run.id)
+        const retiredNotice =
+          retired.length > 0 ? { retired: await runtime.summarizeRetiredRunMail(retired) } : {}
         let current = readDelivery(params.wait ? typeFilter : undefined)
         if (current) {
           recordHandedOut(current)
@@ -924,12 +928,14 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: false,
             connectionLost: false,
+            ...retiredNotice,
             ...(params.format || params.inject
               ? { formatted: current.messages.map(formatMessageBanner).join('\n\n') }
               : {})
           }
         }
-        if (!params.wait) {
+        // Why a retired notice ends a wait: a background watch would otherwise hold the line for its whole window.
+        if (!params.wait || retired.length > 0) {
           return {
             runId: run.id,
             deliveryId: null,
@@ -938,7 +944,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             acknowledged: acknowledged?.delivery.id ?? null,
             timedOut: false,
             cancelled: false,
-            connectionLost: false
+            connectionLost: false,
+            ...retiredNotice
           }
         }
 

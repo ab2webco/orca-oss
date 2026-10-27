@@ -70,6 +70,13 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('read `orca game events` and `orca game inbox` first')
   })
 
+  it('relays a retired backlog as one line and verifies what is still open (ORCA-824)', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
+
+    expect(brief).toContain('A check result with `retired`')
+    expect(brief).toContain('under `unverified` with `/opt/orca-dev game member <ticket>`')
+  })
+
   it('reads and relays its orchestration messages when Orca says it has some, never echoing the line', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
 
