@@ -148,8 +148,17 @@ describe('orca worktree rm on a busy worktree (ORCA-678)', () => {
       .mock.calls.map((call) => String(call[0]))
       .join('\n')
     expect(stderr).toContain('70285 /bin/bash ./watch-pr-comments.sh')
-    expect(stderr).toContain('orca worktree processes --worktree path:/tmp/wt --stop')
+    expect(stderr).toContain(
+      'Stop the orphans with: orca worktree processes --worktree path:/tmp/wt --stop'
+    )
     expect(stderr).toContain('EBUSY')
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('does not list processes when rm is refused for another reason', async () => {
+    callMock.mockRejectedValueOnce(new Error('ticket ORCA-1 has a working game member here'))
+    await main(['worktree', 'rm', '--worktree', 'path:/tmp/wt'], '/tmp')
+    expect(callMock).toHaveBeenCalledTimes(1)
     expect(process.exitCode).toBe(1)
   })
 

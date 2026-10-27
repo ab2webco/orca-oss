@@ -4,6 +4,7 @@ import {
   isSweepableRoot,
   readProcessRows,
   scanCwdProcesses,
+  selectSessionOrphans,
   type CwdProcessScanDeps,
   type ProcessRow
 } from './worktree-cwd-processes'
@@ -35,7 +36,11 @@ function withAncestors(pids: number[], table: ProcessRow[]): Set<number> {
   return result
 }
 
-/** Lists — and with `stop`, terminates — the processes whose cwd is inside a worktree or folder. */
+/**
+ * Lists — and with `stop`, terminates — the processes whose cwd is inside a worktree or folder.
+ * Only orphans are stoppable: a process with a live owner outside the folder (an open Orca
+ * terminal or agent, an editor, Orca itself, the caller) is reported as protected instead.
+ */
 export async function listWorktreeProcesses(
   root: string,
   options: WorktreeProcessesOptions,
@@ -60,12 +65,19 @@ export async function listWorktreeProcesses(
     cwd: row.cwd,
     startedAt: row.startedAt
   }))
-  const uid = process.getuid?.()
+  const selfPid = deps.selfPid ?? process.pid
   const guarded = withAncestors(
-    [deps.selfPid ?? process.pid, ...(options.callerPid ? [options.callerPid] : [])],
+    [selfPid, ...(options.callerPid ? [options.callerPid] : [])],
     scan.table
   )
-  const targets = scan.inside.filter((row) => !guarded.has(row.pid) && row.uid === uid)
+  const uid = process.getuid?.()
+  const targets =
+    uid === undefined
+      ? []
+      : selectSessionOrphans(
+          { ...scan, inside: scan.inside.filter((row) => !guarded.has(row.pid)) },
+          { notBeforeMs: 0, uid, selfPid }
+        ).filter((row) => !guarded.has(row.pid))
   const targetPids = new Set(targets.map((row) => row.pid))
   const protectedPids = processes.filter((p) => !targetPids.has(p.pid)).map((p) => p.pid)
   if (!options.stop) {

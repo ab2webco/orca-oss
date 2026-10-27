@@ -16,7 +16,8 @@ export type WorktreeProcessesResult =
       processes: WorktreeProcessInfo[]
       /** Pids sent SIGTERM; survivors get SIGKILL only if pid + lstart + pgid still match. */
       stopped: number[]
-      /** Pids that --stop never signals: Orca, the caller, their ancestors, other users. */
+      /** Pids --stop never signals: they still have a live owner (an open terminal or agent,
+       *  an editor, Orca, the caller) or belong to another user. */
       protected: number[]
     }
   | { supported: false; root: string; reason: string }

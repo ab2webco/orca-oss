@@ -84,6 +84,16 @@ describe('listWorktreeProcesses', () => {
     expect(deps.sendSignal).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps processes that still have a live owner outside the worktree', async () => {
+    const root = tempRoot()
+    // 30 is an open terminal's host (cwd elsewhere); 20 is its shell and 21 the agent in it.
+    const table = [row(1, 0, { uid: 0 }), row(30, 1), row(20, 30), row(21, 20), row(10, 1)]
+    const deps = fakeDeps(root, table, [20, 21, 10])
+    const result = await listWorktreeProcesses(root, { stop: true }, deps)
+    expect(result.supported && result.stopped).toEqual([10])
+    expect(result.supported && result.protected).toEqual([20, 21])
+  })
+
   it('refuses to stop anything under home or the filesystem root', async () => {
     const root = tempRoot()
     const deps = { ...fakeDeps(root, [row(10, 1)], [10]), home: root }
@@ -104,24 +114,38 @@ describe('listWorktreeProcesses', () => {
     })
   })
 
-  it.skipIf(process.platform === 'win32' || spawnSync('sleep', ['0']).status !== 0)(
-    'stops a real process whose cwd is inside the worktree',
+  it.skipIf(process.platform === 'win32' || spawnSync('/bin/sh', ['-c', 'true']).status !== 0)(
+    'stops a real orphaned poller but keeps a live-owned process in the same worktree',
     async () => {
       const root = tempRoot()
-      const child = spawn('sleep', ['300'], { cwd: root, stdio: 'ignore', detached: true })
-      const pid = child.pid ?? 0
+      // Why: the shell exits at once, so the poller is reparented exactly like a nohup'd job.
+      const orphanPid = Number(
+        spawnSync('/bin/sh', ['-c', 'sleep 300 >/dev/null 2>&1 & echo $!'], {
+          cwd: root,
+          encoding: 'utf8'
+        }).stdout.trim()
+      )
+      const owned = spawn('sleep', ['300'], { cwd: root, stdio: 'ignore' })
+      const ownedPid = owned.pid ?? 0
+      const pid = orphanPid
       try {
+        expect(pid).toBeGreaterThan(0)
         const listed = await listWorktreeProcesses(root, { stop: false })
-        expect(listed.supported && listed.processes.map((p) => p.pid)).toContain(pid)
+        expect(listed.supported && listed.processes.map((p) => p.pid)).toEqual(
+          expect.arrayContaining([pid, ownedPid])
+        )
         const stopped = await listWorktreeProcesses(root, { stop: true })
-        expect(stopped.supported && stopped.stopped).toContain(pid)
+        expect(stopped.supported && stopped.stopped).toEqual([pid])
+        expect(stopped.supported && stopped.protected).toContain(ownedPid)
         const deadline = Date.now() + 10_000
         while (isAlive(pid) && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
         expect(isAlive(pid)).toBe(false)
+        expect(isAlive(ownedPid)).toBe(true)
       } finally {
-        if (isAlive(pid)) {
+        owned.kill('SIGKILL')
+        if (pid > 0 && isAlive(pid)) {
           process.kill(pid, 'SIGKILL')
         }
       }

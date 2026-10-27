@@ -8,7 +8,7 @@ export const WORKTREE_PROCESSES_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca worktree processes --worktree <selector> [--stop] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'stop'],
     notes: [
-      'Runs on the SSH host for a remote worktree. --stop never signals Orca, the calling shell, their ancestors or another user.'
+      'Runs on the SSH host for a remote worktree. --stop terminates only orphaned processes; anything with a live owner (an open terminal or agent, an editor, Orca, this shell) or another user is kept.'
     ]
   }
 ]

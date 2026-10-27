@@ -121,7 +121,7 @@ ORCA worktree processes --worktree id:<repoId>::<worktreePath> --stop --json
 ORCA worktree rm --worktree id:<repoId>::<worktreePath> --force --json
 ```
 
-`worktree processes` lists the processes whose cwd is inside the worktree or folder (pid, ppid, command, cwd), on the SSH host for a remote worktree. Run it when `worktree rm` reports the folder busy; `--stop` terminates them but never Orca itself, the calling shell, their ancestors or another user's processes.
+`worktree processes` lists the processes whose cwd is inside the worktree or folder (pid, ppid, command, cwd), on the SSH host for a remote worktree. Run it when `worktree rm` reports the folder busy; `--stop` terminates only orphans left behind (reparented to init); anything with a live owner — an open terminal or agent, an editor, Orca, the calling shell — or another user's process is listed as kept.
 
 Selectors:
 
