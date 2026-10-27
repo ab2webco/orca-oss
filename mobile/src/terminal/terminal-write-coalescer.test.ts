@@ -197,4 +197,33 @@ describe('terminal write coalescer', () => {
     vi.advanceTimersByTime(TERMINAL_WRITE_FLUSH_WINDOW_MS * 4)
     expect(sink.delivered).toEqual(['a', 'b'])
   })
+
+  it('setPaused(true) drops pending and later writes and arms no timer', () => {
+    vi.useFakeTimers()
+    const sink = createDeliverySink()
+    const coalescer = createTerminalWriteCoalescer(sink.deliver)
+
+    coalescer.write('a')
+    coalescer.write('pending')
+    coalescer.setPaused(true)
+    coalescer.write('while-paused')
+    coalescer.flushNow()
+
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(TERMINAL_WRITE_FLUSH_WINDOW_MS * 4)
+    expect(sink.delivered).toEqual(['a'])
+  })
+
+  it('setPaused(false) takes the leading edge on the next write', () => {
+    vi.useFakeTimers()
+    const sink = createDeliverySink()
+    const coalescer = createTerminalWriteCoalescer(sink.deliver)
+
+    coalescer.write('a')
+    coalescer.setPaused(true)
+    coalescer.setPaused(false)
+    coalescer.write('b')
+
+    expect(sink.delivered).toEqual(['a', 'b'])
+  })
 })
