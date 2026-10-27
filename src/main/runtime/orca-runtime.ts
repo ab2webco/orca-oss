@@ -1328,6 +1328,11 @@ import {
   getSshGitProviderGeneration,
   requireSshGitProvider
 } from '../providers/ssh-git-dispatch'
+import { runWorktreeProcesses } from './worktree-processes'
+import type {
+  WorktreeProcessesOptions,
+  WorktreeProcessesResult
+} from '../../shared/worktree-processes'
 import { detectGitHubAvatarIcon, detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import type {
@@ -23389,6 +23394,17 @@ export class OrcaRuntimeService {
 
   async showManagedWorktree(worktreeSelector: string) {
     return await this.resolveWorktreeSelector(worktreeSelector)
+  }
+
+  async listManagedWorktreeProcesses(
+    worktreeSelector: string,
+    options: WorktreeProcessesOptions
+  ): Promise<WorktreeProcessesResult> {
+    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
+    const connectionId = this.store?.getRepo(worktree.repoId)?.connectionId ?? null
+    return await runWorktreeProcesses({ path: worktree.path, connectionId }, options, {
+      getSshGitProvider
+    })
   }
 
   async showManagedTerminalWorkspace(worktreeSelector: string) {

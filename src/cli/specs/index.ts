@@ -23,9 +23,11 @@ import { ARTIFACT_COMMAND_SPECS } from './artifacts'
 import { DASHBOARD_POPOUT_COMMAND_SPECS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_COMMAND_SPECS } from './orchestrator-game'
 import { ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS } from './orchestrator-game-board'
+import { WORKTREE_PROCESSES_COMMAND_SPECS } from './worktree-processes'
 
 export const COMMAND_SPECS: CommandSpec[] = [
   ...CORE_COMMAND_SPECS,
+  ...WORKTREE_PROCESSES_COMMAND_SPECS,
   ...ARTIFACT_COMMAND_SPECS,
   ...DASHBOARD_POPOUT_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_COMMAND_SPECS,

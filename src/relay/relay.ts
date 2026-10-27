@@ -39,6 +39,7 @@ import { GitHandler } from './git-handler'
 import { PreflightHandler } from './preflight-handler'
 import { ExternalAutomationsHandler } from './external-automations-handler'
 import { PortScanHandler } from './port-scan-handler'
+import { WorktreeProcessHandler } from './worktree-process-handler'
 import { AgentExecHandler } from './agent-exec-handler'
 import { WorkspaceSessionHandler } from './workspace-session-handler'
 import { AiVaultHandler } from './ai-vault-handler'
@@ -721,6 +722,9 @@ async function main(): Promise<void> {
 
   const _portScanHandler = new PortScanHandler(dispatcher)
   void _portScanHandler
+
+  const _worktreeProcessHandler = new WorktreeProcessHandler(dispatcher)
+  void _worktreeProcessHandler
 
   const _agentExecHandler = new AgentExecHandler(dispatcher)
   void _agentExecHandler

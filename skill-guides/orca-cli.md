@@ -116,8 +116,12 @@ ORCA worktree create --name independent-task --no-parent --json
 ORCA worktree set --worktree id:<repoId>::<worktreePath> --display-name "My Task" --json
 ORCA worktree set --worktree active --comment "reproduced bug; testing fix" --json
 ORCA worktree set --worktree active --workspace-status in-review --json
+ORCA worktree processes --worktree active --json
+ORCA worktree processes --worktree id:<repoId>::<worktreePath> --stop --json
 ORCA worktree rm --worktree id:<repoId>::<worktreePath> --force --json
 ```
+
+`worktree processes` lists the processes whose cwd is inside the worktree or folder (pid, ppid, command, cwd), on the SSH host for a remote worktree. Run it when `worktree rm` reports the folder busy; `--stop` terminates them but never Orca itself, the calling shell, their ancestors or another user's processes.
 
 Selectors:
 
