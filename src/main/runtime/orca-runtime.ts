@@ -17022,6 +17022,11 @@ export class OrcaRuntimeService {
       if (listedPaneKeys.has(paneKey)) {
         continue
       }
+      // Why: the collection is scoped to every resolved worktree so it can prune handles;
+      // a scoped list must still only answer for its own worktree (ORCA-811).
+      if (targetWorktreeId && record.worktreeId !== targetWorktreeId) {
+        continue
+      }
       const summary = this.buildSleepingTerminalSummary(record, worktreesById)
       if (summary) {
         listedPaneKeys.add(paneKey)
