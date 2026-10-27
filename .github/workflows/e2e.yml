@@ -258,7 +258,7 @@ jobs:
       - name: Install native build and headless UI tools
         uses: ./.github/actions/install-apt-packages
         with:
-          packages: build-essential fonts-noto-cjk python3 xvfb zsh
+          packages: build-essential fonts-noto-cjk openbox python3 wmctrl xvfb zsh
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -312,7 +312,16 @@ jobs:
               E2E_PROJECT_ARGS+=(--project=electron-ondemand)
             fi
           fi
-          xvfb-run --auto-servernum env "${E2E_ENV[@]}" \
+          WITH_WM=0
+          case " ${E2E_PROJECT_ARGS[*]} " in *electron-headful*) WITH_WM=1 ;; esac
+          # Why openbox: bare Xvfb has no window manager, so minimize() is a no-op and @headful specs never see isMinimized().
+          xvfb-run --auto-servernum bash -c '
+            if [ "$0" = 1 ]; then
+              openbox >/dev/null 2>&1 &
+              timeout 10 bash -c "until wmctrl -m >/dev/null 2>&1; do sleep 0.2; done"
+            fi
+            exec "$@"
+          ' "$WITH_WM" env "${E2E_ENV[@]}" \
             pnpm run test:e2e "${TEST_FILES[@]}" --workers=1 "${E2E_PROJECT_ARGS[@]}"
 
       - name: Upload E2E JSON report

@@ -625,13 +625,23 @@ test('attachment keeps recovery error until document readiness', async ({
   orcaPage,
   registerPostElectronShutdownCleanup
 }) => {
-  const { browserTab, fixtureUrl } = await createBrowserFixture(
+  const { browserTab, fixtureUrl, worktreeId } = await createBrowserFixture(
     orcaPage,
     registerPostElectronShutdownCleanup
   )
   await expect
     .poll(() => readBrowserGuestState(orcaPage, browserTab.id))
     .toMatchObject({ marker: 'painted-file-guest', url: fixtureUrl })
+  // Why: the first dom-ready's registration clears recovery errors when it resolves; the injected one must come after.
+  await expect
+    .poll(
+      async () =>
+        (await listRegisteredBrowserPages(orcaPage, worktreeId)).result?.tabs?.find(
+          (tab) => tab.browserPageId === browserTab.activePageId
+        ),
+      { timeout: 10_000 }
+    )
+    .toMatchObject({ browserPageId: browserTab.activePageId, url: fixtureUrl })
 
   await orcaPage.evaluate(
     ({ workspaceId, browserPageId, validatedUrl, recoveryErrorCode }) => {
