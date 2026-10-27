@@ -3,6 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describeProcessForFailure, processRunState } from './process-run-state-test-harness'
 import type { ProcessRow } from './worktree-cwd-processes'
 import { listWorktreeProcesses } from './worktree-process-control'
 
@@ -11,15 +12,6 @@ const STARTED = 'Tue Oct 27 08:05:00 2026'
 
 function row(pid: number, ppid: number, extra: Partial<ProcessRow> = {}): ProcessRow {
   return { pid, ppid, pgid: pid, uid: UID, startedAt: STARTED, command: `proc-${pid}`, ...extra }
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
 }
 
 describe('listWorktreeProcesses', () => {
@@ -138,14 +130,20 @@ describe('listWorktreeProcesses', () => {
         expect(stopped.supported && stopped.stopped).toEqual([pid])
         expect(stopped.supported && stopped.protected).toContain(ownedPid)
         const deadline = Date.now() + 10_000
-        while (isAlive(pid) && Date.now() < deadline) {
+        // Why: the stopped orphan stays a zombie until init reaps it, which this test cannot bound.
+        while (processRunState(pid) === 'running' && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
-        expect(isAlive(pid)).toBe(false)
-        expect(isAlive(ownedPid)).toBe(true)
+        const orphanState = processRunState(pid)
+        expect(
+          orphanState,
+          orphanState === 'running' ? describeProcessForFailure(pid) : ''
+        ).not.toBe('running')
+        expect(processRunState(ownedPid)).toBe('running')
+        expect(owned.signalCode).toBeNull()
       } finally {
         owned.kill('SIGKILL')
-        if (pid > 0 && isAlive(pid)) {
+        if (pid > 0 && processRunState(pid) === 'running') {
           process.kill(pid, 'SIGKILL')
         }
       }

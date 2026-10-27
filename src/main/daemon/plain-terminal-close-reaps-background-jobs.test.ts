@@ -3,21 +3,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { describeProcessForFailure, processRunState } from '../pty/process-run-state-test-harness'
 import { createPtySubprocess } from './pty-subprocess'
 import { Session } from './session'
 import { TerminalSessionTeardown } from './terminal-session-teardown'
 
 const hasBash = process.platform !== 'win32' && spawnSync('/bin/bash', ['--version']).status === 0
 const POLL_CEILING_MS = 10_000
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
 
 async function pollUntil(predicate: () => boolean, ceilingMs: number): Promise<boolean> {
   const deadline = Date.now() + ceilingMs
@@ -77,11 +69,11 @@ describe.skipIf(!hasBash)('closing a plain daemon terminal (ORCA-678)', () => {
       const pollerPid = Number(readFileSync(pidFile, 'utf8').trim())
       expect(pollerPid).toBeGreaterThan(0)
       cleanups.push(() => {
-        if (isProcessAlive(pollerPid)) {
+        if (processRunState(pollerPid) === 'running') {
           process.kill(pollerPid, 'SIGKILL')
         }
       })
-      expect(isProcessAlive(pollerPid)).toBe(true)
+      expect(processRunState(pollerPid)).toBe('running')
 
       await new TerminalSessionTeardown(new Map([['orca-678-plain', session]])).killSession(
         'orca-678-plain',
@@ -90,7 +82,12 @@ describe.skipIf(!hasBash)('closing a plain daemon terminal (ORCA-678)', () => {
       )
 
       expect(await pollUntil(() => !session.isAlive, POLL_CEILING_MS)).toBe(true)
-      expect(await pollUntil(() => !isProcessAlive(pollerPid), POLL_CEILING_MS)).toBe(true)
+      // Why: the killed poller is reparented to init and stays a zombie until init reaps it.
+      const pollerEnded = await pollUntil(
+        () => processRunState(pollerPid) !== 'running',
+        POLL_CEILING_MS
+      )
+      expect(pollerEnded, pollerEnded ? '' : describeProcessForFailure(pollerPid)).toBe(true)
     },
     30_000
   )

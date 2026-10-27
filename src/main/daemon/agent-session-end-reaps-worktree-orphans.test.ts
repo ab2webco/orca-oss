@@ -3,21 +3,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { describeProcessForFailure, processRunState } from '../pty/process-run-state-test-harness'
 import { createPtySubprocess } from './pty-subprocess'
 import { Session } from './session'
 import { TerminalSessionTeardown } from './terminal-session-teardown'
 
 const hasBash = process.platform !== 'win32' && spawnSync('/bin/bash', ['--version']).status === 0
 const POLL_CEILING_MS = 15_000
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
 
 async function pollUntil(predicate: () => boolean, ceilingMs: number): Promise<boolean> {
   const deadline = Date.now() + ceilingMs
@@ -96,11 +88,11 @@ describe.skipIf(!hasBash)('an agent session that ends (ORCA-678 2/3)', () => {
       const pollerPid = Number(readFileSync(pidFile, 'utf8').trim())
       expect(pollerPid).toBeGreaterThan(0)
       cleanups.push(() => {
-        if (isProcessAlive(pollerPid)) {
+        if (processRunState(pollerPid) === 'running') {
           process.kill(pollerPid, 'SIGKILL')
         }
       })
-      expect(isProcessAlive(pollerPid)).toBe(true)
+      expect(processRunState(pollerPid)).toBe('running')
       // Why: same cwd and start window, but its parent (this test) is alive, so it has an owner.
       const owned = spawn('sleep', ['300'], { cwd: dir, stdio: 'ignore' })
       cleanups.push(() => owned.kill('SIGKILL'))
@@ -110,10 +102,16 @@ describe.skipIf(!hasBash)('an agent session that ends (ORCA-678 2/3)', () => {
       await endSession(session, sessionId)
 
       expect(await pollUntil(() => !session.isAlive, POLL_CEILING_MS)).toBe(true)
-      expect(await pollUntil(() => !isProcessAlive(pollerPid), POLL_CEILING_MS)).toBe(true)
+      // Why: a killed orphan stays a zombie until init reaps it, which this test cannot bound.
+      const pollerEnded = await pollUntil(
+        () => processRunState(pollerPid) !== 'running',
+        POLL_CEILING_MS
+      )
+      expect(pollerEnded, pollerEnded ? '' : describeProcessForFailure(pollerPid)).toBe(true)
       // Past the sweep's SIGKILL grace window, the owned process must still be running.
       await new Promise((resolve) => setTimeout(resolve, 2_500))
-      expect(isProcessAlive(ownedPid)).toBe(true)
+      expect(processRunState(ownedPid)).toBe('running')
+      expect(owned.signalCode).toBeNull()
     },
     45_000
   )
