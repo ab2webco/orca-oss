@@ -61,8 +61,18 @@ export const PANEL_CONTENT_HEIGHT_INITIAL_PX = 320
 export const PANEL_CLOSE_ACTION = 'panel.close'
 export const panelCloseParamsSchema = z.object({}).strict().optional()
 
+/** Bridge-level action: the panel runs one of its own plugin's worker commands,
+ *  as the palette would, so a button can start a stopped worker. Needs no
+ *  capability: the plugin was already approved with that command. */
+export const PANEL_RUN_COMMAND_ACTION = 'panel.runCommand'
+export const panelRunCommandParamsSchema = z.object({ commandId: z.string().min(1) }).strict()
+
 export function isPanelBridgeAction(action: string): boolean {
-  return isPluginPanelAction(action) || action === PANEL_CLOSE_ACTION
+  return (
+    isPluginPanelAction(action) ||
+    action === PANEL_CLOSE_ACTION ||
+    action === PANEL_RUN_COMMAND_ACTION
+  )
 }
 
 export const panelActionRequestSchema = z.object({

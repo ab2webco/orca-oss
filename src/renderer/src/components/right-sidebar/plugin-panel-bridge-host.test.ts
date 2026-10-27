@@ -460,3 +460,36 @@ describe('createPanelBridgeMessageHandler panel.close', () => {
     )
   })
 })
+
+describe('createPanelBridgeMessageHandler panel.runCommand', () => {
+  it("relays a command run to main and posts main's answer back", async () => {
+    const panelWindow = createFakePanelWindow()
+    const { handler, callPanelAction } = createHandler(panelWindow, {
+      ok: true,
+      value: { ran: true }
+    })
+
+    handler(
+      messageEvent(
+        {
+          type: 'orca-panel-action',
+          requestId: 'run-1',
+          action: 'panel.runCommand',
+          params: { commandId: 'sonar.refresh' }
+        },
+        panelWindow
+      )
+    )
+    await flush()
+
+    expect(callPanelAction).toHaveBeenCalledWith({
+      sessionToken: SESSION_TOKEN,
+      action: 'panel.runCommand',
+      params: { commandId: 'sonar.refresh' }
+    })
+    expect(panelWindow.postMessage).toHaveBeenCalledWith(
+      { type: 'orca-panel-action-result', requestId: 'run-1', ok: true, value: { ran: true } },
+      '*'
+    )
+  })
+})
