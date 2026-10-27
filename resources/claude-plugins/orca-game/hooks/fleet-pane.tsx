@@ -31,6 +31,7 @@ import { paneLinksOf, type PaneLink } from './pane-links'
 import { projectKeyOf, type PanelSection } from './panel-layout'
 import { hintLayoutOnce, readFleetLayout } from './panel-layout-store'
 import { sectionChipsOf, sectionMarksOf } from './panel-section-marks'
+import { catalogPickerOf } from './panel-widgets'
 import { levelOf } from './rewards'
 import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './member-advisor'
 import { tapButtonsOf, type TapButton } from './tap-buttons'
@@ -175,6 +176,7 @@ export const registerFleetPane = (on: On): void => {
     const project = projectKeyOf(state.worktree?.id)
     const layout = await readFleetLayout($, project)
     const isShown = (section: PanelSection) => layout.shown.includes(section)
+    const catalog = catalogPickerOf($, e, palette, columns, project, layout)
     const marks = sectionMarksOf($, e, project, layout)
     const { isCollapsed } = marks
     const members = state.agents.map((agent) => ({
@@ -354,6 +356,7 @@ export const registerFleetPane = (on: On): void => {
       <Box flexDirection="column">
         {isFlat ? flatScore !== undefined && flatLine($, e, flatScore, palette) : art.get(HUD_KEY)}
         {isTap && menuRow}
+        {isTap && catalog}
         {sectionChips}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">
           {isTap
@@ -391,6 +394,7 @@ export const registerFleetPane = (on: On): void => {
         {sections}
         {links.length > 0 && linksRow}
         {!isTap && menuRow}
+        {!isTap && catalog}
       </Box>
     )
   })

@@ -30,8 +30,12 @@ export function claudeVersionOk(): boolean {
   }
 }
 
-export async function clickTerminalText(page: Page, text: string): Promise<void> {
-  const point = await page.evaluate((needle) => {
+/** The screen point at the middle of the last drawn `text` in the active terminal, or null. */
+export async function terminalPointOf(
+  page: Page,
+  text: string
+): Promise<{ x: number; y: number } | null> {
+  return page.evaluate((needle) => {
     for (const manager of window.__paneManagers?.values() ?? []) {
       const pane = manager.getActivePane?.()
       if (!pane) {
@@ -76,6 +80,10 @@ export async function clickTerminalText(page: Page, text: string): Promise<void>
     }
     return null
   }, text)
+}
+
+export async function clickTerminalText(page: Page, text: string): Promise<void> {
+  const point = await terminalPointOf(page, text)
   expect(point, `"${text}" is not on the terminal screen`).not.toBeNull()
   await page.mouse.click(point!.x, point!.y)
 }

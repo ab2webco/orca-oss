@@ -261,6 +261,54 @@ describe('panel layout', () => {
     expect(world.writes).toEqual([])
     await ui.unmount()
   })
+
+  test('a widget added from the Panel menu shows at once and is still there after a reopen', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'widgets' })
+    await ui.press({ key: 'catalog-todo' })
+    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(fleetIn(world)).toEqual({
+      order: DEFAULT_ORDER,
+      collapsed: [],
+      shown: ['team', 'reviews', 'todo']
+    })
+    await ui.press({ key: 'widgets' })
+    await ui.unmount()
+    const reopened = await pane($)
+    expect(await headerOf(reopened, 'todo')).toBe('▾ To Do 12')
+    await reopened.unmount()
+  })
+
+  test('the catalog removes a shown widget and moves one up or down', async ($, on) => {
+    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
+    await start($, on, world)
+    const ui = await pane($)
+    await ui.press({ key: 'widgets' })
+    await ui.press({ key: 'catalog-down-team' })
+    await ui.press({ key: 'catalog-todo' })
+    expect(fleetIn(world)).toEqual({
+      order: ['review', 'team', 'reviews', 'todo', 'actions'],
+      collapsed: [],
+      shown: ['team', 'reviews']
+    })
+    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
+    await ui.press({ key: 'widgets' })
+    await ui.unmount()
+  })
+
+  test('on a phone the Widgets chip opens a catalog of touch-sized chips', async ($, on) => {
+    const world = worldOf()
+    await start($, on, world)
+    const ui = await pane($, 40)
+    await ui.press({ key: 'widgets' })
+    const chip = await ui.find({ type: 'Button', key: 'catalog-todo' })
+    expect(shownOf(chip)).toContain('○ To Do')
+    expect(shownOf(chip).split('\n')).toHaveLength(3)
+    await ui.press({ key: 'widgets' })
+    await ui.unmount()
+  })
 })
 
 const layout = async ($: Engine, args = '') =>

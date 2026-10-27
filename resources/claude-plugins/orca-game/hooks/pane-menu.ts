@@ -4,6 +4,7 @@ import { flatToggleLabelsOf, petLabelOf } from './band-chips'
 import { refreshSoon } from './fleet-sync'
 import { toggleFlat } from './flat-toggle'
 import { gameStrings } from './game-strings'
+import { CATALOG_MENU_KEY, catalogMenuLabelsOf, toggleCatalog } from './panel-widgets'
 import { clawdReact } from './quest-runtime'
 import type { SceneDefinition } from './scenes/index'
 import { toggleViewPicker, viewMenuLabelsOf, VIEW_MENU_KEY } from './view-picker'
@@ -46,6 +47,8 @@ export function paneMenuItemsOf(
     },
     // Why no hotkey: every letter and digit is taken; the selector is a press away.
     { key: VIEW_MENU_KEY, labels: viewMenuLabelsOf(), onPress: () => toggleViewPicker($) },
+    // Why no hotkey: every letter and digit is taken; the catalog is a press away.
+    { key: CATALOG_MENU_KEY, labels: catalogMenuLabelsOf(), onPress: () => toggleCatalog($) },
     ...(isFlat ? [] : [pet]),
     { key: 'quit', hotkey: 'q', labels: [`✕ ${text.close}`], onPress: close }
   ]
