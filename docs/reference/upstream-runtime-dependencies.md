@@ -114,3 +114,6 @@ list revokes plugins from upstream's marketplace, which the fork still consumes 
 4. Self-hosting a share endpoint is blocked by the first-party host guard, not merely unimplemented.
 5. The plugin kill list is fetched from upstream on every refresh, in source and packaged builds
    alike. Upstream decides which plugins are revoked; the fork can only exempt its own.
+
+The decisions that gate moving these services in-house (ORCA-329) are in
+[`own-identity-and-services-decisions.md`](./own-identity-and-services-decisions.md).
