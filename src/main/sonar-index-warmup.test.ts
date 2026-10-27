@@ -75,13 +75,28 @@ describe('scheduleSonarIndexWarmup', () => {
     expect(result).toBeUndefined()
     expect(spawn).toHaveBeenCalledWith(
       'node',
-      [cliPath, 'index', '--warmup', '--root', worktreePath],
+      [cliPath, 'index', '--root', worktreePath],
       expect.objectContaining({
         stdio: 'ignore',
         env: expect.objectContaining({ ORCA_USER_DATA_PATH: userDataDir })
       })
     )
     expect(child.unref).toHaveBeenCalled()
+  })
+
+  it('marks the run as a warm-up through the environment, not a flag', () => {
+    installTree()
+    const spawn = vi.fn((): FakeChild => new FakeChild())
+
+    scheduleSonarIndexWarmup({ userDataDir, worktreePath, spawn, debug })
+
+    expect(spawn).toHaveBeenCalledWith(
+      'node',
+      expect.not.arrayContaining(['--warmup']),
+      expect.objectContaining({
+        env: expect.objectContaining({ ORCA_SONAR_WARMUP: '1' })
+      })
+    )
   })
 
   it('kills a run that outlives the timeout', () => {

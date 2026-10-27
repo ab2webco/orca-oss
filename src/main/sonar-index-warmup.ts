@@ -33,8 +33,9 @@ export function scheduleSonarIndexWarmup(options: ScheduleSonarIndexWarmupOption
       return
     }
     const start = options.spawn ?? spawnChild
-    const child = start('node', [lookup.cliPath, 'index', '--warmup', '--root', worktreePath], {
-      env: { ...process.env, ORCA_USER_DATA_PATH: userDataDir },
+    // Why: published orca-sonar v0.1.0 rejects unknown flags, so warm-up is signalled by env.
+    const child = start('node', [lookup.cliPath, 'index', '--root', worktreePath], {
+      env: { ...process.env, ORCA_USER_DATA_PATH: userDataDir, ORCA_SONAR_WARMUP: '1' },
       stdio: 'ignore'
     })
     const timer = setTimeout(() => child.kill(), SONAR_WARMUP_TIMEOUT_MS)
