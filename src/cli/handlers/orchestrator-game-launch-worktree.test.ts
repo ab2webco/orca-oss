@@ -36,10 +36,11 @@ const MAIN = worktree('/repo', 'main', {
   }
 })
 
-function stateWith(agents: unknown[] = []) {
+function stateWith(agents: unknown[] = [], unlistedMembers: unknown[] = []) {
   return {
     config: { mode: 'on' },
     agents,
+    unlistedMembers,
     worktree: { id: LEAD_WORKTREE, path: '/repo', branch: 'main', displayName: 'cineco' },
     project: {
       reviews: null,
@@ -54,10 +55,18 @@ function stateWith(agents: unknown[] = []) {
   }
 }
 
-function fakeClient(worktrees: unknown[], agents: unknown[] = [], effects: unknown[] = []) {
+type Fake = {
+  agents?: unknown[]
+  effects?: unknown[]
+  unlisted?: unknown[]
+  /** Review state per branch, as hostedReview.forBranch reports it. */
+  reviews?: Record<string, string>
+}
+
+function fakeClient(worktrees: unknown[], fake: Fake = {}) {
   const calls: [string, Record<string, unknown>][] = []
   const results: Record<string, unknown> = {
-    'game.state': stateWith(agents),
+    'game.state': stateWith(fake.agents, fake.unlisted),
     'worktree.list': { worktrees, totalCount: worktrees.length, truncated: false },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] },
@@ -68,12 +77,16 @@ function fakeClient(worktrees: unknown[], agents: unknown[] = [], effects: unkno
       taskId: 'task_1',
       dispatchId: 'd1',
       state: 'ready',
-      effects
+      effects: fake.effects ?? []
     }
   }
   const client = {
     call: async (method: string, params: Record<string, unknown>) => {
       calls.push([method, params])
+      if (method === 'hostedReview.forBranch') {
+        const state = fake.reviews?.[String(params.branch)]
+        return { ok: true, result: state ? { provider: 'github', number: 925, state } : null }
+      }
       return { ok: true, result: results[method] }
     }
   } as unknown as RuntimeClient
@@ -103,11 +116,9 @@ describe('game launch: the ticket keeps its worktree', () => {
 
   it('reuses the idle worktree that holds the ticket PR branch instead of a new child', async () => {
     const old = worktree('/ws/cin-12-2', 'fab/cin-12', { linkedPR: 925 })
-    const { client, calls, start } = fakeClient(
-      [MAIN, old],
-      [],
-      [{ kind: 'worktree', action: 'reused', id: old.id }]
-    )
+    const { client, calls, start } = fakeClient([MAIN, old], {
+      effects: [{ kind: 'worktree', action: 'reused', id: old.id }]
+    })
 
     await launch(client)
 
@@ -131,7 +142,7 @@ describe('game launch: the ticket keeps its worktree', () => {
       displayName: 'Arthur · CIN-12 Cartelera',
       worktree: { id: old.id, branch: 'fab/cin-12', displayName: 'cin-12' }
     }
-    const { client, calls } = fakeClient([MAIN, old], [member])
+    const { client, calls } = fakeClient([MAIN, old], { agents: [member] })
 
     await expect(launch(client)).rejects.toThrow(
       'CIN-12 already has a live agent in /ws/cin-12 (Arthur · CIN-12 Cartelera)'
@@ -183,7 +194,7 @@ describe('game launch: the ticket keeps its worktree', () => {
     expect(start()).toEqual(expect.objectContaining({ worktree: 'new-child' }))
   })
 
-  it('prefers the worktree linked to the ticket, then the one holding a PR', async () => {
+  it('prefers the previous member worktree, then one linked to the ticket, then one named after it', async () => {
     const linked = worktree('/ws/feature', 'fab/feature', {
       linkedWorkItem: {
         provider: 'jira',
@@ -194,15 +205,43 @@ describe('game launch: the ticket keeps its worktree', () => {
         jiraIdentifier: 'CIN-12'
       }
     })
-    const named = worktree('/ws/cin-12', 'fab/cin-12', { linkedPR: 1 })
+    const named = worktree('/ws/cin-12', 'fab/cin-12')
     const first = fakeClient([MAIN, named, linked])
     await launch(first.client)
     expect(first.start()).toEqual(expect.objectContaining({ worktree: `id:${linked.id}` }))
 
-    const fresh = worktree('/ws/cin-12-3', 'fab/cin-12-3')
-    const second = fakeClient([MAIN, fresh, named])
+    // Why: a folder workspace has no branch and need not carry the ticket in its name.
+    const folder = worktree('/ws/landing', '', { branch: '' })
+    const second = fakeClient([MAIN, named, linked, folder], {
+      unlisted: [{ ticket: 'CIN-12', name: null, branch: null, worktreeId: folder.id }]
+    })
     await launch(second.client)
-    expect(second.start()).toEqual(expect.objectContaining({ worktree: `id:${named.id}` }))
+    expect(second.start()).toEqual(expect.objectContaining({ worktree: `id:${folder.id}` }))
+  })
+
+  it('breaks a tie by the open PR the host finds for the branch, with no link in meta', async () => {
+    const fresh = worktree('/ws/cin-12-3', 'fab/cin-12-3')
+    const holder = worktree('/ws/cin-12-2', 'fab/cin-12')
+    const { client, calls, start } = fakeClient([MAIN, fresh, holder], {
+      reviews: { 'fab/cin-12': 'open' }
+    })
+
+    await launch(client)
+
+    expect(start()).toEqual(expect.objectContaining({ worktree: `id:${holder.id}` }))
+    expect(calls.filter(([method]) => method === 'hostedReview.forBranch')).toHaveLength(2)
+  })
+
+  it('reads no review when one worktree matches, and a merged PR breaks no tie', async () => {
+    const single = fakeClient([MAIN, worktree('/ws/cin-12', 'fab/cin-12')])
+    await launch(single.client)
+    expect(single.calls.map(([method]) => method)).not.toContain('hostedReview.forBranch')
+
+    const merged = fakeClient(
+      [MAIN, worktree('/ws/cin-12', 'fab/cin-12'), worktree('/ws/cin-12-2', 'fab/cin-12-2')],
+      { reviews: { 'fab/cin-12': 'merged' } }
+    )
+    await expect(launch(merged.client)).rejects.toThrow('CIN-12 matches 2 worktrees')
   })
 
   it('refuses naming both when two worktrees match the ticket equally', async () => {
@@ -215,7 +254,12 @@ describe('game launch: the ticket keeps its worktree', () => {
     await expect(launch(client)).rejects.toThrow(
       'CIN-12 matches 2 worktrees (/ws/cin-12, /ws/cin-12-2)'
     )
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'worktree.list'])
+    expect(calls.map(([method]) => method)).toEqual([
+      'game.state',
+      'worktree.list',
+      'hostedReview.forBranch',
+      'hostedReview.forBranch'
+    ])
   })
 
   it('skips the lead worktree, the main worktree and archived ones', async () => {

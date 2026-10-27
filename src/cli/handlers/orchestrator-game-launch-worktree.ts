@@ -3,6 +3,7 @@ import { RuntimeClientError } from '../runtime-client'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import type { RuntimeWorktreeListResult, RuntimeWorktreeRecord } from '../../shared/runtime-types'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
+import type { HostedReviewInfo } from '../../shared/hosted-review'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -26,20 +27,18 @@ function linkedTicketsOf(worktree: RuntimeWorktreeRecord): string[] {
   ].flatMap((id) => (id ? [id.toUpperCase()] : []))
 }
 
-const hasReview = (worktree: RuntimeWorktreeRecord): boolean =>
-  [
-    worktree.linkedPR,
-    worktree.linkedGitLabMR,
-    worktree.linkedBitbucketPR,
-    worktree.linkedAzureDevOpsPR,
-    worktree.linkedGiteaPR
-  ].some((number) => typeof number === 'number') || worktree.linkedWorkItem?.type === 'pr'
-
-/** 2 linked to the ticket, 1 named after it, 0 not its worktree; a PR breaks ties. */
-function ticketRankOf(worktree: RuntimeWorktreeRecord, ticket: string): number {
+/** 3 the previous member's, 2 linked to the ticket, 1 named after it, 0 not its worktree. */
+function ticketRankOf(
+  worktree: RuntimeWorktreeRecord,
+  ticket: string,
+  previous: ReadonlySet<string>
+): number {
+  if (previous.has(worktree.id)) {
+    return 3
+  }
   const linked = linkedTicketsOf(worktree)
   if (linked.includes(ticket)) {
-    return 4 + (hasReview(worktree) ? 1 : 0)
+    return 2
   }
   // Why: a worktree linked to another ticket is that ticket's, whatever its name says.
   if (linked.length > 0) {
@@ -48,15 +47,35 @@ function ticketRankOf(worktree: RuntimeWorktreeRecord, ticket: string): number {
   // Why the boundaries: CIN-12 must not match cin-123 or xcin-12; Orca's dedupe suffix cin-12-2 does.
   const named = new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(ticket.toLowerCase())}(?![a-z0-9])`)
   const names = [basenameOf(worktree.path), branchNameOf(worktree.branch ?? worktree.git?.branch)]
-  if (!names.some((name) => named.test(name.toLowerCase()))) {
-    return 0
+  return names.some((name) => named.test(name.toLowerCase())) ? 1 : 0
+}
+
+// Why the host's read: a member's `gh pr create` never writes meta.linkedPR, so the branch decides.
+async function holdsOpenReview(client: Client, worktree: RuntimeWorktreeRecord): Promise<boolean> {
+  const branch = branchNameOf(worktree.branch ?? worktree.git?.branch)
+  if (!branch) {
+    return false
   }
-  return 2 + (hasReview(worktree) ? 1 : 0)
+  const review = await client
+    .call<HostedReviewInfo | null>('hostedReview.forBranch', {
+      repo: `id:${worktree.repoId}`,
+      branch,
+      linkedGitHubPR: worktree.linkedPR ?? null,
+      linkedGitLabMR: worktree.linkedGitLabMR ?? null,
+      linkedBitbucketPR: worktree.linkedBitbucketPR ?? null,
+      linkedAzureDevOpsPR: worktree.linkedAzureDevOpsPR ?? null,
+      linkedGiteaPR: worktree.linkedGiteaPR ?? null
+    })
+    .then(
+      (response) => response.result,
+      () => null
+    )
+  return review?.state === 'open' || review?.state === 'draft'
 }
 
 /**
  * The selector of the ticket's existing worktree to relaunch in, or null for a new one.
- * Read-only: lists worktrees and reads game state, never checks out or writes a link.
+ * Read-only: lists worktrees and reviews and reads game state, never checks out or writes a link.
  */
 async function existingTicketWorktreeOf(args: {
   client: Client
@@ -64,22 +83,26 @@ async function existingTicketWorktreeOf(args: {
   ticket: string
   repo: string | null
 }): Promise<string | null> {
-  const { state, ticket } = args
+  const { client, state, ticket } = args
   const lead = state.worktree?.id ?? null
   // Why: new-child branches from the lead's repo, so that is where the ticket's worktree lives.
   const repo = args.repo ?? (lead ? `id:${getRepoIdFromWorktreeId(lead)}` : null)
   if (repo === null) {
     return null
   }
-  const listed = await args.client.call<RuntimeWorktreeListResult>('worktree.list', {
+  const listed = await client.call<RuntimeWorktreeListResult>('worktree.list', {
     repo,
     limit: LIST_LIMIT
   })
+  const previous = new Set(
+    (state.unlistedMembers ?? []).flatMap((one) => (one.ticket === ticket ? [one.worktreeId] : []))
+  )
   const ranked = listed.result.worktrees
     .filter((one) => one.id !== lead && !one.isArchived && !one.git?.isMainWorktree)
-    .map((one) => ({ worktree: one, rank: ticketRankOf(one, ticket) }))
+    .map((one) => ({ worktree: one, rank: ticketRankOf(one, ticket, previous) }))
     .filter((one) => one.rank > 0)
   for (const { worktree } of ranked) {
+    // Why any row: a `done` agent sits at its prompt; an exited one's row is retired.
     const live = state.agents.find((agent) => agent.worktree?.id === worktree.id)
     if (live) {
       throw new RuntimeClientError(
@@ -89,15 +112,20 @@ async function existingTicketWorktreeOf(args: {
     }
   }
   const top = Math.max(0, ...ranked.map((one) => one.rank))
-  const best = ranked.filter((one) => one.rank === top)
-  const [only] = best
+  let best = ranked.filter((one) => one.rank === top).map((one) => one.worktree)
+  if (best.length > 1) {
+    const open = await Promise.all(best.map((one) => holdsOpenReview(client, one)))
+    const withReview = best.filter((_, index) => open[index])
+    best = withReview.length > 0 ? withReview : best
+  }
   if (best.length > 1) {
     throw new RuntimeClientError(
       'invalid_argument',
-      `${ticket} matches ${best.length} worktrees (${best.map((one) => one.worktree.path).join(', ')}); remove or link the stale one before launching again.`
+      `${ticket} matches ${best.length} worktrees (${best.map((one) => one.path).join(', ')}); remove or link the stale one before launching again.`
     )
   }
-  return only ? `id:${only.worktree.id}` : null
+  const [only] = best
+  return only ? `id:${only.id}` : null
 }
 
 /**

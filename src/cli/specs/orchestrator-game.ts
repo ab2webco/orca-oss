@@ -78,7 +78,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
       "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
-      "A relaunch reuses the ticket's idle worktree in that repo (linked to the ticket, or named after it, the one holding a PR first); refused when an agent is live there or two match equally.",
+      "A relaunch reuses the ticket's idle worktree in that repo (its previous member's, else linked to the ticket, else named after it; an open PR breaks a tie); refused when an agent is live there or two still match.",
       '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.',
       ...GAME_LAUNCH_OVERRIDE_NOTES
     ],
