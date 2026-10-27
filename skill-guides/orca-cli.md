@@ -364,6 +364,16 @@ Common recoveries:
 - `browser_stale_ref`: run `orca snapshot --json` and retry with fresh refs.
 - `browser_tab_not_found`: run `orca tab list --json` before switching or closing.
 
+## Sonar Code Lookup
+
+`orca sonar` runs the installed orca-sonar plugin for file and symbol lookup with fewer tokens than grep plus file reads.
+
+- `orca sonar find <text> --json`: matching files with `path`, `line` and the matching `text`.
+- `orca sonar symbol <name> --json`: where a symbol is declared.
+- `orca sonar index --root <worktree>`: build or refresh the index. Queries also refresh changed files.
+
+If it reports `sonar_not_installed`, use plain `rg` and file reads and do not reinstall the plugin yourself. On a remote Orca host it reports `sonar_remote_unavailable`; use plain search there.
+
 ## Next Action
 
 Confirm `orca status --json` unless already checked this turn, then choose the narrowest command for the job: `worktree ps/current/create`, `terminal list/read/wait/send`, `automations list`, `artifacts list/share`, or built-in browser `snapshot`.
