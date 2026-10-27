@@ -154,6 +154,8 @@ export async function scanCwdProcesses(
   }
 }
 
+const LSTART_SKEW_MS = 2_000
+
 export type OrphanSelection = {
   notBeforeMs: number
   uid: number
@@ -186,8 +188,9 @@ export function selectSessionOrphans(
     selfAndAncestors.add(row.pid)
     row = byPid.get(row.ppid)
   }
-  // ps lstart is second-resolution, so compare on the session's start second.
-  const notBefore = Math.floor(selection.notBeforeMs / 1_000) * 1_000
+  // Why: Linux lstart reads up to ~1s early (second-truncated boot time, measured on Linux CI), so
+  // a poller started just after the session can fall before its start second.
+  const notBefore = Math.floor((selection.notBeforeMs - LSTART_SKEW_MS) / 1_000) * 1_000
   const candidates = new Set<number>()
   for (const row of scan.inside) {
     const startedAtMs = Date.parse(row.startedAt)

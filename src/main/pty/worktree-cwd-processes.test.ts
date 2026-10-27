@@ -125,6 +125,19 @@ describe('selectSessionOrphans', () => {
     expect(select(scanOf(table, [10, 11, 900, 12]), 900)).toEqual([])
   })
 
+  it('keeps a poller that ps reports up to a second before its real start (Linux lstart skew)', () => {
+    // Why: Linux lstart is derived from a second-truncated boot time, so a poller that started
+    // 0.3s after the session can read as 07:59:59 while the session started at 08:00:00.300.
+    const sessionStart = Date.parse('Tue Oct 27 08:00:00 2026') + 300
+    const table = [row(1, 0, { uid: 0 }), row(10, 1, { startedAt: 'Tue Oct 27 07:59:59 2026' })]
+    const scan = scanOf(table, [10])
+    expect(
+      selectSessionOrphans(scan, { notBeforeMs: sessionStart, uid: UID, selfPid: 900 }).map(
+        (r) => r.pid
+      )
+    ).toEqual([10])
+  })
+
   it('does not hang on a cyclic-looking table from pid reuse', () => {
     const table = [row(10, 11), row(11, 10)]
     expect(select(scanOf(table, [10, 11]))).toEqual([])
