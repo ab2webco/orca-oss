@@ -19,3 +19,22 @@ export function idleNextOf(review: GameAgent['review']): string {
 /** A remote member whose host does not answer: its home dispatch is what the lead can still read (ORCA-824). */
 export const silentHostNextOf = (host: string, paneKey: string): string =>
   `${host} does not answer: orca orchestration worker-show --dispatch ${paneKey.replace(/^remote:/, '')}`
+
+/** What a remote member asks of the lead before its phase does; null when nothing (ORCA-793). */
+export function remoteNextOf(agent: GameAgent, ticket: string | null): string | null {
+  const remote = agent.remote
+  if (remote?.stateKnown === false) {
+    return silentHostNextOf(remote.host, agent.paneKey)
+  }
+  return remote?.earlierLead && remote.ticketDone
+    ? `left by an earlier lead, ticket done: orca game stop ${ticket ?? agent.paneKey}`
+    : null
+}
+
+/** The linked ticket's status, or `done` once the home Run completed a remote member's task. */
+export const memberTicketStatusOf = (agent: GameAgent): string | null =>
+  agent.workItem
+    ? agent.workItem.status || agent.workItem.statusGroup
+    : agent.remote?.ticketDone
+      ? 'done'
+      : null

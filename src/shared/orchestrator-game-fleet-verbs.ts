@@ -1,4 +1,4 @@
-import { idleNextOf, silentHostNextOf } from './orchestrator-game-member-next'
+import { idleNextOf, memberTicketStatusOf, remoteNextOf } from './orchestrator-game-member-next'
 import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
@@ -42,6 +42,8 @@ export type GameFleetRow = {
   host: string | null
   /** False while a remote member's host does not answer: `state` is then a guess. */
   stateKnown: boolean
+  /** A remote member a lead that no longer leads it launched (ORCA-793). */
+  earlierLead: boolean
 }
 
 const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
@@ -66,8 +68,9 @@ type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
 export function isFinishedMember(agent: GameAgent): boolean {
   const group = agent.workItem?.statusGroup
   return (
-    agent.review?.state === 'merged' &&
-    (group === undefined || group === 'review' || group === 'done')
+    (agent.review?.state === 'merged' &&
+      (group === undefined || group === 'review' || group === 'done')) ||
+    agent.remote?.ticketDone === true
   )
 }
 
@@ -121,16 +124,13 @@ function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
   return {
     name: agent.displayName ?? agent.paneKey,
     ticket: ticketOfMember(agent),
-    ticketStatus: agent.workItem ? agent.workItem.status || agent.workItem.statusGroup : null,
+    ticketStatus: memberTicketStatusOf(agent),
     state: agent.state,
     review: agent.review ? `#${agent.review.number} ${agent.review.state}` : null,
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next:
-      agent.remote?.stateKnown === false
-        ? silentHostNextOf(agent.remote.host, agent.paneKey)
-        : nextWithQuestionOf(agent, phase, question),
+    next: remoteNextOf(agent, ticketOfMember(agent)) ?? nextWithQuestionOf(agent, phase, question),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
@@ -141,7 +141,8 @@ function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
     lastActivityAt: agent.lastActivityAt ?? null,
     orphaned: agent.orphaned === true,
     host: agent.remote?.host ?? null,
-    stateKnown: agent.remote?.stateKnown !== false
+    stateKnown: agent.remote?.stateKnown !== false,
+    earlierLead: agent.remote?.earlierLead === true
   }
 }
 
@@ -263,9 +264,9 @@ export function gameSweepOf(state: FleetInput): GameSweepEntry[] {
       if (agent.worktree) {
         pending.push(`worktree ${agent.worktree.branch} stays`)
       }
-      if (!agent.workItem) {
+      if (!agent.workItem && !agent.remote?.ticketDone) {
         pending.push('no linked ticket to confirm')
-      } else if (agent.workItem.statusGroup !== 'done') {
+      } else if (agent.workItem && agent.workItem.statusGroup !== 'done') {
         pending.push(
           `ticket ${agent.workItem.identifier} is ${agent.workItem.status || agent.workItem.statusGroup}, not done`
         )

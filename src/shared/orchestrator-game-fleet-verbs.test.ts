@@ -264,6 +264,58 @@ describe('gameFleetReportOf', () => {
     ])
   })
 
+  it("flags an earlier lead's remote member whose ticket is done and counts it once as finished (ORCA-793)", () => {
+    const fleet = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          paneKey: 'remote:ctx_829',
+          displayName: 'ORCA-829 versionCode',
+          state: 'done',
+          terminalHandle: 'term_5c58ff4d',
+          remote: {
+            host: 'imac',
+            stateKnown: true,
+            earlierLead: true,
+            ticketDone: true
+          }
+        }),
+        member({
+          paneKey: 'remote:ctx_826',
+          displayName: 'ORCA-826 stall',
+          remote: { host: 'imac', stateKnown: true, earlierLead: true }
+        })
+      ]
+    })
+
+    expect(fleet.rows).toEqual([
+      expect.objectContaining({
+        ticket: 'ORCA-826',
+        phase: 'working',
+        earlierLead: true
+      }),
+      expect.objectContaining({
+        ticket: 'ORCA-829',
+        ticketStatus: 'done',
+        phase: 'finished',
+        earlierLead: true,
+        next: 'left by an earlier lead, ticket done: orca game stop ORCA-829'
+      })
+    ])
+    expect(fleet.running).toBe(1)
+    const [swept] = gameSweepOf({
+      agents: [
+        member({
+          paneKey: 'remote:ctx_829',
+          displayName: 'ORCA-829',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, ticketDone: true }
+        })
+      ]
+    })
+    expect(swept.pending).toEqual([])
+  })
+
   it('names the agent and the managed account each member runs on', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

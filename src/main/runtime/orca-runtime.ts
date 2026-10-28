@@ -191,6 +191,7 @@ import {
 import { syncFederatedDispatch } from './orchestration/federation-sync'
 import { formatMessagePointer } from './orchestration/formatter'
 import {
+  listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   remoteGameMembersOf,
   type RemoteGameMemberShow
@@ -31417,7 +31418,15 @@ export class OrcaRuntimeService {
     if (state.role !== 'lead' || !run || !this._orchestrationDb) {
       return state
     }
-    const sources = listRemoteGameMemberSources(this._orchestrationDb, run.id)
+    const sources = [
+      ...listRemoteGameMemberSources(this._orchestrationDb, run.id),
+      // Why: a new lead opens a new Run, so its predecessor's members are only found here.
+      ...listEarlierLeadRemoteMemberSources(
+        this._orchestrationDb,
+        run.id,
+        (handle) => this.getTerminalPaneKey(handle) !== null
+      )
+    ]
     if (sources.length === 0) {
       return state
     }

@@ -220,6 +220,11 @@ takes the host records, each host's running count from the home DB, each host's 
 requested role. It returns the chosen host or a named refusal.
 
 **Fleet and state.** The cross-host fleet is read from the home DB. Per-host process scans are not used.
+Built in ORCA-793: a new lead opens a new Run, so the fleet also lists unreleased remote members of a
+Run whose lead is gone, and of the current Run from before this lead claimed it, as long as their
+host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
+task is completed carries `remote.ticketDone`, counts as finished, and its next step is `game stop`.
+Another live lead's members are never listed. Both fields are optional on the wire.
 
 **Wire.** Capability `orchestration.federation-game-member.v1` (name proposed). `game` and
 `setupAdmission` are forwarded only after the remote confirms it.

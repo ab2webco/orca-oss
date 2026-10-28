@@ -73,7 +73,14 @@ export type GameAgent = {
   remote?: GameRemoteHost
 }
 
-export type GameRemoteHost = { host: string; stateKnown: boolean }
+export type GameRemoteHost = {
+  host: string
+  stateKnown: boolean
+  /** Launched by a lead that no longer leads it; read from the home Run DB (ORCA-793). */
+  earlierLead?: true
+  /** The home Run completed the member's task. */
+  ticketDone?: true
+}
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 

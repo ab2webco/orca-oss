@@ -1,12 +1,34 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { OrchestrationDb } from './orchestration/db'
 import {
+  listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   remoteGameMembersOf,
   type RemoteGameMemberSource
 } from './orchestrator-game-remote-members'
 
 const LEAD_PANE = 'tab_lead:11111111-1111-4111-8111-111111111111'
+
+function startRemote(d: OrchestrationDb, runId: string, title: string): string {
+  const task = d.createTask({ spec: title, taskTitle: title, runId })
+  const started = d.createStartingWorkerDispatch({
+    taskId: task.id,
+    startOptions: { on: 'env_imac', serverName: 'imac' },
+    federation: {
+      environmentId: 'env_imac',
+      environmentName: 'imac',
+      peerFingerprint: 'fp_imac',
+      protocolVersion: 1
+    }
+  })
+  d.updateFederatedDispatchResources({
+    dispatchId: started.dispatch.id,
+    remoteRuntimeEpoch: 'epoch_imac',
+    worktreeId: `repo::/home/me/${title.toLowerCase()}`,
+    terminalHandle: `term_${title}`
+  })
+  return started.dispatch.id
+}
 
 describe('remote members of a lead (ORCA-824)', () => {
   let db: OrchestrationDb | undefined
@@ -15,27 +37,6 @@ describe('remote members of a lead (ORCA-824)', () => {
     db?.close()
     db = undefined
   })
-
-  function startRemote(d: OrchestrationDb, runId: string, title: string): string {
-    const task = d.createTask({ spec: title, taskTitle: title, runId })
-    const started = d.createStartingWorkerDispatch({
-      taskId: task.id,
-      startOptions: { on: 'env_imac', serverName: 'imac' },
-      federation: {
-        environmentId: 'env_imac',
-        environmentName: 'imac',
-        peerFingerprint: 'fp_imac',
-        protocolVersion: 1
-      }
-    })
-    d.updateFederatedDispatchResources({
-      dispatchId: started.dispatch.id,
-      remoteRuntimeEpoch: 'epoch_imac',
-      worktreeId: 'repo::/home/me/orca-805',
-      terminalHandle: `term_${title}`
-    })
-    return started.dispatch.id
-  }
 
   it("lists the live members the lead's Run placed on a remote host", () => {
     db = new OrchestrationDb(':memory:')
@@ -105,7 +106,9 @@ describe('remote members of a lead (ORCA-824)', () => {
     remoteWorktreeId: 'repo::/home/me/orca-805',
     stage: 'agent_started',
     lastActivityAt: '2026-10-27T14:00:00.000Z',
-    finished: false
+    finished: false,
+    ticketDone: false,
+    earlierLead: false
   }
 
   it('reads state, branch and PR from the host and the review provider', async () => {
@@ -155,5 +158,205 @@ describe('remote members of a lead (ORCA-824)', () => {
       remote: { host: 'imac', stateKnown: false }
     })
     expect(member.review).toBeUndefined()
+  })
+
+  it('flags a member whose ticket the home Run completed', () => {
+    db = new OrchestrationDb(':memory:')
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    const done = startRemote(db, run.id, 'ORCA-829')
+    settle(db, done, '2999-01-01 00:00:00')
+
+    expect(listRemoteGameMemberSources(db, run.id)).toEqual([
+      expect.objectContaining({
+        dispatchId: done,
+        finished: true,
+        ticketDone: true
+      })
+    ])
+  })
+
+  it('a home with no federated dispatches has no remote sources', () => {
+    db = new OrchestrationDb(':memory:')
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+
+    expect(listRemoteGameMemberSources(db, run.id)).toEqual([])
+    expect(listEarlierLeadRemoteMemberSources(db, run.id, () => false)).toEqual([])
+  })
+})
+
+function sqliteOf(d: OrchestrationDb): {
+  prepare: (sql: string) => { run: () => void }
+} {
+  return (d as unknown as { db: { prepare: (sql: string) => { run: () => void } } }).db
+}
+
+function settle(d: OrchestrationDb, dispatchId: string, completedAt: string): void {
+  const sqlite = sqliteOf(d)
+  sqlite
+    .prepare(
+      `UPDATE dispatch_contexts SET status = 'completed', completed_at = '${completedAt}'
+       WHERE id = '${dispatchId}'`
+    )
+    .run()
+  sqlite
+    .prepare(`UPDATE worker_dispatches SET state = 'succeeded' WHERE dispatch_id = '${dispatchId}'`)
+    .run()
+  sqlite
+    .prepare(
+      `UPDATE tasks SET status = 'completed'
+       WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = '${dispatchId}')`
+    )
+    .run()
+}
+
+describe('remote members an earlier lead launched (ORCA-793)', () => {
+  let db: OrchestrationDb | undefined
+
+  afterEach(() => {
+    db?.close()
+    db = undefined
+  })
+
+  function leads(d: OrchestrationDb): {
+    current: string
+    earlier: string
+    liveOther: string
+  } {
+    const earlier = d.createRun({
+      objective: 'earlier lead',
+      coordinatorHandle: 'term_gone',
+      coordinatorPaneKey: 'tab_gone:33333333-3333-4333-8333-333333333333'
+    })
+    const liveOther = d.createRun({
+      objective: 'other live lead',
+      coordinatorHandle: 'term_other',
+      coordinatorPaneKey: 'tab_other:22222222-2222-4222-9222-222222222222'
+    })
+    const current = d.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    return {
+      current: current.id,
+      earlier: earlier.id,
+      liveOther: liveOther.id
+    }
+  }
+
+  const liveLeads = new Set(['term_lead', 'term_other'])
+  const leadIsLive = (handle: string): boolean => liveLeads.has(handle)
+
+  it("lists an unreleased member of a Run whose lead is gone, with its ticket's outcome", () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    const orphan = startRemote(db, runs.earlier, 'ORCA-829')
+    settle(db, orphan, '2026-10-20 10:00:00')
+    const stillWorking = startRemote(db, runs.earlier, 'ORCA-826')
+
+    const sources = listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive)
+
+    expect(sources).toEqual([
+      expect.objectContaining({
+        dispatchId: orphan,
+        taskTitle: 'ORCA-829',
+        hostName: 'imac',
+        remoteTerminalHandle: 'term_ORCA-829',
+        finished: true,
+        ticketDone: true,
+        earlierLead: true
+      }),
+      expect.objectContaining({
+        dispatchId: stillWorking,
+        finished: false,
+        ticketDone: false,
+        earlierLead: true
+      })
+    ])
+  })
+
+  it("lists the current Run's members from before this lead claimed it, not the ones it already shows", () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    const before = startRemote(db, runs.current, 'ORCA-700')
+    settle(db, before, '2000-01-01 00:00:00')
+    startRemote(db, runs.current, 'ORCA-805')
+
+    expect(
+      listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive).map((one) => one.dispatchId)
+    ).toEqual([before])
+  })
+
+  it("leaves out another live lead's members and members already released or stopped", () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    startRemote(db, runs.liveOther, 'ORCA-900')
+    const released = startRemote(db, runs.earlier, 'ORCA-701')
+    settle(db, released, '2026-10-20 10:00:00')
+    db.markFederatedWorkerReleased(released)
+    const stopped = startRemote(db, runs.earlier, 'ORCA-702')
+    sqliteOf(db)
+      .prepare(`UPDATE worker_dispatches SET state = 'stopped' WHERE dispatch_id = '${stopped}'`)
+      .run()
+
+    expect(listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive)).toEqual([])
+  })
+
+  const earlier: RemoteGameMemberSource = {
+    dispatchId: 'ctx_829',
+    taskTitle: 'ORCA-829 versionCode check',
+    hostName: 'imac',
+    environmentId: 'env_imac',
+    remoteTerminalHandle: 'term_5c58ff4d',
+    remoteWorktreeId: 'repo::/home/me/orca-829',
+    stage: 'agent_started',
+    lastActivityAt: null,
+    finished: true,
+    ticketDone: true,
+    earlierLead: true
+  }
+
+  it("shows an earlier lead's member only while its host still runs its terminal", async () => {
+    const reads = (liveness: 'running' | 'gone' | null) => ({
+      showOf: async () =>
+        liveness ? { branch: 'fabolivark/orca-829', title: '✳ Claude Code', liveness } : null,
+      reviewOf: async () => null
+    })
+
+    expect(await remoteGameMembersOf([earlier], reads('gone'))).toEqual([])
+    expect(await remoteGameMembersOf([earlier], reads(null))).toEqual([])
+    expect(await remoteGameMembersOf([earlier], reads('running'))).toEqual([
+      expect.objectContaining({
+        paneKey: 'remote:ctx_829',
+        state: 'done',
+        terminalHandle: 'term_5c58ff4d',
+        remote: {
+          host: 'imac',
+          stateKnown: true,
+          earlierLead: true,
+          ticketDone: true
+        }
+      })
+    ])
+  })
+
+  it("keeps the current lead's remote host shape unchanged", async () => {
+    const [member] = await remoteGameMembersOf(
+      [{ ...earlier, earlierLead: false, ticketDone: false, finished: false }],
+      {
+        showOf: async () => null,
+        reviewOf: async () => null
+      }
+    )
+
+    expect(member.remote).toEqual({ host: 'imac', stateKnown: false })
   })
 })
