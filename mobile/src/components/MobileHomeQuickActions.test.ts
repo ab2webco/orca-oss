@@ -4,11 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HostProfile } from '../transport/types'
 import { MobileHomeQuickActions } from './MobileHomeQuickActions'
 
+const windowDimensions = vi.hoisted(() => ({ width: 390, fontScale: 1 }))
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   StyleSheet: { create: (styles: unknown) => styles },
   Text: 'Text',
-  View: 'View'
+  View: 'View',
+  useWindowDimensions: () => windowDimensions
 }))
 
 vi.mock('lucide-react-native', () => ({
@@ -40,6 +43,8 @@ describe('MobileHomeQuickActions', () => {
   afterEach(() => {
     act(() => renderer?.unmount())
     renderer = null
+    windowDimensions.width = 390
+    windowDimensions.fontScale = 1
     vi.restoreAllMocks()
   })
 
@@ -86,6 +91,22 @@ describe('MobileHomeQuickActions', () => {
       )
       expect(text.props.style).toMatchObject({ flexShrink: 1 })
     }
+  })
+
+  // Why: at 320 dp and the capped text size, "Workspace" split into "New Wor / kspace".
+  it('stacks the actions one per row when the capped text cannot fit them side by side', async () => {
+    const rowDirection = () =>
+      Object.assign({}, ...[newWorkspaceButton().parent!.props.style].flat().filter(Boolean))
+        .flexDirection
+
+    await renderQuickActions([])
+    expect(rowDirection()).toBe('row')
+
+    act(() => renderer?.unmount())
+    windowDimensions.width = 320
+    windowDimensions.fontScale = 2
+    await renderQuickActions([])
+    expect(rowDirection()).toBe('column')
   })
 
   it('disables workspace creation without a connected host', async () => {
