@@ -4,6 +4,7 @@ import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
+import { cardLayoutOf } from '../hooks/fleet-tiles'
 import type { GameState } from '../types'
 
 const ORCA_CLI = '/opt/orca/bin/orca'
@@ -245,7 +246,7 @@ describe('fleet pane links', () => {
       expect(links.map((one) => one.props?.href)).toEqual([tambora.url])
       const text = shownOf(links[0])
       expect(text.startsWith('▶ Tambora')).toBe(true)
-      expect(cellWidthOf(text)).toBeLessThanOrEqual(columns - 25)
+      expect(cellWidthOf(text)).toBeLessThanOrEqual(cardLayoutOf(columns).room)
       expect(linksIn(await ui.find({ type: 'Box', key: 'card-tab-1:tester' }))).toEqual([])
       await ui.unmount()
     }
