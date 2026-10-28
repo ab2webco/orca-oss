@@ -30,7 +30,8 @@ export function processRunState(pid: number): ProcessRunState {
     }
   }
   const status = readProcessStatus(pid)
-  if (status === null) {
+  // Why: a zombie being reaped shows X for an instant before it vanishes; it is not alive.
+  if (status === null || status.startsWith('X')) {
     return 'gone'
   }
   return status.startsWith('Z') ? 'zombie' : 'running'
