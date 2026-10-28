@@ -1387,21 +1387,28 @@ out of the backdrop, since anything on the ground line reads as something to jum
   first press, none once the pane is hidden or loses the keyboard (it pauses), none after a crash.
 - At 160 columns a frame costs about 1 ms, so a run in play takes under 2% of a core.
 
-`/orca-game:demo arcade` (or `/quest demo arcade`) opens a practice run in a pane of its own. It is
-the only way to open the runner until a perfect merge offers a play: it earns no points or XP, writes
-nothing to Orca or the store, adds no setting, and closing the pane drops the run.
+`/orca-game:demo arcade` (or `/quest demo arcade`) opens a practice run in a pane of its own: it
+earns no points or XP, writes nothing to Orca or the store, adds no setting, and closing the pane
+drops the run.
 
-`/orca-game:demo offer` (or `/quest demo offer`) plays the offer a perfect merge will make
+A lead pane (`role` not `member`, rewards on) offers one run when a member's review turns
+`perfectMerge: true` between two polls
+([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The offer
+is keyed by the perfect-merge reward's id and kept under `arcade-offers` in `$.store`, so a merge
+seen again after a replay or a reload never offers twice. `/orca-game:demo offer` (or
+`/quest demo offer`) plays the same offer
 ([`arcade-offer.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), keeping
-nothing either:
+nothing:
 
 - The scene celebrates (the merge float and the level-up stars, drawn in the band while idle) and
-  the arcade pane opens without taking the keyboard, so the prompt keeps what the user is typing.
-- A line under the frame counts down 15 seconds. `j` (or a click on Play) takes the keyboard and
-  starts the run; `n`, Esc or the end of the countdown closes the pane and drops the offer.
+  the arcade pane opens asking for the keyboard, so `j` and `n` reach the pane and never the
+  prompt. Claude Code grants that only over an empty composer with no dialog or survey up, so text
+  the user is typing stays theirs; then the line names `ctrl+x tab, then j`, which is true there.
+- A line under the frame counts down 15 seconds. `j` (or a click on Play) starts the run; `n`, Esc
+  or the end of the countdown closes the pane and drops the offer.
 - While a teammate waits on the user (the band's "Needs you"), or a member's own question waits on
-  its lead, the countdown stands still and a run in play holds with no frames; both go on by
-  themselves once it is answered.
+  its lead, the countdown stands still, a run in play holds with no frames, and an offer opened then
+  leaves the keyboard to the prompt for the answer; both go on by themselves once it is answered.
 - Points a real offer's run earns stay apart from member XP; a demo offer writes none.
 
 ## Other plugins in a game pane

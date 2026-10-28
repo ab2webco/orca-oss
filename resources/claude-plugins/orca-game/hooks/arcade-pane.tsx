@@ -114,7 +114,8 @@ async function blitArcade($: EngineInterface, own: Arcade): Promise<void> {
 
 /**
  * Opens the arcade pane on a fresh run of the built-in runner in the active scene. An offer
- * celebrates first and leaves the keyboard to the prompt until the user picks play.
+ * celebrates first and asks for the keyboard, so its j and n never reach the prompt; the host
+ * grants it only over an empty composer, and the offer leaves it there while someone needs the user.
  */
 export async function openArcade($: EngineInterface, isOffer = false): Promise<void> {
   closeArcade()
@@ -166,7 +167,7 @@ export async function openArcade($: EngineInterface, isOffer = false): Promise<v
     clawdReact($, 'level')
   }
   const words = arcadeWords()
-  await openPane($, isOffer ? words.offerTitle : words.title, !isOffer)
+  await openPane($, isOffer ? words.offerTitle : words.title, !isOffer || !isHeld())
 }
 
 function playOffer($: EngineInterface, own: Arcade): void {
@@ -208,7 +209,7 @@ export const registerArcade = (on: On): void => {
         <Box flexDirection="column">
           {raster}
           <Text key={OFFER_LINE} bold color={offer.isHeld ? 'yellow' : 'green'}>
-            {arcadeOfferLineOf(offer.left, offer.isHeld)}
+            {arcadeOfferLineOf(offer.left, offer.isHeld, e.props.isFocused)}
           </Text>
           <Button
             key={PLAY_BUTTON}
