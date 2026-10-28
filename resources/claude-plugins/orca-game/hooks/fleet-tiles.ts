@@ -12,6 +12,19 @@ import type { Costume, SceneDefinition, ScenePhase } from './scenes/index'
 
 export const TILE_COLUMNS = 22
 export const TILE_ROWS = 4
+// A card's round border and the text column's padding on each side.
+const CARD_FRAME = 4
+// Why 20: below it the head row cuts the ticket (`LU… idle`), so the tile goes first (ORCA-827).
+const CARD_TEXT_MIN = 20
+
+/** A card's text room, and whether the tile still fits beside it at `columns`. */
+export const cardLayoutOf = (columns: number): { withTile: boolean; room: number } => {
+  const withTile = columns - TILE_COLUMNS - CARD_FRAME >= CARD_TEXT_MIN
+  return {
+    withTile,
+    room: Math.max(1, columns - CARD_FRAME - (withTile ? TILE_COLUMNS : 0))
+  }
+}
 
 const TILE_PIXELS = TILE_ROWS * 2
 const TILE_FLOOR = TILE_PIXELS - 1

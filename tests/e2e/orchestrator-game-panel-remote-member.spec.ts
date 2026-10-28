@@ -64,6 +64,7 @@ const screenText = async (page: Page) => (await screenRows(page)).join('\n')
 const SILENT_HOST = 'imac not answering'
 // Why either: a phone-width card shortens the tag to `imac ?` rather than ellipsize it.
 const SILENT_HOST_ANY = /imac (not answering|\?)/
+const TICKETS = ['LUM-12', 'LUM-14', 'LUM-15'] as const
 
 /** Wheels a short docked Panel down until the silent host's card is on screen. */
 async function scrollPanelTo(page: Page, text: RegExp): Promise<void> {
@@ -119,14 +120,20 @@ test('the Panel names the paired host of a remote member, and says when it does 
           path: testInfo.outputPath(`${shot}.png`),
           animations: 'disabled'
         })
-        if (!SILENT_HOST_ANY.test(await screenText(orcaPage))) {
+        let seen = await screenText(orcaPage)
+        if (!SILENT_HOST_ANY.test(seen)) {
           await scrollPanelTo(orcaPage, SILENT_HOST_ANY)
+          seen += `\n${await screenText(orcaPage)}`
           await orcaPage.waitForTimeout(HOLD_MS)
           await orcaPage.screenshot({
             path: testInfo.outputPath(`${shot}-scrolled.png`),
             animations: 'disabled'
           })
           await orcaPage.mouse.wheel(0, -3_600)
+        }
+        // ORCA-827: a phone-width card cut the ticket to `LU…` behind its sprite.
+        for (const ticket of TICKETS) {
+          expect(seen, `${shot} drops ${ticket}`).toMatch(new RegExp(`\\b${ticket}\\b`))
         }
       }
     }
