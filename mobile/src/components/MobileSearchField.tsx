@@ -4,10 +4,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
   View,
   type TextInputProps
 } from 'react-native'
+import { TextInput } from '../theme/dynamic-type-text'
 import { Search, X } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 

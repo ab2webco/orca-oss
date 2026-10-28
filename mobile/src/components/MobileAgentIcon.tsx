@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { ImageSourcePropType } from 'react-native'
 import { Terminal } from 'lucide-react-native'
 import type { TuiAgent } from '../../../src/shared/tui-agent'

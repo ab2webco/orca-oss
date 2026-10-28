@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from 'react'
 import {
   View,
-  Text,
   StyleSheet,
   Pressable,
   ActivityIndicator,
   Linking,
   type LayoutChangeEvent
 } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter } from 'expo-router'

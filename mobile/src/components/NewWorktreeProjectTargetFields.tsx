@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native'
+import { View, Pressable, StyleSheet, Platform } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronDown, Monitor } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 

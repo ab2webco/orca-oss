@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AccessibilityInfo,
-  Animated,
-  BackHandler,
-  Text,
-  useWindowDimensions,
-  View
-} from 'react-native'
+import { AccessibilityInfo, Animated, BackHandler, useWindowDimensions, View } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { OrcaLogo } from '../src/components/OrcaLogo'

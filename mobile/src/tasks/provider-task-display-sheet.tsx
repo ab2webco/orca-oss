@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { BottomDrawer } from '../components/BottomDrawer'
 import type { PickerOption } from '../components/PickerModal'
 import { colors, spacing, typography } from '../theme/mobile-theme'

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, type TextStyle } from 'react-native'
+import { StyleSheet, type TextStyle } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { MobileSyntaxSegment, MobileSyntaxTokenKind } from '../session/mobile-file-syntax'
 import { colors } from '../theme/mobile-theme'
 

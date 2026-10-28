@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 
 // Pure types and selectors live in account-usage-state.ts (no RN imports) so

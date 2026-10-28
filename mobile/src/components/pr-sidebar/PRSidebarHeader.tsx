@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text, TextInput } from '../../theme/dynamic-type-text'
 import { ArrowRight, ExternalLink, Pencil } from 'lucide-react-native'
 import { colors } from '../../theme/mobile-theme'
 import type { PRInfo } from '../../../../src/shared/github/pull-request-types'

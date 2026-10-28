@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import {
   selectHostWorkspaceListState,

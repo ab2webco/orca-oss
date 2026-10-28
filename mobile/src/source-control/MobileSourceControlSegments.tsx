@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import {
   SOURCE_CONTROL_HUB_TABS,
   SOURCE_CONTROL_HUB_TAB_LABELS,

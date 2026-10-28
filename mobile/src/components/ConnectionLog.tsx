@@ -1,5 +1,6 @@
 import { useRef } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { ConnectionLogEntry } from '../transport/types'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 

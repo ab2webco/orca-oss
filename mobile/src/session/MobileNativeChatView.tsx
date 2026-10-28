@@ -5,9 +5,9 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
-  Text,
   View
 } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ArrowDown, ChevronsDownUp, ChevronsUpDown, Square } from 'lucide-react-native'

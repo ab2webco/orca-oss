@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, typography } from '../theme/mobile-theme'
 
 type DictationStatus = {

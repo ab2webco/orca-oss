@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { TextInput, type TextInputProps } from 'react-native'
+import type { TextInputProps } from 'react-native'
+import { TextInput } from '../theme/dynamic-type-text'
 
 const MOBILE_WORKSPACE_NAME_FOCUS_DELAY_MS = 220
 

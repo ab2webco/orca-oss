@@ -1,7 +1,8 @@
 // The pill and choice-row primitives the session-option card is built from, kept
 // beside it so the card file stays about layout and apply wiring.
 
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { Check, ChevronDown, ChevronRight } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type {

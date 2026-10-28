@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, RefreshControl, SectionList, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { Play } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'

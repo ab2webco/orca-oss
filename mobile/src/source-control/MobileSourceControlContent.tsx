@@ -1,12 +1,5 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  SectionList,
-  Text,
-  TextInput,
-  View
-} from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, SectionList, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { Minus, MoreHorizontal, Plus, Sparkles } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import { MobileSourceControlCreatePrEntry } from './MobileSourceControlCreatePrEntry'

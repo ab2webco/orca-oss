@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { View, Text, StyleSheet, Pressable, FlatList, Alert } from 'react-native'
+import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { QrCode, Settings, ChevronRight, Terminal, ListTodo } from 'lucide-react-native'

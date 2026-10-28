@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text, TextInput } from '../../theme/dynamic-type-text'
 import { Check } from 'lucide-react-native'
 import { colors } from '../../theme/mobile-theme'
 import type { GitHubAssignableUser } from '../../../../src/shared/github/pull-request-types'

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { Pressable, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { PickerModal } from '../components/PickerModal'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import {

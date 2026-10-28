@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { View, Text, StyleSheet, SectionList, Pressable, Alert, RefreshControl } from 'react-native'
+import { View, StyleSheet, SectionList, Pressable, Alert, RefreshControl } from 'react-native'
+import { Text } from '../../../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router'
 import {
@@ -1491,6 +1492,8 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
@@ -1596,10 +1599,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize
   },
   errorText: {
     color: colors.statusRed,

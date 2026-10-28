@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { View, StyleSheet } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { SquareTerminal } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text, TextInput } from '../../theme/dynamic-type-text'
 import { colors } from '../../theme/mobile-theme'
 import { isSubmittableCommentBody } from '../../session/pr-comment-actions'
 import { prCommentComposerStyles as styles } from './pr-comment-composer-styles'
