@@ -153,6 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgRaised
   },
   quickActionLabel: {
+    flexShrink: 1,
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600'

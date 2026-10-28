@@ -77,6 +77,17 @@ describe('MobileHomeQuickActions', () => {
     return renderer!.root.findByType('PickerModal')
   }
 
+  it('wraps a label inside its button instead of overflowing it at large text sizes', async () => {
+    await renderQuickActions([])
+
+    for (const label of ['Pair Desktop', 'New Workspace']) {
+      const text = renderer!.root.find(
+        (node) => node.type === 'Text' && node.props.children === label
+      )
+      expect(text.props.style).toMatchObject({ flexShrink: 1 })
+    }
+  })
+
   it('disables workspace creation without a connected host', async () => {
     await renderQuickActions([])
 

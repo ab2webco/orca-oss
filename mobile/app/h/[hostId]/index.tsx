@@ -1492,6 +1492,8 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
