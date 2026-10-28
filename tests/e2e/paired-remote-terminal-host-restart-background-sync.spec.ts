@@ -336,19 +336,41 @@ async function expectTerminalInteractive(
 }
 
 async function moveHostAwayFromWorktree(page: Page, targetWorktreeId: string): Promise<string> {
-  const alternateWorktreeId = await page.evaluate((targetId) => {
-    const state = window.__store?.getState()
-    const alternate = state?.allWorktrees().find((worktree) => worktree.id !== targetId)
-    if (!state || !alternate) {
-      return null
-    }
-    state.setActiveView('editor')
-    state.setActiveWorktree(alternate.id)
-    return alternate.id
-  }, targetWorktreeId)
+  const missing = 'Host fixture needs a second worktree for inactive-workspace restart coverage'
+  let alternateWorktreeId: string | null = null
+  // Why: the seeded secondary is external and surfaces only after the visibility refetch, which trails under load.
+  await expect
+    .poll(
+      async () => {
+        alternateWorktreeId = await page.evaluate(async (targetId) => {
+          const store = window.__store
+          const target = store
+            ?.getState()
+            .allWorktrees()
+            .find((worktree) => worktree.id === targetId)
+          if (!store || !target) {
+            return null
+          }
+          await store.getState().fetchWorktrees(target.repoId)
+          const alternate = store
+            .getState()
+            .allWorktrees()
+            .find((worktree) => worktree.id !== targetId)
+          return alternate?.id ?? null
+        }, targetWorktreeId)
+        return alternateWorktreeId
+      },
+      { timeout: 30_000, message: missing }
+    )
+    .not.toBeNull()
   if (!alternateWorktreeId) {
-    throw new Error('Host fixture needs a second worktree for inactive-workspace restart coverage')
+    throw new Error(missing)
   }
+  await page.evaluate((alternateId) => {
+    const state = window.__store?.getState()
+    state?.setActiveView('editor')
+    state?.setActiveWorktree(alternateId)
+  }, alternateWorktreeId)
   await expect
     .poll(() => page.evaluate(() => window.__store?.getState().activeWorktreeId ?? null))
     .toBe(alternateWorktreeId)
