@@ -108,6 +108,34 @@ export function gameLaunchChoiceOf(
   }
 }
 
+/** `--on <host>`: the paired host a member runs on, in its own worktree of that host's `repo`. */
+export type GameRemotePlacement = { on: string; repo: string }
+
+export function remotePlacementOf(
+  flags: Map<string, string | boolean>,
+  repo: string | null,
+  typed: GameLaunchFlags
+): GameRemotePlacement | null {
+  const on = flagText(flags, 'on')
+  if (on === undefined) {
+    return null
+  }
+  // Why: a remote new-top-level needs the host's own repo selector, and no host repo map exists yet.
+  if (repo === null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--on ${on} needs --repo <selector of the repo on ${on}>.`
+    )
+  }
+  if (typed.account !== undefined) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--account cannot combine with --on: ${on} runs the member on its own accounts.`
+    )
+  }
+  return { on, repo }
+}
+
 // Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
 export function taskPromptOf(flags: Map<string, string | boolean>): string | null {
   if (!flags.has('prompt')) {

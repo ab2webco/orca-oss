@@ -3,6 +3,7 @@ import { OrchestrationDb } from './orchestration/db'
 import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
+  liveRemoteMemberTitlesOf,
   remoteGameMembersOf,
   type EarlierLeadRunLead,
   type EarlierLeadRunPanes,
@@ -446,6 +447,28 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
         (one) => one.taskTitle
       )
     ).toEqual(['ORCA-700', 'ORCA-829'])
+  })
+
+  it("holds the titles of every Run's unreleased remote members for the name pool (ORCA-794)", () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    startRemote(db, runs.current, 'Arthur · ORCA-805')
+    startRemote(db, runs.liveOther, 'Merlin · ORCA-900')
+    const finished = startRemote(db, runs.earlier, 'Gawain · ORCA-829')
+    settle(db, finished, '2026-10-20 10:00:00')
+    const released = startRemote(db, runs.earlier, 'Morgana · ORCA-701')
+    settle(db, released, '2026-10-20 10:00:00')
+    db.markFederatedWorkerReleased(released)
+    const stopped = startRemote(db, runs.earlier, 'Percival · ORCA-702')
+    sqliteOf(db)
+      .prepare(`UPDATE worker_dispatches SET state = 'stopped' WHERE dispatch_id = '${stopped}'`)
+      .run()
+
+    expect(liveRemoteMemberTitlesOf(db)).toEqual([
+      'Arthur · ORCA-805',
+      'Merlin · ORCA-900',
+      'Gawain · ORCA-829'
+    ])
   })
 
   const earlier: RemoteGameMemberSource = {

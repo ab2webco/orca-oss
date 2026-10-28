@@ -531,6 +531,72 @@ describe('orca game launch', () => {
     expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
       expect.objectContaining({ worktree: 'new-top-level', repo: 'name:cineco-frontend' })
     )
+    expect(
+      calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    ).not.toHaveProperty('on')
+  })
+
+  it('starts the member on a paired host with the same roster name and game as a local one (ORCA-794)', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('worktree.list')
+    expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
+      expect.objectContaining({ taskTitle: 'Arthur · CIN-12 Cartelera page' })
+    )
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({
+        on: 'imac',
+        worktree: 'new-top-level',
+        repo: 'name:cineco',
+        name: 'cin-12',
+        displayName: 'Arthur · CIN-12 Cartelera page',
+        game: true
+      })
+    )
+    expect(JSON.parse(output.join('')).result).toEqual(
+      expect.objectContaining({ ticket: 'CIN-12', name: 'Arthur' })
+    )
+  })
+
+  it('refuses --on without the host repo, or with an account, before any call (ORCA-794)', async () => {
+    const cases: [[string, string][], RegExp][] = [
+      [[['on', 'imac']], /--on imac needs --repo <selector of the repo on imac>/],
+      [
+        [
+          ['on', 'imac'],
+          ['repo', 'name:cineco'],
+          ['account', 'ana@example.com']
+        ],
+        /--account cannot combine with --on: imac runs the member on its own accounts/
+      ]
+    ]
+    for (const [extra, refusal] of cases) {
+      const { client, calls } = fakeClient(stateWith())
+
+      await expect(launch(client, 'CIN-12', extra)).rejects.toThrow(refusal)
+      expect(calls).toEqual([])
+    }
+  })
+
+  it('never pins a local account to a remote member, even with accounts: auto (ORCA-794)', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 2, agent: 'claude', accounts: 'auto' } })
+    )
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
+    expect(
+      calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    ).not.toHaveProperty('claudeAccountId')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {

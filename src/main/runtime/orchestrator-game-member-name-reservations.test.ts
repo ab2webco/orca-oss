@@ -41,6 +41,17 @@ describe('liveProjectMemberNamesOf', () => {
       'Percival'
     ])
   })
+
+  it('adds the names of members placed on paired hosts, so a local launch never takes one (ORCA-794)', () => {
+    expect(
+      liveProjectMemberNamesOf({
+        worktrees: [],
+        inProject,
+        saved: [],
+        remote: ['Lancelot · ORCA-5 Away', 'ORCA-6 unnamed']
+      })
+    ).toEqual(['Lancelot'])
+  })
 })
 
 const ROSTER = [{ en: 'Arthur', es: 'Arturo' }, 'Merlin', 'Lancelot']
