@@ -1,5 +1,5 @@
 import { createElement, type ReactElement } from 'react'
-import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
+import { act, create, type ReactTestInstance } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MIN_TOUCH_TARGET } from '../theme/mobile-theme'
 import { HomeSettingsButton } from './HomeSettingsButton'
@@ -91,18 +91,21 @@ function pressableByLabel(root: ReactTestInstance, label: string): ReactTestInst
   return root.find((node) => node.type === 'Pressable' && node.props.accessibilityLabel === label)
 }
 
-let renderer: ReactTestRenderer | null = null
+// Why: holding the renderer in a `| null` union trips the root type-aware lint, which cannot resolve its type.
+const unmounts: (() => void)[] = []
 
 function render(element: ReactElement): ReactTestInstance {
+  let readRoot!: () => ReactTestInstance
   act(() => {
-    renderer = create(element)
+    const renderer = create(element)
+    unmounts.push(() => renderer.unmount())
+    readRoot = () => renderer.root
   })
-  return renderer!.root
+  return readRoot()
 }
 
 afterEach(() => {
-  act(() => renderer?.unmount())
-  renderer = null
+  act(() => unmounts.splice(0).forEach((unmount) => unmount()))
 })
 
 const toolbarProps: HostListToolbarProps = {
