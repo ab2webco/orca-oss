@@ -6,9 +6,17 @@ import { arcadeWords } from './arcade-words'
 export const ARCADE_OFFER_SECONDS = 15
 const SECOND_MS = 1000
 
-/** The line under the offer: seconds left, or that it waits while someone needs the user. */
-export const arcadeOfferLineOf = (left: number, isHeld: boolean): string =>
-  isHeld ? arcadeWords().offerHeld(left) : arcadeWords().offerLeft(left)
+/**
+ * The line under the offer: seconds left, or that it waits while someone needs the user. Without
+ * the keyboard it names the chord that reaches the pane, since j and n would go to the prompt.
+ */
+export const arcadeOfferLineOf = (left: number, isHeld: boolean, isFocused = true): string => {
+  const words = arcadeWords()
+  if (isHeld) {
+    return words.offerHeld(left)
+  }
+  return isFocused ? words.offerLeft(left) : `${words.offerLeft(left)} · ${words.offerReach}`
+}
 
 export type ArcadeCountdown = { stop: () => void }
 

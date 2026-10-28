@@ -5,6 +5,7 @@ import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
 import { readJevAdvisor } from './advisor-state'
+import { offerArcadeOnUnlock } from './arcade-unlock'
 import { cliInvocationOf } from './cli-invocation'
 import {
   gameFleetArgvOf,
@@ -235,6 +236,10 @@ export async function refresh($: EngineInterface): Promise<void> {
     await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
+    // Why after questFleet: a teammate waiting on the user must already hold the offer it opens.
+    if (config.rewards) {
+      await offerArcadeOnUnlock($, before.state, next).catch(() => undefined)
+    }
   }
 }
 
