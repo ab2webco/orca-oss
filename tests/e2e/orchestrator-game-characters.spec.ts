@@ -20,8 +20,35 @@ const MERLIN = 0x5f8fd7
 const MORGANA = 0x7a2a8a
 const ELAINE = 0xf878f8
 const OWN_COLORS = { Merlin: MERLIN, Morgana: MORGANA, Elaine: ELAINE }
-// The built-in Quest's own looks for three of its roster names (resources/.../scenes/quest.ts).
-const QUEST_COLORS = { Merlin: 0x6f8fe0, Guinevere: 0xf0a0c0, Morgana: 0x9a6ad0 }
+// Each built-in's first roster name, plain, and three of its characters by a color of their own
+// (resources/claude-plugins/orca-game/hooks/scenes/<id>.ts). Quest and Beast Tamer by body color;
+// the others by accessory, since their palettes recolor glyphs the build costume barely shows.
+const BUILT_INS = [
+  {
+    id: 'quest',
+    plain: 'Arthur',
+    colors: { Merlin: 0x6f8fe0, Guinevere: 0xf0a0c0, Morgana: 0x9a6ad0 },
+    widths: WIDTHS
+  },
+  {
+    id: 'vigilante',
+    plain: 'Nightjar',
+    colors: { Vesper: 0xd83a8a, Cipher: 0x5fe0a0, Specter: 0xc8f0ff },
+    widths: WIDTHS.slice(0, 2)
+  },
+  {
+    id: 'jrpg',
+    plain: 'Aerin',
+    colors: { Lyra: 0xff7ab0, Corin: 0x9ae07a, Bryn: 0x3a6ad0 },
+    widths: WIDTHS.slice(0, 2)
+  },
+  {
+    id: 'tamer',
+    plain: 'Pip',
+    colors: { Mochi: 0xf8b8d0, Puddle: 0x5fa8e8, Thistle: 0xa06ad0 },
+    widths: WIDTHS.slice(0, 2)
+  }
+] as const
 
 const princess = {
   rows: ['...YYYY...', '..YYYYYY..', '..PSSSSP..', '..SESSES..', '.PPPPPPPP.', '..PPPPPP..'],
@@ -162,8 +189,14 @@ async function charactersPainted(
 
 type Capture = (name: string) => Promise<void>
 
-async function captureBand(app: ElectronApplication, page: Page, capture: Capture, prefix: string) {
-  for (const width of WIDTHS) {
+async function captureBand(
+  app: ElectronApplication,
+  page: Page,
+  capture: Capture,
+  prefix: string,
+  widths: readonly number[] = WIDTHS
+) {
+  for (const width of widths) {
     await closeSidebars(page)
     await setWindowWidth(app, page, width)
     await capture(`${prefix}-${width}.png`)
@@ -175,9 +208,10 @@ async function capturePanel(
   app: ElectronApplication,
   page: Page,
   capture: Capture,
-  prefix: string
+  prefix: string,
+  widths: readonly number[] = WIDTHS
 ) {
-  for (const width of WIDTHS) {
+  for (const width of widths) {
     await closeSidebars(page)
     await setWindowWidth(app, page, width)
     await capture(`${prefix}-${width}.png`)
@@ -261,52 +295,54 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
-for (const theme of ['light', 'dark'] as const) {
-  test(`the built-in Quest draws four of its roster names as four characters (${theme})`, async ({
-    electronApp,
-    orcaPage,
-    testRepoPath
-  }, testInfo) => {
-    test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
-    test.setTimeout(300_000)
-    await waitForSessionReady(orcaPage)
-    await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
-    const roster = ['Arthur', ...Object.keys(QUEST_COLORS)]
-    // Before: names outside Quest's roster all wear the phase costume.
-    const band = await startGameBand(orcaPage, testRepoPath, {
-      state: gameState(undefined, ['Rowan', 'Quill', 'Wren', 'Sable'], 'quest'),
-      theme,
-      locale: 'en',
-      scene: 'quest'
-    })
-    const capture: Capture = async (name) => {
-      await orcaPage.waitForTimeout(1_500)
-      await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
-    }
-    try {
-      await expect
-        .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
-        .toContain('Sable')
-      await capture(`quest-before-band-${theme}-1440.png`)
-      expect(await charactersPainted(orcaPage, QUEST_COLORS)).toEqual([])
-      await band.setState(gameState(undefined, roster, 'quest'))
-      await clickTerminalText(orcaPage, 'Refresh')
-      await expect
-        .poll(() => charactersPainted(orcaPage, QUEST_COLORS), { timeout: 20_000 })
-        .toEqual(Object.keys(QUEST_COLORS))
-      await captureBand(electronApp, orcaPage, capture, `quest-band-${theme}`)
-
+for (const { id, plain, colors, widths } of BUILT_INS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`the built-in ${id} draws four of its roster names as four characters (${theme})`, async ({
+      electronApp,
+      orcaPage,
+      testRepoPath
+    }, testInfo) => {
+      test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+      test.setTimeout(300_000)
+      await waitForSessionReady(orcaPage)
       await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
-      await clickTerminalText(orcaPage, 'Panel')
-      await expect
-        .poll(() => screenOf(orcaPage), { timeout: 20_000, message: 'the Panel never opened' })
-        .toContain('LUM-16')
-      await expect
-        .poll(() => charactersPainted(orcaPage, QUEST_COLORS), { timeout: 20_000 })
-        .toEqual(Object.keys(QUEST_COLORS))
-      await capturePanel(electronApp, orcaPage, capture, `quest-panel-${theme}`)
-    } finally {
-      await rm(band.root, { recursive: true, force: true })
-    }
-  })
+      const roster = [plain, ...Object.keys(colors)]
+      // Before: names outside the scene's roster all wear the phase costume.
+      const band = await startGameBand(orcaPage, testRepoPath, {
+        state: gameState(undefined, ['Rowan', 'Quill', 'Wren', 'Sable'], id),
+        theme,
+        locale: 'en',
+        scene: id
+      })
+      const capture: Capture = async (name) => {
+        await orcaPage.waitForTimeout(1_500)
+        await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
+      }
+      try {
+        await expect
+          .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
+          .toContain('Sable')
+        await capture(`${id}-before-band-${theme}-1440.png`)
+        expect(await charactersPainted(orcaPage, colors)).toEqual([])
+        await band.setState(gameState(undefined, roster, id))
+        await clickTerminalText(orcaPage, 'Refresh')
+        await expect
+          .poll(() => charactersPainted(orcaPage, colors), { timeout: 20_000 })
+          .toEqual(Object.keys(colors))
+        await captureBand(electronApp, orcaPage, capture, `${id}-band-${theme}`, widths)
+
+        await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
+        await clickTerminalText(orcaPage, 'Panel')
+        await expect
+          .poll(() => screenOf(orcaPage), { timeout: 20_000, message: 'the Panel never opened' })
+          .toContain('LUM-16')
+        await expect
+          .poll(() => charactersPainted(orcaPage, colors), { timeout: 20_000 })
+          .toEqual(Object.keys(colors))
+        await capturePanel(electronApp, orcaPage, capture, `${id}-panel-${theme}`, widths)
+      } finally {
+        await rm(band.root, { recursive: true, force: true })
+      }
+    })
+  }
 }
