@@ -7,13 +7,10 @@ vi.mock('react-native', () => ({ Text: 'Text', TextInput: 'TextInput' }))
 import { MAX_FONT_SIZE_MULTIPLIER, Text, TextInput } from './dynamic-type-text'
 
 function render(element: ReturnType<typeof createElement>): ReactTestRenderer {
-  let renderer: ReactTestRenderer | undefined
+  let renderer!: ReactTestRenderer
   act(() => {
     renderer = create(element)
   })
-  if (!renderer) {
-    throw new Error('renderer was not created')
-  }
   return renderer
 }
 
