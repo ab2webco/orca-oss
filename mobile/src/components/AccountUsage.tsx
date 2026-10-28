@@ -74,7 +74,10 @@ export function UsageBar({
             style={styles.usageSpinner}
           />
         ) : (
-          <Text style={styles.usageValue}>{unavailable || used == null ? '—' : `${used}%`}</Text>
+          // Why: the fixed column keeps tracks aligned, so "100%" shrinks rather than splitting.
+          <Text style={styles.usageValue} numberOfLines={1} adjustsFontSizeToFit>
+            {unavailable || used == null ? '—' : `${used}%`}
+          </Text>
         )}
       </View>
       {resetText ? (
