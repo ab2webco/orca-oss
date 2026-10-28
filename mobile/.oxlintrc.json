@@ -29,12 +29,7 @@
   },
   "overrides": [
     {
-      "files": [
-        "src/theme/dynamic-type-text.tsx",
-        "test-doubles/**",
-        "**/*.test.ts",
-        "**/*.test.tsx"
-      ],
+      "files": ["test-doubles/**", "**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "no-restricted-imports": "off"
       }
