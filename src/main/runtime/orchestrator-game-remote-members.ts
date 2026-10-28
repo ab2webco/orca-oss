@@ -1,6 +1,11 @@
 import type Database from '../sqlite/sync-database'
 import { detectAgentStatusFromTitle } from '../../shared/agent-title-status'
-import { gameReviewOf, type GameAgent } from '../../shared/orchestrator-game-state'
+import type { RemoteMemberAgent } from '../../shared/orchestrator-game-remote-agent'
+import {
+  gameAgentStateOf,
+  gameReviewOf,
+  type GameAgent
+} from '../../shared/orchestrator-game-state'
 import type { RuntimeTerminalLiveness } from '../../shared/runtime-types'
 import type { OrchestrationDb } from './orchestration/db'
 
@@ -26,6 +31,8 @@ export type RemoteGameMemberShow = {
   branch: string
   title: string | null
   liveness: RuntimeTerminalLiveness
+  /** The host's hook reading of the agent; absent from an older host (ORCA-837). */
+  agent?: RemoteMemberAgent | null
 }
 
 type RemoteMemberReads = {
@@ -145,15 +152,20 @@ export async function remoteGameMembersOf(
       const stateKnown = show !== null && show.liveness !== 'gone'
       const hosted = show?.branch ? await reads.reviewOf(show.branch).catch(() => null) : null
       const review = hosted ? gameReviewOf(hosted) : null
-      const state: GameAgent['state'] = source.finished
-        ? 'done'
-        : titleState
-          ? TITLE_STATES[titleState]
-          : 'idle'
+      // Why: the hooks see a member keep working after its dispatch settles (ORCA-837).
+      const agent = stateKnown ? (show?.agent ?? null) : null
+      const state: GameAgent['state'] = agent
+        ? gameAgentStateOf(agent.state)
+        : source.finished
+          ? 'done'
+          : titleState
+            ? TITLE_STATES[titleState]
+            : 'idle'
+      const lastActivityAt = latestActivityOf(source.lastActivityAt, agent?.updatedAt)
       return {
         paneKey: `remote:${source.dispatchId}`,
         displayName: source.taskTitle ?? source.dispatchId,
-        agentType: null,
+        agentType: agent?.agentType ?? null,
         state,
         toolName: null,
         isLeader: false,
@@ -175,9 +187,18 @@ export async function remoteGameMembersOf(
             }
           : {}),
         ...(review ? { review } : {}),
-        ...(source.lastActivityAt ? { lastActivityAt: source.lastActivityAt } : {})
+        ...(agent?.limit ? { limit: agent.limit } : {}),
+        ...(lastActivityAt ? { lastActivityAt } : {})
       }
     })
   )
   return members.filter((member): member is GameAgent => member !== null)
+}
+
+function latestActivityOf(dispatchAt: string | null, hookAt: number | undefined): string | null {
+  const hook = hookAt ? new Date(hookAt).toISOString() : null
+  if (!dispatchAt || !hook) {
+    return dispatchAt ?? hook
+  }
+  return Date.parse(hook) > Date.parse(dispatchAt) ? hook : dispatchAt
 }

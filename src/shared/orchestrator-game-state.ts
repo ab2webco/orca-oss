@@ -250,6 +250,9 @@ const AGENT_STATES: Record<AgentStatusState, GameAgent['state']> = {
   done: 'done'
 }
 
+export const gameAgentStateOf = (state: AgentStatusState): GameAgent['state'] =>
+  AGENT_STATES[state] ?? 'idle'
+
 export function gameAgentOf(
   row: Pick<
     RuntimeWorktreeAgentRow,
@@ -262,7 +265,7 @@ export function gameAgentOf(
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
-    state: AGENT_STATES[row.state] ?? 'idle',
+    state: gameAgentStateOf(row.state),
     toolName: row.toolName,
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})

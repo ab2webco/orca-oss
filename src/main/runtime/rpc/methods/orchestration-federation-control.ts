@@ -31,12 +31,18 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         authenticatedCallerFingerprint
       )
       const observation = await inspectRemoteAttachment(runtime, params.dispatchId)
+      // Why optional: an older home ignores it, and the home reads its absence as an older host (ORCA-837).
+      const agent =
+        observation.exact && observation.terminal
+          ? await runtime.getFederatedMemberAgent(observation.terminal.handle).catch(() => null)
+          : null
       return {
         dispatchId: params.dispatchId,
         runtimeEpoch: runtime.getRuntimeId(),
         attachment: exposeRemoteAttachment(attachment),
         terminal: observation.exact ? observation.terminal : null,
-        observation: { status: observation.status, exactWorker: observation.exact }
+        observation: { status: observation.status, exactWorker: observation.exact },
+        ...(agent ? { agent } : {})
       }
     }
   }),

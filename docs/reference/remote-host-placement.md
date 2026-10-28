@@ -225,6 +225,10 @@ Run whose lead is gone, and of the current Run from before this lead claimed it,
 host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
 task is completed carries `remote.ticketDone`, counts as finished, and its next step is `game stop`.
 Another live lead's members are never listed. Both fields are optional on the wire.
+Built in ORCA-837: `federationShow` also returns an optional `agent` (the host's latest Claude/Codex
+hook state, its time and a usage limit), and that wins over the dispatch's status, so a member that
+keeps working after `worker_done` reads as working. A host that omits it keeps the dispatch-and-title
+reading, so no capability is needed: the read is the same RPC with one more optional field (Rule 1).
 
 **Wire.** Capability `orchestration.federation-game-member.v1` (name proposed). `game` and
 `setupAdmission` are forwarded only after the remote confirms it.

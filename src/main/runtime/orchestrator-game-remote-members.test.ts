@@ -144,6 +144,60 @@ describe('remote members of a lead (ORCA-824)', () => {
     })
   })
 
+  it("shows the agent's hook state the host relays, not its settled dispatch (ORCA-837)", async () => {
+    const [member] = await remoteGameMembersOf([{ ...source, finished: true }], {
+      showOf: async () => ({
+        branch: 'fabolivark/orca-817',
+        title: '✳ Claude Code',
+        liveness: 'running',
+        agent: {
+          state: 'working',
+          agentType: 'claude',
+          updatedAt: Date.parse('2026-10-27T14:12:00Z')
+        }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member).toMatchObject({
+      state: 'working',
+      agentType: 'claude',
+      lastActivityAt: '2026-10-27T14:12:00.000Z'
+    })
+  })
+
+  it('relays a waiting agent and one stopped by its usage limit (ORCA-837)', async () => {
+    const members = await remoteGameMembersOf([source, { ...source, dispatchId: 'ctx_806' }], {
+      showOf: async ({ dispatchId }) => ({
+        branch: 'b',
+        title: null,
+        liveness: 'running',
+        agent:
+          dispatchId === 'ctx_805'
+            ? { state: 'blocked', agentType: 'codex', updatedAt: 0 }
+            : { state: 'done', agentType: 'claude', updatedAt: 0, limit: { resetsAt: 99 } }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(members.map(({ state, limit }) => ({ state, limit }))).toEqual([
+      { state: 'waiting', limit: undefined },
+      { state: 'done', limit: { resetsAt: 99 } }
+    ])
+    // Why: the dispatch's own reading is newer than the hook's.
+    expect(members[0].lastActivityAt).toBe('2026-10-27T14:00:00.000Z')
+  })
+
+  it('keeps the dispatch and title reading for an older host that relays no agent (ORCA-837)', async () => {
+    const [member] = await remoteGameMembersOf([{ ...source, finished: true }], {
+      showOf: async () => ({ branch: 'b', title: '⠂ Claude Code', liveness: 'running' }),
+      reviewOf: async () => null
+    })
+
+    expect(member).toMatchObject({ state: 'done', agentType: null })
+    expect(member.limit).toBeUndefined()
+  })
+
   it('still lists a member whose host does not answer, with its state unknown', async () => {
     const [member] = await remoteGameMembersOf([source], {
       showOf: async () => {
