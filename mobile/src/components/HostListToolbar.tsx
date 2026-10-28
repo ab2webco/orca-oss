@@ -3,13 +3,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent
 } from 'react-native'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import { Text } from '../theme/dynamic-type-text'
 import { Filter, Layers, List, Search, SlidersHorizontal, UserCircle, X } from 'lucide-react-native'
 import { MIN_TOUCH_TARGET, colors, spacing } from '../theme/mobile-theme'
 

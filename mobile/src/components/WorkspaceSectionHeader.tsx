@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { RepoIcon } from '../../../src/shared/repo-icon'
 import { MIN_TOUCH_TARGET, colors, spacing } from '../theme/mobile-theme'
 import { MobileRepoIcon } from './MobileRepoIcon'
