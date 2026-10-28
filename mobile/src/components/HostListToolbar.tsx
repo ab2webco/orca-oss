@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -42,11 +42,17 @@ export function HostListToolbar({
   onOpenTasks,
   onToggleSearch
 }: HostListToolbarProps) {
-  const [viewportWidth, setViewportWidth] = useState(0)
-  const [contentWidth, setContentWidth] = useState(0)
-  const [scrollX, setScrollX] = useState(0)
+  // Why: scroll metrics live in a ref so scrolling only re-renders when the cue flips.
+  const metrics = useRef({ viewportWidth: 0, contentWidth: 0, scrollX: 0 })
   // Why: at 320 dp the chips no longer fit beside the icons; they scroll instead of truncating.
-  const showOverflowCue = viewportWidth > 0 && scrollX + viewportWidth < contentWidth - 1
+  const [showOverflowCue, setShowOverflowCue] = useState(false)
+  const updateMetrics = (next: Partial<typeof metrics.current>): void => {
+    const m = Object.assign(metrics.current, next)
+    const overflowing = m.viewportWidth > 0 && m.scrollX + m.viewportWidth < m.contentWidth - 1
+    if (overflowing !== showOverflowCue) {
+      setShowOverflowCue(overflowing)
+    }
+  }
   const filterActive = activeFilterCount > 0
   const iconColor = connected ? colors.textSecondary : colors.textMuted
 
@@ -58,10 +64,12 @@ export function HostListToolbar({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}
           scrollEventThrottle={32}
-          onLayout={(event: LayoutChangeEvent) => setViewportWidth(event.nativeEvent.layout.width)}
-          onContentSizeChange={(width: number) => setContentWidth(width)}
+          onLayout={(event: LayoutChangeEvent) =>
+            updateMetrics({ viewportWidth: event.nativeEvent.layout.width })
+          }
+          onContentSizeChange={(width: number) => updateMetrics({ contentWidth: width })}
           onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) =>
-            setScrollX(event.nativeEvent.contentOffset.x)
+            updateMetrics({ scrollX: event.nativeEvent.contentOffset.x })
           }
         >
           <ToolbarChip
