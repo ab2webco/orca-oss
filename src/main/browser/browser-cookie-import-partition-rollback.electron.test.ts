@@ -54,7 +54,9 @@ async function run() {
   const targetSession = session.fromPartition(partition)
   const window = new BrowserWindow({ show: false, webPreferences: { partition } })
   mark('window created')
-  await window.loadURL('data:text/html,<title>cookie rollback fixture</title>')
+  const page = 'data:text/html,<title>cookie rollback fixture</title>'
+  // Why twice: on a loaded CI runner the first navigation can stop before it commits (ERR_FAILED -2).
+  await window.loadURL(page).catch(() => window.loadURL(page))
   mark('window loaded')
   const debug = window.webContents.debugger
   debug.attach('1.3')

@@ -46,3 +46,32 @@ export function uncoloredGlyphOf(
 ): string | undefined {
   return [...rows.join('')].find((one) => one !== '.' && !Object.hasOwn(colors, one))
 }
+
+// Why: the mod draws a costume as six rows plus a legs row inside an eight-pixel tile.
+export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
+
+// Why ASCII: the mod indexes rows by UTF-16 unit, so one glyph must be one unit.
+const spriteRow = z.string().regex(/^[!-~]{10}$/, 'must be ten printable ASCII glyphs')
+
+export const costumeSchema = z
+  .object({
+    rows: z.array(spriteRow).length(ORCHESTRATOR_GAME_COSTUME_ROWS),
+    legs: z.tuple([spriteRow, spriteRow]),
+    colors: z.record(glyph, color)
+  })
+  .superRefine((costume, ctx) => {
+    const missing = uncoloredGlyphOf([...costume.rows, ...costume.legs], costume.colors)
+    if (missing !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['colors'], message: `glyph "${missing}" has no color` })
+    }
+  })
+
+export const byPhase = <T extends z.ZodType>(schema: T) =>
+  z.object({
+    working: schema,
+    docs: schema,
+    build: schema,
+    verify: schema,
+    pr: schema,
+    handoff: schema
+  })
