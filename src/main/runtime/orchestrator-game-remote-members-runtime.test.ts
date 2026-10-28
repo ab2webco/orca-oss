@@ -104,4 +104,54 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
       })
     ])
   })
+
+  it('lists a member an earlier lead left running on the host, flagged with its ticket done (ORCA-793)', async () => {
+    const { runtime } = leadWithRemoteMember()
+    const db = runtime.getOrchestrationDb()
+    const earlier = db.createRun({
+      objective: 'earlier lead',
+      coordinatorHandle: 'term_gone',
+      coordinatorPaneKey: 'tab-0:33333333-3333-4333-8333-333333333333'
+    })
+    const task = db.createTask({ spec: 'release', taskTitle: 'ORCA-829 check', runId: earlier.id })
+    const started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_imac', serverName: 'imac' },
+      federation: {
+        environmentId: 'env_imac',
+        environmentName: 'imac',
+        peerFingerprint: 'fp_imac',
+        protocolVersion: 1
+      }
+    })
+    db.updateFederatedDispatchResources({
+      dispatchId: started.dispatch.id,
+      remoteRuntimeEpoch: 'epoch_imac',
+      worktreeId: 'repo::/home/me/orca-829',
+      terminalHandle: 'term_5c58ff4d'
+    })
+    const sqlite = (db as unknown as { db: { prepare: (sql: string) => { run: () => void } } }).db
+    sqlite.prepare(`UPDATE tasks SET status = 'completed' WHERE id = '${task.id}'`).run()
+    sqlite
+      .prepare(
+        `UPDATE dispatch_contexts SET status = 'completed', completed_at = '2026-10-20 10:00:00'
+         WHERE id = '${started.dispatch.id}'`
+      )
+      .run()
+    vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({
+      terminal: { branch: 'fabolivark/orca-829', title: '✳ Claude Code', liveness: 'running' }
+    })
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(state.agents.filter((agent) => agent.isMember)).toEqual([
+      expect.objectContaining({ displayName: 'ORCA-805 gate' }),
+      expect.objectContaining({
+        paneKey: `remote:${started.dispatch.id}`,
+        state: 'done',
+        terminalHandle: 'term_5c58ff4d',
+        remote: { host: 'imac', stateKnown: true, earlierLead: true, ticketDone: true }
+      })
+    ])
+  })
 })
