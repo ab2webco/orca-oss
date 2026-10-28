@@ -1037,6 +1037,10 @@ Each also dresses Jev's advisor ([The cast](#the-cast-a-pet-and-jevs-advisor)): 
 Night Watch the commissioner, Crystal Saga an oracle and Beast Tamer the professor. None has a pet,
 so Pet hearts Clawd, the hero, as before.
 
+Each ships Orca's built-in roster for the scene (`ORCHESTRATOR_GAME_BUILT_IN_ROSTERS`, 12 names; a
+mod test pins the two equal) and dresses every name after the first as a
+[character](#characters-a-look-per-roster-name) of its own.
+
 ## Render: classic, hd or hd-compact
 
 `render` picks how the spinner scene is drawn
@@ -1343,6 +1347,43 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   under its `★ lead` row (`◇ ORCA-609 · Opus 5.5·high`, or `◆` for a Jev report), and the Fleet
   heading counts either. The card's rows without a gesture take the terminal's own foreground, not
   the scene's parchment, which a light theme's near-white panel would hide.
+
+## Characters: a look per roster name
+
+A scene's `roster` entry is a plain name, drawn in the phase costumes, or an object that gives that
+name a look of its own, so members in the same phase are told apart
+([`orchestrator-game-scene-characters.ts`](../../src/shared/orchestrator-game-scene-characters.ts),
+[`character-look.ts`](../../resources/claude-plugins/orca-game/hooks/character-look.ts)):
+
+```json
+"roster": [
+  "Arthur",
+  { "name": "Merlin", "variant": { "colors": { "O": "#6f8fe0" }, "accessory": "halo", "accessoryColor": "#fff3a0" } },
+  { "name": "Elaine", "costumes": { "working": { "rows": [], "legs": [], "colors": {} } } }
+]
+```
+
+- **`variant`.** `colors` (glyph → color) is laid over every phase costume's `colors`; a glyph no
+  costume draws is refused. `accessory` is one of `crown`, `halo`, `horns`, `antenna`, `bow`,
+  `feather`, `cape`, drawn only on empty cells around the head, in `accessoryColor` or its own
+  default. A variant needs `colors` or an `accessory`; `accessoryColor` needs an accessory.
+- **`costumes`.** A costume for every phase, validated like the scene's own.
+- **Validation.** An entry with both looks, or any bad look, drops the whole roster with a
+  `roster.N…` warning (names included) and the scene still draws; `orca game scene validate`
+  lists every issue.
+- **Who is whom.** The mod finds a member's character by the name before the `·` of its display name,
+  in any language, case-insensitively and without a ` 2` suffix. A member with no character, or any
+  member of a scene without characters, draws exactly as before. The band, the Panel tiles and the
+  hd party draw the character; the flat view puts a `■` in its color before the name.
+- **On the wire.** `roster` stays names only, so `game.memberName.reserve` and an older mod see what
+  they always did. The looks travel in the definition's optional `characters` field
+  (`[{ name, variant?, costumes? }]`), which an older mod ignores. An Orca older than this drops a
+  file roster with object entries with a warning and keeps the scene.
+- **Making them.** `orca game scene new` starts with ten characters. Settings' **Create from**
+  writes a scene's characters back as roster entries. The
+  [scenes skill](../../skill-guides/orca-game-scenes.md#characters-for-an-existing-scene) adds or
+  regenerates them in an existing file in place, and the scene captures draw every roster name as its
+  Panel tile (`sheet-roster-scene-file-<phase>.png`).
 
 ## Scenes from plugins
 

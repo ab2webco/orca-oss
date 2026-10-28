@@ -883,6 +883,9 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   ([`scene-theme.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-theme.ts)). Bad
   `themes` are left out with a warning and the scene still draws; an Orca or mod older than
   `themes` ignores it and draws the plain looks.
+- Optional `roster` lists the names members take; an entry can give its name a look of its own (a
+  `variant` palette and accessory, or `costumes`). See
+  [Characters](./orchestrator-game.md#characters-a-look-per-roster-name).
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the
