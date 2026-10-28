@@ -12,7 +12,8 @@ import {
   terminalPointOf
 } from './helpers/orchestrator-game-band'
 
-// A lead with one local member and two on a paired host, one of which does not answer (ORCA-824).
+// A lead with one local member and three on a paired host: one live, one whose host does not answer
+// (ORCA-824), and one finished whose terminal closed while its host answers (ORCA-854).
 // The local and one remote member carry roster names from the same pool (ORCA-794).
 const HOLD_MS = 1_500
 const REDRAW_MS = 1_000
@@ -20,8 +21,8 @@ const REDRAW_MS = 1_000
 const member = (
   paneKey: string,
   ticket: string,
-  state: 'working' | 'idle',
-  remote: { host: string; stateKnown: boolean } | null,
+  state: 'working' | 'idle' | 'done',
+  remote: { host: string; stateKnown: boolean; gone?: true } | null,
   name: string | null = null
 ) => ({
   paneKey,
@@ -51,7 +52,8 @@ const gameState = {
     },
     member('demo-local', 'LUM-12', 'working', null, 'Arthur'),
     member('remote:ctx_14', 'LUM-14', 'working', { host: 'imac', stateKnown: true }, 'Merlin'),
-    member('remote:ctx_15', 'LUM-15', 'idle', { host: 'imac', stateKnown: false })
+    member('remote:ctx_15', 'LUM-15', 'idle', { host: 'imac', stateKnown: false }),
+    member('remote:ctx_16', 'LUM-16', 'done', { host: 'imac', stateKnown: true, gone: true })
   ],
   review: null,
   workItem: null,
@@ -66,23 +68,32 @@ const screenText = async (page: Page) => (await screenRows(page)).join('\n')
 const SILENT_HOST = 'imac not answering'
 // Why either: a phone-width card shortens the tag to `imac ?` rather than ellipsize it.
 const SILENT_HOST_ANY = /imac (not answering|\?)/
-const TICKETS = ['LUM-12', 'LUM-14', 'LUM-15'] as const
+// Why: a finished member's closed terminal must not read as gone or as a silent host (ORCA-854).
+const CLOSED_AS_GONE = /gone from imac|imac ✕/
+const TICKETS = ['LUM-12', 'LUM-14', 'LUM-15', 'LUM-16'] as const
 const NAMES = ['Arthur', 'Merlin'] as const
 
-/** Wheels a short docked Panel down until the silent host's card is on screen. */
-async function scrollPanelTo(page: Page, text: RegExp): Promise<void> {
+// Why both: the silent host's card and the last one, the finished member's, must each be read.
+const SCROLL_TARGETS = [SILENT_HOST_ANY, /\bLUM-16\b/]
+
+/** Wheels a short docked Panel down until every target was on screen; returns all it read. */
+async function scrollPanelThrough(page: Page, seen: string): Promise<string> {
   // Why ✕: only the Panel's Close chip draws it; the band below repeats the other labels.
   const point = await terminalPointOf(page, '✕')
   expect(point, 'the Panel is not on screen').not.toBeNull()
   await page.mouse.move(point!.x, point!.y)
-  for (let step = 0; step < 30 && !text.test(await screenText(page)); step++) {
+  for (let step = 0; step < 30 && !SCROLL_TARGETS.every((one) => one.test(seen)); step++) {
     await page.mouse.wheel(0, 120)
     await page.waitForTimeout(250)
+    seen += `\n${await screenText(page)}`
   }
-  expect(await screenText(page)).toMatch(text)
+  for (const target of SCROLL_TARGETS) {
+    expect(seen).toMatch(target)
+  }
+  return seen
 }
 
-test('the Panel names the paired host of a remote member, and says when it does not answer', async ({
+test('the Panel names the paired host of a remote member, and says only a silent one does not answer', async ({
   electronApp,
   orcaPage,
   testRepoPath
@@ -125,9 +136,8 @@ test('the Panel names the paired host of a remote member, and says when it does 
           animations: 'disabled'
         })
         let seen = await screenText(orcaPage)
-        if (!SILENT_HOST_ANY.test(seen)) {
-          await scrollPanelTo(orcaPage, SILENT_HOST_ANY)
-          seen += `\n${await screenText(orcaPage)}`
+        if (!SCROLL_TARGETS.every((one) => one.test(seen))) {
+          seen = await scrollPanelThrough(orcaPage, seen)
           await orcaPage.waitForTimeout(HOLD_MS)
           await orcaPage.screenshot({
             path: testInfo.outputPath(`${shot}-scrolled.png`),
@@ -142,6 +152,7 @@ test('the Panel names the paired host of a remote member, and says when it does 
         for (const name of NAMES) {
           expect(seen, `${shot} drops ${name}`).toContain(name)
         }
+        expect(seen, `${shot} calls a finished member gone`).not.toMatch(CLOSED_AS_GONE)
       }
     }
   } finally {
