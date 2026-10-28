@@ -27,8 +27,9 @@ export type MemberCardParts = {
   room: number
   leadTitle: string | null
   cardState: CardState
-  /** null drops the tile column: a phone card gives its width to the ticket (ORCA-827). */
-  tile?: RenderElement | null
+  tile?: RenderElement
+  /** False drops the tile column: a phone card gives its width to the ticket (ORCA-827). */
+  withTile?: boolean
   view?: RenderElement
   advisorRows: RenderElement[]
   link: (key: string, url: string, label: string, child: RenderElement) => RenderElement
@@ -85,7 +86,7 @@ export function memberCard(
       borderStyle="round"
       borderColor={agent.limit === undefined ? color : 'red'}
     >
-      {parts.tile === null ? null : (parts.tile ?? <Box width={TILE_COLUMNS} />)}
+      {parts.withTile === false ? null : (parts.tile ?? <Box width={TILE_COLUMNS} />)}
       <Box flexDirection="column" paddingX={1} flexGrow={1} flexShrink={1}>
         {/* Why wrap: on a phone the crown and state move down whole instead of splitting mid-word. */}
         <Box flexDirection="row" columnGap={1} flexWrap="wrap">

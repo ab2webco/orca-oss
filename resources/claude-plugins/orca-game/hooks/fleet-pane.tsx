@@ -323,7 +323,8 @@ export const registerFleetPane = (on: On): void => {
               room: cardRoom,
               leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
               cardState: cardStateOf(agent, state),
-              tile: cardLayout.withTile ? art.get(`tile-${member.key}`) : null,
+              tile: art.get(`tile-${member.key}`),
+              withTile: cardLayout.withTile,
               view:
                 agent.terminalHandle === undefined || isTap
                   ? undefined
