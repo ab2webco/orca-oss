@@ -29,7 +29,8 @@ Run every step; skipping validation is the usual way scenes ship broken.
 1. **Start from the template**, never from a blank file. It is the built-in Quest with every
    required block filled in, its team-band palette (`hud`) and its advisor (a wizard), plus an
    example of each optional block Quest lacks: a `foe` (a goblin), a `finale` and a `cast.pet`
-   (a fox). Replace them all; none of them is meant to stay:
+   (a fox), and a `roster` of ten of Quest's characters. Replace them all; none of them is meant
+   to stay:
 
    ```text
    orca game scene new .orca/scenes/<name>.json
@@ -105,6 +106,27 @@ are the only ways to keep a scene out of the repo:
 
 `orca game scene validate` takes any path, so validate a plugin's scene file the same way.
 
+## Characters for an existing scene
+
+To add characters to a scene, or regenerate them, edit that file **where it is**, private ones
+too, and change only its `roster`: every other key stays as it is.
+
+1. Run `orca game scene validate <file>` first. If it already has issues, report them before
+   editing; do not fix other blocks unasked.
+2. List the glyphs its costumes draw (the keys of every `costumes.<phase>.colors`). Recolor the
+   figure's main ones (body, clothes, hair); leave the eyes and the darkest color alone, since hd
+   inks the outline from it.
+3. Keep the roster's names and their order, then add names in the scene's voice until there are
+   at least 10. The first stays a plain name. Each of the others becomes
+   `{ "name": …, "variant": { "colors": {…}, "accessory": …, "accessoryColor": … } }` with 1 to 3
+   of those glyphs in colors of its own. To regenerate, replace the `variant`s and keep the names.
+4. Make each one unmistakable: no two characters share a palette and an accessory, and every
+   `accessoryColor` is lighter than `#666666`, or it vanishes into the dark Panel tile.
+5. Validate until clean; roster problems read `roster.N…`.
+6. Look at them: the [captures](#looking-at-it-without-a-pane) draw every roster name as its
+   Panel tile in `sheet-roster-scene-file-<phase>.png`. `/quest demo` does not: its party is not
+   named from the roster.
+
 ## Looking at it without a pane
 
 `/quest demo` in a Claude Agent Teams pane is the real check. Without a pane, an Orca **source
@@ -119,6 +141,8 @@ pnpm run capture:orca-game-scenes -- --scene-file /abs/path/<name>.json --out /t
   columns, with the advisor, the hero at a fixed step and, in hd, a two-member party:
   `scene-file-<phase>-classic-130.png`, `scene-file-<phase>-hd-day-60.png`… and one sheet per
   phase, `sheet-scene-file-<phase>.png`, with its six captures labelled. Look at the sheets.
+- Every `roster` name is drawn as its Panel tile, one sheet per phase:
+  `sheet-roster-scene-file-<phase>.png`.
 - `--phases build,pr` (or `all`) limits or widens the phases; the built-in scenes, drawn too for
   comparison, default to `build`. The Panel's advisor and member cards land in `sheet-cards.png`
   and `sheet-members.png`; `index.txt` lists every file.
@@ -140,7 +164,7 @@ Top level, all required unless marked optional:
 | `finale`   | Optional. Caption painted while a merge runs                       |
 | `hud`      | Optional. The team band's frame, sky and text colors               |
 | `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
-| `roster`   | Optional. Names a lead's members take, in order                    |
+| `roster`   | Optional. Names a lead's members take, each in a look of its own   |
 | `themes`   | Optional. Palette variants the band shows one a day                |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
@@ -331,15 +355,34 @@ CJK characters and emoji are refused. A plain string or per-language object.
 ### `roster` (optional)
 
 ```json
-["Mario", "Luigi", { "en": "Peach", "es": "Melocotón" }, "Toad"]
+[
+  "Mario",
+  {
+    "name": "Luigi",
+    "variant": { "colors": { "C": "#2e7d4f" }, "accessory": "cape", "accessoryColor": "#7fd36a" }
+  },
+  {
+    "name": { "en": "Peach", "es": "Melocotón" },
+    "costumes": { "working": { "rows": ["…"], "legs": ["…"], "colors": {} } }
+  }
+]
 ```
 
-1 to 24 names, each 1 to 32 characters, a plain string or per-language object. Each member a
-lead launches takes the first name no live member holds and keeps it until it is released;
-the ticket stays next to it (`Mario · CIN-12 Cartelera`). Once every name is taken, members
-are named after their ticket only. A name must not look like a ticket id (`K-9`), contain
-`·`, or repeat. An invalid roster is left out with a warning and the scene still draws; the
-project's `orchestratorGame.orchestrator.memberNames` replaces it.
+1 to 24 entries. Each member a lead launches takes the first name no live member holds and keeps
+it until it is released; the ticket stays next to it (`Mario · CIN-12 Cartelera`). Once every
+name is taken, members are named after their ticket only. A name is 1 to 32 characters, a plain
+string or per-language object, must not look like a ticket id (`K-9`), contain `·`, or repeat.
+
+An entry is a plain name, drawn in the phase costumes, or an object with `name` and one look:
+
+- `variant`: the phase costumes with changes, at least one of:
+  - `colors`: glyph → color, laid over every phase's `colors`. Only glyphs some costume draws.
+  - `accessory`: `crown`, `halo`, `horns`, `antenna`, `bow`, `feather` or `cape`, drawn on the
+    empty cells around the head, so it never covers the costume. `accessoryColor` sets its color.
+- `costumes`: a costume of its own for **every** phase, in the shape above.
+
+Set a `variant` or `costumes`, not both. An invalid roster is left out with a warning and the
+scene still draws; the project's `orchestratorGame.orchestrator.memberNames` replaces the names.
 
 ### `themes` (optional)
 
@@ -368,6 +411,9 @@ scene still draws in its plain looks.
 | `finale…: must be width-1 characters…`                            | Remove emoji and CJK characters from the finale                       |
 | `cast.<member>…: every row of a frame must be the same width`     | Pad the short rows with `.`                                           |
 | `cast.<member>.frames: every frame must be the size of the first` | Same width and height for every frame, `happy` and gesture            |
+| `roster.N.variant.colors: glyph "X" is in no costume`             | Recolor only glyphs a `costumes.<phase>.colors` lists                 |
+| `roster.N: set a variant or costumes, not both`                   | Keep one look per entry                                               |
+| `roster.N.variant: must set colors or an accessory`               | Give the variant a palette, an accessory or both                      |
 | `not valid JSON`                                                  | Trailing comma, missing quote or comment: JSON allows none            |
 
 If the game still draws Quest after `validate` passes: check the path in Settings or
@@ -379,6 +425,8 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
 - Every phase should be recognizably different (costume colors and the world) so the user
   can tell at a glance what each teammate is doing.
 - Name cards in the scene's own voice, short enough to read on a narrow pane.
+- Give the roster at least 10 names, each a character of its own, so a team in one phase never
+  looks like clones.
 - Include `hud`, `foe` and `finale`: a scene without them only half changes the game. Add a
   `cast` pet whenever the lead is not Clawd, or Pet hearts the lead.
 - Give every costume, pet and advisor one dark color (eyes, hair, boots): hd inks its outline

@@ -56,6 +56,12 @@ export const sceneShotsOf = (id, phases, widths = COLUMNS) =>
     ])
   )
 
+/** Each roster name of a scene as its Panel tile, so its characters are compared side by side. */
+export const rosterShotsOf = (id, phases, names) =>
+  phases.flatMap((phase) =>
+    names.map((member, i) => ({ name: `roster-${id}-${phase}-${i + 1}`, phase, member }))
+  )
+
 // 1440, 768, 390 and 320 px at 9 px a cell; the game's look has a day and a night, no app theme.
 const ARCADE_COLUMNS = [160, 85, 43, 35]
 
