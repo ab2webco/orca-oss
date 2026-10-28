@@ -1,5 +1,6 @@
 import type { GameAgent, GameReview, GameState, RecentReward } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
+import { characterColorOf } from './character-look'
 import { xpTextOf, type Level } from './fleet-hud'
 import { CI_COLORS, ciShortOf } from './fleet-labels'
 import { gameLocale, gameStrings, localizedNameOf } from './game-strings'
@@ -26,6 +27,8 @@ type Slot = Omit<FlatPart, 'text'> & {
 const GAP = '  '
 const SEP = ' · '
 const NAME_CELLS = 12
+const LOOK_SWATCH = '■'
+const LOOK_CELLS = 2
 // A character before its ticket, also when Orca sent no title after it.
 const CHARACTER = /^(.+?) · /
 
@@ -185,9 +188,15 @@ const memberLineOf = (
     slots.push({ key: 'phase', priority: 1, labels: [label], color: PHASE_COLORS[phase], bold })
   }
   slots.push(...reviewSlotsOf(agent.review ?? null, words))
+  // Why a swatch, not the name's color: the name's color already says the member's state.
+  const look = characterColorOf(scene, agent.displayName)
+  const swatch: FlatPart[] =
+    look === undefined
+      ? []
+      : [{ key: 'look', text: `${LOOK_SWATCH} `, color: `#${look.toString(16).padStart(6, '0')}` }]
   return {
     key: `flat-member-${agent.paneKey}`,
-    parts: fitSlots(slots, columns),
+    parts: [...swatch, ...fitSlots(slots, columns - swatch.length * LOOK_CELLS)],
     paneKey: agent.paneKey
   }
 }

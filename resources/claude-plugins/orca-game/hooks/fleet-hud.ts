@@ -1,4 +1,5 @@
 import { actionPixel } from './action-props'
+import { characterCostumeOf } from './character-look'
 import { fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
 import { crownAtOf, crownPixel } from './hd-party'
@@ -68,7 +69,7 @@ const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => 
   return isStar ? hud.star : mix(hud.skyTop, hud.skyBottom, y / (HUD_PIXELS - 1))
 }
 
-type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number }
+type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number; name?: string }
 
 const spriteTopOf = (sprite: Sprite, tick: number): number =>
   2 -
@@ -84,7 +85,8 @@ const hudSprite = (
 ): number | undefined => {
   // A member on red CI trades turns with the scene's foe.
   const isFoeTurn = sprite.mood === 'hurt' && Math.floor(tick / 6) % 2 === 1
-  const costume = (isFoeTurn ? scene.foe : undefined) ?? scene.costumes[sprite.phase]
+  const costume =
+    (isFoeTurn ? scene.foe : undefined) ?? characterCostumeOf(scene, sprite.name, sprite.phase)
   const isResting = isRestingOf(sprite.state, sprite.mood)
   const top = spriteTopOf(sprite, tick)
   const column = x - sprite.at

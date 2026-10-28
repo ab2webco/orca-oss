@@ -204,7 +204,14 @@ export const registerFleetPane = (on: On): void => {
         columns: TILE_COLUMNS,
         rows: TILE_ROWS,
         draw: (at: number) =>
-          tileCellsOf(scene, member.isDone ? 'handed' : member.phase, member.state, at, member.mood)
+          tileCellsOf(
+            scene,
+            member.isDone ? 'handed' : member.phase,
+            member.state,
+            at,
+            member.mood,
+            member.name
+          )
       })),
       ...(isShown('team') ? advisorTiles : [])
     ])
