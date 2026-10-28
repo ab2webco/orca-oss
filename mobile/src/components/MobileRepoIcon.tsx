@@ -21,7 +21,8 @@ import {
   SquareTerminal,
   Wrench
 } from 'lucide-react-native'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { RepoIcon } from '../../../src/shared/repo-icon'
 import { colors } from '../theme/mobile-theme'
 

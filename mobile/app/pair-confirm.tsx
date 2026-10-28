@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, BackHandler } from 'react-native'
+import { View, StyleSheet, Pressable, ActivityIndicator, BackHandler } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'

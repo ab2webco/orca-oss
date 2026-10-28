@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import { Image, Pressable, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import * as Clipboard from 'expo-clipboard'
 import { ArrowUp, ChevronDown, Copy, SquareChevronRight } from 'lucide-react-native'
 import { diffFromText, diffFromToolCall } from '../../../src/shared/native-chat-diff'

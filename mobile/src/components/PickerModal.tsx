@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Pressable, StyleSheet } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { Check } from 'lucide-react-native'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { BottomDrawer } from './BottomDrawer'

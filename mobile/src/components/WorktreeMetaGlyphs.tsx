@@ -1,5 +1,6 @@
 import { CircleDot, GitMerge, StickyNote } from 'lucide-react-native'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors } from '../theme/mobile-theme'
 import { prStateToken } from './pr-state-token'
 import { statusColor } from './pr-sidebar/pr-sidebar-status-color'

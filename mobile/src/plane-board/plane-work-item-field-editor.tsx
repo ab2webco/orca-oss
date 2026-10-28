@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'
 import {

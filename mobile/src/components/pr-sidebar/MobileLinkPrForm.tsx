@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native'
+import { Text, TextInput } from '../../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../../theme/mobile-theme'
 import type { RpcClient } from '../../transport/rpc-client'
 import { triggerError, triggerSuccess } from '../../platform/haptics'

@@ -1,4 +1,5 @@
-import { FlatList, Pressable, Text, View } from 'react-native'
+import { FlatList, Pressable, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronLeft, ListChecks, MoreHorizontal } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 import type { MobileDiffReviewQueueFilter } from '../session/mobile-diff-review-queue'

@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AppState,
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Switch,
-  type AppStateStatus
-} from 'react-native'
+import { AppState, View, StyleSheet, Pressable, Switch, type AppStateStatus } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { useFocusEffect } from 'expo-router'
 import { ChevronRight, X } from 'lucide-react-native'
 import type Animated from 'react-native-reanimated'

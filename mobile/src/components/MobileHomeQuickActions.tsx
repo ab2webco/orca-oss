@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Plus, QrCode } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { HostProfile } from '../transport/types'
 import { hostEndpointLabel } from '../transport/host-endpoint-label'
 import { colors, radii, spacing } from '../theme/mobile-theme'

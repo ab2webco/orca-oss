@@ -1,12 +1,6 @@
 import type { ReactNode } from 'react'
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type GestureResponderEvent
-} from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronDown } from 'lucide-react-native'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 

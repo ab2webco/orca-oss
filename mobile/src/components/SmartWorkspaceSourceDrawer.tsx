@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ActivityIndicator,
-  FlatList,
-  InteractionManager,
-  Pressable,
-  Text,
-  TextInput,
-  View
-} from 'react-native'
+import { ActivityIndicator, FlatList, InteractionManager, Pressable, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import type { RpcClient } from '../transport/rpc-client'
 import type { SmartWorkspaceSourceRow as SourceRow } from '../../../src/shared/new-workspace/smart-workspace-source-results'
 import {

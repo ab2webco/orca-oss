@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
-import { Image, Linking, Pressable, Text, View } from 'react-native'
+import { Image, Linking, Pressable, View } from 'react-native'
+import { Text } from '../../theme/dynamic-type-text'
 import { Check, CornerDownRight, ExternalLink, Pencil, Trash2, Undo2 } from 'lucide-react-native'
 import type {
   GitHubReaction,

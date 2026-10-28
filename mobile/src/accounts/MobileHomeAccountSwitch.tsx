@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { AccountsSnapshot, ProviderKey } from '../components/account-usage-state'
 import { ClaudeIcon, OpenAIIcon } from '../components/AgentIcons'
 import type { HostProfile } from '../transport/types'

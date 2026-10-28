@@ -8,9 +8,7 @@ import {
   FlatList,
   Image,
   View,
-  Text,
   ScrollView,
-  TextInput,
   Pressable,
   Keyboard,
   Platform,
@@ -19,6 +17,7 @@ import {
   type LayoutChangeEvent,
   type ListRenderItem
 } from 'react-native'
+import { Text, TextInput } from '../../../../src/theme/dynamic-type-text'
 import * as Clipboard from 'expo-clipboard'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'

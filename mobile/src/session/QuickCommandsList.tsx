@@ -1,4 +1,5 @@
-import { View, Text, Pressable, TextInput, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { Check, Plus, Search } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'

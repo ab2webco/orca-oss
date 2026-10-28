@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, Switch } from 'react-native'
+import { View, Pressable, Switch } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {

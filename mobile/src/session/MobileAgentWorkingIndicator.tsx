@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Animated, StyleSheet, Text, View } from 'react-native'
+import { Animated, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 
 /** Animated three-dot "agent is working" row, shown while the active agent is

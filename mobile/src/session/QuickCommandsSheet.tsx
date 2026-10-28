@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Alert, View, Text, Pressable, StyleSheet } from 'react-native'
+import { Alert, View, Pressable, StyleSheet } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronLeft } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import { BottomDrawer } from '../components/BottomDrawer'

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { ArrowUp, Check, CircleHelp } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { formatQuestionAnswer, type MobileChatQuestion } from './mobile-native-chat-question'

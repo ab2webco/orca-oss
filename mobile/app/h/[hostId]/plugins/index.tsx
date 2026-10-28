@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native'
+import { Text } from '../../../../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react-native'

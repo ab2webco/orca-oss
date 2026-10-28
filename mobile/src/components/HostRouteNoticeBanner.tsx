@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { X } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 

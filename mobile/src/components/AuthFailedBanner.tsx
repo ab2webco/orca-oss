@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Pressable, StyleSheet } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing } from '../theme/mobile-theme'
 
 // Why: auth-failed is no longer necessarily terminal (issue #5200) — a

@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { BellRing, MessageSquare } from 'lucide-react-native'
 import type { MobileOnboardingStep } from './mobile-onboarding-plan'
 import { mobileOnboardingStyles as styles } from './mobile-onboarding-styles'

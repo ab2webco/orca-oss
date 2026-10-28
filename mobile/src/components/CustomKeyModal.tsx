@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { View, Text, Pressable, TextInput, StyleSheet, Switch } from 'react-native'
+import { View, Pressable, StyleSheet, Switch } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { ChevronLeft } from 'lucide-react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { colors, spacing, radii, typography } from '../theme/mobile-theme'
@@ -274,7 +275,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                   >
-                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                    <Text style={[styles.chipText, selected && styles.selectedLabelText]}>
                       {modifier.label}
                     </Text>
                     {modifier.glyph ? (
@@ -347,7 +348,7 @@ export function CustomKeyModal({ visible, onClose, onKeysChanged, onManageShortc
                         accessibilityLabel={key.accessibilityLabel}
                         accessibilityState={{ selected }}
                       >
-                        <Text style={[styles.keyCellText, selected && styles.keyCellTextSelected]}>
+                        <Text style={[styles.keyCellText, selected && styles.selectedLabelText]}>
                           {key.label}
                         </Text>
                       </Pressable>
@@ -551,7 +552,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500'
   },
-  chipTextSelected: {
+  selectedLabelText: {
     color: colors.bgBase
   },
   chipGlyph: {
@@ -630,9 +631,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     fontFamily: typography.monoFamily
-  },
-  keyCellTextSelected: {
-    color: colors.bgBase
   },
   macroForm: {
     padding: spacing.md,

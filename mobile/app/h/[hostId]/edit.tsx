@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
-  Text,
-  TextInput,
   StyleSheet,
   Pressable,
   ActivityIndicator,
@@ -10,6 +8,7 @@ import {
   Platform,
   ScrollView
 } from 'react-native'
+import { Text, TextInput } from '../../../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'

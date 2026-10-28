@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronLeft, X } from 'lucide-react-native'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'

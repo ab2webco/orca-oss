@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 import { agentDotState } from '../worktree/agent-row-display'
