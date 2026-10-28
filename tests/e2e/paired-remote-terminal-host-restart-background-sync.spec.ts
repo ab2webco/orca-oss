@@ -17,6 +17,10 @@ import {
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import { settlePairedCleanupCall } from './helpers/paired-cleanup-call-budget'
 import { waitForTabParked } from './helpers/terminal-hidden-parking'
+import {
+  collectUnresponsiveRendererEvidence,
+  evaluateWithinRendererBudget
+} from './helpers/unresponsive-renderer-evidence'
 
 const PARK_DELAY_MS = 2_000
 const scratch = mkdtempSync(path.join(os.tmpdir(), 'orca-paired-host-restart-background-'))
@@ -206,18 +210,30 @@ async function findTerminalHandle(
   return terminal
 }
 
-async function openClientTab(page: Page, worktreeId: string, webTabId: string): Promise<void> {
+async function openClientTab(
+  client: PairedElectronClient,
+  worktreeId: string,
+  webTabId: string
+): Promise<void> {
+  const { page } = client
+  const mirrored = `Client never mirrored host tab ${webTabId}`
+  // Why: a renderer that stops answering gives the poll one sample and a bare timeout (ORCA-826); name the stall instead.
   await expect
     .poll(
       () =>
-        page.evaluate(
-          ({ worktreeId, webTabId }) =>
-            (window.__store?.getState().tabsByWorktree[worktreeId] ?? []).some(
-              (tab) => tab.id === webTabId
+        evaluateWithinRendererBudget(
+          () =>
+            page.evaluate(
+              ({ worktreeId, webTabId }) =>
+                (window.__store?.getState().tabsByWorktree[worktreeId] ?? []).some(
+                  (tab) => tab.id === webTabId
+                ),
+              { worktreeId, webTabId }
             ),
-          { worktreeId, webTabId }
+          () => collectUnresponsiveRendererEvidence(client.app),
+          { label: mirrored }
         ),
-      { timeout: 60_000, message: `Client never mirrored host tab ${webTabId}` }
+      { timeout: 60_000, message: mirrored }
     )
     .toBe(true)
   await page.evaluate(
@@ -320,19 +336,41 @@ async function expectTerminalInteractive(
 }
 
 async function moveHostAwayFromWorktree(page: Page, targetWorktreeId: string): Promise<string> {
-  const alternateWorktreeId = await page.evaluate((targetId) => {
-    const state = window.__store?.getState()
-    const alternate = state?.allWorktrees().find((worktree) => worktree.id !== targetId)
-    if (!state || !alternate) {
-      return null
-    }
-    state.setActiveView('editor')
-    state.setActiveWorktree(alternate.id)
-    return alternate.id
-  }, targetWorktreeId)
+  const missing = 'Host fixture needs a second worktree for inactive-workspace restart coverage'
+  let alternateWorktreeId: string | null = null
+  // Why: the seeded secondary is external and surfaces only after the visibility refetch, which trails under load.
+  await expect
+    .poll(
+      async () => {
+        alternateWorktreeId = await page.evaluate(async (targetId) => {
+          const store = window.__store
+          const target = store
+            ?.getState()
+            .allWorktrees()
+            .find((worktree) => worktree.id === targetId)
+          if (!store || !target) {
+            return null
+          }
+          await store.getState().fetchWorktrees(target.repoId)
+          const alternate = store
+            .getState()
+            .allWorktrees()
+            .find((worktree) => worktree.id !== targetId)
+          return alternate?.id ?? null
+        }, targetWorktreeId)
+        return alternateWorktreeId
+      },
+      { timeout: 30_000, message: missing }
+    )
+    .not.toBeNull()
   if (!alternateWorktreeId) {
-    throw new Error('Host fixture needs a second worktree for inactive-workspace restart coverage')
+    throw new Error(missing)
   }
+  await page.evaluate((alternateId) => {
+    const state = window.__store?.getState()
+    state?.setActiveView('editor')
+    state?.setActiveWorktree(alternateId)
+  }, alternateWorktreeId)
   await expect
     .poll(() => page.evaluate(() => window.__store?.getState().activeWorktreeId ?? null))
     .toBe(alternateWorktreeId)
@@ -384,12 +422,12 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
     const firstDecoy = await createHostTerminal(client, worktreeId, 'first-decoy')
     const parkingDecoy = await createHostTerminal(client, worktreeId, 'parking-decoy')
     terminals.push(target, firstDecoy, parkingDecoy)
-    await openClientTab(client.page, worktreeId, target.webTabId)
+    await openClientTab(client, worktreeId, target.webTabId)
     await expect
       .poll(() => readPaneContent(client!.page, target.webTabId), { timeout: 30_000 })
       .toContain('READY')
-    await openClientTab(client.page, worktreeId, firstDecoy.webTabId)
-    await openClientTab(client.page, worktreeId, parkingDecoy.webTabId)
+    await openClientTab(client, worktreeId, firstDecoy.webTabId)
+    await openClientTab(client, worktreeId, parkingDecoy.webTabId)
     await waitForTabParked(client.page, target.webTabId, { parkDelayMs: PARK_DELAY_MS })
 
     const targetSuffix = target.ptyId.slice(-10)
@@ -419,7 +457,7 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
     expect(readDaemonPid(session.userDataDir), 'daemon must survive the host relaunch').toBe(
       daemonPid
     )
-    await openClientTab(client.page, worktreeId, target.webTabId)
+    await openClientTab(client, worktreeId, target.webTabId)
     await expect
       .poll(
         () =>
@@ -451,7 +489,7 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
     const reconnectControl = await createHostTerminal(client, worktreeId, 'reconnect-control')
     terminals.push(reconnectControl)
     expect(reconnectControl.ptyId).not.toBe(target.ptyId)
-    await openClientTab(client.page, worktreeId, reconnectControl.webTabId)
+    await openClientTab(client, worktreeId, reconnectControl.webTabId)
     await waitForPaneConnected(client.page, reconnectControl.webTabId)
     await expectTerminalInteractive(client, reconnectControl, 'y')
   } finally {
