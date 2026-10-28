@@ -9,8 +9,9 @@ live run was made and no remote host was contacted.
 
 ## Summary
 
-- Remote placement exists only in `orchestration worker-start --on <saved-environment>`. The Run and
-  the coordinator stay on the home host. `game launch` and `game wave` have no placement.
+- Remote placement exists in `orchestration worker-start --on <saved-environment>` and, since
+  ORCA-794, `game launch --on <host> --repo <host repo>`. The Run and the coordinator stay on the
+  home host. `game wave` has no placement.
 - The home Run DB already records each federated dispatch's environment (`federated_dispatches`), so
   a cross-host fleet can come from the lead's own DB without scanning remote hosts.
 - Per-host capacity needs no new RPC. `diagnostics.memory` returns the host fields the game's cap

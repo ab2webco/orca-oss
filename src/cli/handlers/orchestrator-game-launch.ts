@@ -8,9 +8,11 @@ import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestr
 import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
+  remotePlacementOf,
   requiredTicket,
   taskPromptOf,
-  type GameLaunchFlags
+  type GameLaunchFlags,
+  type GameRemotePlacement
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
@@ -134,11 +136,15 @@ export async function launchGameMember(args: {
   launched?: GameLaunchedOnAccount
   /** Names this same command already gave, for the same reason. */
   namesTaken?: readonly string[]
+  /** A paired host instead of this Orca; named from the same roster as a local member. */
+  remote?: GameRemotePlacement | null
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
-  const where = await memberWorktreeParamsOf({ client, state, ticket, repo })
+  const where = args.remote
+    ? { ...args.remote, worktree: 'new-top-level' }
+    : await memberWorktreeParamsOf({ client, state, ticket, repo })
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
   const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
@@ -148,10 +154,13 @@ export async function launchGameMember(args: {
     DISPLAY_NAME_MAX,
     item?.id ?? ticket
   )
-  const memberAccount = await resolveGameMemberAccount(client, choice, {
-    agents: state.agents,
-    launched: args.launched
-  })
+  // Why: a host resolves accounts from its own roster and refuses a local pin.
+  const memberAccount = args.remote
+    ? { pin: {}, account: null }
+    : await resolveGameMemberAccount(client, choice, {
+        agents: state.agents,
+        launched: args.launched
+      })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
   if (choice.model) {
@@ -258,6 +267,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const overrides = parseGameLaunchFlags(flags)
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
+    const remote = remotePlacementOf(flags, repo, overrides)
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, ticket)
     if (response.result.pausedMembers?.some((one) => one.ticket === ticket)) {
@@ -290,7 +300,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       flags,
       cwd,
       prompt,
-      overrides
+      overrides,
+      remote
     })
     if (!isLaunchUnderway(launched)) {
       process.exitCode = 1

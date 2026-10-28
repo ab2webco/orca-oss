@@ -70,14 +70,22 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own worktree, as this project's lead",
     usage:
-      'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo', 'prompt', ...GAME_LAUNCH_OVERRIDE_FLAGS],
+      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'ticket',
+      'repo',
+      'on',
+      'prompt',
+      ...GAME_LAUNCH_OVERRIDE_FLAGS
+    ],
     positionalArgs: ['ticket'],
     notes: [
       'Run it from the lead terminal: the member reports to it through Orca orchestration.',
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
       "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
+      "--on <host> starts the member on that paired host (a saved environment) in a new worktree of --repo, which is then the host's repo selector and required; it takes the same roster name and game as a local member, and the host's own accounts (--account is refused).",
       "A relaunch reuses the ticket's idle worktree in that repo (its previous member's, else linked to the ticket, else named after it; an open PR breaks a tie); refused when an agent is live there or two still match.",
       '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.',
       ...GAME_LAUNCH_OVERRIDE_NOTES
@@ -86,6 +94,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'orca game launch CIN-1232 --json',
       'orca game launch CIN-1232 --prompt "Run the Tambora test run of {id} and report pass/fail"',
       'orca game launch CIN-1232 --repo name:cineco-frontend --json',
+      'orca game launch ORCA-831 --on imac --repo name:orca-oss',
       'orca game launch CIN-1232 --agent codex --account ana@example.com'
     ]
   },

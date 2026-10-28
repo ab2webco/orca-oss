@@ -13,6 +13,7 @@ import {
 } from './helpers/orchestrator-game-band'
 
 // A lead with one local member and two on a paired host, one of which does not answer (ORCA-824).
+// The local and one remote member carry roster names from the same pool (ORCA-794).
 const HOLD_MS = 1_500
 const REDRAW_MS = 1_000
 
@@ -20,10 +21,11 @@ const member = (
   paneKey: string,
   ticket: string,
   state: 'working' | 'idle',
-  remote: { host: string; stateKnown: boolean } | null
+  remote: { host: string; stateKnown: boolean } | null,
+  name: string | null = null
 ) => ({
   paneKey,
-  displayName: ticket,
+  displayName: name ? `${name} · ${ticket}` : ticket,
   agentType: remote ? '' : 'claude',
   state,
   toolName: null,
@@ -47,8 +49,8 @@ const gameState = {
       toolName: 'Read',
       isLeader: true
     },
-    member('demo-local', 'LUM-12', 'working', null),
-    member('remote:ctx_14', 'LUM-14', 'working', { host: 'imac', stateKnown: true }),
+    member('demo-local', 'LUM-12', 'working', null, 'Arthur'),
+    member('remote:ctx_14', 'LUM-14', 'working', { host: 'imac', stateKnown: true }, 'Merlin'),
     member('remote:ctx_15', 'LUM-15', 'idle', { host: 'imac', stateKnown: false })
   ],
   review: null,
@@ -65,6 +67,7 @@ const SILENT_HOST = 'imac not answering'
 // Why either: a phone-width card shortens the tag to `imac ?` rather than ellipsize it.
 const SILENT_HOST_ANY = /imac (not answering|\?)/
 const TICKETS = ['LUM-12', 'LUM-14', 'LUM-15'] as const
+const NAMES = ['Arthur', 'Merlin'] as const
 
 /** Wheels a short docked Panel down until the silent host's card is on screen. */
 async function scrollPanelTo(page: Page, text: RegExp): Promise<void> {
@@ -99,7 +102,8 @@ test('the Panel names the paired host of a remote member, and says when it does 
         timeout: 60_000,
         message: 'the band never drew the seeded party'
       })
-      .toContain('LUM-12')
+      // Why a name: the band cuts a named member to `Merlin · …`, dropping its ticket.
+      .toContain('Merlin')
     await orcaPage.waitForTimeout(REDRAW_MS)
     await clickTerminalText(orcaPage, 'Panel')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('▾ Team')
@@ -134,6 +138,9 @@ test('the Panel names the paired host of a remote member, and says when it does 
         // ORCA-827: a phone-width card cut the ticket to `LU…` behind its sprite.
         for (const ticket of TICKETS) {
           expect(seen, `${shot} drops ${ticket}`).toMatch(new RegExp(`\\b${ticket}\\b`))
+        }
+        for (const name of NAMES) {
+          expect(seen, `${shot} drops ${name}`).toContain(name)
         }
       }
     }

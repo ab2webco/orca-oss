@@ -13,12 +13,14 @@ const HOLD_MS = 10 * 60_000
 
 /**
  * Every name a live member of the project holds, whichever lead launched it: rows in the project's
- * worktrees, members its panes launched in other repos, and saved members whose worktree still runs.
+ * worktrees, members its panes launched in other repos, saved members whose worktree still runs,
+ * and members placed on paired hosts (their home task titles).
  */
 export function liveProjectMemberNamesOf(args: {
   worktrees: readonly ScannedWorktree[]
   inProject: (worktree: ScannedWorktree) => boolean
   saved: readonly Pick<GameMemberSession, 'name' | 'worktreeId' | 'lastState'>[]
+  remote?: readonly string[]
 }): string[] {
   const projectPanes = new Set(
     args.worktrees.filter(args.inProject).flatMap((one) => one.agents.map((row) => row.paneKey))
@@ -34,9 +36,11 @@ export function liveProjectMemberNamesOf(args: {
   const saved = args.saved.filter(
     (one) => one.lastState !== 'finished' && one.worktreeId !== null && running.has(one.worktreeId)
   )
-  return [...rows.map((row) => row.displayName), ...saved.map((one) => one.name)].flatMap(
-    (name) => memberNameOf(name) ?? []
-  )
+  return [
+    ...rows.map((row) => row.displayName),
+    ...saved.map((one) => one.name),
+    ...(args.remote ?? [])
+  ].flatMap((name) => memberNameOf(name) ?? [])
 }
 
 /** Names picked for launches whose members do not run yet, held per project so two launches never share one. */

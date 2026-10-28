@@ -116,6 +116,15 @@ describe('gameLeadBriefOf', () => {
     )
   })
 
+  it('places a member on a paired host with game launch --on, never a plain worker-start (ORCA-794)', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca game launch <ticket> --on <host> --repo <selector of the repo on that host>`'
+    )
+    expect(brief).toContain('never with `orchestration worker-start --on`')
+  })
+
   it('writes every command with the CLI this session runs', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
 

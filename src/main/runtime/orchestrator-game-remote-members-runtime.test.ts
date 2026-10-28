@@ -225,3 +225,38 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
     )
   })
 })
+
+describe('the member name pool with a member on a paired host (ORCA-794)', () => {
+  it("skips the name a remote member's home task holds", async () => {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({ worktrees: [] } as never)
+    const db = new OrchestrationDb(':memory:')
+    runtime.setOrchestrationDb(db)
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    const task = db.createTask({ spec: 'gate', taskTitle: 'Arthur · ORCA-805 gate', runId: run.id })
+    db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_imac', serverName: 'imac' },
+      federation: {
+        environmentId: 'env_imac',
+        environmentName: 'imac',
+        peerFingerprint: 'fp_imac',
+        protocolVersion: 1
+      }
+    })
+
+    const reserved = await runtime.reserveGameMemberName({
+      ticket: 'ORCA-806',
+      roster: ['Arthur', 'Merlin'],
+      locale: 'en',
+      taken: []
+    })
+
+    expect(reserved).toEqual({ name: 'Merlin' })
+    db.close()
+  })
+})

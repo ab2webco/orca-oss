@@ -534,7 +534,10 @@ pane's `ORCA_GAME_LOCALE`. The name goes before the ticket (`Merlin · CIN-12 Ca
 reaches the tab title, `game fleet`, the HUD and the member card. It is freed when the member is
 released, and a member gets its ticket alone once every name is taken or the scene has none
 ([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
-The project Settings' **Member names** takes plain names separated by commas.
+The project Settings' **Member names** takes plain names separated by commas. A member on a paired
+host (`game launch --on`) takes its name from the same pool: the lead's Orca picks it and keeps it
+in the home task title, and the names of every unreleased remote member in its Run DB count as held,
+so a local and a remote member never share one.
 
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
@@ -543,8 +546,9 @@ The lead's verbs, run from the lead's terminal
 - `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
-- `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
-  `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
+- `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — one member for
+  one ticket; `--repo` starts it in another repo of the project, and `--on` on a paired host (see
+  the fleet section below; `--repo` is then the host's repo and required). `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
   investigation. Per-launch overrides of the lead config (also on `game wave`, for every member it
   launches):
@@ -559,8 +563,8 @@ The lead's verbs, run from the lead's terminal
   - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
     3 s apart, with the same orchestration request id, so the runtime never starts a second member
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
-    `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
-    `orchestration worker-start --on` refuses account pins because the server resolves its own).
+    A member launched with `--on` runs on the host's own accounts, so `--account` is refused there
+    and `accounts: auto` pins nothing (`orchestration worker-start --on` refuses account pins).
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
     agent's process env, so a model router outside Orca can leave that choice alone (Jev 0.13.1+
@@ -956,7 +960,13 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   and NEXT `worker-show --dispatch <id>`. The fleet holds the lead Run's live remote dispatches and
   those that finished since the current lead claimed the Run. A remote agent started any other way
   (a plain terminal on the host) has no record on the lead's machine and cannot be listed;
-  `game launch` has no `--on` yet.
+  `orca game launch <ticket> --on <host> --repo <selector of the repo on that host>` is the
+  game's remote launch: the same roster name, task title, member record and `game: true` as a
+  local launch, sent as `worker-start --on <host>` with a `new-top-level` worktree. The host
+  starts the pane as a game member (band and character) when it has the game-member capability,
+  and draws Quest when its checkout lacks the project's `sceneFile`. A plain
+  `worker-start --on` gives the member neither a name nor the game. There is no host repo map
+  yet, so `--repo` names the host's own repo.
 - The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and
   returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
 - A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")

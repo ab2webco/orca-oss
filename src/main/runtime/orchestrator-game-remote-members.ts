@@ -130,6 +130,24 @@ export function listEarlierLeadRemoteMemberSources(
     .map(({ runId: _runId, coordinatorHandle: _handle, ...row }) => sourceOf(row, true))
 }
 
+/**
+ * Task titles of every Run's remote members still holding their host's resources, for the name
+ * pool. Not scoped to a project: the home Run DB does not record one, and a skipped name costs nothing.
+ */
+export function liveRemoteMemberTitlesOf(db: OrchestrationDb): string[] {
+  const rows = sqliteOf(db)
+    .prepare(
+      `SELECT t.task_title AS taskTitle
+         ${SOURCE_JOINS}
+        WHERE ${NOT_RELEASED}
+          AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
+          AND t.task_title IS NOT NULL
+        ORDER BY d.created_at, d.rowid`
+    )
+    .all() as { taskTitle: string }[]
+  return rows.map((row) => row.taskTitle)
+}
+
 const TITLE_STATES = {
   working: 'working',
   permission: 'waiting',

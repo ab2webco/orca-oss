@@ -193,6 +193,7 @@ import { formatMessagePointer } from './orchestration/formatter'
 import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
+  liveRemoteMemberTitlesOf,
   remoteGameMembersOf,
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
@@ -30930,7 +30931,8 @@ export class OrcaRuntimeService {
     const live = liveProjectMemberNamesOf({
       worktrees: ps.worktrees,
       inProject: (one) => `repo:${one.repoId}` === project.key,
-      saved: saved.ok ? saved.members : []
+      saved: saved.ok ? saved.members : [],
+      remote: this._orchestrationDb ? liveRemoteMemberTitlesOf(this._orchestrationDb) : []
     })
     return {
       name: this.gameMemberNames.reserve({
