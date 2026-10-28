@@ -68,7 +68,11 @@ export const ORCHESTRATION_FEDERATION_RELEASE_METHODS: RpcMethod[] = [
           await runtime.removeManagedWorktree(`id:${created.id}`, false)
           receipt.removedWorktree = created.id
         } catch (error) {
-          worktreeError = error instanceof Error ? error.message : String(error)
+          const message = error instanceof Error ? error.message : String(error)
+          // Why: removed by hand earlier (ORCA-826); nothing is left to keep.
+          if (message !== 'selector_not_found') {
+            worktreeError = message
+          }
         }
       }
       runtime.getOrchestrationDb().markRemoteAttachmentReleased(params.dispatchId)

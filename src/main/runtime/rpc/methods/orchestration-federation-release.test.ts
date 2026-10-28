@@ -12,6 +12,7 @@ import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { createFederationWorkerStartRequest as startRequest } from './orchestration-federation-test-request'
 import { configureWorkerRuntime } from './orchestration-federation-worker-runtime-mocks'
+import { WORKTREE_METHODS } from './worktree'
 
 // Why: a finished remote member could not be released, so it stayed in the fleet and its
 // terminal and worktree stayed on the remote host (ORCA-790).
@@ -32,7 +33,10 @@ describe('releasing a remote worker through the relay', () => {
     workerRuntime.setOrchestrationDb(workerDb)
     configureWorkerRuntime(workerRuntime)
     vi.spyOn(workerRuntime, 'removeManagedWorktree').mockResolvedValue({} as never)
-    workerDispatcher = new RpcDispatcher({ runtime: workerRuntime, methods: ORCHESTRATION_METHODS })
+    workerDispatcher = new RpcDispatcher({
+      runtime: workerRuntime,
+      methods: [...ORCHESTRATION_METHODS, ...WORKTREE_METHODS]
+    })
     workerCapabilities = [...(workerRuntime.getStatus().capabilities ?? [])]
     remoteMethods = []
     const transport: OrchestrationEnvironmentTransport = {
@@ -216,5 +220,102 @@ describe('releasing a remote worker through the relay', () => {
     })
     expect(JSON.stringify(response)).toContain('update Orca on windows')
     expect(remoteMethods).not.toContain('orchestration.federationRelease')
+  })
+
+  function useOlderWorkerBuild(): void {
+    workerCapabilities = workerCapabilities.filter(
+      (capability) => capability !== ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY
+    )
+  }
+
+  function forgetOnHost(dispatchId: string): void {
+    const sqlite = (
+      workerDb as unknown as { db: { prepare: (sql: string) => { run: (id: string) => void } } }
+    ).db
+    sqlite.prepare('DELETE FROM remote_dispatch_attachments WHERE dispatch_id = ?').run(dispatchId)
+  }
+
+  function leaveNothingOnHost(): void {
+    vi.mocked(workerRuntime.showTerminal).mockRejectedValue(new Error('terminal_handle_stale'))
+    vi.spyOn(workerRuntime, 'showManagedWorktree').mockRejectedValue(
+      new Error('selector_not_found')
+    )
+  }
+
+  // Why: ORCA-826's terminal and worktree were removed by hand on the iMac, so its row stayed a ghost.
+  describe('when nothing of the member is left on its host', () => {
+    it('settles when a capable host no longer has the dispatch', async () => {
+      const { run, task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+      forgetOnHost(dispatch.id)
+
+      const response = await release(dispatch.id)
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'released', remote: { alreadyGone: true } }
+      })
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('does not report a worktree that was already removed as an error', async () => {
+      vi.mocked(workerRuntime.removeManagedWorktree).mockRejectedValue(
+        new Error('selector_not_found')
+      )
+      const { task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+
+      const response = await release(dispatch.id)
+
+      expect(response).toMatchObject({ ok: true, result: { state: 'released' } })
+      expect(JSON.stringify(response)).not.toContain('worktreeError')
+    })
+
+    it('settles on an older host that no longer has the dispatch', async () => {
+      useOlderWorkerBuild()
+      const { run, task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+      forgetOnHost(dispatch.id)
+
+      const response = await release(dispatch.id)
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'released', remote: { alreadyGone: true } }
+      })
+      expect(remoteMethods).not.toContain('orchestration.federationRelease')
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('settles on an older host once its terminal and worktree are gone', async () => {
+      useOlderWorkerBuild()
+      const { run, task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+      leaveNothingOnHost()
+
+      const response = await release(dispatch.id)
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'released', processAction: 'none', remote: { alreadyGone: true } }
+      })
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('keeps an older host retained while its worktree is still there', async () => {
+      useOlderWorkerBuild()
+      const { task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+      vi.mocked(workerRuntime.showTerminal).mockRejectedValue(new Error('terminal_handle_stale'))
+      vi.spyOn(workerRuntime, 'showManagedWorktree').mockResolvedValue({ id: 'wt' } as never)
+
+      const response = await release(dispatch.id)
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'retained', reason: 'federation_unsupported' }
+      })
+    })
   })
 })
