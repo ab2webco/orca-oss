@@ -80,6 +80,8 @@ export type GameRemoteHost = {
   earlierLead?: true
   /** The home Run completed the member's task. */
   ticketDone?: true
+  /** The host answered and the member's terminal is no longer there (ORCA-790). */
+  gone?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }

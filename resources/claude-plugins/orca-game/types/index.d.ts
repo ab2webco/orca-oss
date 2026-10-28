@@ -56,7 +56,12 @@ export type GameAgent = {
   remote?: GameMemberRemote
 }
 
-export type GameMemberRemote = { host: string; stateKnown: boolean }
+export type GameMemberRemote = {
+  host: string
+  stateKnown: boolean
+  /** The host answered and the member's terminal is no longer there. */
+  gone?: true
+}
 
 export type GameMemberLaunch = { model: string | null; effort: string | null }
 
