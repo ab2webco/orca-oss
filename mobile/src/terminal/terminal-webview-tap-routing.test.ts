@@ -3,7 +3,7 @@
 // printed http(s) URL must post an `open-url` message (which RN routes to the
 // in-app/phone browser). Regression guard for taps that jitter a few pixels —
 // those were being swallowed because the tap shared the long-press slop gate.
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { XTERM_HTML } from './terminal-webview-html'
 
 function iifeSource(): string {
@@ -116,8 +116,16 @@ function fireTouch(type: string, touches: Array<{ x: number; y: number }>): void
   document.dispatchEvent(ev)
 }
 
-// Wait one macrotask so init()'s rAF chain (term.open -> ready) settles.
-const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 50))
+const FIT_SCALE = 200 / 640
+
+// Why: taps map through the fit scale, which applyFitScale commits a frame after `ready`; a fixed
+// 50ms wait lost that race under full-suite load.
+const settle = (posted: Posted): Promise<void> =>
+  vi.waitFor(() => {
+    expect(posted.some((m) => m.type === 'ready')).toBe(true)
+    const surface = document.getElementById('terminal-surface') as HTMLElement
+    expect(surface.style.transform).toContain(`scale(${FIT_SCALE})`)
+  })
 
 describe('terminal WebView tap routing', () => {
   // Fit scale here is min(1, innerWidth / (cellW*cols)) = 200 / 640 = 0.3125.
@@ -134,7 +142,7 @@ describe('terminal WebView tap routing', () => {
 
   it('posts open-url when a clean tap lands on a URL', async () => {
     const { posted } = boot(URL_LINE)
-    await settle()
+    await settle(posted)
     fireTouch('touchstart', [{ x: tapX, y: tapY }])
     fireTouch('touchend', [])
     expect(posted.find((m) => m.type === 'open-url')?.url).toBe('https://example.com/foo')
@@ -144,7 +152,7 @@ describe('terminal WebView tap routing', () => {
     // Why: a finger rarely lands perfectly still. Movement under TAP_SLOP must
     // not reclassify the tap as a scroll and drop the link open.
     const { posted } = boot(URL_LINE)
-    await settle()
+    await settle(posted)
     fireTouch('touchstart', [{ x: tapX, y: tapY }])
     fireTouch('touchmove', [{ x: tapX + 11, y: tapY + 4 }])
     fireTouch('touchend', [])
@@ -153,7 +161,7 @@ describe('terminal WebView tap routing', () => {
 
   it('focuses native input after reporting a touch tap to a mouse-tracking TUI', async () => {
     const { posted } = boot('interactive prompt', undefined, 'drag')
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: 20, y: tapY }])
     fireTouch('touchend', [])
@@ -167,7 +175,7 @@ describe('terminal WebView tap routing', () => {
 
   it('reports a non-mouse touch tap without terminal mouse bytes', async () => {
     const { posted } = boot('plain prompt')
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: 20, y: tapY }])
     fireTouch('touchend', [])
@@ -180,7 +188,7 @@ describe('terminal WebView tap routing', () => {
     // Why: scrollback reflow rewraps the local buffer; the tap path must keep
     // working afterward (the reflow message must not disturb tap routing).
     const { posted } = boot(URL_LINE)
-    await settle()
+    await settle(posted)
     window.dispatchEvent(
       new MessageEvent('message', { data: JSON.stringify({ type: 'reflow', cols: 100, rows: 24 }) })
     )
@@ -192,7 +200,7 @@ describe('terminal WebView tap routing', () => {
   it('opens first-load OSC links from snapshot metadata on the exact cell range', async () => {
     const oscLinks = [{ row: 0, startCol: 6, endCol: 11, uri: 'https://example.com/issue/1234' }]
     const { posted } = boot('issue #1234 done', oscLinks)
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: screenXForCol(7), y: tapY }])
     fireTouch('touchend', [])
@@ -203,7 +211,7 @@ describe('terminal WebView tap routing', () => {
   it('opens first-load file OSC links through terminal file taps', async () => {
     const oscLinks = [{ row: 0, startCol: 5, endCol: 15, uri: 'file:///tmp/result.json#L12C3' }]
     const { posted } = boot('open artifact here', oscLinks)
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: screenXForCol(7), y: tapY }])
     fireTouch('touchend', [])
@@ -220,7 +228,7 @@ describe('terminal WebView tap routing', () => {
   it('opens plain file URLs through terminal file taps', async () => {
     const line = 'open file:///tmp/result.json#L12C3 now'
     const { posted } = boot(line)
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: screenXForCol(line.indexOf('result')), y: tapY }])
     fireTouch('touchend', [])
@@ -236,7 +244,7 @@ describe('terminal WebView tap routing', () => {
   it('does not open snapshot OSC links from adjacent terminal cells', async () => {
     const oscLinks = [{ row: 0, startCol: 6, endCol: 11, uri: 'https://example.com/issue/1234' }]
     const { posted } = boot('issue #1234 done', oscLinks)
-    await settle()
+    await settle(posted)
 
     fireTouch('touchstart', [{ x: screenXForCol(12), y: tapY }])
     fireTouch('touchend', [])
@@ -252,7 +260,7 @@ describe('terminal WebView tap routing', () => {
       uri: `file:///tmp/result-${index}.json#L1`
     }))
     const { posted } = boot('plain text', oscLinks)
-    await settle()
+    await settle(posted)
 
     const OriginalURL = window.URL
     let parseCount = 0
@@ -277,7 +285,7 @@ describe('terminal WebView tap routing', () => {
   it('does not open stale snapshot OSC links after the row text changes', async () => {
     const oscLinks = [{ row: 0, startCol: 6, endCol: 11, uri: 'https://example.com/issue/1234' }]
     const { posted, setLine } = boot('issue #1234 done', oscLinks)
-    await settle()
+    await settle(posted)
     setLine('issue plain done')
 
     fireTouch('touchstart', [{ x: screenXForCol(7), y: tapY }])
@@ -288,7 +296,7 @@ describe('terminal WebView tap routing', () => {
 
   it('does not post open-url for a scroll gesture past the tap slop', async () => {
     const { posted } = boot(URL_LINE)
-    await settle()
+    await settle(posted)
     fireTouch('touchstart', [{ x: tapX, y: tapY }])
     fireTouch('touchmove', [{ x: tapX, y: tapY + 120 }])
     fireTouch('touchend', [])
