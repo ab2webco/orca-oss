@@ -63,6 +63,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
         homePeerFingerprint: orchestrationMutation.callerFingerprint,
         protocolVersion: params.protocolVersion,
         runtimeEpoch: runtime.getRuntimeId(),
+        ...(params.game && params.gameScene ? { gameScene: params.gameScene } : {}),
         mutationReceipt: orchestrationMutation
       })
       const effects: FederationEffect[] = []

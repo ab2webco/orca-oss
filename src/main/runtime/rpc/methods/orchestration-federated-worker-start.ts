@@ -56,11 +56,17 @@ export async function startFederatedWorker(args: {
     undefined,
     params.timeoutMs
   )) as RuntimeStatus
-  const { federationProtocolVersion, gameMember } = negotiateFederatedWorkerStart({
-    status,
-    serverName: server.name,
-    params
-  })
+  const { federationProtocolVersion, gameMember, carriesGameScene } = negotiateFederatedWorkerStart(
+    {
+      status,
+      serverName: server.name,
+      params
+    }
+  )
+  // Why never blocking: without the scene the host draws its own, as before.
+  const gameScene = carriesGameScene
+    ? await runtime.readCallerGameScene(params.from).catch(() => null)
+    : null
 
   const setupDecision = createsWorktree ? (params.setup ?? 'run') : 'not_applicable'
   const started = db.createStartingWorkerDispatch({
@@ -121,7 +127,8 @@ export async function startFederatedWorker(args: {
         effort: params.effort,
         timeoutMs: params.timeoutMs,
         devMode: params.devMode,
-        ...gameMember
+        ...gameMember,
+        ...(gameScene ? { gameScene } : {})
       },
       (params.timeoutMs ?? 60_000) + 15_000,
       { orchestrationRequestId: orchestrationMutation.requestId }

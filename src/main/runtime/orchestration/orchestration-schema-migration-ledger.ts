@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 36
+export const ORCHESTRATION_SCHEMA_VERSION = 37
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -144,5 +144,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     lineage: 'lab',
     summary: 'host-observed worker activity per dispatch (ORCA-746)',
     effects: ['column:dispatch_contexts.last_activity_at']
+  },
+  {
+    version: 37,
+    lineage: 'lab',
+    summary: "a remote game member's scene from its lead (ORCA-794)",
+    effects: ['column:remote_dispatch_attachments.game_scene']
   }
 ]

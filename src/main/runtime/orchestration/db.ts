@@ -1170,6 +1170,9 @@ export class OrchestrationDb {
       if (current < 36 && !this.hasColumn('dispatch_contexts', 'last_activity_at')) {
         this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN last_activity_at TEXT')
       }
+      if (current < 37 && !this.hasColumn('remote_dispatch_attachments', 'game_scene')) {
+        this.db.exec('ALTER TABLE remote_dispatch_attachments ADD COLUMN game_scene TEXT')
+      }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
     } catch (err) {
@@ -5108,6 +5111,8 @@ export class OrchestrationDb {
     homePeerFingerprint: string
     protocolVersion: number
     runtimeEpoch: string
+    /** The lead's scene, kept so the member's band draws it after a restart too. */
+    gameScene?: { id: string; text: string }
     mutationReceipt: {
       callerFingerprint: string
       requestId: string
@@ -5153,15 +5158,17 @@ export class OrchestrationDb {
       this.db
         .prepare(
           `INSERT INTO remote_dispatch_attachments (
-             dispatch_id, task_id, home_peer_fingerprint, protocol_version, runtime_epoch
-           ) VALUES (?, ?, ?, ?, ?)`
+             dispatch_id, task_id, home_peer_fingerprint, protocol_version, runtime_epoch,
+             game_scene
+           ) VALUES (?, ?, ?, ?, ?, ?)`
         )
         .run(
           params.dispatchId,
           params.taskId,
           params.homePeerFingerprint,
           params.protocolVersion,
-          params.runtimeEpoch
+          params.runtimeEpoch,
+          params.gameScene ? JSON.stringify(params.gameScene) : null
         )
       this.db.exec('COMMIT')
       return this.getRemoteDispatchAttachment(params.dispatchId) as RemoteDispatchAttachmentRow
@@ -5175,6 +5182,18 @@ export class OrchestrationDb {
     return this.db
       .prepare('SELECT * FROM remote_dispatch_attachments WHERE dispatch_id = ?')
       .get(dispatchId) as RemoteDispatchAttachmentRow | undefined
+  }
+
+  /** The scene the newest remote member in this worktree brought from its lead. */
+  getGameSceneForWorktree(worktreeId: string): { id: string; text: string } | null {
+    const row = this.db
+      .prepare(
+        `SELECT game_scene FROM remote_dispatch_attachments
+         WHERE worktree_id = ? AND game_scene IS NOT NULL
+         ORDER BY created_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(worktreeId) as { game_scene: string } | undefined
+    return row ? (JSON.parse(row.game_scene) as { id: string; text: string }) : null
   }
 
   recordRemoteAttachmentStage(params: {
