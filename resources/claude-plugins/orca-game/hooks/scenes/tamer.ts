@@ -1,7 +1,28 @@
-import type { SceneDefinition } from './scene-definition'
+import { sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const FACE = 0xf0c9a0
+
+// A shiny: the tamer's cap and every partner's body in one color of its own.
+const shiny = (
+  name: string,
+  color: number,
+  ...accessory: [Parameters<typeof sceneCharacter>[2], number]
+) => sceneCharacter(name, { C: color, G: color, R: color, T: color, A: color }, ...accessory)
+
+const CHARACTERS = [
+  shiny('Mochi', 0xf8b8d0, 'bow', 0xe0405a),
+  shiny('Bramble', 0x7a5a3a, 'horns', 0xe8e0c8),
+  shiny('Sprout', 0x9ae07a, 'antenna', 0x5fbf6a),
+  shiny('Pebble', 0xa0a0a8, 'crown', 0xffd84a),
+  shiny('Fern', 0x3f9f5a, 'feather', 0x2f8a3a),
+  shiny('Clover', 0x6ad08a, 'halo', 0xfff3a0),
+  shiny('Thistle', 0xa06ad0, 'horns', 0xb07ae0),
+  shiny('Puddle', 0x5fa8e8, 'bow', 0x6aa8f0),
+  shiny('Nibbles', 0xe8c890, 'antenna', 0x8a6a4a),
+  shiny('Juniper', 0x4a7aa0, 'cape', 0x6a8ad0),
+  shiny('Biscuit', 0xd89a5a, 'cape', 0xb05a2a)
+]
 
 // Beast Tamer by Jucer Orozco (koombea/cineco-orchestrator PR #32): a tamer and five original
 // creatures across flower meadows, and a wild glitch bug on red CI.
@@ -171,6 +192,9 @@ export const TAMER_SCENE: SceneDefinition = {
   },
   finale: { en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!' },
   // Jev's advisor: the professor in a lab coat, who knows every creature's level.
+  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  roster: ['Pip', ...CHARACTERS.map((one) => one.name)],
+  characters: CHARACTERS,
   cast: {
     advisor: {
       name: { en: 'Professor', es: 'Profesor' },

@@ -1,10 +1,32 @@
-import type { SceneDefinition } from './scene-definition'
+import { sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const FACE = 0xf0c9a0
 const MERC_HAIR = 0xf2d35a
 const NAVY = 0x2f3a6b
 const STEEL = 0xd0d6de
+
+// A party member's face, and the hair, hood or helmet each phase's costume wears.
+const member = (
+  name: string,
+  face: number,
+  hair: number,
+  ...accessory: [Parameters<typeof sceneCharacter>[2], number]
+) => sceneCharacter(name, { S: face, Y: hair, P: hair, G: hair, A: hair }, ...accessory)
+
+const CHARACTERS = [
+  member('Kael', 0xf3d2b0, 0xd83a2e, 'horns', 0xe8e0c8),
+  member('Lyra', 0xe8b890, 0x5fb8ff, 'bow', 0xff7ab0),
+  member('Riven', 0xc08860, 0x2a2a3a, 'feather', 0x9a3ad0),
+  member('Sora', 0xf6dcc4, 0x7fe0ff, 'halo', 0xfff3a0),
+  member('Thane', 0x9a6440, 0x8a8a8a, 'horns', 0xb89a70),
+  member('Mira', 0xf0c8a0, 0xf878c8, 'bow', 0xffffff),
+  member('Elara', 0xd8a878, 0xf4f0d0, 'crown', 0xffd84a),
+  member('Bryn', 0xb07850, 0xe07a2a, 'cape', 0x3a6ad0),
+  member('Corin', 0x7a4a2a, 0x4a8a3a, 'antenna', 0x9ae07a),
+  member('Faye', 0xfadcc0, 0x9a6ad0, 'feather', 0x4fc3f7),
+  member('Zephyr', 0xe0b080, 0x4fd8b0, 'cape', 0xd8f0ff)
+]
 
 // Crystal Saga by Jucer Orozco (koombea/cineco-orchestrator PR #32): a JRPG party crossing
 // crystal spires, and a silver-haired rival on red CI.
@@ -174,6 +196,9 @@ export const JRPG_SCENE: SceneDefinition = {
   // Why ★: PR #32 framed it with ♪, which is outside the characters a Raster is known to draw.
   finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' },
   // Jev's advisor: a hooded oracle whose orb flickers while it reads the signs.
+  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  roster: ['Aerin', ...CHARACTERS.map((one) => one.name)],
+  characters: CHARACTERS,
   cast: {
     advisor: {
       name: { en: 'Oracle', es: 'Oráculo' },

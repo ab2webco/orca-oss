@@ -16,6 +16,9 @@ import {
   sceneFile
 } from '../../../../src/shared/__fixtures__/orchestrator-game-scene'
 
+// Why: the built-in Quest dresses its own roster; these tests need its costumes undressed.
+const { characters: _quest, ...PLAIN } = QUEST_SCENE
+
 const princess = {
   rows: ['...YYYY...', '..YYYYYY..', '..PSSSSP..', '..SESSES..', '.PPPPPPPP.', '..PPPPPP..'],
   legs: ['..P....P..', '.P......P.'],
@@ -23,7 +26,7 @@ const princess = {
 }
 
 const SCENE: SceneDefinition = {
-  ...QUEST_SCENE,
+  ...PLAIN,
   roster: ['Arthur', { en: 'Merlin', es: 'Merlín' }, 'Morgana', 'Elaine'],
   characters: [
     {
@@ -40,7 +43,7 @@ const NAMES = ['Arthur · ORCA-1 a', 'Merlin · ORCA-2 b', 'Morgana · ORCA-3 c'
 describe('characterCostumeOf', () => {
   it('draws a plain-name member, or a scene without characters, in the phase costume as before', () => {
     expect(characterCostumeOf(SCENE, NAMES[0]!, 'build')).toBe(QUEST_SCENE.costumes.build)
-    expect(characterCostumeOf(QUEST_SCENE, NAMES[1]!, 'build')).toBe(QUEST_SCENE.costumes.build)
+    expect(characterCostumeOf(PLAIN, NAMES[1]!, 'build')).toBe(QUEST_SCENE.costumes.build)
     expect(characterCostumeOf(SCENE, 'ORCA-9 no name', 'pr')).toBe(QUEST_SCENE.costumes.pr)
   })
 
@@ -144,7 +147,7 @@ const slotsOf = (scene: SceneDefinition): string[] => {
 describe('members drawn as their characters', () => {
   it('draws each member in one phase as its character on the band, a plain name as before', () => {
     const drawn = slotsOf(SCENE)
-    const plain = slotsOf(QUEST_SCENE)
+    const plain = slotsOf(PLAIN)
     expect(drawn[0]).toBe(plain[0])
     expect(drawn.slice(1).filter((slot, i) => slot === plain[i + 1])).toEqual([])
   })
