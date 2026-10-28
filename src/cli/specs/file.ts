@@ -32,6 +32,38 @@ export const FILE_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['file', 'read'],
+    summary: 'Print a workspace file, on this host or a paired one',
+    usage:
+      'orca file read <path> [--offset <byte>] [--limit <bytes>] [--worktree <selector>] [--environment <env>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'path', 'offset', 'limit', 'worktree'],
+    positionalArgs: ['path'],
+    notes: [
+      'The path must stay inside the selected worktree or folder workspace; the runtime rejects anything outside it.',
+      'Without --offset/--limit the whole file is read up to the runtime preview budget (512 KiB, less over a paired connection). Larger files fail with a hint to read byte ranges.',
+      '--offset/--limit read a byte range (default 64 KiB, at most 512 KiB); text output ends with the next --offset when more remains. Ranged reads are unavailable for SSH worktrees.',
+      'Binary files are reported as binary and their bytes are never printed.',
+      'With --environment, --worktree is required because the local cwd cannot identify a worktree on the other host.'
+    ],
+    examples: [
+      'orca file read src/App.tsx',
+      'orca file read README.md --worktree branch:main --environment imac',
+      'orca file read logs/app.log --offset 0 --limit 65536 --worktree active --json'
+    ]
+  },
+  {
+    path: ['file', 'list'],
+    summary: 'List a workspace directory, on this host or a paired one',
+    usage: 'orca file list [<dir>] [--worktree <selector>] [--environment <env>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'path', 'worktree'],
+    positionalArgs: ['path'],
+    notes: [
+      'Lists the worktree root when <dir> is omitted. Directories end with "/".',
+      'The directory must stay inside the selected worktree or folder workspace.'
+    ],
+    examples: ['orca file list', 'orca file list src --worktree branch:main --environment imac']
+  },
+  {
     path: ['file', 'open-changed'],
     summary: 'Open all git-changed files for a workspace',
     usage: 'orca file open-changed [--mode edit|diff|both] [--worktree <selector>] [--json]',
