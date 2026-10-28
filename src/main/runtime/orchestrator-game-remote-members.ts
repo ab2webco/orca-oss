@@ -174,7 +174,8 @@ export async function remoteGameMembersOf(
           host: source.hostName,
           stateKnown,
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
-          ...(source.ticketDone ? { ticketDone: true as const } : {})
+          ...(source.ticketDone ? { ticketDone: true as const } : {}),
+          ...(show?.liveness === 'gone' ? { gone: true as const } : {})
         },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch

@@ -17,7 +17,8 @@ import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
 import { reviewSectionOf } from './fleet-review-section'
-import { focusTerminal, openGameLink, viewOf } from './fleet-sync'
+import { viewMember } from './member-view-press'
+import { openGameLink, viewOf } from './fleet-sync'
 import { cardLayoutOf, TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
 import { cardStateOf, leadStateOf } from './lead-state'
@@ -83,12 +84,7 @@ export const registerFleetPane = (on: On): void => {
       </Button>
     )
     // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
-    const viewPressOf = (agent: GameAgent, handle: string) => () =>
-      void focusTerminal($, handle).then((isFocused) => {
-        if (!isFocused) {
-          $.ui.toast(text.couldNotOpen(agent.displayName))
-        }
-      })
+    const viewPressOf = (agent: GameAgent, handle: string) => () => viewMember($, agent, handle)
     const viewHotkeyOf = (index: number) => (index < 9 ? String(index + 1) : undefined)
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button

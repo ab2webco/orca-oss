@@ -214,6 +214,16 @@ describe('remote members of a lead (ORCA-824)', () => {
     expect(member.review).toBeUndefined()
   })
 
+  // Why: View on such a member must say it is gone, not that its host is silent (ORCA-790).
+  it('marks a member whose terminal is gone on an answering host', async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({ branch: '', title: null, liveness: 'gone' }),
+      reviewOf: async () => null
+    })
+
+    expect(member.remote).toEqual({ host: 'imac', stateKnown: false, gone: true })
+  })
+
   it('flags a member whose ticket the home Run completed', () => {
     db = new OrchestrationDb(':memory:')
     const run = db.createRun({
