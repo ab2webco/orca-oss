@@ -48965,6 +48965,32 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it("forgets a paired client's record of the same worktree but not an SSH host's", async () => {
+    const pairedWorktreeId = `repo-paired::${TEST_WORKTREE_PATH}`
+    const sshWorktreeId = `repo-ssh::${TEST_WORKTREE_PATH}`
+    const { runtimeStore, removeWorktreeMeta } = createStaleRuntimeWorktreeStore(TEST_WORKTREE_ID)
+    runtimeStore.setWorktreeMeta(pairedWorktreeId, { hostId: 'runtime:paired-env' })
+    runtimeStore.setWorktreeMeta(sshWorktreeId, {})
+    const repos = [
+      ...store.getRepos(),
+      { ...store.getRepos()[0], id: 'repo-paired', executionHostId: 'runtime:paired-env' },
+      { ...store.getRepos()[0], id: 'repo-ssh', connectionId: 'ssh-1' }
+    ]
+    const runtime = createWorktreeRemovalRuntime({
+      ...runtimeStore,
+      getRepos: () => repos,
+      getRepo: (id: string) => repos.find((repo) => repo.id === id)
+    })
+    vi.mocked(removeWorktree).mockResolvedValue({})
+
+    await runtime.removeManagedWorktree(TEST_WORKTREE_ID)
+
+    expect(removeWorktreeMeta).toHaveBeenCalledWith(pairedWorktreeId, 'runtime:paired-env')
+    expect(deleteWorktreeHistoryDirMock).toHaveBeenCalledWith(pairedWorktreeId)
+    expect(removeWorktreeMeta).not.toHaveBeenCalledWith(sshWorktreeId)
+    expect(deleteWorktreeHistoryDirMock).not.toHaveBeenCalledWith(sshWorktreeId)
+  })
+
   it('passes project shared links through the runtime removal preflight and cleanup', async () => {
     const runtime = createWorktreeRemovalRuntime()
     vi.mocked(loadHooks).mockReturnValue({

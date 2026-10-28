@@ -327,6 +327,11 @@ import {
   toSshExecutionHostId,
   type ExecutionHostId
 } from '../../shared/execution-host'
+import {
+  collapseSameDiskWorktreeRecords,
+  findSameDiskSiblingWorktreeIds,
+  toRuntimeDiskHostId
+} from './same-disk-worktree-records'
 import { preservedBranchCleanupScopeKey } from '../../shared/preserved-branch-cleanup'
 import { getRegisteredSshState } from '../ipc/ssh'
 import type {
@@ -26820,6 +26825,27 @@ export class OrcaRuntimeService {
     })
   }
 
+  // Why: a paired client can register this host's repo again under its own `runtime:` id, so
+  // one deleted tree is listed under both records; leaving the sibling turns it into a ghost.
+  private forgetSameDiskSiblingWorktreeRecords(
+    store: RuntimeStore,
+    repo: Repo,
+    worktreePath: string
+  ): void {
+    const siblings = findSameDiskSiblingWorktreeIds(
+      repo,
+      worktreePath,
+      store.getRepos(),
+      normalizeRuntimePathForComparison
+    )
+    for (const sibling of siblings) {
+      this.clearOptimisticReconcileToken(sibling.worktreeId)
+      this.removeWorktreeMetadataAndHistory(store, sibling.worktreeId)
+      this.invalidateWorktreeScanCacheForRepo(sibling.repoId)
+      this.notifyWorktreesChanged(sibling.repoId)
+    }
+  }
+
   private removeWorktreeMetadataAndHistory(store: RuntimeStore, worktreeId: string): void {
     // Why: worktree IDs are path-derived and can be recreated, so removal must
     // purge history and process-local caches before the ID points at new state.
@@ -27214,6 +27240,7 @@ export class OrcaRuntimeService {
             }
             this.clearOptimisticReconcileToken(removalTarget.id)
             this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+            this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
             this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
             this.invalidateResolvedWorktreeCache()
             this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27263,6 +27290,7 @@ export class OrcaRuntimeService {
               )
               this.clearOptimisticReconcileToken(removalTarget.id)
               this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+              this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
               this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
               this.invalidateResolvedWorktreeCache()
               this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27299,6 +27327,7 @@ export class OrcaRuntimeService {
                 ))
             this.clearOptimisticReconcileToken(removalTarget.id)
             this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+            this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
             this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
             this.invalidateResolvedWorktreeCache()
             this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27353,6 +27382,7 @@ export class OrcaRuntimeService {
           )
           this.clearOptimisticReconcileToken(removalTarget.id)
           this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+          this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
           this.invalidateResolvedWorktreeCache()
           this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
           invalidateAuthorizedRootsCache()
@@ -27399,6 +27429,7 @@ export class OrcaRuntimeService {
           )
           this.clearOptimisticReconcileToken(removalTarget.id)
           this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+          this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
           this.invalidateResolvedWorktreeCache()
           this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
           invalidateAuthorizedRootsCache()
@@ -27555,6 +27586,7 @@ export class OrcaRuntimeService {
               )
               this.clearOptimisticReconcileToken(removalTarget.id)
               this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+              this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
               this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
               this.invalidateResolvedWorktreeCache()
               this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27589,6 +27621,7 @@ export class OrcaRuntimeService {
         )
         this.clearOptimisticReconcileToken(removalTarget.id)
         this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+        this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
         this.invalidateResolvedWorktreeCache()
         this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
         invalidateAuthorizedRootsCache()
@@ -32697,18 +32730,6 @@ export class OrcaRuntimeService {
       candidates = worktrees.filter((worktree) =>
         runtimePathsEqual(worktree.path, selector.slice(5))
       )
-      if (candidates.length > 1) {
-        const hostIds = new Set(
-          candidates.map((worktree) => {
-            const repo = this.store?.getRepo(worktree.repoId)
-            return getWorktreeExecutionHostId(worktree, repo)
-          })
-        )
-        // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
-        if (hostIds.size === 1) {
-          candidates = [candidates[0]]
-        }
-      }
     } else if (selector.startsWith('branch:')) {
       const branchSelector = selector.slice(7)
       candidates = worktrees.filter((worktree) =>
@@ -32729,6 +32750,23 @@ export class OrcaRuntimeService {
           runtimePathsEqual(worktree.path, selector) ||
           branchSelectorMatches(worktree.branch, selector)
       )
+    }
+
+    if (candidates.length > 1 && !selector.startsWith('id:')) {
+      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
+        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
+      candidates = collapseSameDiskWorktreeRecords(
+        candidates,
+        getHostId,
+        normalizeRuntimePathForComparison
+      )
+      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
+      if (
+        selector.startsWith('path:') &&
+        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
+      ) {
+        candidates = [candidates[0]]
+      }
     }
 
     if (candidates.length === 1) {
