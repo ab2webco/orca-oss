@@ -98,36 +98,58 @@ export function listRemoteGameMemberSources(
   return rows.map((row) => sourceOf(row, false))
 }
 
+/** The panes that place a Run's lead; `coordinator*` are null once a newer Run took the pane. */
+export type EarlierLeadRunPanes = {
+  coordinatorHandle: string | null
+  coordinatorPaneKey: string | null
+  /** The lead pane that created the member's task, which outlives the Run's binding. */
+  creatorPaneKey: string | null
+}
+
+/** A Run's lead as this Orca sees it now; `projectKey` is null when no pane places it. */
+export type EarlierLeadRunLead = { live: boolean; projectKey: string | null }
+
 /**
- * Unreleased remote members no live lead shows: those of a Run whose lead is gone, and the current
- * Run's from before this lead claimed it. Another live lead's members stay its own.
+ * Unreleased remote members no live lead shows: those of a Run of this lead's project whose lead
+ * is gone, and the current Run's from before this lead claimed it. Another live lead's members,
+ * and any other project's, stay out.
  */
 export function listEarlierLeadRemoteMemberSources(
   db: OrchestrationDb,
-  runId: string,
-  leadIsLive: (coordinatorHandle: string) => boolean
+  lead: { runId: string; projectKey: string | null },
+  leadOf: (run: EarlierLeadRunPanes) => EarlierLeadRunLead
 ): RemoteGameMemberSource[] {
   const rows = sqliteOf(db)
     .prepare(
-      `SELECT ${SOURCE_COLUMNS}, d.run_id AS runId, r.coordinator_handle AS coordinatorHandle
+      `SELECT ${SOURCE_COLUMNS}, d.run_id AS runId, r.coordinator_handle AS coordinatorHandle,
+              r.coordinator_pane_key AS coordinatorPaneKey, t.created_by_pane_key AS creatorPaneKey
          ${SOURCE_JOINS}
         WHERE ${NOT_RELEASED}
           AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
           AND NOT (d.run_id = ? AND ${CURRENT_ERA})
         ORDER BY d.created_at DESC, d.rowid DESC`
     )
-    .all(runId) as (SourceRow & {
-    runId: string
-    coordinatorHandle: string | null
-  })[]
+    .all(lead.runId) as (SourceRow & EarlierLeadRunPanes & { runId: string })[]
   return rows
-    .filter(
-      (row) =>
-        row.runId === runId || row.coordinatorHandle === null || !leadIsLive(row.coordinatorHandle)
-    )
+    .filter((row) => {
+      if (row.runId === lead.runId) {
+        return true
+      }
+      // Why: a lead acts on the members it lists, so another project's must never look like its own (ORCA-848).
+      const other = leadOf(row)
+      return lead.projectKey !== null && other.projectKey === lead.projectKey && !other.live
+    })
     .slice(0, EARLIER_LEAD_LIMIT)
     .toReversed()
-    .map(({ runId: _runId, coordinatorHandle: _handle, ...row }) => sourceOf(row, true))
+    .map(
+      ({
+        runId: _runId,
+        coordinatorHandle: _handle,
+        coordinatorPaneKey: _pane,
+        creatorPaneKey: _creator,
+        ...row
+      }) => sourceOf(row, true)
+    )
 }
 
 const TITLE_STATES = {

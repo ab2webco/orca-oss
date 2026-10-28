@@ -225,6 +225,10 @@ Run whose lead is gone, and of the current Run from before this lead claimed it,
 host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
 task is completed carries `remote.ticketDone`, counts as finished, and its next step is `game stop`.
 Another live lead's members are never listed. Both fields are optional on the wire.
+Scoped in ORCA-848: an earlier Run counts only when its lead pane belongs to this lead's project
+(`repo:<id>`, the key the game board and paused members use). The pane is the Run's coordinator pane,
+or, once a newer Run took that pane, the pane that created the member's task. A Run whose lead pane
+still runs is live even when a restart fenced its handle (ORCA-835). A Run Orca cannot place is left out.
 Built in ORCA-837: `federationShow` also returns an optional `agent` (the host's latest Claude/Codex
 hook state, its time and a usage limit), and that wins over the dispatch's status, so a member that
 keeps working after `worker_done` reads as working. A host that omits it keeps the dispatch-and-title

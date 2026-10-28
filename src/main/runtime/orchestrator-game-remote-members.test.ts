@@ -4,6 +4,8 @@ import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   remoteGameMembersOf,
+  type EarlierLeadRunLead,
+  type EarlierLeadRunPanes,
   type RemoteGameMemberSource
 } from './orchestrator-game-remote-members'
 
@@ -252,7 +254,12 @@ describe('remote members of a lead (ORCA-824)', () => {
     })
 
     expect(listRemoteGameMemberSources(db, run.id)).toEqual([])
-    expect(listEarlierLeadRemoteMemberSources(db, run.id, () => false)).toEqual([])
+    expect(
+      listEarlierLeadRemoteMemberSources(db, { runId: run.id, projectKey: 'repo:orca' }, () => ({
+        live: false,
+        projectKey: 'repo:orca'
+      }))
+    ).toEqual([])
   })
 })
 
@@ -289,20 +296,30 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     db = undefined
   })
 
+  const GONE_PANE = 'tab_gone:33333333-3333-4333-8333-333333333333'
+  const OTHER_PANE = 'tab_other:22222222-2222-4222-9222-222222222222'
+  const CINECO_PANE = 'tab_cineco:44444444-4444-4444-8444-444444444444'
+
   function leads(d: OrchestrationDb): {
     current: string
     earlier: string
     liveOther: string
+    cineco: string
   } {
     const earlier = d.createRun({
       objective: 'earlier lead',
       coordinatorHandle: 'term_gone',
-      coordinatorPaneKey: 'tab_gone:33333333-3333-4333-8333-333333333333'
+      coordinatorPaneKey: GONE_PANE
     })
     const liveOther = d.createRun({
       objective: 'other live lead',
       coordinatorHandle: 'term_other',
-      coordinatorPaneKey: 'tab_other:22222222-2222-4222-9222-222222222222'
+      coordinatorPaneKey: OTHER_PANE
+    })
+    const cineco = d.createRun({
+      objective: 'another project lead',
+      coordinatorHandle: 'term_cineco_gone',
+      coordinatorPaneKey: CINECO_PANE
     })
     const current = d.createRun({
       objective: 'lead',
@@ -312,12 +329,29 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     return {
       current: current.id,
       earlier: earlier.id,
-      liveOther: liveOther.id
+      liveOther: liveOther.id,
+      cineco: cineco.id
     }
   }
 
   const liveLeads = new Set(['term_lead', 'term_other'])
-  const leadIsLive = (handle: string): boolean => liveLeads.has(handle)
+  const projectOfPane: Record<string, string> = {
+    [LEAD_PANE]: 'repo:orca',
+    [GONE_PANE]: 'repo:orca',
+    [OTHER_PANE]: 'repo:orca',
+    [CINECO_PANE]: 'repo:cineco'
+  }
+  const leadOf = (run: EarlierLeadRunPanes): EarlierLeadRunLead => {
+    const pane = run.coordinatorPaneKey ?? run.creatorPaneKey
+    return {
+      live: run.coordinatorHandle !== null && liveLeads.has(run.coordinatorHandle),
+      projectKey: pane ? (projectOfPane[pane] ?? null) : null
+    }
+  }
+  const leadIn = (runId: string, projectKey: string | null = 'repo:orca') => ({
+    runId,
+    projectKey
+  })
 
   it("lists an unreleased member of a Run whose lead is gone, with its ticket's outcome", () => {
     db = new OrchestrationDb(':memory:')
@@ -326,7 +360,7 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     settle(db, orphan, '2026-10-20 10:00:00')
     const stillWorking = startRemote(db, runs.earlier, 'ORCA-826')
 
-    const sources = listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive)
+    const sources = listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf)
 
     expect(sources).toEqual([
       expect.objectContaining({
@@ -355,7 +389,9 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     startRemote(db, runs.current, 'ORCA-805')
 
     expect(
-      listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive).map((one) => one.dispatchId)
+      listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf).map(
+        (one) => one.dispatchId
+      )
     ).toEqual([before])
   })
 
@@ -371,7 +407,45 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
       .prepare(`UPDATE worker_dispatches SET state = 'stopped' WHERE dispatch_id = '${stopped}'`)
       .run()
 
-    expect(listEarlierLeadRemoteMemberSources(db, runs.current, leadIsLive)).toEqual([])
+    expect(listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf)).toEqual([])
+  })
+
+  it("leaves out another project's members, even when their lead is gone (ORCA-848)", () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    startRemote(db, runs.cineco, 'CINE-12')
+    const ours = startRemote(db, runs.earlier, 'ORCA-829')
+
+    expect(
+      listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf).map(
+        (one) => one.dispatchId
+      )
+    ).toEqual([ours])
+  })
+
+  it('keeps only its own Run when Orca cannot place the lead or the earlier Run (ORCA-848)', () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    const own = startRemote(db, runs.current, 'ORCA-700')
+    settle(db, own, '2000-01-01 00:00:00')
+    startRemote(db, runs.earlier, 'ORCA-829')
+    const unplaced = db.createRun({
+      objective: 'closed lead',
+      coordinatorHandle: 'term_closed',
+      coordinatorPaneKey: 'tab_closed:55555555-5555-4555-8555-555555555555'
+    })
+    startRemote(db, unplaced.id, 'ORCA-830')
+
+    expect(
+      listEarlierLeadRemoteMemberSources(db, leadIn(runs.current, null), leadOf).map(
+        (one) => one.dispatchId
+      )
+    ).toEqual([own])
+    expect(
+      listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf).map(
+        (one) => one.taskTitle
+      )
+    ).toEqual(['ORCA-700', 'ORCA-829'])
   })
 
   const earlier: RemoteGameMemberSource = {
