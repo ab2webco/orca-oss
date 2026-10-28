@@ -89,4 +89,55 @@ describe('prepare Android release script', () => {
       'MOBILE_ANDROID_RELEASE_VERSION must match the committed mobile app version'
     )
   })
+
+  it('fails before the build when Play already holds the committed versionCode', () => {
+    const { configPath } = createAppConfig()
+
+    const result = spawnSync(process.execPath, [scriptPath], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOBILE_APP_CONFIG_PATH: configPath,
+        MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE: '4'
+      }
+    })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      'Android versionCode 4 is not above 4, the highest one Play already has'
+    )
+  })
+
+  it('accepts a committed versionCode above the highest one Play has', () => {
+    const { configPath } = createAppConfig()
+
+    const output = execFileSync(process.execPath, [scriptPath], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOBILE_APP_CONFIG_PATH: configPath,
+        MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE: '3'
+      }
+    })
+
+    expect(output).toContain('Highest Play versionCode: 3')
+  })
+
+  it('rejects a malformed Play versionCode instead of skipping the check', () => {
+    const { configPath } = createAppConfig()
+
+    const result = spawnSync(process.execPath, [scriptPath], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOBILE_APP_CONFIG_PATH: configPath,
+        MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE: 'none'
+      }
+    })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      'MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE must be a non-negative integer'
+    )
+  })
 })
