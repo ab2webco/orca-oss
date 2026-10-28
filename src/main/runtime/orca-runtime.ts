@@ -724,7 +724,16 @@ import {
   type GameProjectWorkPort
 } from './orchestrator-game-project-work'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
-import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import {
+  gameAgentStateOf,
+  statusGroupOfJira,
+  type OrchestratorGameState
+} from '../../shared/orchestrator-game-state'
+import {
+  parseRemoteMemberAgent,
+  remoteMemberAgentOf,
+  type RemoteMemberAgent
+} from '../../shared/orchestrator-game-remote-agent'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
@@ -31173,6 +31182,22 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */
+  async getFederatedMemberAgent(handle: string): Promise<RemoteMemberAgent | null> {
+    const paneKey = this.getTerminalPaneKey(handle)
+    const agent = remoteMemberAgentOf(this.getAgentStatusSnapshotFn?.() ?? [], paneKey)
+    if (!agent || !paneKey) {
+      return null
+    }
+    const limit = await this.gameMemberLimitFor({
+      paneKey,
+      agentType: agent.agentType,
+      state: gameAgentStateOf(agent.state),
+      account: null
+    }).catch(() => null)
+    return limit ? { ...agent, limit } : agent
+  }
+
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
   private async gameMemberLimitFor(member: {
     paneKey: string
@@ -31438,8 +31463,8 @@ export class OrcaRuntimeService {
           'orchestration.federationShow',
           { dispatchId: source.dispatchId },
           REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
-        )) as { terminal: RemoteGameMemberShow | null }
-        return shown.terminal
+        )) as { terminal: RemoteGameMemberShow | null; agent?: unknown }
+        return shown.terminal && { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
       },
       reviewOf: async (branch) =>
         repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null

@@ -89,6 +89,33 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     ])
   })
 
+  it("shows a settled member the host's hooks still see working (ORCA-837)", async () => {
+    const { runtime, dispatchId } = leadWithRemoteMember()
+    const sqlite = (
+      runtime.getOrchestrationDb() as unknown as {
+        db: { prepare: (sql: string) => { run: () => void } }
+      }
+    ).db
+    sqlite
+      .prepare(
+        `UPDATE dispatch_contexts SET status = 'completed', completed_at = '2999-01-01'
+         WHERE id = '${dispatchId}'`
+      )
+      .run()
+    vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({
+      terminal: { branch: 'fabolivark/orca-817', title: '✳ Claude Code', liveness: 'running' },
+      agent: { state: 'working', agentType: 'claude', updatedAt: 1_000, unknownField: 1 }
+    })
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(state.agents.find((agent) => agent.isMember)).toMatchObject({
+      state: 'working',
+      agentType: 'claude',
+      lastActivityAt: new Date(1_000).toISOString()
+    })
+  })
+
   it('keeps the member when its host is offline, state unknown', async () => {
     const { runtime, dispatchId } = leadWithRemoteMember()
     vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockRejectedValue(
@@ -153,5 +180,48 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
         remote: { host: 'imac', stateKnown: true, earlierLead: true, ticketDone: true }
       })
     ])
+  })
+})
+
+describe("a host's reading of a federated member's agent (ORCA-837)", () => {
+  const hook = (state: 'working' | 'done') => ({
+    paneKey: 'tab:817',
+    state,
+    prompt: '',
+    agentType: 'claude',
+    connectionId: null,
+    receivedAt: 42,
+    stateStartedAt: 40
+  })
+
+  it("reads the terminal's pane from the hook snapshot and adds a usage limit when stopped", async () => {
+    let rows = [hook('working')]
+    const runtime = new OrcaRuntimeService(null, undefined, { getAgentStatusSnapshot: () => rows })
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab:817')
+    const limitFor = vi
+      .spyOn(
+        runtime as unknown as {
+          gameMemberLimitFor: (member: { state: string }) => Promise<unknown>
+        },
+        'gameMemberLimitFor'
+      )
+      // Why: the real reading never limits a working member.
+      .mockImplementation(async ({ state }) => (state === 'working' ? null : { resetsAt: 9 }))
+
+    expect(await runtime.getFederatedMemberAgent('term_817')).toEqual({
+      state: 'working',
+      agentType: 'claude',
+      updatedAt: 42
+    })
+    rows = [hook('done')]
+    expect(await runtime.getFederatedMemberAgent('term_817')).toEqual({
+      state: 'done',
+      agentType: 'claude',
+      updatedAt: 42,
+      limit: { resetsAt: 9 }
+    })
+    expect(limitFor).toHaveBeenCalledWith(
+      expect.objectContaining({ paneKey: 'tab:817', state: 'done', account: null })
+    )
   })
 })
