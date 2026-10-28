@@ -3,6 +3,7 @@
  * used to copy each row's padding and the Panel's `│` border. Paints a real captured Claude screen,
  * drags a native selection over the commands and asserts the exact clipboard text.
  */
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
@@ -31,6 +32,15 @@ const PASTE_KEY = IS_MAC ? 'Meta+V' : 'Control+Shift+V'
 // Shift-drag (Option on macOS) takes xterm's own selection over Claude's mouse mode.
 const SELECT_MODIFIER = IS_MAC ? 'Alt' : 'Shift'
 
+type Capture = { rows: number; lines: string[] }
+const captures = JSON.parse(readFileSync(CAPTURES, 'utf8')) as Record<string, Capture>
+// The fixture puts a capture line at `index + paneRows - captureRows`, so this gap holds only for a
+// frame painted at the pane's current size, not one left over from before a resize.
+const rowsBelowLastCommand = (isDocked: boolean): number => {
+  const capture = isDocked ? captures.panel1440! : captures.panel768!
+  return capture.rows - capture.lines.findLastIndex((line) => line.includes(LAST_COMMAND))
+}
+
 type Cell = { x: number; y: number }
 type FrameLayout = {
   cellWidth: number
@@ -38,6 +48,7 @@ type FrameLayout = {
   left: number
   top: number
   cols: number
+  rows: number
   isAltScreen: boolean
   cursorRow: string
   first: Cell
@@ -62,6 +73,7 @@ async function readLayout(page: Page): Promise<FrameLayout> {
       left: rect.left,
       top: rect.top,
       cols: terminal.cols,
+      rows: terminal.rows,
       isAltScreen: buffer.type === 'alternate',
       cursorRow: rows[buffer.cursorY] ?? '',
       first: { x: rows[lastY - 2]?.indexOf('git fetch') ?? -1, y: lastY - 2 },
@@ -76,8 +88,16 @@ async function paintFrame(page: Page, isDocked: boolean): Promise<FrameLayout> {
   await expect
     .poll(
       async () => {
+        const previous = JSON.stringify(layout)
         layout = await readLayout(page)
-        return layout.isAltScreen && layout.first.x >= 0 && layout.border >= 0 === isDocked
+        // Why the same read twice: a late resize repaints the frame and moves the commands under the drag.
+        return (
+          layout.isAltScreen &&
+          layout.first.x >= 0 &&
+          layout.border >= 0 === isDocked &&
+          layout.rows - layout.last.y === rowsBelowLastCommand(isDocked) &&
+          JSON.stringify(layout) === previous
+        )
       },
       { message: 'the Claude frame never painted at this width' }
     )
