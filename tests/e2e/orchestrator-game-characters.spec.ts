@@ -20,6 +20,35 @@ const MERLIN = 0x5f8fd7
 const MORGANA = 0x7a2a8a
 const ELAINE = 0xf878f8
 const OWN_COLORS = { Merlin: MERLIN, Morgana: MORGANA, Elaine: ELAINE }
+// Each built-in's first roster name, plain, and three of its characters by a color of their own
+// (resources/claude-plugins/orca-game/hooks/scenes/<id>.ts). Quest and Beast Tamer by body color;
+// the others by accessory, since their palettes recolor glyphs the build costume barely shows.
+const BUILT_INS = [
+  {
+    id: 'quest',
+    plain: 'Arthur',
+    colors: { Merlin: 0x6f8fe0, Guinevere: 0xf0a0c0, Morgana: 0x9a6ad0 },
+    widths: WIDTHS
+  },
+  {
+    id: 'vigilante',
+    plain: 'Nightjar',
+    colors: { Vesper: 0xd83a8a, Cipher: 0x5fe0a0, Specter: 0xc8f0ff },
+    widths: WIDTHS.slice(0, 2)
+  },
+  {
+    id: 'jrpg',
+    plain: 'Aerin',
+    colors: { Lyra: 0xff7ab0, Corin: 0x9ae07a, Bryn: 0x3a6ad0 },
+    widths: WIDTHS.slice(0, 2)
+  },
+  {
+    id: 'tamer',
+    plain: 'Pip',
+    colors: { Mochi: 0xf8b8d0, Puddle: 0x5fa8e8, Thistle: 0xa06ad0 },
+    widths: WIDTHS.slice(0, 2)
+  }
+] as const
 
 const princess = {
   rows: ['...YYYY...', '..YYYYYY..', '..PSSSSP..', '..SESSES..', '.PPPPPPPP.', '..PPPPPP..'],
@@ -57,8 +86,19 @@ const member = (name: string, ticket: string, title: string) => ({
   worktree: { id: `demo-wt-${ticket}`, branch: `feat/${ticket.toLowerCase()}`, displayName: ticket }
 })
 
-const gameState = (definition: unknown) => ({
-  config: { mode: 'on', hud: true, rewards: true, render: 'hd', scene: SCENE_ID },
+const TICKETS = [
+  ['LUM-12', 'Dark mode toggle'],
+  ['LUM-14', 'Offline cache'],
+  ['LUM-15', 'Onboarding copy'],
+  ['LUM-16', 'Search filters']
+] as const
+
+const gameState = (
+  definition: unknown,
+  names = ['Arthur', 'Merlin', 'Morgana', 'Elaine'],
+  scene = SCENE_ID
+) => ({
+  config: { mode: 'on', hud: true, rewards: true, render: 'hd', scene },
   warnings: [],
   worktree: { id: 'demo-wt-lead', path: '/work/lumen-app', branch: 'main', displayName: 'lumen' },
   agents: [
@@ -70,14 +110,14 @@ const gameState = (definition: unknown) => ({
       toolName: 'Read',
       isLeader: true
     },
-    member('Arthur', 'LUM-12', 'Dark mode toggle'),
-    member('Merlin', 'LUM-14', 'Offline cache'),
-    member('Morgana', 'LUM-15', 'Onboarding copy'),
-    member('Elaine', 'LUM-16', 'Search filters')
+    ...names.map((name, i) => {
+      const [ticket, title] = TICKETS[i]!
+      return member(name, ticket, title)
+    })
   ],
   review: null,
   workItem: null,
-  extensions: { scenes: [{ id: SCENE_ID, pluginId: 'file', definition }] },
+  extensions: { scenes: definition ? [{ id: SCENE_ID, pluginId: 'file', definition }] : [] },
   links: [],
   activity: null,
   role: 'lead',
@@ -137,11 +177,54 @@ const isNear = (a: number, b: number): boolean =>
   channels(a).every((one, i) => Math.abs(one - (channels(b)[i] ?? 0)) <= 9)
 
 /** Which of the characters' own colors the terminal paints. */
-async function charactersPainted(page: Page): Promise<string[]> {
+async function charactersPainted(
+  page: Page,
+  colors: Record<string, number> = OWN_COLORS
+): Promise<string[]> {
   const painted = await paintedColors(page)
-  return Object.entries(OWN_COLORS)
+  return Object.entries(colors)
     .filter(([, color]) => painted.some((one) => isNear(one, color)))
     .map(([name]) => name)
+}
+
+type Capture = (name: string) => Promise<void>
+
+async function captureBand(
+  app: ElectronApplication,
+  page: Page,
+  capture: Capture,
+  prefix: string,
+  widths: readonly number[] = WIDTHS
+) {
+  for (const width of widths) {
+    await closeSidebars(page)
+    await setWindowWidth(app, page, width)
+    await capture(`${prefix}-${width}.png`)
+  }
+}
+
+/** Every width of the Panel, wheeled down card by card to the last member where it docks short. */
+async function capturePanel(
+  app: ElectronApplication,
+  page: Page,
+  capture: Capture,
+  prefix: string,
+  widths: readonly number[] = WIDTHS
+) {
+  for (const width of widths) {
+    await closeSidebars(page)
+    await setWindowWidth(app, page, width)
+    await capture(`${prefix}-${width}.png`)
+    for (let step = 0; !(await screenOf(page)).includes('LUM-16'); step++) {
+      expect(step, `the last card never scrolled into view at ${width}px`).toBeLessThan(20)
+      const point = await terminalPointOf(page, '✕')
+      expect(point, 'the Panel menu is not on screen').not.toBeNull()
+      await page.mouse.move(point!.x, point!.y)
+      await page.mouse.wheel(0, 240)
+      await capture(`${prefix}-${width}-scrolled-${step + 1}.png`)
+    }
+    await page.mouse.wheel(0, -4_800)
+  }
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -179,11 +262,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() => charactersPainted(orcaPage), { timeout: 20_000 })
         .toEqual(Object.keys(OWN_COLORS))
-      for (const width of WIDTHS) {
-        await closeSidebars(orcaPage)
-        await setWindowWidth(electronApp, orcaPage, width)
-        await capture(`band-${theme}-${width}.png`)
-      }
+      await captureBand(electronApp, orcaPage, capture, `band-${theme}`)
 
       await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
       await clickTerminalText(orcaPage, 'Panel')
@@ -193,21 +272,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() => charactersPainted(orcaPage), { timeout: 20_000 })
         .toEqual(Object.keys(OWN_COLORS))
-      for (const width of WIDTHS) {
-        await closeSidebars(orcaPage)
-        await setWindowWidth(electronApp, orcaPage, width)
-        await capture(`panel-${theme}-${width}.png`)
-        // A phone-width Panel docks short: wheel it down card by card to the last member.
-        for (let step = 0; !(await screenOf(orcaPage)).includes('LUM-16'); step++) {
-          expect(step, `the last card never scrolled into view at ${width}px`).toBeLessThan(20)
-          const point = await terminalPointOf(orcaPage, '✕')
-          expect(point, 'the Panel menu is not on screen').not.toBeNull()
-          await orcaPage.mouse.move(point!.x, point!.y)
-          await orcaPage.mouse.wheel(0, 240)
-          await capture(`panel-${theme}-${width}-scrolled-${step + 1}.png`)
-        }
-        await orcaPage.mouse.wheel(0, -4_800)
-      }
+      await capturePanel(electronApp, orcaPage, capture, `panel-${theme}`)
 
       // The flat view has no sprites, so each character is a swatch of its own color.
       await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
@@ -228,4 +293,56 @@ for (const theme of ['light', 'dark'] as const) {
       await rm(band.root, { recursive: true, force: true })
     }
   })
+}
+
+for (const { id, plain, colors, widths } of BUILT_INS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`the built-in ${id} draws four of its roster names as four characters (${theme})`, async ({
+      electronApp,
+      orcaPage,
+      testRepoPath
+    }, testInfo) => {
+      test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+      test.setTimeout(300_000)
+      await waitForSessionReady(orcaPage)
+      await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
+      const roster = [plain, ...Object.keys(colors)]
+      // Before: names outside the scene's roster all wear the phase costume.
+      const band = await startGameBand(orcaPage, testRepoPath, {
+        state: gameState(undefined, ['Rowan', 'Quill', 'Wren', 'Sable'], id),
+        theme,
+        locale: 'en',
+        scene: id
+      })
+      const capture: Capture = async (name) => {
+        await orcaPage.waitForTimeout(1_500)
+        await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
+      }
+      try {
+        await expect
+          .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
+          .toContain('Sable')
+        await capture(`${id}-before-band-${theme}-1440.png`)
+        expect(await charactersPainted(orcaPage, colors)).toEqual([])
+        await band.setState(gameState(undefined, roster, id))
+        await clickTerminalText(orcaPage, 'Refresh')
+        await expect
+          .poll(() => charactersPainted(orcaPage, colors), { timeout: 20_000 })
+          .toEqual(Object.keys(colors))
+        await captureBand(electronApp, orcaPage, capture, `${id}-band-${theme}`, widths)
+
+        await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
+        await clickTerminalText(orcaPage, 'Panel')
+        await expect
+          .poll(() => screenOf(orcaPage), { timeout: 20_000, message: 'the Panel never opened' })
+          .toContain('LUM-16')
+        await expect
+          .poll(() => charactersPainted(orcaPage, colors), { timeout: 20_000 })
+          .toEqual(Object.keys(colors))
+        await capturePanel(electronApp, orcaPage, capture, `${id}-panel-${theme}`, widths)
+      } finally {
+        await rm(band.root, { recursive: true, force: true })
+      }
+    })
+  }
 }

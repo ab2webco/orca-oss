@@ -44,12 +44,13 @@ const mark = (step) => {
 }
 
 async function run() {
+  await app.whenReady()
+  mark('ready')
+  // Why after ready: a loaded runner can spend the whole budget booting Electron; the spawn's timeout bounds that.
   const timeout = setTimeout(() => {
     writeFileSync(resultPath, JSON.stringify({ step: 'timed out after ' + currentStep }))
     app.exit(1)
   }, 20000)
-  await app.whenReady()
-  mark('ready')
   const partition = 'persist:partition-rollback-cookie-test'
   const targetSession = session.fromPartition(partition)
   const window = new BrowserWindow({ show: false, webPreferences: { partition } })

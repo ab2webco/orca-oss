@@ -1,4 +1,11 @@
-import type { AdvisorGesture, PlantKind, Scenery } from '../../types'
+import type {
+  AdvisorGesture,
+  CharacterAccessory,
+  LocalizedName,
+  PlantKind,
+  SceneCharacter,
+  Scenery
+} from '../../types'
 
 export type {
   AdvisorGesture,
@@ -60,3 +67,11 @@ export const ADVISOR_GESTURES = Object.keys(ADVISOR_GESTURE_SET) as readonly Adv
 export const CAST_MAX_ROWS = 7
 export const CAST_MAX_WIDTH = 10
 export const CAST_MAX_FRAMES = 4
+
+/** A roster character in the phase costumes, under its own palette and accessory. */
+export const sceneCharacter = (
+  name: LocalizedName,
+  colors: Readonly<Record<string, number>>,
+  accessory: CharacterAccessory,
+  accessoryColor: number
+): SceneCharacter => ({ name, variant: { colors, accessory, accessoryColor } })
