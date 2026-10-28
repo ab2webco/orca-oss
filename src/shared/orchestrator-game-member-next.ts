@@ -26,6 +26,10 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
   if (remote?.stateKnown === false) {
     return silentHostNextOf(remote.host, agent.paneKey)
   }
+  // Why: a finished member's closed terminal is how it ends; its phase says what is next (ORCA-854).
+  if (remote?.gone && agent.state !== 'done') {
+    return `gone from ${remote.host}: orca game stop ${ticket ?? agent.paneKey}`
+  }
   return remote?.earlierLead && remote.ticketDone
     ? `left by an earlier lead, ticket done: orca game stop ${ticket ?? agent.paneKey}`
     : null

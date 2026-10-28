@@ -19,6 +19,7 @@ export type RemoteGameMemberSource = {
   remoteWorktreeId: string | null
   stage: string | null
   lastActivityAt: string | null
+  createdAt: string
   finished: boolean
   /** The home Run completed the member's task. */
   ticketDone: boolean
@@ -36,6 +37,7 @@ export type RemoteGameMemberShow = {
 }
 
 type RemoteMemberReads = {
+  /** Null when the host answers without the member's terminal; rejects when it does not answer. */
   showOf: (source: RemoteGameMemberSource) => Promise<RemoteGameMemberShow | null>
   reviewOf: (branch: string) => Promise<Parameters<typeof gameReviewOf>[0] | null>
 }
@@ -45,6 +47,7 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               f.remote_terminal_handle AS remoteTerminalHandle,
               f.remote_worktree_id AS remoteWorktreeId, w.stage AS stage,
               COALESCE(d.last_activity_at, d.last_heartbeat_at) AS lastActivityAt,
+              d.created_at AS createdAt,
               d.status NOT IN ('pending', 'dispatched') AS finished,
               COALESCE(t.status, '') = 'completed' AS ticketDone`
 
@@ -176,24 +179,47 @@ const TITLE_STATES = {
   idle: 'idle'
 } as const
 
+/**
+ * One source per host worktree: a later `worker-start --on --worktree` there is the same member, so
+ * its newest dispatch speaks for it under the first one's title (ORCA-854).
+ */
+function oneSourcePerWorktree(
+  sources: readonly RemoteGameMemberSource[]
+): RemoteGameMemberSource[] {
+  const groups = Map.groupBy(sources, (source) =>
+    source.remoteWorktreeId
+      ? `${source.environmentId}\0${source.remoteWorktreeId}`
+      : `dispatch\0${source.dispatchId}`
+  )
+  return [...groups.values()].map((group) => {
+    const [oldest, ...later] = group.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const newest = later.at(-1) ?? oldest!
+    return { ...newest, taskTitle: oldest!.taskTitle ?? newest.taskTitle }
+  })
+}
+
 /** Fleet rows for remote members; a host that does not answer still lists its member, state unknown. */
 export async function remoteGameMembersOf(
   sources: readonly RemoteGameMemberSource[],
   reads: RemoteMemberReads
 ): Promise<GameAgent[]> {
   const members = await Promise.all(
-    sources.map(async (source): Promise<GameAgent | null> => {
-      const show = await reads.showOf(source).catch(() => null)
+    oneSourcePerWorktree(sources).map(async (source): Promise<GameAgent | null> => {
+      const answer = await reads.showOf(source).then(
+        (show) => ({ answered: true, show }),
+        () => ({ answered: false, show: null })
+      )
+      const { show } = answer
+      const gone = answer.answered && (show === null || show.liveness === 'gone')
       // Why: an earlier lead's member is only worth listing while its terminal still runs.
-      if (source.earlierLead && (show === null || show.liveness === 'gone')) {
+      if (source.earlierLead && (show === null || gone)) {
         return null
       }
       const titleState = show?.title ? detectAgentStatusFromTitle(show.title) : null
-      const stateKnown = show !== null && show.liveness !== 'gone'
       const hosted = show?.branch ? await reads.reviewOf(show.branch).catch(() => null) : null
       const review = hosted ? gameReviewOf(hosted) : null
       // Why: the hooks see a member keep working after its dispatch settles (ORCA-837).
-      const agent = stateKnown ? (show?.agent ?? null) : null
+      const agent = gone ? null : (show?.agent ?? null)
       const state: GameAgent['state'] = agent
         ? gameAgentStateOf(agent.state)
         : source.finished
@@ -212,10 +238,10 @@ export async function remoteGameMembersOf(
         isMember: true,
         remote: {
           host: source.hostName,
-          stateKnown,
+          stateKnown: answer.answered,
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
-          ...(show?.liveness === 'gone' ? { gone: true as const } : {})
+          ...(gone ? { gone: true as const } : {})
         },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch

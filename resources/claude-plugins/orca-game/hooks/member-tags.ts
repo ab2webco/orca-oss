@@ -64,19 +64,22 @@ export const memberRemoteOf = (value: unknown): GameMemberRemote | undefined =>
 export const agentTagOf = (
   agent: {
     agentType: GameAgent['agentType']
+    state?: GameAgent['state']
     account?: GameMemberAccount
     remote?: GameMemberRemote
   },
   room: number
 ): string => {
   const { remote } = agent
+  // Why: `gone` means the host answered, even from an older Orca that also sent `stateKnown: false`.
+  const answering = remote ? remote.stateKnown || remote.gone === true : false
   // Why `host ?`: a narrow card would ellipsize `imac not answering` into `imac no…`.
   const hosts = remote
-    ? remote.gone
+    ? remote.gone && agent.state !== 'done'
       ? [remoteGoneTagOf(remote.host), `${remote.host} ✕`]
       : [
-          gameStrings().text.remoteHost(remote.host, remote.stateKnown),
-          remote.stateKnown ? remote.host : `${remote.host} ?`
+          gameStrings().text.remoteHost(remote.host, answering),
+          answering ? remote.host : `${remote.host} ?`
         ]
     : ['']
   const bases = [
