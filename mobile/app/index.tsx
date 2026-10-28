@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native'
 import { Text } from '../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { QrCode, Settings, ChevronRight, Terminal, ListTodo } from 'lucide-react-native'
+import { QrCode, ChevronRight, Terminal, ListTodo } from 'lucide-react-native'
 import { ClaudeIcon, OpenAIIcon } from '../src/components/AgentIcons'
 import {
   type AccountsSnapshot,
@@ -57,6 +57,7 @@ import { TaskProviderLogo } from '../src/components/TaskProviderLogo'
 import { ActionSheetModal } from '../src/components/ActionSheetModal'
 import { getHostListActionSheetActions } from '../src/host-list-action-sheet-actions'
 import { ConfirmModal } from '../src/components/ConfirmModal'
+import { HomeSettingsButton } from '../src/components/HomeSettingsButton'
 import {
   setCachedWorktrees,
   getCachedWorktrees,
@@ -771,12 +772,7 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.brandName}>Orca Lab</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
-          onPress={() => router.push('/settings')}
-        >
-          <Settings size={18} color={colors.textSecondary} />
-        </Pressable>
+        <HomeSettingsButton onPress={() => router.push('/settings')} />
       </View>
 
       {hostCatalog.length === 0 ? (
@@ -1155,16 +1151,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 17,
     fontWeight: '700'
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  iconButtonPressed: {
-    backgroundColor: colors.bgRaised
   },
 
   /* ─── Hero / greeting ─── */
