@@ -32330,7 +32330,12 @@ export class OrcaRuntimeService {
     if (windowId !== this.authoritativeWindowId) {
       return
     }
-    console.error(`[runtime] renderer graph reload failed (${reason}); failing closed.`)
+    // Why: a teardown kill of a ready renderer is not a failed reload; saying so sent ORCA-826 after the wrong cause.
+    console.error(
+      this.graphStatus === 'reloading'
+        ? `[runtime] renderer graph reload failed (${reason}); failing closed.`
+        : `[runtime] renderer gone while graph ${this.graphStatus} (${reason}); failing closed.`
+    )
     this.markGraphUnavailable(windowId)
   }
 

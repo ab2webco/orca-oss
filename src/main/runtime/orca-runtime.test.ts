@@ -2602,6 +2602,30 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('names a reload failure only when a reload was in flight', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const runtime = createRuntime()
+    runtime.attachWindow(TEST_WINDOW_ID)
+    runtime.markGraphReady(TEST_WINDOW_ID)
+
+    runtime.markGraphReloadFailed(TEST_WINDOW_ID, 'renderer-process-gone')
+
+    expect(runtime.getStatus().graphStatus).toBe('unavailable')
+    expect(errors).toHaveBeenCalledWith(
+      '[runtime] renderer gone while graph ready (renderer-process-gone); failing closed.'
+    )
+
+    runtime.attachWindow(TEST_WINDOW_ID)
+    runtime.markGraphReady(TEST_WINDOW_ID)
+    runtime.markRendererReloading(TEST_WINDOW_ID)
+    runtime.markGraphReloadFailed(TEST_WINDOW_ID, 'renderer-process-gone')
+
+    expect(errors).toHaveBeenLastCalledWith(
+      '[runtime] renderer graph reload failed (renderer-process-gone); failing closed.'
+    )
+    errors.mockRestore()
+  })
+
   it('stays unavailable during initial loads before a graph is published', () => {
     const runtime = createRuntime()
 
