@@ -1,3 +1,4 @@
+import { characterCostumeOf } from './character-look'
 import {
   isBlink,
   isRestingOf,
@@ -136,9 +137,10 @@ const tileClawd = (
   x: number,
   y: number,
   tick: number,
-  mood: Mood
+  mood: Mood,
+  name: string | undefined
 ): number | undefined => {
-  const costume = scene.costumes[kind === 'handed' ? 'handoff' : kind]
+  const costume = characterCostumeOf(scene, name, kind === 'handed' ? 'handoff' : kind)
   const isResting = isRestingOf(state, mood)
   const isHopping =
     !isResting &&
@@ -172,7 +174,9 @@ export const tileGridOf = (
   kind: TileKind,
   state: MemberState,
   tick: number,
-  mood: Mood = 'none'
+  mood: Mood = 'none',
+  /** The member's name, which picks its character's look. */
+  name?: string
 ): number[][] => {
   const moving = state === 'idle' && mood === 'none' ? 0 : tick
   const prop =
@@ -183,7 +187,7 @@ export const tileGridOf = (
   for (let row = 0; row < TILE_ROWS; row += 1) {
     for (let x = 0; x < TILE_COLUMNS; x += 1) {
       const pixel = (y: number): number =>
-        tileClawd(scene, kind, state, x, y, moving, mood) ??
+        tileClawd(scene, kind, state, x, y, moving, mood, name) ??
         (y === TILE_FLOOR ? WOOD : (prop(x, y, moving) ?? tileBackdropOf(y)))
       grid.push([UPPER_HALF, pixel(row * 2), pixel(row * 2 + 1)])
     }

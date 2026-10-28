@@ -23,6 +23,8 @@
     "../resources/claude-plugins/orca-game/hooks/hd-material.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-overlay.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-party.ts",
+    "../resources/claude-plugins/orca-game/hooks/character-look.ts",
+    "../resources/claude-plugins/orca-game/hooks/member-character.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-readability.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-sprite.ts",
     "../resources/claude-plugins/orca-game/hooks/hd-thought.ts",
