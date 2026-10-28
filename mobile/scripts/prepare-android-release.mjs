@@ -84,6 +84,23 @@ if (requestedVersionCode || bumpVersionCode) {
   fail('Android versionCode changes must be committed in mobile/app.json before release')
 }
 
+// Why before the build: Play only rejects a used versionCode at upload, ~30 min in,
+// after the GitHub release already shipped the colliding APK (ORCA-829).
+const playHighestVersionCode = input('MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE')
+if (playHighestVersionCode) {
+  if (!/^\d+$/.test(playHighestVersionCode)) {
+    fail('MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE must be a non-negative integer')
+  }
+  const highest = Number(playHighestVersionCode)
+  if (currentVersionCode <= highest) {
+    fail(
+      `Android versionCode ${currentVersionCode} is not above ${highest}, the highest one Play already has. ` +
+        `Commit a versionCode of at least ${highest + 1} in mobile/app.json before releasing.`
+    )
+  }
+  console.log(`Highest Play versionCode: ${highest}`)
+}
+
 const tag = `mobile-android-v${currentVersion}`
 const publishRelease =
   githubRef.startsWith(androidTagRefPrefix) || truthy(input('MOBILE_ANDROID_PUBLISH_RELEASE'))

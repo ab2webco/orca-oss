@@ -296,6 +296,33 @@ platform :ios do
 end
 
 platform :android do
+  desc "Write the highest versionCode Play holds on any track to GITHUB_OUTPUT"
+  lane :play_highest_version_code do
+    codes = []
+    failures = []
+    %w[internal alpha beta production].each do |track|
+      codes.concat(
+        google_play_track_version_codes(
+          package_name: BUNDLE_ID,
+          track: track,
+          json_key_data: ENV.fetch("PLAY_SERVICE_ACCOUNT_JSON"),
+        ).map(&:to_i),
+      )
+    rescue StandardError => error
+      # A track with no release yet raises too, so one failing track is not fatal.
+      UI.important("Could not read Play track #{track}: #{error.message}")
+      failures << track
+    end
+    # Why fatal only when every track fails: that is a credential or API problem, and
+    # reporting 0 would let a used versionCode through to a 30-minute build.
+    UI.user_error!("Could not read any Play track; see the errors above") if failures.size == 4
+
+    highest = codes.max || 0
+    UI.message("Highest Play versionCode: #{highest}")
+    output_path = ENV["GITHUB_OUTPUT"].to_s
+    File.open(output_path, "a") { |file| file.puts("highest_version_code=#{highest}") } unless output_path.empty?
+  end
+
   desc "Upload the release App Bundle to the Play internal track"
   lane :publish_internal do
     UI.user_error!("Missing #{ANDROID_BUNDLE_PATH}; run bundleRelease first") unless File.exist?(ANDROID_BUNDLE_PATH)
