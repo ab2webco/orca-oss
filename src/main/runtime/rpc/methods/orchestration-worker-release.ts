@@ -9,6 +9,7 @@ import {
   exposeWorkerTerminalResource,
   type WorkerReleaseReceipt
 } from './orchestration-worker-release-completion'
+import { releaseFederatedWorker } from './orchestration-federated-worker-release'
 
 const WorkerDispatchParams = z.object({ dispatch: requiredString('Missing --dispatch') })
 
@@ -30,19 +31,15 @@ export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.workerRelease',
     params: WorkerDispatchParams,
-    handler: async (params, { runtime }): Promise<WorkerReleaseReceipt> => {
+    handler: async (params, { runtime, orchestrationMutation }): Promise<WorkerReleaseReceipt> => {
       const db = runtime.getOrchestrationDb()
-      if (db.getFederatedDispatch(params.dispatch)) {
-        // Fail closed: the worker server owns that terminal; a home-side close would be a guess.
-        return {
-          dispatchId: params.dispatch,
-          state: 'retained',
-          reason: 'federation_unsupported',
-          processAction: 'none',
-          archive: null,
-          recovery:
-            'Connected-server workers do not support release yet; inspect the worker server directly.'
-        }
+      const federated = db.getFederatedDispatch(params.dispatch)
+      if (federated) {
+        return releaseFederatedWorker({
+          runtime,
+          federated,
+          requestId: orchestrationMutation?.requestId
+        })
       }
       const requested = db.requestWorkerTerminalRelease(params.dispatch)
       if (requested.disposition === 'already_released') {

@@ -320,7 +320,12 @@ export function gamePushPlanOf(state: FleetInput): GamePushEntry[] {
   return byPhase(entries, (entry) => entry.row.phase)
 }
 
-export type GameStopTarget = { row: GameFleetRow; worktreeId: string | null }
+export type GameStopTarget = {
+  row: GameFleetRow
+  worktreeId: string | null
+  /** A remote member's home dispatch; its terminal handle only resolves on its host. */
+  remoteDispatchId: string | null
+}
 
 /** Members `orca game stop` ends, in list order; never the lead. */
 export function gameStopTargetsOf(
@@ -329,7 +334,8 @@ export function gameStopTargetsOf(
 ): { targets: GameStopTarget[]; missing: string[] } {
   const all = membersOf(state).map((agent) => ({
     row: rowOf(agent),
-    worktreeId: agent.worktree?.id ?? null
+    worktreeId: agent.worktree?.id ?? null,
+    remoteDispatchId: agent.remote ? agent.paneKey.replace(/^remote:/, '') : null
   }))
   if (tickets === 'all') {
     return { targets: all, missing: [] }

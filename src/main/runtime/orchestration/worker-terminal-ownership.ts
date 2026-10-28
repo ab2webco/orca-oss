@@ -24,6 +24,7 @@ export type WorkerTerminalRetainedReason =
   | 'identity_unproven'
   | 'legacy_ambiguous'
   | 'federation_unsupported'
+  | 'not_settled'
 
 export type WorkerTerminalArchiveStatus = 'captured' | 'empty' | 'unavailable'
 

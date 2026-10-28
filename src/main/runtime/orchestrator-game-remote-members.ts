@@ -32,6 +32,7 @@ type RemoteMemberReads = {
 /**
  * Live remote members of a Run, plus those that finished since the current lead claimed it (the
  * same era cut the inbox uses), so a fresh lead does not inherit yesterday's finished hosts.
+ * A released member's host resources are gone, so it leaves the fleet.
  */
 export function listRemoteGameMemberSources(
   db: OrchestrationDb,
@@ -52,6 +53,7 @@ export function listRemoteGameMemberSources(
          LEFT JOIN tasks t ON t.id = d.task_id
          LEFT JOIN worker_dispatches w ON w.dispatch_id = f.dispatch_id
         WHERE d.run_id = ?
+          AND COALESCE(w.stage, '') <> 'released'
           AND (d.status IN ('pending', 'dispatched')
             OR (COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
               AND d.completed_at >= r.updated_at))
