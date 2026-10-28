@@ -72,6 +72,24 @@ describe('member agent and account tag', () => {
 })
 
 describe('member host tag (ORCA-824)', () => {
+  // Why: a member whose terminal is gone on its host must not read as a silent host (ORCA-790).
+  it('keeps that the host answered and the member is gone', () => {
+    expect(
+      parseGameState(stateWith({ remote: { host: 'imac', stateKnown: false, gone: true } }))
+        ?.agents[0]?.remote
+    ).toEqual({ host: 'imac', stateKnown: false, gone: true })
+  })
+
+  it('says a gone member is gone from its host, in the session language', () => {
+    const gone = { host: 'imac', stateKnown: false, gone: true as const }
+    setGameLocale('en')
+    expect(agentTagOf({ agentType: '', remote: gone }, 40)).toBe('gone from imac')
+    expect(agentTagOf({ agentType: '', remote: gone }, 6)).toBe('imac ✕')
+    setGameLocale('es')
+    expect(agentTagOf({ agentType: '', remote: gone }, 40)).toBe('ya no está en imac')
+    setGameLocale('en')
+  })
+
   it('keeps the paired host a member runs on and drops a malformed one', () => {
     expect(
       parseGameState(stateWith({ remote: { host: 'imac', stateKnown: false } }))?.agents[0]?.remote

@@ -73,7 +73,12 @@ export type GameAgent = {
   remote?: GameRemoteHost
 }
 
-export type GameRemoteHost = { host: string; stateKnown: boolean }
+export type GameRemoteHost = {
+  host: string
+  stateKnown: boolean
+  /** The host answered and the member's terminal is no longer there (ORCA-790). */
+  gone?: true
+}
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 

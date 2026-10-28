@@ -90,7 +90,11 @@ export async function remoteGameMembersOf(
         toolName: null,
         isLeader: false,
         isMember: true,
-        remote: { host: source.hostName, stateKnown },
+        remote: {
+          host: source.hostName,
+          stateKnown,
+          ...(show?.liveness === 'gone' ? { gone: true as const } : {})
+        },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch
           ? {

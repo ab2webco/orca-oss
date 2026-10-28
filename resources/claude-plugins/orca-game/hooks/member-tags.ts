@@ -1,6 +1,7 @@
 import type { GameAgent, GameMemberAccount, GameMemberLimit, GameMemberRemote } from '../types'
 import { cellWidthOf } from './cell-width'
 import { gameStrings } from './game-strings'
+import { remoteGoneTagOf } from './remote-member-view'
 
 // What a member card says about the account its agent runs on.
 
@@ -52,7 +53,11 @@ const SHORT_LOCAL = 3
 
 export const memberRemoteOf = (value: unknown): GameMemberRemote | undefined =>
   isShape(value) && typeof value.host === 'string' && value.host !== ''
-    ? { host: value.host, stateKnown: value.stateKnown !== false }
+    ? {
+        host: value.host,
+        stateKnown: value.stateKnown !== false,
+        ...(value.gone === true ? { gone: true as const } : {})
+      }
     : undefined
 
 /** `codex · ana@…`: the domain never shows, and the name shortens before the account is dropped. */
@@ -67,10 +72,12 @@ export const agentTagOf = (
   const { remote } = agent
   // Why `host ?`: a narrow card would ellipsize `imac not answering` into `imac no…`.
   const hosts = remote
-    ? [
-        gameStrings().text.remoteHost(remote.host, remote.stateKnown),
-        remote.stateKnown ? remote.host : `${remote.host} ?`
-      ]
+    ? remote.gone
+      ? [remoteGoneTagOf(remote.host), `${remote.host} ✕`]
+      : [
+          gameStrings().text.remoteHost(remote.host, remote.stateKnown),
+          remote.stateKnown ? remote.host : `${remote.host} ?`
+        ]
     : ['']
   const bases = [
     ...hosts.map((host) => [agent.agentType, host].filter(Boolean).join(' · ')),
