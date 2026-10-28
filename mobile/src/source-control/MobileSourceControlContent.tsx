@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, SectionList, View } from 'react-native'
-import { Text, TextInput } from '../theme/dynamic-type-text'
+import { Text, TextInput, useCompactTextLayout } from '../theme/dynamic-type-text'
 import { Minus, MoreHorizontal, Plus, Sparkles } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import { MobileSourceControlCreatePrEntry } from './MobileSourceControlCreatePrEntry'
@@ -17,6 +17,7 @@ type Props = {
 // Changes tab: local file changes only — uncommitted (staged/unstaged) plus
 // committed-on-branch vs base. PR conflicts and push status live elsewhere.
 export function MobileSourceControlContent({ state }: Props) {
+  const compact = useCompactTextLayout()
   const {
     insets,
     connState,
@@ -186,10 +187,14 @@ export function MobileSourceControlContent({ state }: Props) {
           }
         ]}
       >
-        <View style={styles.commitRow}>
+        <View style={[styles.commitRow, compact && styles.commitRowStacked]}>
           {stagedCount === 0 ? (
             <View
-              style={[styles.commitInput, styles.commitInputDisabled]}
+              style={[
+                styles.commitInput,
+                compact && styles.commitInputStacked,
+                styles.commitInputDisabled
+              ]}
               accessibilityRole="text"
               accessibilityState={{ disabled: true }}
               accessibilityLabel="Commit message disabled. No staged files."
@@ -198,7 +203,7 @@ export function MobileSourceControlContent({ state }: Props) {
             </View>
           ) : (
             <TextInput
-              style={styles.commitInput}
+              style={[styles.commitInput, compact && styles.commitInputStacked]}
               value={commitMessage}
               onChangeText={setCommitMessage}
               placeholder="Commit message"
