@@ -30796,12 +30796,27 @@ export class OrcaRuntimeService {
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
     const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
+    return {
+      key: this.gameProjectKeyOfWorktree(worktreeId, worktreesById) ?? 'no-project',
+      worktreesById,
+      worktree
+    }
+  }
+
+  private gameProjectKeyOfWorktree(
+    worktreeId: string | null | undefined,
+    worktreesById: ReadonlyMap<string, ResolvedWorktree>
+  ): string | null {
+    if (!worktreeId) {
+      return null
+    }
     // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
     // keyed `no-project` then would split the project's history and lessons in two.
-    const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
+    const idRepoId = splitWorktreeId(worktreeId)?.repoId
     const repoId =
-      worktree?.repoId ?? (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
-    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById, worktree }
+      worktreesById.get(worktreeId)?.repoId ??
+      (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
+    return repoId ? `repo:${repoId}` : null
   }
 
   getGameBoard(): GameBoard {
@@ -31430,26 +31445,48 @@ export class OrcaRuntimeService {
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
-    return await this.withRemoteGameMembers(withPaused, args.paneKey, worktree?.repoId)
+    return await this.withRemoteGameMembers(withPaused, args.paneKey, worktree, worktreesById)
   }
 
   // Why after the paused view: remote members have no local session to save or resume (ORCA-824).
   private async withRemoteGameMembers(
     state: OrchestratorGameState,
     leadPaneKey: string | undefined,
-    repoId: string | undefined
+    worktree: ResolvedWorktree | null,
+    worktreesById: ReadonlyMap<string, ResolvedWorktree>
   ): Promise<OrchestratorGameState> {
     const run = leadPaneKey ? this._orchestrationDb?.getCurrentRunForPane?.(leadPaneKey) : undefined
-    if (state.role !== 'lead' || !run || !this._orchestrationDb) {
+    if (state.role !== 'lead' || !leadPaneKey || !run || !this._orchestrationDb) {
       return state
     }
+    const repoId = worktree?.repoId
+    const projectOfPane = (paneKey: string | null): string | null =>
+      paneKey
+        ? this.gameProjectKeyOfWorktree(
+            this.getTerminalWorktreeIdForPaneKey(paneKey),
+            worktreesById
+          )
+        : null
     const sources = [
       ...listRemoteGameMemberSources(this._orchestrationDb, run.id),
       // Why: a new lead opens a new Run, so its predecessor's members are only found here.
       ...listEarlierLeadRemoteMemberSources(
         this._orchestrationDb,
-        run.id,
-        (handle) => this.getTerminalPaneKey(handle) !== null
+        {
+          runId: run.id,
+          projectKey: worktree
+            ? this.gameProjectKeyOfWorktree(worktree.id, worktreesById)
+            : projectOfPane(leadPaneKey)
+        },
+        (other) => ({
+          // Why the pane too: a restart fences the Run's handle while its lead pane runs on (ORCA-835).
+          live:
+            (other.coordinatorHandle !== null &&
+              this.getTerminalPaneKey(other.coordinatorHandle) !== null) ||
+            (other.coordinatorPaneKey !== null &&
+              this.getPtyRecordForPaneKey(other.coordinatorPaneKey)?.connected === true),
+          projectKey: projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey)
+        })
       )
     ]
     if (sources.length === 0) {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrchestrationDb } from './orchestration/db'
+import type { GameAgent } from '../../shared/orchestrator-game-state'
 
 const LEAD_PANE = 'tab-1:11111111-1111-4111-8111-111111111111'
 
@@ -134,11 +135,20 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
 
   it('lists a member an earlier lead left running on the host, flagged with its ticket done (ORCA-793)', async () => {
     const { runtime } = leadWithRemoteMember()
+    const earlierPane = 'tab-0:33333333-3333-4333-8333-333333333333'
+    // Why: an earlier lead's members are listed only within the lead's own project (ORCA-848).
+    vi.spyOn(
+      runtime as unknown as { getResolvedWorktreeMap: () => Promise<Map<string, unknown>> },
+      'getResolvedWorktreeMap'
+    ).mockResolvedValue(new Map([['wt-lead', { id: 'wt-lead', repoId: 'repo-orca' }]]))
+    vi.spyOn(runtime, 'getTerminalWorktreeIdForPaneKey').mockImplementation((paneKey) =>
+      paneKey === LEAD_PANE || paneKey === earlierPane ? 'wt-lead' : null
+    )
     const db = runtime.getOrchestrationDb()
     const earlier = db.createRun({
       objective: 'earlier lead',
       coordinatorHandle: 'term_gone',
-      coordinatorPaneKey: 'tab-0:33333333-3333-4333-8333-333333333333'
+      coordinatorPaneKey: earlierPane
     })
     const task = db.createTask({ spec: 'release', taskTitle: 'ORCA-829 check', runId: earlier.id })
     const started = db.createStartingWorkerDispatch({
@@ -180,6 +190,165 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
         remote: { host: 'imac', stateKnown: true, earlierLead: true, ticketDone: true }
       })
     ])
+  })
+})
+
+describe("a lead's earlier-lead remote members stay in its project (ORCA-848)", () => {
+  const databases: OrchestrationDb[] = []
+  const ORCA_PANE = 'tab-2:22222222-2222-4222-8222-222222222222'
+  const CINECO_PANE = 'tab-3:33333333-3333-4333-8333-333333333333'
+
+  afterEach(() => {
+    for (const database of databases) {
+      database.close()
+    }
+    databases.length = 0
+  })
+
+  // Why the casts: these lookups are private, and real ones need live panes and a worktree scan.
+  function leadInOrca(
+    livePanes: readonly string[] = [],
+    before: (db: OrchestrationDb) => void = () => undefined
+  ): {
+    runtime: OrcaRuntimeService
+    db: OrchestrationDb
+  } {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({
+      worktrees: [{ worktreeId: 'wt-lead', branch: 'main', displayName: 'lead', agents: [leadRow] }]
+    } as never)
+    const internals = runtime as unknown as {
+      getResolvedWorktreeMap: () => Promise<Map<string, unknown>>
+      getPtyRecordForPaneKey: (paneKey: string) => { connected: boolean } | null
+    }
+    vi.spyOn(internals, 'getResolvedWorktreeMap').mockResolvedValue(
+      new Map([
+        ['wt-lead', { id: 'wt-lead', repoId: 'repo-orca' }],
+        ['wt-orca-old', { id: 'wt-orca-old', repoId: 'repo-orca' }],
+        ['wt-cineco', { id: 'wt-cineco', repoId: 'repo-cineco' }]
+      ])
+    )
+    const worktreeOfPane: Record<string, string> = {
+      [LEAD_PANE]: 'wt-lead',
+      [ORCA_PANE]: 'wt-orca-old',
+      [CINECO_PANE]: 'wt-cineco'
+    }
+    vi.spyOn(runtime, 'getTerminalWorktreeIdForPaneKey').mockImplementation(
+      (paneKey) => worktreeOfPane[paneKey] ?? null
+    )
+    vi.spyOn(internals, 'getPtyRecordForPaneKey').mockImplementation((paneKey) =>
+      livePanes.includes(paneKey) ? { connected: true } : null
+    )
+    const db = new OrchestrationDb(':memory:')
+    databases.push(db)
+    runtime.setOrchestrationDb(db)
+    before(db)
+    db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({
+      terminal: { branch: 'fabolivark/member', title: '✳ Claude Code', liveness: 'running' }
+    })
+    return { runtime, db }
+  }
+
+  function remoteMemberOf(
+    db: OrchestrationDb,
+    runId: string,
+    title: string,
+    createdByPaneKey?: string
+  ): string {
+    const task = db.createTask({ spec: title, taskTitle: title, runId, createdByPaneKey })
+    const started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_imac', serverName: 'imac' },
+      federation: {
+        environmentId: 'env_imac',
+        environmentName: 'imac',
+        peerFingerprint: 'fp_imac',
+        protocolVersion: 1
+      }
+    })
+    db.updateFederatedDispatchResources({
+      dispatchId: started.dispatch.id,
+      remoteRuntimeEpoch: 'epoch_imac',
+      worktreeId: `repo::/home/me/${title.toLowerCase()}`,
+      terminalHandle: `term_${title}`
+    })
+    return started.dispatch.id
+  }
+
+  const remoteNames = (agents: readonly GameAgent[]) =>
+    agents.filter((agent) => agent.isMember).map((agent) => agent.displayName)
+
+  it("leaves out a member of another project's Run whose lead is gone", async () => {
+    const { runtime, db } = leadInOrca()
+    const cineco = db.createRun({
+      objective: 'cineco lead',
+      coordinatorHandle: 'term_cineco_gone',
+      coordinatorPaneKey: CINECO_PANE
+    })
+    remoteMemberOf(db, cineco.id, 'CINE-12')
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(remoteNames(state.agents)).toEqual([])
+  })
+
+  it('treats a Run whose handle is stale but whose lead pane still runs as live (ORCA-835)', async () => {
+    const { runtime, db } = leadInOrca([ORCA_PANE])
+    const fenced = db.createRun({
+      objective: 'fenced lead',
+      coordinatorHandle: 'term_before_restart',
+      coordinatorPaneKey: ORCA_PANE
+    })
+    remoteMemberOf(db, fenced.id, 'ORCA-844')
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(remoteNames(state.agents)).toEqual([])
+  })
+
+  it("still lists this project's earlier lead's member once the lead is gone", async () => {
+    const { runtime, db } = leadInOrca()
+    const earlier = db.createRun({
+      objective: 'earlier lead',
+      coordinatorHandle: 'term_before_restart',
+      coordinatorPaneKey: ORCA_PANE
+    })
+    remoteMemberOf(db, earlier.id, 'ORCA-829')
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(remoteNames(state.agents)).toEqual(['ORCA-829'])
+  })
+
+  it('places a Run a newer lead unbound by the pane that created its member', async () => {
+    const { runtime, db } = leadInOrca([], (home) => {
+      const unbound = home.createRun({
+        objective: 'earlier lead in this pane',
+        coordinatorHandle: 'term_earlier',
+        coordinatorPaneKey: LEAD_PANE
+      })
+      remoteMemberOf(home, unbound.id, 'ORCA-826', LEAD_PANE)
+    })
+    const cineco = db.createRun({
+      objective: 'cineco lead',
+      coordinatorHandle: 'term_cineco_old',
+      coordinatorPaneKey: CINECO_PANE
+    })
+    remoteMemberOf(db, cineco.id, 'CINE-12', CINECO_PANE)
+    db.createRun({
+      objective: 'newer cineco lead',
+      coordinatorHandle: 'term_cineco_new',
+      coordinatorPaneKey: CINECO_PANE
+    })
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(remoteNames(state.agents)).toEqual(['ORCA-826'])
   })
 })
 
