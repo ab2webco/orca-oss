@@ -161,6 +161,12 @@ host (decision O3).
   the existing ones (`src/shared/protocol-version.ts:64-78`). The home sends `game` and
   `setupAdmission` only after the remote confirms the capability. An older host is refused for game
   placement with a named error. Plain `worker-start --on` keeps working on older hosts.
+- Built in ORCA-790: `orchestration.federation-release.v1`. `worker-release` and `game stop` on a
+  settled remote member call `orchestration.federationRelease` on its host. That closes the agent
+  terminal the dispatch created and removes the worktree it created, without `--force`, so a tree
+  with changes stays. Both servers then mark the dispatch `stage = released` and it leaves the
+  fleet. A host without the capability keeps the member `retained` with `federation_unsupported`
+  and nothing is called there.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the

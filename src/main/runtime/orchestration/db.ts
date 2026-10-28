@@ -5416,6 +5416,27 @@ export class OrchestrationDb {
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
   }
 
+  // Why stage, not state: the settled outcome stays readable; only the resources are gone.
+  markRemoteAttachmentReleased(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET stage = 'released', updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('succeeded', 'failed', 'stopped', 'abandoned')`
+      )
+      .run(dispatchId)
+  }
+
+  markFederatedWorkerReleased(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches
+         SET stage = 'released', updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('succeeded', 'failed', 'stopped', 'abandoned')`
+      )
+      .run(dispatchId)
+  }
+
   markRemoteAttachmentStopUnknown(dispatchId: string, reason: string): RemoteDispatchAttachmentRow {
     this.db
       .prepare(

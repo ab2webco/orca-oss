@@ -157,7 +157,7 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
   })
 ]
 
-function requireHomeAttachment(
+export function requireHomeAttachment(
   runtime: OrcaRuntimeService,
   dispatchId: string,
   callerFingerprint: string | undefined
@@ -172,7 +172,7 @@ function requireHomeAttachment(
   return attachment
 }
 
-async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispatchId: string) {
+export async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispatchId: string) {
   const db = runtime.getOrchestrationDb()
   const attachment = db.getRemoteDispatchAttachment(dispatchId)
   if (!attachment?.terminal_handle) {
