@@ -172,6 +172,23 @@ Update after meaningful state changes such as repro, fix, validation, handoff, o
 
 Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, `in-review`, `completed`.
 
+## Workspace Files
+
+Read and list files of a worktree or folder workspace, on this host or a paired one, without SSH or asking another agent to print them:
+
+```text
+ORCA file list --worktree active --json
+ORCA file list src --worktree branch:main --environment <env> --json
+ORCA file read src/App.tsx --worktree active --json
+ORCA file read README.md --worktree branch:main --environment <env> --json
+ORCA file read logs/app.log --offset 0 --limit 65536 --worktree active --json
+```
+
+- Paths stay confined to the selected workspace; the runtime rejects anything outside it.
+- With `--environment` (or `--pairing-code`), `--worktree` is required.
+- A whole-file read is capped by the runtime preview budget (512 KiB, less over a paired connection). For larger files read byte ranges with `--offset`/`--limit` (at most 512 KiB) and continue from `nextOffset` until `eof` is true. Ranged reads are unavailable for SSH worktrees.
+- Binary files come back with `isBinary: true` and no content.
+
 ## Terminals
 
 Common commands:

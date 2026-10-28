@@ -103,6 +103,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/file.js')).FILE_HANDLERS
   },
   {
+    name: 'file-content',
+    keys: ['file read', 'file list'],
+    load: async () => (await import('./handlers/file-content.js')).FILE_CONTENT_HANDLERS
+  },
+  {
     name: 'events',
     keys: ['events'],
     load: async () => (await import('./handlers/events.js')).EVENTS_HANDLERS
