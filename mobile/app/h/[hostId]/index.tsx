@@ -6,12 +6,9 @@ import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'ex
 import {
   Search,
   X,
-  Pin,
   List,
   SlidersHorizontal,
   Layers,
-  ChevronDown,
-  ChevronRight,
   ChevronLeft,
   Plus,
   Moon,
@@ -44,8 +41,9 @@ import type { RpcSuccess } from '../../../src/transport/types'
 import { StatusDot } from '../../../src/components/StatusDot'
 import { NewWorktreeModalController } from '../../../src/components/NewWorktreeModalController'
 import { NewWorkspaceFab, FAB_SIZE } from '../../../src/components/NewWorkspaceFab'
-import { MobileRepoIcon } from '../../../src/components/MobileRepoIcon'
 import { WorktreeListRow } from '../../../src/components/WorktreeListRow'
+import { HostListToolbar } from '../../../src/components/HostListToolbar'
+import { WorkspaceSectionHeader } from '../../../src/components/WorkspaceSectionHeader'
 import { useNow } from '../../../src/hooks/use-now'
 import { useActiveWorktreeScroll } from '../../../src/hooks/use-active-worktree-scroll'
 import type { RepoIcon } from '../../../../src/shared/repo-icon'
@@ -735,6 +733,14 @@ export function HostScreen({
   }, [filters])
   const selectedSortLabel =
     SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? 'Recent'
+  const groupModeLabel =
+    groupMode === 'none'
+      ? 'Group'
+      : groupMode === 'workspaceStatus'
+        ? 'Status'
+        : groupMode === 'repo'
+          ? 'Repo'
+          : 'PR'
 
   const handleGroupChange = useCallback(
     (value: MobileGroupMode) => {
@@ -932,13 +938,7 @@ export function HostScreen({
               >
                 <Layers size={14} color={colors.textSecondary} />
                 <Text style={styles.sortLabel} numberOfLines={1}>
-                  {groupMode === 'none'
-                    ? 'Group'
-                    : groupMode === 'workspaceStatus'
-                      ? 'Status'
-                      : groupMode === 'repo'
-                        ? 'Repo'
-                        : 'PR'}
+                  {groupModeLabel}
                 </Text>
               </Pressable>
             </View>
@@ -1025,77 +1025,19 @@ export function HostScreen({
             </View>
           </View>
         ) : (
-          <View style={styles.toolbar}>
-            <Pressable
-              style={[styles.filterChip, activeFilterCount > 0 && styles.filterChipActive]}
-              onPress={() => setShowFilterModal(true)}
-            >
-              <Filter
-                size={12}
-                color={activeFilterCount > 0 ? colors.textPrimary : colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilterCount > 0 && styles.filterChipTextActive
-                ]}
-              >
-                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </Text>
-            </Pressable>
-
-            <Pressable style={styles.modeButton} onPress={() => setShowSortPicker(true)}>
-              <SlidersHorizontal size={14} color={colors.textSecondary} />
-              <Text style={styles.sortLabel} numberOfLines={1}>
-                {selectedSortLabel}
-              </Text>
-            </Pressable>
-
-            <Pressable style={styles.modeButton} onPress={() => setShowGroupPicker(true)}>
-              <Layers size={14} color={colors.textSecondary} />
-              <Text style={styles.sortLabel} numberOfLines={1}>
-                {groupMode === 'none'
-                  ? 'Group'
-                  : groupMode === 'workspaceStatus'
-                    ? 'Status'
-                    : groupMode === 'repo'
-                      ? 'Repo'
-                      : 'PR'}
-              </Text>
-            </Pressable>
-
-            <View style={styles.toolbarSpacer} />
-
-            <Pressable
-              style={styles.searchToggle}
-              onPress={() => navigateFromHostList(`/h/${hostId}/accounts`)}
-              disabled={connState !== 'connected'}
-            >
-              <UserCircle
-                size={16}
-                color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-              />
-            </Pressable>
-
-            <Pressable
-              style={styles.searchToggle}
-              onPress={() => navigateFromHostList(`/h/${hostId}/tasks`)}
-              disabled={connState !== 'connected'}
-            >
-              <List
-                size={16}
-                color={connState === 'connected' ? colors.textSecondary : colors.textMuted}
-              />
-            </Pressable>
-
-            <Pressable style={styles.searchToggle} onPress={() => setShowSearch((s) => !s)}>
-              {showSearch ? (
-                <X size={16} color={colors.textSecondary} />
-              ) : (
-                <Search size={16} color={colors.textSecondary} />
-              )}
-            </Pressable>
-          </View>
+          <HostListToolbar
+            activeFilterCount={activeFilterCount}
+            sortLabel={selectedSortLabel}
+            groupLabel={groupModeLabel}
+            connected={connState === 'connected'}
+            showSearch={showSearch}
+            onOpenFilter={() => setShowFilterModal(true)}
+            onOpenSort={() => setShowSortPicker(true)}
+            onOpenGroup={() => setShowGroupPicker(true)}
+            onOpenAccounts={() => navigateFromHostList(`/h/${hostId}/accounts`)}
+            onOpenTasks={() => navigateFromHostList(`/h/${hostId}/tasks`)}
+            onToggleSearch={() => setShowSearch((s) => !s)}
+          />
         )}
       </View>
 
@@ -1174,27 +1116,18 @@ export function HostScreen({
               groupMode === 'repo' ? uniqueRepoColors.get(section.title) : null
             const repoSectionIcon = groupMode === 'repo' ? repoIconsByName.get(section.title) : null
             return (
-              <Pressable style={styles.sectionHeader} onPress={() => toggleCollapsed(section.key)}>
-                {isCollapsed ? (
-                  <ChevronRight size={12} color={colors.textMuted} style={styles.sectionIcon} />
-                ) : (
-                  <ChevronDown size={12} color={colors.textMuted} style={styles.sectionIcon} />
-                )}
-                {section.icon === 'pin' && (
-                  <Pin size={12} color={colors.textMuted} style={styles.sectionIcon} />
-                )}
-                {groupMode === 'repo' ? (
-                  <View style={styles.sectionRepoIcon}>
-                    <MobileRepoIcon
-                      repoIcon={repoSectionIcon}
-                      size={14}
-                      color={repoSectionColor ?? colors.textSecondary}
-                    />
-                  </View>
-                ) : null}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Text style={styles.sectionCount}>{count}</Text>
-              </Pressable>
+              <WorkspaceSectionHeader
+                title={section.title}
+                count={count}
+                collapsed={isCollapsed}
+                onToggle={() => toggleCollapsed(section.key)}
+                pinned={section.icon === 'pin'}
+                repo={
+                  groupMode === 'repo'
+                    ? { icon: repoSectionIcon, color: repoSectionColor }
+                    : undefined
+                }
+              />
             )
           }}
           ItemSeparatorComponent={ListSeparator}
@@ -1490,17 +1423,6 @@ const styles = StyleSheet.create({
     fontSize: typography.metaSize,
     fontWeight: '600'
   },
-  toolbar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle
-  },
   embeddedToolbar: {
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.sm,
@@ -1565,9 +1487,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary
   },
-  toolbarSpacer: {
-    flex: 1
-  },
   floatingWorkspaceHeaderButton: {
     width: 32,
     height: 32,
@@ -1584,9 +1503,6 @@ const styles = StyleSheet.create({
   },
   toolbarIconDisabled: {
     opacity: 0.6
-  },
-  searchToggle: {
-    padding: spacing.xs
   },
   searchBar: {
     paddingHorizontal: spacing.md,
@@ -1606,31 +1522,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: spacing.lg
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs
-  },
-  sectionIcon: {
-    marginRight: spacing.xs
-  },
-  sectionRepoIcon: {
-    marginRight: spacing.xs
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  sectionCount: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginLeft: spacing.xs
   },
   separator: {
     height: 1,
