@@ -963,8 +963,11 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   `orca game launch <ticket> --on <host> --repo <selector of the repo on that host>` is the
   game's remote launch: the same roster name, task title, member record and `game: true` as a
   local launch, sent as `worker-start --on <host>` with a `new-top-level` worktree. The host
-  starts the pane as a game member (band and character) when it has the game-member capability,
-  and draws Quest when its checkout lacks the project's `sceneFile`. A plain
+  starts the pane as a game member (band and character) when it has the game-member capability.
+  The lead's Orca also sends the scene file the lead draws, as written, to a host advertising
+  `orchestration.federation-game-scene.v1`. The host keeps it on the member's attach record and
+  draws it only when the member's worktree has no readable scene file of its own (`.orca/` is often
+  git-excluded, so a new host worktree lacks it). An older host draws its own scene, or Quest. A plain
   `worker-start --on` gives the member neither a name nor the game. There is no host repo map
   yet, so `--repo` names the host's own repo.
 - The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and

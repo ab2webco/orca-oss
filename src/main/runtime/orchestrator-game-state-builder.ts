@@ -9,7 +9,8 @@ import {
   type GameMemberWork,
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
-import { readSceneFile } from './orchestrator-game-scene-file-read'
+import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
@@ -108,6 +109,8 @@ export type OrchestratorGameStateInput = {
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
+  /** The scene a remote member's lead sent; drawn only when the worktree's own file does not read. */
+  readCarriedScene?: () => CarriedGameScene | null
   /** The project's STOP; absent leaves `stopped` out, as from an older host. */
   readStop?: () => Promise<GameStop | null>
   /** The project's inboxes; read only for a lead. */
@@ -146,7 +149,7 @@ export async function buildOrchestratorGameState(
       tracker ? settle(input.readPlane) : Promise.resolve(null),
       tracker ? settle(input.readLinear) : Promise.resolve(null),
       readScenes ? settle(readScenes) : Promise.resolve(null),
-      readSceneFile(resolved, input.worktree),
+      readSceneFileOrCarried(resolved, input.worktree, input.readCarriedScene),
       readStop ? settleGameStop(readStop) : Promise.resolve(null),
       readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null),
       readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
@@ -156,7 +159,11 @@ export async function buildOrchestratorGameState(
   const config = {
     ...resolved.config,
     mode: shownOrchestratorGameModeOf(resolved.config),
-    ...(sceneFile?.warning === undefined ? {} : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
+    ...(sceneFile?.scene
+      ? { scene: sceneFile.scene.id }
+      : sceneFile?.warning === undefined
+        ? {}
+        : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
     timezone: desktopGameTimezoneOf(resolved.config.timezone)
   }
   let workItem: GameWorkItem | null = null

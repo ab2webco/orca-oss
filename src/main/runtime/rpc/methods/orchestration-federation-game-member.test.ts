@@ -1,6 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
-import { ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import {
+  ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY
+} from '../../../../shared/protocol-version'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
 import { WorkerSetupAdmission } from '../../orchestration/worker-setup-admission'
@@ -11,6 +14,7 @@ import { createFederationWorkerStartRequest as startRequest } from './orchestrat
 import { configureWorkerRuntime } from './orchestration-federation-worker-runtime-mocks'
 
 const GAME_MEMBER_FIELDS = ['game', 'setupAdmission'] as const
+const SCENE = { id: 'file:mario-bros', text: '{"name":"Mario Bros"}' }
 
 // Why: an older remote's attach schema strips unknown fields, so a game member sent
 // there without a capability check becomes a silent plain worker (ORCA-792).
@@ -23,10 +27,17 @@ describe('federated game members across versions', () => {
   let workerCapabilities: string[]
   let attachParams: Record<string, unknown>[]
   let workerAdmission: WorkerSetupAdmission
+  let readLeadScene: MockInstance<OrcaRuntimeService['readCallerGameScene']>
 
   function useOlderWorkerBuild(): void {
     workerCapabilities = workerCapabilities.filter(
       (capability) => capability !== ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY
+    )
+  }
+
+  function useBuildWithoutScenes(): void {
+    workerCapabilities = workerCapabilities.filter(
+      (capability) => capability !== ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY
     )
   }
 
@@ -79,6 +90,11 @@ describe('federated game members across versions', () => {
               delete sent[field]
             }
           }
+          if (
+            !workerCapabilities.includes(ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY)
+          ) {
+            delete sent.gameScene
+          }
         }
         return (await workerDispatcher.dispatch({
           id: `remote_${method}`,
@@ -96,6 +112,7 @@ describe('federated game members across versions', () => {
     })
     homeRuntime.setOrchestrationDb(homeDb)
     homeDispatcher = new RpcDispatcher({ runtime: homeRuntime, methods: ORCHESTRATION_METHODS })
+    readLeadScene = vi.spyOn(homeRuntime, 'readCallerGameScene').mockResolvedValue(SCENE)
     vi.spyOn(homeRuntime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_coord' ? 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' : null
     )
@@ -121,6 +138,45 @@ describe('federated game members across versions', () => {
     expect(workerRuntime.getStatus().capabilities).toContain(
       ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY
     )
+  })
+
+  it('keeps the lead scene for a game member on a remote that carries scenes', async () => {
+    expect(workerRuntime.getStatus().capabilities).toContain(
+      ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY
+    )
+    const task = createHomeTask()
+
+    const response = await homeDispatcher.dispatch(startRequest(task.id, { game: true }))
+
+    expect(response).toMatchObject({ ok: true, result: { state: 'ready' } })
+    expect(readLeadScene).toHaveBeenCalledWith('term_coord')
+    expect(attachParams[0]).toMatchObject({ game: true, gameScene: SCENE })
+    expect(workerDb.getGameSceneForWorktree('repo::windows-worktree')).toEqual(SCENE)
+  })
+
+  it('starts the game member without the scene on a remote older than scenes', async () => {
+    useBuildWithoutScenes()
+    const task = createHomeTask()
+
+    const response = await homeDispatcher.dispatch(startRequest(task.id, { game: true }))
+
+    expect(response).toMatchObject({ ok: true, result: { state: 'ready' } })
+    expect(attachParams[0]).toMatchObject({ game: true })
+    expect(attachParams[0]).not.toHaveProperty('gameScene')
+    expect(workerRuntime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ orchestrationGameMember: true })
+    )
+    expect(workerDb.getGameSceneForWorktree('repo::windows-worktree')).toBeNull()
+  })
+
+  it('sends no scene for a plain worker', async () => {
+    const task = createHomeTask()
+
+    await homeDispatcher.dispatch(startRequest(task.id))
+
+    expect(readLeadScene).not.toHaveBeenCalled()
+    expect(attachParams[0]).not.toHaveProperty('gameScene')
+    expect(workerDb.getGameSceneForWorktree('repo::windows-worktree')).toBeNull()
   })
 
   it('refuses a game member for an older remote by name and starts nothing', async () => {

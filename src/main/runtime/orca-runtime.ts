@@ -706,6 +706,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
   orchestratorGameViewSettingsOf,
@@ -31252,6 +31253,23 @@ export class OrcaRuntimeService {
     })
   }
 
+  /** The scene file a lead pane draws, sent with its remote game members (ORCA-794). */
+  async readCallerGameScene(handle: string): Promise<CarriedGameScene | null> {
+    const worktreeId = (await this.showTerminal(handle).catch(() => null))?.worktreeId
+    const worktree = worktreeId ? (await this.getResolvedWorktreeMap()).get(worktreeId) : undefined
+    if (!worktree) {
+      return null
+    }
+    return readLeadGameScene({
+      settings: this.store?.getSettings?.(),
+      worktree: {
+        repoId: worktree.repoId ?? null,
+        path: worktree.path,
+        connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null
+      }
+    })
+  }
+
   async getOrchestratorGameState(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -31335,6 +31353,8 @@ export class OrcaRuntimeService {
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      readCarriedScene: () =>
+        worktree ? (this._orchestrationDb?.getGameSceneForWorktree(worktree.id) ?? null) : null,
       readInboxes: () =>
         this.gameBoard.inboxSummary({
           worktreeId: worktree?.id,

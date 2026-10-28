@@ -4,6 +4,7 @@ import {
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY
@@ -17,6 +18,8 @@ export type FederatedWorkerNegotiation = {
   federationProtocolVersion: 1 | 2 | 3
   /** Sent only to a host that confirmed it honors them. */
   gameMember: { game?: true; setupAdmission?: 'queue' }
+  /** An older host drops the lead's scene, so it is read only for a host that keeps it. */
+  carriesGameScene: boolean
 }
 
 /** Refuses, before any effect, a host that cannot run this start as asked. */
@@ -70,6 +73,9 @@ export function negotiateFederatedWorkerStart(args: {
     federationProtocolVersion,
     gameMember: params.game
       ? { game: true, ...(params.setupAdmission ? { setupAdmission: params.setupAdmission } : {}) }
-      : {}
+      : {},
+    carriesGameScene:
+      params.game === true &&
+      capabilities.includes(ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY)
   }
 }

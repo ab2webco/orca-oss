@@ -74,6 +74,9 @@ export const ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY =
 // Why: an older host's attach schema strips `game` and `setupAdmission`, starting a silent plain worker (ORCA-792).
 export const ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY =
   'orchestration.federation-game-member.v1' as const
+// Why: an older host's attach schema strips `gameScene`, so its member draws only a scene in its own checkout (ORCA-794).
+export const ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY =
+  'orchestration.federation-game-scene.v1' as const
 // Why: an older host has no federationRelease, so the home must keep its member retained (ORCA-790).
 export const ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY =
   'orchestration.federation-release.v1' as const
@@ -187,6 +190,7 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   BROWSER_SCREENCAST_RUNTIME_CAPABILITY,

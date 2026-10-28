@@ -45,7 +45,11 @@ const SPACE = JSON.stringify(
 
 function build(
   path: string,
-  options: { local?: Record<string, string>; connectionId?: string } = {}
+  options: {
+    local?: Record<string, string>
+    connectionId?: string
+    carried?: { id: string; text: string }
+  } = {}
 ): ReturnType<typeof buildOrchestratorGameState> {
   return buildOrchestratorGameState({
     settings: options.local ? { orchestratorGameProjects: { repo1: options.local } } : undefined,
@@ -62,7 +66,8 @@ function build(
     leaderPaneKey: null,
     readReview: none,
     readPlane: none,
-    readLinear: none
+    readLinear: none,
+    ...(options.carried ? { readCarriedScene: () => options.carried ?? null } : {})
   })
 }
 
@@ -191,5 +196,49 @@ describe('buildOrchestratorGameState scene file', () => {
     expect(state.warnings[0]).toBe(
       'Scene file .orca/scenes/space.json: the SSH host is not connected; drawing Quest'
     )
+  })
+
+  describe("a remote member's scene from its lead", () => {
+    const LEAD = 'file:.orca/mario-bros.json'
+    const carried = { id: LEAD, text: SPACE }
+
+    it('draws it when the worktree names no scene file', async () => {
+      const state = await build(checkout({}), { carried })
+
+      expect(state.config.scene).toBe(LEAD)
+      expect(state.warnings).toEqual([])
+      expect(state.extensions?.scenes.map((one) => one.id)).toEqual([LEAD])
+      expect(state.extensions?.scenes[0]?.definition.looks.pr.skyTop).toBe(0x102030)
+    })
+
+    it('draws it instead of Quest when the named file is missing', async () => {
+      const state = await build(checkout({}), {
+        local: { sceneFile: '.orca/scenes/space.json' },
+        carried
+      })
+
+      expect(state.config.scene).toBe(LEAD)
+      expect(state.warnings).toEqual([])
+    })
+
+    it("keeps the worktree's own scene file when it reads", async () => {
+      const state = await build(checkout({ '.orca/scenes/space.json': SPACE }), {
+        local: { sceneFile: '.orca/scenes/space.json' },
+        carried
+      })
+
+      expect(state.config.scene).toBe(ID)
+      expect(state.extensions?.scenes.map((one) => one.id)).toEqual([ID])
+    })
+
+    it('falls back as before when the carried scene does not parse', async () => {
+      const state = await build(checkout({}), {
+        local: { sceneFile: '.orca/scenes/space.json' },
+        carried: { id: LEAD, text: '{ looks:' }
+      })
+
+      expect(state.config.scene).toBe('quest')
+      expect(state.warnings[0]).toBe('Scene file .orca/scenes/space.json: not found; drawing Quest')
+    })
   })
 })
