@@ -77,6 +77,8 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'dispatch_not_found',
   'dispatch_run_mismatch',
   'dispatch_inactive',
+  // Why: its message names the member's next step when the lead's Orca cannot reopen (ORCA-856).
+  'dispatch_reopen_unsupported',
   'worker_identity_changed',
   'cursor_invalid',
   'cursor_dispatch_mismatch',

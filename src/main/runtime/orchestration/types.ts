@@ -217,6 +217,8 @@ export type RemoteDispatchAttachmentRow = {
   last_error: string | null
   /** JSON of the lead's scene `{ id, text }`; null for a plain worker or an older home. */
   game_scene: string | null
+  /** The capability hash at a successful settlement; lets its member reopen it with `ask` (ORCA-856). */
+  settled_capability_hash: string | null
   created_at: string
   updated_at: string
 }

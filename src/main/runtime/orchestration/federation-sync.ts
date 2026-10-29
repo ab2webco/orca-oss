@@ -133,6 +133,9 @@ async function syncFederatedDispatchPages(
     if (stored.message.read === 0) {
       runtime.notifyMessageArrived(stored.message.to_handle, stored.message.type)
     }
+    if (stored.reopened) {
+      runtime.ensureOrchestrationFederationRelay(dispatch.run_id)
+    }
     imported += stored.duplicate ? 0 : 1
   }
 

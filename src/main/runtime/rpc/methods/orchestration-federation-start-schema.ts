@@ -7,7 +7,7 @@ export const FederationAttachStartParams = z.object({
   dispatchId: requiredString('Missing Dispatch ID'),
   taskId: requiredString('Missing Task ID'),
   taskSpec: requiredString('Missing Task spec'),
-  protocolVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  protocolVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   worktree: requiredString('Missing remote worktree selector'),
   name: OptionalString,
   repo: OptionalString,
