@@ -109,6 +109,7 @@ describe('remote members of a lead (ORCA-824)', () => {
     remoteWorktreeId: 'repo::/home/me/orca-805',
     stage: 'agent_started',
     lastActivityAt: '2026-10-27T14:00:00.000Z',
+    createdAt: '2026-10-27 13:00:00',
     finished: false,
     ticketDone: false,
     earlierLead: false
@@ -170,7 +171,8 @@ describe('remote members of a lead (ORCA-824)', () => {
   })
 
   it('relays a waiting agent and one stopped by its usage limit (ORCA-837)', async () => {
-    const members = await remoteGameMembersOf([source, { ...source, dispatchId: 'ctx_806' }], {
+    const other = { ...source, dispatchId: 'ctx_806', remoteWorktreeId: 'repo::/home/me/orca-806' }
+    const members = await remoteGameMembersOf([source, other], {
       showOf: async ({ dispatchId }) => ({
         branch: 'b',
         title: null,
@@ -224,7 +226,80 @@ describe('remote members of a lead (ORCA-824)', () => {
       reviewOf: async () => null
     })
 
-    expect(member.remote).toEqual({ host: 'imac', stateKnown: false, gone: true })
+    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, gone: true })
+  })
+
+  // Why: a host answers `terminal: null` once the member's terminal closed; that is not silence (ORCA-854).
+  it('shows a finished member whose terminal closed as finished on its answering host', async () => {
+    const [member] = await remoteGameMembersOf([{ ...source, finished: true }], {
+      showOf: async () => null,
+      reviewOf: async () => null
+    })
+
+    expect(member).toMatchObject({
+      state: 'done',
+      remote: { host: 'imac', stateKnown: true, gone: true }
+    })
+  })
+
+  it('marks an unfinished member whose terminal closed as gone, not its host as silent', async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => null,
+      reviewOf: async () => null
+    })
+
+    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, gone: true })
+  })
+
+  // Why: a follow-up `worker-start --on --worktree` titled from its prompt listed the ticket twice (ORCA-854).
+  it('lists two dispatches in one host worktree as one member, titled by the first', async () => {
+    const reads: string[] = []
+    const members = await remoteGameMembersOf(
+      [
+        {
+          ...source,
+          dispatchId: 'ctx_attach',
+          taskTitle: "CIN-1294: you are now attached to the lead's team",
+          remoteTerminalHandle: 'term_attach',
+          createdAt: '2026-10-28 15:00:00'
+        },
+        { ...source, dispatchId: 'ctx_other', remoteWorktreeId: 'repo::/home/me/orca-806' },
+        { ...source, taskTitle: 'CIN-1294 Cartelera', finished: true, earlierLead: true }
+      ],
+      {
+        showOf: async ({ dispatchId }) => {
+          reads.push(dispatchId)
+          return { branch: 'b', title: null, liveness: 'running' }
+        },
+        reviewOf: async () => null
+      }
+    )
+
+    expect(
+      members.map(({ paneKey, displayName, terminalHandle, state, remote }) => ({
+        paneKey,
+        displayName,
+        terminalHandle,
+        state,
+        earlierLead: remote?.earlierLead
+      }))
+    ).toEqual([
+      {
+        paneKey: 'remote:ctx_attach',
+        displayName: 'CIN-1294 Cartelera',
+        terminalHandle: 'term_attach',
+        state: 'idle',
+        earlierLead: undefined
+      },
+      {
+        paneKey: 'remote:ctx_other',
+        displayName: 'ORCA-805 regression gate',
+        terminalHandle: 'term_805',
+        state: 'idle',
+        earlierLead: undefined
+      }
+    ])
+    expect(reads.toSorted()).toEqual(['ctx_attach', 'ctx_other'])
   })
 
   it('flags a member whose ticket the home Run completed', () => {
@@ -480,6 +555,7 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     remoteWorktreeId: 'repo::/home/me/orca-829',
     stage: 'agent_started',
     lastActivityAt: null,
+    createdAt: '2026-10-27 09:00:00',
     finished: true,
     ticketDone: true,
     earlierLead: true
@@ -513,7 +589,9 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     const [member] = await remoteGameMembersOf(
       [{ ...earlier, earlierLead: false, ticketDone: false, finished: false }],
       {
-        showOf: async () => null,
+        showOf: async () => {
+          throw new Error('environment offline')
+        },
         reviewOf: async () => null
       }
     )

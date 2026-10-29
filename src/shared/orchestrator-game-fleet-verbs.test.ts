@@ -264,6 +264,36 @@ describe('gameFleetReportOf', () => {
     ])
   })
 
+  // Why: a closed terminal on an answering host read as a silent host (ORCA-854).
+  it('asks to stop a member gone from an answering host, and leaves a finished one to its phase', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          paneKey: 'remote:ctx_2',
+          displayName: 'CIN-2 Combos',
+          state: 'idle',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        }),
+        member({
+          paneKey: 'remote:ctx_3',
+          displayName: 'CIN-3 Snacks',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        ticket: 'CIN-2',
+        stateKnown: true,
+        next: 'gone from imac: orca game stop CIN-2'
+      }),
+      expect.objectContaining({ ticket: 'CIN-3', state: 'done', next: 'push' })
+    ])
+  })
+
   it("flags an earlier lead's remote member whose ticket is done and counts it once as finished (ORCA-793)", () => {
     const fleet = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,

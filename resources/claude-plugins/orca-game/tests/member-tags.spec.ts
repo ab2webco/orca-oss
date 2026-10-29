@@ -90,6 +90,15 @@ describe('member host tag (ORCA-824)', () => {
     setGameLocale('en')
   })
 
+  // Why: a finished member's terminal closing on an answering host is not news (ORCA-854).
+  it('names the host of a finished member whose terminal closed as for a live one', () => {
+    const closed = { host: 'imac', stateKnown: true, gone: true as const }
+    setGameLocale('en')
+    expect(agentTagOf({ agentType: '', state: 'done', remote: closed }, 40)).toBe('on imac')
+    expect(agentTagOf({ agentType: '', state: 'done', remote: closed }, 6)).toBe('imac')
+    expect(agentTagOf({ agentType: '', state: 'idle', remote: closed }, 40)).toBe('gone from imac')
+  })
+
   it('keeps the paired host a member runs on and drops a malformed one', () => {
     expect(
       parseGameState(stateWith({ remote: { host: 'imac', stateKnown: false } }))?.agents[0]?.remote

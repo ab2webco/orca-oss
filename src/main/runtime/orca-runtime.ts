@@ -31522,7 +31522,13 @@ export class OrcaRuntimeService {
           'orchestration.federationShow',
           { dispatchId: source.dispatchId },
           REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
-        )) as { terminal: RemoteGameMemberShow | null; agent?: unknown }
+        ).catch((error: unknown) => {
+          // Why: a host that no longer knows the dispatch answered; only silence rejects (ORCA-854).
+          if (error instanceof OrchestrationError && error.code === 'dispatch_not_found') {
+            return { terminal: null }
+          }
+          throw error
+        })) as { terminal: RemoteGameMemberShow | null; agent?: unknown }
         return shown.terminal && { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
       },
       reviewOf: async (branch) =>
