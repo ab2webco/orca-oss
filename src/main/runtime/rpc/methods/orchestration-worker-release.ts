@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { WorkerTerminalListState } from '../../orchestration/worker-terminal-ownership'
 import { defineMethod, type RpcMethod } from '../core'
@@ -32,70 +33,8 @@ export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.workerRelease',
     params: WorkerDispatchParams,
-    handler: async (params, { runtime, orchestrationMutation }): Promise<WorkerReleaseReceipt> => {
-      const db = runtime.getOrchestrationDb()
-      const federated = db.getFederatedDispatch(params.dispatch)
-      if (federated) {
-        return releaseFederatedWorker({
-          runtime,
-          federated,
-          requestId: orchestrationMutation?.requestId
-        })
-      }
-      const requested = db.requestWorkerTerminalRelease(params.dispatch)
-      if (requested.disposition === 'already_released') {
-        return {
-          dispatchId: params.dispatch,
-          state: 'already_released',
-          processAction: 'none',
-          archive: archiveSummary(requested.resource)
-        }
-      }
-      if (requested.disposition === 'retained') {
-        const resource = requested.resource
-        const processIncarnation = resource?.process_incarnation
-        if (
-          processIncarnation &&
-          (await runtime.inspectTerminalProcessIncarnationLiveness(
-            processIncarnation,
-            resource.host_scope
-          )) === 'dead'
-        ) {
-          const reconciled = db.settleDeadWorkerTerminalRelease({
-            requestingDispatchId: params.dispatch,
-            resourceId: resource.id,
-            processIncarnation
-          })
-          if (reconciled.disposition === 'released') {
-            runtime.notifyMessageArrived(`dispatch:${params.dispatch}`, 'status')
-            return {
-              dispatchId: params.dispatch,
-              state: 'released',
-              processAction: 'none',
-              archive: archiveSummary(reconciled.resource)
-            }
-          }
-        }
-        return {
-          dispatchId: params.dispatch,
-          state: 'retained',
-          reason: requested.reason,
-          processAction: 'none',
-          archive: archiveSummary(resource),
-          recovery: retainedRecoveryOf(
-            requested.reason,
-            params.dispatch,
-            resource?.terminal_handle ?? null
-          )
-        }
-      }
-      return completeWorkerTerminalRelease({
-        runtime,
-        db,
-        dispatchId: params.dispatch,
-        resource: requested.resource
-      })
-    }
+    handler: async (params, { runtime, orchestrationMutation }): Promise<WorkerReleaseReceipt> =>
+      releaseWorker(runtime, params.dispatch, orchestrationMutation?.requestId)
   }),
   defineMethod({
     name: 'orchestration.workerRetain',
@@ -186,3 +125,69 @@ export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
     })
   })
 ]
+
+/** worker-release for a local or remote worker; also what game auto-release runs (ORCA-864). */
+export async function releaseWorker(
+  runtime: OrcaRuntimeService,
+  dispatchId: string,
+  requestId: string | undefined
+): Promise<WorkerReleaseReceipt> {
+  const db = runtime.getOrchestrationDb()
+  const federated = db.getFederatedDispatch(dispatchId)
+  if (federated) {
+    return releaseFederatedWorker({
+      runtime,
+      federated,
+      requestId
+    })
+  }
+  const requested = db.requestWorkerTerminalRelease(dispatchId)
+  if (requested.disposition === 'already_released') {
+    return {
+      dispatchId,
+      state: 'already_released',
+      processAction: 'none',
+      archive: archiveSummary(requested.resource)
+    }
+  }
+  if (requested.disposition === 'retained') {
+    const resource = requested.resource
+    const processIncarnation = resource?.process_incarnation
+    if (
+      processIncarnation &&
+      (await runtime.inspectTerminalProcessIncarnationLiveness(
+        processIncarnation,
+        resource.host_scope
+      )) === 'dead'
+    ) {
+      const reconciled = db.settleDeadWorkerTerminalRelease({
+        requestingDispatchId: dispatchId,
+        resourceId: resource.id,
+        processIncarnation
+      })
+      if (reconciled.disposition === 'released') {
+        runtime.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
+        return {
+          dispatchId,
+          state: 'released',
+          processAction: 'none',
+          archive: archiveSummary(reconciled.resource)
+        }
+      }
+    }
+    return {
+      dispatchId,
+      state: 'retained',
+      reason: requested.reason,
+      processAction: 'none',
+      archive: archiveSummary(resource),
+      recovery: retainedRecoveryOf(requested.reason, dispatchId, resource?.terminal_handle ?? null)
+    }
+  }
+  return completeWorkerTerminalRelease({
+    runtime,
+    db,
+    dispatchId,
+    resource: requested.resource
+  })
+}
