@@ -18,6 +18,7 @@ import {
   persistFederatedSetupWaitOutcome
 } from './orchestration-federation-setup'
 import { claimFederatedSetupSlot } from './orchestration-federation-setup-admission'
+import { resolveHostMemberAccount } from './orchestration-federation-member-account'
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { holdSlotForSetup } from './orchestration-worker-setup-queue'
@@ -53,6 +54,15 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           existingPlacement: 'an exact existing folder workspace'
         })
       }
+      const memberAccount = params.account
+        ? await resolveHostMemberAccount({
+            runtime,
+            agent,
+            selector: params.account,
+            reusesTerminal: Boolean(params.terminal)
+          })
+        : null
+      const accountPin = memberAccount?.pin ?? {}
       const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
       const gameMember = params.game ? { orchestrationGameMember: true } : {}
 
@@ -102,6 +112,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             createdWithAgent: agent as TuiAgent,
             startupAgent: agent as TuiAgent,
             ...gameMember,
+            ...accountPin,
             ...(launch.preferences ? { startupLaunchPreferences: launch.preferences } : {}),
             activate: false,
             lineage: { noParent: true }
@@ -177,6 +188,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               // its CLI is `cursor-agent`); resolve through the TUI agent config.
               startupAgent: agent as TuiAgent,
               ...gameMember,
+              ...accountPin,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
               title: `worker-${params.taskId}`,
               presentation: 'background'
@@ -268,6 +280,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           terminalHandle,
           setup,
           launch: launch.receipt,
+          ...(memberAccount ? { account: memberAccount.account } : {}),
           effects,
           residualResources: []
         }

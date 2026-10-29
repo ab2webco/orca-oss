@@ -31,7 +31,9 @@ export const FederationAttachStartParams = z.object({
       id: z.string().min(1).max(512),
       text: z.string().max(ORCHESTRATOR_GAME_SCENE_MAX_BYTES)
     })
-    .optional()
+    .optional(),
+  // Why optional: the home sends it only to a host advertising the member-account capability.
+  account: z.string().min(1).max(320).optional()
 })
 
 export type FederationAttachStartInput = z.infer<typeof FederationAttachStartParams>

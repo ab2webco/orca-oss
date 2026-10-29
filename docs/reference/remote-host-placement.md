@@ -129,6 +129,12 @@ host (decision O3).
 - Proposal: a remote member picks its account on the remote, from that host's roster. No new pin
   field. The accounts must be registered on the remote over SSH
   (`docs/reference/headless-linux-server.md:764-775`).
+- Shipped (ORCA-798, decision O5 revised): `auto` alone could land on an account a project forbids,
+  so `game launch --on` forwards the typed selector (`auto` or an email) in the optional
+  `account` field of `federationAttachStart`, gated by
+  `orchestration.federation-member-account.v1`. The host resolves it in
+  `orchestration-federation-member-account.ts`, refuses before any effect, and returns only the
+  email. No account id crosses hosts.
 - A cross-host `game move` is a new dispatch on the other host, not an in-place switch. The current
   `game move` restart path (`src/cli/handlers/orchestrator-game-move.ts:139-149`) is **unverified**;
   child 8 reads it before changing it.

@@ -63,6 +63,12 @@ export function prepareLocalWorkerStart(args: {
 }): { agent: TuiAgent | undefined; launch: WorkerStartLaunch } {
   const { params, createsWorktree, runtime } = args
   assertWorkerLaunchPreferencesCreateTerminal(params)
+  if (params.remoteAccount) {
+    throw new OrchestrationError(
+      'invalid_argument',
+      'remoteAccount names an account on a connected server and needs --on; pin a local account with --claude-account or --codex-account.'
+    )
+  }
   if (params.terminal && (params.claudeAccountId || params.codexAccountId)) {
     throw new OrchestrationError(
       'invalid_argument',

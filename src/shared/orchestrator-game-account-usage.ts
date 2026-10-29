@@ -1,8 +1,8 @@
-import type { AccountListEntry } from '../account-format'
-import type { GameAccountUsage, GameQuotaWindow } from '../../shared/orchestrator-game-account-pick'
-import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
-import type { GameAccountProvider } from '../../shared/orchestrator-game-member-agent'
-import type { GameAgent } from '../../shared/orchestrator-game-state'
+import type { AccountListEntry } from './managed-account-list-entries'
+import type { GameAccountUsage, GameQuotaWindow } from './orchestrator-game-account-pick'
+import { ticketOfMember } from './orchestrator-game-fleet-verbs'
+import type { GameAccountProvider } from './orchestrator-game-member-agent'
+import type { GameAgent } from './orchestrator-game-state'
 
 /** Tickets of members launched in this same command, by account id, not yet in game.state. */
 export type GameLaunchedOnAccount = Map<string, string[]>

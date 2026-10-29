@@ -20,7 +20,7 @@ import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
-import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
+import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import {
   memberDisplayNameOf,
@@ -58,7 +58,11 @@ export type GameLaunchResult = {
 type WorkerStartResult = Pick<
   GameLaunchResult,
   'runId' | 'taskId' | 'dispatchId' | 'state' | 'setupQueue' | 'lastError'
-> & { effects?: { kind: string; id?: string }[] }
+> & {
+  effects?: { kind: string; id?: string }[]
+  /** The host's own account for a member placed with --on; only its email crosses back (ORCA-798). */
+  account?: { provider: string; email: string }
+}
 
 const DISPLAY_NAME_MAX = 60
 
@@ -154,7 +158,7 @@ export async function launchGameMember(args: {
     DISPLAY_NAME_MAX,
     item?.id ?? ticket
   )
-  // Why: a host resolves accounts from its own roster and refuses a local pin.
+  // Why: a host resolves the typed selector against its own roster and refuses a local pin.
   const memberAccount = args.remote
     ? { pin: {}, account: null }
     : await resolveGameMemberAccount(client, choice, {
@@ -210,6 +214,7 @@ export async function launchGameMember(args: {
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
     ...memberAccount.pin,
+    ...(args.remote && choice.account ? { remoteAccount: choice.account } : {}),
     run: runId,
     from,
     devMode: isDevCliInvocation(),
@@ -229,6 +234,7 @@ export async function launchGameMember(args: {
     worktreeId: worker.result.effects?.find((one) => one.kind === 'worktree')?.id,
     lastState: worker.result.state
   })
+  const { account: hostAccount, ...started } = worker.result
   const launched: GameLaunchResult = {
     ticket,
     ...(name === null ? {} : { name }),
@@ -236,7 +242,8 @@ export async function launchGameMember(args: {
     ...(memberAccount.account
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
       : {}),
-    ...worker.result
+    ...(hostAccount ? { account: hostAccount.email } : {}),
+    ...started
   }
   await postGameEvents(client, [
     {
@@ -267,7 +274,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const overrides = parseGameLaunchFlags(flags)
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
-    const remote = remotePlacementOf(flags, repo, overrides)
+    const remote = remotePlacementOf(flags, repo)
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, ticket)
     if (response.result.pausedMembers?.some((one) => one.ticket === ticket)) {

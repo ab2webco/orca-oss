@@ -113,8 +113,7 @@ export type GameRemotePlacement = { on: string; repo: string }
 
 export function remotePlacementOf(
   flags: Map<string, string | boolean>,
-  repo: string | null,
-  typed: GameLaunchFlags
+  repo: string | null
 ): GameRemotePlacement | null {
   const on = flagText(flags, 'on')
   if (on === undefined) {
@@ -125,12 +124,6 @@ export function remotePlacementOf(
     throw new RuntimeClientError(
       'invalid_argument',
       `--on ${on} needs --repo <selector of the repo on ${on}>.`
-    )
-  }
-  if (typed.account !== undefined) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `--account cannot combine with --on: ${on} runs the member on its own accounts.`
     )
   }
   return { on, repo }
