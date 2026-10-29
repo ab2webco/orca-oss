@@ -210,7 +210,8 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'close'],
     notes: [
       '--close records each finished member in `orca game history`, then releases its dispatch, or closes its terminal when it has none.',
-      'Working and waiting members and the lead are never touched; worktrees are left in place.'
+      'Working and waiting members and the lead are never touched, even with a merged PR or a completed Run; worktrees are left in place.',
+      'Each row names its host, last activity and why it counts as finished.'
     ],
     examples: ['orca game sweep', 'orca game sweep --close --json']
   },
