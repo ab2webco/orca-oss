@@ -1,5 +1,6 @@
 import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
-import { isFinishedMember, ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import { finishedSignalOf } from '../../shared/orchestrator-game-member-finished'
 import {
   pausedMembersOf,
   queuedMembersOf,
@@ -91,8 +92,8 @@ export class GamePausedMembers {
     const handle = agent.terminalHandle
     const context = handle ? this.deps.contextOf(handle) : undefined
     const sessionId = handle ? this.deps.sessionIdOf(handle) : null
-    // Why a completed dispatch counts: its worker_done succeeded, so it is never resumed.
-    const finished = isFinishedMember(agent) || context?.dispatchStatus === 'completed'
+    // Why: done work is never resumed, busy or not; a completed dispatch's worker_done succeeded.
+    const finished = finishedSignalOf(agent) !== null || context?.dispatchStatus === 'completed'
     return {
       ticket,
       name: agent.displayName,

@@ -184,13 +184,13 @@ function formatSweepClose(closed: SweepClose | null | undefined): string {
     : ` — release ${closed.dispatchId} [${closed.state}]${closed.reason ? ` ${closed.reason}` : ''}`
 }
 
-export function formatSweep(sweep: GameSweepResult): string {
+export function formatSweep(sweep: GameSweepResult, now: number = Date.now()): string {
   if (sweep.finished.length === 0) {
     return 'No finished members.'
   }
   const lines = sweep.finished.map(
     (entry) =>
-      `${ticketLabel(entry.row)} ${entry.row.review ?? ''}${formatSweepClose(entry.closed)}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}${entry.history ? `\n  history ${entry.history}` : ''}`
+      `${ticketLabel(entry.row)} ${entry.row.review ?? ''} on ${entry.row.host ?? 'local'}, active ${sinceOf(entry.row.lastActivityAt, now)}${formatSweepClose(entry.closed)}\n  why: ${entry.reason}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}${entry.history ? `\n  history ${entry.history}` : ''}`
   )
   return sweep.closed
     ? lines.join('\n')

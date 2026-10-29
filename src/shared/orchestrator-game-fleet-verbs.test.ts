@@ -83,13 +83,47 @@ const finished = member({
 describe('memberPhaseOf', () => {
   it('is finished only with a merged PR and a ticket in review or done, or no ticket', () => {
     expect(memberPhaseOf(finished)).toBe('finished')
-    expect(memberPhaseOf(member({ review: review('merged') }))).toBe('finished')
+    expect(memberPhaseOf(member({ state: 'idle', review: review('merged') }))).toBe('finished')
     expect(
       memberPhaseOf(member({ review: review('merged'), workItem: ticket('CIN-1', 'in_progress') }))
     ).toBe('working')
     expect(memberPhaseOf(member({ state: 'waiting', review: review('open') }))).toBe('needs-you')
     expect(memberPhaseOf(member({ state: 'done' }))).toBe('idle')
     expect(memberPhaseOf(member({ state: 'idle' }))).toBe('idle')
+  })
+})
+
+// Why (ORCA-862): sweep listed a member `game state` showed working, so --close would have freed it.
+describe('a member its live state reports busy', () => {
+  const busy = [
+    member({ paneKey: 'm', displayName: 'CIN-3', review: review('merged') }),
+    member({
+      paneKey: 'remote:ctx_8eba552ae8ed',
+      displayName: 'CIN-1295',
+      lastActivityAt: '2026-10-29T19:34:00.000Z',
+      remote: { host: 'imac', stateKnown: true, ticketDone: true }
+    }),
+    member({ paneKey: 'q', displayName: 'CIN-4', state: 'waiting', review: review('merged') })
+  ]
+
+  it('is never finished, so sweep leaves it and the fleet keeps its slot', () => {
+    expect(busy.map(memberPhaseOf)).toEqual(['working', 'working', 'needs-you'])
+    expect(gameSweepOf({ lead: DEFAULT_GAME_LEAD, agents: busy })).toEqual([])
+    const fleet = gameFleetReportOf({ lead: { ...DEFAULT_GAME_LEAD, cap: 3 }, agents: busy })
+    expect(fleet.counts.finished).toBe(0)
+    expect(fleet.running).toBe(3)
+  })
+
+  it('is swept once it stops, with its host, last activity and why', () => {
+    const [swept] = gameSweepOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [{ ...busy[1]!, state: 'idle' }]
+    })
+
+    expect(swept?.reason).toBe('its home Run completed the task; agent idle')
+    expect(swept?.row).toEqual(
+      expect.objectContaining({ host: 'imac', lastActivityAt: '2026-10-29T19:34:00.000Z' })
+    )
   })
 })
 
@@ -441,15 +475,24 @@ describe('gameSweepOf', () => {
         member({
           paneKey: 'n',
           displayName: 'CIN-6',
+          state: 'idle',
           review: review('merged'),
           terminalHandle: undefined
         })
       ]
     })
 
-    expect(swept.map((entry) => [entry.row.ticket, entry.pending])).toEqual([
-      ['CIN-9', ['worktree cin-9 stays', 'ticket CIN-9 is QA, not done']],
-      ['CIN-6', ['no linked ticket to confirm', 'no terminal to close']]
+    expect(swept.map((entry) => [entry.row.ticket, entry.reason, entry.pending])).toEqual([
+      [
+        'CIN-9',
+        'PR #41 merged, ticket QA; agent done',
+        ['worktree cin-9 stays', 'ticket CIN-9 is QA, not done']
+      ],
+      [
+        'CIN-6',
+        'PR #41 merged; agent idle',
+        ['no linked ticket to confirm', 'no terminal to close']
+      ]
     ])
   })
 })

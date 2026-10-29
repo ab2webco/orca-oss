@@ -7,9 +7,10 @@ import {
 import type { GameWaitingMessage } from './orchestrator-game-inbox'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 
-export { ticketInText }
+export { ticketInText, isFinishedMember }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -64,15 +65,6 @@ export type GameFleet = {
 
 type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
   Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
-
-export function isFinishedMember(agent: GameAgent): boolean {
-  const group = agent.workItem?.statusGroup
-  return (
-    (agent.review?.state === 'merged' &&
-      (group === undefined || group === 'review' || group === 'done')) ||
-    agent.remote?.ticketDone === true
-  )
-}
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   if (isFinishedMember(agent)) {
@@ -253,7 +245,12 @@ export function gameWavePlanOf(
   return plan
 }
 
-export type GameSweepEntry = { row: GameFleetRow; pending: string[] }
+export type GameSweepEntry = {
+  row: GameFleetRow
+  /** Why it counts as finished, with the live state that let it through. */
+  reason: string
+  pending: string[]
+}
 
 /** Finished members, each with what releasing its tab still leaves for someone to do. */
 export function gameSweepOf(state: FleetInput): GameSweepEntry[] {
@@ -274,7 +271,11 @@ export function gameSweepOf(state: FleetInput): GameSweepEntry[] {
       if (!agent.terminalHandle) {
         pending.push('no terminal to close')
       }
-      return { row: rowOf(agent), pending }
+      return {
+        row: rowOf(agent),
+        reason: `${finishedSignalOf(agent)}; agent ${agent.state}`,
+        pending
+      }
     })
 }
 
