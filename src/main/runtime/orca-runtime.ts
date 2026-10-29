@@ -774,6 +774,7 @@ import {
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
+import { tellGameLead } from './orchestrator-game-lead-note'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
@@ -3851,7 +3852,19 @@ export class OrcaRuntimeService {
     stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
     projectOf: (caller) => this.gameBoardProjectOf(caller),
     inboxSourceOf: (lead) =>
-      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels())
+      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
+    tellLead: (lead, note) => {
+      try {
+        return tellGameLead(
+          this.getOrchestrationDb(),
+          (handle, type) => this.notifyMessageArrived(handle, type),
+          lead.handle,
+          note
+        )
+      } catch {
+        return false
+      }
+    }
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false

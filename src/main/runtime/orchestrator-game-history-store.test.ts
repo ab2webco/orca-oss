@@ -290,3 +290,29 @@ describe('GameHistoryStore inbox cursors', () => {
     expect((await again.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1'])
   })
 })
+
+describe('GameHistoryStore owner questions', () => {
+  it('keeps them per project next to the history, and loses none when writes race', async () => {
+    const { store: first, dir } = store()
+    await first.append('repo-a', record('CIN-1'))
+    await Promise.all(
+      ['oq_1', 'oq_2', 'oq_3'].map((id) =>
+        first.changeOwnerQuestions('repo-a', (list) => ({ list: [...list, { id }], result: id }))
+      )
+    )
+    const unchanged = await first.changeOwnerQuestions('repo-a', () => ({
+      list: null,
+      result: 'kept'
+    }))
+
+    const again = new GameHistoryStore(() => dir)
+    expect(unchanged).toBe('kept')
+    expect(await again.ownerQuestions('repo-a')).toEqual([
+      { id: 'oq_1' },
+      { id: 'oq_2' },
+      { id: 'oq_3' }
+    ])
+    expect(await again.ownerQuestions('repo-b')).toEqual([])
+    expect((await again.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1'])
+  })
+})

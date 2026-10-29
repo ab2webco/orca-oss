@@ -57,7 +57,8 @@ function board(rows: GameInboxMail[], pendingQuestions: GameInboxMail[] = []) {
         mail: rows,
         pendingQuestions
       }
-    }
+    },
+    tellLead: () => true
   })
   return { game, asked }
 }
