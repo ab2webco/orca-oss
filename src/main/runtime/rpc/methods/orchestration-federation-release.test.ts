@@ -318,4 +318,102 @@ describe('releasing a remote worker through the relay', () => {
       })
     })
   })
+
+  function stop(dispatchId: string, requestId = 'stop_request') {
+    return homeDispatcher.dispatch({
+      id: `rpc_${requestId}`,
+      authToken: 'coordinator-token',
+      orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+      orchestrationRequestId: requestId,
+      method: 'orchestration.workerStop',
+      params: { dispatch: dispatchId }
+    })
+  }
+
+  // Why: the host's PTY is dead after a restart, so its process incarnation no longer matches.
+  function killPtyOnHost(): void {
+    vi.mocked(workerRuntime.showTerminal).mockResolvedValue({
+      handle: 'term_windows_worker',
+      connected: false,
+      liveness: 'gone'
+    } as never)
+    vi.mocked(workerRuntime.getTerminalProcessIncarnation).mockReturnValue(null)
+  }
+
+  // Why: imac rows for ORCA-854/855/857 answered stop_unknown to worker-stop and not_settled to worker-release, so nothing cleared them and they filled the cap.
+  describe('when a stop cannot reach the member it names (ORCA-864)', () => {
+    it('settles the stop when the host has no record of the dispatch', async () => {
+      const { run, dispatch } = await startRemoteMember()
+      forgetOnHost(dispatch.id)
+
+      const stopped = await stop(dispatch.id)
+
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { state: 'stopped', processAction: 'none' }
+      })
+      expect(JSON.stringify(stopped)).toContain('windows has no record of this member')
+      await expect(release(dispatch.id)).resolves.toMatchObject({
+        ok: true,
+        result: { state: 'released', remote: { alreadyGone: true } }
+      })
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('settles the stop when the host terminal is a dead PTY, then releases its worktree', async () => {
+      const { run, dispatch } = await startRemoteMember()
+      killPtyOnHost()
+
+      const stopped = await stop(dispatch.id)
+
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { state: 'stopped', processAction: 'none' }
+      })
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
+      expect(workerDb.getRemoteDispatchAttachment(dispatch.id)?.state).toBe('stopped')
+      await expect(release(dispatch.id)).resolves.toMatchObject({
+        ok: true,
+        result: { state: 'released', remote: { removedWorktree: 'repo::windows-worktree' } }
+      })
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('releases a stop_unknown member once its host shows nothing is left', async () => {
+      const { run, dispatch } = await startRemoteMember()
+      vi.mocked(workerRuntime.getTerminalProcessIncarnation).mockReturnValue('another:pty:2')
+      await expect(stop(dispatch.id)).resolves.toMatchObject({
+        ok: true,
+        result: { state: 'stop_unknown' }
+      })
+
+      const stillThere = await release(dispatch.id)
+      expect(stillThere).toMatchObject({
+        ok: true,
+        result: { state: 'retained', reason: 'not_settled' }
+      })
+      expect(JSON.stringify(stillThere)).toContain('Close its terminal on windows')
+
+      killPtyOnHost()
+      vi.spyOn(workerRuntime, 'showManagedWorktree').mockRejectedValue(
+        new Error('selector_not_found')
+      )
+      const response = await release(dispatch.id, 'release_after_gone')
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'released', remote: { alreadyGone: true } }
+      })
+      expect(homeDb.getWorkerDispatch(dispatch.id)?.state).toBe('stopped')
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    })
+
+    it('tells a member that has not finished how to stop it', async () => {
+      const { dispatch } = await startRemoteMember()
+
+      const response = await release(dispatch.id)
+
+      expect(JSON.stringify(response)).toContain(`worker-stop --dispatch ${dispatch.id}`)
+    })
+  })
 })

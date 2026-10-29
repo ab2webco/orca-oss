@@ -379,6 +379,30 @@ describe('gameFleetReportOf', () => {
 
     expect(rows.map((row) => row.ticket)).toEqual(['CIN-7', 'CIN-8', null])
   })
+
+  // Why: three imac rows whose terminals were gone held 3 of 10 slots, so a new launch was refused.
+  it('does not count a member gone from its host against the cap (ORCA-864)', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 2 },
+      agents: [
+        member({ paneKey: 'local' }),
+        member({
+          paneKey: 'remote:ctx_854',
+          displayName: 'ORCA-854 relay',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        }),
+        member({
+          paneKey: 'remote:ctx_silent',
+          displayName: 'ORCA-857 mail',
+          remote: { host: 'imac', stateKnown: false }
+        })
+      ]
+    })
+
+    expect(fleet.rows.map((row) => row.ticket)).toEqual(['CIN-1', 'ORCA-857', 'ORCA-854'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 0 })
+  })
 })
 
 describe('gameWavePlanOf', () => {

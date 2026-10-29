@@ -131,6 +131,56 @@ describe("a lead's members across a restart, through the runtime", () => {
     ])
   })
 
+  // Why (ORCA-864): live imac members showed again under "Paused since Orca restarted", each taking a slot.
+  it('does not list a saved member as paused while it runs on a paired host', async () => {
+    await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
+      worktreeId: 'wt-lead',
+      paneKey: 'tab-1:lead'
+    })
+    const db = new OrchestrationDb(':memory:')
+    const run = db.createRun({
+      objective: 'game',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: 'tab-1:lead'
+    })
+    const task = db.createTask({ spec: 'ORCA-609', taskTitle: 'Merlin · ORCA-609', runId: run.id })
+    const started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_imac', serverName: 'imac' },
+      federation: {
+        environmentId: 'env_imac',
+        environmentName: 'imac',
+        peerFingerprint: 'fp_imac',
+        protocolVersion: 1
+      }
+    })
+    db.updateFederatedDispatchResources({
+      dispatchId: started.dispatch.id,
+      remoteRuntimeEpoch: 'epoch_imac',
+      worktreeId: 'repo::/home/me/orca-609',
+      terminalHandle: 'term_on_imac'
+    })
+    try {
+      const runtime = runtimeWith([leadWorktree])
+      runtime.setOrchestrationDb(db)
+      vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({
+        terminal: { branch: 'fabolivark/orca-609', title: null, liveness: 'running' }
+      })
+
+      const after = await runtime.getOrchestratorGameState({
+        worktreeId: 'wt-lead',
+        paneKey: 'tab-1:lead'
+      })
+
+      expect(after.agents.filter((agent) => agent.remote).map((agent) => agent.paneKey)).toEqual([
+        `remote:${started.dispatch.id}`
+      ])
+      expect(after.pausedMembers).toEqual([])
+    } finally {
+      db.close()
+    }
+  })
+
   it('shows nothing paused to a member pane', async () => {
     const member = await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
       worktreeId: 'wt-member',

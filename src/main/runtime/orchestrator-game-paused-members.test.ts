@@ -108,6 +108,30 @@ describe('GamePausedMembers.note', () => {
     expect(after.paused.map((one) => one.ticket)).toEqual(['ORCA-1'])
   })
 
+  // Why: live imac members for ORCA-862 and ORCA-855 also showed as paused ready rows, each taking a slot.
+  it('keeps a live remote member out of paused without saving it as a local session (ORCA-864)', async () => {
+    const { paused, store } = setup()
+    await paused.record('repo:a', {
+      ticket: 'ORCA-862',
+      name: 'Merlin · ORCA-862',
+      runId: 'run_1',
+      taskId: 'task_ORCA-862',
+      lastState: 'ready'
+    })
+    const remote = member('ORCA-862', {
+      paneKey: 'remote:ctx_862',
+      terminalHandle: 'term-remote',
+      worktree: { id: 'imac-wt', branch: 'orca-862', displayName: 'orca-862' },
+      remote: { host: 'imac', stateKnown: true }
+    })
+
+    expect((await paused.note('repo:a', [remote])).paused).toEqual([])
+    const saved = await store.read('repo:a')
+    expect(saved.ok && saved.members.map((one) => [one.ticket, one.worktreeId])).toEqual([
+      ['ORCA-862', null]
+    ])
+  })
+
   it('lists a member whose start waits for the setup in flight as queued, not paused', async () => {
     const { paused } = setup()
     await paused.record('repo:a', {
