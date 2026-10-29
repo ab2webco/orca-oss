@@ -60,7 +60,7 @@ export function GameOwnerQuestionCard({
             type="button"
             variant="link"
             size="xs"
-            className="h-auto max-w-full justify-start gap-1 p-0 text-xs"
+            className="h-auto max-w-full justify-start gap-1 p-0 text-xs has-[>svg]:px-0"
             onClick={() => void window.api.shell.openUrl(question.context ?? '')}
           >
             <ExternalLink className="size-3 shrink-0" />
