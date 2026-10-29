@@ -36,6 +36,8 @@ type ProjectLog = {
   cursors: Record<string, unknown>
   /** Per character key, its saved progress; absent until a member with a character is freed. */
   characters: Record<string, unknown> | null
+  /** What the lead asked the person; absent until the first question. */
+  ownerQuestions: unknown[] | null
 }
 
 type LoadedLog = {
@@ -75,7 +77,8 @@ function logOf(data: GameStoreData): ProjectLog {
     records: listOf(data, 'records'),
     events: listOf(data, 'events'),
     cursors: isRecord(data.cursors) ? data.cursors : {},
-    characters: isRecord(data.characters) ? data.characters : null
+    characters: isRecord(data.characters) ? data.characters : null,
+    ownerQuestions: Array.isArray(data.ownerQuestions) ? data.ownerQuestions : null
   }
 }
 
@@ -147,6 +150,24 @@ export class GameHistoryStore {
     return { added }
   }
 
+  async ownerQuestions(projectKey: string): Promise<unknown[]> {
+    return (await this.read(projectKey)).log.ownerQuestions ?? []
+  }
+
+  /** `change` returns a null list to leave the file as it is. */
+  async changeOwnerQuestions<R>(
+    projectKey: string,
+    change: (list: readonly unknown[]) => { list: unknown[] | null; result: R }
+  ): Promise<R> {
+    let result: R | undefined
+    await this.update(projectKey, (current) => {
+      const next = change(current.ownerQuestions ?? [])
+      result = next.result
+      return next.list ? { ...current, ownerQuestions: next.list } : null
+    })
+    return result as R
+  }
+
   // Why migrate only in memory here: reads run outside the queue, so only update() may persist.
   private async read(projectKey: string): Promise<LoadedLog> {
     let text: string
@@ -168,8 +189,9 @@ export class GameHistoryStore {
     const result = migrateGameStore(parsed, this.migrations)
     if (result.kind === 'frozen') {
       const fits =
-        ['records', 'events'].every((key) => !(key in parsed) || Array.isArray(parsed[key])) &&
-        ['cursors', 'characters'].every((key) => !(key in parsed) || isRecord(parsed[key]))
+        ['records', 'events', 'ownerQuestions'].every(
+          (key) => !(key in parsed) || Array.isArray(parsed[key])
+        ) && ['cursors', 'characters'].every((key) => !(key in parsed) || isRecord(parsed[key]))
       return { log: logOf(parsed), before: { kind: fits ? 'none' : 'read-only' } }
     }
     return {
@@ -206,11 +228,18 @@ export class GameHistoryStore {
           // Why a copy, not a rename: until the migrated file lands, the old one stays readable.
           await copyFile(file, this.besideOf(projectKey, `v${before.from}-${fileStamp()}.backup`))
         }
-        const { data, records, events, cursors, characters } = log
+        const { data, records, events, cursors, characters, ownerQuestions } = log
         await writeFileDurable(
           durableWriteTempPath(file),
           file,
-          JSON.stringify({ ...data, records, events, cursors, ...(characters && { characters }) })
+          JSON.stringify({
+            ...data,
+            records,
+            events,
+            cursors,
+            ...(characters && { characters }),
+            ...(ownerQuestions && { ownerQuestions })
+          })
         )
         return log
       })
