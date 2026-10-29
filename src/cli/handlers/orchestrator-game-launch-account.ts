@@ -6,7 +6,7 @@ import {
   gameAccountUsagesOf,
   isAutoPickableAccount,
   type GameLaunchedOnAccount
-} from './orchestrator-game-account-usage'
+} from '../../shared/orchestrator-game-account-usage'
 import type { GameLaunchChoice } from './orchestrator-game-launch-options'
 import {
   GAME_ACCOUNT_NEAR_LIMIT_PERCENT,

@@ -1,7 +1,10 @@
 import type { CommandHandler } from '../dispatch'
 import { accountListEntriesOf, type RuntimeAccountsSnapshot } from '../account-format'
 import { printResult } from '../format'
-import { gameAccountUsagesOf, isAutoPickableAccount } from './orchestrator-game-account-usage'
+import {
+  gameAccountUsagesOf,
+  isAutoPickableAccount
+} from '../../shared/orchestrator-game-account-usage'
 import { tableOf } from './orchestrator-game-fleet-format'
 import { readCallerGameState } from './orchestrator-game-launch'
 import {

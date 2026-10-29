@@ -24,6 +24,8 @@ export const WorkerStartParams = z.object({
   agent: OptionalString,
   claudeAccountId: OptionalString,
   codexAccountId: OptionalString,
+  // Why a selector, not an id: with --on the host resolves `auto` or an email against its own roster (ORCA-798).
+  remoteAccount: OptionalString,
   model: OptionalWorkerLaunchPreference,
   effort: OptionalWorkerLaunchPreference,
   retryOf: OptionalString,

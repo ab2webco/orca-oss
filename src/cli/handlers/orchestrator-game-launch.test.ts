@@ -563,29 +563,20 @@ describe('orca game launch', () => {
     )
   })
 
-  it('refuses --on without the host repo, or with an account, before any call (ORCA-794)', async () => {
-    const cases: [[string, string][], RegExp][] = [
-      [[['on', 'imac']], /--on imac needs --repo <selector of the repo on imac>/],
-      [
-        [
-          ['on', 'imac'],
-          ['repo', 'name:cineco'],
-          ['account', 'ana@example.com']
-        ],
-        /--account cannot combine with --on: imac runs the member on its own accounts/
-      ]
-    ]
-    for (const [extra, refusal] of cases) {
-      const { client, calls } = fakeClient(stateWith())
+  it('refuses --on without the host repo before any call (ORCA-794)', async () => {
+    const { client, calls } = fakeClient(stateWith())
 
-      await expect(launch(client, 'CIN-12', extra)).rejects.toThrow(refusal)
-      expect(calls).toEqual([])
-    }
+    await expect(launch(client, 'CIN-12', [['on', 'imac']])).rejects.toThrow(
+      /--on imac needs --repo <selector of the repo on imac>/
+    )
+    expect(calls).toEqual([])
   })
 
-  it('never pins a local account to a remote member, even with accounts: auto (ORCA-794)', async () => {
+  it('hands accounts: auto to the host instead of pinning a local account (ORCA-798)', async () => {
     const { client, calls } = fakeClient(
-      stateWith({ lead: { autostart: false, cap: 2, agent: 'claude', accounts: 'auto' } })
+      stateWith({
+        lead: { autostart: false, cap: 2, agent: 'claude', accounts: 'auto' }
+      })
     )
 
     await launch(client, 'CIN-12', [
@@ -594,9 +585,35 @@ describe('orca game launch', () => {
     ])
 
     expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
-    expect(
-      calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
-    ).not.toHaveProperty('claudeAccountId')
+    const started = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    expect(started).toEqual(expect.objectContaining({ remoteAccount: 'auto' }))
+    expect(started).not.toHaveProperty('claudeAccountId')
+  })
+
+  it('sends a typed account for the host to resolve and shows the email it used (ORCA-798)', async () => {
+    const { client, calls } = fakeClient(stateWith(), undefined, {
+      'orchestration.workerStart': {
+        runId: 'run_1',
+        taskId: 'task_1',
+        dispatchId: 'dispatch_1',
+        state: 'ready',
+        account: { provider: 'claude', email: 'ana@koombea.com' }
+      }
+    })
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco'],
+      ['account', 'ana@koombea.com']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ on: 'imac', remoteAccount: 'ana@koombea.com' })
+    )
+    const result = JSON.parse(output.join('')).result
+    expect(result).toEqual(expect.objectContaining({ account: 'ana@koombea.com' }))
+    expect(result).not.toHaveProperty('accountId')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {
