@@ -35,7 +35,8 @@ import type {
   FederatedDispatchRow,
   RemoteDispatchAttachmentRow,
   FederationRelayDirection,
-  FederationRelayItemRow
+  FederationRelayItemRow,
+  RemoteAttachmentRefusal
 } from './types'
 import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestration-task-display'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
@@ -5364,21 +5365,60 @@ export class OrchestrationDb {
     paneKey: string | null
     processIncarnation: string | null
   }): boolean {
+    return this.diagnoseRemoteAttachmentAuthority(params) === null
+  }
+
+  /** Null when the caller holds the attachment's authority, else why it does not. */
+  diagnoseRemoteAttachmentAuthority(params: {
+    dispatchId: string
+    capability: string | undefined
+    paneKey: string | null
+    processIncarnation: string | null
+  }): RemoteAttachmentRefusal | null {
     const attachment = this.getRemoteDispatchAttachment(params.dispatchId)
+    if (!attachment?.capability_hash) {
+      return 'capability_revoked'
+    }
     if (
-      !attachment?.capability_hash ||
-      !params.capability ||
       !attachment.pane_key ||
       !params.paneKey ||
       !isEquivalentPaneKey(attachment.pane_key, params.paneKey) ||
       !attachment.process_incarnation ||
       attachment.process_incarnation !== params.processIncarnation
     ) {
-      return false
+      return 'process_mismatch'
+    }
+    if (!params.capability) {
+      return 'capability_missing'
     }
     const expected = Buffer.from(attachment.capability_hash, 'hex')
     const observed = Buffer.from(hashDispatchCapability(params.capability), 'hex')
     return expected.length === observed.length && timingSafeEqual(expected, observed)
+      ? null
+      : 'capability_mismatch'
+  }
+
+  hasRecentFederationRelayKind(params: {
+    dispatchId: string
+    direction: FederationRelayDirection
+    kind: string
+    withinSeconds: number
+  }): boolean {
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM federation_relay_items
+           WHERE dispatch_id = ? AND direction = ? AND kind = ?
+             AND (acked_at IS NULL OR created_at > datetime('now', ?))
+           LIMIT 1`
+        )
+        .get(
+          params.dispatchId,
+          params.direction,
+          params.kind,
+          `-${params.withinSeconds} seconds`
+        ) !== undefined
+    )
   }
 
   isRemoteAttachmentProcessCurrent(params: {

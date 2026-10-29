@@ -223,6 +223,12 @@ export type RemoteDispatchAttachmentRow = {
 
 export type FederationRelayDirection = 'to_home' | 'to_worker'
 
+export type RemoteAttachmentRefusal =
+  | 'capability_missing'
+  | 'capability_mismatch'
+  | 'capability_revoked'
+  | 'process_mismatch'
+
 export type FederationRelayItemRow = {
   dispatch_id: string
   direction: FederationRelayDirection
