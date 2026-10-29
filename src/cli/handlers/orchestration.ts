@@ -1223,6 +1223,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       cancelled?: boolean
       connectionLost?: boolean
       answerMessageId?: string | null
+      reopenedDispatchId?: string
       legacyCompatibility?: LegacyCompatibilityResult
     }>(
       client,
@@ -1255,6 +1256,11 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       console.log(`Resume with: ${result.result.legacyCompatibility.resumeCommand}`)
     } else if (result.result.answer !== null) {
       console.log(result.result.answer)
+    }
+    if (!json && result.result.reopenedDispatchId) {
+      console.error(
+        `Dispatch ${result.result.reopenedDispatchId} reopened by this question: send worker_done again when the follow-up is done.`
+      )
     }
     if (result.result.legacyCompatibility?.resumeRequired) {
       await flushStdout()

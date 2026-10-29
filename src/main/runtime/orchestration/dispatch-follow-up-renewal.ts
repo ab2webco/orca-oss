@@ -17,3 +17,34 @@ export function renewDispatchForFollowUpPrompt(
     reason: 'Renewed by a follow-up prompt from the lead.'
   })
 }
+
+// Why (ORCA-856): a member asking after its worker_done reopens that Dispatch so
+// the question reaches the lead; only the holder of its capability can.
+export function renewDispatchForMemberAsk(
+  db: OrchestrationDb,
+  caller: {
+    handle: string
+    paneKey: string | undefined
+    capability: string | undefined
+    processIncarnation: string | undefined
+  }
+): DispatchContextRow | undefined {
+  const latest = db.getLatestDispatchForIdentity(caller.handle, caller.paneKey)
+  if (latest?.status !== 'completed') {
+    return undefined
+  }
+  const authority = db.verifyDispatchCapability({
+    dispatchId: latest.id,
+    capability: caller.capability,
+    paneKey: caller.paneKey,
+    processIncarnation: caller.processIncarnation,
+    acceptRevoked: true
+  })
+  if (!authority.valid) {
+    return undefined
+  }
+  return db.renewCompletedDispatch({
+    dispatchId: latest.id,
+    reason: 'Renewed by a question from its member after worker_done.'
+  })
+}

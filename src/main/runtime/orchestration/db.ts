@@ -7094,6 +7094,8 @@ export class OrchestrationDb {
     capability: string | undefined
     paneKey: string | undefined
     processIncarnation: string | undefined
+    /** Proves the holder of a completed Dispatch, whose capability worker_done revoked (ORCA-856). */
+    acceptRevoked?: boolean
   }): { valid: true } | { valid: false; reason: string } {
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {
@@ -7102,7 +7104,7 @@ export class OrchestrationDb {
     if (!dispatch.capability_hash) {
       return { valid: false, reason: `Dispatch ${params.dispatchId} has no lifecycle capability.` }
     }
-    if (dispatch.capability_revoked_at) {
+    if (dispatch.capability_revoked_at && !params.acceptRevoked) {
       return { valid: false, reason: `Dispatch ${params.dispatchId} capability is revoked.` }
     }
     if (!params.capability) {
