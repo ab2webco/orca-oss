@@ -67,7 +67,7 @@ function build(
     readReview: none,
     readPlane: none,
     readLinear: none,
-    ...(options.carried ? { readCarriedScene: () => options.carried ?? null } : {})
+    ...(options.carried ? { readCarriedScene: async () => options.carried ?? null } : {})
   })
 }
 

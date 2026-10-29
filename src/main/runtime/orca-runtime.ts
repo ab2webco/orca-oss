@@ -31303,6 +31303,10 @@ export class OrcaRuntimeService {
       : []
     const callerHandle =
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
+    const callerParentPaneKey = args.paneKey
+      ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
+          ?.parentPaneKey
+      : null
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -31343,18 +31347,21 @@ export class OrcaRuntimeService {
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
-      callerParentPaneKey: args.paneKey
-        ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
-            ?.parentPaneKey
-        : null,
+      callerParentPaneKey,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
-      readCarriedScene: () =>
-        worktree ? (this._orchestrationDb?.getGameSceneForWorktree(worktree.id) ?? null) : null,
+      // Why the lead's pane too: a scene file its checkout leaves untracked is not in a member's worktree.
+      readCarriedScene: async () => {
+        const sent = worktree ? this._orchestrationDb?.getGameSceneForWorktree(worktree.id) : null
+        const lead = callerParentPaneKey
+          ? this.getTerminalHandleForPaneKey(callerParentPaneKey)
+          : null
+        return sent ?? (lead ? this.readCallerGameScene(lead) : null)
+      },
       readInboxes: () =>
         this.gameBoard.inboxSummary({
           worktreeId: worktree?.id,

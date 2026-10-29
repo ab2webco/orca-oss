@@ -9,7 +9,7 @@ import { OrchestrationDb } from './orchestration/db'
 const SCENE_ID = 'file:.orca/mario-bros.json'
 const MARIO = JSON.stringify(sceneFile({}))
 
-describe("a remote game member's scene from its lead (ORCA-794)", () => {
+describe("a game member's scene from its lead (ORCA-794, ORCA-870)", () => {
   const dirs: string[] = []
   const databases: OrchestrationDb[] = []
 
@@ -33,11 +33,22 @@ describe("a remote game member's scene from its lead (ORCA-794)", () => {
     return dir
   }
 
-  function withWorktree(runtime: OrcaRuntimeService, id: string, path: string): void {
+  function withWorktrees(runtime: OrcaRuntimeService, paths: Record<string, string>): void {
     vi.spyOn(
       runtime as unknown as { getResolvedWorktreeMap: () => Promise<Map<string, unknown>> },
       'getResolvedWorktreeMap'
-    ).mockResolvedValue(new Map([[id, { id, repoId: 'repo1', path, branch: 'main' }]]))
+    ).mockResolvedValue(
+      new Map(
+        Object.entries(paths).map(([id, path]) => [
+          id,
+          { id, repoId: 'repo1', path, branch: 'main' }
+        ])
+      )
+    )
+  }
+
+  function withWorktree(runtime: OrcaRuntimeService, id: string, path: string): void {
+    withWorktrees(runtime, { [id]: path })
   }
 
   it("reads the scene file the lead's pane draws", async () => {
@@ -85,6 +96,42 @@ describe("a remote game member's scene from its lead (ORCA-794)", () => {
     const state = await runtime.getOrchestratorGameState({ worktreeId: 'wt-member' })
 
     expect(state.config.scene).toBe(SCENE_ID)
+    expect(state.extensions?.scenes.map((one) => one.id)).toEqual([SCENE_ID])
+  })
+
+  // The lead's scene file is untracked, so a local member's own worktree has no copy.
+  it("draws a local member's band in its lead's scene when its worktree lacks the file", async () => {
+    const runtime = new OrcaRuntimeService(null)
+    const yaml = 'orchestratorGame:\n  sceneFile: .orca/mario-bros.json\n'
+    withWorktrees(runtime, {
+      'wt-lead': checkout({ 'orca.yaml': yaml, '.orca/mario-bros.json': MARIO }),
+      'wt-member': checkout({ 'orca.yaml': yaml })
+    })
+    vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({
+      worktrees: [
+        { worktreeId: 'wt-lead', agents: [{ paneKey: 'pane-lead' }] },
+        {
+          worktreeId: 'wt-member',
+          agents: [{ paneKey: 'pane-member', parentPaneKey: 'pane-lead' }]
+        }
+      ]
+    } as never)
+    vi.spyOn(
+      runtime as unknown as { getTerminalHandleForPaneKey: (paneKey: string) => string | null },
+      'getTerminalHandleForPaneKey'
+    ).mockImplementation((paneKey) => (paneKey === 'pane-lead' ? 'term_lead' : null))
+    vi.spyOn(runtime, 'showTerminal').mockImplementation(
+      async (handle) => ({ worktreeId: handle === 'term_lead' ? 'wt-lead' : 'wt-member' }) as never
+    )
+
+    const state = await runtime.getOrchestratorGameState({
+      worktreeId: 'wt-member',
+      paneKey: 'pane-member'
+    })
+
+    expect(state.role).toBe('member')
+    expect(state.config.scene).toBe(SCENE_ID)
+    expect(state.warnings).toEqual([])
     expect(state.extensions?.scenes.map((one) => one.id)).toEqual([SCENE_ID])
   })
 })
