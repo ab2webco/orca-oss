@@ -52,7 +52,7 @@ export type GameFleet = {
   rows: GameFleetRow[]
   counts: Record<GameMemberPhase, number>
   cap: number
-  /** Members not finished: each holds a ticket and a slot. */
+  /** Members not finished and not gone from their host: each holds a ticket and a slot. */
   running: number
   free: number
   /** Members not live since Orca or the machine restarted: `game resume-members`. */
@@ -187,7 +187,9 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
   // Why paused ones count: each still holds its ticket until it is resumed or discarded.
   const paused = state.pausedMembers ?? []
   const queued = state.queuedMembers ?? []
-  const running = rows.length - counts.finished + paused.length + queued.length
+  // Why gone ones do not: their host answered that the terminal is gone, so nothing runs there (ORCA-864).
+  const gone = membersOf(state).filter((agent) => agent.remote?.gone && !isFinishedMember(agent))
+  const running = rows.length - counts.finished - gone.length + paused.length + queued.length
   return {
     rows,
     counts,

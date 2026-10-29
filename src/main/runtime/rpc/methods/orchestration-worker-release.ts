@@ -10,6 +10,7 @@ import {
   type WorkerReleaseReceipt
 } from './orchestration-worker-release-completion'
 import { releaseFederatedWorker } from './orchestration-federated-worker-release'
+import { retainedRecoveryOf } from './orchestration-worker-retained-recovery'
 
 const WorkerDispatchParams = z.object({ dispatch: requiredString('Missing --dispatch') })
 
@@ -80,7 +81,12 @@ export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
           state: 'retained',
           reason: requested.reason,
           processAction: 'none',
-          archive: archiveSummary(resource)
+          archive: archiveSummary(resource),
+          recovery: retainedRecoveryOf(
+            requested.reason,
+            params.dispatch,
+            resource?.terminal_handle ?? null
+          )
         }
       }
       return completeWorkerTerminalRelease({

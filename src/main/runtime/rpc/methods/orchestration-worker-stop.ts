@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
 import { requiredString } from '../schemas'
+import { isHostDispatchNotFound } from './orchestration-federated-worker-gone'
 import {
   inspectWorkerTerminal,
   resolvePinnedFederatedServer
@@ -67,6 +68,17 @@ export const ORCHESTRATION_WORKER_STOP_METHODS: RpcMethod[] = [
             remote.processAction
           )
         } catch (error) {
+          // Why: the host holds nothing of it for this home, so no stop there can ever be proven (ORCA-864).
+          if (isHostDispatchNotFound(error)) {
+            const worker = db.reconcileFederatedWorkerStop(params.dispatch)
+            return {
+              dispatchId: params.dispatch,
+              state: worker.state,
+              alreadySettled: false,
+              processAction: 'none',
+              warning: `${server.name} has no record of this member for this Orca; nothing was closed there.`
+            }
+          }
           const reason = error instanceof Error ? error.message : String(error)
           return unknownReceipt(
             params.dispatch,

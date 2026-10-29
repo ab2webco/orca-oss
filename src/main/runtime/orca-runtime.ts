@@ -31461,16 +31461,20 @@ export class OrcaRuntimeService {
         return null
       }
     })
-    const withPaused = await this.withPausedGameMembers(state, {
+    const withRemote = await this.withRemoteGameMembers(
+      state,
+      args.paneKey,
+      worktree,
+      worktreesById
+    )
+    return await this.withPausedGameMembers(withRemote, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
       liveWorktreeIds: new Set(
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
-    return await this.withRemoteGameMembers(withPaused, args.paneKey, worktree, worktreesById)
   }
 
-  // Why after the paused view: remote members have no local session to save or resume (ORCA-824).
   private async withRemoteGameMembers(
     state: OrchestratorGameState,
     leadPaneKey: string | undefined,

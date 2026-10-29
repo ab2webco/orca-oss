@@ -125,6 +125,15 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         }
       }
       const observation = await inspectRemoteAttachment(runtime, params.dispatchId)
+      if (observation.status === 'gone') {
+        const attachment = db.settleRemoteAttachmentStop(params.dispatchId)
+        return {
+          dispatchId: params.dispatchId,
+          state: attachment.state,
+          alreadySettled: false,
+          processAction: 'none'
+        }
+      }
       if (!observation.exact || !observation.terminal) {
         const attachment = db.markRemoteAttachmentStopUnknown(
           params.dispatchId,
@@ -193,6 +202,10 @@ export async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispa
     paneKey: runtime.getTerminalPaneKey(attachment.terminal_handle),
     processIncarnation: runtime.getTerminalProcessIncarnation(attachment.terminal_handle)
   })
+  // Why: a dead PTY runs nobody's agent, so its changed identity is not another process (ORCA-864).
+  if (!exact && terminal.liveness === 'gone') {
+    return { terminal: null, exact: false, status: 'gone' as const }
+  }
   return {
     terminal,
     exact,
