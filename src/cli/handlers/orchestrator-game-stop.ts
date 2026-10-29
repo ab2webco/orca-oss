@@ -33,7 +33,7 @@ export type GameStopEntry = {
 export type GameStopResult = { members: GameStopEntry[] }
 
 // Why: a stop on any other state is a no-op receipt; those dispatches only keep a terminal, if anything.
-const STOPPABLE: ReadonlySet<string> = new Set([
+export const STOPPABLE: ReadonlySet<string> = new Set([
   'starting',
   'ready',
   'start_unknown',

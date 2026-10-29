@@ -248,6 +248,33 @@ describe('orca game move', () => {
     )
   })
 
+  it('tells a remote member to move with --on instead of switching a terminal here (ORCA-798)', async () => {
+    const remote = {
+      ...CLAUDE_MEMBER,
+      paneKey: 'remote:ctx_a',
+      remote: { host: 'imac', stateKnown: true }
+    }
+    const { client, methods } = fakeClient(stateWith(remote), snapshotWith(limits(10)))
+
+    await expect(move(client, [['account', 'cy@example.com']])).rejects.toThrow(
+      /CIN-5 runs on imac; move it with --on <host> --repo/
+    )
+    expect(methods()).not.toContain('accounts.switchClaudeTerminal')
+  })
+
+  it('plans a move to another host with --on and --repo without touching anything (ORCA-798)', async () => {
+    const { client, methods } = fakeClient(stateWith(CLAUDE_MEMBER), snapshotWith(limits(10)))
+
+    await move(client, [
+      ['on', 'm1'],
+      ['repo', 'name:cineco'],
+      ['dry-run', true]
+    ])
+
+    expect(printed()).toMatchObject({ ticket: 'CIN-5', moved: false, via: 'host', to: 'm1' })
+    expect(methods()).toEqual(['game.state'])
+  })
+
   it('refuses a ticket no member holds, and the account it already runs on', async () => {
     const missing = fakeClient(stateWith(CLAUDE_MEMBER), snapshotWith(limits(10)))
     await expect(move(missing.client, [['ticket', 'CIN-9']])).rejects.toThrow(

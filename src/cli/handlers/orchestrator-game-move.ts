@@ -10,7 +10,8 @@ import {
   resolveGameMemberAccount,
   type GameMemberAccountChoice
 } from './orchestrator-game-launch-account'
-import { gameLaunchChoiceOf } from './orchestrator-game-launch-options'
+import { gameLaunchChoiceOf, remotePlacementOf } from './orchestrator-game-launch-options'
+import { moveMemberToHost } from './orchestrator-game-move-host'
 import { dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
@@ -26,14 +27,16 @@ export type GameMoveResult = {
   ticket: string
   moved: boolean
   dryRun?: boolean
-  /** `switch` resumes a Claude session in its own terminal; `relaunch` restarts the member on its worktree. */
-  via?: 'switch' | 'relaunch'
+  /** `switch` resumes a Claude session in its own terminal; `relaunch` restarts the member on its worktree; `host` starts it anew on another host. */
+  via?: 'switch' | 'relaunch' | 'host'
   from: string | null
   to?: string
   dispatchId?: string
   state?: string
   /** Why it stays: every other account is at or near its limit, and when the first is back. */
   wait?: string
+  /** The worktree the old host keeps after a move to another host. */
+  kept?: string
 }
 
 const TICKET = /^[A-Z0-9][A-Z0-9_-]{0,39}$/
@@ -161,7 +164,8 @@ export const formatGameMove = (move: GameMoveResult): string => {
     return `${move.ticket} stays on ${move.from ?? 'its account'}: ${move.wait}`
   }
   const head = `${move.ticket} ${move.dryRun ? 'would move' : 'moved'} ${move.from ?? '?'} → ${move.to ?? '?'} (${move.via})`
-  return move.dispatchId ? `${head}: member ${move.dispatchId} [${move.state}]` : head
+  const line = move.dispatchId ? `${head}: member ${move.dispatchId} [${move.state}]` : head
+  return move.kept ? `${line}; ${move.kept} kept` : line
 }
 
 export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
@@ -174,6 +178,44 @@ export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
     const state = response.result
     refuseWhileStopped(state, `moving ${ticket}`)
     const member = memberOf(state, ticket)
+    const rawRepo = flags.get('repo')
+    const placement = remotePlacementOf(
+      flags,
+      typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
+    )
+    if (placement) {
+      const typed = typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined
+      if (flags.get('dry-run') === true) {
+        const plan: GameMoveResult = {
+          ticket,
+          moved: false,
+          dryRun: true,
+          via: 'host',
+          from: member.account?.email ?? null,
+          to: placement.on
+        }
+        printResult({ ...response, result: plan }, json, formatGameMove)
+        return
+      }
+      const moved = await moveMemberToHost({
+        client,
+        state,
+        member,
+        ticket,
+        placement,
+        account: typed,
+        flags,
+        cwd
+      })
+      printResult({ ...response, result: moved }, json, formatGameMove)
+      return
+    }
+    if (member.remote) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `${ticket} runs on ${member.remote.host}; move it with --on <host> --repo <selector of the repo there>, which starts it anew on that host.`
+      )
+    }
     const from = member.account?.email ?? null
     if (
       member.account &&
