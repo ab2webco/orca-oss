@@ -95,6 +95,8 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'setup_slot_busy',
   'relay_quota_exceeded',
   'dispatch_capability_invalid',
+  // Why: a refused remote member's message names its recovery step (ORCA-857).
+  'orchestration_sender_unauthenticated',
   'agent_unconfigured',
   'terminal_worktree_mismatch',
   'request_mismatch',

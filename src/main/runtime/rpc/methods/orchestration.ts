@@ -40,6 +40,7 @@ import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
+import { refuseRemoteMemberMail } from '../../orchestration/remote-member-mail-refusal'
 import {
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
@@ -416,6 +417,38 @@ function interruptedAcknowledgedCheck(
   }
 }
 
+// Why: a remote member refused here has no other way to reach its lead (ORCA-857).
+function authenticateRemoteAwareSender(
+  runtime: OrcaRuntimeService,
+  params: { from?: string; senderPaneKey?: string; senderLaunchToken?: string },
+  type: string
+): { handle: string; paneKey?: string } {
+  try {
+    return runtime.authenticateOrchestrationSender({
+      claimedHandle: params.from,
+      paneKey: params.senderPaneKey,
+      launchToken: params.senderLaunchToken
+    })
+  } catch (error) {
+    const db = runtime.getOrchestrationDb()
+    const attachment =
+      error instanceof Error &&
+      error.message === 'orchestration_sender_unauthenticated' &&
+      params.senderPaneKey &&
+      type !== 'heartbeat'
+        ? db.findActiveRemoteAttachmentForPane(params.senderPaneKey)
+        : undefined
+    if (!attachment) {
+      throw error
+    }
+    throw refuseRemoteMemberMail(db, {
+      dispatchId: attachment.dispatch_id,
+      type,
+      refusal: 'sender_unauthenticated'
+    })
+  }
+}
+
 function rejectFederatedExplicitTarget(params: { to?: string; run?: string }): void {
   if (params.to || params.run) {
     throw new OrchestrationError(
@@ -445,11 +478,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     ) => {
       const db = runtime.getOrchestrationDb()
       // Why: lifecycle authority starts with proof of the local sender pane, never its claimed handle.
-      const sender = runtime.authenticateOrchestrationSender({
-        claimedHandle: params.from,
-        paneKey: params.senderPaneKey,
-        launchToken: params.senderLaunchToken
-      })
+      const sender = authenticateRemoteAwareSender(runtime, params, params.type ?? 'status')
       const from = sender.handle
       // Why keep the attested caller as well: hook identity survives a graph remount, where the
       // runtime can no longer resolve the pane from the handle alone. It is matched against the
@@ -466,23 +495,30 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         rejectFederatedExplicitTarget(params)
         const processIncarnation =
           attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from)
-        if (
-          !db.verifyRemoteAttachmentAuthority({
-            dispatchId: remoteAttachment.dispatch_id,
-            capability: orchestrationCapability,
-            paneKey: senderPaneKey ?? null,
-            processIncarnation
-          })
-        ) {
-          const reason = 'The remote Dispatch capability or exact worker process is invalid.'
+        const authority = {
+          dispatchId: remoteAttachment.dispatch_id,
+          capability: orchestrationCapability,
+          paneKey: senderPaneKey ?? null,
+          processIncarnation
+        }
+        if (!db.verifyRemoteAttachmentAuthority(authority)) {
+          const refusal = db.diagnoseRemoteAttachmentAuthority(authority) ?? 'capability_mismatch'
           if (params.type === 'heartbeat') {
             logHeartbeatRejection(
               { from_handle: from, sender_pane_key: senderPaneKey ?? null },
               remoteAttachment.dispatch_id,
-              reason
+              refusal
+            )
+            throw new OrchestrationError(
+              'dispatch_capability_invalid',
+              'The remote Dispatch capability or exact worker process is invalid.'
             )
           }
-          throw new OrchestrationError('dispatch_capability_invalid', reason)
+          throw refuseRemoteMemberMail(db, {
+            dispatchId: remoteAttachment.dispatch_id,
+            type: params.type ?? 'status',
+            refusal
+          })
         }
         const type = (params.type ?? 'status') as MessageType
         const payload = parseRemoteWorkerPayload(params.payload)
@@ -1616,11 +1652,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       }
 
       const db = runtime.getOrchestrationDb()
-      const sender = runtime.authenticateOrchestrationSender({
-        claimedHandle: params.from,
-        paneKey: params.senderPaneKey,
-        launchToken: params.senderLaunchToken
-      })
+      const sender = authenticateRemoteAwareSender(runtime, params, 'question')
       const from = sender.handle
       // Why: echoed on every return so a clamped caller reports the budget actually waited, not the one it asked for.
       const timeoutMs = clampOrchestrationAskTimeoutMs(params.timeoutMs)
@@ -1804,18 +1836,18 @@ async function askRemoteRunHome(args: {
 }): Promise<unknown> {
   const db = args.runtime.getOrchestrationDb()
   const timeoutMs = clampOrchestrationAskTimeoutMs(args.params.timeoutMs)
-  if (
-    !db.verifyRemoteAttachmentAuthority({
+  const authority = {
+    dispatchId: args.dispatchId,
+    capability: args.orchestrationCapability,
+    paneKey: args.paneKey,
+    processIncarnation: args.runtime.getTerminalProcessIncarnation(args.from)
+  }
+  if (!db.verifyRemoteAttachmentAuthority(authority)) {
+    throw refuseRemoteMemberMail(db, {
       dispatchId: args.dispatchId,
-      capability: args.orchestrationCapability,
-      paneKey: args.paneKey,
-      processIncarnation: args.runtime.getTerminalProcessIncarnation(args.from)
+      type: 'question',
+      refusal: db.diagnoseRemoteAttachmentAuthority(authority) ?? 'capability_mismatch'
     })
-  ) {
-    throw new OrchestrationError(
-      'dispatch_capability_invalid',
-      'The remote Dispatch capability or exact worker process is invalid.'
-    )
   }
   const options =
     args.params.options
