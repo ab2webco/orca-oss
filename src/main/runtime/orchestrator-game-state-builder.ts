@@ -115,6 +115,8 @@ export type OrchestratorGameStateInput = {
   readStop?: () => Promise<GameStop | null>
   /** The project's inboxes; read only for a lead. */
   readInboxes?: () => Promise<GameInboxSummary[]>
+  /** Questions the lead asked the person that wait for an answer; read only for a lead. */
+  readOpenOwnerQuestions?: () => Promise<number>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** My open PRs and tickets across the repo, not only this worktree's. */
@@ -142,19 +144,32 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere } = input
-  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere, suggested] =
-    await Promise.all([
-      input.worktree ? settle(input.readReview) : Promise.resolve(null),
-      tracker ? settle(input.readPlane) : Promise.resolve(null),
-      tracker ? settle(input.readLinear) : Promise.resolve(null),
-      readScenes ? settle(readScenes) : Promise.resolve(null),
-      readSceneFileOrCarried(resolved, input.worktree, input.readCarriedScene),
-      readStop ? settleGameStop(readStop) : Promise.resolve(null),
-      readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null),
-      readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
-      input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null)
-    ])
+  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions } = input
+  const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
+    read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
+  const [
+    review,
+    plane,
+    linear,
+    sceneSources,
+    sceneFile,
+    stop,
+    inboxes,
+    leadElsewhere,
+    suggested,
+    openOwnerQuestions
+  ] = await Promise.all([
+    input.worktree ? settle(input.readReview) : Promise.resolve(null),
+    tracker ? settle(input.readPlane) : Promise.resolve(null),
+    tracker ? settle(input.readLinear) : Promise.resolve(null),
+    readScenes ? settle(readScenes) : Promise.resolve(null),
+    readSceneFileOrCarried(resolved, input.worktree, input.readCarriedScene),
+    readStop ? settleGameStop(readStop) : Promise.resolve(null),
+    leadOnly(readInboxes),
+    readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
+    input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
+    leadOnly(readOpenOwnerQuestions)
+  ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
     ...resolved.config,
@@ -288,6 +303,7 @@ export async function buildOrchestratorGameState(
     ...(leaderActivity ? { activity: leaderActivity } : {}),
     ...(stop ? { stopped: stop.stopped } : {}),
     ...(inboxes ? { inboxes } : {}),
+    ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')

@@ -668,6 +668,9 @@ The lead's verbs, run from the lead's terminal
 - `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` and
   `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
   have it read events and inbox before answering "qué pasó".
+- `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
+[--all]` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
+  to the person as records, below.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
 
@@ -972,6 +975,14 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- What the lead asks the person is a record, not chat text (ORCA-782): `game ask-owner` keeps the
+  question with its ticket, up to 6 options, a context line and the time asked in the project's board
+  file, next to its events ([`orchestrator-game-owner-questions.ts`](../../src/shared/orchestrator-game-owner-questions.ts)).
+  Open ones are never dropped; the last 200 answered stay for the audit. `game state --json` gives
+  the lead `openOwnerQuestions`. `game answer-owner` (and later the Inbox) answers once: the host
+  writes an `escalation` from `owner` to the lead's terminal, a type the lead's watch passes, and
+  the lead records it on the ticket. The same answer again is a no-op, a different one is refused,
+  and a member can neither ask the person nor answer for them.
 - Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
   its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
   their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`

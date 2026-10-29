@@ -62,3 +62,26 @@ describe('buildOrchestratorGameState inboxes', () => {
     expect('inboxes' in failed).toBe(false)
   })
 })
+
+describe('buildOrchestratorGameState owner questions', () => {
+  it('gives the lead the count of questions waiting on the person, a member none', async () => {
+    const lead = await buildOrchestratorGameState({
+      ...base,
+      readOpenOwnerQuestions: async () => 2
+    })
+    expect(lead.openOwnerQuestions).toBe(2)
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readOpenOwnerQuestions: async () => 2
+    })
+    expect('openOwnerQuestions' in member).toBe(false)
+    const failed = await buildOrchestratorGameState({
+      ...base,
+      readOpenOwnerQuestions: async () => {
+        throw new Error('EACCES')
+      }
+    })
+    expect('openOwnerQuestions' in failed).toBe(false)
+  })
+})

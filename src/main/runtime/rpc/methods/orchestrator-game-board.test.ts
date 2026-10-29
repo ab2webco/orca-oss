@@ -113,4 +113,58 @@ describe('game board RPC', () => {
       ]
     ])
   })
+
+  it('asks, lists and answers owner questions, refusing a malformed call', async () => {
+    const { send, calls } = dispatcherWith({
+      askOwner: async () => ({ question: { id: 'oq_1' } }),
+      ownerQuestions: async () => ({ questions: [], open: 0 }),
+      answerOwner: async () => ({ delivered: true })
+    })
+
+    await expect(
+      send('game.ownerAsk', {
+        terminalHandle: 'h1',
+        ticket: 'CIN-1',
+        question: 'Ship it?',
+        options: ['Yes', 'No'],
+        context: 'PR #4'
+      })
+    ).resolves.toMatchObject({ ok: true, result: { question: { id: 'oq_1' } } })
+    await expect(send('game.ownerQuestions', { all: true })).resolves.toMatchObject({ ok: true })
+    await expect(send('game.ownerAnswer', { id: 'oq_1', option: 2 })).resolves.toMatchObject({
+      ok: true,
+      result: { delivered: true }
+    })
+    await expect(
+      send('game.ownerAsk', { question: 'x', options: ['1', '2', '3', '4', '5', '6', '7'] })
+    ).resolves.toMatchObject({ ok: false })
+    await expect(send('game.ownerAnswer', { id: 'oq_1', option: 0 })).resolves.toMatchObject({
+      ok: false
+    })
+    await expect(send('game.ownerAnswer', { id: 'oq_1' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      [
+        'askOwner',
+        {
+          worktreeId: undefined,
+          terminalHandle: 'h1',
+          ticket: 'CIN-1',
+          question: 'Ship it?',
+          options: ['Yes', 'No'],
+          context: 'PR #4'
+        }
+      ],
+      ['ownerQuestions', { worktreeId: undefined, terminalHandle: undefined, all: true }],
+      [
+        'answerOwner',
+        {
+          worktreeId: undefined,
+          terminalHandle: undefined,
+          id: 'oq_1',
+          option: 2,
+          text: undefined
+        }
+      ]
+    ])
+  })
 })

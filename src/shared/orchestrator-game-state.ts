@@ -185,6 +185,8 @@ export type OrchestratorGameState = {
   stopped?: GameStop | null
   /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
   inboxes?: GameInboxSummary[]
+  /** Questions the lead asked the person (`game ask-owner`) still unanswered; only for the lead, absent from an older host. */
+  openOwnerQuestions?: number
   /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
   pausedMembers?: GamePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */

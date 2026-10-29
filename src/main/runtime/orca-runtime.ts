@@ -31422,6 +31422,13 @@ export class OrcaRuntimeService {
           worktreeId: worktree?.id,
           terminalHandle: callerHandle ?? undefined
         }),
+      readOpenOwnerQuestions: async () =>
+        (
+          await this.gameBoard.ownerQuestions({
+            worktreeId: worktree?.id,
+            terminalHandle: callerHandle ?? undefined
+          })
+        ).open,
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
           worktreeId: worktree?.id,

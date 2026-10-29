@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { GAME_EVENT_KINDS, GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
+import {
+  GAME_OWNER_CONTEXT_MAX,
+  GAME_OWNER_OPTIONS_MAX,
+  GAME_OWNER_OPTION_TEXT_MAX,
+  GAME_OWNER_QUESTION_TEXT_MAX
+} from '../../../../shared/orchestrator-game-owner-questions'
 
 // Why the caller's worktree or terminal: the board belongs to the lead's project, and a member's to its lead's.
 const Caller = {
@@ -35,6 +41,31 @@ const GameInboxParams = z
     markRead: z.boolean().optional()
   })
   .optional()
+
+const GameOwnerAskParams = z.object({
+  ...Caller,
+  ticket: z.string().max(40).optional(),
+  question: z.string().min(1).max(GAME_OWNER_QUESTION_TEXT_MAX),
+  options: z
+    .array(z.string().min(1).max(GAME_OWNER_OPTION_TEXT_MAX))
+    .max(GAME_OWNER_OPTIONS_MAX)
+    .optional(),
+  context: z.string().max(GAME_OWNER_CONTEXT_MAX).optional()
+})
+
+const GameOwnerQuestionsParams = z.object({ ...Caller, all: z.boolean().optional() }).optional()
+
+// Why exactly one of option and text: the person picks a button or writes an answer.
+const GameOwnerAnswerParams = z
+  .object({
+    ...Caller,
+    id: z.string().min(1).max(40),
+    option: z.number().int().min(1).max(GAME_OWNER_OPTIONS_MAX).optional(),
+    text: z.string().min(1).max(GAME_OWNER_QUESTION_TEXT_MAX).optional()
+  })
+  .refine((params) => (params.option === undefined) !== (params.text === undefined), {
+    message: 'Give either option or text.'
+  })
 
 /** The project's shared board: events, the STOP switch and inboxes; newer than `game.history`. */
 export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
@@ -73,6 +104,41 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
         ticket: params?.ticket,
         unread: params?.unread,
         markRead: params?.markRead
+      })
+  }),
+  defineMethod({
+    name: 'game.ownerAsk',
+    params: GameOwnerAskParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().askOwner({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        ticket: params.ticket,
+        question: params.question,
+        options: params.options,
+        context: params.context
+      })
+  }),
+  defineMethod({
+    name: 'game.ownerQuestions',
+    params: GameOwnerQuestionsParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().ownerQuestions({
+        worktreeId: params?.worktreeId,
+        terminalHandle: params?.terminalHandle,
+        all: params?.all
+      })
+  }),
+  defineMethod({
+    name: 'game.ownerAnswer',
+    params: GameOwnerAnswerParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().answerOwner({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        id: params.id,
+        option: params.option,
+        text: params.text
       })
   }),
   defineMethod({

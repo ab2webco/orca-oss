@@ -42,6 +42,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain("don't relaunch or re-arm watchers until asked")
   })
 
+  it('asks the person through a recorded question, never only in chat', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca game ask-owner --ticket <id> --question <text> --option <a> --option <b>`'
+    )
+    expect(brief).toContain('an escalation from `owner`')
+  })
+
   it('resumes the members a restart paused at once, then tells the person', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
