@@ -44,14 +44,14 @@ export async function readSceneFile(
     : failed(parsed.error)
 }
 
-/** The worktree's own scene file, else the one a remote member's lead sent with it. */
+/** The worktree's own scene file, else the one its member's lead draws. */
 export async function readSceneFileOrCarried(
   resolved: ResolvedOrchestratorGameConfig,
   worktree: NonNullable<OrchestratorGameStateInput['worktree']> | null,
-  readCarried: (() => CarriedGameScene | null) | undefined
+  readCarried: (() => Promise<CarriedGameScene | null>) | undefined
 ): Promise<SceneFileOutcome | null> {
   const own = await readSceneFile(resolved, worktree)
-  const carried = own?.scene ? null : (readCarried?.() ?? null)
+  const carried = own?.scene || !readCarried ? null : await readCarried().catch(() => null)
   const parsed = carried ? parseOrchestratorGameScene(carried.text, carried.id) : null
   return carried && parsed?.ok
     ? {

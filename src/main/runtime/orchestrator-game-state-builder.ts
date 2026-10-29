@@ -109,8 +109,8 @@ export type OrchestratorGameStateInput = {
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
-  /** The scene a remote member's lead sent; drawn only when the worktree's own file does not read. */
-  readCarriedScene?: () => CarriedGameScene | null
+  /** The scene a member's lead draws; used only when the worktree's own file does not read. */
+  readCarriedScene?: () => Promise<CarriedGameScene | null>
   /** The project's STOP; absent leaves `stopped` out, as from an older host. */
   readStop?: () => Promise<GameStop | null>
   /** The project's inboxes; read only for a lead. */
