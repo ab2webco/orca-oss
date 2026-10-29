@@ -246,10 +246,12 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     // 390px window the panel is handed ~80px, so they say nothing about the
     // panel's own layout at 390. Widen the window until the FRAME is the target
     // width, then photograph the frame itself.
+    // Why: innerWidth, not clientWidth — on Linux a clipped frame shows a 15px classic
+    // scrollbar that clientWidth subtracts, so the loop oscillated across it (405 vs 375).
     const frameWidthOf = async (): Promise<number> =>
       panelFrame(orcaPage)
         .locator('body')
-        .evaluate((body) => body.ownerDocument.documentElement.clientWidth)
+        .evaluate((body) => body.ownerDocument.defaultView?.innerWidth ?? 0)
     // Why: innerWidth reaches the target before the sidebar re-clamps from it, so an
     // early read is stale and the correction overshoots; wait for the width to stop moving.
     const settledFrameWidthOf = async (): Promise<number> => {
