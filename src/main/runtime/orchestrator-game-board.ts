@@ -63,6 +63,8 @@ export class GameBoard {
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       inboxSourceOf: (lead: GameBoardLead) => GameInboxSource
       tellLead: (lead: GameBoardLead, note: GameLeadNote) => boolean
+      /** Lets an open Inbox refresh instead of polling. */
+      ownerQuestionsChanged?: (projectKey: string) => void
       now?: () => Date
     }
   ) {}
@@ -139,6 +141,7 @@ export class GameBoard {
       list: addGameOwnerQuestion(list, question),
       result: null
     }))
+    this.deps.ownerQuestionsChanged?.(project.key)
     return { question }
   }
 
@@ -178,6 +181,7 @@ export class GameBoard {
       case 'repeated':
         return { question: result.question, delivered: false, repeated: true }
       case 'answered': {
+        this.deps.ownerQuestionsChanged?.(project.key)
         const delivered = project.lead
           ? this.deps.tellLead(project.lead, gameOwnerAnswerNote(result.question))
           : false

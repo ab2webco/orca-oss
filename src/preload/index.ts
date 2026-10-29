@@ -4753,6 +4753,11 @@ const api = {
       ) => callback(data)
       ipcRenderer.on('runtime:browserDriverChanged', listener)
       return () => ipcRenderer.removeListener('runtime:browserDriverChanged', listener)
+    },
+    onGameOwnerQuestionsChanged: (callback: () => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('runtime:gameOwnerQuestionsChanged', listener)
+      return () => ipcRenderer.removeListener('runtime:gameOwnerQuestionsChanged', listener)
     }
   },
 
