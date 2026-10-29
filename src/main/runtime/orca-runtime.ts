@@ -544,6 +544,10 @@ import {
 } from '../agent-trust-presets'
 import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
 import { claudeLaunchRequiresFolderTrust } from '../claude-accounts/claude-folder-trust'
+import {
+  findClaudeBannerIndex,
+  findClaudeStartupDialogSignals
+} from './claude-startup-dialog-signal'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
 import { recordManagedHookInstallFailure } from '../agent-hooks/install-telemetry'
 import {
@@ -42136,7 +42140,8 @@ function findDismissedStartupModalIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorActivePromptIndex(normalized)
+    findCursorActivePromptIndex(normalized),
+    findClaudeBannerIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
 }
@@ -42226,7 +42231,7 @@ function isTerminalWaitWhitespace(value: string, index: number): boolean {
 }
 
 const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always/i
+  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode/i
 
 function findTerminalWaitBlockedSignal(
   normalized: string
@@ -42235,7 +42240,8 @@ function findTerminalWaitBlockedSignal(
   if (!TERMINAL_WAIT_BLOCKED_SENTINEL_RE.test(normalized)) {
     return null
   }
-  const candidates: { reason: RuntimeTerminalWaitBlockedReason; index: number }[] = []
+  const candidates: { reason: RuntimeTerminalWaitBlockedReason; index: number }[] =
+    findClaudeStartupDialogSignals(normalized)
   const updateIndex = normalized.lastIndexOf('update available')
   if (updateIndex !== -1 && normalized.includes('press enter to continue', updateIndex)) {
     candidates.push({ reason: 'codex-update-prompt', index: updateIndex })

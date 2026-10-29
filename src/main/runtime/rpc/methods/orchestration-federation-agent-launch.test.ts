@@ -104,4 +104,59 @@ describe('federated worker agent launch', () => {
       expect.not.objectContaining({ command: expect.anything() })
     )
   })
+
+  it('refuses a remote Claude terminal parked on the bypass dialog by name, not timeout (ORCA-855)', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runtime = new OrcaRuntimeService()
+    runtime.setOrchestrationDb(db)
+    vi.spyOn(runtime, 'validateOrchestrationAgentLauncher').mockImplementation(() => {})
+    vi.spyOn(runtime, 'showManagedTerminalWorkspace').mockResolvedValue({
+      id: 'repo::/remote/member'
+    } as never)
+    vi.spyOn(runtime, 'showTerminal').mockResolvedValue({
+      handle: 'term_remote_member',
+      worktreeId: 'repo::/remote/member'
+    } as never)
+    vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+    vi.spyOn(runtime, 'waitForTerminal').mockResolvedValue({
+      handle: 'term_remote_member',
+      condition: 'tui-idle',
+      satisfied: false,
+      status: 'running',
+      exitCode: null,
+      blockedReason: 'claude-bypass-permissions-prompt'
+    })
+    const sendTerminalAgentPrompt = vi.spyOn(runtime, 'sendTerminalAgentPrompt')
+    const method = ORCHESTRATION_METHODS.find(
+      (candidate) => candidate.name === 'orchestration.federationAttachStart'
+    )
+    if (!method) {
+      throw new Error('federationAttachStart method is not registered')
+    }
+
+    const result = (await method.handler(
+      method.params!.parse({
+        dispatchId: 'ctx_remote_claude',
+        taskId: 'task_remote_claude',
+        taskSpec: 'remote claude member',
+        protocolVersion: 3,
+        worktree: 'repo::/remote/member',
+        terminal: 'term_remote_member'
+      }),
+      {
+        runtime,
+        orchestrationMutation: {
+          callerFingerprint: 'home_peer',
+          requestId: 'request_remote_claude',
+          method: 'orchestration.federationAttachStart',
+          payloadHash: 'remote_claude_payload'
+        }
+      }
+    )) as { state: string; failedStage?: string; lastError?: string }
+
+    expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
+    expect(result.lastError).toContain('Agent startup blocked: claude-bypass-permissions-prompt.')
+    expect(result.lastError).toContain("choose 'Yes, I accept'")
+    expect(sendTerminalAgentPrompt).not.toHaveBeenCalled()
+  })
 })

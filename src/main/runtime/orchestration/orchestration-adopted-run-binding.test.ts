@@ -59,6 +59,8 @@ function createAdoptedFixture(options: { settleWork: boolean }): AdoptedFixture 
   before.close()
 
   const raw = new SyncDatabase(dbPath)
+  // Why: SQLite stamps whole seconds; legacy mail predates any claim, so pin it before the bind's second.
+  raw.exec("UPDATE messages SET created_at = '2026-10-26 16:00:00'")
   if (options.settleWork) {
     raw.exec("UPDATE dispatch_contexts SET status = 'completed'")
   }
@@ -143,31 +145,29 @@ describe('adopted Run binding without --takeover-legacy', () => {
 
   // Why: this is what makes the unflagged claim safe — the recovered coordinator's mail is not orphaned.
   it('promotes the retained coordinator mail onto the claiming Run', () => {
-    const { db, adoptedRunId, recoveryMessageId } = createAdoptedFixture({ settleWork: true })
+    const { db, adoptedRunId, dispatchId, recoveryMessageId } = createAdoptedFixture({
+      settleWork: true
+    })
     expect(db.getMessageById(recoveryMessageId)).toMatchObject({
       to_handle: LEGACY_COORDINATOR_HANDLE,
       delivery_contract: 'legacy_direct'
     })
 
-    const run = db.bindRun({
+    db.bindRun({
       runId: adoptedRunId,
       coordinatorHandle: CURRENT_COORDINATOR_HANDLE,
       coordinatorPaneKey: CURRENT_COORDINATOR_PANE
-    })!
+    })
 
     expect(db.getMessageById(recoveryMessageId)).toMatchObject({
       to_handle: `run:${adoptedRunId}`,
       delivery_contract: 'current_delivery',
       read: 0
     })
-    expect(
-      db
-        .getOrCreateRunDelivery({
-          runId: adoptedRunId,
-          consumerGeneration: run.consumer_generation
-        })
-        ?.messages.map((message) => message.id)
-    ).toContain(recoveryMessageId)
+    // Why: a settled report from before the claim reaches the new lead as its retired notice (ORCA-824).
+    expect(db.retireSettledRunMail(adoptedRunId)).toEqual([
+      { id: recoveryMessageId, type: 'worker_done', dispatchId }
+    ])
   })
 
   it('revokes an attested legacy coordinator when it claims the settled Run', () => {
