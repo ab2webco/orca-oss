@@ -52,9 +52,16 @@ its words from it. A Raster only takes width-1 characters, so a wide character i
 A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws a member
 band in place of the lead's: one line with its character, ticket, the phase card it shows, its PR
 and CI ([`member-band.tsx`](../../resources/claude-plugins/orca-game/hooks/member-band.tsx)). It has
-no menu, team chips, party HUD or buttons. While the member's `orca orchestration ask` waits on
-the lead, a second line shows the question (`? Asked <lead>: …`), cleared when the answer returns.
-Its replies use the same cards as the lead's, and the scene still draws above the spinner.
+no Panel, team chips, party HUD or lead buttons, only a menu row on the pane's own colors:
+**Collapse** folds the band to that row and takes the scene off the spinner for the session,
+**Text** is the lead's text toggle, and **Refresh** reads `game state` again. While the member's
+`orca orchestration ask` waits on the lead, a line shows the question (`? Asked <lead>: …`), kept
+when collapsed and cleared when the answer returns. Its replies use the same cards as the lead's,
+and the scene still draws above the spinner unless collapsed or in text mode.
+
+A local member draws its lead's scene file when its own worktree cannot read it: `.orca/` is often
+git-excluded, so a fresh member worktree lacks the file the lead draws, and `game state` reads the
+lead's copy through the member's parent pane before falling back to Quest (ORCA-870).
 
 ### A member's one-line brief
 
