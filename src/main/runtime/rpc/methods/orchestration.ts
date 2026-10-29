@@ -35,6 +35,7 @@ import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
+import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
@@ -1672,13 +1673,24 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           taskId: remoteAttachment.task_id
         })
       }
-      const activeDispatch = db.getActiveDispatchForIdentity(from, paneKey)
+      let activeDispatch = db.getActiveDispatchForIdentity(from, paneKey)
+      const reopenedDispatch = activeDispatch
+        ? undefined
+        : renewDispatchForMemberAsk(db, {
+            handle: from,
+            paneKey,
+            capability: orchestrationCapability,
+            processIncarnation: runtime.getTerminalProcessIncarnation(from) ?? undefined
+          })
+      activeDispatch ??= reopenedDispatch
       if (!activeDispatch) {
         throw new OrchestrationError(
           'dispatch_inactive',
           'ask requires an active supervised Dispatch.'
         )
       }
+      // Why: the member must send worker_done again, so the CLI tells it its Dispatch reopened.
+      const reopened = reopenedDispatch ? { reopenedDispatchId: reopenedDispatch.id } : {}
       if (activeDispatch.capability_hash) {
         const authority = db.verifyDispatchCapability({
           dispatchId: activeDispatch.id,
@@ -1743,7 +1755,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         timedOut: false,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       })
       const deadline = Date.now() + timeoutMs
       while (true) {
@@ -1763,7 +1776,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: false,
             connectionLost: false,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         if (signal?.aborted) {
@@ -1774,7 +1788,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: true,
             connectionLost: true,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         const remainingMs = deadline - Date.now()
@@ -1786,7 +1801,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: true,
             cancelled: false,
             connectionLost: false,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         await runtime.waitForMessage(`dispatch:${activeDispatch.id}`, {

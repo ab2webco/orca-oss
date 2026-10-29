@@ -634,6 +634,33 @@ describe('orchestration timeout flag validation', () => {
     )
   })
 
+  it('tells a member that its question reopened its settled Dispatch (ORCA-856)', async () => {
+    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    callMock.mockResolvedValue({
+      result: {
+        answer: 'yes',
+        messageId: 'msg_1',
+        threadId: 'msg_1',
+        timedOut: false,
+        reopenedDispatchId: 'ctx_settled'
+      }
+    })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await ORCHESTRATION_HANDLERS['orchestration ask']({
+      flags: new Map<string, string | boolean>([['question', 'More work?']]),
+      client: { call: callMock },
+      cwd: '/tmp/repo',
+      json: false
+    } as never)
+
+    expect(log).toHaveBeenCalledWith('yes')
+    expect(error).toHaveBeenCalledWith(
+      'Dispatch ctx_settled reopened by this question: send worker_done again when the follow-up is done.'
+    )
+  })
+
   it('passes an ask resume without creating a new question payload', async () => {
     process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
     callMock.mockResolvedValue({
