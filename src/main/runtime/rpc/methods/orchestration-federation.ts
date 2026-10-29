@@ -1,4 +1,5 @@
 import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
+import { describeAgentStartupBlocked } from '../../claude-startup-dialog-signal'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
@@ -219,7 +220,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           }
           throw new Error(
             wait.blockedReason
-              ? `Agent startup blocked: ${wait.blockedReason}`
+              ? describeAgentStartupBlocked(wait.blockedReason)
               : `Agent did not become ready (${wait.status}).`
           )
         }

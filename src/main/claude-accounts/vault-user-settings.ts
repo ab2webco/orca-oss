@@ -19,6 +19,11 @@ import type { ClaudeVaultSettingInheritanceKey } from '../../shared/managed-acco
 //   and the per-vault knobs the CLI itself writes back from inside a session
 //   (`theme`, `model`, `effortLevel`, `advisorModel`, `tui`, `autoMemoryEnabled`,
 //   `skipDangerousModePermissionPrompt`, `enabledPlugins`, `extraKnownMarketplaces`).
+//
+//   seeded once — `skipDangerousModePermissionPrompt`: the user's acceptance of
+//   Claude's Bypass Permissions warning on this machine. A fresh vault without it
+//   parks every bypass launch on that dialog (ORCA-855), so an absent vault value
+//   takes a home `true`; a value the vault already holds is its own answer.
 
 export const INHERITABLE_VAULT_SETTING_KEYS: readonly ClaudeVaultSettingInheritanceKey[] = [
   'permissions',
@@ -28,6 +33,21 @@ export const INHERITABLE_VAULT_SETTING_KEYS: readonly ClaudeVaultSettingInherita
   'agentPushNotifEnabled',
   'outputStyle'
 ]
+
+/** The vault settings with the home Bypass Permissions acceptance seeded; null when nothing changes. */
+export function seedBypassPermissionsAcceptance(
+  vaultSettingsJson: string | null,
+  homeSettings: Record<string, unknown> | null
+): string | null {
+  if (homeSettings?.skipDangerousModePermissionPrompt !== true) {
+    return null
+  }
+  const vaultSettings = parseSettingsObject(vaultSettingsJson)
+  if (vaultSettings === null || vaultSettings.skipDangerousModePermissionPrompt !== undefined) {
+    return null
+  }
+  return `${JSON.stringify({ ...vaultSettings, skipDangerousModePermissionPrompt: true }, null, 2)}\n`
+}
 
 /** Permission lists are unioned, never replaced — a replace that dropped a
  *  vault-local `deny` would silently *weaken* a restriction the user set. */

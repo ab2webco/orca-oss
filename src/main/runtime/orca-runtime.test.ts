@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks'
 import { EventEmitter } from 'node:events'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { lstat, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, win32 } from 'node:path'
@@ -1014,6 +1014,13 @@ const TEST_WINDOW_ID = 1
 const TEST_REPO_ID = 'repo-1'
 const TEST_REPO_PATH = '/tmp/repo'
 const TEST_WORKTREE_PATH = '/tmp/worktree-a'
+// Why: real Claude bytes; it lays words out with cursor moves, not spaces.
+const CLAUDE_STARTUP_DIALOGS = JSON.parse(
+  readFileSync(
+    new URL('./__fixtures__/claude-startup-dialogs-2.1.312.json', import.meta.url),
+    'utf8'
+  )
+) as { folderTrust: string; bypassPermissions: string }
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
 
 /**
@@ -17030,6 +17037,99 @@ describe('OrcaRuntimeService', () => {
       status: 'running',
       blockedReason: 'codex-trust-workspace'
     })
+  })
+
+  it.each([
+    ['folderTrust', 'claude-folder-trust-prompt'],
+    ['bypassPermissions', 'claude-bypass-permissions-prompt']
+  ] as const)(
+    'returns a blocked wait result for the Claude %s dialog a fresh config shows (ORCA-855)',
+    async (dialog, blockedReason) => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'claude'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData('pty-bg', CLAUDE_STARTUP_DIALOGS[dialog], Date.now())
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+      ).resolves.toMatchObject({ handle, satisfied: false, blockedReason })
+    }
+  )
+
+  it.each([
+    [
+      'the trust dialog with its option rows intact',
+      ' Accessing workspace:\n\n /workspace/member\n\n Quick safety check: Is this a project you created or one you trust?\n\n \u276f No, exit\n   Yes, I trust this folder\n\n Enter to confirm \u00b7 Esc to cancel\n',
+      'claude-folder-trust-prompt'
+    ],
+    [
+      'the bypass dialog after an accepted trust dialog',
+      `${CLAUDE_STARTUP_DIALOGS.folderTrust}\r\n${CLAUDE_STARTUP_DIALOGS.bypassPermissions}`,
+      'claude-bypass-permissions-prompt'
+    ]
+  ] as const)('names %s by its Claude reason (ORCA-855)', async (_label, output, blockedReason) => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData('pty-bg', output, Date.now())
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: false, blockedReason })
+  })
+
+  it('resolves tui-idle for a Claude lane past its answered startup dialogs (ORCA-855)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      `${CLAUDE_STARTUP_DIALOGS.folderTrust}\r\n${CLAUDE_STARTUP_DIALOGS.bypassPermissions}\r\n` +
+        '\u001b[2J\u001b[H Claude Code v2.1.312\r\n  Opus 5.5\r\n\u276f \r\n\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
+  })
+
+  it('does not read a started Claude session quoting the dialog text as blocked (ORCA-855)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      ' Claude Code v2.1.312\r\n\u276f read the matcher\r\n' +
+        "  const CLAUDE_FOLDER_TRUST_HEADING = 'accessing workspace:' // trust\r\n" +
+        "  const CLAUDE_BYPASS_PERMISSIONS_HEADING = 'running in bypass permissions mode'\r\n" +
+        '\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
   })
 
   it('resolves tui-idle for an idle Cursor lane past its dismissed trust dialog (#8210)', async () => {

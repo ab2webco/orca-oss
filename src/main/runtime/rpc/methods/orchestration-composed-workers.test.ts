@@ -452,6 +452,37 @@ describe('orchestration RPC methods', () => {
       }
     )
 
+    it.each([
+      ['claude-folder-trust-prompt', 'accept the trust prompt'],
+      ['claude-bypass-permissions-prompt', "choose 'Yes, I accept'"]
+    ] as const)(
+      'refuses a Claude start parked on %s with its next step (ORCA-855)',
+      async (blockedReason, nextStep) => {
+        setup()
+        mockCurrentWorkerStart()
+        vi.mocked(runtime.waitForTerminal).mockResolvedValueOnce({
+          handle: 'term_worker',
+          condition: 'tui-idle',
+          satisfied: false,
+          status: 'running',
+          exitCode: null,
+          blockedReason
+        })
+        const task = db.createTask({ spec: 'blocked Claude dialog' })
+
+        const result = (await call('orchestration.workerStart', {
+          task: task.id,
+          from: 'term_coord',
+          agent: 'claude'
+        })) as { state: string; failedStage: string; lastError: string }
+
+        expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
+        expect(result.lastError).toContain(`Agent startup blocked: ${blockedReason}.`)
+        expect(result.lastError).toContain(nextStep)
+        expect(runtime.sendTerminalAgentPrompt).not.toHaveBeenCalled()
+      }
+    )
+
     it('creates a child worktree agent-first with setup run by default', async () => {
       setup()
       mockCurrentWorkerStart()
