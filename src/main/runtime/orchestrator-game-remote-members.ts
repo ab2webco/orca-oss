@@ -255,6 +255,15 @@ export async function remoteGameMembersOf(
           : {}),
         ...(review ? { review } : {}),
         ...(agent?.limit ? { limit: agent.limit } : {}),
+        // Why a home-side id: the host keeps its account ids; this one only keys the tag and counts.
+        ...(agent?.account
+          ? {
+              account: {
+                ...agent.account,
+                id: `remote:${source.environmentId}:${agent.account.email}`
+              }
+            }
+          : {}),
         ...(lastActivityAt ? { lastActivityAt } : {})
       }
     })

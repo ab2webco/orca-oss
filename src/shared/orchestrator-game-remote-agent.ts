@@ -4,6 +4,7 @@ import {
   type AgentStatusState
 } from './agent-status-types'
 import type { GameMemberLimit } from './orchestrator-game-member-limit'
+import { accountProviderOfAgent, type GameAccountProvider } from './orchestrator-game-member-agent'
 
 /**
  * A remote member's agent as its host's Claude/Codex hooks report it, relayed on
@@ -15,6 +16,8 @@ export type RemoteMemberAgent = {
   /** When the host last received a hook event for the pane (ms). */
   updatedAt: number
   limit?: GameMemberLimit
+  /** The host's account the pane runs on; only its email crosses hosts (ORCA-798). */
+  account?: { provider: GameAccountProvider; email: string }
 }
 
 /** The host's hook reading for a pane; null without one, or when it is only restored from disk. */
@@ -38,7 +41,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   if (typeof value !== 'object' || value === null) {
     return null
   }
-  const { state, agentType, updatedAt, limit } = value as Record<string, unknown>
+  const { state, agentType, updatedAt, limit, account } = value as Record<string, unknown>
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -47,10 +50,20 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
     return null
   }
   const resetsAt = (limit as { resetsAt?: unknown } | undefined)?.resetsAt
+  const relayed = relayedAccountOf(account)
   return {
     state: state as AgentStatusState,
     agentType: typeof agentType === 'string' ? agentType : null,
     updatedAt,
-    ...(limit && (resetsAt === null || typeof resetsAt === 'number') ? { limit: { resetsAt } } : {})
+    ...(limit && (resetsAt === null || typeof resetsAt === 'number')
+      ? { limit: { resetsAt } }
+      : {}),
+    ...(relayed ? { account: relayed } : {})
   }
+}
+
+function relayedAccountOf(value: unknown): RemoteMemberAgent['account'] | null {
+  const { provider, email } = (value ?? {}) as Record<string, unknown>
+  const known = accountProviderOfAgent(typeof provider === 'string' ? provider : null)
+  return known && typeof email === 'string' && email !== '' ? { provider: known, email } : null
 }
