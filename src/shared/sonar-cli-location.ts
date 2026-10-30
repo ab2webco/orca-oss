@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Why: the plugin's install folder name is its identity (`<publisher>.<id>`).
-const SONAR_PLUGIN_DIRECTORY = 'ab2web.orca-sonar'
+export const SONAR_PLUGIN_KEY = 'ab2web.orca-sonar'
 const CURRENT_POINTER = 'current'
 const CONTENT_HASH = /^[0-9a-f]{64}$/
 const CLI_ENTRY = join('bin', 'orca-sonar.ts')
@@ -16,7 +16,7 @@ export type SonarCliLookup =
 
 /** The installed orca-sonar CLI, found through Orca's own `current` pointer. */
 export function resolveSonarCli(userDataDir: string): SonarCliLookup {
-  const pluginDir = join(userDataDir, 'plugins', SONAR_PLUGIN_DIRECTORY)
+  const pluginDir = join(userDataDir, 'plugins', SONAR_PLUGIN_KEY)
   const pointer = readPointer(join(pluginDir, CURRENT_POINTER))
   if (pointer === null) {
     return { ok: false, reason: 'not_installed' }

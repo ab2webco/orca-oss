@@ -88,7 +88,7 @@ import {
 } from './runtime/orchestration/environment-transport'
 import { startOrchestrationAtLaunch } from './runtime/orchestration/orchestration-startup'
 import { callRuntimeEnvironment } from './ipc/runtime-environment-transport-routing'
-import { resolveEnvironment } from '../shared/runtime-environment-store'
+import { listEnvironments, resolveEnvironment } from '../shared/runtime-environment-store'
 import { getPreferredPairingOffer } from '../shared/runtime-environments'
 import { OrcaRuntimeRpcServer } from './runtime/runtime-rpc'
 import {
@@ -350,7 +350,7 @@ import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
-import { scheduleSonarIndexWarmup } from './sonar-index-warmup'
+import { isSonarPluginActive, scheduleSonarIndexWarmup } from './sonar-index-warmup'
 import { wirePluginAgentStatusEvents } from './plugins/plugin-agent-status-event'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
 import { forwardOrcaNotificationsToPlugins } from './plugins/plugin-notification-event-bridge'
@@ -398,6 +398,7 @@ import {
   advanceSyntheticTitleSpinnerEntries,
   type SyntheticTitleSpinnerEntry
 } from './synthetic-title-spinner'
+import { getClaudeManagedAccountsRoot } from './claude-accounts/managed-auth-path'
 import { shouldSendSyntheticTitleFrame } from './synthetic-title-visibility'
 import { shouldCopySyntheticTitleFrameToPtyData } from './synthetic-title-frame-routing'
 import {
@@ -467,6 +468,7 @@ function warmSonarIndexOnWorktreeCreate(event: RuntimeWorktreeLifecycleEvent): v
   scheduleSonarIndexWarmup({
     userDataDir: app.getPath('userData'),
     worktreePath: event.path,
+    isPluginActive: () => isSonarPluginActive(pluginService),
     debug: (message, error) => console.debug(message, error)
   })
 }
@@ -2714,6 +2716,7 @@ void app.whenReady().then(async () => {
     // alone and cannot shell out to `date` to turn resets_at into a duration.
     publishStatuslineResetCountdown(event)
     rateLimits?.ingestLiveClaudeRateLimits(event)
+    runtime?.noteClaudePaneStatusLine(event, getClaudeManagedAccountsRoot())
   })
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store!.getSettings()
@@ -2807,6 +2810,7 @@ void app.whenReady().then(async () => {
         peerFingerprint: fingerprintOrchestrationPeer(pairing.publicKeyB64)
       }
     },
+    list: () => listEnvironments(app.getPath('userData')).map(({ id, name }) => ({ id, name })),
     call: (selector, method, params, timeoutMs, envelope) =>
       callRuntimeEnvironment(
         app.getPath('userData'),

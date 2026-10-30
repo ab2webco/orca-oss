@@ -110,6 +110,18 @@ describe('counts and needs', () => {
     ])
   })
 
+  // Why (ORCA-907): its hooks say idle, but only a person can log its account in again.
+  it('counts a member whose account logged out as waiting on the person, and says why', () => {
+    const agents = [
+      agent({ displayName: 'out', state: 'idle', limit: { resetsAt: null, loggedOut: true } }),
+      agent({ displayName: 'capped', state: 'idle', limit: { resetsAt: null } })
+    ]
+    expect(countsOf(agents)).toEqual({ working: 0, idle: 1, waiting: 1, done: 0 })
+    expect(needsOf(state({ agents }))).toEqual([
+      { name: 'out', text: 'logged out · /login in its pane', url: null }
+    ])
+  })
+
   it("reads a member in its own worktree by that worktree's PR and ticket, not the lead's", () => {
     const worktree = { id: 'wt-8', branch: 'feat/cin-8', displayName: 'cin-8' }
     const merged = { ...REVIEW, number: 8, state: 'merged', ci: 'success' } as const

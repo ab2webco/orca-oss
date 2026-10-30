@@ -56,6 +56,7 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
         questions={questions}
         onAnswer={answer}
         threads={threads}
+        onReply={threads.reply}
       />
     </>
   )

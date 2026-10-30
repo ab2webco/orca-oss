@@ -6,9 +6,9 @@ import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
-  resolveOrchestratorGameLead,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
+import { gameLeadOverPairedHostsOf } from './orchestrator-game-paired-hosts'
 import { builtInGameActivityRules, gameActivityOf } from '../../shared/orchestrator-game-activity'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
@@ -128,11 +128,11 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const lead = resolveOrchestratorGameLead(layers, input.host ?? null)
   const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const placed = await gameLeadOverPairedHostsOf(layers, input, role)
   const actions = gameStateActionsOf({
     role,
-    lead,
+    lead: placed.lead,
     project: gameActionsOf(integrations.actions, placeholders)
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
@@ -198,7 +198,7 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
-    lead,
+    ...placed,
     rewardWeights: resolveOrchestratorGameRewardWeights(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],

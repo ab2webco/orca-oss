@@ -279,7 +279,7 @@ describe('gameLeadSourceOf', () => {
     const layers = {
       global: { orchestrator: { cap: 2, agent: 'codex' } },
       project: { orchestrator: { cap: 6 } },
-      local: { orchestrator: { cap: 99, label: 'Boss' } }
+      local: { orchestrator: { cap: 999, label: 'Boss' } }
     }
     expect(gameLeadSourceOf(layers, 'cap')).toBe('project')
     expect(gameLeadSourceOf(layers, 'agent')).toBe('global')
