@@ -33001,13 +33001,57 @@ export class OrcaRuntimeService {
         return scoped
       }
     }
-    const worktrees = await this.listResolvedWorktrees()
-    let candidates: ResolvedWorktree[]
-
     if (selector === 'active') {
       throw new Error('selector_not_found')
     }
+    const listedAt = Date.now()
+    let candidates = this.matchWorktreeSelector(
+      await this.listResolvedWorktrees(),
+      selector,
+      explicitWorktreeId
+    )
+    // Why (ORCA-865): a worktree added outside this runtime stays hidden until the scan TTL lapses.
+    if (candidates.length === 0 && this.hasWorktreeScanNotAfter(listedAt)) {
+      this.expireWorktreeScanCaches()
+      candidates = this.matchWorktreeSelector(
+        await this.listResolvedWorktrees(),
+        selector,
+        explicitWorktreeId
+      )
+    }
 
+    if (candidates.length > 1 && !selector.startsWith('id:')) {
+      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
+        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
+      candidates = collapseSameDiskWorktreeRecords(
+        candidates,
+        getHostId,
+        normalizeRuntimePathForComparison
+      )
+      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
+      if (
+        selector.startsWith('path:') &&
+        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
+      ) {
+        candidates = [candidates[0]]
+      }
+    }
+
+    if (candidates.length === 1) {
+      return candidates[0]
+    }
+    if (candidates.length > 1) {
+      throw new Error('selector_ambiguous')
+    }
+    throw new Error('selector_not_found')
+  }
+
+  private matchWorktreeSelector(
+    worktrees: ResolvedWorktree[],
+    selector: string,
+    explicitWorktreeId: string | null
+  ): ResolvedWorktree[] {
+    let candidates: ResolvedWorktree[]
     if (selector.startsWith('id:')) {
       const worktreeId = explicitWorktreeId ?? selector.slice(3)
       candidates = worktrees.filter((worktree) => worktree.id === worktreeId)
@@ -33047,31 +33091,7 @@ export class OrcaRuntimeService {
           branchSelectorMatches(worktree.branch, selector)
       )
     }
-
-    if (candidates.length > 1 && !selector.startsWith('id:')) {
-      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
-        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
-      candidates = collapseSameDiskWorktreeRecords(
-        candidates,
-        getHostId,
-        normalizeRuntimePathForComparison
-      )
-      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
-      if (
-        selector.startsWith('path:') &&
-        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
-      ) {
-        candidates = [candidates[0]]
-      }
-    }
-
-    if (candidates.length === 1) {
-      return candidates[0]
-    }
-    if (candidates.length > 1) {
-      throw new Error('selector_ambiguous')
-    }
-    throw new Error('selector_not_found')
+    return candidates
   }
 
   private async resolveWorkspaceParentSelector(selector: string): Promise<ResolvedWorkspaceParent> {
@@ -33857,6 +33877,23 @@ export class OrcaRuntimeService {
   private invalidateResolvedWorktreeCache(): void {
     this.resolvedWorktreeGeneration += 1
     this.resolvedWorktreeCache = null
+  }
+
+  private hasWorktreeScanNotAfter(timestamp: number): boolean {
+    return [...this.worktreeScanCache.values()].some(
+      (entry) => entry.result.ok && entry.scannedAt <= timestamp
+    )
+  }
+
+  /** Why expire rather than drop: a kept entry lets an unchanged Git-admin fingerprint skip the rescan. */
+  private expireWorktreeScanCaches(): void {
+    for (const entry of this.worktreeScanCache.values()) {
+      // Why: a cached failure is the spawn-pressure backoff; a selector miss must not defeat it.
+      if (entry.result.ok) {
+        entry.expiresAt = 0
+      }
+    }
+    this.invalidateResolvedWorktreeCache()
   }
 
   private invalidateWorktreeScanCacheForRepo(repoId: string): void {
@@ -41418,7 +41455,7 @@ function maxUpwardCursorReach(
   previousRedrawCursor: RetainedTailRedrawCursor | null
 ): number {
   let reach = previousRedrawCursor ? previousRedrawCursor.rowFromEnd : 0
-  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?A/g
+  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?[AF]/g
   let match: RegExpExecArray | null
   while ((match = cursorUpPattern.exec(normalizedChunk)) !== null) {
     reach += match[1] ? Number.parseInt(match[1], 10) : 1
@@ -41625,9 +41662,17 @@ export function appendNormalizedToMultilineTailBufferUnwindowed(
         continue
       }
       const firstParam = parsed.firstParam ?? 1
-      if (parsed.final === 'A') {
+      // Why: like xterm, vertical moves keep the rows they pass and stop at the edges instead of scrolling.
+      if (parsed.final === 'A' || parsed.final === 'F') {
         cursorRow = Math.max(0, cursorRow - firstParam)
-        rows.splice(cursorRow + 1)
+        if (parsed.final === 'F') {
+          cursorColumn = 0
+        }
+      } else if (parsed.final === 'B' || parsed.final === 'e' || parsed.final === 'E') {
+        cursorRow = Math.min(cursorRow + firstParam, Math.max(cursorRow, rows.length - 1))
+        if (parsed.final === 'E') {
+          cursorColumn = 0
+        }
       } else if (parsed.final === 'K') {
         eraseLine(parsed.firstParam ?? 0)
       } else if (parsed.final === 'G' || parsed.final === '`') {
@@ -41962,9 +42007,10 @@ function containsTerminalVerticalLineControl(value: string): boolean {
       return false
     }
     index = parsed.endIndex
+    // Why not B/e: at the bottom row, where a chunk without a redraw cursor starts, a down move is a no-op.
     if (
       parsed.kind === 'csi' &&
-      parsed.final === 'A' &&
+      (parsed.final === 'A' || parsed.final === 'F' || parsed.final === 'E') &&
       hasCanonicalNumericCsiParams(parsed.params)
     ) {
       return true
@@ -43243,6 +43289,10 @@ function isTerminalPreviewLineControl(parsed: {
   }
   return (
     parsed.final === 'A' ||
+    parsed.final === 'B' ||
+    parsed.final === 'e' ||
+    parsed.final === 'E' ||
+    parsed.final === 'F' ||
     parsed.final === 'G' ||
     parsed.final === '`' ||
     parsed.final === 'D' ||

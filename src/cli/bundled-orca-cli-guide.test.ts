@@ -10,4 +10,8 @@ describe('bundled orca-cli guide', () => {
     expect(guide?.fullMarkdown).toContain('orca sonar find')
     expect(guide?.fullMarkdown).toContain('orca sonar symbol')
   })
+
+  it('tells agents to fall back to plain search when the owner switched Sonar off for agents', () => {
+    expect(guide?.fullMarkdown).toContain('turned off for agents')
+  })
 })
