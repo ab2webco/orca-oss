@@ -12,3 +12,7 @@ export function buildSettledShellProbeInputSequence(
   // needs a separate Ctrl+C so ConPTY cannot join it to the command as input.
   return platform === 'win32' ? ['\x03', command] : ['\x03\x15', command]
 }
+
+export function buildPendingLineDiscardInputSequence(command: string): readonly string[] {
+  return ['\x15\x03', command]
+}
