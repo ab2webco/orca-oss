@@ -29,14 +29,8 @@ describe('tellGameLead', () => {
 
     expect(told).toBe(true)
     expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
-    expect(
-      db.getOrCreateRunDelivery({
-        runId: run.id,
-        consumerGeneration: run.consumer_generation,
-        terminalHandle: 'term_lead',
-        wakeTypes: ['worker_done']
-      })
-    ).toBeFalsy()
+    // Why (ORCA-861): mail from outside the lead's members wakes a watch whatever its types.
+    expect(db.hasUnreadOutsideMemberRunMail(run.id, 'term_lead')).toBe(true)
     const delivery = db.getOrCreateRunDelivery({
       runId: run.id,
       consumerGeneration: run.consumer_generation,

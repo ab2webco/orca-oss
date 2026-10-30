@@ -158,6 +158,8 @@ describe('lead watch and the mail pointer (ORCA-824)', () => {
       coordinatorHandle: TERMINAL_HANDLE,
       coordinatorPaneKey: PANE_KEY
     })
+    // Why: only a member's status rides silently; mail from outside the Run wakes the watch (ORCA-861).
+    db.createDispatchContext(db.createTask({ spec: 'work', runId: run.id }).id, 'term_member')
     await driveToLiveIdle(runtime)
 
     const watch = check(runtime, { wait: true, types: LEAD_WATCH_TYPES, timeoutMs: 60_000 })

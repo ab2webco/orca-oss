@@ -2518,6 +2518,8 @@ type TerminalWaiter = {
 type MessageWaiter = {
   handle: string
   typeFilter: string[] | undefined
+  /** Wakes a typed waiter on a type it filters out; a lead watch's mail from outside its members (ORCA-861). */
+  wakesOutsideTypeFilter?: () => boolean
   resolve: (result: MessageWaitResult) => void
   timeout: NodeJS.Timeout | null
   abortCleanup: (() => void) | null
@@ -36315,7 +36317,10 @@ export class OrcaRuntimeService {
       ? [...waiters].filter((waiter) =>
           runHeartbeat
             ? waiter.typeFilter?.includes('heartbeat') === true
-            : !messageType || !waiter.typeFilter || waiter.typeFilter.includes(messageType)
+            : !messageType ||
+              !waiter.typeFilter ||
+              waiter.typeFilter.includes(messageType) ||
+              waiter.wakesOutsideTypeFilter?.() === true
         )
       : []
     if (consumers.length === 0) {
@@ -36347,6 +36352,7 @@ export class OrcaRuntimeService {
       timeoutMs?: number
       signal?: AbortSignal
       exclusive?: boolean
+      wakesOutsideTypeFilter?: () => boolean
     }
   ): Promise<MessageWaitResult> {
     return new Promise((resolve) => {
@@ -36360,6 +36366,7 @@ export class OrcaRuntimeService {
       const waiter: MessageWaiter = {
         handle,
         typeFilter: options?.typeFilter,
+        wakesOutsideTypeFilter: options?.wakesOutsideTypeFilter,
         resolve,
         timeout: null,
         abortCleanup: null

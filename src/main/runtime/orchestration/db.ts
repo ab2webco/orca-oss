@@ -46,7 +46,7 @@ import { startSpan } from '../../observability/tracer'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
 import { workerObservedModelOf, type WorkerObservedModel } from './worker-observed-model'
-import { isBatchRetirableForWait } from './run-delivery-wake'
+import { isBatchRetirableForWait, outsideMemberMailSql } from './run-delivery-wake'
 import {
   deriveWorkerTerminalListState,
   WORKER_SETTLED_STATES,
@@ -2972,7 +2972,8 @@ export class OrchestrationDb {
         const retiredForWait =
           params.wakeTypes !== undefined &&
           params.wakeTypes.length > 0 &&
-          isBatchRetirableForWait(messages, params.wakeTypes)
+          isBatchRetirableForWait(messages, params.wakeTypes) &&
+          !this.holdsOutsideMemberMail(params.runId, messages)
         if (
           !retiredForWait &&
           (!consumesHeartbeats || !messages.every((message) => message.type === 'heartbeat'))
@@ -2990,20 +2991,14 @@ export class OrchestrationDb {
           .run(existing.id)
       }
 
-      if (params.wakeTypes && params.wakeTypes.length > 0) {
-        const placeholders = params.wakeTypes.map(() => '?').join(',')
-        const matching = this.db
-          .prepare(
-            `SELECT 1 FROM messages
-             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
-               AND delivery_contract = 'current_delivery'
-               AND type IN (${placeholders}) LIMIT 1`
-          )
-          .get(params.runId, address, terminalHandle, ...params.wakeTypes)
-        if (!matching) {
-          this.db.exec('COMMIT')
-          return undefined
-        }
+      const wakeTypes = params.wakeTypes ?? []
+      const firstWake =
+        wakeTypes.length > 0
+          ? this.firstRunMailWakeSequence(params.runId, address, terminalHandle, wakeTypes)
+          : undefined
+      if (wakeTypes.length > 0 && firstWake === undefined) {
+        this.db.exec('COMMIT')
+        return undefined
       }
 
       const oldest = this.db
@@ -3014,10 +3009,9 @@ export class OrchestrationDb {
            ORDER BY sequence ASC LIMIT ?`
         )
         .all(params.runId, address, terminalHandle, limit) as MessageRow[]
-      const wakeTypes = params.wakeTypes ?? []
       const messages = exposeMessageListTimestamps(
-        wakeTypes.length > 0 && !oldest.some((message) => wakeTypes.includes(message.type))
-          ? this.runMailEndingAtFirstWake(params.runId, address, terminalHandle, wakeTypes, limit)
+        firstWake !== undefined && (oldest.at(-1)?.sequence ?? -1) < firstWake
+          ? this.runMailEndingAt(params.runId, address, terminalHandle, firstWake, limit)
           : oldest
       )
       if (messages.length === 0) {
@@ -3046,37 +3040,74 @@ export class OrchestrationDb {
     }
   }
 
-  // Why: 50+ unread status rows ahead of a worker_done would fill a FIFO batch without it; the older
-  // rows stay unread for a later batch instead of being consumed unseen (ORCA-701).
-  private runMailEndingAtFirstWake(
+  // Why (ORCA-861): a typed watch also wakes on mail its own members did not send, whatever its type.
+  private firstRunMailWakeSequence(
     runId: string,
     address: string,
     terminalHandle: string,
-    wakeTypes: readonly MessageType[],
+    wakeTypes: readonly MessageType[]
+  ): number | undefined {
+    const placeholders = wakeTypes.map(() => '?').join(',')
+    const outside = outsideMemberMailSql(runId)
+    const row = this.db
+      .prepare(
+        `SELECT MIN(sequence) AS sequence FROM messages
+         WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+           AND delivery_contract = 'current_delivery'
+           AND (type IN (${placeholders}) OR ${outside.sql})`
+      )
+      .get(runId, address, terminalHandle, ...wakeTypes, ...outside.params) as
+      | { sequence: number | null }
+      | undefined
+    return row?.sequence ?? undefined
+  }
+
+  private holdsOutsideMemberMail(runId: string, messages: readonly MessageRow[]): boolean {
+    if (messages.length === 0) {
+      return false
+    }
+    const outside = outsideMemberMailSql(runId)
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM messages WHERE id IN (${messages.map(() => '?').join(',')})
+           AND ${outside.sql} LIMIT 1`
+        )
+        .get(...messages.map((message) => message.id), ...outside.params) !== undefined
+    )
+  }
+
+  /** Whether a typed Run watch has unread mail from outside its members to wake on (ORCA-861). */
+  hasUnreadOutsideMemberRunMail(runId: string, terminalHandle = `run:${runId}`): boolean {
+    const outside = outsideMemberMailSql(runId)
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM messages
+           WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+             AND delivery_contract = 'current_delivery' AND ${outside.sql} LIMIT 1`
+        )
+        .get(runId, `run:${runId}`, terminalHandle, ...outside.params) !== undefined
+    )
+  }
+
+  // Why: 50+ unread status rows ahead of a worker_done would fill a FIFO batch without it; the older
+  // rows stay unread for a later batch instead of being consumed unseen (ORCA-701).
+  private runMailEndingAt(
+    runId: string,
+    address: string,
+    terminalHandle: string,
+    lastSequence: number,
     limit: number
   ): MessageRow[] {
-    const mailbox = `((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
-      AND delivery_contract = 'current_delivery'`
-    const placeholders = wakeTypes.map(() => '?').join(',')
     const newestFirst = this.db
       .prepare(
         `SELECT * FROM messages
-         WHERE ${mailbox}
-           AND sequence <= (
-             SELECT MIN(sequence) FROM messages WHERE ${mailbox} AND type IN (${placeholders})
-           )
+         WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+           AND delivery_contract = 'current_delivery' AND sequence <= ?
          ORDER BY sequence DESC LIMIT ?`
       )
-      .all(
-        runId,
-        address,
-        terminalHandle,
-        runId,
-        address,
-        terminalHandle,
-        ...wakeTypes,
-        limit
-      ) as MessageRow[]
+      .all(runId, address, terminalHandle, lastSequence, limit) as MessageRow[]
     return newestFirst.toReversed()
   }
 
