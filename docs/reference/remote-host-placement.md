@@ -180,6 +180,14 @@ host (decision O3).
   settled members every 10 s, so the question reopens the home Dispatch and lands in the lead's
   waiting list. Against a home at protocol 3 the host refuses with `dispatch_reopen_unsupported`
   and a message telling the member to ask the lead for a follow-up dispatch.
+- Built in ORCA-838: `orchestration.federation-follow-up.v1` (federation protocol 5). The lead's
+  `orchestration send --to dispatch:<id>` to a settled, unreleased remote member reopens that same
+  Dispatch at home and relays a `follow_up` item; the host reopens the attachment with the member's
+  own capability, so push-on-idle hands the mail to the agent on its next turn and the Panel tracks
+  it again. The body ends with a note to send `worker_done` again. A protocol-4 member is refused
+  with `dispatch_inactive` naming `worker-start --on <host> --worktree … --terminal …`, and a
+  `worker-start --on --terminal` that fails `agent_readiness` on a settled member's pane names the
+  `send --to dispatch:<id>` follow-up.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the

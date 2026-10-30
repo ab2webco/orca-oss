@@ -5590,6 +5590,8 @@ export class OrchestrationDb {
     messageId?: string
     settleRemoteOutcome?: WorkerReportOutcome
     remoteQuestion?: true
+    /** Reopens the settled home Dispatch in the same transaction as the follow-up (ORCA-838). */
+    reopenSettledReason?: string
   }): FederationRelayItemRow {
     const byteCount = Buffer.byteLength(params.payload, 'utf8')
     const messageId = params.messageId ?? generateId('relay')
@@ -5609,6 +5611,19 @@ export class OrchestrationDb {
             `Remote Dispatch ${params.dispatchId} is not active.`
           )
         }
+      }
+      if (
+        params.reopenSettledReason &&
+        !this.renewCompletedDispatchInTransaction({
+          dispatchId: params.dispatchId,
+          reason: params.reopenSettledReason,
+          federated: true
+        })
+      ) {
+        throw new OrchestrationError(
+          'dispatch_inactive',
+          `Federated Dispatch ${params.dispatchId} is no longer settled; check it again.`
+        )
       }
       if (params.kind === 'heartbeat') {
         const heartbeat = this.db
@@ -7853,6 +7868,26 @@ export class OrchestrationDb {
 
   /** Settled federated members whose host may reopen them with a question (ORCA-856). */
   listReopenableFederatedDispatchIds(): string[] {
+    return this.reopenableFederatedDispatchIds('', [])
+  }
+
+  /** Whether the lead may reopen this settled remote member with a follow-up (ORCA-838). */
+  isReopenableFederatedDispatch(dispatchId: string): boolean {
+    return this.reopenableFederatedDispatchIds('AND fd.dispatch_id = ?', [dispatchId]).length > 0
+  }
+
+  /** The settled remote member still holding this host terminal, newest first (ORCA-838). */
+  findReopenableFederatedDispatchOnTerminal(
+    environmentId: string,
+    terminalHandle: string
+  ): string | undefined {
+    return this.reopenableFederatedDispatchIds(
+      'AND fd.environment_id = ? AND fd.remote_terminal_handle = ?',
+      [environmentId, terminalHandle]
+    ).at(-1)
+  }
+
+  private reopenableFederatedDispatchIds(filter: string, args: string[]): string[] {
     const rows = this.db
       .prepare(
         `SELECT fd.dispatch_id FROM federated_dispatches fd
@@ -7864,9 +7899,12 @@ export class OrchestrationDb {
              SELECT 1 FROM dispatch_contexts newer
              WHERE newer.task_id = dc.task_id AND newer.rowid > dc.rowid
            )
+           ${filter}
          ORDER BY fd.rowid`
       )
-      .all(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION) as { dispatch_id: string }[]
+      .all(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION, ...args) as {
+      dispatch_id: string
+    }[]
     return rows.map((row) => row.dispatch_id)
   }
 

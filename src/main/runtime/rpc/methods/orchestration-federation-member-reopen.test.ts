@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
 import {
   ORCHESTRATION_CONTRACT_VERSION,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import { OrcaRuntimeService } from '../../orca-runtime'
@@ -139,6 +140,9 @@ describe('federated member ask after worker_done', () => {
   }
 
   it('negotiates protocol 4 only with a host that advertises member reopen', async () => {
+    workerCapabilities = workerCapabilities.filter(
+      (capability) => capability !== ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY
+    )
     const current = await settledMember()
     expect(workerDb.getRemoteDispatchAttachment(current.dispatchId)?.protocol_version).toBe(4)
     expect(homeDb.getFederatedDispatch(current.dispatchId)?.protocol_version).toBe(4)
