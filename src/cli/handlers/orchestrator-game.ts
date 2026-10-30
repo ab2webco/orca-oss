@@ -5,6 +5,7 @@ import { DEFAULT_GAME_LEAD, type OrchestratorGameLead } from '../../shared/orche
 import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
+import { withGameMemberIdentity } from '../../shared/orchestrator-game-member-identity'
 
 type GameLeadRegistration = {
   registered?: boolean
@@ -103,11 +104,16 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, () => `Opened ${url} in the system browser`)
   },
   'game state': async ({ client, json }) => {
-    const result = await client.call<OrchestratorGameState>('game.state', {
+    const response = await client.call<OrchestratorGameState>('game.state', {
       ...callerParams(),
       ...advisorParams()
     })
-    printResult(result, json, formatGameState)
+    // Why here, not on the host: an older host's members get the fields too.
+    printResult(
+      { ...response, result: withGameMemberIdentity(response.result) },
+      json,
+      formatGameState
+    )
   },
   'game lead': async ({ client, json }) => {
     const response = await client.call<OrchestratorGameState>('game.state', callerParams())

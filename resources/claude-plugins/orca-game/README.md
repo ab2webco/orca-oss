@@ -130,7 +130,10 @@ entries.
   agents: [{ paneKey, displayName, agentType,
              state: 'working' | 'waiting' | 'idle' | 'done',
              toolName: string | null, isLeader: boolean,
-             terminalHandle?: string /* term_…, kept only in that shape */ }],
+             terminalHandle?: string /* term_…, kept only in that shape */,
+             /* members only, as `game fleet` reads them: */
+             ticket?, host /* paired host or 'local' */, accountEmail?, worktreeId?, branch?,
+             pr?: number, ci? }],
   review: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure-devops' | 'gitea',
             number, title, url,
             state: 'open' | 'draft' | 'merged' | 'closed',
