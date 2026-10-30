@@ -14,5 +14,7 @@ export function buildSettledShellProbeInputSequence(
 }
 
 export function buildPendingLineDiscardInputSequence(command: string): readonly string[] {
-  return ['\x15\x03', command]
+  // Why no Ctrl+C: input that lands while the shell handles SIGINT is mangled — bash
+  // re-inserts the discarded CSI-u remainder, zsh drops the command's first byte.
+  return ['\x15', command]
 }
