@@ -25,7 +25,7 @@ export type GameAgentRow = Pick<
   | 'toolName'
   | 'lastActivityAt'
   | 'orphaned'
-> & { parentPaneKey?: string | null }
+> & { parentPaneKey?: string | null; stateStartedAt?: number }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
 export type GameMemberAccountOf = (member: {
@@ -171,6 +171,7 @@ export async function gameFleetOf(args: {
         ...(advisor ? { advisor } : {}),
         ...(launch ? { launch } : {}),
         ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
+        ...(isMember && row.stateStartedAt ? { stateSince: row.stateStartedAt } : {}),
         ...(isMember && row.orphaned ? { orphaned: true as const } : {})
       }
     })

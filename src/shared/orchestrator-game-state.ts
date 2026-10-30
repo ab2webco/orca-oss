@@ -67,6 +67,8 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** When the host last saw the member's terminal work (ORCA-746); absent when unknown or from an older host. */
   lastActivityAt?: string
+  /** When the member's current agent state began, on its host's clock (ms); absent from an older host. */
+  stateSince?: number
   /** Failed for silence yet still working, not reopened because something replaced it (ORCA-658). */
   orphaned?: true
   /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */

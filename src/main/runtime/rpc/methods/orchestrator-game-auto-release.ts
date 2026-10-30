@@ -1,7 +1,8 @@
 import {
   gameAutoReleaseCandidatesOf,
   remoteDispatchIdOf,
-  type GameAutoReleaseCandidate
+  type GameAutoReleaseCandidate,
+  type GameMemberReport
 } from '../../../../shared/orchestrator-game-auto-release'
 import { GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
 import type { GameAgent, OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
@@ -36,7 +37,7 @@ export function withGameAutoRelease(
   }
   const attempts = attemptsByRuntime.get(runtime) ?? new Map<string, Attempt>()
   attemptsByRuntime.set(runtime, attempts)
-  const candidates = gameAutoReleaseCandidatesOf(state.agents, reportedDispatchOf(db))
+  const candidates = gameAutoReleaseCandidatesOf(state.agents, reportOf(db))
   for (const candidate of candidates) {
     if (!attempts.has(candidate.dispatchId)) {
       attempts.set(candidate.dispatchId, 'releasing')
@@ -54,8 +55,12 @@ export function withGameAutoRelease(
 }
 
 // Why the home DB: worker_done settles the member's own worker row there, local or remote alike.
-function reportedDispatchOf(db: OrchestrationDb): (agent: GameAgent) => string | null {
+function reportOf(db: OrchestrationDb): (agent: GameAgent) => GameMemberReport | null {
   let local: ReturnType<OrchestrationDb['listWorkerTerminalResources']> | null = null
+  const reported = (dispatchId: string): GameMemberReport | null => {
+    const at = utcMsOf(db.getDispatchContextById(dispatchId)?.completed_at ?? null)
+    return Number.isFinite(at) ? { dispatchId, at } : null
+  }
   return (agent) => {
     const remote = remoteDispatchIdOf(agent)
     if (remote) {
@@ -63,7 +68,7 @@ function reportedDispatchOf(db: OrchestrationDb): (agent: GameAgent) => string |
       return worker &&
         worker.stage !== 'released' &&
         WORKER_RELEASABLE_STATES.includes(worker.state)
-        ? remote
+        ? reported(remote)
         : null
     }
     if (!agent.terminalHandle) {
@@ -74,10 +79,14 @@ function reportedDispatchOf(db: OrchestrationDb): (agent: GameAgent) => string |
     return row &&
       row.terminalState !== 'released' &&
       WORKER_RELEASABLE_STATES.includes(row.workerState)
-      ? row.dispatchId
+      ? reported(row.dispatchId)
       : null
   }
 }
+
+// Why: SQLite's datetime('now') has no T and no zone; it is UTC.
+const utcMsOf = (at: string | null): number =>
+  at ? Date.parse(at.includes('T') ? at : `${at.replace(' ', 'T')}Z`) : Number.NaN
 
 async function release(
   runtime: OrcaRuntimeService,

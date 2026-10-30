@@ -15,6 +15,8 @@ export type RemoteMemberAgent = {
   agentType: string | null
   /** When the host last received a hook event for the pane (ms). */
   updatedAt: number
+  /** When the pane's current state began (ms); absent from an older host. */
+  stateStartedAt?: number
   limit?: GameMemberLimit
   /** The host's account the pane runs on; only its email crosses hosts (ORCA-798). */
   account?: { provider: GameAccountProvider; email: string }
@@ -32,7 +34,8 @@ export function remoteMemberAgentOf(
   return {
     state: entry.state,
     agentType: entry.agentType ?? null,
-    updatedAt: entry.receivedAt
+    updatedAt: entry.receivedAt,
+    ...(Number.isFinite(entry.stateStartedAt) ? { stateStartedAt: entry.stateStartedAt } : {})
   }
 }
 
@@ -41,7 +44,10 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   if (typeof value !== 'object' || value === null) {
     return null
   }
-  const { state, agentType, updatedAt, limit, account } = value as Record<string, unknown>
+  const { state, agentType, updatedAt, stateStartedAt, limit, account } = value as Record<
+    string,
+    unknown
+  >
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -55,6 +61,9 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
     state: state as AgentStatusState,
     agentType: typeof agentType === 'string' ? agentType : null,
     updatedAt,
+    ...(typeof stateStartedAt === 'number' && Number.isFinite(stateStartedAt)
+      ? { stateStartedAt }
+      : {}),
     ...(limit && (resetsAt === null || typeof resetsAt === 'number')
       ? { limit: { resetsAt } }
       : {}),
