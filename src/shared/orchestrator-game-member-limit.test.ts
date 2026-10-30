@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { accountLimitsOf, gameMemberLimitOf } from './orchestrator-game-member-limit'
+import {
+  accountLimitsOf,
+  freshestLimitsOf,
+  gameMemberLimitOf
+} from './orchestrator-game-member-limit'
 import type { ProviderRateLimits } from './rate-limit-types'
 
 const NOW = 1_000_000
@@ -150,5 +154,21 @@ describe('accountLimitsOf', () => {
     expect(accountLimitsOf(state, 'claude', 'acct_b', 'acct_a')).toBe(inactive)
     expect(accountLimitsOf(state, 'claude', 'acct_a', 'acct_a')).toBe(active)
     expect(accountLimitsOf(state, 'codex', 'acct_x', null)).toBeNull()
+  })
+})
+
+// Why (ORCA-907): a pane's status line showed 7d 100% while Orca's cached reading said 64%.
+describe('freshestLimitsOf', () => {
+  it("prefers the newer of the pane's own reading and the account's cached one", () => {
+    const cached = { ...limits(64), updatedAt: NOW - HOUR }
+    const pane = { ...limits(100), updatedAt: NOW }
+    expect(freshestLimitsOf(cached, pane)).toBe(pane)
+    expect(freshestLimitsOf({ ...cached, updatedAt: NOW + 1 }, pane)).toEqual({
+      ...cached,
+      updatedAt: NOW + 1
+    })
+    expect(freshestLimitsOf(null, pane)).toBe(pane)
+    expect(freshestLimitsOf(cached, null)).toBe(cached)
+    expect(freshestLimitsOf(null, null)).toBeNull()
   })
 })

@@ -54,13 +54,13 @@ describe("a remote member's relayed agent reading (ORCA-837)", () => {
   it("keeps a host's word that the member's account logged out (ORCA-907)", () => {
     expect(
       parseRemoteMemberAgent({
-        state: 'idle',
+        state: 'done',
         updatedAt: 5,
         limit: { resetsAt: null, loggedOut: true }
       })?.limit
     ).toEqual({ resetsAt: null, loggedOut: true })
     expect(
-      parseRemoteMemberAgent({ state: 'idle', updatedAt: 5, limit: { resetsAt: 7, loggedOut: 1 } })
+      parseRemoteMemberAgent({ state: 'done', updatedAt: 5, limit: { resetsAt: 7, loggedOut: 1 } })
         ?.limit
     ).toEqual({ resetsAt: 7 })
   })

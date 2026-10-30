@@ -12,8 +12,7 @@ describe("a Claude pane's live session (ORCA-907)", () => {
       event: {
         configDir: join(ROOT, 'acct_bo', 'auth'),
         fiveHour: { used_percentage: 12, resets_at: RESET_S },
-        sevenDay: { used_percentage: 100, resets_at: RESET_S },
-        paneKey: 'tab-1:leaf-1'
+        sevenDay: { used_percentage: 100, resets_at: RESET_S }
       },
       managedRoot: ROOT,
       boundAccountId: 'acct_ana',
@@ -35,7 +34,7 @@ describe("a Claude pane's live session (ORCA-907)", () => {
   it('names no account for the shared home or a directory outside the managed vaults', () => {
     const of = (configDir: string | null) =>
       claudePaneLiveSessionOf({
-        event: { configDir, fiveHour: null, sevenDay: { used_percentage: 5 }, paneKey: 'p' },
+        event: { configDir, fiveHour: null, sevenDay: { used_percentage: 5 } },
         managedRoot: ROOT,
         boundAccountId: null,
         now: NOW

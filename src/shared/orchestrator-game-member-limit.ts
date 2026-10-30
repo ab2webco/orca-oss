@@ -9,11 +9,19 @@ import {
 import type { ProviderRateLimits, RateLimitState } from './rate-limit-types'
 
 /** A member stopped by its account's usage limit; `resetsAt` is Unix ms, null when unknown. */
-export type GameMemberLimit = { resetsAt: number | null; spend?: true }
+export type GameMemberLimit = { resetsAt: number | null; spend?: true; loggedOut?: true }
 
 // Why: a spend cap is billed money, which the 5h and 7d readings never count (ORCA-896).
 const SPEND_LIMIT_TEXT =
   /\b(?:hit|reached|exceeded)\b[\s\S]{0,60}?\b(?:spend(?:ing)?|billing|credit)\s+limit\b|\/usage-credits\b/i
+
+// Why the last lines only: the agent prints it just above its prompt, and older output can quote it.
+const LOGGED_OUT_TAIL_LINES = 12
+const LOGGED_OUT_TEXT =
+  /\b(?:not logged in|invalid api key|oauth token (?:has )?(?:expired|been revoked|revoked))\b[^\n]{0,40}?please run \/login\b|\bplease log out and sign in again\b/i
+
+const isLoggedOutTail = (tail: string): boolean =>
+  LOGGED_OUT_TEXT.test(tail.split('\n').slice(-LOGGED_OUT_TAIL_LINES).join('\n'))
 
 /** The usage reading Orca holds for one managed account, active or cached. */
 export function accountLimitsOf(
@@ -30,6 +38,17 @@ export function accountLimitsOf(
   }
   const cached = provider === 'claude' ? state.inactiveClaudeAccounts : state.inactiveCodexAccounts
   return cached.find((usage) => usage.accountId === accountId)?.rateLimits ?? null
+}
+
+/** The newer of two readings of one account; a pane's own status line can be ahead of Orca's cache. */
+export function freshestLimitsOf(
+  cached: ProviderRateLimits | null,
+  pane: ProviderRateLimits | null
+): ProviderRateLimits | null {
+  if (!cached || !pane) {
+    return cached ?? pane
+  }
+  return pane.updatedAt >= cached.updatedAt ? pane : cached
 }
 
 const hasQuota = (limits: ProviderRateLimits): boolean => {
@@ -53,6 +72,10 @@ export function gameMemberLimitOf(args: {
   // Why not while working: a member still making progress is not stopped, whatever a reading says.
   if (provider === null || args.state === 'working') {
     return null
+  }
+  // Why first: a logged-out account has no usable reading, and only a person can log it back in.
+  if (args.terminalTail !== null && isLoggedOutTail(args.terminalTail)) {
+    return { resetsAt: null, loggedOut: true }
   }
   const exhausted = args.accountLimits
     ? findUnresetExhaustedWindow(args.accountLimits, args.now)
