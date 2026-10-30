@@ -1,6 +1,7 @@
 import type {
   RuntimeTerminalClose,
   RuntimeTerminalCreate,
+  RuntimePairedTerminalReveal,
   RuntimeTerminalFocus,
   RuntimeTerminalListResult,
   RuntimeTerminalAgentSessionState,
@@ -82,6 +83,17 @@ function getRequestedTuiAgent(
 }
 
 const terminalFocusHandler: CommandHandler = async ({ flags, client, cwd, json }) => {
+  const on = getOptionalStringFlag(flags, 'on')
+  if (on) {
+    // Why: the handle lives on that server, so this window opens it there (ORCA-839).
+    const terminal = getRequiredStringFlag(flags, 'terminal')
+    const result = await client.call<{ focus: RuntimePairedTerminalReveal }>(
+      'terminal.revealPaired',
+      { terminal, on }
+    )
+    printResult(result, json, ({ focus }) => `Opened ${focus.handle} on ${focus.host}`)
+    return
+  }
   // Why: the caller's own pane lets the host tell a phone watching it to follow (ORCA-611).
   const source = process.env.ORCA_TERMINAL_HANDLE?.trim()
   const result = await client.call<{ focus: RuntimeTerminalFocus }>('terminal.focus', {
