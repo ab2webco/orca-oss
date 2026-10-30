@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultGameMemberCapOf, GAME_LEAD_CAP_MAX } from './orchestrator-game-lead'
+import { defaultGameMemberCapOf, GAME_HOST_CAP_MAX } from './orchestrator-game-lead'
 import {
   hostPlacementCapOf,
   parseHostPlacementRecord,
@@ -60,8 +60,8 @@ describe('parseHostPlacementRecord', () => {
 
   it('rejects a cap outside 1 to the lead cap max', () => {
     expect(parsed({ ...valid(), cap: 1 })?.cap).toBe(1)
-    expect(parsed({ ...valid(), cap: GAME_LEAD_CAP_MAX })?.cap).toBe(GAME_LEAD_CAP_MAX)
-    for (const cap of [0, -1, GAME_LEAD_CAP_MAX + 1, 2.5, '3', Number.NaN]) {
+    expect(parsed({ ...valid(), cap: GAME_HOST_CAP_MAX })?.cap).toBe(GAME_HOST_CAP_MAX)
+    for (const cap of [0, -1, GAME_HOST_CAP_MAX + 1, 2.5, '3', Number.NaN]) {
       expect(errorOf({ ...valid(), cap })).toMatch(/^cap /)
     }
   })

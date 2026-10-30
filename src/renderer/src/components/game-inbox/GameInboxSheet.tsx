@@ -15,7 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { GameOwnerQuestionCard } from './GameOwnerQuestionCard'
 import { GameInboxWaitingList } from './GameInboxWaitingList'
+import { GameInboxAnsweredList } from './GameInboxAnsweredList'
 import { GameInboxThreadsView } from './GameInboxThreadsView'
+import { GameMemberOverride, GameMemberReplyForm } from './GameMemberReplyForm'
+import type { GameMemberReply } from './game-inbox-threads-client'
 
 function TabCount({ count }: { count: number }): React.JSX.Element | null {
   return count > 0 ? (
@@ -23,7 +26,7 @@ function TabCount({ count }: { count: number }): React.JSX.Element | null {
   ) : null
 }
 
-// Why smaller below sm: the tabs must fit a 320px window.
+// Why smaller below sm: four tabs must fit a 320px window.
 const TAB = 'px-1.5 text-xs sm:px-2 sm:text-sm'
 
 const LIST_PANEL = 'scrollbar-sleek mt-0 min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4'
@@ -34,13 +37,15 @@ export function GameInboxSheet({
   onOpenChange,
   questions,
   onAnswer,
-  threads
+  threads,
+  onReply
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   questions: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
   threads: GameInboxThreads
+  onReply: (reply: GameMemberReply) => Promise<void>
 }): React.JSX.Element {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -75,6 +80,9 @@ export function GameInboxSheet({
               <TabsTrigger value="threads" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.threads', 'Threads')}
               </TabsTrigger>
+              <TabsTrigger value="answered" className={TAB}>
+                {translate('auto.components.game-inbox.GameInboxSheet.answered', 'Answered')}
+              </TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="for-you" className={`${LIST_PANEL} space-y-3`}>
@@ -96,10 +104,35 @@ export function GameInboxSheet({
             )}
           </TabsContent>
           <TabsContent value="waiting" className={LIST_PANEL}>
-            <GameInboxWaitingList items={threads.waiting} />
+            <GameInboxWaitingList
+              items={threads.waiting}
+              renderActions={(item) => (
+                <GameMemberReplyForm
+                  id={item.id}
+                  ticket={item.ticket}
+                  placeholder={translate(
+                    'auto.components.game-inbox.GameInboxSheet.answerInstead',
+                    'Answer instead of the lead'
+                  )}
+                  onReply={(text) => onReply({ id: item.id, text, ticket: item.ticket })}
+                />
+              )}
+            />
           </TabsContent>
           <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col pt-2">
             <GameInboxThreadsView threads={threads.threads} />
+          </TabsContent>
+          <TabsContent value="answered" className={LIST_PANEL}>
+            <GameInboxAnsweredList
+              items={threads.answered}
+              renderActions={(item) => (
+                <GameMemberOverride
+                  id={item.id}
+                  ticket={item.ticket}
+                  onReply={(text) => onReply({ id: item.id, text, ticket: item.ticket })}
+                />
+              )}
+            />
           </TabsContent>
         </Tabs>
       </SheetContent>

@@ -11,7 +11,7 @@ export const SONAR_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Forwards every following argument to the orca-sonar CLI installed in Orca Lab.',
       'The index lives in Orca Lab data and never inside the repository.',
-      'Needs Node 24 or newer on PATH and the orca-sonar plugin installed.'
+      'Needs Node 24 or newer on PATH and the orca-sonar plugin installed and enabled in Orca Lab.'
     ],
     examples: ['orca sonar find Tab --json', 'orca sonar symbol runCli']
   }

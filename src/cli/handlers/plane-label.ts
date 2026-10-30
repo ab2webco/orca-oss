@@ -1,8 +1,4 @@
-import type {
-  PlaneLabelMutationResult,
-  PlaneMutationResult,
-  PlaneWorkItem
-} from '../../shared/plane-types'
+import type { PlaneLabelMutationResult, PlaneMutationResult } from '../../shared/plane-types'
 import type { CommandHandler, HandlerContext } from '../dispatch'
 import { printResult } from '../format'
 import { getOptionalStringFlag, getRepeatedStringFlag, getRequiredStringFlag } from '../flags'
@@ -13,6 +9,7 @@ import {
   unwrapPlaneLabelMutation
 } from '../plane-request-builders'
 import { formatPlaneLabelCreated } from '../plane-format'
+import { fetchPlaneWriteWorkItem, resolvePlaneWriteProjectId } from '../plane-write-project'
 
 const PLANE_WRITE_TIMEOUT_MS = 75_000
 
@@ -43,25 +40,14 @@ async function runLabelEdit(ctx: HandlerContext, mode: 'add' | 'remove'): Promis
   const { flags, client, json } = ctx
   rejectAllWorkspaceForPlaneWrite(flags)
   const requestedId = getRequiredStringFlag(flags, 'id')
-  const projectId = getRequiredStringFlag(flags, 'project')
+  const project = getOptionalStringFlag(flags, 'project')
   const workspaceId = getOptionalStringFlag(flags, 'workspace')
   const given = getRepeatedStringFlag(flags, 'label')
   if (given.length === 0) {
     throw new RuntimeClientError('invalid_argument', 'Missing required --label')
   }
-  const item = (
-    await client.call<PlaneWorkItem | null>('plane.getWorkItem', {
-      workItemId: requestedId,
-      projectId,
-      workspaceId
-    })
-  ).result
-  if (!item) {
-    throw new RuntimeClientError(
-      'plane_work_item_not_found',
-      `Plane work item ${requestedId} not found`
-    )
-  }
+  const item = await fetchPlaneWriteWorkItem(client, requestedId, project, workspaceId)
+  const projectId = resolvePlaneWriteProjectId(item, project)
   const labelIds = new Set(item.labelIds ?? [])
   for (const id of given) {
     if (mode === 'add') {

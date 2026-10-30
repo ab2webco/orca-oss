@@ -83,3 +83,52 @@ describe('useGameInboxThreads', () => {
     expect(result.current).toMatchObject({ threads: [], waiting: [], answered: [] })
   })
 })
+
+describe('useGameInboxThreads reply (ORCA-878)', () => {
+  it('replies for the person, then rereads; a refused reply is thrown for the row to show', async () => {
+    let waiting = 1
+    const call = vi.fn(async (args: { method: string; params?: { text?: string } }) => {
+      if (args.method === 'game.ownerReplyToMember') {
+        if (args.params?.text === 'late') {
+          return {
+            id: 'r',
+            ok: false,
+            error: { code: 'runtime_error', message: 'Its member is gone' }
+          }
+        }
+        waiting = 0
+        return {
+          id: 'r',
+          ok: true,
+          result: { mode: 'answered', delivered: true },
+          _meta: { runtimeId: 'rt' }
+        }
+      }
+      return {
+        id: 'r',
+        ok: true,
+        result: {
+          threads: [thread('ORCA-1')],
+          waiting: Array.from({ length: waiting }, () => ({
+            id: 'q1',
+            ticket: 'ORCA-1',
+            kind: 'question',
+            subject: 'Question',
+            body: 'Which port?',
+            at: '2026-10-29T10:00:00Z',
+            answerer: 'lead'
+          })),
+          answered: []
+        },
+        _meta: { runtimeId: 'rt' }
+      }
+    })
+    Object.defineProperty(window, 'api', { configurable: true, value: { runtime: { call } } })
+    const { result } = renderHook(() => useGameInboxThreads(SCOPE, true))
+    await waitFor(() => expect(result.current.waiting).toHaveLength(1))
+
+    await act(() => result.current.reply({ id: 'q1', text: '8080', ticket: 'ORCA-1' }))
+    expect(result.current.waiting).toEqual([])
+    await expect(result.current.reply({ id: 'q1', text: 'late' })).rejects.toThrow(/member is gone/)
+  })
+})

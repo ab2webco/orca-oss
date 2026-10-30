@@ -3,6 +3,9 @@ import type { GameAccountProvider } from './orchestrator-game-member-agent'
 /** One quota window of a managed account; `resetsAt` is Unix ms, null when unknown. */
 export type GameQuotaWindow = { usedPercent: number; resetsAt: number | null }
 
+/** A member stopped on it; `loggedOut` when its session asks for /login (ORCA-907). */
+export type GameAccountStop = { resetsAt: number | null; loggedOut?: true }
+
 /** A managed account as the lead weighs it: its 5h and 7d use and the members on it. */
 export type GameAccountUsage = {
   provider: GameAccountProvider
@@ -15,7 +18,7 @@ export type GameAccountUsage = {
   /** Tickets of the lead's members running on it. */
   members: string[]
   /** A member on it stopped on a usage or spend limit; usable again at `resetsAt`, null when unknown. */
-  stopped?: { resetsAt: number | null }
+  stopped?: GameAccountStop
 }
 
 export type GameAccountStanding = 'free' | 'near' | 'limited' | 'unknown'

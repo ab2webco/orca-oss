@@ -13,7 +13,7 @@ export type OrchestratorGameLead = {
   autostart: boolean
   /** Ask the person before `game resume-members` after a restart; unset or false resumes at once. */
   askBeforeResume?: boolean
-  /** Members running at once; a launch past it is refused. */
+  /** Members running at once; in a layer, the ceiling over the sum of every host's cap. */
   cap: number
   /** The agent a member runs, as `orca orchestration worker-start --agent` names it. */
   agent: string
@@ -45,7 +45,10 @@ export type OrchestratorGameAccounts = 'default' | 'auto' | string[]
 
 export type OrchestratorGameLeadLayer = Partial<OrchestratorGameLead>
 
-export const GAME_LEAD_CAP_MAX = 12
+/** Members one machine runs at once, at most; the lead's total is the sum over its hosts (ORCA-888). */
+export const GAME_HOST_CAP_MAX = 12
+/** The project's overall ceiling over every host; a bound on typos, not on capacity. */
+export const GAME_LEAD_CAP_MAX = 100
 const GAME_LEAD_RULES_MAX = 4000
 const GAME_LEAD_LABEL_MAX = 32
 const AGENT_ID = /^[a-z][a-z0-9-]{0,31}$/
@@ -74,7 +77,7 @@ export function defaultGameMemberCapOf(host: GameHostProfile | null): number {
     Math.floor(host.totalMemory / MEMBER_MEMORY_BYTES),
     Math.floor(host.cpuCoreCount / MEMBER_CPU_CORES)
   )
-  return Math.min(GAME_LEAD_CAP_MAX, Math.max(1, Number.isFinite(fit) ? fit : 1))
+  return Math.min(GAME_HOST_CAP_MAX, Math.max(1, Number.isFinite(fit) ? fit : 1))
 }
 
 export const DEFAULT_GAME_PUSH_PROMPT =

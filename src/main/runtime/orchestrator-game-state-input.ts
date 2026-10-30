@@ -29,6 +29,7 @@ import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-bud
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
+import type { PairedGameHostEntry } from './orchestrator-game-paired-hosts'
 
 type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
 
@@ -40,6 +41,8 @@ export type OrchestratorGameStateInput = {
   systemLocale?: string
   /** Orca's machine, which sets the member cap no layer sets. */
   host?: GameHostProfile
+  /** The paired hosts and what each publishes; read only for a lead (ORCA-888). */
+  readPairedHosts?: () => Promise<PairedGameHostEntry[]>
   worktree: {
     id: string
     repoId: string | null

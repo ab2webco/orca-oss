@@ -10,4 +10,12 @@ describe('bundled orca-cli guide', () => {
     expect(guide?.fullMarkdown).toContain('orca sonar find')
     expect(guide?.fullMarkdown).toContain('orca sonar symbol')
   })
+
+  it('tells agents to fall back to plain search when the owner switched Sonar off for agents', () => {
+    expect(guide?.fullMarkdown).toContain('turned off for agents')
+  })
+
+  it('tells agents to fall back to plain search when Orca is not running the plugin', () => {
+    expect(guide?.fullMarkdown).toContain('sonar_plugin_inactive')
+  })
 })

@@ -1,6 +1,6 @@
 import { spawn as spawnChild, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { statSync } from 'node:fs'
-import { resolveSonarCli } from '../shared/sonar-cli-location'
+import { SONAR_PLUGIN_KEY, resolveSonarCli } from '../shared/sonar-cli-location'
 
 export const SONAR_WARMUP_TIMEOUT_MS = 30_000
 
@@ -17,6 +17,8 @@ export type SonarWarmupSpawn = (
 export type ScheduleSonarIndexWarmupOptions = {
   userDataDir: string
   worktreePath: string
+  // Why: the warm-up runs the plugin's code, so it waits for the same enable and consent its worker does.
+  isPluginActive: () => boolean
   spawn?: SonarWarmupSpawn
   debug: (message: string, error: unknown) => void
 }
@@ -25,7 +27,7 @@ export type ScheduleSonarIndexWarmupOptions = {
 export function scheduleSonarIndexWarmup(options: ScheduleSonarIndexWarmupOptions): void {
   const { userDataDir, worktreePath, debug } = options
   try {
-    if (!isDirectory(worktreePath)) {
+    if (!options.isPluginActive() || !isDirectory(worktreePath)) {
       return
     }
     const lookup = resolveSonarCli(userDataDir)
@@ -48,6 +50,13 @@ export function scheduleSonarIndexWarmup(options: ScheduleSonarIndexWarmupOption
   } catch (error) {
     debug('orca-sonar warm-up could not start', error)
   }
+}
+
+/** Null grants mean disabled, unconsented, kill-listed or the plugin system off. */
+export function isSonarPluginActive(
+  plugins: { getGrantedCapabilities: (pluginKey: string) => readonly unknown[] | null } | null
+): boolean {
+  return plugins?.getGrantedCapabilities(SONAR_PLUGIN_KEY) != null
 }
 
 function isDirectory(path: string): boolean {

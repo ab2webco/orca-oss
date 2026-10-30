@@ -35,6 +35,18 @@ describe('gameAccountUsagesOf', () => {
     ])
   })
 
+  it('marks an account logged out when one of its members says it must log in again (ORCA-907)', () => {
+    const usages = gameAccountUsagesOf({
+      entries: [entry('ana')],
+      provider: 'claude',
+      agents: [
+        member('CIN-1', 'ana', { resetsAt: 9 }),
+        member('CIN-2', 'ana', { resetsAt: null, loggedOut: true })
+      ]
+    })
+    expect(usages[0]?.stopped).toEqual({ resetsAt: null, loggedOut: true })
+  })
+
   it('keeps only the accounts the project allows, by email or id', () => {
     const usages = gameAccountUsagesOf({
       entries: [entry('ana'), entry('cy'), entry('dee')],

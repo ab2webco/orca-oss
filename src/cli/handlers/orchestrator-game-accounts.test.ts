@@ -144,7 +144,8 @@ describe('orca game accounts', () => {
             usableAt: new Date(NOW + 90 * 60_000).toISOString(),
             members: ['CIN-1'],
             autoPick: true,
-            memberStopped: false
+            memberStopped: false,
+            memberLoggedOut: false
           },
           expect.objectContaining({ email: 'cy@example.com', standing: 'near', limited: false })
         ],
@@ -192,6 +193,22 @@ describe('orca game accounts', () => {
 
     expect(output.join('\n')).toMatch(
       /bo@example\.com\s+5h 10%.*limited, member stopped on a limit, back at an unknown time\s+CIN-2/
+    )
+  })
+
+  // Why (ORCA-907): its readings had quota, so it listed as free while its member asked for /login.
+  it('shows an account whose member logged out as logged out, not free', async () => {
+    const out = {
+      ...member('m2', 'CIN-2', { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }),
+      state: 'idle',
+      limit: { resetsAt: null, loggedOut: true }
+    }
+    const { client } = fakeClient({ ...STATE, agents: [out] })
+
+    await run(client, false)
+
+    expect(output.join('\n')).toMatch(
+      /bo@example\.com\s+5h 10%.*logged out, a member asks for \/login\s+CIN-2/
     )
   })
 
