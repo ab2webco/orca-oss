@@ -17,6 +17,10 @@ Lo que esto compra es que saltárselo sea un acto deliberado que deja dicho cont
 lineage, en vez de una deriva de cuatro rondas que nadie nombra.
 """
 
+# Why: macOS ships python3 3.9 at /usr/bin; `str | None` crashes there at import, the hook
+# exits 1 and Claude Code runs the merge unchecked (ORCA-803).
+from __future__ import annotations
+
 import json
 import os
 import re
