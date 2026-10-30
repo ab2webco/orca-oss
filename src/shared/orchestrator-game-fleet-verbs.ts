@@ -176,19 +176,20 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
     counts[row.phase] += 1
   }
   const cap = (state.lead ?? DEFAULT_GAME_LEAD).cap
-  // Why paused ones count: each still holds its ticket until it is resumed or discarded.
-  const paused = state.pausedMembers ?? []
+  // Why paused ones count: each holds its ticket until resumed or discarded; with its worktree gone
+  // nothing can run it again, so it holds no slot (ORCA-832).
+  const holding = (state.pausedMembers ?? []).filter((one) => !one.worktreeGone)
   const queued = state.queuedMembers ?? []
   // Why gone ones do not: their host answered that the terminal is gone, so nothing runs there (ORCA-864).
   const gone = membersOf(state).filter((agent) => agent.remote?.gone && !isFinishedMember(agent))
-  const running = rows.length - counts.finished - gone.length + paused.length + queued.length
+  const running = rows.length - counts.finished - gone.length + holding.length + queued.length
   return {
     rows,
     counts,
     cap,
     running,
     free: Math.max(0, cap - running),
-    paused,
+    paused: state.pausedMembers ?? [],
     queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
   }

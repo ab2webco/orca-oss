@@ -754,6 +754,7 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
@@ -3799,7 +3800,12 @@ export class OrcaRuntimeService {
       gamePausedCauseOf(
         this.getOrchestrationDbIfAvailable()?.getDispatchContext(member.taskId),
         (handle) => this.isTerminalOpenForHandle(handle)
-      )
+      ),
+    worktreeGone: (worktreeId) =>
+      isGameMemberWorktreeGone(worktreeId, {
+        reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
+        scan: (repo) => this.listRepoWorktreesForResolution(repo)
+      })
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({

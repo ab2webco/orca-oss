@@ -84,12 +84,31 @@ function formatOpenTerminals(paused: GameFleet['paused']): string[] {
   ]
 }
 
+const formatWorktreeGone = (gone: GameFleet['paused']): string[] =>
+  gone.length === 0
+    ? []
+    : [
+        `Cannot resume, worktree gone: ${gone.length} · \`orca game resume-members <ticket> --discard\` frees them`,
+        tableOf([
+          ['TICKET', 'STATE', 'BRANCH', 'AGENT', 'ACCOUNT', 'NAME'],
+          ...gone.map((one) => [
+            one.ticket,
+            one.lastState ?? '-',
+            one.branch ?? '-',
+            one.agent ?? '-',
+            one.account ?? '-',
+            one.name ?? ''
+          ])
+        ])
+      ]
+
 function formatPaused(fleet: GameFleet): string[] {
   if (fleet.pausedError) {
     return [`Could not resume members: ${fleet.pausedError}`]
   }
-  const restarted = fleet.paused.filter((one) => one.cause === undefined)
-  const open = formatOpenTerminals(fleet.paused)
+  const restarted = fleet.paused.filter((one) => one.cause === undefined && !one.worktreeGone)
+  const gone = fleet.paused.filter((one) => one.cause === undefined && one.worktreeGone)
+  const open = [...formatOpenTerminals(fleet.paused), ...formatWorktreeGone(gone)]
   if (restarted.length === 0) {
     return open
   }

@@ -29,7 +29,7 @@ type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameResumedMember = {
   ticket: string
-  result: 'resumed' | 'relaunched' | 'submitted' | 'finished' | 'skipped' | 'failed'
+  result: 'resumed' | 'relaunched' | 'submitted' | 'finished' | 'skipped' | 'unresumable' | 'failed'
   dispatchId?: string
   /** The open terminal Enter was pressed in, for `submitted`. */
   terminal?: string
@@ -149,11 +149,15 @@ const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
   submitted: 'Enter pressed in its terminal',
   finished: 'already finished, forgotten',
   skipped: 'skipped',
+  unresumable: 'cannot resume',
   failed: 'failed'
 }
 
 const unlistedReason = (one: GameUnlistedMember): string =>
   `its agent runs in ${one.branch ?? one.worktreeId}, but this lead does not list it`
+
+const worktreeGoneReason = (one: GamePausedMember): string =>
+  `its worktree ${one.branch ?? 'of record'} is gone; \`orca game resume-members ${one.ticket} --discard\` frees it`
 
 export const formatResumedMembers = (result: { members: GameResumedMember[] }): string =>
   result.members.length === 0
@@ -205,9 +209,12 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
       )
       return
     }
-    const paused = (state.pausedMembers ?? []).filter(
+    const listed = (state.pausedMembers ?? []).filter(
       (one) => named.length === 0 || named.includes(one.ticket)
     )
+    // Why apart: retrying them failed at every lead start, before the worktree was even checked (ORCA-832).
+    const gone = listed.filter((one) => one.worktreeGone)
+    const paused = listed.filter((one) => !one.worktreeGone)
     const unlisted = (state.unlistedMembers ?? []).filter(
       (one) => named.length === 0 || named.includes(one.ticket)
     )
@@ -229,22 +236,34 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
             openTerminal: ticketsWith('terminal-open'),
             resume: closed.slice(0, free).map((one) => one.ticket),
             overCap: closed.slice(free).map((one) => one.ticket),
-            ...(unlisted.length > 0 ? { unlisted } : {})
+            ...(unlisted.length > 0 ? { unlisted } : {}),
+            ...(gone.length > 0 ? { unresumable: gone.map((one) => one.ticket) } : {})
           }
         },
         json,
         (plan) =>
-          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}${plan.unlisted ? ` · running but not listed by this lead: ${plan.unlisted.map((one) => `${one.ticket} (${one.branch ?? one.worktreeId})`).join(', ')}` : ''}`
+          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}${plan.unlisted ? ` · running but not listed by this lead: ${plan.unlisted.map((one) => `${one.ticket} (${one.branch ?? one.worktreeId})`).join(', ')}` : ''}${gone.length > 0 ? ` · worktree gone, cannot resume: ${gone.map((one) => `${one.ticket} (${one.branch ?? '-'})`).join(', ')}; \`orca game resume-members <ticket> --discard\` frees it` : ''}`
       )
       return
     }
     refuseWhileStopped(state, 'resuming members')
     const from = await resolveCoordinatorTerminalHandle(flags, cwd, client)
-    const members: GameResumedMember[] = unlisted.map((one) => ({
-      ticket: one.ticket,
-      result: 'skipped',
-      reason: unlistedReason(one)
-    }))
+    const members: GameResumedMember[] = [
+      ...unlisted.map(
+        (one): GameResumedMember => ({
+          ticket: one.ticket,
+          result: 'skipped',
+          reason: unlistedReason(one)
+        })
+      ),
+      ...gone.map(
+        (one): GameResumedMember => ({
+          ticket: one.ticket,
+          result: 'unresumable',
+          reason: worktreeGoneReason(one)
+        })
+      )
+    ]
     let running = liveMembers
     // Why one at a time: N agents reopening at once can exhaust a small machine's memory.
     for (const member of paused) {

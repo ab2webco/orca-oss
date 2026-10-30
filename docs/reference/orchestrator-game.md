@@ -758,6 +758,12 @@ are saved while they run, so the team picks up where it was:
   `game launch` refuses its ticket and `game wave` skips it (`paused`), so a ticket never gets a
   second member. A member whose PR merged or whose dispatch reported success is never paused, and
   `game sweep --close` and `game stop` forget the members they free.
+- **Worktree gone.** A paused member whose repo answered without its saved worktree carries
+  `worktreeGone` ([`game-member-worktree-presence.ts`](../../src/main/runtime/game-member-worktree-presence.ts));
+  a repo that could not be scanned, such as an SSH host offline, never marks it. It frees its slot,
+  `game fleet` lists it under `Cannot resume, worktree gone`, and `game resume-members` reports it
+  `unresumable` with the `--discard` command, without binding a run or failing the exit code, so a
+  lead start no longer retries it (ORCA-832).
 - **Resume.** `game resume-members` takes the paused members in turn, one at a time and never past
   the cap ([`orchestrator-game-member-resume.ts`](../../src/main/runtime/orchestrator-game-member-resume.ts)):
   - It first binds the run that owns their tasks; it never takes that run over while this lead

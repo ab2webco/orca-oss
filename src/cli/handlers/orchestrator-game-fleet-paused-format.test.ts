@@ -49,6 +49,18 @@ describe('fleet text for a member that is not live (ORCA-754)', () => {
   })
 })
 
+describe('fleet text for a paused member whose worktree is gone (ORCA-832)', () => {
+  it('lists it apart from the resumable ones, pointing at --discard', () => {
+    const text = fleetText([paused('ORCA-681', { worktreeGone: true }), paused('ORCA-682')])
+
+    expect(text).toContain('Paused since Orca or the machine restarted: 1')
+    expect(text).toContain(
+      'Cannot resume, worktree gone: 1 · `orca game resume-members <ticket> --discard` frees them'
+    )
+    expect(text).toMatch(/ORCA-681\s+launching\s+orca-681/)
+  })
+})
+
 describe('formatFleet with remote members (ORCA-824)', () => {
   it('prints each member’s host, and unknown for a host that does not answer', () => {
     const member = {

@@ -190,6 +190,8 @@ export type GamePausedMember = {
   cause?: GamePausedCause
   /** The member's still-open terminal, sent with `cause`. */
   terminal?: string
+  /** Its saved worktree no longer exists, so only `--discard` clears it (ORCA-832). */
+  worktreeGone?: true
 }
 
 /** A start the host holds until its setup slot frees (ORCA-746). */
@@ -231,7 +233,9 @@ export function pausedMembersOf(
   live: { tickets: ReadonlySet<string>; worktreeIds: ReadonlySet<string> },
   /** Tasks whose start is queued or running on the host: on their way, not paused. */
   startingTaskIds: ReadonlySet<string> = new Set(),
-  causeOf: GamePausedCauseOf = () => null
+  causeOf: GamePausedCauseOf = () => null,
+  /** Saved worktrees whose repo answered without them (ORCA-832). */
+  goneWorktreeIds: ReadonlySet<string> = new Set()
 ): GamePausedMember[] {
   return members
     .filter(
@@ -241,18 +245,22 @@ export function pausedMembersOf(
         !startingTaskIds.has(one.taskId) &&
         !(one.worktreeId !== null && live.worktreeIds.has(one.worktreeId))
     )
-    .map((one) => ({
-      ticket: one.ticket,
-      name: one.name,
-      agent: one.agent,
-      account: one.account,
-      branch: one.branch,
-      lastState: one.lastState,
-      resumable: one.sessionId !== null && one.worktreeId !== null,
-      runId: one.runId,
-      since: one.updatedAt,
-      ...causeOf(one)
-    }))
+    .map((one) => {
+      const gone = one.worktreeId !== null && goneWorktreeIds.has(one.worktreeId)
+      return {
+        ticket: one.ticket,
+        name: one.name,
+        agent: one.agent,
+        account: one.account,
+        branch: one.branch,
+        lastState: one.lastState,
+        resumable: !gone && one.sessionId !== null && one.worktreeId !== null,
+        runId: one.runId,
+        since: one.updatedAt,
+        ...causeOf(one),
+        ...(gone ? { worktreeGone: true as const } : {})
+      }
+    })
 }
 
 /** A saved member whose worktree runs an agent this lead does not list; never resumed over it. */
