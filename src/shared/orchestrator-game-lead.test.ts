@@ -52,8 +52,21 @@ describe('parseGameLead', () => {
     expect(parseGameLead({ accounts: 'default' }).value).toEqual({ accounts: 'default' })
     expect(parseGameLead({ accounts: 'spread' })).toEqual({
       value: {},
-      warnings: ['orchestratorGame.orchestrator.accounts must be default or auto']
+      warnings: [
+        'orchestratorGame.orchestrator.accounts must be default, auto, or a list of account emails or ids'
+      ]
     })
+  })
+
+  it('takes accounts as a list of the accounts members may use, and warns on a bad entry', () => {
+    expect(parseGameLead({ accounts: [' a@example.com ', 'acct_b'] })).toEqual({
+      value: { accounts: ['a@example.com', 'acct_b'] },
+      warnings: []
+    })
+    expect(parseGameLead({ accounts: [] }).warnings).toEqual([
+      'orchestratorGame.orchestrator.accounts must be default, auto, or a list of account emails or ids'
+    ])
+    expect(parseGameLead({ accounts: ['a@example.com', 7] }).value).toEqual({})
   })
 
   it('takes memberNames as a roster and warns with the first bad name', () => {

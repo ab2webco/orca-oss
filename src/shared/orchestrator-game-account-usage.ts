@@ -34,15 +34,50 @@ export function isAutoPickableAccount(entry: AccountListEntry): boolean {
   )
 }
 
+/** The latest limit a member stopped on, by the account id it runs on. */
+function stoppedByAccountOf(
+  agents: readonly GameAgent[]
+): Map<string, { resetsAt: number | null }> {
+  const byAccount = new Map<string, { resetsAt: number | null }>()
+  for (const agent of agents) {
+    if (agent.isMember && !agent.isLeader && agent.account && agent.limit) {
+      const seen = byAccount.get(agent.account.id)
+      const resetsAt =
+        seen === undefined
+          ? agent.limit.resetsAt
+          : seen.resetsAt === null || agent.limit.resetsAt === null
+            ? null
+            : Math.max(seen.resetsAt, agent.limit.resetsAt)
+      byAccount.set(agent.account.id, { resetsAt })
+    }
+  }
+  return byAccount
+}
+
+/** Whether the project's `orchestrator.accounts` list (emails or ids) allows this account. */
+export function isAllowedGameAccount(
+  entry: { id: string; email: string },
+  allowed: readonly string[] | undefined
+): boolean {
+  return (
+    allowed === undefined ||
+    allowed.some((one) => one === entry.id || one.toLowerCase() === entry.email.toLowerCase())
+  )
+}
+
 export function gameAccountUsagesOf(args: {
   entries: readonly AccountListEntry[]
   provider: GameAccountProvider
   agents: readonly GameAgent[]
   launched?: GameLaunchedOnAccount
+  allowed?: readonly string[]
 }): GameAccountUsage[] {
   const members = gameMembersByAccountOf(args.agents)
+  const stopped = stoppedByAccountOf(args.agents)
   return args.entries
-    .filter((entry) => entry.provider === args.provider)
+    .filter(
+      (entry) => entry.provider === args.provider && isAllowedGameAccount(entry, args.allowed)
+    )
     .map((entry) => {
       // Why: 'unavailable' means the provider reports no quota for it, which is no reading at all.
       const quota = entry.quota?.status === 'unavailable' ? null : entry.quota
@@ -52,7 +87,8 @@ export function gameAccountUsagesOf(args: {
         email: entry.email,
         session: windowOf(quota?.session),
         weekly: windowOf(quota?.weekly),
-        members: [...(members.get(entry.id) ?? []), ...(args.launched?.get(entry.id) ?? [])]
+        members: [...(members.get(entry.id) ?? []), ...(args.launched?.get(entry.id) ?? [])],
+        ...(stopped.has(entry.id) ? { stopped: stopped.get(entry.id) } : {})
       }
     })
 }

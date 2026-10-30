@@ -62,6 +62,28 @@ describe('gameAccountStandingOf', () => {
   })
 })
 
+describe('an account whose member stopped on a limit', () => {
+  const stopped = (resetsAt: number | null): GameAccountUsage => ({
+    ...usage('a', 20, 40, ['CIN-1']),
+    stopped: { resetsAt }
+  })
+
+  it('is limited until that limit resets, whatever its 5h and 7d readings say', () => {
+    expect(gameAccountStandingOf(stopped(NOW + HOUR), NOW)).toEqual({
+      standing: 'limited',
+      usedPercent: 40,
+      resetsAt: NOW + HOUR
+    })
+    expect(gameAccountStandingOf(stopped(null), NOW).standing).toBe('limited')
+    expect(gameAccountStandingOf(stopped(NOW - 1), NOW).standing).toBe('free')
+  })
+
+  it('is skipped for a busier account that can still take a member', () => {
+    const pick = pickGameMemberAccount([stopped(null), usage('b', 60, 70, ['CIN-2'])], NOW)
+    expect(pick.kind === 'account' && pick.account.email).toBe('b')
+  })
+})
+
 describe('pickGameMemberAccount', () => {
   it('picks the account with the most free quota', () => {
     const pick = pickGameMemberAccount(
