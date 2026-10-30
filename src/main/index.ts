@@ -398,6 +398,7 @@ import {
   advanceSyntheticTitleSpinnerEntries,
   type SyntheticTitleSpinnerEntry
 } from './synthetic-title-spinner'
+import { getClaudeManagedAccountsRoot } from './claude-accounts/managed-auth-path'
 import { shouldSendSyntheticTitleFrame } from './synthetic-title-visibility'
 import { shouldCopySyntheticTitleFrameToPtyData } from './synthetic-title-frame-routing'
 import {
@@ -2715,6 +2716,7 @@ void app.whenReady().then(async () => {
     // alone and cannot shell out to `date` to turn resets_at into a duration.
     publishStatuslineResetCountdown(event)
     rateLimits?.ingestLiveClaudeRateLimits(event)
+    runtime?.noteClaudePaneStatusLine(event, getClaudeManagedAccountsRoot())
   })
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store!.getSettings()

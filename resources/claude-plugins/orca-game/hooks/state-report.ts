@@ -34,6 +34,9 @@ export const memberPhaseOf = (agent: GameAgent): MemberPhase => {
   if (isFinished(agent)) {
     return 'finished'
   }
+  if (agent.limit?.loggedOut) {
+    return 'needs-you'
+  }
   if (agent.limit) {
     return 'limited'
   }

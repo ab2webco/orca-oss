@@ -72,6 +72,9 @@ export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   if (isFinishedMember(agent)) {
     return 'finished'
   }
+  if (agent.limit?.loggedOut) {
+    return 'needs-you'
+  }
   if (agent.limit) {
     return 'limited'
   }
@@ -100,7 +103,7 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
     case 'finished':
       return 'sweep --close'
     case 'needs-you':
-      return 'answer it'
+      return agent.limit?.loggedOut ? loggedOutNextOf(agent) : 'answer it'
     case 'limited':
       return limitedNextOf(agent)
     case 'working':
@@ -109,6 +112,9 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
       return idleNextOf(agent.review)
   }
 }
+
+const loggedOutNextOf = (agent: GameAgent): string =>
+  `log ${agent.account?.email ?? 'its account'} in again (/login in its pane), or game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
 
 const limitedNextOf = (agent: GameAgent): string =>
   `game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}, or wait for the reset`

@@ -52,7 +52,9 @@ describe('AgentHookServer /statusline/claude', () => {
         configDir: '/home/dev/managed',
         fiveHour: { used_percentage: 12.5, resets_at: 1738425600 },
         sevenDay: { used_percentage: 40, resets_at: 1712059200 },
-        model: null
+        model: null,
+        // Why (ORCA-907): the runtime files the report under the pane that sent it.
+        paneKey: 'pane-1'
       }
     ])
   })
