@@ -20,44 +20,37 @@ function scopeKeyOf(scope: GameInboxScope | null): string | null {
   return `${host}\u0000${scope.worktreeId}`
 }
 
-/** The open questions the lead asked the person, reread on a pushed change or window focus. */
+/** The open questions the lead asked the person, reread on a pushed change or window focus; pass a memoized scope. */
 export function useGameOwnerQuestions(scope: GameInboxScope | null): {
   questions: GameOwnerQuestion[]
   answer: (id: string, reply: GameOwnerReply) => Promise<void>
 } {
   const [loaded, setLoaded] = useState<{ key: string; questions: GameOwnerQuestion[] } | null>(null)
-  const scopeKey = scopeKeyOf(scope)
-  const scopeRef = useRef(scope)
-  scopeRef.current = scope
   // Why: a slower earlier read must not overwrite a later one.
   const readSeq = useRef(0)
 
-  const reload = useCallback(async () => {
-    const current = scopeRef.current
+  const reload = useCallback(async (current: GameInboxScope) => {
     const key = scopeKeyOf(current)
-    if (!current || !key) {
-      return
-    }
     const seq = ++readSeq.current
     try {
       const questions = await readOpenGameOwnerQuestions(current)
-      if (seq === readSeq.current) {
+      if (seq === readSeq.current && key) {
         setLoaded({ key, questions })
       }
     } catch {
       // Why: a host without the board (older build, offline) shows no questions, not an error.
-      if (seq === readSeq.current) {
+      if (seq === readSeq.current && key) {
         setLoaded({ key, questions: NO_QUESTIONS })
       }
     }
   }, [])
 
   useEffect(() => {
-    if (!scopeKey) {
+    if (!scope) {
       return
     }
-    void reload()
-    const reloadNow = (): void => void reload()
+    const reloadNow = (): void => void reload(scope)
+    reloadNow()
     const stopLocal = window.api.runtime.onGameOwnerQuestionsChanged?.(reloadNow)
     const stopPaired = onGameOwnerQuestionsChanged(reloadNow)
     window.addEventListener('focus', reloadNow)
@@ -66,20 +59,20 @@ export function useGameOwnerQuestions(scope: GameInboxScope | null): {
       stopPaired()
       window.removeEventListener('focus', reloadNow)
     }
-  }, [scopeKey, reload])
+  }, [scope, reload])
 
   const answer = useCallback(
     async (id: string, reply: GameOwnerReply) => {
-      const current = scopeRef.current
-      if (!current) {
+      if (!scope) {
         return
       }
-      await answerGameOwnerQuestion(current, id, reply)
-      await reload()
+      await answerGameOwnerQuestion(scope, id, reply)
+      await reload(scope)
     },
-    [reload]
+    [scope, reload]
   )
 
+  const scopeKey = scopeKeyOf(scope)
   return {
     questions: loaded && loaded.key === scopeKey ? loaded.questions : NO_QUESTIONS,
     answer
