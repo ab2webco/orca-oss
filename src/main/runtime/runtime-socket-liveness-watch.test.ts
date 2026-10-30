@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { watchRuntimeSocketLiveness } from './runtime-socket-liveness-watch'
 
-function scriptedProbe(results: (string | null)[]): () => Promise<string | null> {
-  return vi.fn(async () => results.shift() ?? null)
-}
-
 describe('watchRuntimeSocketLiveness', () => {
   const watches: { stop: () => void }[] = []
   afterEach(() => {
@@ -12,60 +8,72 @@ describe('watchRuntimeSocketLiveness', () => {
     vi.restoreAllMocks()
   })
 
-  function watch(probe: () => Promise<string | null>, rebind = vi.fn(async () => {})) {
+  function watch({
+    hasEndpoint = () => true,
+    rebind = vi.fn(async () => {}),
+    dropped = () => 0
+  }: {
+    hasEndpoint?: () => boolean
+    rebind?: () => Promise<void>
+    dropped?: () => number
+  } = {}) {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const handle = watchRuntimeSocketLiveness({
-      probe,
+      hasEndpoint,
       rebind,
-      describe: () => ({}),
+      describe: () => ({
+        activeConnections: 64,
+        droppedConnections: dropped(),
+        lastServerError: null
+      }),
       pollIntervalMs: 60_000
     })
     watches.push(handle)
     return { handle, rebind }
   }
 
-  it('rebinds only after three consecutive failed probes', async () => {
-    const { handle, rebind } = watch(scriptedProbe(['EPIPE', 'EPIPE', 'ENOENT']))
+  it('reports connections the cap turned away once, and never rebinds for them', async () => {
+    let dropped = 3
+    const { handle, rebind } = watch({ dropped: () => dropped })
     await handle.check()
     await handle.check()
+    dropped = 5
+    await handle.check()
+
     expect(rebind).not.toHaveBeenCalled()
+    expect(vi.mocked(console.warn).mock.calls.map(([line]) => line)).toEqual([
+      '[runtime] Local RPC socket turned away 3 connection(s) at its cap:',
+      '[runtime] Local RPC socket turned away 2 connection(s) at its cap:'
+    ])
+  })
+
+  it('rebinds on the first check that finds the socket file gone', async () => {
+    const { handle, rebind } = watch({ hasEndpoint: () => false })
     await handle.check()
     expect(rebind).toHaveBeenCalledTimes(1)
   })
 
-  it('forgets earlier failures once the socket answers', async () => {
-    const { handle, rebind } = watch(scriptedProbe(['EPIPE', 'EPIPE', null, 'EPIPE', 'EPIPE']))
-    for (let i = 0; i < 5; i += 1) {
-      await handle.check()
-    }
-    expect(rebind).not.toHaveBeenCalled()
-  })
-
-  it('never stacks a probe behind one still in flight', async () => {
-    let answer: (value: string | null) => void = () => {}
-    const probe = vi.fn(
+  it('never stacks a check behind a rebind still in flight', async () => {
+    let finish: () => void = () => {}
+    const rebind = vi.fn(
       () =>
-        new Promise<string | null>((resolve) => {
-          answer = resolve
+        new Promise<void>((resolve) => {
+          finish = resolve
         })
     )
-    const { handle } = watch(probe)
+    const { handle } = watch({ hasEndpoint: () => false, rebind })
     const first = handle.check()
-    const second = handle.check()
-    expect(second).toBe(first)
-    answer(null)
+    expect(handle.check()).toBe(first)
+    finish()
     await first
-    expect(probe).toHaveBeenCalledTimes(1)
+    expect(rebind).toHaveBeenCalledTimes(1)
   })
 
-  it('does not rebind from a probe that settles after stop', async () => {
-    const { handle, rebind } = watch(scriptedProbe(['EPIPE', 'EPIPE', 'EPIPE']))
-    await handle.check()
-    await handle.check()
-    const pending = handle.check()
+  it('does nothing once stopped', async () => {
+    const { handle, rebind } = watch({ hasEndpoint: () => false })
     handle.stop()
-    await pending
+    await handle.check()
     expect(rebind).not.toHaveBeenCalled()
   })
 
@@ -73,13 +81,9 @@ describe('watchRuntimeSocketLiveness', () => {
     const rebind = vi.fn(async () => {
       throw new Error('EADDRINUSE')
     })
-    const { handle } = watch(
-      scriptedProbe(['EPIPE', 'EPIPE', 'EPIPE', 'EPIPE', 'EPIPE', 'EPIPE']),
-      rebind
-    )
-    for (let i = 0; i < 6; i += 1) {
-      await handle.check()
-    }
+    const { handle } = watch({ hasEndpoint: () => false, rebind })
+    await handle.check()
+    await handle.check()
     expect(rebind).toHaveBeenCalledTimes(2)
   })
 })

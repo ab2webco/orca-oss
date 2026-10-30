@@ -1,20 +1,20 @@
 // Why: this is the original Unix socket / named pipe transport extracted from
 // runtime-rpc.ts. It preserves the exact same behavior: newline-delimited JSON,
-// 30s idle timeout, 1MB max message, 32 max connections, chmod 0o600 on Unix.
+// 30s idle timeout, 1MB max message, 64 max connections, chmod 0o600 on Unix.
 // It also owns the keepalive timer and per-connection abort signal so the
 // server-side handler can cancel long-poll dispatches when the client goes
 // away. See design doc §3.1.
-import { createConnection, createServer, type Server, type Socket } from 'node:net'
+import { createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, existsSync, rmSync } from 'node:fs'
 import type { LocalStreamWrite, RpcMessageContext, RpcTransport } from './transport'
 
 const MAX_RUNTIME_RPC_MESSAGE_BYTES = 1024 * 1024
 const RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS = 30_000
-const MAX_RUNTIME_RPC_CONNECTIONS = 32
+// Why: long-polls (16) and event streams (8) are fenced in runtime-rpc, so they hold at most 24
+// slots; the other 40 cover short RPCs piling up while main is busy (ORCA-830).
+const MAX_RUNTIME_RPC_CONNECTIONS = 64
 const DEFAULT_KEEPALIVE_INTERVAL_MS = 10_000
 const MAX_LOCAL_STREAM_BACKLOG_BYTES = 1024 * 1024
-// Why: answered by the transport itself, so a liveness probe exercises accept/read/write without auth or the dispatcher.
-export const RUNTIME_RPC_PROBE_FRAME = '{"_probe":true}'
 
 export type UnixSocketTransportDiagnostics = {
   activeConnections: number
@@ -62,7 +62,10 @@ export class UnixSocketTransport implements RpcTransport {
     if (this.server) {
       return
     }
+    this.server = await this.listen()
+  }
 
+  private async listen(): Promise<Server> {
     if (this.kind === 'unix' && existsSync(this.endpoint)) {
       rmSync(this.endpoint, { force: true })
     }
@@ -92,14 +95,15 @@ export class UnixSocketTransport implements RpcTransport {
     if (this.kind === 'unix') {
       chmodSync(this.endpoint, 0o600)
     }
-
-    this.server = server
+    return server
   }
 
   async stop(): Promise<void> {
     const server = this.server
     this.server = null
     if (!server) {
+      // Why: a failed relisten leaves no listener but still owns the connections it accepted before.
+      this.destroyActiveSockets()
       return
     }
     const closePromise = new Promise<void>((resolve, reject) => {
@@ -113,19 +117,30 @@ export class UnixSocketTransport implements RpcTransport {
     })
     // Why: server.close() stops accepting new connections but waits for
     // existing sockets; long-poll keepalives can otherwise hold shutdown open.
-    for (const socket of Array.from(this.activeSockets)) {
-      socket.destroy()
-    }
+    this.destroyActiveSockets()
     await closePromise
     if (this.kind === 'unix' && existsSync(this.endpoint)) {
       rmSync(this.endpoint, { force: true })
     }
   }
 
-  // Why: stop() unlinks the endpoint, so a rebind recreates a socket file something else deleted.
-  async restart(): Promise<void> {
-    await this.stop()
-    await this.start()
+  /** False once a Unix socket file is gone from disk; a named pipe lives as long as its listener. */
+  hasEndpoint(): boolean {
+    return this.kind === 'named-pipe' || existsSync(this.endpoint)
+  }
+
+  /** Binds a fresh listener at the endpoint; connections the old one accepted keep running. */
+  async relisten(): Promise<void> {
+    // Why: closing the handle unlinks its path synchronously, so it must go before the new bind.
+    this.server?.close()
+    this.server = null
+    this.server = await this.listen()
+  }
+
+  private destroyActiveSockets(): void {
+    for (const socket of Array.from(this.activeSockets)) {
+      socket.destroy()
+    }
   }
 
   getDiagnostics(): UnixSocketTransportDiagnostics {
@@ -134,35 +149,6 @@ export class UnixSocketTransport implements RpcTransport {
       droppedConnections: this.droppedConnections,
       lastServerError: this.lastServerError
     }
-  }
-
-  /** Dials this transport's own endpoint like a CLI would; resolves null when it answers, else the reason. */
-  probe(timeoutMs: number): Promise<string | null> {
-    return new Promise((resolve) => {
-      let settled = false
-      let buffer = ''
-      const socket = createConnection(this.endpoint)
-      const settle = (failure: string | null): void => {
-        if (settled) {
-          return
-        }
-        settled = true
-        clearTimeout(timer)
-        socket.destroy()
-        resolve(failure)
-      }
-      const timer = setTimeout(() => settle(`no answer within ${timeoutMs}ms`), timeoutMs)
-      socket.setEncoding('utf8')
-      socket.once('error', (error: NodeJS.ErrnoException) => settle(error.code ?? error.message))
-      socket.once('close', () => settle('closed before answering'))
-      socket.on('data', (chunk: string) => {
-        buffer += chunk
-        if (buffer.includes(`${RUNTIME_RPC_PROBE_FRAME}\n`)) {
-          settle(null)
-        }
-      })
-      socket.write(`${RUNTIME_RPC_PROBE_FRAME}\n`)
-    })
   }
 
   private handleConnection(socket: Socket): void {
@@ -212,9 +198,7 @@ export class UnixSocketTransport implements RpcTransport {
       while (newlineIndex !== -1) {
         const rawMessage = buffer.slice(0, newlineIndex).trim()
         buffer = buffer.slice(newlineIndex + 1)
-        if (rawMessage === RUNTIME_RPC_PROBE_FRAME) {
-          socket.end(`${RUNTIME_RPC_PROBE_FRAME}\n`)
-        } else if (rawMessage) {
+        if (rawMessage) {
           this.dispatchMessage(socket, rawMessage, inflight)
         }
         newlineIndex = buffer.indexOf('\n')

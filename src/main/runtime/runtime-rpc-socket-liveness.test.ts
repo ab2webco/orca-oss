@@ -14,13 +14,18 @@ vi.mock('../git/worktree', () => ({
 }))
 
 // Why: the same frame `orca status` sends; null when the runtime answers, else what the CLI would have seen.
-function statusError(metadata: RuntimeMetadata): Promise<string | null> {
+function statusError(
+  metadata: RuntimeMetadata,
+  socket = createConnection(findTransport(metadata, 'unix')!.endpoint)
+): Promise<string | null> {
   return new Promise((resolve) => {
     let buffer = ''
-    const socket = createConnection(findTransport(metadata, 'unix')!.endpoint)
     const settle = (result: string | null): void => {
       clearTimeout(timer)
-      socket.destroy()
+      socket.removeAllListeners()
+      if (result !== null) {
+        socket.destroy()
+      }
       resolve(result)
     }
     const timer = setTimeout(() => settle('timeout'), 2000)
@@ -33,11 +38,16 @@ function statusError(metadata: RuntimeMetadata): Promise<string | null> {
         settle((JSON.parse(buffer.split('\n')[0]) as { ok: boolean }).ok ? null : 'rpc_error')
       }
     })
-    socket.on('connect', () => {
+    const send = (): void => {
       socket.write(
         `${JSON.stringify({ id: 'status', authToken: metadata.authToken, method: 'status.get' })}\n`
       )
-    })
+    }
+    if (socket.connecting) {
+      socket.once('connect', send)
+    } else {
+      send()
+    }
   })
 }
 
@@ -60,7 +70,7 @@ async function openIdleConnections(endpoint: string, count: number): Promise<Soc
   return sockets
 }
 
-// Why: named pipes leave no file to delete and Windows has no Unix socket backlog semantics to pin.
+// Why: named pipes leave no file to delete.
 describe.skipIf(process.platform === 'win32')('local RPC socket liveness (ORCA-830)', () => {
   const cleanups: (() => Promise<void> | void)[] = []
   afterEach(async () => {
@@ -87,36 +97,34 @@ describe.skipIf(process.platform === 'win32')('local RPC socket liveness (ORCA-8
     return { server, metadata }
   }
 
-  it('rebinds a socket file deleted under a live runtime', async () => {
+  it('rebinds a socket file deleted under a live runtime without cutting held connections', async () => {
     const { server, metadata } = await startServer()
     const endpoint = findTransport(metadata, 'unix')!.endpoint
-    expect(await statusError(metadata)).toBeNull()
+    const [held] = await openIdleConnections(endpoint, 1)
+    cleanups.push(() => {
+      held.destroy()
+    })
 
     rmSync(endpoint)
     expect(await statusError(metadata)).toEqual(UNREACHABLE)
 
     await server.checkRuntimeSocketLiveness()
-    await server.checkRuntimeSocketLiveness()
-    expect(await statusError(metadata)).toEqual(UNREACHABLE)
-    await server.checkRuntimeSocketLiveness()
 
     expect(await statusError(metadata)).toBeNull()
+    expect(await statusError(metadata, held)).toBeNull()
     expect(readRuntimeMetadata(server['userDataPath'])).toEqual(metadata)
   })
 
-  it('recovers when held connections fill the socket cap', async () => {
+  it('still answers with every fenced long-poll and stream slot held plus a burst', async () => {
     const { server, metadata } = await startServer()
     const endpoint = findTransport(metadata, 'unix')!.endpoint
-    const holders = await openIdleConnections(endpoint, 32)
+    // Why: 16 long-polls + 8 streams, plus 18 short calls from a lead and 8 members firing at once.
+    const holders = await openIdleConnections(endpoint, 16 + 8 + 18)
     cleanups.push(() => holders.forEach((socket) => socket.destroy()))
 
-    expect(await statusError(metadata)).toEqual(UNREACHABLE)
-
-    for (let i = 0; i < 3; i += 1) {
-      await server.checkRuntimeSocketLiveness()
-    }
-
     expect(await statusError(metadata)).toBeNull()
+    await server.checkRuntimeSocketLiveness()
+    expect(holders.every((socket) => !socket.destroyed)).toBe(true)
   })
 
   it('stops probing once the server stops', async () => {

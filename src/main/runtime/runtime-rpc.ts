@@ -14,7 +14,6 @@ import {
 } from './runtime-metadata-ownership-watch'
 import {
   RUNTIME_SOCKET_LIVENESS_POLL_MS,
-  RUNTIME_SOCKET_PROBE_TIMEOUT_MS,
   watchRuntimeSocketLiveness,
   type RuntimeSocketLivenessWatch
 } from './runtime-socket-liveness-watch'
@@ -93,7 +92,7 @@ type OrcaRuntimeRpcServerOptions = {
   longPollCap?: number
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
-  // Why: test-only override for the local socket self-probe cadence.
+  // Why: test-only override for the local socket liveness cadence.
   socketLivenessPollMs?: number
 }
 
@@ -166,11 +165,11 @@ export type MobilePairingConnectionContext = Readonly<{
 // Why: keepalive frames count as socket activity, resetting both idle timers so long-polls outlive the 30s/60s idle caps. See §3.1.
 const KEEPALIVE_INTERVAL_MS = 10_000
 
-// Why: cap long-polls at half the 32-slot connection budget so they can't starve short RPCs; overflow → runtime_busy. See §7 risk #2.
+// Why: cap long-polls at a quarter of the local socket's 64 slots so they can't starve short RPCs; overflow → runtime_busy. See §7 risk #2.
 const LONG_POLL_CAP = 16
 // Why: only these streams run on the local socket; the rest assume a paired WebSocket's lifecycle.
 const LOCAL_STREAMING_METHODS: ReadonlySet<string> = new Set(['events.subscribe'])
-// Why: each stream holds one of the socket's 32 connections for as long as it runs.
+// Why: each stream holds one of the socket's 64 connections for as long as it runs.
 const MAX_LOCAL_STREAMS = 8
 
 // Why: orchestration.ask blocks on a human/agent reply for minutes, an order of
@@ -1328,7 +1327,7 @@ export class OrcaRuntimeRpcServer {
 
     this.socketLivenessWatch = watchRuntimeSocketLiveness({
       pollIntervalMs: this.socketLivenessPollMs,
-      probe: () => socketTransport.probe(RUNTIME_SOCKET_PROBE_TIMEOUT_MS),
+      hasEndpoint: () => socketTransport.hasEndpoint(),
       describe: () => socketTransport.getDiagnostics(),
       rebind: async () => {
         if (!this.activeTransports.includes(socketTransport)) {
@@ -1343,7 +1342,7 @@ export class OrcaRuntimeRpcServer {
             this.runtime.getRuntimeId()
           )
         }
-        await socketTransport.restart()
+        await socketTransport.relisten()
         // Why: a stop() that raced the rebind must not leave a listener outside activeTransports.
         if (!this.activeTransports.includes(socketTransport)) {
           await socketTransport.stop()
@@ -1608,7 +1607,7 @@ export class OrcaRuntimeRpcServer {
     this.metadataOwnershipWatch?.check()
   }
 
-  /** Why: test-only seam — runs one socket probe instead of waiting out the poll interval. */
+  /** Why: test-only seam — runs one socket liveness check instead of waiting out the poll interval. */
   checkRuntimeSocketLiveness(): Promise<void> {
     return this.socketLivenessWatch?.check() ?? Promise.resolve()
   }
