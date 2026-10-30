@@ -69,10 +69,7 @@ export class GamePairedHostReader {
   }
 }
 
-/**
- * The lead, its cap summed over this Orca and each paired host under the project's cap, with each
- * host's own cap; with no paired host, or for a member, the lead as its layers resolve.
- */
+/** The lead's cap summed over its hosts under the project's cap, and each host's own cap. */
 export async function gameLeadOverPairedHostsOf(
   layers: Parameters<typeof resolveOrchestratorGameLead>[0],
   input: { host?: GameHostProfile; readPairedHosts?: () => Promise<PairedGameHostEntry[]> },

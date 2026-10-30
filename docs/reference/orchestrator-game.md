@@ -610,21 +610,13 @@ The lead's verbs, run from the lead's terminal
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
-- **Per-host caps (ORCA-888).** Once this Orca has a saved environment, each host runs its own
-  number of members: this Orca what its memory and cores fit (one per 4 GB and 2 cores, 1 to 12),
-  and each paired host the `memberCap` it publishes on `status.get` (the same formula over its own
-  machine). The lead's total is their sum, so a machine added adds capacity; `orchestrator.cap`, when
-  a layer sets it, is only a ceiling over that sum, not a per-machine cap. A host that does not
-  answer adds nothing, and its members still hold its slots. A host older than this publishes no
-  profile: it adds nothing and its members take this Orca's slots, as before. `game fleet` prints
-  `Hosts: local 3/5 · imac 4/8 · m1 0/6` under its head line, and `game state --json` carries the
-  caps in `hosts`. `game launch` refuses per host and names the room elsewhere
-  (`imac at cap 6/6, m1 has 4 free: launch ORCA-1 with --on m1, or close one on imac.`); `game wave` and
-  `game resume-members` start members on this Orca only, so they stop at its cap. A host's reading
-  is cached for 30 s ([`orchestrator-game-paired-hosts.ts`](../../src/main/runtime/orchestrator-game-paired-hosts.ts),
-  [`orchestrator-game-host-load.ts`](../../src/shared/orchestrator-game-host-load.ts)). With no saved
-  environment, `orchestrator.cap` stays the one number it was. An explicit cap per host (the
-  placement record) has no setter yet.
+- **Per-host caps (ORCA-888).** With a saved environment, the lead's cap is the sum of each
+  reachable host's: this Orca's from its memory and cores (one per 4 GB and 2 cores, 1 to 12), each
+  paired host's `memberCap` from `status.get`, cached 30 s. A layer's `orchestrator.cap` only caps
+  that sum. A host that does not answer adds nothing; an older one publishes no cap, so its members
+  take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
+  carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
+  `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,

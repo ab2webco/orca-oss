@@ -13,10 +13,7 @@ export type OrchestratorGameLead = {
   autostart: boolean
   /** Ask the person before `game resume-members` after a restart; unset or false resumes at once. */
   askBeforeResume?: boolean
-  /**
-   * Members running at once; a launch past it is refused. Set in a layer, it is the ceiling over
-   * every host; in a lead's state it is the total its reachable hosts fit under that ceiling.
-   */
+  /** Members running at once; in a layer, the ceiling over the sum of every host's cap. */
   cap: number
   /** The agent a member runs, as `orca orchestration worker-start --agent` names it. */
   agent: string

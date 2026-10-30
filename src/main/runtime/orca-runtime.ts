@@ -205,11 +205,6 @@ const gameHostProfileOfThisMachine = (): GameHostProfile => ({
   totalMemory: totalmem(),
   cpuCoreCount: Math.max(1, cpus().length)
 })
-
-const gameHostOfThisMachine = (): NonNullable<RuntimeStatus['gameHost']> => {
-  const profile = gameHostProfileOfThisMachine()
-  return { ...profile, memberCap: defaultGameMemberCapOf(profile) }
-}
 import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
 import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -5882,7 +5877,9 @@ export class OrcaRuntimeService {
       hostPlatform: process.platform,
       terminalWindowsShell: this.store?.getSettings?.().terminalWindowsShell ?? null,
       floatingWorkspaceEnabled: this.store?.getSettings?.().floatingTerminalEnabled !== false,
-      gameHost: gameHostOfThisMachine(),
+      gameHost: ((profile) => ({ ...profile, memberCap: defaultGameMemberCapOf(profile) }))(
+        gameHostProfileOfThisMachine()
+      ),
       protocolVersion: RUNTIME_PROTOCOL_VERSION,
       minCompatibleMobileVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
     }
