@@ -1,0 +1,39 @@
+name: Packaged Plugin Seal
+
+# Why on PRs too: the Lab Release gate runs this same check on the commit it ships, but a change to
+# the Claude plugin path should meet it before merge, not at release time (ORCA-663).
+
+on:
+  pull_request:
+    paths:
+      - 'src/main/claude/orchestrator-game-*'
+      - 'src/main/claude/claude-plugin-dir-probe*'
+      - 'resources/claude-plugins/**'
+      - 'config/electron-builder.config.cjs'
+      - 'config/scripts/verify-packaged-claude-plugin-seal*'
+      - '.github/actions/verify-packaged-plugin-seal/**'
+      - '.github/workflows/packaged-plugin-seal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaged-plugin-seal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  seal:
+    name: packaged plugin seal (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/verify-packaged-plugin-seal
