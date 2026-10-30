@@ -11,7 +11,8 @@ export function formatRemoteOrchestrationCheck(
   response: RpcResponse,
   json: boolean,
   terminal: string,
-  formattedRequested: boolean
+  formattedRequested: boolean,
+  cli?: string
 ): { stdout: string; stderr: string } {
   if (!response.ok || !isRecord(response.result)) {
     return json
@@ -25,7 +26,8 @@ export function formatRemoteOrchestrationCheck(
   const result = prepareOrchestrationCheckOutput(
     { ...(response.result as OrchestrationCheckOutput), messages, count },
     terminal,
-    formattedRequested
+    formattedRequested,
+    cli
   )
   if (json) {
     return {
@@ -34,7 +36,7 @@ export function formatRemoteOrchestrationCheck(
     }
   }
   return {
-    stdout: `${formatOrchestrationCheckText(result, terminal)}\n`,
+    stdout: `${formatOrchestrationCheckText(result, terminal, cli)}\n`,
     stderr: ''
   }
 }

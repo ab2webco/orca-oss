@@ -130,8 +130,9 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['orchestration', 'inbox'],
     summary: 'Show messages across (or for) recipients',
-    usage: 'orca orchestration inbox [--limit <n>] [--terminal <handle>] [--full] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'limit', 'terminal', 'full']
+    usage:
+      'orca orchestration inbox [--limit <n>] [--terminal <handle>] [--id <msg_id>] [--full] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'limit', 'terminal', 'id', 'full']
   },
   {
     path: ['orchestration', 'task-create'],
