@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { formatGameLaunch } from './orchestrator-game-launch-result'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
 import {

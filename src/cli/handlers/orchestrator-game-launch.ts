@@ -20,13 +20,15 @@ import {
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
 import {
-  GAME_GLOBAL_LOGIN_LABEL,
-  gameGlobalLoginNoteOf,
   globalLoginHolderOf,
   remoteGlobalLoginOf,
-  resolveGameMemberAccount,
-  type GameGlobalLoginLaunch
+  resolveGameMemberAccount
 } from './orchestrator-game-launch-account'
+import {
+  formatGameLaunch,
+  isLaunchUnderway,
+  type GameLaunchResult
+} from './orchestrator-game-launch-result'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
@@ -46,30 +48,12 @@ import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../.
 import {
   formatSetupQueue,
   runtimeCapabilitiesOf,
-  setupAdmissionOf,
-  type GameSetupQueue
+  setupAdmissionOf
 } from './orchestrator-game-setup-queue'
 
 export { readCallerGameState }
 
 type Client = Parameters<CommandHandler>[0]['client']
-
-export type GameLaunchResult = GameGlobalLoginLaunch & {
-  ticket: string
-  /** The scene character the member was named after; absent once the roster ran out. */
-  name?: string
-  agent: string
-  /** The managed account's email and id; absent when Orca's own account selection applies. */
-  account?: string
-  accountId?: string
-  runId: string
-  taskId: string
-  /** Absent while the member waits for the host's setup slot. */
-  dispatchId?: string
-  state: string
-  setupQueue?: GameSetupQueue
-  lastError?: string
-}
 
 type WorkerStartResult = Pick<
   GameLaunchResult,
@@ -258,23 +242,6 @@ export async function launchGameMember(args: {
   ])
   return launched
 }
-
-export const formatGameLaunch = (launched: GameLaunchResult): string => {
-  const who = [
-    launched.agent,
-    launched.account ?? (launched.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : undefined)
-  ]
-    .filter(Boolean)
-    .join(' · ')
-  const what = launched.setupQueue
-    ? formatSetupQueue(launched.setupQueue, who)
-    : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
-}
-
-/** A queued member is on its way, not a failed launch. */
-export const isLaunchUnderway = (launched: GameLaunchResult): boolean =>
-  launched.state === 'ready' || launched.state === 'queued'
 
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {
   'game launch': async ({ flags, client, cwd, json }) => {

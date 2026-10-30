@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { formatGameLaunch } from './orchestrator-game-launch-result'
 import { gameLaunchChoiceOf } from './orchestrator-game-launch-options'
 import { globalLoginHolderOf } from './orchestrator-game-launch-account'
 import type { RuntimeClient } from '../runtime-client'
