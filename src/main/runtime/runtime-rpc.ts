@@ -12,6 +12,12 @@ import {
   watchRuntimeMetadataOwnership,
   type RuntimeMetadataOwnershipWatch
 } from './runtime-metadata-ownership-watch'
+import {
+  RUNTIME_SOCKET_LIVENESS_POLL_MS,
+  RUNTIME_SOCKET_PROBE_TIMEOUT_MS,
+  watchRuntimeSocketLiveness,
+  type RuntimeSocketLivenessWatch
+} from './runtime-socket-liveness-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
 import type { RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse, successResponse } from './rpc/errors'
@@ -87,6 +93,8 @@ type OrcaRuntimeRpcServerOptions = {
   longPollCap?: number
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
+  // Why: test-only override for the local socket self-probe cadence.
+  socketLivenessPollMs?: number
 }
 
 export type PairingOfferUnavailableReason =
@@ -553,6 +561,7 @@ export class OrcaRuntimeRpcServer {
   private readonly keepaliveIntervalMs: number
   private readonly longPollCap: number
   private readonly metadataOwnershipPollMs: number
+  private readonly socketLivenessPollMs: number
   private readonly askLongPollCap: number
   private readonly relayRevokeOutbox: RelayRevokeOutbox
   private deviceRegistry: DeviceRegistry | null = null
@@ -562,6 +571,7 @@ export class OrcaRuntimeRpcServer {
   private activeTransports: RpcTransport[] = []
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
+  private socketLivenessWatch: RuntimeSocketLivenessWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
@@ -605,7 +615,8 @@ export class OrcaRuntimeRpcServer {
     webClientRoot,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP,
-    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS
+    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS,
+    socketLivenessPollMs = RUNTIME_SOCKET_LIVENESS_POLL_MS
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
     this.dispatcher = new RpcDispatcher({ runtime })
@@ -620,6 +631,7 @@ export class OrcaRuntimeRpcServer {
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
     this.metadataOwnershipPollMs = metadataOwnershipPollMs
+    this.socketLivenessPollMs = socketLivenessPollMs
     // Why: derived, not configurable — the reservation must hold for whatever cap a caller picks.
     this.askLongPollCap = Math.max(1, Math.floor(longPollCap * ASK_LONG_POLL_SHARE))
     this.relayRevokeOutbox = new RelayRevokeOutbox(userDataPath)
@@ -1313,6 +1325,33 @@ export class OrcaRuntimeRpcServer {
         )
       }
     })
+
+    this.socketLivenessWatch = watchRuntimeSocketLiveness({
+      pollIntervalMs: this.socketLivenessPollMs,
+      probe: () => socketTransport.probe(RUNTIME_SOCKET_PROBE_TIMEOUT_MS),
+      describe: () => socketTransport.getDiagnostics(),
+      rebind: async () => {
+        if (!this.activeTransports.includes(socketTransport)) {
+          return
+        }
+        if (this.platform !== 'win32') {
+          // Why: recreates a purged $TMPDIR fallback directory before listening again.
+          createRuntimeTransportMetadata(
+            this.userDataPath,
+            this.pid,
+            this.platform,
+            this.runtime.getRuntimeId()
+          )
+        }
+        await socketTransport.restart()
+        // Why: a stop() that raced the rebind must not leave a listener outside activeTransports.
+        if (!this.activeTransports.includes(socketTransport)) {
+          await socketTransport.stop()
+          return
+        }
+        this.metadataOwnershipWatch?.check()
+      }
+    })
   }
 
   // Why: STA-2370 — a desktop with no previously-connected device stays on loopback until the user
@@ -1569,6 +1608,11 @@ export class OrcaRuntimeRpcServer {
     this.metadataOwnershipWatch?.check()
   }
 
+  /** Why: test-only seam — runs one socket probe instead of waiting out the poll interval. */
+  checkRuntimeSocketLiveness(): Promise<void> {
+    return this.socketLivenessWatch?.check() ?? Promise.resolve()
+  }
+
   async stop(): Promise<void> {
     // Why: STA-2370 — refuse new widens, then let any in-flight pairing widen settle into the live
     // transport arrays before snapshotting them, so a racing rebind can't strand a wide 0.0.0.0 listener
@@ -1585,6 +1629,8 @@ export class OrcaRuntimeRpcServer {
     this.transports = []
     this.metadataOwnershipWatch?.stop()
     this.metadataOwnershipWatch = null
+    this.socketLivenessWatch?.stop()
+    this.socketLivenessWatch = null
     this.mobileSocketWiring = null
     this.detachWebSocketWiring = null
     const stopResults = await Promise.allSettled(

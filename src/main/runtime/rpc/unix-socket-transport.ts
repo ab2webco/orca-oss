@@ -4,7 +4,7 @@
 // It also owns the keepalive timer and per-connection abort signal so the
 // server-side handler can cancel long-poll dispatches when the client goes
 // away. See design doc §3.1.
-import { createServer, type Server, type Socket } from 'node:net'
+import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, existsSync, rmSync } from 'node:fs'
 import type { LocalStreamWrite, RpcMessageContext, RpcTransport } from './transport'
 
@@ -13,6 +13,14 @@ const RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS = 30_000
 const MAX_RUNTIME_RPC_CONNECTIONS = 32
 const DEFAULT_KEEPALIVE_INTERVAL_MS = 10_000
 const MAX_LOCAL_STREAM_BACKLOG_BYTES = 1024 * 1024
+// Why: answered by the transport itself, so a liveness probe exercises accept/read/write without auth or the dispatcher.
+export const RUNTIME_RPC_PROBE_FRAME = '{"_probe":true}'
+
+export type UnixSocketTransportDiagnostics = {
+  activeConnections: number
+  droppedConnections: number
+  lastServerError: string | null
+}
 
 export type UnixSocketTransportOptions = {
   endpoint: string
@@ -37,6 +45,8 @@ export class UnixSocketTransport implements RpcTransport {
   private server: Server | null = null
   private messageHandler: MessageHandler | null = null
   private readonly activeSockets = new Set<Socket>()
+  private droppedConnections = 0
+  private lastServerError: string | null = null
 
   constructor({ endpoint, kind, keepaliveIntervalMs }: UnixSocketTransportOptions) {
     this.endpoint = endpoint
@@ -68,6 +78,15 @@ export class UnixSocketTransport implements RpcTransport {
         server.off('error', reject)
         resolve()
       })
+    })
+    // Why: past maxConnections Node closes new clients silently; the CLI reads that as "could not connect" (ORCA-830).
+    server.on('drop', () => {
+      this.droppedConnections += 1
+    })
+    // Why: an accept error (EMFILE under load) would otherwise throw in main with no listener attached.
+    server.on('error', (error) => {
+      this.lastServerError = error instanceof Error ? error.message : String(error)
+      console.error('[runtime] Local RPC transport error:', error)
     })
 
     if (this.kind === 'unix') {
@@ -101,6 +120,49 @@ export class UnixSocketTransport implements RpcTransport {
     if (this.kind === 'unix' && existsSync(this.endpoint)) {
       rmSync(this.endpoint, { force: true })
     }
+  }
+
+  // Why: stop() unlinks the endpoint, so a rebind recreates a socket file something else deleted.
+  async restart(): Promise<void> {
+    await this.stop()
+    await this.start()
+  }
+
+  getDiagnostics(): UnixSocketTransportDiagnostics {
+    return {
+      activeConnections: this.activeSockets.size,
+      droppedConnections: this.droppedConnections,
+      lastServerError: this.lastServerError
+    }
+  }
+
+  /** Dials this transport's own endpoint like a CLI would; resolves null when it answers, else the reason. */
+  probe(timeoutMs: number): Promise<string | null> {
+    return new Promise((resolve) => {
+      let settled = false
+      let buffer = ''
+      const socket = createConnection(this.endpoint)
+      const settle = (failure: string | null): void => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(timer)
+        socket.destroy()
+        resolve(failure)
+      }
+      const timer = setTimeout(() => settle(`no answer within ${timeoutMs}ms`), timeoutMs)
+      socket.setEncoding('utf8')
+      socket.once('error', (error: NodeJS.ErrnoException) => settle(error.code ?? error.message))
+      socket.once('close', () => settle('closed before answering'))
+      socket.on('data', (chunk: string) => {
+        buffer += chunk
+        if (buffer.includes(`${RUNTIME_RPC_PROBE_FRAME}\n`)) {
+          settle(null)
+        }
+      })
+      socket.write(`${RUNTIME_RPC_PROBE_FRAME}\n`)
+    })
   }
 
   private handleConnection(socket: Socket): void {
@@ -150,7 +212,9 @@ export class UnixSocketTransport implements RpcTransport {
       while (newlineIndex !== -1) {
         const rawMessage = buffer.slice(0, newlineIndex).trim()
         buffer = buffer.slice(newlineIndex + 1)
-        if (rawMessage) {
+        if (rawMessage === RUNTIME_RPC_PROBE_FRAME) {
+          socket.end(`${RUNTIME_RPC_PROBE_FRAME}\n`)
+        } else if (rawMessage) {
           this.dispatchMessage(socket, rawMessage, inflight)
         }
         newlineIndex = buffer.indexOf('\n')
