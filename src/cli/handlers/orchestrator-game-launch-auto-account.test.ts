@@ -137,6 +137,94 @@ describe('orca game launch with accounts: auto', () => {
     expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_cy' })])
   })
 
+  it('picks the freest account when the project sets no accounts and no --account is given', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({ ana: limits(70, 40), cy: limits(10, 30) })
+    )
+
+    await launch(client)
+
+    expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_cy' })])
+  })
+
+  it('refuses rather than fall back to the global login while managed accounts exist', async () => {
+    const snapshot = snapshotWith({ ana: limits(10, 10) })
+    const failed = {
+      ...snapshot,
+      rateLimits: {
+        ...snapshot.rateLimits,
+        claudeAccountAuth: [{ accountId: 'acct_ana', state: 'failed' }]
+      }
+    }
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      failed
+    )
+
+    await expect(launch(client)).rejects.toThrow(/global login.*--account/)
+    expect(starts()).toEqual([])
+  })
+
+  it('launches on the global login with no managed account at all, and says so', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
+      flags: new Map([['ticket', 'CIN-12']]),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(starts()).toHaveLength(1)
+    expect(starts()[0]).not.toHaveProperty('claudeAccountId')
+    expect(output.join('\n')).toMatch(/CIN-12.*global login/s)
+  })
+
+  it('refuses a second member on the global login', async () => {
+    const onGlobal = {
+      paneKey: 'm1',
+      displayName: 'CIN-1',
+      agentType: 'claude',
+      state: 'working',
+      isLeader: false,
+      isMember: true,
+      globalLogin: true
+    }
+    const { client, starts } = fakeClient(
+      stateWith({ agents: [onGlobal], lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await expect(launch(client)).rejects.toThrow(/CIN-1 already runs on the global login/)
+    expect(starts()).toEqual([])
+  })
+
+  it('wave with no managed account launches one member on the global login and refuses the rest', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game wave']({
+      flags: new Map([['tickets', 'CIN-1,CIN-2']]),
+      client,
+      cwd: '/repo',
+      json: true
+    })
+
+    expect(starts()).toEqual([expect.objectContaining({ name: 'cin-1' })])
+    expect(starts()[0]).not.toHaveProperty('claudeAccountId')
+    const wave = JSON.parse(output.join('')).result
+    expect(wave.launched).toEqual([expect.objectContaining({ ticket: 'CIN-1', globalLogin: true })])
+    expect(wave.failed).toEqual([
+      { ticket: 'CIN-2', error: expect.stringMatching(/CIN-1 already runs on the global login/) }
+    ])
+  })
+
   it('keeps the default account selection with accounts: default and no --account', async () => {
     const { client, calls, starts } = fakeClient(
       stateWith({ lead: { autostart: false, cap: 4, agent: 'claude', accounts: 'default' } }),
@@ -207,7 +295,7 @@ describe('orca game launch with accounts: auto', () => {
 
   it('wave spreads the members it launches over equally free accounts', async () => {
     const { client, starts } = fakeClient(
-      stateWith(),
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
       snapshotWith({ ana: limits(10, 10), cy: limits(11, 10) })
     )
 

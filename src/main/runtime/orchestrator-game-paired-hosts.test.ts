@@ -95,6 +95,13 @@ describe('gameLeadOverPairedHostsOf', () => {
     expect(placed.hosts?.map((one) => one.cap)).toEqual([5, 8, 0])
   })
 
+  it('a member never reads the paired hosts', async () => {
+    const readPairedHosts = vi.fn(paired)
+    const placed = await gameLeadOverPairedHostsOf({}, { host: local, readPairedHosts }, 'member')
+    expect(readPairedHosts).not.toHaveBeenCalled()
+    expect(placed).toEqual({ lead: expect.objectContaining({ cap: 5 }) })
+  })
+
   it('with no paired host, or none readable, the cap is the one the layers resolve', async () => {
     const layers = { project: { orchestrator: { cap: 8 } } }
     for (const readPairedHosts of [

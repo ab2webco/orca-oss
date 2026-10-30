@@ -1,4 +1,5 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch'
+import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import type { GameHold } from './orchestrator-game-hold'
 import { formatSetupQueue } from './orchestrator-game-setup-queue'
@@ -174,7 +175,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.branch ?? '-',
     row.host ?? 'local',
     row.agent ?? '-',
-    row.account ?? '-',
+    row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.next,
     row.name
   ])

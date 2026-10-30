@@ -1,5 +1,9 @@
-import { membersOf, rowOf, type GameFleetRow } from './orchestrator-game-fleet-verbs'
-import type { OrchestratorGameState } from './orchestrator-game-state'
+import {
+  gameFleetMembersOf,
+  gameFleetRowOf,
+  type GameFleetInput,
+  type GameFleetRow
+} from './orchestrator-game-fleet-verbs'
 
 export type GameStopTarget = {
   row: GameFleetRow
@@ -10,11 +14,11 @@ export type GameStopTarget = {
 
 /** Members `orca game stop` ends, in list order; never the lead. */
 export function gameStopTargetsOf(
-  state: Pick<OrchestratorGameState, 'agents' | 'lead'>,
+  state: GameFleetInput,
   tickets: 'all' | readonly string[]
 ): { targets: GameStopTarget[]; missing: string[] } {
-  const all = membersOf(state).map((agent) => ({
-    row: rowOf(agent),
+  const all = gameFleetMembersOf(state).map((agent) => ({
+    row: gameFleetRowOf(agent),
     worktreeId: agent.worktree?.id ?? null,
     remoteDispatchId: agent.remote ? agent.paneKey.replace(/^remote:/, '') : null
   }))

@@ -32,8 +32,10 @@ export type GameLaunchChoice = {
   agent: string
   model?: string
   effort?: string
-  /** An email, an account id, or `auto` (the flag, or orchestrator.accounts: auto); null keeps today's selection. */
+  /** An email, an account id, or `auto` (the flag, or orchestrator.accounts unset or auto); null with accounts: default. */
   account: string | null
+  /** What a paired host resolves: only what the flag or orchestrator.accounts named. */
+  remoteAccount: string | null
 }
 
 function flagText(flags: Map<string, string | boolean>, name: string): string | undefined {
@@ -104,7 +106,9 @@ export function gameLaunchChoiceOf(
     agent,
     ...(model === undefined ? {} : { model }),
     ...(model === undefined || effort === undefined ? {} : { effort }),
-    account: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
+    // Why auto when unset: Orca cannot move or refresh a member on the global login (ORCA-809).
+    account: typed.account ?? (lead.accounts === 'default' ? null : 'auto'),
+    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
   }
 }
 

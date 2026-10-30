@@ -291,7 +291,7 @@ export function ProjectOrchestratorGameLeadSetting({
         label={accountsText.label}
         description={effective(
           'accounts',
-          lead.accounts === 'auto' ? accountsText.auto : accountsText.default
+          lead.accounts === 'default' ? accountsText.default : accountsText.auto
         )}
         control={
           <SettingsSegmentedControl

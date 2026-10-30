@@ -86,6 +86,22 @@ describe('orca game fleet verbs', () => {
     expect(text).toMatch(/claude\s+ana@example\.com/)
   })
 
+  it('fleet flags a member on the global login', async () => {
+    const { client } = fakeClient(stateWith({ agents: [LEAD, member({ globalLogin: true })] }))
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(output.join('\n')).toMatch(/claude\s+global login\s/)
+    output = []
+    await run('game fleet', client)
+    expect(printed().rows).toEqual([expect.objectContaining({ account: null, globalLogin: true })])
+  })
+
   it('fleet text lists members paused by a restart and how to resume or discard them', async () => {
     const { client } = fakeClient(
       stateWith({
@@ -145,39 +161,6 @@ describe('orca game fleet verbs', () => {
 
     expect(output.join('\n')).toContain(
       'Could not resume members: the saved members file is damaged'
-    )
-  })
-
-  it('fleet text shows each host’s load, and wave stops at this Orca’s cap (ORCA-888)', async () => {
-    const onImac = member({
-      paneKey: 'i',
-      displayName: 'CIN-9 on imac',
-      remote: { host: 'imac', stateKnown: true }
-    })
-    const state = stateWith({
-      agents: [LEAD, member({}), onImac],
-      lead: { autostart: false, cap: 7, agent: 'claude' },
-      hosts: [
-        { host: 'local', cap: 1, status: 'ok' },
-        { host: 'imac', id: 'env-imac', cap: 6, status: 'ok' }
-      ]
-    })
-    const text = formatFleet(gameFleetReportOf(state as never))
-    expect(text.split('\n')[1]).toBe('Hosts: local 1/1 · imac 1/6')
-
-    const { client, calls } = fakeClient(state)
-    await run('game wave', client, [['dry-run', true]])
-    expect(methods(calls)).toEqual(['game.state'])
-    expect(printed()).toEqual(
-      expect.objectContaining({
-        free: 0,
-        launch: [],
-        skipped: [
-          { ticket: 'CIN-1', reason: 'already running' },
-          { ticket: 'CIN-2', reason: 'cap' },
-          { ticket: 'CIN-3', reason: 'cap' }
-        ]
-      })
     )
   })
 

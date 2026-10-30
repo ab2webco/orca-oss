@@ -5,6 +5,7 @@ import {
   settle,
   type GameAgentRow,
   type GameMemberAccountOf,
+  type GameMemberGlobalLoginOf,
   type GameMemberLimitOf,
   type GameMemberWork,
   type ReadLinkedStatus
@@ -109,6 +110,7 @@ export type OrchestratorGameStateInput = {
   readLinear: () => Promise<TrackerItem | null>
   readLinkedStatus?: ReadLinkedStatus
   accountOf?: GameMemberAccountOf
+  globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
@@ -229,10 +231,7 @@ export async function buildOrchestratorGameState(
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
   const role = input.callerParentPaneKey ? 'member' : 'lead'
-  const placed = await gameLeadOverPairedHostsOf(
-    layers,
-    role === 'lead' ? input : { host: input.host }
-  )
+  const placed = await gameLeadOverPairedHostsOf(layers, input, role)
   const actions = gameStateActionsOf({
     role,
     lead: placed.lead,
@@ -271,6 +270,7 @@ export async function buildOrchestratorGameState(
     readMemberWork: input.readMemberWork,
     readLinkedStatus: input.readLinkedStatus,
     accountOf: input.accountOf,
+    globalLoginOf: input.globalLoginOf,
     limitOf: input.limitOf,
     advisorOf: input.advisorOf,
     launchOf: input.launchOf,

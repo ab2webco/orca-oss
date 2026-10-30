@@ -58,15 +58,16 @@ function formatQuota(quota: AccountQuota | null): string {
   return windows.join(' · ')
 }
 
-const UNKNOWN_TERMINAL_ACCOUNT_REASONS: Record<ClaudeTerminalAccountUnknownReason, string> = {
-  'pane-unresolved': 'no live pane resolved for that handle (closed, asleep, or reminted)',
-  'no-claude-binding': 'Orca Lab holds no Claude account binding for this pane',
-  'ownership-unresolved': 'this pane outlived a restart and its owner is not resolved yet',
-  'remote-host': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
-  'no-caller-terminal':
-    'this command is not running inside an Orca Lab-managed terminal; pass --terminal <handle>',
-  'lookup-failed': 'the runtime could not answer (it may be older than this CLI)'
-}
+export const UNKNOWN_TERMINAL_ACCOUNT_REASONS: Record<ClaudeTerminalAccountUnknownReason, string> =
+  {
+    'pane-unresolved': 'no live pane resolved for that handle (closed, asleep, or reminted)',
+    'no-claude-binding': 'Orca Lab holds no Claude account binding for this pane',
+    'ownership-unresolved': 'this pane outlived a restart and its owner is not resolved yet',
+    'remote-host': 'this pane runs on a WSL distro or SSH host that owns its own Claude auth',
+    'no-caller-terminal':
+      'this command is not running inside an Orca Lab-managed terminal; pass --terminal <handle>',
+    'lookup-failed': 'the runtime could not answer (it may be older than this CLI)'
+  }
 
 const UNSWITCHABLE_TERMINAL_REASONS: Partial<
   Record<ClaudeTerminalAccountSwitchFailureReason, string>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyPageContextLoss,
   formatPageContextLossLine,
+  isRewrittenProtocolError,
   type PageContextLossObservation
 } from './page-context-loss-evidence'
 
@@ -20,6 +21,7 @@ function observation(
     windowsAtReport: 1,
     handleWindowIndex: 0,
     windowUrlsAtReport: [APP_URL],
+    rewrittenProtocolError: false,
     ...overrides
   }
 }
@@ -27,6 +29,31 @@ function observation(
 // ORCA-300: three causes produce the same Playwright message, and the whole
 // point of this helper is that they stop being indistinguishable. Each case
 // below is one of the three the investigation could not separate.
+// Playwright 1.59.1 prints this sentence from two places; only the trailing
+// period tells them apart (crExecutionContext.js rewriteError vs frames.js).
+describe('isRewrittenProtocolError', () => {
+  it('matches the reworded CDP error, with its period', () => {
+    expect(
+      isRewrittenProtocolError(
+        'Error: page.evaluate: Execution context was destroyed, most likely because of a navigation.'
+      )
+    ).toBe(true)
+  })
+
+  it('does not match a context Chromium really destroyed', () => {
+    expect(
+      isRewrittenProtocolError(
+        'Error: page.evaluate: Execution context was destroyed, most likely because of a navigation'
+      )
+    ).toBe(false)
+    expect(
+      isRewrittenProtocolError(
+        'page.evaluate: Execution context was destroyed, most likely because of a navigation\nCall log:'
+      )
+    ).toBe(false)
+  })
+})
+
 describe('classifyPageContextLoss', () => {
   it('calls a same-URL main-frame navigation a reload', () => {
     // Orca reloads its own window on several paths; a reload destroys the
@@ -88,6 +115,27 @@ describe('classifyPageContextLoss', () => {
     )
   })
 
+  it('names a protocol error Playwright reworded when nothing navigated', () => {
+    // ORCA-885: Chromium answered 'Promise was collected' and Playwright
+    // reported it as a destroyed context; the page was never touched.
+    expect(classifyPageContextLoss(observation({ rewrittenProtocolError: true }))).toBe(
+      'protocol-error'
+    )
+  })
+
+  it('still reads a navigation before a reworded protocol error', () => {
+    // A call sent into a context that a navigation just replaced is reworded
+    // the same way, so the navigation is the cause there.
+    expect(
+      classifyPageContextLoss(
+        observation({
+          rewrittenProtocolError: true,
+          mainFrameNavigations: [{ atMs: 900, url: APP_URL }]
+        })
+      )
+    ).toBe('reloaded')
+  })
+
   it('admits it saw nothing rather than guessing', () => {
     // The honest outcome, and the one that says this recorder is not the
     // instrument that will explain the failure.
@@ -98,6 +146,16 @@ describe('classifyPageContextLoss', () => {
     const line = formatPageContextLossLine('spec > test', observation(), 'no-navigation')
     expect(line).toContain('[page-context-loss]')
     expect(line).toContain('this recorder cannot see the cause')
+  })
+
+  it('says in the line that the context was not destroyed', () => {
+    const line = formatPageContextLossLine(
+      'spec > test',
+      observation({ rewrittenProtocolError: true }),
+      'protocol-error'
+    )
+    expect(line).toContain('protocol-error')
+    expect(line).toContain('the context was not destroyed')
   })
 
   it('puts the navigation timeline in the line', () => {

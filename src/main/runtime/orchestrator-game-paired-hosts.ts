@@ -71,15 +71,20 @@ export class GamePairedHostReader {
 
 /**
  * The lead, its cap summed over this Orca and each paired host under the project's cap, with each
- * host's own cap; with no paired host, the lead as its layers resolve.
+ * host's own cap; with no paired host, or for a member, the lead as its layers resolve.
  */
 export async function gameLeadOverPairedHostsOf(
   layers: Parameters<typeof resolveOrchestratorGameLead>[0],
-  input: { host?: GameHostProfile; readPairedHosts?: () => Promise<PairedGameHostEntry[]> }
+  input: { host?: GameHostProfile; readPairedHosts?: () => Promise<PairedGameHostEntry[]> },
+  role: 'lead' | 'member' = 'lead'
 ): Promise<{ lead: OrchestratorGameLead; hosts?: GameHostCap[] }> {
   const local = input.host ?? null
   const lead = resolveOrchestratorGameLead(layers, local)
-  const paired = input.readPairedHosts ? await input.readPairedHosts().catch(() => null) : null
+  // Why a member skips it: only the lead launches, and a member's state must not wait on hosts.
+  const paired =
+    role === 'lead' && input.readPairedHosts
+      ? await input.readPairedHosts().catch(() => null)
+      : null
   // Why only with a paired host: alone, a project's cap stays the one this machine runs.
   if (!paired?.length) {
     return { lead }
