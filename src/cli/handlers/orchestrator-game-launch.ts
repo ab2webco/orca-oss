@@ -60,6 +60,8 @@ export type GameLaunchResult = {
   accountId?: string
   /** No managed account exists, so the member runs on the host's global login. */
   globalLogin?: true
+  /** Why `auto` picked the account. */
+  accountWhy?: string
   runId: string
   taskId: string
   /** Absent while the member waits for the host's setup slot. */
@@ -126,7 +128,7 @@ export async function launchGameMember(args: {
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
-  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
+  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
   const where = args.remote
     ? { ...args.remote, worktree: 'new-top-level' }
     : await memberWorktreeParamsOf({ client, state, ticket, repo })
@@ -241,6 +243,7 @@ export async function launchGameMember(args: {
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
       : {}),
     ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
+    ...(memberAccount.why ? { accountWhy: memberAccount.why } : {}),
     ...(hostAccount ? { account: hostAccount.email } : {}),
     ...started
   }
@@ -267,7 +270,7 @@ export const formatGameLaunch = (launched: GameLaunchResult): string => {
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${GLOBAL_LOGIN_NOTE}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.accountWhy ? `\n${launched.accountWhy}` : ''}${launched.globalLogin ? `\n${GLOBAL_LOGIN_NOTE}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
 }
 
 /** A queued member is on its way, not a failed launch. */

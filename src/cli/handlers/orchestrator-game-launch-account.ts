@@ -4,14 +4,17 @@ import { resolveManagedAccountSelector } from '../account-selector'
 import { RuntimeClientError } from '../runtime-client'
 import {
   gameAccountUsagesOf,
+  isAllowedGameAccount,
   isAutoPickableAccount,
   type GameLaunchedOnAccount
 } from '../../shared/orchestrator-game-account-usage'
-import type { GameLaunchChoice } from './orchestrator-game-launch-options'
+import { allowedAccountsText, type GameLaunchChoice } from './orchestrator-game-launch-options'
 import {
   GAME_ACCOUNT_NEAR_LIMIT_PERCENT,
+  gameAccountStandingOf,
   gameResetInText,
-  pickGameMemberAccount
+  pickGameMemberAccount,
+  type GameAccountUsage
 } from '../../shared/orchestrator-game-account-pick'
 import {
   accountProviderOfAgent,
@@ -48,6 +51,8 @@ export type GameMemberAccountChoice = {
   account: { id: string; email: string } | null
   /** No managed account exists, so the member runs on the host's global login. */
   globalLogin?: true
+  /** Why `auto` picked this account, for the launch output. */
+  why?: string
 }
 
 // Why bounded: accounts.list waits on provider usage APIs that can stall behind broken auth.
@@ -65,7 +70,8 @@ function namedAccount(
   snapshot: RuntimeAccountsSnapshot,
   provider: GameAccountProvider,
   agent: string,
-  selector: string
+  selector: string,
+  allowed: readonly string[] | undefined
 ): GameMemberAccountChoice {
   const other = provider === 'claude' ? 'codex' : 'claude'
   const named = (account: { id: string; email: string }): boolean =>
@@ -83,6 +89,12 @@ function namedAccount(
     accounts: snapshot[provider].accounts
   })
   const email = snapshot[provider].accounts.find((account) => account.id === id)?.email ?? id
+  if (!isAllowedGameAccount({ id, email }, allowed)) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `${email} is not one of the accounts this project allows: ${allowedAccountsText(allowed ?? [])}.`
+    )
+  }
   return { pin: pinOf(provider, id), account: { id, email } }
 }
 
@@ -127,10 +139,42 @@ function globalLoginChoice(
   return { ...NO_ACCOUNT, globalLogin: true }
 }
 
+const windowText = (label: string, window: GameAccountUsage['session']): string =>
+  window ? `${label} ${Math.round(window.usedPercent)}%` : `${label} —`
+
+const percentOf = (usage: GameAccountUsage): string =>
+  `${windowText('5h', usage.session)}, ${windowText('7d', usage.weekly)}`
+
+/** The launch line: the account picked, and each one passed over as limited or near. */
+function pickWhy(
+  pick: { account: GameAccountUsage; standing: 'free' | 'unknown' },
+  usages: readonly GameAccountUsage[],
+  allowed: readonly string[] | undefined,
+  now: number
+): string {
+  const label = GAME_ACCOUNT_PROVIDER_LABELS[pick.account.provider]
+  const skipped = usages.flatMap((usage) => {
+    const { standing } = gameAccountStandingOf(usage, now)
+    if (usage === pick.account || (standing !== 'limited' && standing !== 'near')) {
+      return []
+    }
+    const cause = usage.stopped
+      ? `${usage.members.join(', ') || 'a member'} stopped on a limit`
+      : percentOf(usage)
+    return [`${usage.email} (${standing}: ${cause})`]
+  })
+  const which = pick.standing === 'free' ? 'the freest usable' : 'no reading yet, the first'
+  return [
+    `${pick.account.email}: ${which} ${label} account${allowed ? ' the project allows' : ''} (${percentOf(pick.account)})`,
+    ...(skipped.length > 0 ? [`skipped ${skipped.join(', ')}`] : [])
+  ].join('; ')
+}
+
 async function autoAccount(
   client: Client,
   provider: GameAccountProvider,
-  context: GameMemberAccountContext
+  context: GameMemberAccountContext,
+  allowed: readonly string[] | undefined
 ): Promise<GameMemberAccountChoice> {
   const usagesOf = (snapshot: RuntimeAccountsSnapshot) =>
     gameAccountUsagesOf({
@@ -139,7 +183,8 @@ async function autoAccount(
       ),
       provider,
       agents: context.agents,
-      launched: context.launched
+      launched: context.launched,
+      allowed
     })
   let snapshot = await readAccounts(client)
   let usages = usagesOf(snapshot)
@@ -157,6 +202,12 @@ async function autoAccount(
   }
   const now = Date.now()
   const pick = pickGameMemberAccount(usages, now)
+  if (pick.kind === 'none' && allowed !== undefined) {
+    throw new RuntimeClientError(
+      GAME_ACCOUNTS_UNUSABLE,
+      `No usable ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account here: ${allowedAccountsText(allowed)}, and Orca does not fall back to the global login. See \`orca game accounts\`.`
+    )
+  }
   if (pick.kind === 'none') {
     return context.globalLoginHolder === undefined
       ? NO_ACCOUNT
@@ -168,13 +219,17 @@ async function autoAccount(
       `Every ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_PERCENT}%+ of its 5h or 7d window); the first is usable again ${gameResetInText(pick.resetsAt, now)}${pick.resetsAt === null ? '' : ` (${new Date(pick.resetsAt).toISOString()})`}. Wait for it, or name one with --account <email|id>. See \`orca game accounts\`.`
     )
   }
-  return { pin: pinOf(provider, pick.account.id), account: pick.account }
+  return {
+    pin: pinOf(provider, pick.account.id),
+    account: pick.account,
+    why: pickWhy(pick, usages, allowed, now)
+  }
 }
 
 /** The managed account a new member runs on: the one named, the freest one for `auto`, or Orca's default. */
 export async function resolveGameMemberAccount(
   client: Client,
-  choice: Pick<GameLaunchChoice, 'agent' | 'account'>,
+  choice: Pick<GameLaunchChoice, 'agent' | 'account' | 'allowedAccounts'>,
   context: GameMemberAccountContext
 ): Promise<GameMemberAccountChoice> {
   const provider = accountProviderOfAgent(choice.agent)
@@ -182,7 +237,13 @@ export async function resolveGameMemberAccount(
     return NO_ACCOUNT
   }
   if (choice.account === 'auto') {
-    return await autoAccount(client, provider, context)
+    return await autoAccount(client, provider, context, choice.allowedAccounts)
   }
-  return namedAccount(await readAccounts(client), provider, choice.agent, choice.account)
+  return namedAccount(
+    await readAccounts(client),
+    provider,
+    choice.agent,
+    choice.account,
+    choice.allowedAccounts
+  )
 }

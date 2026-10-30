@@ -82,10 +82,10 @@ const STATE = {
   lead: { autostart: false, cap: 4, agent: 'claude' }
 }
 
-function fakeClient() {
+function fakeClient(state: unknown = STATE) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
-    'game.state': STATE,
+    'game.state': state,
     'accounts.snapshot': SNAPSHOT,
     'accounts.list': SNAPSHOT
   }
@@ -143,7 +143,8 @@ describe('orca game accounts', () => {
             limited: true,
             usableAt: new Date(NOW + 90 * 60_000).toISOString(),
             members: ['CIN-1'],
-            autoPick: true
+            autoPick: true,
+            memberStopped: false
           },
           expect.objectContaining({ email: 'cy@example.com', standing: 'near', limited: false })
         ],
@@ -177,6 +178,21 @@ describe('orca game accounts', () => {
       'Every Claude account is at or near its limit; the first is usable again in 1h 30m'
     )
     expect(text).toMatch(/bo@example\.com\s+5h 10%.*free\s+CIN-2/)
+  })
+
+  it('shows an account whose member stopped on a spend limit as limited, with when it is back (ORCA-896)', async () => {
+    const stopped = {
+      ...member('m2', 'CIN-2', { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }),
+      state: 'idle',
+      limit: { resetsAt: null, spend: true }
+    }
+    const { client } = fakeClient({ ...STATE, agents: [stopped] })
+
+    await run(client, false)
+
+    expect(output.join('\n')).toMatch(
+      /bo@example\.com\s+5h 10%.*limited, member stopped on a limit, back at an unknown time\s+CIN-2/
+    )
   })
 
   it('refreshes provider usage first with --refresh', async () => {

@@ -291,11 +291,16 @@ export function ProjectOrchestratorGameLeadSetting({
         label={accountsText.label}
         description={effective(
           'accounts',
-          lead.accounts === 'default' ? accountsText.default : accountsText.auto
+          Array.isArray(lead.accounts)
+            ? lead.accounts.join(', ')
+            : lead.accounts === 'default'
+              ? accountsText.default
+              : accountsText.auto
         )}
         control={
           <SettingsSegmentedControl
-            value={stored?.accounts ?? 'inherit'}
+            // Why: an allow-list comes from orca.yaml; Settings can only override it with default or auto.
+            value={Array.isArray(stored?.accounts) ? 'auto' : (stored?.accounts ?? 'inherit')}
             ariaLabel={accountsText.label}
             size="sm"
             options={[

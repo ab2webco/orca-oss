@@ -536,7 +536,7 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: default # optional: auto (unset: the freest managed account, see below) or default (Orca's own selection)
+    accounts: default # optional: auto (unset: the freest managed account, see below), default (Orca's own selection), or a list of allowed account emails or ids
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
@@ -843,6 +843,12 @@ of its agent with the most free quota
   unknown, Orca refreshes usage once (bounded to 20 s) before picking.
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
+- An account one of whose members stopped on a limit (see below) is **limited** until that limit
+  resets, whatever its 5h and 7d readings say: a spend limit is not in those readings (ORCA-896).
+- `accounts: [a@example.com, acct_id]` restricts `auto`, `--account` and `game move` to the
+  accounts listed (emails or ids); with none of them usable the launch is refused, never moved to
+  the global login. Settings can only override the list with `default` or `auto`.
+- The launch prints the account picked, its 5h and 7d use, and each account it skipped and why.
 - When every account is near or limited the launch is refused with when the first is back.
 - A launch never falls back to the host's global login (`~/.claude`, `~/.codex`) while the agent
   has managed accounts: Orca cannot refresh, `game move` or `account switch` a member there
@@ -855,7 +861,8 @@ of its agent with the most free quota
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
-verifiably back under its limit (the same guard Orca's auto-switch uses)
+verifiably back under its limit (the same guard Orca's auto-switch uses). A spend-limit message
+(`spend limit`, `/usage-credits`) keeps it limited even then, since no reading counts spend
 ([`orchestrator-game-member-limit.ts`](../../src/shared/orchestrator-game-member-limit.ts)).
 `game state` carries it as the member's `limit: { resetsAt }`, and each member's account as
 `account: { provider, id, email }`. `game fleet` shows the phase `limited` with `game move` as the
