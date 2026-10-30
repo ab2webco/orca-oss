@@ -15322,6 +15322,23 @@
         "theUpdate": "la actualización",
         "cancel": "Cancelar",
         "restartNow": "Reiniciar ahora"
+      },
+      "game-inbox": {
+        "GameInboxSheet": {
+          "title": "Bandeja",
+          "description": "Lo que el lead del proyecto te pidió decidir.",
+          "forYou": "Para ti",
+          "empty": "No hay preguntas esperando tu respuesta."
+        },
+        "GameOwnerQuestionCard": {
+          "failed": "La respuesta no se envió.",
+          "yourAnswer": "Tu respuesta",
+          "placeholder": "Responde con tus palabras",
+          "send": "Enviar"
+        },
+        "SidebarGameInboxEntry": {
+          "inbox": "Bandeja"
+        }
       }
     },
     "i18n": {
