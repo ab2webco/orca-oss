@@ -12,7 +12,7 @@ export type GameStopTarget = {
   remoteDispatchId: string | null
 }
 
-/** Members `orca game stop` ends, in list order; never the lead. */
+/** Members `orca game stop` ends, in list order; never the lead, and a found session only by name. */
 export function gameStopTargetsOf(
   state: GameFleetInput,
   tickets: 'all' | readonly string[]
@@ -23,11 +23,14 @@ export function gameStopTargetsOf(
     remoteDispatchId: agent.remote ? agent.paneKey.replace(/^remote:/, '') : null
   }))
   if (tickets === 'all') {
-    return { targets: all, missing: [] }
+    return { targets: all.filter((target) => !target.row.found), missing: [] }
   }
   const named = [...new Set(tickets.map((ticket) => ticket.trim().toUpperCase()))]
+  // Why the name: a found session may carry no ticket, and its worktree name is how the fleet lists it.
+  const isNamed = (row: GameFleetRow, name: string): boolean =>
+    row.ticket === name || row.name.toUpperCase() === name
   return {
-    targets: all.filter((target) => target.row.ticket && named.includes(target.row.ticket)),
-    missing: named.filter((ticket) => !all.some((target) => target.row.ticket === ticket))
+    targets: all.filter((target) => named.some((name) => isNamed(target.row, name))),
+    missing: named.filter((name) => !all.some((target) => isNamed(target.row, name)))
   }
 }

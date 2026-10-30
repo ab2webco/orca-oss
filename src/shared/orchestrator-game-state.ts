@@ -76,6 +76,8 @@ export type GameAgent = {
   orphaned?: true
   /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */
   remote?: GameRemoteHost
+  /** A session no `game launch` started: listed and stopped by name, never acted on in bulk (ORCA-914). */
+  found?: true
 }
 
 export type GameRemoteHost = {

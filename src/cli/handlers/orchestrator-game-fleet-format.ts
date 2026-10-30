@@ -169,7 +169,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.agent ?? '-',
     row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.next,
-    row.name
+    row.found ? `${row.name} (found)` : row.name
   ])
   const header = [
     'PHASE',

@@ -88,6 +88,8 @@ export type OrchestratorGameStateInput = {
   agents: GameAgentRow[]
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
   members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  /** Every other session on this machine; read only for a lead (ORCA-914). */
+  found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
@@ -258,6 +260,7 @@ export async function buildOrchestratorGameState(
   const agents = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
+    found: input.callerParentPaneKey ? [] : input.found,
     leaderPaneKey: input.leaderPaneKey,
     teamHandles: input.teamHandles,
     terminalHandleOf: input.terminalHandleOf,

@@ -54,8 +54,9 @@ export class GamePausedMembers {
       starting: []
     }
   ): Promise<GamePausedMembersView> {
+    // Why not found ones: no launch of this lead started them, so there is nothing of its own to resume (ORCA-914).
     const live = agents.flatMap((agent) => {
-      const ticket = agent.isMember ? ticketOfMember(agent) : null
+      const ticket = agent.isMember && !agent.found ? ticketOfMember(agent) : null
       return ticket ? [{ agent, ticket }] : []
     })
     let error: string | null = null

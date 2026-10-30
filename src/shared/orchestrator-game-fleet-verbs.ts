@@ -47,6 +47,8 @@ export type GameFleetRow = {
   stateKnown: boolean
   /** A remote member a lead that no longer leads it launched (ORCA-793). */
   earlierLead: boolean
+  /** No `game launch` started it: only verbs that name it act on it (ORCA-914). */
+  found: boolean
 }
 
 const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
@@ -101,7 +103,10 @@ export function ticketOfMember(agent: GameAgent): string | null {
 function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
   switch (phase) {
     case 'finished':
-      return 'sweep --close'
+      // Why: sweep never closes a session the lead did not launch (ORCA-914).
+      return agent.found
+        ? `game stop ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
+        : 'sweep --close'
     case 'needs-you':
       return agent.limit?.loggedOut ? loggedOutNextOf(agent) : 'answer it'
     case 'limited':
@@ -143,7 +148,8 @@ export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage):
     orphaned: agent.orphaned === true,
     host: agent.remote?.host ?? null,
     stateKnown: agent.remote?.stateKnown !== false,
-    earlierLead: agent.remote?.earlierLead === true
+    earlierLead: agent.remote?.earlierLead === true,
+    found: agent.found === true
   }
 }
 
@@ -190,10 +196,11 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
   const holding = (state.pausedMembers ?? []).filter((one) => !one.worktreeGone)
   const queued = state.queuedMembers ?? []
   // Why gone ones do not: their host answered that the terminal is gone, so nothing runs there (ORCA-864).
-  const gone = gameFleetMembersOf(state).filter(
-    (agent) => agent.remote?.gone && !isFinishedMember(agent)
+  // Why found ones do not either: no wave launched them, so they never held a launch slot (ORCA-914).
+  const free = gameFleetMembersOf(state).filter(
+    (agent) => (agent.remote?.gone || agent.found) && !isFinishedMember(agent)
   )
-  const running = rows.length - counts.finished - gone.length + holding.length + queued.length
+  const running = rows.length - counts.finished - free.length + holding.length + queued.length
   return {
     rows,
     counts,
@@ -269,7 +276,7 @@ export type GameSweepEntry = {
 /** Finished members, each with what releasing its tab still leaves for someone to do. */
 export function gameSweepOf(state: GameFleetInput): GameSweepEntry[] {
   return gameFleetMembersOf(state)
-    .filter(isFinishedMember)
+    .filter((agent) => !agent.found && isFinishedMember(agent))
     .map((agent) => {
       const pending: string[] = []
       if (agent.worktree) {
@@ -315,6 +322,9 @@ export function gamePushPlanOf(state: GameFleetInput): GamePushEntry[] {
           action: 'needs-you',
           reason: 'waiting on a question or dialog: the person or the lead answers it'
         }
+      }
+      if (row.found) {
+        return { ...base, action: 'leave', reason: 'found: not launched by this lead' }
       }
       if (row.phase === 'working') {
         return { ...base, action: 'leave', reason: 'working' }
