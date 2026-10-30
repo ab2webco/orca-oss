@@ -31433,12 +31433,12 @@ export class OrcaRuntimeService {
           : null
         return sent ?? (lead ? this.readCallerGameScene(lead) : null)
       },
+      // Why worktreeId: the map can miss a worktree it has not scanned yet; the board keys by the id's repo.
       readInboxes: () =>
         this.gameBoard.inboxSummary({
-          worktreeId: worktree?.id,
+          worktreeId,
           terminalHandle: callerHandle ?? undefined
         }),
-      // Why worktreeId: the map can miss a worktree it has not scanned yet; the board keys by the id's repo.
       readOpenOwnerQuestions: async () =>
         (
           await this.gameBoard.ownerQuestions({
@@ -31448,13 +31448,13 @@ export class OrcaRuntimeService {
         ).open,
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
-          worktreeId: worktree?.id,
+          worktreeId,
           terminalHandle: callerHandle ?? undefined
         }),
       readStop: async () =>
         (
           await this.gameBoard.stopState({
-            worktreeId: worktree?.id,
+            worktreeId,
             terminalHandle: callerHandle ?? undefined
           })
         ).stopped,
