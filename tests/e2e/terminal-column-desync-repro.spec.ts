@@ -105,6 +105,27 @@ async function readColumnSnapshot(page: Page, ptyId: string): Promise<ColumnSnap
   return { xtermCols, ptyCols }
 }
 
+// Why: the resize chain (ResizeObserver → rAF fit → PTY resize IPC) needs
+// longer than a fixed wait under loaded CI, and the two columns are sampled
+// non-atomically. Poll until they converge — a genuinely dropped resize never
+// converges and still fails, so this keeps the regression guard.
+async function expectColumnsInSync(page: Page, ptyId: string, label: string): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const snap = await readColumnSnapshot(page, ptyId)
+        return snap.ptyCols === snap.xtermCols
+          ? 'synced'
+          : `pty=${snap.ptyCols} xterm=${snap.xtermCols}`
+      },
+      {
+        timeout: 30_000,
+        message: `${label}: PTY cols should converge to xterm cols`
+      }
+    )
+    .toBe('synced')
+}
+
 async function closeRightSidebarAndFeatureTips(page: Page): Promise<void> {
   await page.evaluate(() => {
     const store = window.__store
@@ -134,34 +155,16 @@ test.describe('Terminal column desync repro', () => {
     await ensureTerminalVisible(orcaPage)
     const ptyId = await settleTerminal(orcaPage)
 
-    // Why: the resize chain (ResizeObserver → rAF fit → PTY resize IPC) needs
-    // longer than a fixed wait under loaded CI, and the two columns are sampled
-    // non-atomically. Poll until they converge — a genuinely dropped resize
-    // never converges and still fails, so this keeps the regression guard.
-    const expectColumnsInSync = async (label: string): Promise<void> => {
-      await expect
-        .poll(
-          async () => {
-            const snap = await readColumnSnapshot(orcaPage, ptyId)
-            return snap.ptyCols === snap.xtermCols
-              ? 'synced'
-              : `pty=${snap.ptyCols} xterm=${snap.xtermCols}`
-          },
-          { timeout: 30_000, message: `${label}: PTY cols should converge to xterm cols` }
-        )
-        .toBe('synced')
-    }
-
     // Baseline: a freshly fit terminal should agree with its PTY.
-    await expectColumnsInSync('baseline')
+    await expectColumnsInSync(orcaPage, ptyId, 'baseline')
 
     // Shrink the window while the terminal is visible, then widen it. xterm
     // reflows via the ResizeObserver; the PTY must follow.
     await orcaPage.setViewportSize({ width: 760, height: 800 })
-    await expectColumnsInSync('after shrink')
+    await expectColumnsInSync(orcaPage, ptyId, 'after shrink')
 
     await orcaPage.setViewportSize({ width: 1280, height: 800 })
-    await expectColumnsInSync('after widen')
+    await expectColumnsInSync(orcaPage, ptyId, 'after widen')
   })
 
   // Why: guards the applied-size IPC contract the desync fix relies on. The
@@ -215,10 +218,9 @@ test.describe('Terminal column desync repro', () => {
     await ensureTerminalVisible(orcaPage)
     const ptyId = await settleTerminal(orcaPage)
     await orcaPage.setViewportSize({ width: 1280, height: 800 })
-    await orcaPage.waitForTimeout(400)
-
-    const baseline = await readColumnSnapshot(orcaPage, ptyId)
-    expect(baseline.ptyCols).toBe(baseline.xtermCols)
+    // Why: this visible resize is the setup, not the bug under test; CI saw the
+    // PTY still at the pre-resize width after a fixed 400ms (ORCA-876).
+    await expectColumnsInSync(orcaPage, ptyId, 'baseline')
 
     // Hide the terminal by switching worktrees, resize the window narrow while
     // it is in the background (so isRendererPtyResizeAuthoritative() is false
@@ -289,11 +291,8 @@ test.describe('Terminal column desync repro', () => {
     await closeRightSidebarAndFeatureTips(orcaPage)
     await ensureTerminalVisible(orcaPage)
     await orcaPage.setViewportSize({ width: 1280, height: 800 })
-    await orcaPage.waitForTimeout(300)
     const firstPtyId = await settleTerminal(orcaPage)
-
-    const baseline = await readColumnSnapshot(orcaPage, firstPtyId)
-    expect(baseline.ptyCols).toBe(baseline.xtermCols)
+    await expectColumnsInSync(orcaPage, firstPtyId, 'baseline')
 
     // Splitting halves the width of the original pane: xterm reflows to ~half
     // the columns. The PTY must follow, otherwise the existing shell keeps
@@ -307,7 +306,10 @@ test.describe('Terminal column desync repro', () => {
             .map((pane) => pane.ptyId)
             .filter((ptyId): ptyId is string => Boolean(ptyId))
         },
-        { timeout: 30_000, message: 'vertical split should produce two PTY-backed panes' }
+        {
+          timeout: 30_000,
+          message: 'vertical split should produce two PTY-backed panes'
+        }
       )
       .toHaveLength(2)
     const snapshot = await waitForPaneIdentitySnapshot(orcaPage, 2)
@@ -345,7 +347,12 @@ test.describe('Terminal column desync repro', () => {
     // A single mount only trips the race intermittently, so reload-loop the
     // restored-split first-mount and assert none of the attempts desynced.
     const MOUNT_ATTEMPTS = 6
-    const desyncs: { attempt: number; ptyId: string; ptyCols: number; xtermCols: number }[] = []
+    const desyncs: {
+      attempt: number
+      ptyId: string
+      ptyCols: number
+      xtermCols: number
+    }[] = []
 
     await waitForSessionReady(orcaPage)
     await waitForActiveWorktree(orcaPage)
@@ -365,7 +372,9 @@ test.describe('Terminal column desync repro', () => {
       // split layout, then resize down while the panes are still mounting.
       await orcaPage.setViewportSize({ width: 1440, height: 900 })
       await orcaPage.reload()
-      await orcaPage.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
+      await orcaPage.waitForFunction(() => Boolean(window.__store), null, {
+        timeout: 30_000
+      })
       await waitForSessionReady(orcaPage)
       await waitForActiveWorktree(orcaPage)
       await closeRightSidebarAndFeatureTips(orcaPage)
@@ -430,7 +439,9 @@ test.describe('Terminal column desync repro', () => {
         // terminal remounts and spawns its PTY at the wide width.
         await orcaPage.setViewportSize({ width: 1440, height: 900 })
         await orcaPage.reload()
-        await orcaPage.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
+        await orcaPage.waitForFunction(() => Boolean(window.__store), null, {
+          timeout: 30_000
+        })
       }
       await waitForSessionReady(orcaPage)
       await waitForActiveWorktree(orcaPage)
@@ -446,7 +457,11 @@ test.describe('Terminal column desync repro', () => {
 
       const snapshot = await readColumnSnapshot(orcaPage, ptyId)
       if (snapshot.ptyCols !== snapshot.xtermCols) {
-        desyncs.push({ attempt, ptyCols: snapshot.ptyCols, xtermCols: snapshot.xtermCols })
+        desyncs.push({
+          attempt,
+          ptyCols: snapshot.ptyCols,
+          xtermCols: snapshot.xtermCols
+        })
       }
     }
 
