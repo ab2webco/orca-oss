@@ -1,6 +1,7 @@
 import { RuntimeClientError } from '../runtime-client'
 import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
+import { isAllowedGameAccount } from '../../shared/orchestrator-game-account-usage'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import {
   GAME_PROMPT_MAX,
@@ -36,6 +37,8 @@ export type GameLaunchChoice = {
   account: string | null
   /** What a paired host resolves: only what the flag or orchestrator.accounts named. */
   remoteAccount: string | null
+  /** orchestrator.accounts as a list: the only accounts a member may run on. */
+  allowedAccounts?: string[]
 }
 
 function flagText(flags: Map<string, string | boolean>, name: string): string | undefined {
@@ -77,9 +80,26 @@ export function parseGameLaunchFlags(flags: Map<string, string | boolean>): Game
   }
 }
 
+export const allowedAccountsText = (allowed: readonly string[]): string =>
+  `this project allows only ${allowed.join(', ')} (orchestratorGame.orchestrator.accounts)`
+
+/** A paired host gets only what the project's list allows; until hosts filter `auto`, only a named one. */
+function checkRemoteAccountAllowed(choice: GameLaunchChoice, on: string): void {
+  const allowed = choice.allowedAccounts
+  const named = choice.remoteAccount
+  // Why by email: an account id is the host's own, so the home can only match the email the list names.
+  if (allowed && (named === null || !isAllowedGameAccount({ id: named, email: named }, allowed))) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `${allowedAccountsText(allowed)}; name one of them on ${on} with --account <email>, since ${on} would otherwise pick from all of its accounts.`
+    )
+  }
+}
+
 export function gameLaunchChoiceOf(
   typed: GameLaunchFlags,
-  lead: OrchestratorGameLead
+  lead: OrchestratorGameLead,
+  remote?: { on: string } | null
 ): GameLaunchChoice {
   const agent = typed.agent ?? lead.agent
   // Why: the lead's model and effort name its own agent's models; another agent gets its defaults.
@@ -102,14 +122,19 @@ export function gameLaunchChoiceOf(
       `${agent} has no Orca-managed accounts; --account works for claude and codex members.`
     )
   }
-  return {
+  const choice: GameLaunchChoice = {
     agent,
     ...(model === undefined ? {} : { model }),
     ...(model === undefined || effort === undefined ? {} : { effort }),
     // Why auto when unset: Orca cannot move or refresh a member on the global login (ORCA-809).
     account: typed.account ?? (lead.accounts === 'default' ? null : 'auto'),
-    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
+    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null),
+    ...(Array.isArray(lead.accounts) ? { allowedAccounts: lead.accounts } : {})
   }
+  if (remote) {
+    checkRemoteAccountAllowed(choice, remote.on)
+  }
+  return choice
 }
 
 /** `--on <host>`: the paired host a member runs on, in its own worktree of that host's `repo`. */
