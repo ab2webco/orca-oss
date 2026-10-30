@@ -53,6 +53,7 @@ describe('PtyHandler', () => {
   })
 
   afterEach(async () => {
+    vi.unstubAllEnvs()
     await endPtyHandlerTest(handler, originalPlatform)
   })
 
@@ -128,6 +129,8 @@ describe('PtyHandler', () => {
   })
 
   it('revive drops a serialized slug that is not database-safe', async () => {
+    // Why: a suite run inside an Orca terminal inherits that worktree's slug.
+    vi.stubEnv('ORCA_WORKTREE_SLUG', undefined)
     const state = JSON.stringify([
       { id: 'pty-8', pid: process.pid, cols: 80, rows: 24, cwd: '/tmp', worktreeSlug: 'x; rm -rf' }
     ])
