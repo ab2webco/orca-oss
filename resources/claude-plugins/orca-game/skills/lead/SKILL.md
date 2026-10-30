@@ -23,6 +23,11 @@ allowed-tools: Bash
    "$ORCA_GAME_CLI" game lead
    ```
 
+   When the person asks to rotate to a fresh lead (`/orca-game:lead fresh`, "lead nuevo", "rotate
+   the lead"), run `"$ORCA_GAME_CLI" game lead --fresh` instead: it retires the closed lead's stored
+   conversation and makes this session the new lead rather than reopening it. The outgoing lead
+   must be closed first; with it still live, the output says so.
+
    If it says a lead launched this session, stop here and tell the person this is a member
    session. If it starts with `Not the lead:`, stop here too: tell the person, in their language,
    which pane is the project's lead (live, or reopened with its context) and that this session
