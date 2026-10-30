@@ -4,7 +4,11 @@ import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
-import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
+import {
+  DEFAULT_GAME_LEAD,
+  renderGameLaunchPrompt,
+  withGameMemberCiNote
+} from '../../shared/orchestrator-game-lead'
 import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
@@ -178,12 +182,14 @@ export async function launchGameMember(args: {
   )
   const taskParams = {
     spec: withGameLessons(
-      renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
-        id: item?.id ?? ticket,
-        title: item?.title ?? '',
-        url: item?.url ?? '',
-        status: item?.status
-      }),
+      withGameMemberCiNote(
+        renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
+          id: item?.id ?? ticket,
+          title: item?.title ?? '',
+          url: item?.url ?? '',
+          status: item?.status
+        })
+      ),
       await gameLessonBriefFor(client, item?.id ?? ticket)
     ),
     taskTitle: title,

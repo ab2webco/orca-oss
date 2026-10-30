@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
 import {
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
@@ -143,7 +144,7 @@ describe('orca game launch', () => {
       'game.eventPost'
     ])
     expect(calls[7]?.[1]).toEqual({
-      spec: 'Implement CIN-12: Cartelera page',
+      spec: withGameMemberCiNote('Implement CIN-12: Cartelera page'),
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
@@ -169,6 +170,20 @@ describe('orca game launch', () => {
         })
       })
     )
+  })
+
+  // Why: members' own gh CI loops spent the GitHub budget the lead needs to merge (ORCA-877).
+  it("tells the member to read its PR's CI from Orca instead of polling gh", async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client)
+
+    const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1] as
+      | { spec: string }
+      | undefined
+    expect(create?.spec).toBe(`Implement CIN-12: Cartelera page\n\n${GAME_MEMBER_CI_NOTE}`)
+    expect(GAME_MEMBER_CI_NOTE).toContain('`orca game state --json`')
+    expect(GAME_MEMBER_CI_NOTE).toContain('gh pr checks')
   })
 
   it("ends the member's brief with the project's lessons as untrusted data", async () => {
@@ -221,7 +236,9 @@ describe('orca game launch', () => {
       await launch(client)
 
       const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]
-      expect(create).toMatchObject({ spec: 'Implement CIN-12: Cartelera page' })
+      expect(create).toMatchObject({
+        spec: withGameMemberCiNote('Implement CIN-12: Cartelera page')
+      })
     }
   })
 
@@ -496,7 +513,10 @@ describe('orca game launch', () => {
     await launch(client, 'CIN-99')
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
-      expect.objectContaining({ spec: 'Implement CIN-99:', taskTitle: 'Arthur · CIN-99' })
+      expect.objectContaining({
+        spec: withGameMemberCiNote('Implement CIN-99:'),
+        taskTitle: 'Arthur · CIN-99'
+      })
     )
   })
 
@@ -509,7 +529,9 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
       expect.objectContaining({
-        spec: 'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
+        spec: withGameMemberCiNote(
+          'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
+        )
       })
     )
   })
