@@ -16,6 +16,23 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     .toBe(theme)
 }
 
+// The sheet slides in over 300ms and eases its width over 150ms on each resize, so a capture
+// taken straight after the resize shows a frame mid-motion; wait for the motion, then check the box.
+async function settleSheet(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 900 })
+  const sheet = page.getByTestId('game-inbox-sheet')
+  await expect(sheet).toHaveAttribute('data-state', 'open')
+  await sheet.evaluate(async (node) => {
+    await Promise.allSettled(node.getAnimations({ subtree: true }).map((one) => one.finished))
+  })
+  const box = await sheet.boundingBox()
+  if (!box) {
+    throw new Error(`the Inbox sheet has no box at ${width}px`)
+  }
+  expect(box.x, `left edge at ${width}px`).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width, `right edge at ${width}px`).toBeLessThanOrEqual(width)
+}
+
 // The person answers the lead's questions in Orca's own Inbox, not in the lead's chat (ORCA-782).
 test('the Inbox lists every open question for the person and sends the answer they pick or type', async ({
   electronApp,
@@ -26,7 +43,10 @@ test('the Inbox lists every open question for the person and sends the answer th
   const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
   const client = new RuntimeClient(userDataDir, 30_000, null, null)
   const ask = (args: { ticket?: string; question: string; options?: string[]; context?: string }) =>
-    client.call<{ question: GameOwnerQuestion }>('game.ownerAsk', { worktreeId, ...args })
+    client.call<{ question: GameOwnerQuestion }>('game.ownerAsk', {
+      worktreeId,
+      ...args
+    })
   const answerOf = async (id: string) =>
     (
       await client.call<{ questions: GameOwnerQuestion[] }>('game.ownerQuestions', {
@@ -44,7 +64,10 @@ test('the Inbox lists every open question for the person and sends the answer th
     options: ['Yes', 'Wait for lab.112'],
     context: 'https://example.test/pr/41'
   })
-  const byText = await ask({ ticket: 'orca-790', question: 'Which host takes the next member?' })
+  const byText = await ask({
+    ticket: 'orca-790',
+    question: 'Which host takes the next member?'
+  })
   for (let index = 3; index <= 6; index += 1) {
     await ask({
       ticket: `orca-80${index}`,
@@ -60,7 +83,9 @@ test('the Inbox lists every open question for the person and sends the answer th
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   for (const theme of ['dark', 'light'] as const) {
     await setTheme(orcaPage, theme)
-    await orcaPage.screenshot({ path: testInfo.outputPath(`game-inbox-entry-1440-${theme}.png`) })
+    await orcaPage.screenshot({
+      path: testInfo.outputPath(`game-inbox-entry-1440-${theme}.png`)
+    })
   }
   await entry.click()
   const sheet = orcaPage.getByTestId('game-inbox-sheet')
@@ -71,13 +96,16 @@ test('the Inbox lists every open question for the person and sends the answer th
   expect(await list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
 
   for (const width of [1440, 768, 390, 320]) {
-    await orcaPage.setViewportSize({ width, height: 900 })
+    await settleSheet(orcaPage, width)
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
-      await orcaPage.screenshot({ path: testInfo.outputPath(`game-inbox-${width}-${theme}.png`) })
+      await settleSheet(orcaPage, width)
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`game-inbox-${width}-${theme}.png`)
+      })
     }
   }
-  await orcaPage.setViewportSize({ width: 1440, height: 900 })
+  await settleSheet(orcaPage, 1440)
 
   const optionCard = sheet.locator(`[data-game-owner-question="${byOption.result.question.id}"]`)
   await optionCard.getByRole('button', { name: 'Wait for lab.112' }).click()
