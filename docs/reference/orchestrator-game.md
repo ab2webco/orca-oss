@@ -562,6 +562,9 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
+  project's stored lead conversation and this session becomes the new lead instead of reopening it.
+  A live lead still wins, and an older host that drops the flag reopens the old one and says so.
 - `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
