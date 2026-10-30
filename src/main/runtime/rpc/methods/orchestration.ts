@@ -37,6 +37,7 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
 import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
+import { routeFederatedMail } from '../../orchestration/federated-follow-up'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
@@ -651,27 +652,24 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               `Federated Dispatch ${dispatchId} does not support coordinator control mail; start a fresh worker after updating its Orca Lab server.`
             )
           }
-          if (db.getWorkerDispatch(dispatchId)?.state !== 'ready') {
-            throw new OrchestrationError(
-              'dispatch_inactive',
-              `Federated Dispatch ${dispatchId} is not active.`
-            )
-          }
           if (params.type === 'worker_done' || params.type === 'heartbeat') {
             throw new OrchestrationError(
               'invalid_argument',
               'Coordinator-to-worker control mail cannot report worker lifecycle.'
             )
           }
+          const route = routeFederatedMail(db, federatedTarget)
+          const followUp = route.kind === 'control_message' ? undefined : route
           revalidateLegacyCoordinator?.()
           const relay = db.enqueueFederationRelay({
             dispatchId,
             direction: 'to_worker',
-            kind: 'control_message',
+            kind: route.kind,
+            ...(followUp ? { reopenSettledReason: followUp.reopenSettledReason } : {}),
             payload: encodeFederatedControlMessage({
               from,
               subject: params.subject,
-              body: params.body ?? '',
+              body: followUp ? `${params.body ?? ''}\n\n${followUp.note}` : (params.body ?? ''),
               type: (params.type ?? 'status') as MessageType,
               priority: (params.priority ?? 'normal') as MessagePriority,
               threadId: params.threadId ?? null,
@@ -686,7 +684,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               dispatchId: relay.dispatch_id,
               destination: 'worker',
               accepted: true
-            }
+            },
+            ...(followUp ? { reopenedDispatchId: dispatchId } : {})
           }
         }
         // Point-to-point — existing single-recipient behavior
