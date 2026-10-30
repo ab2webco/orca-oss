@@ -34,8 +34,10 @@ export type GameLaunchChoice = {
   effort?: string
   /** An email, an account id, or `auto` (the flag, or orchestrator.accounts unset or auto); null with accounts: default. */
   account: string | null
-  /** What a paired host resolves: only what the flag or orchestrator.accounts named. */
+  /** What a paired host resolves: the flag, or `auto` unless orchestrator.accounts is default. */
   remoteAccount: string | null
+  /** remoteAccount is the unset policy's `auto`, so a host that cannot honor it keeps its global login. */
+  remoteAccountByDefault: boolean
 }
 
 function flagText(flags: Map<string, string | boolean>, name: string): string | undefined {
@@ -108,7 +110,25 @@ export function gameLaunchChoiceOf(
     ...(model === undefined || effort === undefined ? {} : { effort }),
     // Why auto when unset: Orca cannot move or refresh a member on the global login (ORCA-809).
     account: typed.account ?? (lead.accounts === 'default' ? null : 'auto'),
-    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
+    // Why only typed for an agent with no accounts: the host refuses `auto` for it, as this host ignores it.
+    remoteAccount:
+      typed.account ??
+      (lead.accounts === 'default' || accountProviderOfAgent(agent) === null ? null : 'auto'),
+    remoteAccountByDefault: typed.account === undefined && lead.accounts === undefined
+  }
+}
+
+/** The worker-start fields that hand a paired host its account selector. */
+export function remoteAccountParamsOf(choice: GameLaunchChoice): {
+  remoteAccount?: string
+  remoteAccountByDefault?: true
+} {
+  if (choice.remoteAccount === null) {
+    return {}
+  }
+  return {
+    remoteAccount: choice.remoteAccount,
+    ...(choice.remoteAccountByDefault ? { remoteAccountByDefault: true as const } : {})
   }
 }
 

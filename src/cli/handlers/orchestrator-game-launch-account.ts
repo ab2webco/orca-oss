@@ -35,6 +35,40 @@ export type GameMemberAccountContext = {
 /** How `game fleet` and a launch name the host's own login, which no managed account owns. */
 export const GAME_GLOBAL_LOGIN_LABEL = 'global login'
 
+const GLOBAL_LOGIN_CAVEAT = 'Orca cannot move or refresh it, and puts one member there at a time'
+
+/** A member on a global login, as the launch result carries it. */
+export type GameGlobalLoginLaunch = {
+  /** No managed account exists, so the member runs on the host's global login. */
+  globalLogin?: true
+  /** The paired host whose global login it runs on; absent for this host. */
+  globalLoginHost?: string
+  /** That host's Orca cannot pick a member account, so it kept its global login (ORCA-891). */
+  globalLoginOlderHost?: true
+}
+
+/** What a paired host said about a member it started on its global login (ORCA-891). */
+export function remoteGlobalLoginOf(
+  host: string,
+  why: 'no_account' | 'older_host'
+): GameGlobalLoginLaunch {
+  return {
+    globalLogin: true,
+    globalLoginHost: host,
+    ...(why === 'older_host' ? { globalLoginOlderHost: true as const } : {})
+  }
+}
+
+export function gameGlobalLoginNoteOf(launched: GameGlobalLoginLaunch): string {
+  const host = launched.globalLoginHost
+  if (host === undefined) {
+    return `no managed account here, so it runs on the global login: ${GLOBAL_LOGIN_CAVEAT}`
+  }
+  return launched.globalLoginOlderHost
+    ? `${host}'s Orca cannot pick a member account, so it runs on ${host}'s global login; update Orca there`
+    : `no managed account on ${host}, so it runs on ${host}'s global login: ${GLOBAL_LOGIN_CAVEAT}`
+}
+
 /** The error code of an `auto` pick that found every account at or near its limit. */
 export const GAME_ACCOUNTS_LIMITED = 'accounts_limited'
 export const GAME_ACCOUNTS_UNUSABLE = 'accounts_unusable'
@@ -86,7 +120,7 @@ function namedAccount(
   return { pin: pinOf(provider, id), account: { id, email } }
 }
 
-/** The member already on the global login for this agent's provider, if any; one at a time. */
+/** The member already on this host's global login for this agent's provider, if any; one at a time. */
 export function globalLoginHolderOf(
   agents: readonly GameAgent[],
   agent: string,
@@ -98,6 +132,8 @@ export function globalLoginHolderOf(
       (one) =>
         one.isMember &&
         !one.isLeader &&
+        // Why: a paired host's global login is its own; that host counts it (ORCA-891).
+        !one.remote &&
         one.globalLogin === true &&
         accountProviderOfAgent(one.agentType) === provider
     )

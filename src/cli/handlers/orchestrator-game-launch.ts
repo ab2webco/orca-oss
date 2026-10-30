@@ -12,6 +12,7 @@ import {
 import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
+  remoteAccountParamsOf,
   remotePlacementOf,
   requiredTicket,
   taskPromptOf,
@@ -20,8 +21,11 @@ import {
 } from './orchestrator-game-launch-options'
 import {
   GAME_GLOBAL_LOGIN_LABEL,
+  gameGlobalLoginNoteOf,
   globalLoginHolderOf,
-  resolveGameMemberAccount
+  remoteGlobalLoginOf,
+  resolveGameMemberAccount,
+  type GameGlobalLoginLaunch
 } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
@@ -43,7 +47,7 @@ import {
 
 type Client = Parameters<CommandHandler>[0]['client']
 
-export type GameLaunchResult = {
+export type GameLaunchResult = GameGlobalLoginLaunch & {
   ticket: string
   /** The scene character the member was named after; absent once the roster ran out. */
   name?: string
@@ -51,8 +55,6 @@ export type GameLaunchResult = {
   /** The managed account's email and id; absent when Orca's own account selection applies. */
   account?: string
   accountId?: string
-  /** No managed account exists, so the member runs on the host's global login. */
-  globalLogin?: true
   runId: string
   taskId: string
   /** Absent while the member waits for the host's setup slot. */
@@ -69,6 +71,8 @@ type WorkerStartResult = Pick<
   effects?: { kind: string; id?: string }[]
   /** The host's own account for a member placed with --on; only its email crosses back (ORCA-798). */
   account?: { provider: string; email: string }
+  /** A member placed with --on that runs on its host's global login, and why. */
+  globalLogin?: 'no_account' | 'older_host'
 }
 
 const DISPLAY_NAME_MAX = 60
@@ -211,7 +215,7 @@ export async function launchGameMember(args: {
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
     ...memberAccount.pin,
-    ...(args.remote && choice.remoteAccount ? { remoteAccount: choice.remoteAccount } : {}),
+    ...(args.remote ? remoteAccountParamsOf(choice) : {}),
     run: runId,
     from,
     devMode: isDevCliInvocation(),
@@ -231,7 +235,7 @@ export async function launchGameMember(args: {
     worktreeId: worker.result.effects?.find((one) => one.kind === 'worktree')?.id,
     lastState: worker.result.state
   })
-  const { account: hostAccount, ...started } = worker.result
+  const { account: hostAccount, globalLogin: hostGlobalLogin, ...started } = worker.result
   const launched: GameLaunchResult = {
     ticket,
     ...(name === null ? {} : { name }),
@@ -241,6 +245,7 @@ export async function launchGameMember(args: {
       : {}),
     ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
     ...(hostAccount ? { account: hostAccount.email } : {}),
+    ...(args.remote && hostGlobalLogin ? remoteGlobalLoginOf(args.remote.on, hostGlobalLogin) : {}),
     ...started
   }
   await postGameEvents(client, [
@@ -253,9 +258,6 @@ export async function launchGameMember(args: {
   return launched
 }
 
-const GLOBAL_LOGIN_NOTE =
-  'no managed account here, so it runs on the global login: Orca cannot move or refresh it, and puts one member there at a time'
-
 export const formatGameLaunch = (launched: GameLaunchResult): string => {
   const who = [
     launched.agent,
@@ -266,7 +268,7 @@ export const formatGameLaunch = (launched: GameLaunchResult): string => {
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${GLOBAL_LOGIN_NOTE}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
 }
 
 /** A queued member is on its way, not a failed launch. */

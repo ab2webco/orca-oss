@@ -56,8 +56,13 @@ export async function startFederatedWorker(args: {
     undefined,
     params.timeoutMs
   )) as RuntimeStatus
-  const { federationProtocolVersion, gameMember, carriesGameScene, memberAccount } =
-    negotiateFederatedWorkerStart({ status, serverName: server.name, params })
+  const {
+    federationProtocolVersion,
+    gameMember,
+    carriesGameScene,
+    memberAccount,
+    keepsHostGlobalLogin
+  } = negotiateFederatedWorkerStart({ status, serverName: server.name, params })
   // Why never blocking: without the scene the host draws its own, as before.
   const gameScene = carriesGameScene
     ? await runtime.readCallerGameScene(params.from).catch(() => null)
@@ -169,6 +174,11 @@ export async function startFederatedWorker(args: {
         setup: remote.setup,
         launch,
         ...(remote.account ? { account: remote.account } : {}),
+        ...(keepsHostGlobalLogin
+          ? { globalLogin: 'older_host' as const }
+          : remote.globalLogin === true
+            ? { globalLogin: 'no_account' as const }
+            : {}),
         timeoutMs: params.timeoutMs ?? 60_000,
         effects: remote.effects ?? [],
         residualResources: remote.residualResources ?? []
@@ -244,6 +254,8 @@ type RemoteStartReceipt = {
   launch?: OrchestrationWorkerLaunchReceipt
   /** The host's own account the member runs on; only its email crosses back (ORCA-798). */
   account?: { provider: string; email: string }
+  /** No managed account on the host, so the member runs on its global login (ORCA-891). */
+  globalLogin?: boolean
   effects?: unknown[]
   residualResources?: unknown[]
   failedStage?: string
@@ -258,7 +270,9 @@ function isKnownRemoteStartFailure(code: string): boolean {
     'terminal_worktree_mismatch',
     'capability_unsupported',
     'setup_slot_busy',
-    'accounts_limited'
+    'accounts_limited',
+    'accounts_unusable',
+    'global_login_taken'
   ].includes(code)
 }
 

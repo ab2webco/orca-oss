@@ -22,14 +22,18 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 export const FEDERATED_AUTO_ACCOUNT = 'auto'
 
 /** Only the email goes back to the home: account ids stay on the host that owns them. */
-export type FederatedMemberAccount = {
-  pin: { claudeAccountId?: string; codexAccountId?: string }
-  account: { provider: GameAccountProvider; email: string }
-}
+export type FederatedMemberAccount =
+  | {
+      pin: { claudeAccountId?: string; codexAccountId?: string }
+      account: { provider: GameAccountProvider; email: string }
+      globalLogin?: undefined
+    }
+  /** `auto` on a host with no managed account: the member runs on its global login (ORCA-891). */
+  | { pin: Record<string, never>; account: null; globalLogin: GameAccountProvider }
 
 const ADD_HINT = 'register one on this host with `orca account add`'
 
-/** The account a remote member runs on, from this host's own roster; never its global login. */
+/** The account a remote member runs on, from this host's own roster; its global login only when it has none. */
 export function resolveFederatedMemberAccount(args: {
   entries: readonly AccountListEntry[]
   agent: string | undefined
@@ -45,6 +49,9 @@ export function resolveFederatedMemberAccount(args: {
   }
   const label = GAME_ACCOUNT_PROVIDER_LABELS[provider]
   const entries = args.entries.filter((entry) => entry.provider === provider)
+  if (args.selector === FEDERATED_AUTO_ACCOUNT && entries.length === 0) {
+    return { pin: {}, account: null, globalLogin: provider }
+  }
   const chosen =
     args.selector === FEDERATED_AUTO_ACCOUNT
       ? autoEntry(entries, provider, label, args.now)
@@ -100,9 +107,10 @@ function autoEntry(
       { resetsAt: pick.resetsAt }
     )
   }
+  // Why no fallback: a member on the global login cannot be moved or refreshed (ORCA-809).
   throw new OrchestrationError(
-    'invalid_argument',
-    `No usable ${label} account on this host; ${ADD_HINT}.`
+    'accounts_unusable',
+    `No ${label} account on this host can take a member (each is on WSL, a custom endpoint, or its sign-in failed), and Orca does not fall back to the global login while managed accounts exist; fix one's sign-in there, or name one \`orca account list\` shows.`
   )
 }
 

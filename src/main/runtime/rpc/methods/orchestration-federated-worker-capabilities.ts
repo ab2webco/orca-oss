@@ -10,6 +10,7 @@ import {
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY
@@ -27,6 +28,8 @@ export type FederatedWorkerNegotiation = {
   carriesGameScene: boolean
   /** The typed selector, sent only to a host that resolves it against its own roster. */
   memberAccount: { account?: string }
+  /** The unset policy's `auto` this host cannot honor, so its member keeps the host's global login. */
+  keepsHostGlobalLogin: boolean
 }
 
 /** Refuses, before any effect, a host that cannot run this start as asked. */
@@ -66,8 +69,16 @@ export function negotiateFederatedWorkerStart(args: {
       { capability: ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY }
     )
   }
+  // Why both: a host with only member-account refuses `auto` when it has no managed account (ORCA-891).
+  const keepsHostGlobalLogin =
+    Boolean(params.remoteAccount && params.remoteAccountByDefault) &&
+    !(
+      capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY) &&
+      capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY)
+    )
   if (
     params.remoteAccount &&
+    !keepsHostGlobalLogin &&
     !capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
   ) {
     throw new OrchestrationError(
@@ -104,6 +115,8 @@ export function negotiateFederatedWorkerStart(args: {
     carriesGameScene:
       params.game === true &&
       capabilities.includes(ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY),
-    memberAccount: params.remoteAccount ? { account: params.remoteAccount } : {}
+    memberAccount:
+      params.remoteAccount && !keepsHostGlobalLogin ? { account: params.remoteAccount } : {},
+    keepsHostGlobalLogin
   }
 }

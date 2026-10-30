@@ -582,13 +582,19 @@ The lead's verbs, run from the lead's terminal
   - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
     3 s apart, with the same orchestration request id, so the runtime never starts a second member
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
-    A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends only
-    what was typed, `--account <email|id>` or the project's `accounts: auto`, and the host resolves
-    it against its own roster. An email the host does not have, or whose sign-in failed, is refused
-    there, as is `auto` with no usable account or every account at its limit (with the first
-    reset); nothing falls back to the host's global login. The result names the email the host
-    used. A host older than `orchestration.federation-member-account.v1` refuses `--account` and
-    `auto` by name. Without either, the host keeps its own selection, as before.
+    A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends the
+    typed `--account <email|id|auto>`, or `auto` unless the project sets `accounts: default`
+    (ORCA-891), and the host resolves it against its own roster. An email the host does not have,
+    or whose sign-in failed, is refused there, as is `auto` with every account at its limit (with
+    the first reset) or with managed accounts none of which is usable (`accounts_unusable`). Only a
+    host with no managed account for the agent runs `auto` on its global login, one member at a
+    time (`global_login_taken` names the one there); the result says so (`globalLogin: true`,
+    `globalLoginHost`) and the host's `game fleet` row shows `global login`. The result names the
+    email the host used. A host older than `orchestration.federation-member-account.v1` refuses a
+    typed `--account` and `accounts: auto` by name. The unset policy is sent only to a host that
+    also has `orchestration.federation-member-global-login.v1`; an older one gets no selector and
+    keeps its global login, and the launch says so (`globalLoginOlderHost: true`).
+    With `accounts: default` the host keeps its own selection, as before.
     `orchestration worker-start --on` still refuses `--claude-account` and `--codex-account`.
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
@@ -839,7 +845,8 @@ of its agent with the most free quota
   says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
   `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
 - `default` keeps Orca's own account selection, which can be the global login. A member placed
-  with `--on` sends the host only what was typed or set to `auto`.
+  with `--on` follows the same rules on its host, from that host's roster (see `game launch`
+  above); a paired host's member never counts against this host's global login.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
