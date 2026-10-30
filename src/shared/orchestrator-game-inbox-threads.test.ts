@@ -182,4 +182,28 @@ describe('gameInboxThreadsOf', () => {
       }
     ])
   })
+
+  it("shows the person's override on the answer it replaced (ORCA-878)", () => {
+    sequence = 0
+    const question = mail('run:run_1', 'dispatch:d1', { type: 'question', body: 'Which port?' })
+    const answer = mail('dispatch:d1', 'run:run_1', { body: '8080', thread_id: question.id })
+    const override = mail('dispatch:d1', 'term_lead', {
+      body: 'The person overrides your lead\'s answer "8080": Use 3000',
+      thread_id: question.id,
+      payload: JSON.stringify({ from: 'owner', replyTo: question.id, text: 'Use 3000' })
+    })
+
+    const { answered } = gameInboxThreadsOf(
+      source([question, answer, override], {
+        answeredQuestions: [
+          { ...question, answer_body: '8080', answered_at: '2026-10-29 10:05:00' }
+        ]
+      })
+    )
+
+    expect(answered[0]).toMatchObject({
+      answer: '8080',
+      overriddenBy: { text: 'Use 3000', at: override.created_at }
+    })
+  })
 })
