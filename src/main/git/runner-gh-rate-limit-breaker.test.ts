@@ -18,6 +18,7 @@ import {
   getGhRateLimitBlockedUntilMs,
   registerGhRateLimitResetProbe
 } from './gh-rate-limit-breaker'
+import { _resetGhSpendLedger, ghSpendSince } from './gh-spend-ledger'
 
 const PRIMARY_RATE_LIMIT_STDERR =
   'gh: API rate limit exceeded for user ID 1775218. Please wait. (HTTP 403)'
@@ -150,9 +151,9 @@ describe('ghExecFileAsync rate-limit breaker', () => {
     ).rejects.toThrow('rate limit')
 
     expect(
-      getGhRateLimitBlockedUntilMs('core', Date.now(), 'native:github.acme-corp.com')
+      getGhRateLimitBlockedUntilMs('graphql', Date.now(), 'native:github.acme-corp.com')
     ).not.toBeNull()
-    expect(getGhRateLimitBlockedUntilMs('core', Date.now(), 'native:github.com')).toBeNull()
+    expect(getGhRateLimitBlockedUntilMs('graphql', Date.now(), 'native:github.com')).toBeNull()
   })
 
   it('scopes a WSL UNC-cwd 403 to the distro runtime and probes that scope', async () => {
@@ -207,6 +208,24 @@ describe('ghExecFileAsync rate-limit breaker', () => {
     await expect(ghExecFileAsync(['api', 'repos/a/b/pulls'])).resolves.toEqual({
       stdout: '[]',
       stderr: ''
+    })
+  })
+})
+
+describe('ghExecFileAsync spend ledger', () => {
+  beforeEach(() => {
+    _resetGhSpendLedger()
+  })
+
+  it('records each github.com call by shape, but not the exempt probe or another host', async () => {
+    mockGhSuccess('{}')
+    await ghExecFileAsync(['pr', 'view', '1', '--json', 'state'])
+    await ghExecFileAsync(['api', 'rate_limit'])
+    await ghExecFileAsync(['pr', 'view', '2'], { host: 'github.acme-corp.com' })
+
+    expect(ghSpendSince(0)).toEqual({
+      calls: { core: 0, graphql: 1, search: 0 },
+      top: [{ shape: 'pr view', bucket: 'graphql', calls: 1 }]
     })
   })
 })

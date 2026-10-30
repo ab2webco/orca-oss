@@ -722,6 +722,7 @@ import type {
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
+import { readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
   GameProjectWorkCache,
   myOpenPullRequestsOf,
@@ -31442,6 +31443,7 @@ export class OrcaRuntimeService {
             terminalHandle: callerHandle ?? undefined
           })
         ).stopped,
+      readGitHubBudget: () => readGameGitHubBudget(),
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {

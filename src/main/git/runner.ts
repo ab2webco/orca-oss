@@ -27,6 +27,7 @@ import {
   notifyGhPrimaryRateLimit,
   type GhRateLimitBucket
 } from './gh-rate-limit-breaker'
+import { recordGhSpend } from './gh-spend-ledger'
 import { getDefaultWslDistro, parseWslPath, toWindowsWslPath, type WslPathInfo } from '../wsl'
 import { addWslEnvKeys } from '../wsl-env'
 import {
@@ -1703,6 +1704,8 @@ function explicitGhRepoHostname(args: readonly string[]): string | undefined {
   return undefined
 }
 
+const GH_DEFAULT_SCOPE = ghRateLimitScopeKey('native', 'github.com')
+
 function ghRateLimitScope(
   args: readonly string[],
   options: GhExecOptions,
@@ -1766,6 +1769,10 @@ export async function ghExecFileAsync(
   let attemptedDefaultWslFallback = false
   for (let attempt = 0; attempt <= GH_RETRY_DELAYS_MS.length; attempt++) {
     try {
+      // Why only native github.com: that is the shared account budget the game reports (ORCA-877).
+      if (!rateLimitProbe && ghRateLimitScope(args, options, resolved) === GH_DEFAULT_SCOPE) {
+        recordGhSpend(args, rateLimitBucket)
+      }
       const { stdout, stderr } = await execFileCapture(resolved.binary, resolved.args, {
         cwd: resolved.cwd,
         encoding: (options.encoding ?? 'utf-8') as BufferEncoding,

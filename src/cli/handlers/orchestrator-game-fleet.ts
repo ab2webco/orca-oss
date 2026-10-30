@@ -117,7 +117,12 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game fleet': async ({ client, json }) => {
     const response = await readCallerGameState(client)
     await postGameEvents(client, observedGameEventsOf(response.result.agents))
-    printResult({ ...response, result: gameFleetReportOf(response.result) }, json, formatFleet)
+    const { githubBudget } = response.result
+    const fleet = {
+      ...gameFleetReportOf(response.result),
+      ...(githubBudget ? { githubBudget } : {})
+    }
+    printResult({ ...response, result: fleet }, json, formatFleet)
   },
   'game wave': async ({ flags, client, cwd, json }) => {
     const tickets = ticketsOf(flags)

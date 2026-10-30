@@ -2,6 +2,10 @@ import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-lau
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import type { GameHold } from './orchestrator-game-hold'
 import { formatSetupQueue } from './orchestrator-game-setup-queue'
+import {
+  formatGameGitHubBudget,
+  type GameGitHubBudget
+} from '../../shared/orchestrator-game-github-budget'
 import type {
   GameFleet,
   GameFleetRow,
@@ -122,12 +126,15 @@ function sinceOf(at: string | null, now: number): string {
   return minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`
 }
 
-export function formatFleet(fleet: GameFleet, now: number = Date.now()): string {
+export type GameFleetWithBudget = GameFleet & { githubBudget?: GameGitHubBudget }
+
+export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const budget = fleet.githubBudget ? formatGameGitHubBudget(fleet.githubBudget, now) : []
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
   if (fleet.rows.length === 0) {
-    return [head, ...paused].join('\n')
+    return [head, ...budget, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
     row.phase,
@@ -157,7 +164,7 @@ export function formatFleet(fleet: GameFleet, now: number = Date.now()): string 
     'AGENT',
     'ACCOUNT'
   ]
-  return [head, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
+  return [head, ...budget, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }
 
 export function formatWave(wave: GameWaveResult): string {
