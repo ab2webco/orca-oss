@@ -1,7 +1,7 @@
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { expectGameInboxPlaceholdersFit, settleGameInboxSheet } from './helpers/game-inbox-sheet'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
 
@@ -85,6 +85,7 @@ test('the Inbox lists every open question for the person and sends the answer th
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
       await settleGameInboxSheet(orcaPage, width)
+      await expectGameInboxPlaceholdersFit(orcaPage, width)
       await orcaPage.screenshot({
         animations: 'disabled',
         path: testInfo.outputPath(`game-inbox-${width}-${theme}.png`)
