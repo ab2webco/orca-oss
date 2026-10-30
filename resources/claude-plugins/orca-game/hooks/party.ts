@@ -3,6 +3,7 @@ import type { HudMember } from './fleet-hud'
 import { linkOfKind } from './fleet-labels'
 import { gameStrings } from './game-strings'
 import { leadStateOf } from './lead-state'
+import { limitTagOf } from './member-tags'
 import type { MemberState, Mood } from './party-sprites'
 import { actionOf, activityOf, phaseOf, type FlowPhase } from './quest-policy'
 import { isCiRed, reviewLabelOf } from './rewards'
@@ -148,9 +149,14 @@ export const drawnPartyOf = (
   unseen: ghostCountOf(state)
 })
 
+// Why (ORCA-907): a logged-out member's hooks say idle, but it waits on a person to log it in.
+const needStateOf = (agent: GameAgent): GameAgent['state'] =>
+  agent.limit?.loggedOut ? 'waiting' : agent.state
+
 export const countsOf = (agents: readonly GameAgent[]) => {
   const team = agents.filter((agent) => !agent.isLeader)
-  const count = (state: GameAgent['state']) => team.filter((agent) => agent.state === state).length
+  const count = (state: GameAgent['state']) =>
+    team.filter((agent) => needStateOf(agent) === state).length
   return {
     working: count('working'),
     idle: count('idle'),
@@ -163,8 +169,12 @@ export const needsOf = (state: GameState): Need[] => {
   const { waitingNeed, ciFailingNeed } = gameStrings().text
   return [
     ...state.agents
-      .filter((agent) => !agent.isLeader && agent.state === 'waiting')
-      .map((agent) => ({ name: agent.displayName, text: waitingNeed, url: null })),
+      .filter((agent) => !agent.isLeader && needStateOf(agent) === 'waiting')
+      .map((agent) => ({
+        name: agent.displayName,
+        text: agent.limit?.loggedOut ? limitTagOf(agent.limit, Date.now()) : waitingNeed,
+        url: null
+      })),
     ...(state.review !== null && isCiRed(state.review)
       ? [
           {
