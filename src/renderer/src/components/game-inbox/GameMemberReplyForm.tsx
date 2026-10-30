@@ -28,9 +28,10 @@ export function GameMemberReplyForm({
   const typed = text.trim()
 
   return (
-    <div className="space-y-2">
+    // Why stacked in a narrow card: beside Send, the placeholder is cut mid-word at 320px.
+    <div className="@container space-y-2">
       <form
-        className="flex items-center gap-2"
+        className="flex flex-col gap-2 @xs:flex-row @xs:items-center"
         onSubmit={(event) => {
           event.preventDefault()
           if (!typed) {
@@ -56,10 +57,10 @@ export function GameMemberReplyForm({
           value={text}
           disabled={sending}
           placeholder={placeholder}
-          className="h-8 min-w-0 flex-1 text-sm"
+          className="h-8 min-w-0 text-sm @xs:flex-1"
           onChange={(event) => setText(event.target.value)}
         />
-        <Button type="submit" size="sm" disabled={sending || !typed}>
+        <Button type="submit" size="sm" className="self-end" disabled={sending || !typed}>
           {translate('auto.components.game-inbox.GameMemberReplyForm.send', 'Send')}
         </Button>
       </form>

@@ -3,7 +3,7 @@ import { test, expect } from './helpers/orca-app'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { expectGameInboxPlaceholdersFit, settleGameInboxSheet } from './helpers/game-inbox-sheet'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -180,6 +180,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
         for (const theme of ['dark', 'light'] as const) {
           await setTheme(orcaPage, theme)
           await settleGameInboxSheet(orcaPage, width)
+          await expectGameInboxPlaceholdersFit(orcaPage, width)
           await orcaPage.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`${name}-${width}-${theme}.png`)
