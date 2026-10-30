@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { accountLimitsOf, gameMemberLimitOf } from './orchestrator-game-member-limit'
+import {
+  accountLimitsOf,
+  freshestLimitsOf,
+  gameMemberLimitOf
+} from './orchestrator-game-member-limit'
 import type { ProviderRateLimits } from './rate-limit-types'
 
 const NOW = 1_000_000
@@ -67,6 +71,52 @@ describe('gameMemberLimitOf', () => {
     ).toBeNull()
   })
 
+  it('keeps a spend limit while its 5h and 7d windows still have quota, which they do not count', () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: limits(20),
+        terminalTail:
+          "You've hit your individual spend limit · your weekly limit resets Nov 2 · /usage-credits",
+        now: NOW
+      })
+    ).toEqual({ resetsAt: null, spend: true })
+  })
+
+  // Why (ORCA-907): a member whose account logged out sat idle while its account read as free.
+  it('is logged out when the last lines of a stopped member say its account must log in again', () => {
+    const tail = (said: string) =>
+      [...Array(30).fill('work'), said, '> ', '  status line'].join('\n')
+    const of = (said: string, state: 'idle' | 'working' = 'idle', agentType = 'claude') =>
+      gameMemberLimitOf({
+        state,
+        agentType,
+        accountLimits: limits(20),
+        terminalTail: tail(said),
+        now: NOW
+      })
+    expect(of('Not logged in · Please run /login')).toEqual({ resetsAt: null, loggedOut: true })
+    expect(of('OAuth token has expired · Please run /login')).toEqual({
+      resetsAt: null,
+      loggedOut: true
+    })
+    expect(of('Not logged in · Please run /login', 'working')).toBeNull()
+    expect(of('Not logged in · Please run /login', 'idle', 'gemini')).toBeNull()
+    expect(of('Fixed the login page')).toBeNull()
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: null,
+        terminalTail: ['Not logged in · Please run /login', ...Array(30).fill('later work')].join(
+          '\n'
+        ),
+        now: NOW
+      })
+    ).toBeNull()
+  })
+
   it('never calls a context or token limit a usage limit, nor an agent with no managed accounts', () => {
     expect(
       gameMemberLimitOf({
@@ -104,5 +154,21 @@ describe('accountLimitsOf', () => {
     expect(accountLimitsOf(state, 'claude', 'acct_b', 'acct_a')).toBe(inactive)
     expect(accountLimitsOf(state, 'claude', 'acct_a', 'acct_a')).toBe(active)
     expect(accountLimitsOf(state, 'codex', 'acct_x', null)).toBeNull()
+  })
+})
+
+// Why (ORCA-907): a pane's status line showed 7d 100% while Orca's cached reading said 64%.
+describe('freshestLimitsOf', () => {
+  it("prefers the newer of the pane's own reading and the account's cached one", () => {
+    const cached = { ...limits(64), updatedAt: NOW - HOUR }
+    const pane = { ...limits(100), updatedAt: NOW }
+    expect(freshestLimitsOf(cached, pane)).toBe(pane)
+    expect(freshestLimitsOf({ ...cached, updatedAt: NOW + 1 }, pane)).toEqual({
+      ...cached,
+      updatedAt: NOW + 1
+    })
+    expect(freshestLimitsOf(null, pane)).toBe(pane)
+    expect(freshestLimitsOf(cached, null)).toBe(cached)
+    expect(freshestLimitsOf(null, null)).toBeNull()
   })
 })

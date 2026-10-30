@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
-import { readGameInboxThreads } from './game-inbox-threads-client'
+import {
+  readGameInboxThreads,
+  replyToGameMember,
+  type GameMemberReply
+} from './game-inbox-threads-client'
 import type { GameInboxScope } from './game-owner-questions-client'
 import { onGameInboxChanged } from './game-inbox-signal'
 
 const NO_THREADS: GameInboxThreads = { threads: [], waiting: [], answered: [] }
 
-/** The project's threads, read only while the Inbox is open and reread on pushed mail; pass a memoized scope. */
+/** The project's threads, reread on pushed mail while the Inbox is open or the project has no team yet; pass a memoized scope. */
 export function useGameInboxThreads(
   scope: GameInboxScope | null,
   open: boolean
-): GameInboxThreads & { reload: () => Promise<void> } {
+): GameInboxThreads & {
+  reload: () => Promise<void>
+  reply: (message: GameMemberReply) => Promise<void>
+} {
   const [loaded, setLoaded] = useState<{ scope: GameInboxScope; threads: GameInboxThreads } | null>(
     null
   )
@@ -30,19 +37,28 @@ export function useGameInboxThreads(
     }
   }, [])
 
+  const current = loaded && loaded.scope === scope ? loaded.threads : NO_THREADS
+  // Why: closed, it only has to learn the project has a team; open, it follows every message.
+  const live = open || current.threads.length === 0
+
   useEffect(() => {
-    if (!scope || !open) {
+    if (scope) {
+      void read(scope)
+    }
+  }, [scope, open, read])
+
+  useEffect(() => {
+    if (!scope || !live) {
       return
     }
     const readNow = (): void => void read(scope)
-    readNow()
     const stopLocal = window.api.runtime.onGameInboxChanged?.(readNow)
     const stopPaired = onGameInboxChanged(readNow)
     return () => {
       stopLocal?.()
       stopPaired()
     }
-  }, [scope, open, read])
+  }, [scope, live, read])
 
   const reload = useCallback(async () => {
     if (scope) {
@@ -50,6 +66,16 @@ export function useGameInboxThreads(
     }
   }, [scope, read])
 
-  const current = loaded && loaded.scope === scope ? loaded.threads : NO_THREADS
-  return { ...current, reload }
+  const reply = useCallback(
+    async (message: GameMemberReply) => {
+      if (!scope) {
+        return
+      }
+      await replyToGameMember(scope, message)
+      await read(scope)
+    },
+    [scope, read]
+  )
+
+  return { ...current, reload, reply }
 }

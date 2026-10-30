@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readGameInboxThreads } from './game-inbox-threads-client'
+import { readGameInboxThreads, replyToGameMember } from './game-inbox-threads-client'
 
 const MESSAGE = {
   id: 'msg_1',
@@ -56,6 +56,29 @@ describe('readGameInboxThreads', () => {
     })
     expect(call).toHaveBeenCalledWith(
       expect.objectContaining({ method: 'game.inboxThreads', params: { worktreeId: 'repo::wt' } })
+    )
+  })
+})
+
+describe('replyToGameMember (ORCA-878)', () => {
+  it("sends the person's words for a member's message, with its ticket", async () => {
+    const call = stubRuntime({ mode: 'override', delivered: true })
+
+    await expect(
+      replyToGameMember(
+        { target: { kind: 'local' }, worktreeId: 'repo::wt' },
+        {
+          id: 'msg_1',
+          text: 'Yes',
+          ticket: 'ORCA-14'
+        }
+      )
+    ).resolves.toEqual({ mode: 'override', delivered: true })
+    expect(call).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'game.ownerReplyToMember',
+        params: { worktreeId: 'repo::wt', id: 'msg_1', text: 'Yes', ticket: 'ORCA-14' }
+      })
     )
   })
 })

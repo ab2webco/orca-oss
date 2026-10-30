@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
-  gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf,
   ticketInText
 } from './orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
 
@@ -158,6 +158,26 @@ describe('limited members', () => {
       expect.objectContaining({
         limitedUntil: new Date(RESET).toISOString(),
         next: 'game move CIN-5, or wait for the reset'
+      })
+    )
+  })
+
+  // Why (ORCA-907): only someone at the machine can log an account back in.
+  it('puts a member whose account logged out in needs-you, with how to get it back', () => {
+    const loggedOut = member({
+      paneKey: 'o',
+      displayName: 'CIN-6 Out',
+      state: 'idle',
+      account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' },
+      limit: { resetsAt: null, loggedOut: true }
+    })
+    expect(memberPhaseOf(loggedOut)).toBe('needs-you')
+    const fleet = gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [loggedOut] })
+    expect(fleet.rows[0]).toEqual(
+      expect.objectContaining({
+        phase: 'needs-you',
+        limitedUntil: null,
+        next: 'log ana@example.com in again (/login in its pane), or game move CIN-6'
       })
     )
   })

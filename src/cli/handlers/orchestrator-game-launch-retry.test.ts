@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { callWithLaunchRetry, isLaunchRefusal } from './orchestrator-game-launch-retry'
 import { RuntimeClientError } from '../runtime-client'
 
 const unavailable = (requestId?: string) =>
@@ -48,5 +48,14 @@ describe('callWithLaunchRetry', () => {
       ).rejects.toBe(error)
       expect(attempts).toBe(1)
     }
+  })
+})
+
+describe('isLaunchRefusal', () => {
+  it('reads an answer from the runtime as a refusal, and a lost call as unknown', () => {
+    expect(isLaunchRefusal(new RuntimeClientError('invalid_argument', 'no'))).toBe(true)
+    expect(isLaunchRefusal(unavailable('rq1'))).toBe(false)
+    expect(isLaunchRefusal(new RuntimeClientError('runtime_timeout', 'slow'))).toBe(false)
+    expect(isLaunchRefusal(new Error('bug'))).toBe(false)
   })
 })

@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { gameInboxTargetOf, type GameInboxScope } from './game-owner-questions-client'
 import { useGameOwnerQuestions } from './useGameOwnerQuestions'
+import { useGameInboxThreads } from './useGameInboxThreads'
 import { GameInboxSheet } from './GameInboxSheet'
 
-/** Sidebar entry for the lead's open questions; shown only while one waits, so it reads as a call to act. */
+/** Sidebar entry for the project's Inbox: shown while the lead asks the person something or the project has a team; counts only For you. */
 export function SidebarGameInboxEntry(): React.JSX.Element | null {
   const worktreeId = useAppStore((s) => s.activeWorktreeId)
   const hostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
@@ -17,8 +18,9 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
   )
   const { questions, answer } = useGameOwnerQuestions(scope)
   const [open, setOpen] = React.useState(false)
+  const threads = useGameInboxThreads(scope, open)
 
-  if (questions.length === 0 && !open) {
+  if (questions.length === 0 && threads.threads.length === 0 && !open) {
     return null
   }
   return (
@@ -48,7 +50,14 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
           </span>
         ) : null}
       </button>
-      <GameInboxSheet open={open} onOpenChange={setOpen} questions={questions} onAnswer={answer} />
+      <GameInboxSheet
+        open={open}
+        onOpenChange={setOpen}
+        questions={questions}
+        onAnswer={answer}
+        threads={threads}
+        onReply={threads.reply}
+      />
     </>
   )
 }

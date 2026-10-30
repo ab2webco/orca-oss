@@ -471,22 +471,24 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
   await expect(lead.getByText('Off · this machine')).toBeVisible()
   await expect(lead.getByText('opus · this machine')).toBeVisible()
 
-  await expect(lead.getByText("Orca's account · default")).toBeVisible()
+  await expect(lead.getByText('Most free quota · default')).toBeVisible()
   await lead
     .getByRole('radiogroup', { name: 'Member accounts' })
-    .getByRole('radio', { name: 'Most free' })
+    .getByRole('radio', { name: "Orca's" })
     .click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
-    .toEqual({ [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'auto' } } })
-  await expect(lead.getByText('Most free quota · this machine')).toBeVisible()
+    .toEqual({
+      [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'default' } }
+    })
+  await expect(lead.getByText("Orca's account · this machine")).toBeVisible()
 
   const cap = lead.getByRole('textbox', { name: 'Member cap' })
   await cap.fill('40')
   await cap.press('Enter')
   await expect(lead.getByRole('alert')).toHaveText('Enter a whole number from 1 to 12.')
   expect((await savedGameSettings(orcaPage)).orchestratorGameProjects).toEqual({
-    [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'auto' } }
+    [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'default' } }
   })
 
   await expect(lead.getByText('Mario, Luigi · from orca.yaml')).toBeVisible()
@@ -500,7 +502,7 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
         orchestrator: {
           autostart: false,
           model: 'opus',
-          accounts: 'auto',
+          accounts: 'default',
           memberNames: ['Arthur', 'Merlin', 'Morgana']
         }
       }

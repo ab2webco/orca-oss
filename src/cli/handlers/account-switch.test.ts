@@ -37,9 +37,12 @@ describe('orca account switch', () => {
   function buildSwitchClient(
     options: {
       switchResult?: SwitchResultOverrides
-      acceptance?: Record<string, unknown>
+      /** null: refused in preflight, so there is no operation to poll. */
+      acceptance?: Record<string, unknown> | null
       /** Consumed one per `accounts.claudeTerminalSwitchStatus` poll. */
       statusResults?: SwitchResultOverrides[]
+      /** What `accounts.terminalClaudeAccount` reports; absent, the runtime does not know it. */
+      ownership?: Record<string, unknown>
     } = {}
   ): {
     client: RuntimeClient
@@ -68,6 +71,11 @@ describe('orca account switch', () => {
           }
         }
       }
+      if (method === 'accounts.terminalClaudeAccount' && options.ownership) {
+        return {
+          result: { terminal: 'orca-terminal-5', ptyId: 'pty-5', ownership: options.ownership }
+        }
+      }
       if (method === 'accounts.snapshot') {
         return {
           result: {
@@ -87,8 +95,11 @@ describe('orca account switch', () => {
       if (method === 'accounts.switchClaudeTerminal') {
         return {
           result: {
-            accepted: true,
-            acceptance: { operationId: 'op-7', selfSwitch: false, ...options.acceptance },
+            accepted: options.acceptance !== null,
+            acceptance:
+              options.acceptance === null
+                ? null
+                : { operationId: 'op-7', selfSwitch: false, ...options.acceptance },
             result: {
               operationId: 'op-7',
               state: 'committed',
@@ -489,6 +500,70 @@ describe('orca account switch', () => {
       code: 'claude_terminal_switch_session_mismatch',
       // The caller may already be dead; the recovery data must survive in the error.
       message: expect.stringContaining('session-5')
+    })
+  })
+
+  describe('a terminal with no account pinned to it', () => {
+    const refused = {
+      acceptance: null,
+      switchResult: {
+        operationId: '',
+        state: 'preflighting',
+        sourceAccountId: null,
+        sessionId: null,
+        failure: {
+          reason: 'source-unknown',
+          message: 'Orca does not know which managed Claude account owns this terminal.'
+        }
+      }
+    }
+    const switchTo = (client: RuntimeClient) =>
+      ACCOUNT_HANDLERS['account switch']!(
+        switchContext(client, [
+          ['to', 'two@example.com'],
+          ['terminal', 'orca-terminal-5']
+        ])
+      )
+
+    it('names the shared login it runs on and how to relaunch it on the account', async () => {
+      const { client, calls } = buildSwitchClient({ ...refused, ownership: { state: 'none' } })
+      const error = await switchTo(client).catch((caught: unknown) => caught)
+      expect(error).toMatchObject({ code: 'claude_terminal_switch_source_unknown' })
+      expect(String((error as Error).message)).toContain(
+        "runs on the login in Orca Lab's shared runtime, not on a managed account"
+      )
+      expect(String((error as Error).message)).toContain(
+        '`orca game launch <ticket> --account two@example.com`'
+      )
+      expect(String((error as Error).message)).toContain(
+        '`orca terminal create --agent claude --claude-account two@example.com`'
+      )
+      expect(calls.at(-1)).toEqual({
+        method: 'accounts.terminalClaudeAccount',
+        params: { terminal: 'orca-terminal-5' }
+      })
+    })
+
+    it('names the managed account it shares with other terminals', async () => {
+      const { client } = buildSwitchClient({
+        ...refused,
+        ownership: {
+          state: 'account',
+          accountId: 'acct-1',
+          email: 'one@example.com',
+          pinned: false
+        }
+      })
+      await expect(switchTo(client)).rejects.toThrow(
+        "runs on one@example.com as Orca Lab's shared runtime login"
+      )
+    })
+
+    it('still says what to do when the runtime cannot report the pane', async () => {
+      const { client } = buildSwitchClient(refused)
+      await expect(switchTo(client)).rejects.toThrow(
+        'owns this terminal. Relaunch the agent on two@example.com instead'
+      )
     })
   })
 

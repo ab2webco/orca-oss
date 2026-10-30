@@ -750,7 +750,13 @@ import {
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
-import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
+import {
+  ClaudePaneLiveSessions,
+  claudePaneLiveSessionOf,
+  type ClaudePaneLiveSession
+} from '../claude/claude-pane-live-session'
+import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
@@ -808,6 +814,7 @@ import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
+  freshestLimitsOf,
   type GameMemberLimit
 } from '../../shared/orchestrator-game-member-limit'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
@@ -3771,6 +3778,7 @@ export class OrcaRuntimeService {
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
   private readonly gameSuggestedView = createGameSuggestedView()
+  private readonly claudePaneSessions = new ClaudePaneLiveSessions()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
     read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
@@ -13508,7 +13516,9 @@ export class OrcaRuntimeService {
     if (!terminalHandle || !claimedPaneKey || !launchToken) {
       return null
     }
-    const terminal = this.getOrchestrationDispatchAuthority(terminalHandle)
+    const terminal =
+      this.getOrchestrationDispatchAuthority(terminalHandle) ??
+      this.getOrchestrationDispatchAuthorityForStaleHandle(claimedPaneKey)
     if (
       !terminal?.processIncarnation ||
       !terminal.paneKey ||
@@ -13549,7 +13559,7 @@ export class OrcaRuntimeService {
         terminal,
         terminal.processIncarnation,
         claimedPaneKey,
-        terminalHandle,
+        terminal.terminalHandle,
         launchTokenHash
       )
     }
@@ -13566,9 +13576,21 @@ export class OrcaRuntimeService {
       terminal,
       terminal.processIncarnation,
       attestation.paneKey,
-      terminalHandle,
+      terminal.terminalHandle,
       launchTokenHash
     )
+  }
+
+  // Why: a PTY that outlives an Orca restart can get a new handle while its env keeps the old one
+  // (ORCA-835). The pane key still names it, and the caller's launch token is checked against it.
+  private getOrchestrationDispatchAuthorityForStaleHandle(
+    paneKey: string
+  ): OrchestrationCompatibilityTerminalAuthority | null {
+    if (!this.getPtyRecordForPaneKey(paneKey)?.connected) {
+      return null
+    }
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    return handle ? this.getOrchestrationDispatchAuthority(handle) : null
   }
 
   private freezeOrchestrationCompatibilityCallerAuthority(
@@ -31250,6 +31272,45 @@ export class OrcaRuntimeService {
     member: { paneKey: string; agentType: string | null; worktreeId: string | null },
     worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
   ): ReturnType<typeof gameMemberAccountOf> {
+    return this.readGameMemberSeat(member, worktreesById, gameMemberAccountOf)
+  }
+
+  /** Files what a pane's running Claude reported, so its member's account is the live one (ORCA-907). */
+  noteClaudePaneStatusLine(event: ClaudeStatusLineRateLimits, managedRoot: string | null): void {
+    const handle = event.paneKey ? this.getTerminalHandleForPaneKey(event.paneKey) : null
+    const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+    if (!ptyId || !this.accountServices) {
+      return
+    }
+    this.claudePaneSessions.note(
+      ptyId,
+      claudePaneLiveSessionOf({
+        event,
+        managedRoot,
+        boundAccountId: this.getManagedPtyAccountOwner(ptyId, 'claude').accountId,
+        now: Date.now()
+      })
+    )
+  }
+
+  private claudePaneSessionOf(ptyId: string): ClaudePaneLiveSession | null {
+    return this.claudePaneSessions.of(
+      ptyId,
+      this.getManagedPtyAccountOwner(ptyId, 'claude').accountId
+    )
+  }
+
+  private readGameMemberSeat<T>(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>,
+    read: (seat: {
+      agentType: string | null
+      live: ManagedPtyAccountOwner | null
+      session: ClaudePaneLiveSession | null
+      pinnedAccountId: string | null | undefined
+      accounts: readonly { id: string; email: string }[]
+    }) => T
+  ): T | null {
     const provider = accountProviderOfAgent(member.agentType)
     const services = this.accountServices
     if (!provider || !services) {
@@ -31259,9 +31320,10 @@ export class OrcaRuntimeService {
       const handle = this.getTerminalHandleForPaneKey(member.paneKey)
       const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
       const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
-      return gameMemberAccountOf({
+      return read({
         agentType: member.agentType,
         live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
+        session: ptyId && provider === 'claude' ? this.claudePaneSessionOf(ptyId) : null,
         pinnedAccountId:
           provider === 'claude' ? worktree?.claudeAccountId : worktree?.codexAccountId,
         accounts: (provider === 'claude'
@@ -31386,7 +31448,7 @@ export class OrcaRuntimeService {
     const roster = services
       ? (provider === 'claude' ? services.claudeAccounts : services.codexAccounts).listAccounts()
       : null
-    const accountLimits =
+    const cachedLimits =
       services && roster && member.account
         ? accountLimitsOf(
             services.rateLimits.getState(),
@@ -31396,6 +31458,12 @@ export class OrcaRuntimeService {
           )
         : null
     const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+    const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+    const pane = ptyId && provider === 'claude' ? this.claudePaneSessionOf(ptyId) : null
+    const accountLimits = freshestLimitsOf(
+      cachedLimits,
+      pane && pane.accountId === member.account?.id ? pane.limits : null
+    )
     const read = handle
       ? await this.readTerminal(handle, { limit: GAME_MEMBER_LIMIT_TAIL_LINES }).catch(() => null)
       : null
@@ -31498,6 +31566,8 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      globalLoginOf: (member) =>
+        this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin) === true,
       limitOf: (member) => this.gameMemberLimitFor(member),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
@@ -32981,13 +33051,57 @@ export class OrcaRuntimeService {
         return scoped
       }
     }
-    const worktrees = await this.listResolvedWorktrees()
-    let candidates: ResolvedWorktree[]
-
     if (selector === 'active') {
       throw new Error('selector_not_found')
     }
+    const listedAt = Date.now()
+    let candidates = this.matchWorktreeSelector(
+      await this.listResolvedWorktrees(),
+      selector,
+      explicitWorktreeId
+    )
+    // Why (ORCA-865): a worktree added outside this runtime stays hidden until the scan TTL lapses.
+    if (candidates.length === 0 && this.hasWorktreeScanNotAfter(listedAt)) {
+      this.expireWorktreeScanCaches()
+      candidates = this.matchWorktreeSelector(
+        await this.listResolvedWorktrees(),
+        selector,
+        explicitWorktreeId
+      )
+    }
 
+    if (candidates.length > 1 && !selector.startsWith('id:')) {
+      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
+        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
+      candidates = collapseSameDiskWorktreeRecords(
+        candidates,
+        getHostId,
+        normalizeRuntimePathForComparison
+      )
+      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
+      if (
+        selector.startsWith('path:') &&
+        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
+      ) {
+        candidates = [candidates[0]]
+      }
+    }
+
+    if (candidates.length === 1) {
+      return candidates[0]
+    }
+    if (candidates.length > 1) {
+      throw new Error('selector_ambiguous')
+    }
+    throw new Error('selector_not_found')
+  }
+
+  private matchWorktreeSelector(
+    worktrees: ResolvedWorktree[],
+    selector: string,
+    explicitWorktreeId: string | null
+  ): ResolvedWorktree[] {
+    let candidates: ResolvedWorktree[]
     if (selector.startsWith('id:')) {
       const worktreeId = explicitWorktreeId ?? selector.slice(3)
       candidates = worktrees.filter((worktree) => worktree.id === worktreeId)
@@ -33027,31 +33141,7 @@ export class OrcaRuntimeService {
           branchSelectorMatches(worktree.branch, selector)
       )
     }
-
-    if (candidates.length > 1 && !selector.startsWith('id:')) {
-      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
-        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
-      candidates = collapseSameDiskWorktreeRecords(
-        candidates,
-        getHostId,
-        normalizeRuntimePathForComparison
-      )
-      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
-      if (
-        selector.startsWith('path:') &&
-        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
-      ) {
-        candidates = [candidates[0]]
-      }
-    }
-
-    if (candidates.length === 1) {
-      return candidates[0]
-    }
-    if (candidates.length > 1) {
-      throw new Error('selector_ambiguous')
-    }
-    throw new Error('selector_not_found')
+    return candidates
   }
 
   private async resolveWorkspaceParentSelector(selector: string): Promise<ResolvedWorkspaceParent> {
@@ -33837,6 +33927,23 @@ export class OrcaRuntimeService {
   private invalidateResolvedWorktreeCache(): void {
     this.resolvedWorktreeGeneration += 1
     this.resolvedWorktreeCache = null
+  }
+
+  private hasWorktreeScanNotAfter(timestamp: number): boolean {
+    return [...this.worktreeScanCache.values()].some(
+      (entry) => entry.result.ok && entry.scannedAt <= timestamp
+    )
+  }
+
+  /** Why expire rather than drop: a kept entry lets an unchanged Git-admin fingerprint skip the rescan. */
+  private expireWorktreeScanCaches(): void {
+    for (const entry of this.worktreeScanCache.values()) {
+      // Why: a cached failure is the spawn-pressure backoff; a selector miss must not defeat it.
+      if (entry.result.ok) {
+        entry.expiresAt = 0
+      }
+    }
+    this.invalidateResolvedWorktreeCache()
   }
 
   private invalidateWorktreeScanCacheForRepo(repoId: string): void {
@@ -41396,7 +41503,7 @@ function maxUpwardCursorReach(
   previousRedrawCursor: RetainedTailRedrawCursor | null
 ): number {
   let reach = previousRedrawCursor ? previousRedrawCursor.rowFromEnd : 0
-  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?A/g
+  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?[AF]/g
   let match: RegExpExecArray | null
   while ((match = cursorUpPattern.exec(normalizedChunk)) !== null) {
     reach += match[1] ? Number.parseInt(match[1], 10) : 1
@@ -41603,9 +41710,17 @@ export function appendNormalizedToMultilineTailBufferUnwindowed(
         continue
       }
       const firstParam = parsed.firstParam ?? 1
-      if (parsed.final === 'A') {
+      // Why: like xterm, vertical moves keep the rows they pass and stop at the edges instead of scrolling.
+      if (parsed.final === 'A' || parsed.final === 'F') {
         cursorRow = Math.max(0, cursorRow - firstParam)
-        rows.splice(cursorRow + 1)
+        if (parsed.final === 'F') {
+          cursorColumn = 0
+        }
+      } else if (parsed.final === 'B' || parsed.final === 'e' || parsed.final === 'E') {
+        cursorRow = Math.min(cursorRow + firstParam, Math.max(cursorRow, rows.length - 1))
+        if (parsed.final === 'E') {
+          cursorColumn = 0
+        }
       } else if (parsed.final === 'K') {
         eraseLine(parsed.firstParam ?? 0)
       } else if (parsed.final === 'G' || parsed.final === '`') {
@@ -41940,9 +42055,10 @@ function containsTerminalVerticalLineControl(value: string): boolean {
       return false
     }
     index = parsed.endIndex
+    // Why not B/e: at the bottom row, where a chunk without a redraw cursor starts, a down move is a no-op.
     if (
       parsed.kind === 'csi' &&
-      parsed.final === 'A' &&
+      (parsed.final === 'A' || parsed.final === 'F' || parsed.final === 'E') &&
       hasCanonicalNumericCsiParams(parsed.params)
     ) {
       return true
@@ -43221,6 +43337,10 @@ function isTerminalPreviewLineControl(parsed: {
   }
   return (
     parsed.final === 'A' ||
+    parsed.final === 'B' ||
+    parsed.final === 'e' ||
+    parsed.final === 'E' ||
+    parsed.final === 'F' ||
     parsed.final === 'G' ||
     parsed.final === '`' ||
     parsed.final === 'D' ||

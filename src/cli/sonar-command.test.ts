@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runNodeProcess, runSonarCommand } from './sonar-command'
 
 const HASH = 'b'.repeat(64)
+const activeSonar = async () => [{ pluginKey: 'ab2web.orca-sonar', status: 'idle' }]
 
 describe('runSonarCommand', () => {
   let userDataDir: string
@@ -30,7 +31,9 @@ describe('runSonarCommand', () => {
   it('fails with sonar_not_installed when the plugin is not installed', async () => {
     const run = vi.fn(async () => 0)
 
-    await expect(runSonarCommand(['find', 'Tab'], { userDataDir, run })).rejects.toMatchObject({
+    await expect(
+      runSonarCommand(['find', 'Tab'], { userDataDir, run, listPlugins: activeSonar })
+    ).rejects.toMatchObject({
       code: 'sonar_not_installed'
     })
     expect(run).not.toHaveBeenCalled()
@@ -40,7 +43,7 @@ describe('runSonarCommand', () => {
     const cliPath = installTree()
     const run = vi.fn(async () => 0)
 
-    await runSonarCommand(['find', 'Tab', '--json'], { userDataDir, run })
+    await runSonarCommand(['find', 'Tab', '--json'], { userDataDir, run, listPlugins: activeSonar })
 
     expect(run).toHaveBeenCalledWith('node', [cliPath, 'find', 'Tab', '--json'], {
       ...process.env,
@@ -53,7 +56,7 @@ describe('runSonarCommand', () => {
     const run = vi.fn(async () => 0)
 
     await expect(
-      runSonarCommand(['find', 'Tab'], { userDataDir, run, remote: true })
+      runSonarCommand(['find', 'Tab'], { userDataDir, run, remote: true, listPlugins: activeSonar })
     ).rejects.toMatchObject({
       code: 'sonar_remote_unavailable',
       message: expect.stringContaining('remote Orca host')
@@ -65,8 +68,96 @@ describe('runSonarCommand', () => {
     installTree()
 
     await expect(
-      runSonarCommand(['symbol', 'x'], { userDataDir, run: async () => 2 })
+      runSonarCommand(['symbol', 'x'], {
+        userDataDir,
+        run: async () => 2,
+        listPlugins: activeSonar
+      })
     ).resolves.toBe(2)
+  })
+
+  it.each([
+    ['the plugin system is off', [], 'Turn on plugins'],
+    [
+      'the plugin is disabled',
+      [{ pluginKey: 'ab2web.orca-sonar', status: 'disabled' }],
+      'disabled'
+    ],
+    [
+      'an update waits for consent',
+      [{ pluginKey: 'ab2web.orca-sonar', status: 'pending' }],
+      'approve'
+    ],
+    [
+      'the plugin is kill-listed',
+      [
+        {
+          pluginKey: 'ab2web.orca-sonar',
+          status: 'errored',
+          blockedByKillList: { reason: 'bad release' }
+        }
+      ],
+      'safety list'
+    ],
+    ['the install is invalid', [{ pluginKey: 'ab2web.orca-sonar', status: 'invalid' }], 'Reinstall']
+  ])('refuses with sonar_plugin_inactive when %s', async (_state, plugins, hint) => {
+    installTree()
+    const run = vi.fn(async () => 0)
+
+    await expect(
+      runSonarCommand(['find', 'Tab'], { userDataDir, run, listPlugins: async () => plugins })
+    ).rejects.toMatchObject({
+      code: 'sonar_plugin_inactive',
+      message: expect.stringContaining(hint)
+    })
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it.each(['running', 'idle', 'restarting', 'errored'])(
+    'runs the CLI while Orca reports the plugin %s',
+    async (status) => {
+      installTree()
+      const run = vi.fn(async () => 0)
+
+      await runSonarCommand(['find', 'Tab'], {
+        userDataDir,
+        run,
+        listPlugins: async () => [
+          { pluginKey: 'other.plugin', status: 'disabled' },
+          { pluginKey: 'ab2web.orca-sonar', status }
+        ]
+      })
+
+      expect(run).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('does not ask Orca when the plugin is not installed', async () => {
+    const listPlugins = vi.fn(activeSonar)
+
+    await expect(
+      runSonarCommand(['find', 'Tab'], { userDataDir, run: async () => 0, listPlugins })
+    ).rejects.toMatchObject({ code: 'sonar_not_installed' })
+    expect(listPlugins).not.toHaveBeenCalled()
+  })
+
+  it('does not run the CLI when Orca cannot be asked', async () => {
+    installTree()
+    const run = vi.fn(async () => 0)
+    const unreachable = Object.assign(new Error('Orca Lab is not running.'), {
+      code: 'runtime_unavailable'
+    })
+
+    await expect(
+      runSonarCommand(['find', 'Tab'], {
+        userDataDir,
+        run,
+        listPlugins: async () => {
+          throw unreachable
+        }
+      })
+    ).rejects.toBe(unreachable)
+    expect(run).not.toHaveBeenCalled()
   })
 })
 

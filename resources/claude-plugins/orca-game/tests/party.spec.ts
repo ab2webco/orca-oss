@@ -110,6 +110,18 @@ describe('counts and needs', () => {
     ])
   })
 
+  // Why (ORCA-907): its hooks say idle, but only a person can log its account in again.
+  it('counts a member whose account logged out as waiting on the person, and says why', () => {
+    const agents = [
+      agent({ displayName: 'out', state: 'idle', limit: { resetsAt: null, loggedOut: true } }),
+      agent({ displayName: 'capped', state: 'idle', limit: { resetsAt: null } })
+    ]
+    expect(countsOf(agents)).toEqual({ working: 0, idle: 1, waiting: 1, done: 0 })
+    expect(needsOf(state({ agents }))).toEqual([
+      { name: 'out', text: 'logged out · /login in its pane', url: null }
+    ])
+  })
+
   it("reads a member in its own worktree by that worktree's PR and ticket, not the lead's", () => {
     const worktree = { id: 'wt-8', branch: 'feat/cin-8', displayName: 'cin-8' }
     const merged = { ...REVIEW, number: 8, state: 'merged', ci: 'success' } as const
@@ -126,9 +138,10 @@ describe('counts and needs', () => {
       agent({ paneKey: 'm9', displayName: 'CIN-9', isMember: true, worktree, review: red })
     ]
     const party = partyOf(state({ agents, review: null }), true)
+    // Why CIN-9 first: red CI needs the person, so it takes a slot before a merged member.
     expect(party.map((member) => [member.name, member.phase, member.mood])).toEqual([
-      ['CIN-8', 'handoff', 'cheer'],
-      ['CIN-9', 'pr', 'hurt']
+      ['CIN-9', 'pr', 'hurt'],
+      ['CIN-8', 'handoff', 'cheer']
     ])
     expect(needsOf(state({ agents, review: null }))).toEqual([
       { name: 'CIN-9', text: 'CI failing', url: red.url }

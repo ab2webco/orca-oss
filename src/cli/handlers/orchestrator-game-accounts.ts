@@ -33,6 +33,10 @@ export type GameAccountsRow = {
   members: string[]
   /** Whether `accounts: auto` may put a member on it (this host, not a custom endpoint, sign-in not failed). */
   autoPick: boolean
+  /** A member on it stopped on a usage or spend limit its readings may not show. */
+  memberStopped: boolean
+  /** A member on it says the account must log in again, whatever its readings say. */
+  memberLoggedOut: boolean
 }
 
 export type GameAccountsReport = {
@@ -76,7 +80,9 @@ export function gameAccountsReportOf(
           limited: standing === 'limited',
           usableAt: isoOf(resetsAt),
           members: usage.members,
-          autoPick: entry ? isAutoPickableAccount(entry) : false
+          autoPick: entry ? isAutoPickableAccount(entry) : false,
+          memberStopped: usage.stopped !== undefined,
+          memberLoggedOut: usage.stopped?.loggedOut === true
         }
       })
       const pick = pickGameMemberAccount(usages, now)
@@ -112,7 +118,11 @@ export function formatGameAccounts(report: GameAccountsReport, now = Date.now())
         row.email,
         windowText('5h', row.session, now),
         windowText('7d', row.weekly, now),
-        row.standing,
+        row.memberLoggedOut
+          ? 'logged out, a member asks for /login'
+          : row.memberStopped && row.limited
+            ? `limited, member stopped on a limit, back ${gameResetInText(msOf(row.usableAt), now)}`
+            : row.standing,
         row.members.join(', ') || '-',
         row.autoPick ? '' : 'not picked by auto'
       ])

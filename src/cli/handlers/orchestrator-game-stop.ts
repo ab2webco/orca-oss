@@ -1,6 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
-import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-stop-targets'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 

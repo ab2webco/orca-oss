@@ -44,7 +44,7 @@ export function GameOwnerQuestionCard({
 
   return (
     <article
-      className="space-y-3 rounded-xl border border-border bg-card p-4 text-card-foreground"
+      className="@container space-y-3 rounded-xl border border-border bg-card p-4 text-card-foreground"
       data-game-owner-question={question.id}
     >
       <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
@@ -87,8 +87,9 @@ export function GameOwnerQuestionCard({
           ))}
         </div>
       ) : null}
+      {/* Why stacked in a narrow card: beside Send, the placeholder is cut mid-word at 320px. */}
       <form
-        className="flex items-center gap-2"
+        className="flex flex-col gap-2 @xs:flex-row @xs:items-center"
         onSubmit={(event) => {
           event.preventDefault()
           if (typed) {
@@ -107,10 +108,10 @@ export function GameOwnerQuestionCard({
             'auto.components.game-inbox.GameOwnerQuestionCard.placeholder',
             'Answer in your own words'
           )}
-          className="h-8 min-w-0 flex-1 text-sm"
+          className="h-8 min-w-0 text-sm @xs:flex-1"
           onChange={(event) => setText(event.target.value)}
         />
-        <Button type="submit" size="sm" disabled={sending || !typed}>
+        <Button type="submit" size="sm" className="self-end" disabled={sending || !typed}>
           {translate('auto.components.game-inbox.GameOwnerQuestionCard.send', 'Send')}
         </Button>
       </form>

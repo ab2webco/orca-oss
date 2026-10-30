@@ -5,7 +5,7 @@ import { xpTextOf, type Level } from './fleet-hud'
 import { CI_COLORS, ciShortOf } from './fleet-labels'
 import { gameLocale, gameStrings, localizedNameOf } from './game-strings'
 import { shortMemberNameOf } from './member-character'
-import { memberOf } from './party'
+import { memberOf, teamOrderOf } from './party'
 import { isCiRed, reviewLabelOf, signedXpOf } from './rewards'
 import type { SceneDefinition, ScenePhase } from './scenes/index'
 import { memberPhaseOf, ticketOf } from './state-report'
@@ -209,17 +209,14 @@ export type FlatMembersInput = {
   maxMembers: number
 }
 
-/** One line per teammate, the lead first; past `maxMembers` a `+N` line counts the rest. */
+/** One line per teammate in the band's order; past `maxMembers` a `+N` line counts the rest. */
 export const flatMemberLinesOf = ({
   state,
   scene,
   columns,
   maxMembers
 }: FlatMembersInput): FlatLine[] => {
-  const agents = [
-    ...state.agents.filter((one) => one.isLeader),
-    ...state.agents.filter((one) => !one.isLeader)
-  ]
+  const agents = teamOrderOf(state)
   if (agents.length === 0) {
     const empty = fitCells(gameStrings().art.noParty, columns)
     return [{ key: 'flat-empty', parts: [{ key: 'empty', text: empty, color: 'gray' }] }]

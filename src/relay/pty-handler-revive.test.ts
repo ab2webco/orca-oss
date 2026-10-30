@@ -53,6 +53,7 @@ describe('PtyHandler', () => {
   })
 
   afterEach(async () => {
+    vi.unstubAllEnvs()
     await endPtyHandlerTest(handler, originalPlatform)
   })
 
@@ -128,14 +129,19 @@ describe('PtyHandler', () => {
   })
 
   it('revive drops a serialized slug that is not database-safe', async () => {
+    // Why: a suite run inside an Orca terminal inherits that worktree's slug.
+    vi.stubEnv('ORCA_WORKTREE_SLUG', undefined)
     const state = JSON.stringify([
       { id: 'pty-8', pid: process.pid, cols: 80, rows: 24, cwd: '/tmp', worktreeSlug: 'x; rm -rf' }
     ])
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    // Why: a run inside an Orca terminal inherits that pane's own slug into the spawn env.
+    vi.stubEnv('ORCA_WORKTREE_SLUG', undefined)
     try {
       await dispatcher.callRequest('pty.revive', { state })
     } finally {
       killSpy.mockRestore()
+      vi.unstubAllEnvs()
     }
 
     const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }

@@ -1,6 +1,6 @@
 import type { GameAgent, GameMemberAccount, GameMemberLimit, GameMemberRemote } from '../types'
 import { cellWidthOf } from './cell-width'
-import { gameStrings } from './game-strings'
+import { gameLocale, gameStrings, type GameLocale } from './game-strings'
 import { remoteGoneTagOf } from './remote-member-view'
 
 // What a member card says about the account its agent runs on.
@@ -13,10 +13,10 @@ export const memberLimitOf = (value: unknown): GameMemberLimit | undefined => {
     return undefined
   }
   const resetsAt = value.resetsAt
-  if (resetsAt === null) {
-    return { resetsAt: null }
+  if (resetsAt !== null && (typeof resetsAt !== 'number' || !Number.isFinite(resetsAt))) {
+    return undefined
   }
-  return typeof resetsAt === 'number' && Number.isFinite(resetsAt) ? { resetsAt } : undefined
+  return value.loggedOut === true ? { resetsAt, loggedOut: true } : { resetsAt }
 }
 
 /** "1h 30m" until `resetsAt`, rounded up to the minute; null when unknown or past. */
@@ -33,8 +33,16 @@ export const backInOf = (resetsAt: number | null, now: number): string | null =>
   return [hours > 0 ? `${hours}h` : '', rest > 0 ? `${rest}m` : ''].filter(Boolean).join(' ')
 }
 
+// Why not in the catalogs: game-strings.ts is at its line budget, and only this tag says it.
+const LOGGED_OUT: Readonly<Record<GameLocale, string>> = {
+  en: 'logged out · /login in its pane',
+  es: 'sesión cerrada · /login en su panel'
+}
+
 export const limitTagOf = (limit: GameMemberLimit, now: number): string =>
-  gameStrings().text.limited(backInOf(limit.resetsAt, now))
+  limit.loggedOut
+    ? LOGGED_OUT[gameLocale()]
+    : gameStrings().text.limited(backInOf(limit.resetsAt, now))
 
 const PROVIDERS = ['claude', 'codex'] as const
 

@@ -5,6 +5,7 @@ import {
   settle,
   type GameAgentRow,
   type GameMemberAccountOf,
+  type GameMemberGlobalLoginOf,
   type GameMemberLimitOf,
   type GameMemberWork,
   type ReadLinkedStatus
@@ -102,6 +103,7 @@ export type OrchestratorGameStateInput = {
   readLinear: () => Promise<TrackerItem | null>
   readLinkedStatus?: ReadLinkedStatus
   accountOf?: GameMemberAccountOf
+  globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
@@ -255,6 +257,7 @@ export async function buildOrchestratorGameState(
     readMemberWork: input.readMemberWork,
     readLinkedStatus: input.readLinkedStatus,
     accountOf: input.accountOf,
+    globalLoginOf: input.globalLoginOf,
     limitOf: input.limitOf,
     advisorOf: input.advisorOf,
     launchOf: input.launchOf,

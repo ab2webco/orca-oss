@@ -527,7 +527,7 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    accounts: default # optional: auto (unset: the freest managed account, see below), default (Orca's own selection), or a list of allowed account emails or ids
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
@@ -562,6 +562,9 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
+  project's stored lead conversation and this session becomes the new lead instead of reopening it.
+  A live lead still wins, and an older host that drops the flag reopens the old one and says so.
 - `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
@@ -828,8 +831,9 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
 
 ### Accounts and limited members
 
-`accounts: auto` (orca.yaml or the project Settings' **Member accounts**) puts each new member on
-the managed account of its agent with the most free quota
+`accounts: auto`, also when unset (orca.yaml or the project Settings' **Member accounts**), puts
+each new member that `game launch` or `game wave` starts without `--account` on the managed account
+of its agent with the most free quota
 ([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
 
 - An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
@@ -841,12 +845,26 @@ the managed account of its agent with the most free quota
   unknown, Orca refreshes usage once (bounded to 20 s) before picking.
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
+- An account one of whose members stopped on a limit (see below) is **limited** until that limit
+  resets, whatever its 5h and 7d readings say: a spend limit is not in those readings (ORCA-896).
+- `accounts: [a@example.com, acct_id]` restricts `auto`, `--account` and `game move` to the
+  accounts listed (emails or ids); with none of them usable the launch is refused, never moved to
+  the global login. Settings can only override the list with `default` or `auto`.
+- The launch prints the account picked, its 5h and 7d use, and each account it skipped and why.
 - When every account is near or limited the launch is refused with when the first is back.
-  `default` (or unset) keeps Orca's own account selection.
+- A launch never falls back to the host's global login (`~/.claude`, `~/.codex`) while the agent
+  has managed accounts: Orca cannot refresh, `game move` or `account switch` a member there
+  (ORCA-809). When none of them is usable the launch is refused and says to name one with
+  `--account`. With no managed account at all, one member runs on the global login and the launch
+  says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
+  `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
+- `default` keeps Orca's own account selection, which can be the global login. A member placed
+  with `--on` sends the host only what was typed or set to `auto`.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
-verifiably back under its limit (the same guard Orca's auto-switch uses)
+verifiably back under its limit (the same guard Orca's auto-switch uses). A spend-limit message
+(`spend limit`, `/usage-credits`) keeps it limited even then, since no reading counts spend
 ([`orchestrator-game-member-limit.ts`](../../src/shared/orchestrator-game-member-limit.ts)).
 `game state` carries it as the member's `limit: { resetsAt }`, and each member's account as
 `account: { provider, id, email }`. `game fleet` shows the phase `limited` with `game move` as the
@@ -855,6 +873,18 @@ next step, `game push` leaves it alone, and the Panel card turns red with `limit
 `codex · ana@…` tag: the email's domain never shows, and the name shortens, then drops, as the card
 narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
 its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
+
+A member's account is the one its running Claude reports, not only what Orca recorded at spawn
+(ORCA-907). Each status-line post carries the pane's `CLAUDE_CONFIG_DIR`; a managed vault there
+names the account `game fleet`, `game move`, the Panel and a paired host's relay show, ahead of the
+pane's spawn record and the worktree pin. A post from before an account switch no longer counts.
+The same post's 5h and 7d windows decide whether that member is limited when they are newer than
+Orca's cached reading, so the card matches the pane's own status line. A stopped member whose last
+lines ask for `/login` (`Not logged in`, an expired or revoked OAuth token, Codex's `sign in again`)
+is `limit: { resetsAt: null, loggedOut: true }`: phase `needs-you` with
+`log <email> in again (/login in its pane), or game move <ticket>`, the card says
+`logged out · /login in its pane`, and `game accounts` shows its account as logged out, which
+`auto` skips. An older host relays no `loggedOut`, and an older home shows such a member as limited.
 
 ### The lead's XP
 

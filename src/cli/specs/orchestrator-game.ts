@@ -15,15 +15,16 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'lead'],
     summary: "Print the standing rules that make this session the project's lead",
-    usage: 'orca game lead [--json]',
-    allowedFlags: [...GLOBAL_FLAGS],
+    usage: 'orca game lead [--fresh] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'fresh'],
     notes: [
       "Orca's rules plus the project's own from orchestratorGame.orchestrator.rules in orca.yaml.",
       'A session a lead launched gets no rules: it reports to its lead.',
       "One live lead per project: with the project's lead live in another pane, Orca focuses that pane and prints `Not the lead:` instead of the rules.",
-      "With the lead's pane closed, Orca reopens its last conversation in a new tab; when that fails, this session becomes a new lead and the output says why."
+      "With the lead's pane closed, Orca reopens its last conversation in a new tab; when that fails, this session becomes a new lead and the output says why.",
+      '--fresh rotates the lead: with the outgoing lead closed, Orca retires its stored conversation and this session becomes the new lead instead of reopening it.'
     ],
-    examples: ['orca game lead']
+    examples: ['orca game lead', 'orca game lead --fresh']
   },
   {
     path: ['game', 'leads'],

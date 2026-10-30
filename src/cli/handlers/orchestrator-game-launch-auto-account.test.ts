@@ -137,6 +137,94 @@ describe('orca game launch with accounts: auto', () => {
     expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_cy' })])
   })
 
+  it('picks the freest account when the project sets no accounts and no --account is given', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({ ana: limits(70, 40), cy: limits(10, 30) })
+    )
+
+    await launch(client)
+
+    expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_cy' })])
+  })
+
+  it('refuses rather than fall back to the global login while managed accounts exist', async () => {
+    const snapshot = snapshotWith({ ana: limits(10, 10) })
+    const failed = {
+      ...snapshot,
+      rateLimits: {
+        ...snapshot.rateLimits,
+        claudeAccountAuth: [{ accountId: 'acct_ana', state: 'failed' }]
+      }
+    }
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      failed
+    )
+
+    await expect(launch(client)).rejects.toThrow(/global login.*--account/)
+    expect(starts()).toEqual([])
+  })
+
+  it('launches on the global login with no managed account at all, and says so', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
+      flags: new Map([['ticket', 'CIN-12']]),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(starts()).toHaveLength(1)
+    expect(starts()[0]).not.toHaveProperty('claudeAccountId')
+    expect(output.join('\n')).toMatch(/CIN-12.*global login/s)
+  })
+
+  it('refuses a second member on the global login', async () => {
+    const onGlobal = {
+      paneKey: 'm1',
+      displayName: 'CIN-1',
+      agentType: 'claude',
+      state: 'working',
+      isLeader: false,
+      isMember: true,
+      globalLogin: true
+    }
+    const { client, starts } = fakeClient(
+      stateWith({ agents: [onGlobal], lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await expect(launch(client)).rejects.toThrow(/CIN-1 already runs on the global login/)
+    expect(starts()).toEqual([])
+  })
+
+  it('wave with no managed account launches one member on the global login and refuses the rest', async () => {
+    const { client, starts } = fakeClient(
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
+      snapshotWith({})
+    )
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game wave']({
+      flags: new Map([['tickets', 'CIN-1,CIN-2']]),
+      client,
+      cwd: '/repo',
+      json: true
+    })
+
+    expect(starts()).toEqual([expect.objectContaining({ name: 'cin-1' })])
+    expect(starts()[0]).not.toHaveProperty('claudeAccountId')
+    const wave = JSON.parse(output.join('')).result
+    expect(wave.launched).toEqual([expect.objectContaining({ ticket: 'CIN-1', globalLogin: true })])
+    expect(wave.failed).toEqual([
+      { ticket: 'CIN-2', error: expect.stringMatching(/CIN-1 already runs on the global login/) }
+    ])
+  })
+
   it('keeps the default account selection with accounts: default and no --account', async () => {
     const { client, calls, starts } = fakeClient(
       stateWith({ lead: { autostart: false, cap: 4, agent: 'claude', accounts: 'default' } }),
@@ -207,7 +295,7 @@ describe('orca game launch with accounts: auto', () => {
 
   it('wave spreads the members it launches over equally free accounts', async () => {
     const { client, starts } = fakeClient(
-      stateWith(),
+      stateWith({ lead: { autostart: false, cap: 4, agent: 'claude' } }),
       snapshotWith({ ana: limits(10, 10), cy: limits(11, 10) })
     )
 
@@ -222,5 +310,67 @@ describe('orca game launch with accounts: auto', () => {
       expect.objectContaining({ name: 'cin-1', claudeAccountId: 'acct_ana' }),
       expect.objectContaining({ name: 'cin-2', claudeAccountId: 'acct_cy' })
     ])
+  })
+
+  it('skips an account whose member stopped on a spend limit its quota cannot show, and says why', async () => {
+    const stopped = {
+      paneKey: 'm1',
+      displayName: 'CIN-1',
+      agentType: 'claude',
+      state: 'idle',
+      isMember: true,
+      account: { provider: 'claude', id: 'acct_cy', email: 'cy@example.com' },
+      limit: { resetsAt: null, spend: true }
+    }
+    const { client, starts } = fakeClient(
+      stateWith({ agents: [stopped] }),
+      snapshotWith({ ana: limits(60, 50), cy: limits(5, 5) })
+    )
+
+    await ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
+      flags: new Map([['ticket', 'CIN-12']]),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_ana' })])
+    expect(output.join('\n')).toMatch(
+      /ana@example\.com: the freest usable Claude account.*skipped cy@example\.com \(limited: CIN-1 stopped on a limit\)/s
+    )
+  })
+
+  it("picks only among the accounts the project's orchestrator.accounts lists", async () => {
+    const { client, starts } = fakeClient(
+      stateWith({
+        lead: {
+          autostart: false,
+          cap: 4,
+          agent: 'claude',
+          accounts: ['ana@example.com', 'acct_dee']
+        }
+      }),
+      snapshotWith({ ana: limits(60, 50), cy: limits(5, 5), dee: limits(40, 40) })
+    )
+
+    await launch(client)
+
+    expect(starts()).toEqual([expect.objectContaining({ claudeAccountId: 'acct_dee' })])
+  })
+
+  it('refuses a named --account the project does not allow, and never falls back to the global login', async () => {
+    const lead = { autostart: false, cap: 4, agent: 'claude', accounts: ['ana@example.com'] }
+    const named = fakeClient(
+      stateWith({ lead }),
+      snapshotWith({ ana: limits(1, 1), cy: limits(1, 1) })
+    )
+    await expect(launch(named.client, [['account', 'cy@example.com']])).rejects.toThrow(
+      /cy@example\.com is not one of the accounts this project allows.*ana@example\.com/
+    )
+    expect(named.starts()).toEqual([])
+
+    const none = fakeClient(stateWith({ lead }), snapshotWith({ cy: limits(1, 1) }))
+    await expect(launch(none.client)).rejects.toThrow(/allows.*ana@example\.com/)
+    expect(none.starts()).toEqual([])
   })
 })

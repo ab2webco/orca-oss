@@ -16269,9 +16269,13 @@
       "game-inbox": {
         "GameInboxSheet": {
           "title": "Inbox",
-          "description": "What the project's lead asked you to decide.",
+          "description": "What the lead asked you, what waits on it, and how it talks with each member.",
           "forYou": "For you",
-          "empty": "No questions are waiting for you."
+          "empty": "No questions are waiting for you.",
+          "waiting": "Waiting",
+          "threads": "Threads",
+          "answered": "Answered",
+          "answerInstead": "Answer instead of the lead"
         },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
@@ -16281,6 +16285,39 @@
         },
         "SidebarGameInboxEntry": {
           "inbox": "Inbox"
+        },
+        "GameInboxKindTag": {
+          "question": "Question",
+          "decisionGate": "Decision",
+          "workerDone": "Report",
+          "escalation": "Escalation",
+          "status": "Status",
+          "dispatch": "Dispatch",
+          "mergeReady": "Merge ready",
+          "handoff": "Handoff"
+        },
+        "GameInboxWaitingList": {
+          "empty": "No member is waiting for an answer.",
+          "answerer": "{{answerer}} must answer"
+        },
+        "GameInboxAnsweredList": {
+          "empty": "The lead has not answered a member yet.",
+          "answeredAt": "answered {{when}}",
+          "overridden": "You replaced it: {{text}}"
+        },
+        "GameInboxThreadsView": {
+          "rejected": "Rejected",
+          "failed": "Failed",
+          "back": "All threads",
+          "empty": "No member has talked with the lead yet.",
+          "waiting": "{{count}} waiting"
+        },
+        "GameMemberReplyForm": {
+          "failed": "The reply was not sent.",
+          "label": "Your answer to {{ticket}}",
+          "send": "Send",
+          "overridePlaceholder": "Replace the lead's answer",
+          "override": "Override"
         }
       }
     },

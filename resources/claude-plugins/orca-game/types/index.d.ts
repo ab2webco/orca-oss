@@ -54,6 +54,8 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
   remote?: GameMemberRemote
+  /** When its host last saw it work or change state (ms); absent when unknown or from an older host. */
+  activeAt?: number
 }
 
 export type GameMemberRemote = {
@@ -86,7 +88,8 @@ export type GameMemberAdvisor = GameMemberAdvisorPick &
     previous?: GameMemberAdvisorPick
   }
 
-export type GameMemberLimit = { resetsAt: number | null }
+/** `loggedOut`: its account must log in again, which no reset fixes (ORCA-907). */
+export type GameMemberLimit = { resetsAt: number | null; loggedOut?: true }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
 

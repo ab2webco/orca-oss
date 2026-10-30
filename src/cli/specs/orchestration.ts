@@ -95,7 +95,8 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       '          Emits JSON keepalive lines to stderr every 15s so the caller can\n' +
       '          tell the process is alive. `_keepalive` is unrelated to heartbeat\n' +
       '          messages; `_heartbeat` remains as a deprecated compatibility alias.\n' +
-      '          Filter with `jq "select(._keepalive|not)"` when merging streams.',
+      '          Filter with `jq "select(._keepalive|not)"` when merging streams.\n' +
+      '  --json with --wait: the result is one compact line, so the merged stream is NDJSON.',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'terminal',
