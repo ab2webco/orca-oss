@@ -604,7 +604,10 @@ The lead's verbs, run from the lead's terminal
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` records each in `game history`, then releases each one's dispatch, or closes its terminal when no
   dispatch owns it; an unproven release is reported, never followed by a close. It leaves the worktrees; the lead's
-  rules then remove each merged member's worktree and branch with `orca worktree rm`.
+  rules then remove each merged member's worktree and branch with `orca worktree rm`; a member's
+  worktree on a paired host with `orca worktree rm --environment <host> --worktree <selector>`, not
+  ssh. The host may already have removed a merged tree itself, which reads `No worktree on <host>
+matches …` (ORCA-866).
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
 - `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn

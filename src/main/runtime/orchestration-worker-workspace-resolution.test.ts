@@ -258,13 +258,33 @@ describe('orchestration worker workspace resolution', () => {
 
     it.each([
       ['path', `path:${WORKTREE_PATH}`],
-      ['branch', 'branch:feature']
+      ['branch', 'branch:feature'],
+      ['name', 'name:Feature'],
+      ['id', `id:${WORKTREE_ID}`]
     ])('resolves the %s selector to the host-owned record', async (_label, selector) => {
       const runtime = new OrcaRuntimeService(makeDuplicatedStore() as never)
 
       await expect(runtime.showManagedTerminalWorkspace(selector)).resolves.toMatchObject({
         id: WORKTREE_ID
       })
+    })
+
+    // ORCA-866: the lead's `worktree rm --environment imac --worktree branch:…` hit a tree already gone.
+    it('finds no worktree by a branch no longer checked out, but still finds it by path', async () => {
+      scanLocalRepoWorktreesForResolution.mockResolvedValue({
+        ok: true,
+        worktrees: [
+          { path: WORKTREE_PATH, head: 'a', branch: '', isBare: false, isMainWorktree: false }
+        ]
+      })
+      const runtime = new OrcaRuntimeService(makeDuplicatedStore() as never)
+
+      await expect(runtime.showManagedTerminalWorkspace('branch:feature')).rejects.toThrow(
+        'selector_not_found'
+      )
+      await expect(
+        runtime.showManagedTerminalWorkspace(`path:${WORKTREE_PATH}`)
+      ).resolves.toMatchObject({ id: WORKTREE_ID })
     })
 
     it('still rejects a branch checked out at two different paths', async () => {
