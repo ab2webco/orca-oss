@@ -61,6 +61,27 @@ describe("revealing a paired host's terminal", () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
+  // Why: focusing sets store state, and the store notifies its listeners synchronously.
+  it('focuses once when the focus itself notifies the store', async () => {
+    mocks.focus.mockReturnValue(false)
+    mocks.call.mockResolvedValue({ terminal: { worktreeId: 'repo::/home/me/orca-839' } })
+    mocks.activate.mockReturnValue({ primaryTabId: null })
+
+    const revealed = revealPairedTerminal(target)
+    await vi.waitFor(() => expect(mocks.listeners).toHaveLength(1))
+    mocks.focus.mockImplementation(() => {
+      for (const listener of mocks.listeners) {
+        listener()
+      }
+      return true
+    })
+    mocks.listeners[0]!()
+
+    await expect(revealed).resolves.toBe(true)
+    expect(mocks.focus).toHaveBeenCalledTimes(2)
+    expect(mocks.listeners).toHaveLength(0)
+  })
+
   it('says the host did not answer or no longer has the terminal', async () => {
     mocks.focus.mockReturnValue(false)
     mocks.call.mockRejectedValue(new Error('terminal_gone'))

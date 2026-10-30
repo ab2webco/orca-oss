@@ -35,8 +35,16 @@ function focusOnceMirrored(target: { environmentId: string; handle: string }): P
       unsubscribe()
       resolve(false)
     }, MIRROR_WAIT_MS)
+    // Why: focusing sets store state, which re-enters this listener synchronously.
+    let isFocusing = false
     unsubscribe = useAppStore.subscribe(() => {
-      if (focusRendererTerminalHandle(target.handle, target.environmentId)) {
+      if (isFocusing) {
+        return
+      }
+      isFocusing = true
+      const isFocused = focusRendererTerminalHandle(target.handle, target.environmentId)
+      isFocusing = false
+      if (isFocused) {
         clearTimeout(timer)
         unsubscribe()
         resolve(true)
