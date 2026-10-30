@@ -364,6 +364,8 @@ export type GameState = {
   viewScopes?: ('project' | 'global')[]
   /** The view this machine's resources suggest; absent from an older host. */
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
+  /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
+  githubLow?: { remaining: number; limit: number }
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

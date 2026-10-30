@@ -86,7 +86,7 @@ const GH_API_VALUE_FLAGS = new Set([
   '-p'
 ])
 
-function findGhApiEndpoint(args: readonly string[]): string | null {
+export function findGhApiEndpoint(args: readonly string[]): string | null {
   for (let i = 1; i < args.length; i++) {
     const arg = args[i]
     if (!arg.startsWith('-')) {
@@ -99,13 +99,16 @@ function findGhApiEndpoint(args: readonly string[]): string | null {
   return null
 }
 
+const GRAPHQL_GH_COMMANDS = new Set(['pr', 'issue', 'repo'])
+
 export function classifyGhRateLimitBucket(args: readonly string[]): GhRateLimitBucket {
   const command = args[0]
   if (command === 'search') {
     return 'search'
   }
   if (command !== 'api') {
-    return 'core'
+    // Why: gh runs these on GraphQL (GH_DEBUG=api); as core they kept spawning while GraphQL was out.
+    return command && GRAPHQL_GH_COMMANDS.has(command) ? 'graphql' : 'core'
   }
   const endpoint = findGhApiEndpoint(args)
   if (!endpoint) {

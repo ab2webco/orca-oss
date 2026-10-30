@@ -722,6 +722,7 @@ import type {
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
+import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
   GameProjectWorkCache,
   myOpenPullRequestsOf,
@@ -3764,8 +3765,16 @@ export class OrcaRuntimeService {
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
   })
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
-  private readonly gameProjectWork = new GameProjectWorkCache(90_000)
-  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
+  private readonly gameProjectWork = new GameProjectWorkCache(
+    () => 90_000 * gameGitHubPollStretch()
+  )
+  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(
+    () => 60_000 * gameGitHubPollStretch()
+  )
+  // Why TTL 0 otherwise: each pane's own review stays fresh until the GitHub budget runs low (ORCA-877).
+  private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
+    () => (gameGitHubPollStretch() > 1 ? 300_000 : 0)
+  )
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
@@ -21972,10 +21981,12 @@ export class OrcaRuntimeService {
   private async getGameReviewForBranch(
     args: Parameters<OrcaRuntimeService['getHostedReviewForBranch']>[0]
   ): ReturnType<typeof withGameReviewFacts> {
-    const review = await this.getHostedReviewForBranch(args)
-    return review
-      ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
-      : null
+    return this.gameReviews.read(JSON.stringify(args), async () => {
+      const review = await this.getHostedReviewForBranch(args)
+      return review
+        ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
+        : null
+    })
   }
 
   // Why: a retired worker_done must not hide a member whose PR still waits for the lead (ORCA-824).
@@ -31447,6 +31458,7 @@ export class OrcaRuntimeService {
             terminalHandle: callerHandle ?? undefined
           })
         ).stopped,
+      readGitHubBudget: () => readGameGitHubBudget(),
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {

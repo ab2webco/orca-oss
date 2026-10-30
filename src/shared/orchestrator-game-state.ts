@@ -11,6 +11,7 @@ import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
+import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
@@ -197,6 +198,8 @@ export type OrchestratorGameState = {
   unlistedMembers?: GameUnlistedMember[]
   /** Why the saved members could not be read or saved; absent when they could. */
   pausedMembersError?: string
+  /** github.com's budget and Orca's share of it; absent when it cannot be read or from an older host. */
+  githubBudget?: GameGitHubBudget
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
 }

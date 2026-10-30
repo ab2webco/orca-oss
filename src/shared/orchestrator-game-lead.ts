@@ -75,6 +75,12 @@ export function defaultGameMemberCapOf(host: GameHostProfile | null): number {
 export const DEFAULT_GAME_PUSH_PROMPT =
   'Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.'
 
+// Why: members' own gh CI loops spent the GitHub budget the lead needs to merge (ORCA-877).
+export const GAME_MEMBER_CI_NOTE =
+  "CI: read your PR's checks from Orca with `orca game state --json` (`.review.ci` is pending, success or failure); it shares one cached GitHub read with your lead. Do not poll `gh pr checks` or `gh run view`: they spend the GitHub budget the whole team shares."
+
+export const withGameMemberCiNote = (spec: string): string => `${spec}\n\n${GAME_MEMBER_CI_NOTE}`
+
 const at = (key: string): string => `orchestratorGame.orchestrator.${key}`
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

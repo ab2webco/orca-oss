@@ -59,6 +59,7 @@ import type {
 import type { GlobalSettings } from '../../shared/types'
 import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
+import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
@@ -119,6 +120,8 @@ export type OrchestratorGameStateInput = {
   readOpenOwnerQuestions?: () => Promise<number>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
+  /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
+  readGitHubBudget?: () => Promise<GameGitHubBudget | null>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -144,7 +147,8 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions } = input
+  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions, readGitHubBudget } =
+    input
   const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
     read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
   const [
@@ -157,7 +161,8 @@ export async function buildOrchestratorGameState(
     inboxes,
     leadElsewhere,
     suggested,
-    openOwnerQuestions
+    openOwnerQuestions,
+    githubBudget
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -168,7 +173,8 @@ export async function buildOrchestratorGameState(
     leadOnly(readInboxes),
     readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
-    leadOnly(readOpenOwnerQuestions)
+    leadOnly(readOpenOwnerQuestions),
+    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -305,6 +311,7 @@ export async function buildOrchestratorGameState(
     ...(inboxes ? { inboxes } : {}),
     ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
+    ...(githubBudget ? { githubBudget } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

@@ -237,6 +237,39 @@ describe('orca game fleet verbs', () => {
     ])
   })
 
+  it("fleet carries the host's GitHub budget", async () => {
+    const githubBudget = {
+      graphql: { limit: 5000, remaining: 400, resetAt: 1, orcaCalls: 12 },
+      core: { limit: 5000, remaining: 4000, resetAt: 1, orcaCalls: 1 },
+      top: [],
+      low: true
+    }
+    const { client } = fakeClient(stateWith({ agents: [LEAD], githubBudget }))
+
+    await run('game fleet', client)
+
+    expect(printed().githubBudget).toEqual(githubBudget)
+  })
+
+  it("fleet text shows the GitHub budget and Orca's busiest calls under the head line", () => {
+    const now = 1_800_000_000_000
+    const bucket = { limit: 5000, remaining: 400, resetAt: now / 1000 + 600, orcaCalls: 12 }
+    const fleet = {
+      ...gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [] }),
+      githubBudget: {
+        graphql: bucket,
+        core: { ...bucket, remaining: 4000 },
+        top: [{ shape: 'pr checks', bucket: 'graphql' as const, calls: 9 }],
+        low: true
+      }
+    }
+
+    expect(formatFleet(fleet, now).split('\n').slice(1)).toEqual([
+      'GitHub API LOW, game reads slowed 5x: GraphQL 400/5000 left, Orca made 12 calls (resets in 10m) · REST 4000/5000 left, Orca made 12 calls (resets in 10m)',
+      "Orca's busiest calls this hour: pr checks 9"
+    ])
+  })
+
   it("fleet text shows each member's last host-observed activity and an orphaned member's next step", () => {
     const now = Date.parse('2026-10-22T12:10:00.000Z')
     const fleet = gameFleetReportOf({
