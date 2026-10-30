@@ -74,20 +74,15 @@ describe('withGameMemberIdentity', () => {
     })
   })
 
-  it("gives a local member without its own worktree the lead's worktree, branch and PR", () => {
+  it("never lends the lead's worktree or PR to a local member whose worktree is not resolved", () => {
     const [member] = withGameMemberIdentity(
       stateOf([agent({ displayName: 'CIN-7 Taquilla' })], { review: review(9, 'success') })
     ).agents
 
-    expect(member).toMatchObject({
-      ticket: 'CIN-7',
-      host: 'local',
-      worktreeId: 'wt-lead',
-      branch: 'main',
-      pr: 9,
-      ci: 'success'
-    })
-    expect(member).not.toHaveProperty('accountEmail')
+    expect(member).toMatchObject({ ticket: 'CIN-7', host: 'local' })
+    for (const key of ['worktreeId', 'branch', 'pr', 'ci', 'accountEmail']) {
+      expect(member).not.toHaveProperty(key)
+    }
   })
 
   it("never lends the lead's worktree to a remote member whose host did not answer", () => {

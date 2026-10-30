@@ -16,15 +16,10 @@ export type GameMemberIdentity = {
 
 export type GameStateAgentWithIdentity = GameAgent & Partial<GameMemberIdentity>
 
-function memberIdentityOf(
-  agent: GameAgent,
-  lead: Pick<OrchestratorGameState, 'worktree' | 'review'>
-): GameMemberIdentity {
+// Why no fallback to the lead's worktree: an unresolved member would show the lead's branch and PR, as `game fleet` never does.
+function memberIdentityOf(agent: GameAgent): GameMemberIdentity {
   const ticket = ticketOfMember(agent)
-  // Why: a local member without a worktree of its own runs in the lead's, so its branch and PR are those.
-  const inLeadWorktree = !agent.worktree && !agent.remote
-  const worktree = agent.worktree ?? (inLeadWorktree ? lead.worktree : null)
-  const review = agent.review ?? (inLeadWorktree ? lead.review : null)
+  const { worktree, review } = agent
   return {
     ...(ticket ? { ticket } : {}),
     host: agent.remote?.host ?? 'local',
@@ -45,7 +40,7 @@ export function withGameMemberIdentity(
   return {
     ...state,
     agents: state.agents.map((agent) =>
-      agent.isMember && !agent.isLeader ? { ...agent, ...memberIdentityOf(agent, state) } : agent
+      agent.isMember && !agent.isLeader ? { ...agent, ...memberIdentityOf(agent) } : agent
     )
   }
 }
