@@ -114,7 +114,7 @@ export async function launchGameMember(args: {
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
-  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
+  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
   const where = args.remote
     ? { ...args.remote, worktree: 'new-top-level' }
     : await memberWorktreeParamsOf({ client, state, ticket, repo })
@@ -229,6 +229,7 @@ export async function launchGameMember(args: {
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
       : {}),
     ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
+    ...(memberAccount.why ? { accountWhy: memberAccount.why } : {}),
     ...(hostAccount ? { account: hostAccount.email } : {}),
     ...(args.remote && hostGlobalLogin ? remoteGlobalLoginOf(args.remote.on, hostGlobalLogin) : {}),
     ...started

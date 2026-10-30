@@ -787,8 +787,12 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
         resolveCompatibilityCliCommand()
       )
     }
-    printResult(result, json, (r) =>
-      formatOrchestrationCheckText(r, terminal, resolveCompatibilityCliCommand())
+    // Why (ORCA-833): a --wait result shares the merged stream with keepalives, so it must be one line.
+    printResult(
+      result,
+      json,
+      (r) => formatOrchestrationCheckText(r, terminal, resolveCompatibilityCliCommand()),
+      { compact: wait }
     )
     const compatibilityAck = result.result.legacyCompatibility?.ackMessageIds
     if (compatibilityAck && compatibilityAck.length > 0) {

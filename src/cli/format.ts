@@ -67,10 +67,13 @@ type CliErrorContext = {
 export function printResult<TResult>(
   response: RuntimeRpcSuccess<TResult>,
   json: boolean,
-  formatter: (value: TResult) => string
+  formatter: (value: TResult) => string,
+  // Why: one object per line (NDJSON) for streams that interleave with one-line keepalives.
+  options: { compact?: boolean } = {}
 ): void {
   if (json) {
-    console.log(JSON.stringify(prepareComputerCliJsonResult(response), null, 2))
+    const payload = prepareComputerCliJsonResult(response)
+    console.log(options.compact ? JSON.stringify(payload) : JSON.stringify(payload, null, 2))
     return
   }
   console.log(formatter(response.result))
