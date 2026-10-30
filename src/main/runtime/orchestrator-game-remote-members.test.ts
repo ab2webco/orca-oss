@@ -193,6 +193,29 @@ describe('remote members of a lead (ORCA-824)', () => {
     expect(members[0].lastActivityAt).toBe('2026-10-27T14:00:00.000Z')
   })
 
+  it('shows the account the host says its member runs on, keyed to that host (ORCA-798)', async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({
+        branch: 'b',
+        title: null,
+        liveness: 'running',
+        agent: {
+          state: 'working',
+          agentType: 'claude',
+          updatedAt: 0,
+          account: { provider: 'claude', email: 'ana@koombea.com' }
+        }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member.account).toEqual({
+      provider: 'claude',
+      id: `remote:${source.environmentId}:ana@koombea.com`,
+      email: 'ana@koombea.com'
+    })
+  })
+
   it('keeps the dispatch and title reading for an older host that relays no agent (ORCA-837)', async () => {
     const [member] = await remoteGameMembersOf([{ ...source, finished: true }], {
       showOf: async () => ({ branch: 'b', title: '⠂ Claude Code', liveness: 'running' }),

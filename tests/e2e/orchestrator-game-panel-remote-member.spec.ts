@@ -14,7 +14,8 @@ import {
 
 // A lead with one local member and three on a paired host: one live, one whose host does not answer
 // (ORCA-824), and one finished whose terminal closed while its host answers (ORCA-854).
-// The local and one remote member carry roster names from the same pool (ORCA-794).
+// The local and one remote member carry roster names from the same pool (ORCA-794), and the live
+// remote one the account its host relayed (ORCA-798).
 const HOLD_MS = 1_500
 const REDRAW_MS = 1_000
 
@@ -23,7 +24,8 @@ const member = (
   ticket: string,
   state: 'working' | 'idle' | 'done',
   remote: { host: string; stateKnown: boolean; gone?: true } | null,
-  name: string | null = null
+  name: string | null = null,
+  email: string | null = null
 ) => ({
   paneKey,
   displayName: name ? `${name} · ${ticket}` : ticket,
@@ -33,7 +35,8 @@ const member = (
   isLeader: false,
   isMember: true,
   worktree: { id: `wt-${ticket}`, branch: `feat/${ticket.toLowerCase()}`, displayName: ticket },
-  ...(remote ? { remote } : {})
+  ...(remote ? { remote } : {}),
+  ...(email ? { account: { provider: 'claude', id: `remote:env_imac:${email}`, email } } : {})
 })
 
 const gameState = {
@@ -51,7 +54,14 @@ const gameState = {
       isLeader: true
     },
     member('demo-local', 'LUM-12', 'working', null, 'Arthur'),
-    member('remote:ctx_14', 'LUM-14', 'working', { host: 'imac', stateKnown: true }, 'Merlin'),
+    member(
+      'remote:ctx_14',
+      'LUM-14',
+      'working',
+      { host: 'imac', stateKnown: true },
+      'Merlin',
+      'ana@koombea.com'
+    ),
     member('remote:ctx_15', 'LUM-15', 'idle', { host: 'imac', stateKnown: false }),
     member('remote:ctx_16', 'LUM-16', 'done', { host: 'imac', stateKnown: true, gone: true })
   ],
@@ -120,6 +130,8 @@ test('the Panel names the paired host of a remote member, and says only a silent
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('▾ Team')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('on imac')
     expect(await screenText(orcaPage)).toContain(SILENT_HOST)
+    // Why: the host's account must read on the card, never the home's or none (ORCA-798).
+    expect(await screenText(orcaPage)).toContain('ana@…')
 
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
@@ -153,6 +165,7 @@ test('the Panel names the paired host of a remote member, and says only a silent
           expect(seen, `${shot} drops ${name}`).toContain(name)
         }
         expect(seen, `${shot} calls a finished member gone`).not.toMatch(CLOSED_AS_GONE)
+        expect(seen, `${shot} drops the host's account`).toContain('ana@')
       }
     }
   } finally {

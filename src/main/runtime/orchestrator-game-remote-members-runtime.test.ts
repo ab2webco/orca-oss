@@ -414,6 +414,30 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
       expect.objectContaining({ paneKey: 'tab:817', state: 'done', account: null })
     )
   })
+
+  it('relays the email of the account its pane runs on, and weighs its limit by it (ORCA-798)', async () => {
+    const runtime = new OrcaRuntimeService(null, undefined, {
+      getAgentStatusSnapshot: () => [hook('done')]
+    })
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab:817')
+    const account = { provider: 'claude', id: 'imac-ana', email: 'ana@koombea.com' }
+    vi.spyOn(
+      runtime as unknown as { gameMemberAccountFor: () => unknown },
+      'gameMemberAccountFor'
+    ).mockReturnValue(account)
+    const limitFor = vi
+      .spyOn(
+        runtime as unknown as { gameMemberLimitFor: () => Promise<unknown> },
+        'gameMemberLimitFor'
+      )
+      .mockResolvedValue(null)
+
+    const agent = await runtime.getFederatedMemberAgent('term_817')
+
+    expect(agent?.account).toEqual({ provider: 'claude', email: 'ana@koombea.com' })
+    expect(JSON.stringify(agent)).not.toContain('imac-ana')
+    expect(limitFor).toHaveBeenCalledWith(expect.objectContaining({ account }))
+  })
 })
 
 describe('the member name pool with a member on a paired host (ORCA-794)', () => {

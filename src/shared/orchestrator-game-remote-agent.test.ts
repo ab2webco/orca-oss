@@ -48,6 +48,17 @@ describe("a remote member's relayed agent reading (ORCA-837)", () => {
       updatedAt: 5
     })
     expect(parseRemoteMemberAgent(undefined)).toBeNull()
+  })
+
+  it("keeps a relayed account's provider and email, never an id (ORCA-798)", () => {
+    const relayed = (account: unknown) =>
+      parseRemoteMemberAgent({ state: 'working', updatedAt: 5, account })?.account
+    expect(relayed({ provider: 'claude', email: 'ana@koombea.com', id: 'imac-ana' })).toEqual({
+      provider: 'claude',
+      email: 'ana@koombea.com'
+    })
+    expect(relayed({ provider: 'gemini', email: 'ana@koombea.com' })).toBeUndefined()
+    expect(relayed({ provider: 'codex' })).toBeUndefined()
     expect(parseRemoteMemberAgent({ state: 'sleeping', updatedAt: 5 })).toBeNull()
     expect(parseRemoteMemberAgent({ state: 'working', updatedAt: Number.NaN })).toBeNull()
   })

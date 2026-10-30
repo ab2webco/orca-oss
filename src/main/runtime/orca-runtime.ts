@@ -31250,13 +31250,23 @@ export class OrcaRuntimeService {
     if (!agent || !paneKey) {
       return null
     }
+    const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
+    const account = this.gameMemberAccountFor(
+      { paneKey, agentType: agent.agentType, worktreeId },
+      worktreeId ? await this.getResolvedWorktreeMap().catch(() => new Map()) : new Map()
+    )
     const limit = await this.gameMemberLimitFor({
       paneKey,
       agentType: agent.agentType,
       state: gameAgentStateOf(agent.state),
-      account: null
+      account
     }).catch(() => null)
-    return limit ? { ...agent, limit } : agent
+    return {
+      ...agent,
+      // Why the email only: an account id means nothing on the home and must not leave this host (ORCA-798).
+      ...(account ? { account: { provider: account.provider, email: account.email } } : {}),
+      ...(limit ? { limit } : {})
+    }
   }
 
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
