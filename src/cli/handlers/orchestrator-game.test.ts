@@ -171,6 +171,7 @@ describe('orca game state', () => {
             {
               host: 'imac',
               running: 2,
+              cap: 6,
               status: 'ok',
               cpuCoreCount: 4,
               totalMemory: 52 * 1024 ** 3,
@@ -191,7 +192,9 @@ describe('orca game state', () => {
     })
 
     const text = output.join('\n')
-    expect(text).toContain('imac  2 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory')
+    expect(text).toContain(
+      'imac  2/6 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory'
+    )
     expect(text).toContain('m1    0 running · not answering')
   })
 

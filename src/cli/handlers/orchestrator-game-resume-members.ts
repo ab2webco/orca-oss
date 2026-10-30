@@ -17,7 +17,12 @@ import {
   setupAdmissionOf,
   type GameSetupQueue
 } from './orchestrator-game-setup-queue'
-import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  gameFleetReportOf,
+  localGameFreeOf,
+  type GameFleet
+} from '../../shared/orchestrator-game-fleet-verbs'
+import { gameHostLoadFor } from '../../shared/orchestrator-game-host-load'
 import type {
   GameMemberResumeOutcome,
   GameMemberResumeTarget,
@@ -143,6 +148,13 @@ async function bindRunOf(
   return null
 }
 
+const capReasonOf = (fleet: Pick<GameFleet, 'cap' | 'hosts'>, running: number): string => {
+  const local = fleet.hosts && gameHostLoadFor(fleet.hosts, null)
+  return local && running < fleet.cap
+    ? `cap: this Orca is at its cap of ${local.cap}`
+    : `cap: ${fleet.cap} members already run`
+}
+
 const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
   resumed: 'its conversation reopened',
   relaunched: 'a new agent started on its task',
@@ -220,11 +232,13 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     )
     const fleet = gameFleetReportOf({ ...state, pausedMembers: [] })
     const liveMembers = fleet.running
+    // Why local slots: a paused member reopens on this Orca, whatever room paired hosts have (ORCA-888).
+    const room = localGameFreeOf(fleet)
     if (flags.get('dry-run') === true) {
       // Why apart: the real run presses Enter or skips these, and their agents already hold slots.
       const open = paused.filter((one) => one.terminal && one.cause !== undefined)
       const closed = paused.filter((one) => !open.includes(one))
-      const free = Math.max(0, fleet.cap - liveMembers - open.length)
+      const free = Math.max(0, room - open.length)
       const ticketsWith = (cause: string): string[] =>
         open.filter((one) => one.cause === cause).map((one) => one.ticket)
       printResult(
@@ -265,6 +279,7 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
       )
     ]
     let running = liveMembers
+    let taken = 0
     // Why one at a time: N agents reopening at once can exhaust a small machine's memory.
     for (const member of paused) {
       try {
@@ -273,16 +288,17 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         if (settled) {
           members.push(settled)
           running += 1
+          taken += 1
           if (settled.result === 'failed') {
             process.exitCode = 1
           }
           continue
         }
-        if (running >= fleet.cap) {
+        if (taken >= room) {
           members.push({
             ticket: member.ticket,
             result: 'skipped',
-            reason: `cap: ${fleet.cap} members already run`
+            reason: capReasonOf(fleet, running)
           })
           continue
         }
@@ -295,6 +311,7 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         members.push(resumed)
         if (resumed.dispatchId || resumed.setupQueue) {
           running += 1
+          taken += 1
         }
       } catch (error) {
         process.exitCode = 1

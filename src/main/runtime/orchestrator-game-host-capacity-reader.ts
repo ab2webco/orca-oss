@@ -1,8 +1,8 @@
 import {
   gameHostMachineOf,
-  LOCAL_GAME_HOST,
   type GameHostReading
 } from '../../shared/orchestrator-game-host-capacity'
+import { LOCAL_GAME_HOST } from '../../shared/orchestrator-game-host-load'
 
 type Deps = {
   list: () => readonly { id: string; name: string }[]

@@ -516,7 +516,7 @@ project Settings edits all but the two prompts, `rules` and `mcpServers`, which 
 orchestratorGame:
   orchestrator:
     autostart: true # a plain session in this project starts as the lead
-    cap: 4 # members running at once, 1 to 12; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1
+    cap: 4 # members running at once, 1 to 100; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1 and at most 12. With a paired host, the ceiling over every host's cap (below)
     agent: claude # what a member runs, as `orca orchestration worker-start --agent` names it
     model: opus # optional
     effort: high # optional, used only with a model
@@ -610,11 +610,18 @@ The lead's verbs, run from the lead's terminal
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
-- **Host capacity (ORCA-841).** With a saved environment, `game fleet`, `game state` and the
-  Panel list each host's running members, cores, free memory and load, flagged `low memory` (under
-  4 GB or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The
-  figures come from each host's `diagnostics.memory`, so an older host needs no update, and are
-  reused for 15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
+- **Per-host caps (ORCA-888).** With a saved environment, the lead's cap is the sum of each
+  reachable host's: this Orca's from its memory and cores (one per 4 GB and 2 cores, 1 to 12), each
+  paired host's `memberCap` from `status.get`, cached 30 s. A layer's `orchestrator.cap` only caps
+  that sum. A host that does not answer adds nothing; an older one publishes no cap, so its members
+  take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
+  carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
+  `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
+- **Host capacity (ORCA-841).** `game fleet`, `game state` and the Panel then give each host its
+  own line: members against its cap, cores, free memory and load, flagged `low memory` (under 4 GB
+  or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The figures
+  come from each host's `diagnostics.memory`, so an older host needs no update, and are reused for
+  15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,

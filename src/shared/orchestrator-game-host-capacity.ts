@@ -1,8 +1,6 @@
-import { isFinishedMember } from './orchestrator-game-member-finished'
-import type { GameAgent, OrchestratorGameState } from './orchestrator-game-state'
-
-/** This Orca's row; a paired host goes by its saved environment name. */
-export const LOCAL_GAME_HOST = 'local'
+import { gameFleetReportOf } from './orchestrator-game-fleet-verbs'
+import type { GameHostLoad } from './orchestrator-game-host-load'
+import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** The host fields of a `diagnostics.memory` snapshot, which every paired host answers. */
 export type GameHostMachine = {
@@ -15,8 +13,8 @@ export type GameHostMachine = {
 
 export type GameHostReading = { kind: 'ok'; machine: GameHostMachine } | { kind: 'unreachable' }
 
-/** One host as a lead's game state publishes it (ORCA-841). */
-export type GameHostCapacity = { host: string; running: number } & (
+/** One host as a lead's game state publishes it (ORCA-841); `cap` while it publishes one (ORCA-888). */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
   | ({ status: 'ok' } & GameHostMachine)
   | { status: 'unreachable' }
 )
@@ -47,42 +45,29 @@ export function gameHostMachineOf(raw: unknown): GameHostMachine | null {
 
 type Readings = readonly { host: string; reading: GameHostReading }[]
 
-/** Counts members as `game fleet` does: paused and queued ones hold a slot here (ORCA-832, ORCA-864). */
+/** Each host's machine over its ORCA-888 load, so its count is the one `game launch` refuses on. */
 export function gameHostCapacitiesOf(
   readings: Readings,
-  fleet: Pick<OrchestratorGameState, 'agents' | 'pausedMembers' | 'queuedMembers'>
+  loads: readonly GameHostLoad[]
 ): GameHostCapacity[] {
-  const runningOn = fleet.agents
-    .filter((agent: GameAgent) => agent.isMember && !isFinishedMember(agent) && !agent.remote?.gone)
-    .map((agent) => agent.remote?.host ?? LOCAL_GAME_HOST)
-  const held =
-    (fleet.pausedMembers ?? []).filter((one) => !one.worktreeGone).length +
-    (fleet.queuedMembers ?? []).length
-  const known = new Set(readings.map((one) => one.host))
-  // Why: a member whose environment was removed still runs somewhere this Orca cannot read.
-  const unsaved = [...new Set(runningOn)]
-    .filter((host) => !known.has(host))
-    .map((host) => ({ host, reading: { kind: 'unreachable' } as const }))
-  const isLocal = (one: { host: string }) => one.host === LOCAL_GAME_HOST
-  return [...readings.filter(isLocal), ...readings.filter((one) => !isLocal(one)), ...unsaved].map(
-    ({ host, reading }): GameHostCapacity => {
-      const running =
-        runningOn.filter((one) => one === host).length + (isLocal({ host }) ? held : 0)
-      return reading.kind === 'ok'
-        ? { host, running, status: 'ok', ...reading.machine }
-        : { host, running, status: 'unreachable' }
-    }
-  )
+  const machines = new Map(readings.map((one) => [one.host, one.reading]))
+  return loads.map(({ host, running, cap, status }): GameHostCapacity => {
+    const reading = machines.get(host)
+    const capped = status === 'ok' ? { cap } : {}
+    return reading?.kind === 'ok'
+      ? { host, running, ...capped, status: 'ok', ...reading.machine }
+      : { host, running, ...capped, status: 'unreachable' }
+  })
 }
 
-/** Only a lead with a paired host gets the rows; null readings mean none is saved. */
-export const withGameHostCapacity = (
+/** Only a lead with per-host caps gets the rows; null readings mean no environment is saved. */
+export function withGameHostCapacity(
   state: OrchestratorGameState,
   readings: Readings | null
-): OrchestratorGameState =>
-  state.role !== 'lead' || readings === null
-    ? state
-    : { ...state, hostCapacity: gameHostCapacitiesOf(readings, state) }
+): OrchestratorGameState {
+  const loads = state.role === 'lead' && readings ? gameFleetReportOf(state).hosts : undefined
+  return loads ? { ...state, hostCapacity: gameHostCapacitiesOf(readings!, loads) } : state
+}
 
 const gbOf = (bytes: number): string =>
   bytes < 10 * GB ? (bytes / GB).toFixed(1) : String(Math.round(bytes / GB))
@@ -109,7 +94,8 @@ export function formatGameHostCapacity(hosts: readonly GameHostCapacity[]): stri
               ...flagsOf(one)
             ]
           : ['not answering']
-      return `  ${one.host.padEnd(width)}  ${[`${one.running} running`, ...figures].join(' · ')}`
+      const running = one.cap === undefined ? one.running : `${one.running}/${one.cap}`
+      return `  ${one.host.padEnd(width)}  ${[`${running} running`, ...figures].join(' · ')}`
     })
   ]
 }

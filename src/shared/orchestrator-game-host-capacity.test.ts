@@ -60,79 +60,88 @@ describe('gameHostMachineOf', () => {
 })
 
 describe('gameHostCapacitiesOf', () => {
-  it('counts the members running on each host, local first', () => {
+  it('lays each host’s machine over its ORCA-888 load, with a cap only where one is published', () => {
     const rows = gameHostCapacitiesOf(
       [
-        { host: 'imac', reading: { kind: 'ok', machine: imac } },
         { host: 'local', reading: { kind: 'ok', machine: local } },
-        { host: 'm1', reading: { kind: 'unreachable' } }
+        { host: 'imac', reading: { kind: 'ok', machine: imac } },
+        { host: 'm1', reading: { kind: 'unreachable' } },
+        { host: 'mini', reading: { kind: 'ok', machine: imac } }
       ],
-      {
-        agents: [
-          member('lead', { isLeader: true, isMember: false }),
-          member('a'),
-          member('b', { remote: onImac() }),
-          member('c', { remote: onImac(false) }),
-          // Gone from its host, so nothing runs there (ORCA-864).
-          member('d', { remote: onImac(true, true) }),
-          member('e', {
-            state: 'idle',
-            review: { provider: 'github', number: 1, state: 'merged', ci: 'success', url: '' }
-          } as Partial<GameAgent>)
-        ],
-        pausedMembers: [{ worktreeGone: false }, { worktreeGone: true }] as never,
-        queuedMembers: [{}] as never
-      }
+      [
+        { host: 'local', cap: 4, status: 'ok', running: 3, free: 1 },
+        { host: 'imac', id: 'env_imac', cap: 6, status: 'ok', running: 2, free: 4 },
+        { host: 'm1', id: 'env_m1', cap: 0, status: 'unreachable', running: 0, free: 0 },
+        { host: 'mini', id: 'env_mini', cap: 0, status: 'older', running: 1, free: 0 },
+        // A member's host with no saved environment, which the reader never dialed.
+        { host: 'gone', cap: 0, status: 'unreachable', running: 1, free: 0 }
+      ]
     )
     expect(rows).toEqual([
-      { host: 'local', running: 3, status: 'ok', ...local },
-      { host: 'imac', running: 2, status: 'ok', ...imac },
-      { host: 'm1', running: 0, status: 'unreachable' }
-    ])
-  })
-
-  it('lists a host its members name even when it is no longer saved', () => {
-    const rows = gameHostCapacitiesOf(
-      [{ host: 'local', reading: { kind: 'ok', machine: local } }],
-      {
-        agents: [member('b', { remote: onImac() })]
-      }
-    )
-    expect(rows.map((one) => [one.host, one.running, one.status])).toEqual([
-      ['local', 0, 'ok'],
-      ['imac', 1, 'unreachable']
+      { host: 'local', running: 3, cap: 4, status: 'ok', ...local },
+      { host: 'imac', running: 2, cap: 6, status: 'ok', ...imac },
+      { host: 'm1', running: 0, status: 'unreachable' },
+      { host: 'mini', running: 1, status: 'ok', ...imac },
+      { host: 'gone', running: 1, status: 'unreachable' }
     ])
   })
 })
 
 describe('withGameHostCapacity', () => {
-  const state = { role: 'lead', agents: [member('a')] } as OrchestratorGameState
-  const readings = [{ host: 'local', reading: { kind: 'ok' as const, machine: local } }]
+  const state = {
+    role: 'lead',
+    agents: [
+      member('a'),
+      member('b', { remote: onImac() }),
+      member('c', { remote: onImac(true, true) })
+    ],
+    lead: { autostart: false, cap: 10, agent: 'claude' },
+    hosts: [
+      { host: 'local', cap: 4, status: 'ok' },
+      { host: 'imac', id: 'env_imac', cap: 6, status: 'ok' }
+    ],
+    pausedMembers: [{ worktreeGone: false }]
+  } as unknown as OrchestratorGameState
+  const readings = [
+    { host: 'local', reading: { kind: 'ok' as const, machine: local } },
+    { host: 'imac', reading: { kind: 'ok' as const, machine: imac } }
+  ]
 
-  it('publishes the rows for a lead', () => {
-    expect(withGameHostCapacity(state, readings).hostCapacity?.[0]?.running).toBe(1)
+  it('counts a lead’s members per host as game launch does: paused on local, gone nowhere', () => {
+    expect(
+      withGameHostCapacity(state, readings).hostCapacity?.map((one) => [
+        one.host,
+        one.running,
+        one.cap
+      ])
+    ).toEqual([
+      ['local', 2, 4],
+      ['imac', 1, 6]
+    ])
   })
 
-  it('leaves a member, and a lead with no paired host, as they were', () => {
+  it('leaves a member, and a lead without per-host caps or readings, as they were', () => {
     const asMember = { ...state, role: 'member' as const }
+    const unplaced = { ...state, hosts: undefined }
     expect(withGameHostCapacity(asMember, readings)).toBe(asMember)
     expect(withGameHostCapacity(state, null)).toBe(state)
+    expect(withGameHostCapacity(unplaced, readings)).toBe(unplaced)
   })
 })
 
 describe('formatGameHostCapacity', () => {
-  it('prints one line per host with cores, free memory and load', () => {
+  it('prints one line per host with its cap, cores, free memory and load', () => {
     expect(
       formatGameHostCapacity([
-        { host: 'local', running: 3, status: 'ok', ...local },
+        { host: 'local', running: 3, cap: 4, status: 'ok', ...local },
         { host: 'imac', running: 2, status: 'ok', ...imac },
-        { host: 'm1', running: 0, status: 'unreachable' }
+        { host: 'm1', running: 0, cap: 6, status: 'unreachable' }
       ])
     ).toEqual([
       'Hosts:',
-      '  local  3 running · 10 cores · 9.0 of 16 GB free · load 2.1',
+      '  local  3/4 running · 10 cores · 9.0 of 16 GB free · load 2.1',
       '  imac   2 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory',
-      '  m1     0 running · not answering'
+      '  m1     0/6 running · not answering'
     ])
   })
 

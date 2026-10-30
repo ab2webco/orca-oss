@@ -372,8 +372,8 @@ export type GameState = {
   hostCapacity?: GameHostCapacity[]
 }
 
-/** A host's members, and its machine while it answers. */
-export type GameHostCapacity = { host: string; running: number } & (
+/** A host's members against its cap while it publishes one, and its machine while it answers. */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
   | { status: 'unreachable' }
   | ({ status: 'ok'; loadAverage1m: number | null } & Record<GameHostFigure, number>)
 )

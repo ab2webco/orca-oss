@@ -4,7 +4,7 @@ import { isShape, str, type Shape } from './game-state-shapes'
 import { gameLocale } from './game-strings'
 
 type Words = {
-  running: (count: number) => string
+  running: (count: string) => string
   cores: (count: number) => string
   free: (free: string, total: string) => string
   load: (load: string) => string
@@ -56,8 +56,10 @@ const hostOf = (value: unknown): GameHostCapacity[] => {
   if (!isShape(value) || host === undefined || running === undefined) {
     return []
   }
+  const cap = count(value.cap)
+  const head = { host, running, ...(cap ? { cap } : {}) }
   if (value.status === 'unreachable') {
-    return [{ host, running, status: 'unreachable' }]
+    return [{ ...head, status: 'unreachable' }]
   }
   const [cpuCoreCount, totalMemory, availableMemory] = [
     value.cpuCoreCount,
@@ -68,9 +70,7 @@ const hostOf = (value: unknown): GameHostCapacity[] => {
     return []
   }
   const loadAverage1m = count(value.loadAverage1m) ?? null
-  return [
-    { host, running, status: 'ok', cpuCoreCount, totalMemory, availableMemory, loadAverage1m }
-  ]
+  return [{ ...head, status: 'ok', cpuCoreCount, totalMemory, availableMemory, loadAverage1m }]
 }
 
 /** Each host Orca publishes for a lead with a paired host (ORCA-841); absent otherwise. */
@@ -91,9 +91,10 @@ export function hostCapacityLinesOf(
 ): HostCapacityLine[] {
   const words = WORDS[compact ? 'compact' : gameLocale()]
   return hosts.map((one) => {
+    const running = words.running(one.cap ? `${one.running}/${one.cap}` : String(one.running))
     const lineOf = (parts: string[], warn: boolean): HostCapacityLine => ({
       key: one.host,
-      text: `⌂ ${one.host} ${[words.running(one.running), ...parts].join(compact ? ' ' : ' · ')}`,
+      text: `⌂ ${one.host} ${[running, ...parts].join(compact ? ' ' : ' · ')}`,
       warn
     })
     if (one.status === 'unreachable') {

@@ -56,8 +56,8 @@ const gameState = {
     member('remote:ctx_15', 'LUM-15', 'imac')
   ],
   hostCapacity: [
-    { host: 'local', running: 1, ...machine(10, 16, 9, 2.1) },
-    { host: 'imac', running: 2, ...machine(4, 52, 4.9, 3.8) },
+    { host: 'local', running: 1, cap: 4, ...machine(10, 16, 9, 2.1) },
+    { host: 'imac', running: 2, cap: 6, ...machine(4, 52, 4.9, 3.8) },
     { host: 'm1', running: 0, status: 'unreachable' }
   ],
   review: null,
@@ -73,8 +73,8 @@ const screenText = async (page: Page) => (await screenRows(page)).join('\n')
 
 // Why either form: a phone-width Panel draws each host as marks instead of words.
 const HOST_LINES = [
-  /⌂ local (1 running · 10 cores · 9\.0 of 16 GB free · load 2\.1|1▸ 10c 9\.0\/16G L2\.1)/,
-  /⌂ imac (2 running · 4 cores · 4\.9 of 52 GB free · load 3\.8 · low memory|2▸ 4c 4\.9\/52G L3\.8 !mem)/,
+  /⌂ local (1\/4 running · 10 cores · 9\.0 of 16 GB free · load 2\.1|1\/4▸ 10c 9\.0\/16G L2\.1)/,
+  /⌂ imac (2\/6 running · 4 cores · 4\.9 of 52 GB free · load 3\.8 · low memory|2\/6▸ 4c 4\.9\/52G L3\.8 !mem)/,
   /⌂ m1 (0 running · not answering|0▸ \?)/
 ]
 
@@ -92,7 +92,7 @@ async function scrollPanelThrough(page: Page, seen: string): Promise<string> {
   return seen
 }
 
-test('the Panel lists each host with its members, cores, free memory and load', async ({
+test('the Panel lists each host with its members against its cap, cores, free memory and load', async ({
   electronApp,
   orcaPage,
   testRepoPath

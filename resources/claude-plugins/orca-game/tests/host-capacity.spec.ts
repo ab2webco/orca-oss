@@ -14,7 +14,7 @@ const imac = {
   availableMemory: 4.9 * GB,
   loadAverage1m: 3.8
 }
-const local = { ...imac, host: 'local', running: 3, cpuCoreCount: 10, totalMemory: 16 * GB }
+const local = { ...imac, host: 'local', running: 3, cap: 4, cpuCoreCount: 10, totalMemory: 16 * GB }
 const silent = { host: 'm1', running: 1, status: 'unreachable' as const }
 
 const hostsOf = (hostCapacity: unknown) =>
@@ -23,10 +23,17 @@ const hostsOf = (hostCapacity: unknown) =>
 describe('host capacity', () => {
   afterEach(() => setGameLocale('en'))
 
-  it('keeps each host Orca publishes and drops a malformed one', () => {
+  it('keeps each host Orca publishes, drops a malformed one and a malformed cap', () => {
     expect(
-      hostsOf([local, imac, silent, { host: 'x' }, { ...imac, cpuCoreCount: 'four' }])
-    ).toEqual([local, imac, silent])
+      hostsOf([
+        local,
+        imac,
+        silent,
+        { host: 'x' },
+        { ...imac, cpuCoreCount: 'four' },
+        { ...imac, host: 'mini', cap: 'six' }
+      ])
+    ).toEqual([local, imac, silent, { ...imac, host: 'mini' }])
     expect(hostsOf('lots')).toBeUndefined()
     expect(parseGameState(JSON.stringify({ agents: [] }))?.hostCapacity).toBeUndefined()
   })
@@ -35,7 +42,7 @@ describe('host capacity', () => {
     expect(hostCapacityLinesOf([local, imac, silent], false)).toEqual([
       {
         key: 'local',
-        text: '⌂ local 3 running · 10 cores · 4.9 of 16 GB free · load 3.8',
+        text: '⌂ local 3/4 running · 10 cores · 4.9 of 16 GB free · load 3.8',
         warn: false
       },
       {
@@ -48,7 +55,8 @@ describe('host capacity', () => {
   })
 
   it('shortens each line for a phone and keeps every figure', () => {
-    expect(hostCapacityLinesOf([imac, silent], true).map((one) => one.text)).toEqual([
+    expect(hostCapacityLinesOf([local, imac, silent], true).map((one) => one.text)).toEqual([
+      '⌂ local 3/4▸ 10c 4.9/16G L3.8',
       '⌂ imac 2▸ 4c 4.9/52G L3.8 !mem',
       '⌂ m1 1▸ ?'
     ])

@@ -4,9 +4,8 @@ import { hostCapacityOf } from './host-capacity'
 /** The plugin skill that loads the lead's standing rules from `orca game lead`. */
 export const LEAD_SKILL = 'orca-game:lead'
 
-// Mirrors Orca's own limits in src/shared/orchestrator-game-lead.ts.
+// Mirrors Orca's own limits in src/shared/orchestrator-game-lead.ts; a lead's cap sums its hosts', so it has no max.
 const DEFAULT_CAP = 4
-const CAP_MAX = 12
 const LABEL_MAX = 32
 
 type Shape = Record<string, unknown>
@@ -19,10 +18,7 @@ const leadOf = (value: Shape): GameLead => {
   const label = typeof value.label === 'string' ? value.label.trim() : ''
   return {
     autostart: value.autostart === true,
-    cap:
-      typeof cap === 'number' && Number.isInteger(cap) && cap >= 1 && cap <= CAP_MAX
-        ? cap
-        : DEFAULT_CAP,
+    cap: typeof cap === 'number' && Number.isInteger(cap) && cap >= 1 ? cap : DEFAULT_CAP,
     ...(label !== '' && label.length <= LABEL_MAX ? { label } : {})
   }
 }
