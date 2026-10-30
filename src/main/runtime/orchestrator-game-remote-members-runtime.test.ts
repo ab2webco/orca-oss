@@ -447,12 +447,13 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
       getAgentStatusSnapshot: () => [hook('done')]
     })
     const seams = runtime as unknown as {
+      getTerminalHandleForPaneKey: () => string | null
       getTerminalWorktreeIdForPaneKey: () => string | null
       resolveClaudeAccountPtyRecordForHandle: () => { ptyId: string }
       gameMemberLimitFor: () => Promise<unknown>
     }
     vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab:817')
-    vi.spyOn(runtime, 'getTerminalHandleForPaneKey').mockReturnValue('term_817')
+    vi.spyOn(seams, 'getTerminalHandleForPaneKey').mockReturnValue('term_817')
     vi.spyOn(seams, 'getTerminalWorktreeIdForPaneKey').mockReturnValue(null)
     vi.spyOn(seams, 'resolveClaudeAccountPtyRecordForHandle').mockReturnValue({ ptyId: 'pty-817' })
     vi.spyOn(seams, 'gameMemberLimitFor').mockResolvedValue(null)
