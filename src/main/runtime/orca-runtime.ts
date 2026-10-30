@@ -31338,9 +31338,6 @@ export class OrcaRuntimeService {
   /** The worktree names of this host's federated members on its global login for one provider (ORCA-891). */
   async federatedMembersOnGlobalLogin(provider: 'claude' | 'codex'): Promise<string[]> {
     const held = this.getOrchestrationDb().listHeldRemoteAttachments()
-    if (held.length === 0) {
-      return []
-    }
     const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
     return held.flatMap((row) => {
       const paneKey = row.terminal_handle ? this.getTerminalPaneKey(row.terminal_handle) : null

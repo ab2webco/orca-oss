@@ -7,8 +7,6 @@ import {
   type FederatedMemberAccount
 } from './orchestration-federation-member-account'
 
-export const GLOBAL_LOGIN_TAKEN = 'global_login_taken'
-
 // Why kept apart: an attach that took the global login has no pane to read until its agent starts.
 const STARTING_TTL_MS = 120_000
 const starting = new Map<string, { provider: GameAccountProvider; at: number }>()
@@ -29,16 +27,14 @@ export async function claimFederatedGlobalLogin(args: {
       starting.delete(dispatchId)
     }
   }
-  const pending = [...starting]
-    .filter(
-      ([dispatchId, claim]) => claim.provider === args.provider && dispatchId !== args.dispatchId
-    )
-    .map(([dispatchId]) => dispatchId)
+  const pending = [...starting.keys()].filter(
+    (id) => id !== args.dispatchId && starting.get(id)?.provider === args.provider
+  )
   const holder = [...live, ...pending][0]
   if (holder !== undefined) {
     const label = GAME_ACCOUNT_PROVIDER_LABELS[args.provider]
     throw new OrchestrationError(
-      GLOBAL_LOGIN_TAKEN,
+      'global_login_taken',
       `No managed ${label} account on this host, and ${holder} already runs on its global login; Orca puts one member there at a time because it cannot move or refresh it. Add an account there with \`orca account add\`, or wait for ${holder}.`
     )
   }
@@ -54,11 +50,7 @@ export async function attachAccountOf(
 ): Promise<FederatedMemberAccount> {
   const resolved = await resolveHostMemberAccount(args)
   if (resolved.globalLogin) {
-    await claimFederatedGlobalLogin({
-      runtime: args.runtime,
-      dispatchId: args.dispatchId,
-      provider: resolved.globalLogin
-    })
+    await claimFederatedGlobalLogin({ ...args, provider: resolved.globalLogin })
   }
   return resolved
 }

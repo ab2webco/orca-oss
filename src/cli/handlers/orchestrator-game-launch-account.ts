@@ -40,7 +40,6 @@ export const GAME_GLOBAL_LOGIN_LABEL = 'global login'
 
 const GLOBAL_LOGIN_CAVEAT = 'Orca cannot move or refresh it, and puts one member there at a time'
 
-/** A member on a global login, as the launch result carries it. */
 export type GameGlobalLoginLaunch = {
   /** No managed account exists, so the member runs on the host's global login. */
   globalLogin?: true
