@@ -71,6 +71,54 @@ describe('gameMemberReportOf', () => {
     )
     expect(report.now.terminal).toHaveLength(GAME_MEMBER_TERMINAL_LINES)
     expect(report.now.terminal.at(-1)).toBe('line 29')
+    expect(report.now.unsentInput).toBeNull()
+  })
+
+  it('marks the text in Claude input box as unsent, never as something the owner sent', () => {
+    const rule = '─'.repeat(40)
+    const report = gameMemberReportOf({
+      agent,
+      terminalLines: [
+        '⏺ PR #41 is green.',
+        rule,
+        `\u001b[2m❯ merge now\u001b[0m`,
+        rule,
+        '  cin-5 · Opus · ctx 10%'
+      ],
+      dispatches: [],
+      current: null,
+      messages: [],
+      leadHandle: 'term_lead',
+      commits: [],
+      notes: []
+    })
+
+    expect(report.now.unsentInput).toBe('merge now')
+    expect(report.now.terminal).toEqual([
+      '⏺ PR #41 is green.',
+      rule,
+      '❯ (unsent: typed or a Claude suggestion) merge now',
+      rule,
+      '  cin-5 · Opus · ctx 10%'
+    ])
+  })
+
+  it('leaves an empty input box and a prompt glyph outside it alone', () => {
+    const rule = '─'.repeat(40)
+    const lines = ['❯ an earlier prompt in the transcript', rule, '❯', rule, '  status']
+    const report = gameMemberReportOf({
+      agent,
+      terminalLines: lines,
+      dispatches: [],
+      current: null,
+      messages: [],
+      leadHandle: 'term_lead',
+      commits: [],
+      notes: []
+    })
+
+    expect(report.now.unsentInput).toBeNull()
+    expect(report.now.terminal).toEqual(lines)
   })
 
   it('tells what it did since launch: attempts, messages with the lead in order, commits, PR, CI and ticket', () => {
