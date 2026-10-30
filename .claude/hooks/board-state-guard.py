@@ -11,6 +11,10 @@ No bloquea el trabajo: bloquea *anunciarlo* con el board desalineado. La salida 
 emergencia es explícita (`no-ticket:`) para que saltarse la regla deje dicho por qué.
 """
 
+# Why: el python3 de macOS es 3.9 y ahí `str | None` revienta al importar; la guarda sale
+# con 1 y Claude Code deja pasar el comando sin revisar (ORCA-884).
+from __future__ import annotations
+
 import json
 import re
 import subprocess

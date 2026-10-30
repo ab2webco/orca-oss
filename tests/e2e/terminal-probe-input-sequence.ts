@@ -12,3 +12,9 @@ export function buildSettledShellProbeInputSequence(
   // needs a separate Ctrl+C so ConPTY cannot join it to the command as input.
   return platform === 'win32' ? ['\x03', command] : ['\x03\x15', command]
 }
+
+export function buildPendingLineDiscardInputSequence(command: string): readonly string[] {
+  // Why no Ctrl+C: input that lands while the shell handles SIGINT is mangled — bash
+  // re-inserts the discarded CSI-u remainder, zsh drops the command's first byte.
+  return ['\x15', command]
+}

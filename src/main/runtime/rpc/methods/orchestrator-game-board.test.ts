@@ -181,3 +181,35 @@ describe('game board RPC: Inbox threads (ORCA-878)', () => {
     expect(calls).toEqual([['inboxThreads', { worktreeId: 'wt_1', terminalHandle: undefined }]])
   })
 })
+
+describe('game board RPC: the person answers a member (ORCA-878)', () => {
+  it('passes the reply to the board and refuses an empty one', async () => {
+    const { send, calls } = dispatcherWith({
+      replyToMember: async () => ({ mode: 'answered', delivered: true })
+    })
+
+    await expect(
+      send('game.ownerReplyToMember', {
+        worktreeId: 'wt_1',
+        id: 'msg_1',
+        text: '8080',
+        ticket: 'ORCA-14'
+      })
+    ).resolves.toMatchObject({ ok: true, result: { mode: 'answered', delivered: true } })
+    await expect(
+      send('game.ownerReplyToMember', { worktreeId: 'wt_1', id: 'msg_1', text: '' })
+    ).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      [
+        'replyToMember',
+        {
+          worktreeId: 'wt_1',
+          terminalHandle: undefined,
+          id: 'msg_1',
+          text: '8080',
+          ticket: 'ORCA-14'
+        }
+      ]
+    ])
+  })
+})

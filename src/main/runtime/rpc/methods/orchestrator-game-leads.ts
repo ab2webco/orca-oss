@@ -7,7 +7,9 @@ const GameLeadRegisterParams = z.object({
   project: z.string().max(200),
   label: z.string().max(80),
   // Why optional: an older CLI omits it and keeps today's latest-registration-wins behaviour.
-  claim: z.boolean().optional()
+  claim: z.boolean().optional(),
+  // Why optional: an older CLI omits it; an older host drops it and reopens the stored lead.
+  fresh: z.boolean().optional()
 })
 
 /** The leads on this Orca host: `orca game lead` registers one, `orca game leads` lists them. */
@@ -21,7 +23,8 @@ export const ORCHESTRATOR_GAME_LEADS_METHODS: RpcMethod[] = [
         terminalHandle: params.terminalHandle,
         project: params.project,
         label: params.label,
-        ...(params.claim === undefined ? {} : { claim: params.claim })
+        ...(params.claim === undefined ? {} : { claim: params.claim }),
+        ...(params.fresh === undefined ? {} : { fresh: params.fresh })
       })
   }),
   defineMethod({

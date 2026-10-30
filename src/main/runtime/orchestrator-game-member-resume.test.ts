@@ -148,7 +148,7 @@ describe('GameMemberResume.resume', () => {
     expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
       outcome: 'missing',
       ticket: 'ORCA-1',
-      reason: 'its worktree orca-1 is gone'
+      reason: 'its worktree orca-1 is gone; `orca game resume-members ORCA-1 --discard` frees it'
     })
     expect(resumed).toEqual([])
     const kept = await store.read('repo:a')

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RuntimeClient } from '../runtime-client'
-import { gameStopTargetsOf } from '../../shared/orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf } from '../../shared/orchestrator-game-stop-targets'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { stopOne, type GameStopWorker } from './orchestrator-game-stop'
 

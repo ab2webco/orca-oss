@@ -50,6 +50,33 @@ describe('buildOrchestratorGameState member accounts', () => {
     ])
   })
 
+  it('flags a member on the global login, never the lead or a member with a managed account', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:global', parentPaneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-5:managed', parentPaneKey: 'tab-1:lead' }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      accountOf: (member) =>
+        member.paneKey === 'tab-5:managed'
+          ? { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' }
+          : null,
+      globalLoginOf: () => true,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents.map((agent) => [agent.paneKey, agent.globalLogin])).toEqual([
+      ['tab-1:lead', undefined],
+      ['tab-4:global', true],
+      ['tab-5:managed', undefined]
+    ])
+  })
+
   it('marks a member its account limit stopped, asking only for members', async () => {
     const asked: unknown[] = []
     const state = await buildOrchestratorGameState({

@@ -108,7 +108,7 @@ export class GameMemberResume {
       return {
         outcome: 'missing',
         ticket,
-        reason: `its worktree ${member.branch ?? member.worktreeId} is gone`
+        reason: `its worktree ${member.branch ?? member.worktreeId} is gone; \`orca game resume-members ${ticket} --discard\` frees it`
       }
     }
     // Why Claude only: its session id is what Orca's hooks report; other agents restart on their task.

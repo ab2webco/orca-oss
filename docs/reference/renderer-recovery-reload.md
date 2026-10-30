@@ -61,10 +61,31 @@ Both produce the same Playwright message, so the message alone decides nothing.
 | `Target crashed` in the error text | the renderer process died — product path, not test noise |
 | `reason` written to the E2E user-data dir as `renderer_recovery_reload` | the recovery path ran; the reload was Orca's, not Playwright's |
 | `render-process-gone` / `oom` / `Renderer process` in the job log | same |
+| `[page-context-loss] … :: protocol-error` | the context was **not** destroyed — see below |
 | only `most likely because of a navigation`, with no crash trace | undetermined — a lazy chunk load can also destroy the context |
 
 The last row is the honest default. Do not upgrade it to "product bug" or downgrade it to
 "flaky" without one of the rows above.
+
+### The trailing period (ORCA-885)
+
+Playwright 1.59.1 prints this sentence from two places, and only the final period tells them
+apart:
+
+- `…because of a navigation` (no period) comes from `frames.js` `contextDestroyed`: Chromium really
+  tore the context down.
+- `…because of a navigation.` (with a period) comes from `crExecutionContext.js` `rewriteError`, which
+  rewords **any** CDP error on `Runtime.callFunctionOn` that is not a JS exception or a closed
+  session.
+
+The case seen in CI is V8's `Promise was collected`: the promise the evaluate awaited was
+garbage-collected before it settled, which means nothing could ever have resolved it. In both
+ORCA-885 occurrences that was an awaited `window.api.settings.set(...)`, with no navigation, no
+reload and no crash. `page-context-loss-evidence.ts` reports this as `protocol-error` when the
+test's error has the period and nothing navigated. To read the raw error, rerun with
+`DEBUG=pw:protocol` and grep for `"error":{"code":-32000`.
+`page.evaluate(() => new Promise(() => {}))` followed by `HeapProfiler.collectGarbage` reproduces
+the message deterministically.
 
 ## Reading the automated evidence (ORCA-280)
 

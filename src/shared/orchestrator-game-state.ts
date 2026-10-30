@@ -60,6 +60,8 @@ export type GameAgent = {
   workItem?: GameWorkItem
   /** The managed account a member's agent runs on; absent when Orca cannot tell or from an older host. */
   account?: GameMemberAccount
+  /** Runs on the host's global login, which Orca cannot move or refresh (ORCA-809); absent from an older host. */
+  globalLogin?: true
   /** Set while a member is stopped by its account's usage limit; absent from an older host. */
   limit?: { resetsAt: number | null }
   /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */

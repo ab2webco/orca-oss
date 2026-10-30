@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 
 const roster = [
   { id: 'acct_ana', email: 'ana@example.com' },
@@ -36,5 +36,45 @@ describe('gameMemberAccountOf', () => {
       gameMemberAccountOf({ ...base, agentType: 'claude', pinnedAccountId: 'gone' })
     ).toBeNull()
     expect(gameMemberAccountOf({ ...base, agentType: 'claude', pinnedAccountId: null })).toBeNull()
+  })
+})
+
+describe('isGameMemberOnGlobalLogin', () => {
+  const globalPane = { known: true, accountId: null, customEndpoint: false }
+
+  it('is true only for a pane Orca launched with no managed account and no worktree pin', () => {
+    expect(
+      isGameMemberOnGlobalLogin({ agentType: 'claude', live: globalPane, pinnedAccountId: null })
+    ).toBe(true)
+    expect(
+      isGameMemberOnGlobalLogin({
+        agentType: 'claude',
+        live: { ...globalPane, accountId: 'acct_ana' },
+        pinnedAccountId: null
+      })
+    ).toBe(false)
+    expect(
+      isGameMemberOnGlobalLogin({
+        agentType: 'claude',
+        live: globalPane,
+        pinnedAccountId: 'acct_ana'
+      })
+    ).toBe(false)
+  })
+
+  it('is false when the pane owner is unknown or the agent has no managed accounts', () => {
+    expect(
+      isGameMemberOnGlobalLogin({
+        agentType: 'claude',
+        live: { ...globalPane, known: false },
+        pinnedAccountId: null
+      })
+    ).toBe(false)
+    expect(
+      isGameMemberOnGlobalLogin({ agentType: 'claude', live: null, pinnedAccountId: null })
+    ).toBe(false)
+    expect(
+      isGameMemberOnGlobalLogin({ agentType: 'gemini', live: globalPane, pinnedAccountId: null })
+    ).toBe(false)
   })
 })

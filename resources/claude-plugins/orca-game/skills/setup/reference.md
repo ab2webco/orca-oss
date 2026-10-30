@@ -60,7 +60,7 @@ orchestratorGame:
     rules: | # optional, up to 4000 characters: appended to Orca's lead rules
       - [FE] tickets go to the frontend repo (--repo name:frontend).
     actions: true # false hides Orca's lead buttons (Wave, Status, Push, Sweep, Stop)
-    accounts: auto # default | auto: each member on its agent's managed account with the most free quota
+    accounts: auto # auto (also when unset): each member on its agent's freest managed account | default: Orca's own selection
 ```
 
 - URLs must be `http(s)` with a literal host: no placeholder before the path.

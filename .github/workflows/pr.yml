@@ -436,6 +436,39 @@ jobs:
       - name: Smoke managed-hook companions
         run: node config/scripts/smoke-managed-hook-runtime-node18.mjs
 
+  claude_hooks_python_floor:
+    name: Claude hooks on Python 3.9
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+
+      # Why: macOS /usr/bin/python3 is 3.9; a hook that crashes there exits 1 and
+      # Claude Code runs the command unchecked (ORCA-884).
+      - name: Setup Python 3.9
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.9'
+
+      - name: Load every hook and run the hook suites on Python 3.9
+        run: |
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 9), sys.version'
+          for hook in .claude/hooks/*.py; do
+            python3 "$hook" </dev/null >/dev/null
+          done
+          pnpm exec vitest run --config config/vitest.config.ts \
+            config/scripts/board-state-guard.test.mjs \
+            config/scripts/main-merge-guard.test.mjs \
+            config/scripts/oversized-pr-review-guard.test.mjs \
+            config/scripts/post-merge-board-close.test.mjs \
+            config/scripts/pre-commit-branch-guard.test.mjs
+
   package:
     name: package
     runs-on: ubuntu-latest

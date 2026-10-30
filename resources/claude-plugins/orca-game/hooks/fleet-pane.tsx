@@ -25,7 +25,7 @@ import { cardStateOf, leadStateOf } from './lead-state'
 import { runAction } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
-import { countsOf, memberOf, needsOf } from './party'
+import { countsOf, drawnPartyOf, memberOf, needsOf, teamOrderOf } from './party'
 import { animate } from './quest'
 import { currentScene, gameConfig, isSceneShown, ready, shownLead } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
@@ -182,15 +182,15 @@ export const registerFleetPane = (on: On): void => {
     const catalog = catalogPickerOf($, e, palette, columns, project, layout)
     const marks = sectionMarksOf($, e, project, layout)
     const { isCollapsed } = marks
-    const members = state.agents.map((agent) => ({
+    const members = teamOrderOf(state).map((agent) => ({
       agent,
       member: memberOf(agent, state, config.rewards)
     }))
-    const party = members.filter((one) => !one.agent.isLeader).map((one) => one.member)
+    const { party, unseen } = drawnPartyOf(state, config.rewards)
     const level = config.rewards ? levelOf(v.xp) : undefined
     const lead = leadStateOf(state)
     const isLeadAwake = lead !== undefined && lead !== 'sleeping'
-    const extras = { isHeroWorking: isSceneShown() || isLeadAwake, level, isDemo: v.isDemo }
+    const extras = { isHeroWorking: isSceneShown() || isLeadAwake, level, isDemo: v.isDemo, unseen }
     const art = await animate($, e, [
       {
         key: HUD_KEY,

@@ -48,6 +48,8 @@ export type GameAnsweredItem = {
   answer: string
   askedAt: string
   answeredAt: string
+  /** The person replaced the lead's answer from the Inbox. */
+  overriddenBy?: { text: string; at: string }
 }
 
 export type GameInboxThreads = {
@@ -148,21 +150,31 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     })
   )
 
-  const answeredQuestions = (source.answeredQuestions ?? []).flatMap((row): GameAnsweredItem[] =>
-    row.answer_body !== null && row.answered_at !== null
-      ? [
-          {
-            id: row.id,
-            ticket: label(row.from_handle),
-            kind: 'question',
-            question: row.body,
-            answer: row.answer_body,
-            askedAt: row.created_at,
-            answeredAt: row.answered_at
-          }
-        ]
-      : []
-  )
+  const overrideOf = (questionId: string): GameAnsweredItem['overriddenBy'] => {
+    const latest = rows.findLast(
+      (row) => row.thread_id === questionId && payloadOf(row.payload).from === 'owner'
+    )
+    const text = latest ? payloadOf(latest.payload).text : undefined
+    return latest && typeof text === 'string' ? { text, at: latest.created_at } : undefined
+  }
+  const answeredQuestions = (source.answeredQuestions ?? []).flatMap((row): GameAnsweredItem[] => {
+    if (row.answer_body === null || row.answered_at === null) {
+      return []
+    }
+    const overriddenBy = overrideOf(row.id)
+    return [
+      {
+        id: row.id,
+        ticket: label(row.from_handle),
+        kind: 'question',
+        question: row.body,
+        answer: row.answer_body,
+        askedAt: row.created_at,
+        answeredAt: row.answered_at,
+        ...(overriddenBy ? { overriddenBy } : {})
+      }
+    ]
+  })
   const answeredGates = gates.flatMap((gate): GameAnsweredItem[] => {
     const reply = leadReplyAfter(gate)
     return reply

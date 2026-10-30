@@ -73,6 +73,19 @@ describe('GameLeadSessions', () => {
 
     expect(await store.read('repo:a')).toBeNull()
   })
+
+  it("clears one project's session and leaves the others, even when there is none to clear", async () => {
+    const { store } = sessions()
+    await store.write('repo:a', SESSION)
+    await store.write('repo:b', SESSION)
+
+    await store.clear('repo:a')
+    await store.clear('repo:a')
+    await store.clear('repo:never')
+
+    expect(await store.read('repo:a')).toBeNull()
+    expect(await store.read('repo:b')).toEqual(SESSION)
+  })
 })
 
 describe('leadResumeArgsOf', () => {

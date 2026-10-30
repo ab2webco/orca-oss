@@ -133,6 +133,8 @@ describe('orca game launch', () => {
       'game.state',
       'worktree.list',
       'game.memberNameReserve',
+      'accounts.snapshot',
+      'accounts.list',
       'terminal.show',
       'status.get',
       'orchestration.runCurrent',
@@ -143,12 +145,12 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[7]?.[1]).toEqual({
+    expect(calls[9]?.[1]).toEqual({
       spec: withGameMemberCiNote('Implement CIN-12: Cartelera page'),
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[9]?.[1]).toEqual(
+    expect(calls[11]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
@@ -156,6 +158,7 @@ describe('orca game launch', () => {
         name: 'cin-12',
         displayName: 'Arthur · CIN-12 Cartelera page',
         agent: 'claude',
+        claudeAccountId: 'acct_ana',
         run: 'run_1',
         from: 'h1',
         game: true
@@ -789,7 +792,7 @@ describe('orca game launch', () => {
       })
     )
     expect(formatGameLaunch(launched)).toBe(
-      'CIN-12 (Arthur): queued #2 · claude, waiting on Ford · CIN-9; it starts by itself'
+      'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself'
     )
   })
 

@@ -412,6 +412,49 @@ describe('orca game resume-members', () => {
     })
   })
 
+  // Why (ORCA-832): a member whose worktree is gone was retried at every lead start and failed there.
+  describe('a paused member whose worktree is gone', () => {
+    const gone = () => paused('ORCA-681', { branch: 'fabolivark/orca-681', worktreeGone: true })
+
+    it('is planned apart on --dry-run, so nothing reads it as resumable', async () => {
+      const { client } = fakeClient({ pausedMembers: [gone()] })
+
+      await run(client, [['dry-run', true]], false)
+
+      expect(output.join('\n')).toBe(
+        'Would resume: none · worktree gone, cannot resume: ORCA-681 (fabolivark/orca-681); `orca game resume-members <ticket> --discard` frees it'
+      )
+    })
+
+    it('lists it as unresumable in the --dry-run plan', async () => {
+      const { client } = fakeClient({ pausedMembers: [gone(), paused('CIN-1')] })
+
+      await run(client, [['dry-run', true]])
+
+      expect(printed()).toEqual(
+        expect.objectContaining({ resume: ['CIN-1'], unresumable: ['ORCA-681'] })
+      )
+    })
+
+    it('is never resumed nor bound to a run, and does not fail the command', async () => {
+      const { client, calls } = fakeClient({ pausedMembers: [gone()] })
+
+      await run(client)
+
+      expect(calls.map(([m]) => m)).not.toContain('orchestration.runCurrent')
+      expect(calls.map(([m]) => m)).not.toContain('game.memberResume')
+      expect(process.exitCode).toBeUndefined()
+      expect(printed().members).toEqual([
+        {
+          ticket: 'ORCA-681',
+          result: 'unresumable',
+          reason:
+            'its worktree fabolivark/orca-681 is gone; `orca game resume-members ORCA-681 --discard` frees it'
+        }
+      ])
+    })
+  })
+
   // Why (ORCA-764): "Would resume: none" hid a member whose agent runs but this lead does not list.
   describe('a saved member running in a live worktree this lead does not list', () => {
     const unlisted = {

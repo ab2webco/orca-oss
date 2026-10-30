@@ -2,7 +2,10 @@ import type { OrchestrationCompatibilityEvidence } from '../../../../shared/orch
 import { orchestrationSkillRecoveryData } from '../../../../shared/orchestration-rpc-contract'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RunRow } from '../../orchestration/types'
-import type { OrchestrationCompatibilityCallerAuthority, OrcaRuntimeService } from '../../orca-runtime'
+import type {
+  OrchestrationCompatibilityCallerAuthority,
+  OrcaRuntimeService
+} from '../../orca-runtime'
 
 export type RunScopeParams = {
   runId?: string
@@ -54,7 +57,7 @@ export function assertCallerHandleMatchesEvidence(
   }
   throw new OrchestrationError(
     'consumer_fenced',
-    `Terminal ${callerTerminalHandle} is an attested agent pane, so this caller must present its launch evidence to act as it.`,
+    `Terminal ${callerTerminalHandle} is an attested agent pane, so this caller must present its launch evidence (the ORCA_AGENT_LAUNCH_TOKEN Orca put in that pane's environment) to act as it: run the command from that pane. A session resumed after an Orca restart may still name its old terminal.`,
     { effectsApplied: false }
   )
 }
