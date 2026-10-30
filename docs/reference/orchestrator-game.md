@@ -610,6 +610,11 @@ The lead's verbs, run from the lead's terminal
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
+- **Host capacity (ORCA-841).** With a saved environment, `game fleet`, `game state` and the
+  Panel list each host's running members, cores, free memory and load, flagged `low memory` (under
+  4 GB or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The
+  figures come from each host's `diagnostics.memory`, so an older host needs no update, and are
+  reused for 15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,

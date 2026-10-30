@@ -200,6 +200,8 @@ import {
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+// Why longer: the host answers after a full `ps` sweep, and only a first read waits for it.
+const GAME_HOST_CAPACITY_TIMEOUT_MS = 6_000
 import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
 import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -754,6 +756,9 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
+import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import { collectHostMemory } from '../memory/host-memory'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
@@ -3792,6 +3797,18 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
+  private readonly gameHostCapacity = new GameHostCapacityReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    readLocal: collectHostMemory,
+    // Why diagnostics.memory: every paired host already answers it, so no wire change (ORCA-841).
+    readRemote: (environmentId) =>
+      this.callOrchestrationWorkerServer(
+        environmentId,
+        'diagnostics.memory',
+        undefined,
+        GAME_HOST_CAPACITY_TIMEOUT_MS
+      )
+  })
   private readonly gamePausedMembers = new GamePausedMembers({
     store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
@@ -31451,6 +31468,9 @@ export class OrcaRuntimeService {
       ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
           ?.parentPaneKey
       : null
+    const hostReadings = callerParentPaneKey
+      ? Promise.resolve(null)
+      : this.gameHostCapacity.read().catch(() => null)
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -31629,12 +31649,13 @@ export class OrcaRuntimeService {
       worktree,
       worktreesById
     )
-    return await this.withPausedGameMembers(withRemote, {
+    const withPaused = await this.withPausedGameMembers(withRemote, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
       liveWorktreeIds: new Set(
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
+    return withGameHostCapacity(withPaused, await hostReadings)
   }
 
   private async withRemoteGameMembers(

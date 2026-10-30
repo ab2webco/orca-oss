@@ -8,14 +8,14 @@ const GB = 1024 ** 3
 const imac = {
   host: 'imac',
   running: 2,
-  status: 'ok',
+  status: 'ok' as const,
   cpuCoreCount: 4,
   totalMemory: 52 * GB,
   availableMemory: 4.9 * GB,
   loadAverage1m: 3.8
 }
 const local = { ...imac, host: 'local', running: 3, cpuCoreCount: 10, totalMemory: 16 * GB }
-const silent = { host: 'm1', running: 1, status: 'unreachable' }
+const silent = { host: 'm1', running: 1, status: 'unreachable' as const }
 
 const hostsOf = (hostCapacity: unknown) =>
   parseGameState(JSON.stringify({ agents: [], hostCapacity }))?.hostCapacity

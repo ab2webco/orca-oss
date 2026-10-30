@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
@@ -202,6 +203,8 @@ export type OrchestratorGameState = {
   pausedMembersError?: string
   /** github.com's budget and Orca's share of it; absent when it cannot be read or from an older host. */
   githubBudget?: GameGitHubBudget
+  /** This Orca and each paired host: members, cores, free memory, load; only for a lead with a saved environment (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
 }
