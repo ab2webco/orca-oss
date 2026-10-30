@@ -622,6 +622,16 @@ describe('paused members after a restart', () => {
     expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 1 })
   })
 
+  it('frees the slot of a member whose worktree is gone, since nothing can run it (ORCA-832)', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [],
+      pausedMembers: [paused('CIN-7'), { ...paused('CIN-8'), worktreeGone: true }]
+    })
+    expect(fleet.paused.map((one) => one.ticket)).toEqual(['CIN-7', 'CIN-8'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 1, free: 2 })
+  })
+
   it('carries why the saved members could not be read', () => {
     expect(
       gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [], pausedMembersError: 'damaged' })

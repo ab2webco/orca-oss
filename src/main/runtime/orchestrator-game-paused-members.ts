@@ -4,6 +4,7 @@ import { finishedSignalOf } from '../../shared/orchestrator-game-member-finished
 import {
   pausedMembersOf,
   queuedMembersOf,
+  type GameMemberSession,
   type GameMemberSessionPatch,
   type GamePausedCauseOf,
   type GamePausedMember,
@@ -29,6 +30,8 @@ type Deps = {
   sessionIdOf: (terminalHandle: string) => string | null
   /** Why a saved member is not live while its terminal is open; null when the terminal is gone. */
   causeOf?: GamePausedCauseOf
+  /** True only when its repo answered without it; an unreachable host is not gone. */
+  worktreeGone?: (worktreeId: string) => Promise<boolean>
 }
 
 const errorText = (error: unknown): string =>
@@ -74,8 +77,9 @@ export class GamePausedMembers {
     const tickets = new Set(live.map((one) => one.ticket))
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     const liveNow = { tickets, worktreeIds: liveWorktreeIds }
+    const gone = await this.goneWorktreesOf(read.members.filter((one) => !tickets.has(one.ticket)))
     return {
-      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf),
+      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf, gone),
       unlisted: unlistedMembersOf(read.members, liveNow, starting),
       queued: queuedMembersOf(read.members, setup.queued),
       error
@@ -89,6 +93,22 @@ export class GamePausedMembers {
 
   async forget(projectKey: string, tickets: readonly string[]): Promise<void> {
     await this.deps.store.remove(projectKey, tickets)
+  }
+
+  private async goneWorktreesOf(members: readonly GameMemberSession[]): Promise<Set<string>> {
+    const worktreeGone = this.deps.worktreeGone
+    if (!worktreeGone) {
+      return new Set()
+    }
+    const ids = new Set(
+      members.flatMap((one) =>
+        one.worktreeId !== null && one.lastState !== 'finished' ? [one.worktreeId] : []
+      )
+    )
+    const gone = await Promise.all(
+      [...ids].map(async (id) => ((await worktreeGone(id).catch(() => false)) ? [id] : []))
+    )
+    return new Set(gone.flat())
   }
 
   private patchOf(agent: GameAgent, ticket: string): GameMemberSessionPatch {

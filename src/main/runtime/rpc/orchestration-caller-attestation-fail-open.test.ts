@@ -50,6 +50,10 @@ describe('ORCA-370 — a caller with no launch evidence may not name an attested
     )) as { ok: boolean; error?: { code: string }; result?: { run?: { id: string } | null } }
 
     expect(response).toMatchObject({ ok: false, error: { code: 'consumer_fenced' } })
+    // Why (ORCA-832): the refusal must name what the caller has to present, and where to get it.
+    expect((response as { error?: { message?: string } }).error?.message).toMatch(
+      /ORCA_AGENT_LAUNCH_TOKEN.*run the command from that pane/
+    )
     // Why: the refusal must also withhold the binding it was asked to disclose.
     expect(response.result?.run?.id).not.toBe(runId)
   })
