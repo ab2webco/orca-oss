@@ -1,6 +1,6 @@
-import type { GameSceneExtension, GameState } from '../../types'
-import { isShape, str } from '../game-state-shapes'
-import { sceneDefinitionOf } from './scene-shape'
+import type { GameSceneExtension, GameState } from '../types'
+import { isShape, str } from './game-state-shapes'
+import { sceneDefinitionOf } from './scenes/scene-shape'
 
 const MAX_SCENES = 256
 // Orca namespaces a contributed id as `<pluginId>/<id>`, so it can never shadow a built-in scene.
