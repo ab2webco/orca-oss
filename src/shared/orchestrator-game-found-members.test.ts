@@ -102,4 +102,12 @@ describe('found sessions in the fleet (ORCA-914)', () => {
   it('posts no board event for its merge, which no launched member earned', () => {
     expect(observedGameEventsOf([foundDone])).toEqual([])
   })
+
+  it("loads the host it runs on, though not the lead's own count (ORCA-888)", () => {
+    const hosts = [{ host: 'local', cap: 2, status: 'ok' as const }]
+    const fleet = gameFleetReportOf({ ...state, lead: { ...DEFAULT_GAME_LEAD, cap: 5 }, hosts })
+
+    expect(fleet.hosts).toEqual([{ ...hosts[0], running: 2, free: 0 }])
+    expect(fleet).toMatchObject({ running: 1, free: 0 })
+  })
 })

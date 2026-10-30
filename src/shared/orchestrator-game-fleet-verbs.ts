@@ -1,4 +1,9 @@
-import { idleNextOf, memberTicketStatusOf, remoteNextOf } from './orchestrator-game-member-next'
+import {
+  memberTicketStatusOf,
+  phaseNextOf,
+  remoteNextOf,
+  ticketOfMember
+} from './orchestrator-game-member-next'
 import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
@@ -9,8 +14,13 @@ import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orches
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import {
+  gameFleetHostLoadsOf,
+  localGameFreeOf,
+  type GameHostLoad
+} from './orchestrator-game-host-load'
 
-export { ticketInText, isFinishedMember }
+export { ticketInText, ticketOfMember, isFinishedMember, localGameFreeOf }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -60,6 +70,8 @@ export type GameFleet = {
   /** Members not finished and not gone from their host: each holds a ticket and a slot. */
   running: number
   free: number
+  /** Running members and free slots per host, local first; absent when the state has no per-host caps. */
+  hosts?: GameHostLoad[]
   /** Members not live since Orca or the machine restarted: `game resume-members`. */
   paused: GamePausedMember[]
   /** Members whose start waits for the setup in flight (ORCA-746). */
@@ -67,7 +79,7 @@ export type GameFleet = {
   pausedError?: string
 }
 
-export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
+export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead' | 'hosts'> &
   Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
@@ -85,44 +97,6 @@ export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   }
   return agent.state === 'working' ? 'working' : 'idle'
 }
-
-// Why the name and branch: `game launch` names the member after its ticket before any ticket is linked.
-export function ticketOfMember(agent: GameAgent): string | null {
-  if (agent.workItem) {
-    return agent.workItem.identifier.toUpperCase()
-  }
-  for (const text of [agent.displayName, agent.worktree?.displayName, agent.worktree?.branch]) {
-    const ticket = ticketInText(text)
-    if (ticket) {
-      return ticket
-    }
-  }
-  return null
-}
-
-function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
-  switch (phase) {
-    case 'finished':
-      // Why: sweep never closes a session the lead did not launch (ORCA-914).
-      return agent.found
-        ? `game stop ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
-        : 'sweep --close'
-    case 'needs-you':
-      return agent.limit?.loggedOut ? loggedOutNextOf(agent) : 'answer it'
-    case 'limited':
-      return limitedNextOf(agent)
-    case 'working':
-      return 'wait'
-    case 'idle':
-      return idleNextOf(agent.review)
-  }
-}
-
-const loggedOutNextOf = (agent: GameAgent): string =>
-  `log ${agent.account?.email ?? 'its account'} in again (/login in its pane), or game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
-
-const limitedNextOf = (agent: GameAgent): string =>
-  `game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}, or wait for the reset`
 
 export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
   const phase = memberPhaseOf(agent)
@@ -162,7 +136,7 @@ function nextWithQuestionOf(
   if (question && phase !== 'finished') {
     return `waiting on you: orchestration reply --id ${question.id}`
   }
-  return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : nextOf(agent, phase)
+  return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : phaseNextOf(agent, phase)
 }
 
 export const gameFleetMembersOf = (state: GameFleetInput): GameAgent[] =>
@@ -196,17 +170,24 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
   const holding = (state.pausedMembers ?? []).filter((one) => !one.worktreeGone)
   const queued = state.queuedMembers ?? []
   // Why gone ones do not: their host answered that the terminal is gone, so nothing runs there (ORCA-864).
-  // Why found ones do not either: no wave launched them, so they never held a launch slot (ORCA-914).
-  const free = gameFleetMembersOf(state).filter(
+  // Why found ones do not either: no wave launched them, so they hold no launch slot (ORCA-914).
+  const slotless = gameFleetMembersOf(state).filter(
     (agent) => (agent.remote?.gone || agent.found) && !isFinishedMember(agent)
   )
-  const running = rows.length - counts.finished - free.length + holding.length + queued.length
+  const running = rows.length - counts.finished - slotless.length + holding.length + queued.length
+  // Why every member here: a found session still loads the machine it runs on.
+  const hosts =
+    state.hosts &&
+    gameFleetHostLoadsOf(state.hosts, gameFleetMembersOf(state), holding.length + queued.length)
+  const free = Math.max(0, cap - running)
+  const hostsFree = hosts?.reduce((total, one) => total + one.free, 0) ?? free
   return {
     rows,
     counts,
     cap,
     running,
-    free: Math.max(0, cap - running),
+    free: Math.min(free, hostsFree),
+    ...(hosts ? { hosts } : {}),
     paused: state.pausedMembers ?? [],
     queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
@@ -223,7 +204,7 @@ export type GameWavePlan = {
   skipped: { ticket: string; reason: GameWaveSkipReason }[]
 }
 
-/** Named tickets, or the To Do's in list order, up to the free slots; never past the cap. */
+/** Named tickets, or the To Do's in list order, up to this Orca's free slots; never past the cap. */
 export function gameWavePlanOf(
   state: GameFleetInput & Pick<OrchestratorGameState, 'project'>,
   requested: readonly string[]
@@ -254,7 +235,7 @@ export function gameWavePlanOf(
           ? 'queued'
           : group !== undefined && PAST_WORK.has(group)
             ? 'not in To Do'
-            : plan.launch.length >= fleet.free
+            : plan.launch.length >= localGameFreeOf(fleet)
               ? 'cap'
               : null
     if (reason) {

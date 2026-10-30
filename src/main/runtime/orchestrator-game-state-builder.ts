@@ -11,15 +11,19 @@ import {
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import { trackerWorkItemOf, type TrackerItem } from './orchestrator-game-lead-work-item'
 import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
-  resolveOrchestratorGameLead,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
 import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
+import {
+  gameLeadOverPairedHostsOf,
+  type PairedGameHostEntry
+} from './orchestrator-game-paired-hosts'
 import {
   builtInGameActivityRules,
   gameActivityOf,
@@ -46,8 +50,6 @@ import {
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
-  statusGroupOfName,
-  statusGroupOfPlane,
   type GameActivity,
   type GameMemberWorktree,
   type GameWorkItem,
@@ -65,8 +67,6 @@ import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-ad
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 
-type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
-
 export type OrchestratorGameStateInput = {
   settings:
     | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects' | 'uiLanguage'>>
@@ -75,6 +75,8 @@ export type OrchestratorGameStateInput = {
   systemLocale?: string
   /** Orca's machine, which sets the member cap no layer sets. */
   host?: GameHostProfile
+  /** The paired hosts and what each publishes; read only for a lead (ORCA-888). */
+  readPairedHosts?: () => Promise<PairedGameHostEntry[]>
   worktree: {
     id: string
     repoId: string | null
@@ -191,28 +193,11 @@ export async function buildOrchestratorGameState(
         : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
     timezone: desktopGameTimezoneOf(resolved.config.timezone)
   }
-  let workItem: GameWorkItem | null = null
-  if (plane) {
-    workItem = {
-      provider: 'plane',
-      identifier: plane.identifier,
-      title: plane.title,
-      url: plane.url,
-      status: plane.stateName,
-      statusGroup: statusGroupOfPlane(plane.stateGroup, plane.stateName)
-    }
-  } else if (linear) {
-    workItem = {
-      provider: 'linear',
-      identifier: linear.identifier,
-      title: linear.title,
-      url: linear.url,
-      status: linear.stateName,
-      statusGroup: statusGroupOfName(linear.stateName)
-    }
-  } else if (tracker) {
-    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
-  }
+  const workItem =
+    trackerWorkItemOf(plane, linear) ??
+    (tracker
+      ? await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
+      : null)
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
   // Why `tracker`: it is already off for a member, whose band shows no project work.
@@ -227,11 +212,11 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const lead = resolveOrchestratorGameLead(layers, input.host ?? null)
   const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const placed = await gameLeadOverPairedHostsOf(layers, input, role)
   const actions = gameStateActionsOf({
     role,
-    lead,
+    lead: placed.lead,
     project: gameActionsOf(integrations.actions, placeholders)
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
@@ -298,7 +283,7 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
-    lead,
+    ...placed,
     rewardWeights: resolveOrchestratorGameRewardWeights(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],

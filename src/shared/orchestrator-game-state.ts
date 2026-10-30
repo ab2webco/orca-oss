@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
@@ -182,6 +183,8 @@ export type OrchestratorGameState = {
   actions?: GameAction[]
   /** How this project's lead orchestrates; absent from an older host. */
   lead?: OrchestratorGameLead
+  /** Each host's member cap, local first, which `lead.cap` sums; only for a lead, absent from an older host (ORCA-888). */
+  hosts?: GameHostCap[]
   /** XP per reward after every layer; absent from an older host, whose mod uses the baseline. */
   rewardWeights?: GameRewardWeights
   /** Whether the calling pane leads or was launched by a lead; absent from an older host. */
