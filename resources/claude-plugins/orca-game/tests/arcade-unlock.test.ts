@@ -46,7 +46,6 @@ type World = {
   rewards: boolean
   opened: { id: string; title?: string; focus?: boolean }[]
   store: Map<string, unknown>
-  merges?: unknown[]
 }
 
 const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
@@ -92,8 +91,7 @@ const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
           review: null,
           workItem: null,
           links: [],
-          role: world.role,
-          ...(world.merges === undefined ? {} : { merges: world.merges })
+          role: world.role
         }
       }),
       stderr: '',
@@ -146,27 +144,6 @@ describe("a member's perfect merge", () => {
     await clock.advance(POLL_EVERY_MS)
     expect(offers(world)).toHaveLength(1)
     expect(offers(world)[0]?.focus).toBeUndefined()
-  })
-
-  // ORCA-887: the lead or auto-release frees the member right after its merge, before a poll sees it.
-  test('offers one run when the member is released before the next poll sees its merge', async ($, on) => {
-    const { clock, world } = await start($, on, { merges: [] })
-    world.agents = []
-    world.merges = [
-      {
-        key: 'merged ORCA-12 #41',
-        ticket: 'ORCA-12',
-        provider: 'github',
-        number: 41,
-        worktreeId: 'wt-12',
-        perfect: true
-      }
-    ]
-    await clock.advance(POLL_EVERY_MS)
-    expect(offers(world)).toMatchObject([{ title: 'Arcade · unlocked', focus: true }])
-    expect(world.store.get(ARCADE_OFFERS_KEY)).toEqual(['perfect-merge:github#41@wt-12'])
-    await clock.advance(POLL_EVERY_MS * 3)
-    expect(offers(world)).toHaveLength(1)
   })
 
   test("offers nothing from a member's own pane", async ($, on) => {

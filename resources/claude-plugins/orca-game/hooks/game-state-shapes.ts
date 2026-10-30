@@ -13,7 +13,7 @@ export const str = (value: unknown): string | undefined =>
 export const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   (allowed as readonly unknown[]).includes(value) ? (value as T) : undefined
 
-export const REVIEW_PROVIDERS = ['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea'] as const
+const PROVIDERS = ['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea'] as const
 const REVIEW_STATES = ['open', 'draft', 'merged', 'closed'] as const
 const CI_STATES: readonly GameCi[] = ['pending', 'success', 'failure', 'neutral', 'none']
 const TRACKERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
@@ -31,7 +31,7 @@ export const reviewOf = (value: unknown): GameReview | null => {
   if (!isShape(value) || typeof value.number !== 'number') {
     return null
   }
-  const provider = oneOf(value.provider, REVIEW_PROVIDERS)
+  const provider = oneOf(value.provider, PROVIDERS)
   const state = oneOf(value.state, REVIEW_STATES)
   const url = str(value.url)
   if (provider === undefined || state === undefined || url === undefined) {
