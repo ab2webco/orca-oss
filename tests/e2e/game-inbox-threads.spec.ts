@@ -174,21 +174,25 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect(entry).toHaveText('Inbox')
     await entry.click()
     const sheet = orcaPage.getByTestId('game-inbox-sheet')
+    // Every Inbox screen at each width in both themes, the sheet settled before each capture.
+    const captureEveryWidth = async (name: string): Promise<void> => {
+      for (const width of WIDTHS) {
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          await settleGameInboxSheet(orcaPage, width)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`${name}-${width}-${theme}.png`)
+          })
+        }
+      }
+      await settleGameInboxSheet(orcaPage, 1440)
+    }
     await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('2')
 
     await sheet.getByRole('tab', { name: /Waiting/ }).click()
     await expect(sheet.locator('[data-testid^="game-inbox-waiting-"]')).toHaveCount(2)
-    for (const width of WIDTHS) {
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
-        await settleGameInboxSheet(orcaPage, width)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`waiting-${width}-${theme}.png`)
-        })
-      }
-    }
-    await settleGameInboxSheet(orcaPage, 1440)
+    await captureEveryWidth('waiting')
 
     await sheet.getByRole('tab', { name: /Answered/ }).click()
     const answered = sheet.locator('[data-testid^="game-inbox-answered-"]')
@@ -209,33 +213,15 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await send(busy.handle, lead, 'escalation', 'Blocked on CI', 'The e2e shard 3 is red.')
     await expect(messages.getByText('Blocked on CI')).toBeVisible()
 
-    for (const width of WIDTHS) {
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
-        await settleGameInboxSheet(orcaPage, width)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`thread-${width}-${theme}.png`)
-        })
-      }
-    }
-    await settleGameInboxSheet(orcaPage, 1440)
+    await captureEveryWidth('thread')
     await sheet.getByRole('button', { name: /All threads/ }).click()
-    await settleGameInboxSheet(orcaPage, 1440)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('threads-1440-light.png')
-    })
+    await captureEveryWidth('threads')
     await sheet.getByRole('tab', { name: /Answered/ }).click()
     await expect(sheet.getByRole('tab', { name: /Answered/ })).toHaveAttribute(
       'aria-selected',
       'true'
     )
-    await settleGameInboxSheet(orcaPage, 1440)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('answered-1440-light.png')
-    })
+    await captureEveryWidth('answered')
 
     // The person answers a member for the lead: the member's blocked ask returns their words.
     const leadMail = async () =>
@@ -258,11 +244,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     const portRow = sheet.getByTestId(`game-inbox-answered-${portQuestion}`)
     await portRow.getByRole('button', { name: 'Override' }).click()
     await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
-    await settleGameInboxSheet(orcaPage, 390)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('override-390-light.png')
-    })
+    await captureEveryWidth('override')
     await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
     await expect(portRow.getByRole('textbox')).toHaveValue('')
     await expect
@@ -277,11 +259,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
       .poll(leadMail)
       .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
     await expect(portRow).toContainText('You replaced it: Use 3000')
-    await settleGameInboxSheet(orcaPage, 390)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('answered-after-390-light.png')
-    })
+    await captureEveryWidth('answered-after')
   } finally {
     agent.dispose()
   }
