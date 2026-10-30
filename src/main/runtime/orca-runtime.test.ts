@@ -1021,10 +1021,10 @@ const CLAUDE_STARTUP_DIALOGS = JSON.parse(
     'utf8'
   )
 ) as { folderTrust: string; bypassPermissions: string }
-// Why: real Claude bytes; a resize repaints from `CSI H` and walks down with `CSI B`.
+// Why: real Claude bytes; a resize repaints from `CSI H` and walks down with `CSI B`; Enter on the theme picker repaints the login-method picker the same way.
 const CLAUDE_FIRST_RUN = JSON.parse(
   readFileSync(new URL('./__fixtures__/claude-first-run-2.1.314.json', import.meta.url), 'utf8')
-) as { themePicker: string; themePickerAfterResize: string }
+) as { themePicker: string; themePickerAfterResize: string; loginMethodPicker: string }
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
 
 /**
@@ -20298,7 +20298,7 @@ describe('OrcaRuntimeService', () => {
     runtime.onPtyData('pty-1', '\x1b[1A\x1b[2KXY\n', 101)
 
     const read = await runtime.readTerminal(terminal.handle)
-    expect(read.tail).toEqual(['   XY'])
+    expect(read.tail).toEqual(['   XY', 'xyz'])
     expect(read.tail.join('\n')).not.toContain('ABCXY')
     expect(read.tail.join('\n')).not.toContain('2K')
   })
@@ -20315,7 +20315,7 @@ describe('OrcaRuntimeService', () => {
 
     runtime.onPtyData('pty-1', '\x1b[2A', 101)
     const betweenChunks = await runtime.readTerminal(terminal.handle)
-    expect(betweenChunks.tail).toEqual(['• Working'])
+    expect(betweenChunks.tail).toEqual(['• Working', 'Tool call'])
     expect(betweenChunks.latestCursor).toBe('2')
 
     runtime.onPtyData('pty-1', '\x1b[2K\x1b[1G• Working.\n\x1b[2K\x1b[1GTool call finished\n', 102)
@@ -20345,7 +20345,7 @@ describe('OrcaRuntimeService', () => {
     runtime.onPtyData('pty-1', '\x1b[2A\x1b[2K\x1b[1GB2\n', 101)
 
     const read = await runtime.readTerminal(terminal.handle)
-    expect(read.tail).toEqual(['A', 'B2'])
+    expect(read.tail).toEqual(['A', 'B2', 'C'])
     expect(read.latestCursor).toBe('4')
 
     const cursorRead = await runtime.readTerminal(terminal.handle, {
@@ -20461,6 +20461,56 @@ describe('OrcaRuntimeService', () => {
     const completedPartialRead = await runtime.readTerminal(terminal.handle, { cursor: 3 })
     expect(completedPartialRead.tail).toEqual(['Tool call still running'])
     expect(completedPartialRead.nextCursor).toBe('4')
+  })
+
+  it('keeps the rows below the cursor when Claude parks it above its screen (ORCA-882)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    syncSinglePty(runtime)
+
+    const [terminal] = (await runtime.listTerminals()).terminals
+    runtime.onPtyData('pty-1', CLAUDE_FIRST_RUN.themePicker, 100)
+
+    const read = await runtime.readTerminal(terminal.handle)
+    expect(read.tail.at(-1)).toContain('Syntax theme: Monokai Extended (ctrl+t to disable)')
+    expect(read.tail.join('\n')).toContain('Light mode (ANSI colors only)')
+  })
+
+  it("reads Claude's login-method picker, repainted by walking down, after the theme picker (ORCA-882)", async () => {
+    const runtime = new OrcaRuntimeService(store)
+    syncSinglePty(runtime)
+
+    const [terminal] = (await runtime.listTerminals()).terminals
+    runtime.onPtyData('pty-1', CLAUDE_FIRST_RUN.themePicker, 100)
+    runtime.onPtyData('pty-1', CLAUDE_FIRST_RUN.loginMethodPicker, 101)
+
+    const read = await runtime.readTerminal(terminal.handle)
+    expect(read.tail.slice(-7)).toEqual([
+      ' Console account.',
+      '',
+      ' Select login method:',
+      '',
+      ' ❯ 1. Claude account with subscription · Pro, Max, Team, or Enterprise',
+      '   2. Anthropic Console account · API usage billing',
+      '   3. 3rd-party platform · Amazon Bedrock, Microsoft Foundry, Google Vertex AI'
+    ])
+    expect(read.tail.join('\n')).not.toContain('Choose the text style')
+    expect(read.tail.join('\n')).not.toContain('Light mode')
+  })
+
+  it('moves the cursor down with CSI B, CSI e and CSI E, stopping at the last row (ORCA-882)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    syncSinglePty(runtime)
+
+    const [terminal] = (await runtime.listTerminals()).terminals
+    runtime.onPtyData('pty-1', 'one\ntwo\nthree\nfour', 100)
+    runtime.onPtyData(
+      'pty-1',
+      '\x1b[3A\x1b[1G1\x1b[B\x1b[1G2\x1b[1e\x1b[1G3\x1b[9E4!\x1b[F\x1b[2C$',
+      101
+    )
+
+    const read = await runtime.readTerminal(terminal.handle)
+    expect(read.tail).toEqual(['1ne', '2wo', '3h$ee', '4!ur'])
   })
 
   it('does not retain split ANSI controls as visible terminal preview text', async () => {

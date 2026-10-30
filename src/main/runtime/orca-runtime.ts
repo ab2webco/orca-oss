@@ -41371,7 +41371,7 @@ function maxUpwardCursorReach(
   previousRedrawCursor: RetainedTailRedrawCursor | null
 ): number {
   let reach = previousRedrawCursor ? previousRedrawCursor.rowFromEnd : 0
-  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?A/g
+  const cursorUpPattern = /\x1b\[(\d*)(?:;[\d;]*)?[AF]/g
   let match: RegExpExecArray | null
   while ((match = cursorUpPattern.exec(normalizedChunk)) !== null) {
     reach += match[1] ? Number.parseInt(match[1], 10) : 1
@@ -41578,9 +41578,17 @@ export function appendNormalizedToMultilineTailBufferUnwindowed(
         continue
       }
       const firstParam = parsed.firstParam ?? 1
-      if (parsed.final === 'A') {
+      // Why: like xterm, vertical moves keep the rows they pass and stop at the edges instead of scrolling.
+      if (parsed.final === 'A' || parsed.final === 'F') {
         cursorRow = Math.max(0, cursorRow - firstParam)
-        rows.splice(cursorRow + 1)
+        if (parsed.final === 'F') {
+          cursorColumn = 0
+        }
+      } else if (parsed.final === 'B' || parsed.final === 'e' || parsed.final === 'E') {
+        cursorRow = Math.min(cursorRow + firstParam, Math.max(cursorRow, rows.length - 1))
+        if (parsed.final === 'E') {
+          cursorColumn = 0
+        }
       } else if (parsed.final === 'K') {
         eraseLine(parsed.firstParam ?? 0)
       } else if (parsed.final === 'G' || parsed.final === '`') {
@@ -41915,9 +41923,10 @@ function containsTerminalVerticalLineControl(value: string): boolean {
       return false
     }
     index = parsed.endIndex
+    // Why not B/e: at the bottom row, where a chunk without a redraw cursor starts, a down move is a no-op.
     if (
       parsed.kind === 'csi' &&
-      parsed.final === 'A' &&
+      (parsed.final === 'A' || parsed.final === 'F' || parsed.final === 'E') &&
       hasCanonicalNumericCsiParams(parsed.params)
     ) {
       return true
@@ -43196,6 +43205,10 @@ function isTerminalPreviewLineControl(parsed: {
   }
   return (
     parsed.final === 'A' ||
+    parsed.final === 'B' ||
+    parsed.final === 'e' ||
+    parsed.final === 'E' ||
+    parsed.final === 'F' ||
     parsed.final === 'G' ||
     parsed.final === '`' ||
     parsed.final === 'D' ||
