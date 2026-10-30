@@ -14,6 +14,9 @@ export type OrchestrationMessageSummary = {
   read?: number
 }
 
+// Why (ORCA-858): a lead watches check under Claude Code's Monitor, which cuts each line at ~500 characters and each event at ~3000.
+const OUTPUT_LINE_MAX = 400
+
 export type LegacyCompatibilityResult = {
   recovery?: boolean
   readOnly?: boolean
@@ -32,6 +35,8 @@ export type LegacyCompatibilityResult = {
 }
 
 export type OrchestrationCheckOutput = {
+  /** Commands that print each message whose body or payload a watch line would cut; first so a cut event keeps them. */
+  readInFull?: string[]
   messages: OrchestrationMessageSummary[]
   count: number
   formatted?: string
@@ -102,7 +107,50 @@ export function formatOrchestrationCheckText(
         : '[LEGACY COMPATIBILITY]\n'
     : ''
   const deliveryNotice = formatCurrentDeliveryNotice(prepared.legacyCompatibility?.currentDelivery)
-  return `${formatRetiredNotice(prepared.retired)}${formatCheckBody(prepared, legacyHeader, deliveryNotice, compatibilityActive)}`
+  const readInFull = (prepared.readInFull ?? []).map((command) => `Read in full: ${command}\n`)
+  return wrapLongLines(
+    `${readInFull.join('')}${formatRetiredNotice(prepared.retired)}${formatCheckBody(prepared, legacyHeader, deliveryNotice, compatibilityActive)}`
+  )
+}
+
+function wrapLongLines(text: string): string {
+  return text
+    .split('\n')
+    .flatMap((line) => {
+      if (line.length <= OUTPUT_LINE_MAX) {
+        return [line]
+      }
+      const indent = /^ {0,8}/.exec(line)?.[0] ?? ''
+      const pieces: string[] = []
+      let piece = ''
+      for (const character of line.slice(indent.length)) {
+        if (indent.length + piece.length + character.length > OUTPUT_LINE_MAX) {
+          pieces.push(`${indent}${piece}`)
+          piece = ''
+        }
+        piece += character
+      }
+      return [...pieces, `${indent}${piece}`]
+    })
+    .join('\n')
+}
+
+const fitsOneLine = (text: string | null | undefined): boolean =>
+  !text || JSON.stringify(text).length <= OUTPUT_LINE_MAX
+
+const shellWord = (word: string): string =>
+  /^[\w:.@-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`
+
+function readInFullCommands(
+  messages: readonly OrchestrationMessageSummary[],
+  checkedTerminal: string
+): string[] {
+  return messages
+    .filter((message) => !fitsOneLine(message.body) || !fitsOneLine(message.payload))
+    .map(
+      (message) =>
+        `orca orchestration inbox --terminal ${shellWord(message.to_handle ?? checkedTerminal)} --id ${shellWord(message.id)}`
+    )
 }
 
 function formatCheckBody(
@@ -155,14 +203,16 @@ export function prepareOrchestrationCheckOutput<T extends OrchestrationCheckOutp
   const compatibilityActive = Boolean(
     result.legacyCompatibility && !result.legacyCompatibility.readOnly
   )
+  const readInFull = readInFullCommands(result.messages, checkedTerminal)
+  const sized = readInFull.length > 0 ? { readInFull, ...result } : result
   if (
     !formattedRequested ||
     !result.messages.some((message) => isLegacyReadOnlyMessage(message, compatibilityActive))
   ) {
-    return result
+    return sized
   }
   return {
-    ...result,
+    ...sized,
     formatted: formatLegacyAwareCheckMessages(result.messages, checkedTerminal, compatibilityActive)
   }
 }

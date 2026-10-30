@@ -170,7 +170,7 @@ export function gameOwnerQuestionDraftOf(
   return { ticket: draft.ticket?.trim().toUpperCase() || null, question, options, context }
 }
 
-// Why the answer first: the lead's watch and `game inbox` cut long bodies (ORCA-858).
+// Why the answer first: it is what the lead acts on, so it leads the body.
 export function gameOwnerAnswerNote(question: GameOwnerQuestion): {
   subject: string
   body: string
