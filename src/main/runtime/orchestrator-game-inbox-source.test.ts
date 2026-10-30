@@ -29,6 +29,16 @@ function fakeDb(): { db: GameInboxDb; asked: string[] } {
         ? { task_title: 'CIN-1 Cartelera', display_name: null }
         : { task_title: 'Docs', display_name: null },
     listPendingQuestions: (runId) => (runId === 'run_1' ? [row('msg_1', 'term_lead')] : []),
+    listAnsweredQuestions: (runId) =>
+      runId === 'run_1'
+        ? [
+            {
+              ...row('msg_3', 'run:run_1'),
+              answer_body: '8080',
+              answered_at: '2026-10-16 10:05:00'
+            }
+          ]
+        : [],
     getAllMessagesForHandle: (handle) => {
       asked.push(handle)
       return handle === 'dispatch:d1b'
@@ -68,6 +78,16 @@ describe('gameInboxSourceOf', () => {
     expect(
       gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).pendingQuestions
     ).toEqual([row('msg_1', 'term_lead')])
+  })
+
+  it("carries the run's answered questions with their answers, for the Inbox audit (ORCA-878)", () => {
+    const { db } = fakeDb()
+
+    expect(
+      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).answeredQuestions
+    ).toEqual([
+      { ...row('msg_3', 'run:run_1'), answer_body: '8080', answered_at: '2026-10-16 10:05:00' }
+    ])
   })
 
   it('has only the lead terminal when the lead has no run yet', () => {

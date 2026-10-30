@@ -131,4 +131,26 @@ describe('GameBoard inbox', () => {
       { key: 'CIN-1', unread: 0, last: null, waiting: [] }
     ])
   })
+
+  it("gives the person's Inbox every ticket's thread and what waits on the lead, without marking anything read (ORCA-878)", async () => {
+    const question = mail(2, 'term_lead', 'term_1')
+    const { game } = board([mail(1, 'term_1', 'term_lead'), question], [question])
+
+    const read = await game.inboxThreads({ worktreeId: 'wt_lead' })
+
+    expect(
+      read.threads.map((thread) => [thread.ticket, thread.messages.length, thread.waiting])
+    ).toEqual([['CIN-1', 2, 1]])
+    expect(read.waiting.map((item) => [item.id, item.ticket, item.answerer])).toEqual([
+      ['msg_2', 'CIN-1', 'lead']
+    ])
+    expect(read.answered).toEqual([])
+    expect((await game.inbox({ terminalHandle: 'term_lead' })).inbox.unread).toBe(1)
+  })
+
+  it("refuses a member the project's threads: it reads only its own ticket", async () => {
+    const { game } = board([])
+
+    await expect(game.inboxThreads({ terminalHandle: 'term_1' })).rejects.toThrow(/member/)
+  })
 })

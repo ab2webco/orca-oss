@@ -767,6 +767,7 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
@@ -2327,6 +2328,7 @@ type RuntimeNotifier = {
   worktreeRemoteBranchConflict?(event: WorktreeRemoteBranchConflictEvent): void
   reposChanged(): void
   gameOwnerQuestionsChanged?(): void
+  gameInboxChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -3886,6 +3888,10 @@ export class OrcaRuntimeService {
       this.notifier?.gameOwnerQuestionsChanged?.()
       this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
     }
+  })
+  private readonly gameInboxChange = new GameInboxChangeSignal(() => {
+    this.notifier?.gameInboxChanged?.()
+    this.emitClientEvent({ type: 'gameInboxChanged' })
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
@@ -36334,6 +36340,7 @@ export class OrcaRuntimeService {
 
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
+    this.gameInboxChange.mailArrived(messageType)
     const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
     const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
     const dispatch =

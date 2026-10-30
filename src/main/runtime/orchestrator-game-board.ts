@@ -9,6 +9,10 @@ import {
   type GameInboxSummary
 } from '../../shared/orchestrator-game-inbox'
 import {
+  gameInboxThreadsOf,
+  type GameInboxThreads
+} from '../../shared/orchestrator-game-inbox-threads'
+import {
   filterGameEvents,
   type GameEvent,
   type GameEventKind
@@ -114,6 +118,17 @@ export class GameBoard {
         waiting: inbox.waiting
       }
     })
+  }
+
+  /** The person's Inbox: every ticket's thread, what waits on the lead and what it answered; reads, never marks. */
+  async inboxThreads(caller: GameBoardCaller): Promise<GameInboxThreads> {
+    const project = await this.deps.projectOf(caller)
+    if (project.isMember) {
+      throw new Error("A member reads only its own ticket's inbox: use `game inbox`.")
+    }
+    return project.lead
+      ? gameInboxThreadsOf(this.deps.inboxSourceOf(project.lead))
+      : { threads: [], waiting: [], answered: [] }
   }
 
   private async inboxesOf(project: GameBoardProject): Promise<GameInbox[]> {

@@ -13,6 +13,7 @@ export type RuntimeClientEvent =
   | { type: 'worktreesChanged'; repoId: string }
   // Why: a paired desktop's Inbox refreshes on it; old clients drop unknown types.
   | { type: 'gameOwnerQuestionsChanged' }
+  | { type: 'gameInboxChanged' }
   | ({ type: 'nativeChatLaunchDraftResolved' } & RuntimeNativeChatLaunchDraftResolution)
   | { type: 'terminalSideEffects'; batch: TerminalSideEffectBatch }
   // Why: SSH connections live on the runtime host; paired clients have no IPC

@@ -4758,6 +4758,11 @@ const api = {
       const listener = (_event: Electron.IpcRendererEvent) => callback()
       ipcRenderer.on('runtime:gameOwnerQuestionsChanged', listener)
       return () => ipcRenderer.removeListener('runtime:gameOwnerQuestionsChanged', listener)
+    },
+    onGameInboxChanged: (callback: () => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('runtime:gameInboxChanged', listener)
+      return () => ipcRenderer.removeListener('runtime:gameInboxChanged', listener)
     }
   },
 
