@@ -80,6 +80,39 @@ describe('gameMemberLimitOf', () => {
     ).toEqual({ resetsAt: null, spend: true })
   })
 
+  // Why (ORCA-907): a member whose account logged out sat idle while its account read as free.
+  it('is logged out when the last lines of a stopped member say its account must log in again', () => {
+    const tail = (said: string) =>
+      [...Array(30).fill('work'), said, '> ', '  status line'].join('\n')
+    const of = (said: string, state: 'idle' | 'working' = 'idle', agentType = 'claude') =>
+      gameMemberLimitOf({
+        state,
+        agentType,
+        accountLimits: limits(20),
+        terminalTail: tail(said),
+        now: NOW
+      })
+    expect(of('Not logged in · Please run /login')).toEqual({ resetsAt: null, loggedOut: true })
+    expect(of('OAuth token has expired · Please run /login')).toEqual({
+      resetsAt: null,
+      loggedOut: true
+    })
+    expect(of('Not logged in · Please run /login', 'working')).toBeNull()
+    expect(of('Not logged in · Please run /login', 'idle', 'gemini')).toBeNull()
+    expect(of('Fixed the login page')).toBeNull()
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: null,
+        terminalTail: ['Not logged in · Please run /login', ...Array(30).fill('later work')].join(
+          '\n'
+        ),
+        now: NOW
+      })
+    ).toBeNull()
+  })
+
   it('never calls a context or token limit a usage limit, nor an agent with no managed accounts', () => {
     expect(
       gameMemberLimitOf({
