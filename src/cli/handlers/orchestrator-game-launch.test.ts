@@ -497,6 +497,56 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })
 
+  it('refuses per host: a full host names the one with room (ORCA-888)', async () => {
+    const onImac = (paneKey: string) => ({
+      paneKey,
+      state: 'working',
+      isMember: true,
+      remote: { host: 'imac', stateKnown: true }
+    })
+    const { client, calls } = fakeClient(
+      stateWith({
+        agents: [onImac('a'), onImac('b')],
+        lead: { autostart: false, cap: 6, agent: 'claude' },
+        hosts: [
+          { host: 'local', cap: 4, status: 'ok' },
+          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
+        ]
+      })
+    )
+
+    await expect(
+      launch(client, 'cin-12', [
+        ['on', 'imac'],
+        ['repo', 'id:r1']
+      ])
+    ).rejects.toThrow('imac at cap 2/2, local has 4 free: launch CIN-12 with --on local')
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
+  it('launches here while a paired host is full, past the old single cap', async () => {
+    const onImac = (paneKey: string) => ({
+      paneKey,
+      state: 'working',
+      isMember: true,
+      remote: { host: 'imac', stateKnown: true }
+    })
+    const { client, calls } = fakeClient(
+      stateWith({
+        agents: [onImac('a'), onImac('b')],
+        lead: { autostart: false, cap: 3, agent: 'claude' },
+        hosts: [
+          { host: 'local', cap: 1, status: 'ok' },
+          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
+        ]
+      })
+    )
+
+    await launch(client)
+
+    expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
+  })
+
   it('counts a member whose turn ended as running until its PR is merged', async () => {
     const member = { paneKey: 'm', state: 'done', isMember: true }
     const { client, calls } = fakeClient(

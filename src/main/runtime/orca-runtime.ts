@@ -200,6 +200,16 @@ import {
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+
+const gameHostProfileOfThisMachine = (): GameHostProfile => ({
+  totalMemory: totalmem(),
+  cpuCoreCount: Math.max(1, cpus().length)
+})
+
+const gameHostOfThisMachine = (): NonNullable<RuntimeStatus['gameHost']> => {
+  const profile = gameHostProfileOfThisMachine()
+  return { ...profile, memberCap: defaultGameMemberCapOf(profile) }
+}
 import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
 import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -754,6 +764,8 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
+import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
@@ -3792,6 +3804,21 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
+  private readonly gamePairedHosts = new GamePairedHostReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    statusOf: async (environmentId) => {
+      const response = await this.orchestrationEnvironmentTransport!.call(
+        environmentId,
+        'status.get',
+        undefined,
+        REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+      )
+      if (response.ok === false) {
+        throw new Error(response.error.message)
+      }
+      return response.result
+    }
+  })
   private readonly gamePausedMembers = new GamePausedMembers({
     store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
@@ -5855,6 +5882,7 @@ export class OrcaRuntimeService {
       hostPlatform: process.platform,
       terminalWindowsShell: this.store?.getSettings?.().terminalWindowsShell ?? null,
       floatingWorkspaceEnabled: this.store?.getSettings?.().floatingTerminalEnabled !== false,
+      gameHost: gameHostOfThisMachine(),
       protocolVersion: RUNTIME_PROTOCOL_VERSION,
       minCompatibleMobileVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
     }
@@ -31427,7 +31455,8 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
-      host: { totalMemory: totalmem(), cpuCoreCount: Math.max(1, cpus().length) },
+      host: gameHostProfileOfThisMachine(),
+      readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
         ? {
             id: worktree.id,

@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
-  gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf,
   ticketInText
 } from './orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
 
@@ -688,5 +688,80 @@ describe('members queued behind a running setup (ORCA-746)', () => {
       []
     )
     expect(plan).toEqual({ launch: ['CIN-3'], skipped: [{ ticket: 'CIN-1', reason: 'queued' }] })
+  })
+})
+
+describe('per-host caps (ORCA-888)', () => {
+  const remote = (paneKey: string, host: string, extra: Partial<GameAgent> = {}) =>
+    member({
+      paneKey,
+      displayName: `${paneKey.toUpperCase()} on ${host}`,
+      remote: { host, stateKnown: true },
+      ...extra
+    })
+  const hosts = [
+    { host: 'local', cap: 2, status: 'ok' as const },
+    { host: 'imac', id: 'env-imac', cap: 3, status: 'ok' as const },
+    { host: 'm1', id: 'env-m1', cap: 0, status: 'unreachable' as const }
+  ]
+  const state = {
+    agents: [
+      lead,
+      member({ paneKey: 'a', displayName: 'CIN-1 a' }),
+      remote('cin-2', 'imac'),
+      remote('cin-3', 'imac'),
+      remote('cin-4', 'imac', { state: 'done', review: review('merged') }),
+      remote('cin-5', 'm1', { remote: { host: 'm1', stateKnown: false } })
+    ],
+    lead: { ...DEFAULT_GAME_LEAD, cap: 5 },
+    hosts,
+    pausedMembers: [
+      {
+        ticket: 'CIN-6',
+        name: 'CIN-6 x',
+        agent: 'claude',
+        account: null,
+        branch: 'cin-6',
+        lastState: 'working',
+        resumable: true,
+        runId: 'run_1',
+        since: '2026-10-20T10:00:00.000Z'
+      }
+    ]
+  }
+
+  it('counts running members per host; paused ones hold local slots', () => {
+    const fleet = gameFleetReportOf(state)
+    expect(fleet.hosts).toEqual([
+      { ...hosts[0], running: 2, free: 0 },
+      { ...hosts[1], running: 2, free: 1 },
+      { ...hosts[2], running: 1, free: 0 }
+    ])
+    expect(fleet).toMatchObject({ cap: 5, running: 5, free: 0 })
+  })
+
+  it('the total free is the hosts’ free slots under the lead’s cap', () => {
+    expect(gameFleetReportOf({ ...state, lead: { ...DEFAULT_GAME_LEAD, cap: 9 } }).free).toBe(1)
+  })
+
+  it('a wave launches on this Orca only, so it stops at local’s cap', () => {
+    const plan = gameWavePlanOf(
+      {
+        ...state,
+        lead: { ...DEFAULT_GAME_LEAD, cap: 9 },
+        project: todo([{ id: 'CIN-7', group: 'todo' }])
+      },
+      []
+    )
+    expect(plan).toEqual({ launch: [], skipped: [{ ticket: 'CIN-7', reason: 'cap' }] })
+  })
+
+  it('a state without per-host caps keeps the one shared cap', () => {
+    const fleet = gameFleetReportOf({ ...state, hosts: undefined })
+    expect(fleet.hosts).toBeUndefined()
+    expect(fleet).toMatchObject({ cap: 5, running: 5, free: 0 })
+    expect(
+      gameFleetReportOf({ ...state, hosts: undefined, lead: { ...DEFAULT_GAME_LEAD, cap: 9 } }).free
+    ).toBe(4)
   })
 })

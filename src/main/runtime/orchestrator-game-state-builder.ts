@@ -15,10 +15,13 @@ import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
-  resolveOrchestratorGameLead,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
 import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
+import {
+  gameLeadOverPairedHostsOf,
+  type PairedGameHostEntry
+} from './orchestrator-game-paired-hosts'
 import {
   builtInGameActivityRules,
   gameActivityOf,
@@ -74,6 +77,8 @@ export type OrchestratorGameStateInput = {
   systemLocale?: string
   /** Orca's machine, which sets the member cap no layer sets. */
   host?: GameHostProfile
+  /** The paired hosts and what each publishes; read only for a lead (ORCA-888). */
+  readPairedHosts?: () => Promise<PairedGameHostEntry[]>
   worktree: {
     id: string
     repoId: string | null
@@ -223,11 +228,14 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const lead = resolveOrchestratorGameLead(layers, input.host ?? null)
   const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const placed = await gameLeadOverPairedHostsOf(
+    layers,
+    role === 'lead' ? input : { host: input.host }
+  )
   const actions = gameStateActionsOf({
     role,
-    lead,
+    lead: placed.lead,
     project: gameActionsOf(integrations.actions, placeholders)
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
@@ -292,7 +300,7 @@ export async function buildOrchestratorGameState(
         }
       : null,
     agents,
-    lead,
+    ...placed,
     rewardWeights: resolveOrchestratorGameRewardWeights(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],

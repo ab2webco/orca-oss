@@ -4,6 +4,7 @@ import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
   defaultGameMemberCapOf,
+  GAME_HOST_CAP_MAX,
   GAME_LEAD_CAP_MAX,
   parseGameLead,
   renderGameLaunchPrompt,
@@ -161,11 +162,15 @@ describe('defaultGameMemberCapOf', () => {
     expect(defaultGameMemberCapOf({ totalMemory: 128 * GIB, cpuCoreCount: 4 })).toBe(2)
   })
 
-  it('stays within 1 and the cap ceiling', () => {
+  it('stays within 1 and one machine’s ceiling', () => {
     expect(defaultGameMemberCapOf({ totalMemory: 2 * GIB, cpuCoreCount: 1 })).toBe(1)
     expect(defaultGameMemberCapOf({ totalMemory: 512 * GIB, cpuCoreCount: 96 })).toBe(
-      GAME_LEAD_CAP_MAX
+      GAME_HOST_CAP_MAX
     )
+  })
+
+  it('takes a project cap past one machine’s, as a ceiling over every host (ORCA-888)', () => {
+    expect(parseGameLead({ cap: 30 }).value).toEqual({ cap: 30 })
   })
 
   it('falls back to the fixed default when the machine is unknown', () => {

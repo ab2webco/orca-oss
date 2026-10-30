@@ -242,14 +242,14 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({}, undefined, updates)
 
-    commit(field(view.container, 'Member cap'), '40')
+    commit(field(view.container, 'Member cap'), '400')
     commit(field(view.container, 'Agent'), 'Not An Agent')
     expect(updates).toEqual([])
     const alerts = Array.from(view.container.querySelectorAll('[role="alert"]')).map(
       (alert) => alert.textContent
     )
     expect(alerts).toEqual([
-      'Enter a whole number from 1 to 12.',
+      'Enter a whole number from 1 to 100.',
       'Use an agent id like claude or codex.'
     ])
     expect(field(view.container, 'Member cap').getAttribute('aria-invalid')).toBe('true')

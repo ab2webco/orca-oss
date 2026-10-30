@@ -3,6 +3,7 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
+import { gameHostRefusalOf } from '../../shared/orchestrator-game-host-load'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import {
   DEFAULT_GAME_LEAD,
@@ -276,12 +277,14 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       throw new RuntimeClientError('invalid_argument', `${ticket} is ${formatSetupQueue(queued)}.`)
     }
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
-    const { cap, running } = gameFleetReportOf(response.result)
-    if (running >= cap) {
-      throw new RuntimeClientError(
-        'cap_reached',
-        `${running} of ${cap} members are running; close one before launching ${ticket}.`
-      )
+    const { cap, running, hosts } = gameFleetReportOf(response.result)
+    const refusal = hosts
+      ? gameHostRefusalOf(hosts, { cap, running }, remote?.on ?? null, ticket)
+      : running >= cap
+        ? `${running} of ${cap} members are running; close one before launching ${ticket}.`
+        : null
+    if (refusal) {
+      throw new RuntimeClientError('cap_reached', refusal)
     }
     const openPrWarning = openPrWarningOf(response.result)
     if (openPrWarning) {

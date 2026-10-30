@@ -20,6 +20,7 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `  To run it on a paired host: ${run('game launch <ticket> --on <host> --repo <selector of the repo on that host>')},`,
     '  never with `orchestration worker-start --on`, which gives the member no name or game.',
     `  At most ${lead.cap} members run at once; when they are all busy, say which ticket waits.`,
+    `  Each paired host has its own cap: ${run('game fleet')} shows each host's load; when this one is full, launch on a host with room.`,
     '- Keep members working. When none is working, organize the work and launch members from the To Do,',
     '  within the cap. An idle member with no PR in flight is a lead failure: give it its next step or free its slot.',
     '- Finish before starting. Drive each member to merge (review, fixes, CI) before you launch another ticket;',

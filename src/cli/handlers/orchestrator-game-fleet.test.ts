@@ -148,6 +148,39 @@ describe('orca game fleet verbs', () => {
     )
   })
 
+  it('fleet text shows each host’s load, and wave stops at this Orca’s cap (ORCA-888)', async () => {
+    const onImac = member({
+      paneKey: 'i',
+      displayName: 'CIN-9 on imac',
+      remote: { host: 'imac', stateKnown: true }
+    })
+    const state = stateWith({
+      agents: [LEAD, member({}), onImac],
+      lead: { autostart: false, cap: 7, agent: 'claude' },
+      hosts: [
+        { host: 'local', cap: 1, status: 'ok' },
+        { host: 'imac', id: 'env-imac', cap: 6, status: 'ok' }
+      ]
+    })
+    const text = formatFleet(gameFleetReportOf(state as never))
+    expect(text.split('\n')[1]).toBe('Hosts: local 1/1 · imac 1/6')
+
+    const { client, calls } = fakeClient(state)
+    await run('game wave', client, [['dry-run', true]])
+    expect(methods(calls)).toEqual(['game.state'])
+    expect(printed()).toEqual(
+      expect.objectContaining({
+        free: 0,
+        launch: [],
+        skipped: [
+          { ticket: 'CIN-1', reason: 'already running' },
+          { ticket: 'CIN-2', reason: 'cap' },
+          { ticket: 'CIN-3', reason: 'cap' }
+        ]
+      })
+    )
+  })
+
   it('wave --dry-run plans from the To Do without launching anything', async () => {
     const { client, calls } = fakeClient(stateWith({ agents: [LEAD, member({})] }))
 

@@ -88,7 +88,7 @@ import {
 } from './runtime/orchestration/environment-transport'
 import { startOrchestrationAtLaunch } from './runtime/orchestration/orchestration-startup'
 import { callRuntimeEnvironment } from './ipc/runtime-environment-transport-routing'
-import { resolveEnvironment } from '../shared/runtime-environment-store'
+import { listEnvironments, resolveEnvironment } from '../shared/runtime-environment-store'
 import { getPreferredPairingOffer } from '../shared/runtime-environments'
 import { OrcaRuntimeRpcServer } from './runtime/runtime-rpc'
 import {
@@ -2807,6 +2807,7 @@ void app.whenReady().then(async () => {
         peerFingerprint: fingerprintOrchestrationPeer(pairing.publicKeyB64)
       }
     },
+    list: () => listEnvironments(app.getPath('userData')).map(({ id, name }) => ({ id, name })),
     call: (selector, method, params, timeoutMs, envelope) =>
       callRuntimeEnvironment(
         app.getPath('userData'),

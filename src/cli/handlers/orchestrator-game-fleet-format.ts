@@ -13,12 +13,19 @@ import type {
   GameSweepEntry,
   GameWavePlan
 } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  gameHostLoadLineOf,
+  LOCAL_GAME_HOST,
+  type GameHostLoad
+} from '../../shared/orchestrator-game-host-load'
 
 /** Text output of `orca game fleet|wave|sweep|push`; `--json` prints the results as they are. */
 export type GameWaveResult = GameWavePlan & {
   dryRun: boolean
   cap: number
+  /** This Orca's free slots under the lead's total: a wave launches only here. */
   free: number
+  hosts?: GameHostLoad[]
   launched: GameLaunchResult[]
   failed: { ticket: string; error: string }[]
 }
@@ -150,10 +157,11 @@ export type GameFleetWithBudget = GameFleet & { githubBudget?: GameGitHubBudget 
 export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const hosts = fleet.hosts ? [`Hosts: ${gameHostLoadLineOf(fleet.hosts)}`] : []
   const budget = fleet.githubBudget ? formatGameGitHubBudget(fleet.githubBudget, now) : []
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
   if (fleet.rows.length === 0) {
-    return [head, ...budget, ...paused].join('\n')
+    return [head, ...hosts, ...budget, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
     row.phase,
@@ -183,17 +191,33 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     'AGENT',
     'ACCOUNT'
   ]
-  return [head, ...budget, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
+  return [
+    head,
+    ...hosts,
+    ...budget,
+    tableOf([[...header, 'NEXT', 'NAME'], ...rows]),
+    ...paused
+  ].join('\n')
 }
 
 export function formatWave(wave: GameWaveResult): string {
+  const local = wave.hosts?.find((one) => one.host === LOCAL_GAME_HOST)
+  const room = (wave.hosts ?? []).filter((one) => one.free > 0 && one.host !== LOCAL_GAME_HOST)
+  const capped = wave.skipped.filter((one) => one.reason === 'cap')
   const lines = [
-    `Wave: ${wave.free} of ${wave.cap} slots free`,
+    local
+      ? `Wave on this Orca: ${wave.free} of ${local.cap} slots free · Hosts: ${gameHostLoadLineOf(wave.hosts!)}`
+      : `Wave: ${wave.free} of ${wave.cap} slots free`,
     wave.dryRun
       ? `Would launch: ${wave.launch.join(', ') || 'nothing'}`
       : wave.launched.map(formatGameLaunch).join('\n') || 'Launched nothing',
     ...wave.failed.map((one) => `Failed ${one.ticket}: ${one.error}`),
-    ...wave.skipped.map((one) => `Skipped ${one.ticket}: ${one.reason}`)
+    ...wave.skipped.map((one) => `Skipped ${one.ticket}: ${one.reason}`),
+    ...(capped.length > 0 && room.length > 0
+      ? [
+          `Room on ${room.map((one) => `${one.host} (${one.free} free)`).join(', ')}: \`game launch <ticket> --on ${room[0]!.host} --repo <selector>\``
+        ]
+      : [])
   ]
   return lines.join('\n')
 }

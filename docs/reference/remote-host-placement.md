@@ -16,6 +16,10 @@ live run was made and no remote host was contacted.
   a cross-host fleet can come from the lead's own DB without scanning remote hosts.
 - Per-host capacity needs no new RPC. `diagnostics.memory` returns the host fields the game's cap
   formula already uses.
+  Built in ORCA-888 instead: each host publishes an optional `gameHost` (`totalMemory`,
+  `cpuCoreCount`, `memberCap`) on `status.get`, which a lead already calls, and the lead sums the
+  caps of its reachable hosts. An older host omits the field and keeps the single shared cap (wire
+  Rule 1). See "Per-host caps" in [`orchestrator-game.md`](./orchestrator-game.md).
 - Sending a game member to a remote host needs a new capability. Federated attach drops `game` and
   `setupAdmission` today. An older host must be refused, not given a silent non-game worker.
 - One placement module in shared orchestration code serves both the game and plain `worker-start`.
