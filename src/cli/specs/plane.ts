@@ -111,11 +111,11 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'current', 'to', 'project', 'workspace', 'id'],
     positionalArgs: ['id'],
     examples: [
-      'orca plane status set PROJ-12 --to "In Review" --project <projectId> --json',
+      'orca plane status set PROJ-12 --to "In Review" --json',
       'orca plane status set --current --to "In Review" --json'
     ],
     notes: [
-      'Pass --current instead of <id> --project to target the work item linked to the current worktree.'
+      'Pass --current instead of <id> to target the work item linked to the current worktree. --project is optional and accepts the project identifier or UUID.'
     ]
   },
   {
@@ -285,7 +285,7 @@ const PLANE_BASE_COMMAND_SPECS: CommandSpec[] = [
       'Repeated --label replaces the full label set with the provided label ids.',
       '--body/--body-file set the description (Markdown; --body-file - reads stdin).',
       '--parent takes a work item id/identifier; pass --parent null to clear it.',
-      'Pass --current instead of <id> --project to target the work item linked to the current worktree.'
+      'Pass --current instead of <id> to target the work item linked to the current worktree. --project is optional and accepts the project identifier or UUID.'
     ]
   }
 ]
