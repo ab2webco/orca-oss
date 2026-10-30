@@ -26,6 +26,7 @@ import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isWorkspaceKey, worktreeWorkspaceKey } from '../../shared/workspace-scope'
 import { printLineageSummary } from './worktree-lineage-summary'
 import { rethrowWithProcessesHoldingWorktree, worktreeProcessesHandler } from './worktree-processes'
+import { rethrowWorktreeRemovalNotFound } from './worktree-rm-not-found'
 import {
   assertWorkspaceTargetFlagsCompatible,
   hasWorkspaceProjectTarget,
@@ -303,6 +304,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
         allowGameMember: flags.get('force-member') === true
       })
       .catch((error: unknown) => rethrowWithProcessesHoldingWorktree(error, client, worktree))
+      .catch((error: unknown) => rethrowWorktreeRemovalNotFound(error, flags, client, worktree))
     printHookWarning(result.result, json)
     printPreservedBranchWarning(result.result, json)
     printResult(result, json, (value) => `removed: ${value.removed}`)
