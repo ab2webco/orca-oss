@@ -13937,6 +13937,52 @@ describe('OrcaRuntimeService', () => {
     }
   )
 
+  it('launches and resumes a Claude game member with prompt suggestions off, even without the mod', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    for (const [agent, gameMember] of [
+      ['claude', true],
+      ['codex', true],
+      ['claude', false]
+    ] as const) {
+      await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        startupAgent: agent,
+        orchestrationWorker: true,
+        ...(gameMember ? { orchestrationGameMember: true } : {}),
+        title: 'member'
+      })
+    }
+    await runtime.ensureAgentSession(
+      {
+        kind: 'explicit',
+        worktree: `id:${TEST_WORKTREE_ID}`,
+        agent: 'claude',
+        providerSession: { key: 'session_id', id: 'member-session' }
+      },
+      {},
+      { orchestrationGameMember: true }
+    )
+
+    const [member, codex, worker, resumed] = spawn.mock.calls.map(
+      (call) =>
+        call[0] as {
+          env?: Record<string, string>
+          launchConfig?: { agentEnv?: Record<string, string> }
+        }
+    )
+    expect(member?.env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
+    expect(resumed?.env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
+    expect(codex?.env ?? {}).not.toHaveProperty('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION')
+    expect(worker?.env ?? {}).not.toHaveProperty('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION')
+  })
+
   it('resolves a startupAgent to the CLI binary on Windows, where `cursor` is the IDE', async () => {
     setPlatform('win32')
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
@@ -46283,6 +46329,7 @@ describe('OrcaRuntimeService', () => {
       expect(options.command ?? '').not.toContain('--plugin-dir')
       expect(options.env ?? {}).not.toHaveProperty('ORCA_GAME_ROLE')
     }
+    expect(spawn.mock.calls.at(-1)?.[0].env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
   })
 
   it('sends follow-up prompts for CLI-created stdin-after-start startup agents', async () => {

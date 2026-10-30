@@ -151,7 +151,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'member'],
     positionalArgs: ['member'],
     notes: [
-      'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes.',
+      'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes; text left in a Claude input box is marked unsent (typed or a Claude suggestion) and given as unsentInput.',
       'Since launch: every dispatch of its task, the last 10 messages between it and the lead (questions, answers, worker_done), its last 10 commits since the base, PR, CI and ticket status.',
       'A part Orca cannot read is listed under notes; the rest still prints. Read-only.',
       'A member already freed is in `orca game history`.'
