@@ -72,4 +72,14 @@ describe("a remote member's relayed agent reading (ORCA-837)", () => {
     expect(parseRemoteMemberAgent({ state: 'sleeping', updatedAt: 5 })).toBeNull()
     expect(parseRemoteMemberAgent({ state: 'working', updatedAt: Number.NaN })).toBeNull()
   })
+
+  it('keeps a relayed global login only when no account came with it (ORCA-891)', () => {
+    const relayed = (extra: Record<string, unknown>) =>
+      parseRemoteMemberAgent({ state: 'working', updatedAt: 5, ...extra })
+    expect(relayed({ globalLogin: true })?.globalLogin).toBe(true)
+    expect(relayed({ globalLogin: 'yes' })?.globalLogin).toBeUndefined()
+    expect(
+      relayed({ globalLogin: true, account: { provider: 'claude', email: 'ana@koombea.com' } })
+    ).not.toHaveProperty('globalLogin')
+  })
 })

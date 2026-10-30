@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
-import { ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import {
+  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY
+} from '../../../../shared/protocol-version'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
 import type { OrchestrationEnvironmentTransport } from '../../orchestration/environment-transport'
@@ -245,5 +248,99 @@ describe('remote member accounts across hosts (ORCA-798)', () => {
       error: { code: 'invalid_argument' }
     })
     expect(attachParams).toHaveLength(0)
+  })
+
+  describe('with orchestrator.accounts unset (ORCA-891)', () => {
+    const NO_ACCOUNTS = {
+      claude: { accounts: [], activeAccountId: null },
+      codex: { accounts: [], activeAccountId: null },
+      rateLimits: {
+        claude: null,
+        codex: null,
+        inactiveClaudeAccounts: [],
+        inactiveCodexAccounts: []
+      }
+    }
+    const unset = { remoteAccount: 'auto', remoteAccountByDefault: true }
+    const dropCapabilities = (...dropped: string[]) => {
+      workerCapabilities = workerCapabilities.filter((one) => !dropped.includes(one))
+    }
+
+    it('lands on the freest managed account of the host', async () => {
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', account: { provider: 'claude', email: 'ops@netsat.co' } }
+      })
+      expect(JSON.stringify(response)).not.toContain('globalLogin')
+      expect(workerRuntime.createManagedWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ claudeAccountId: 'imac-ops' })
+      )
+    })
+
+    it("runs on the host's global login when it has no managed account, and says so", async () => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(NO_ACCOUNTS as never)
+
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', globalLogin: 'no_account' }
+      })
+      expect(attachParams[0]).toMatchObject({ account: 'auto' })
+      expect(workerRuntime.createManagedWorktree).toHaveBeenCalledWith(
+        expect.not.objectContaining({ claudeAccountId: expect.anything() })
+      )
+    })
+
+    it('refuses a second member while one holds the host global login', async () => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(NO_ACCOUNTS as never)
+      vi.spyOn(workerRuntime, 'federatedMembersOnGlobalLogin').mockResolvedValue(['Ana · CIN-11'])
+
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'failed', refusal: { code: 'global_login_taken' } }
+      })
+      expect(JSON.stringify(response)).toContain('Ana · CIN-11')
+      expect(workerRuntime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+
+    it('keeps an older host on its global login instead of refusing, and says so', async () => {
+      for (const dropped of [
+        [ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY],
+        [
+          ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+          ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY
+        ]
+      ]) {
+        dropCapabilities(...dropped)
+        attachParams = []
+
+        const response = await homeDispatcher.dispatch({
+          ...claudeStart(createHomeTask().id, unset),
+          orchestrationRequestId: `request_${dropped.length}`
+        })
+
+        expect(response).toMatchObject({
+          ok: true,
+          result: { state: 'ready', globalLogin: 'older_host' }
+        })
+        expect(attachParams[0]).not.toHaveProperty('account')
+      }
+    })
+
+    it('still refuses accounts: auto on a host older than member accounts', async () => {
+      dropCapabilities(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({ ok: false, error: { code: 'capability_unsupported' } })
+      expect(attachParams).toHaveLength(0)
+    })
   })
 })
