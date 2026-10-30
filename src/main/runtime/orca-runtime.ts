@@ -795,6 +795,7 @@ import {
   gameMemberLaunchOf,
   type GameMemberLaunch
 } from '../../shared/orchestrator-game-member-launch'
+import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
@@ -23761,7 +23762,9 @@ export class OrcaRuntimeService {
     agent: TuiAgent,
     prompt: string | undefined,
     launchPreferences?: AgentLaunchPreferences,
-    gameMember?: OrchestratorGameMemberLaunch | null
+    gameMember?: OrchestratorGameMemberLaunch | null,
+    /** Set for every game member, also one that gets no game (SSH, mod off). */
+    orchestrationGameMember?: boolean
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -23785,7 +23788,11 @@ export class OrcaRuntimeService {
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
@@ -24287,7 +24294,8 @@ export class OrcaRuntimeService {
             args.startupAgent,
             args.startupPrompt,
             args.startupLaunchPreferences,
-            gameMember
+            gameMember,
+            args.orchestrationGameMember
           )
         : null
     const draftStartup =
@@ -27842,7 +27850,11 @@ export class OrcaRuntimeService {
       prompt: '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        opts.orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform,
@@ -28007,7 +28019,11 @@ export class OrcaRuntimeService {
         request.agentArgs !== undefined
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        request.agent,
+        resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+        launchAccount.orchestrationGameMember
+      ),
       ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,

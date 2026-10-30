@@ -5,6 +5,7 @@ import {
 } from './orchestrator-game-fleet-verbs'
 import type { GameAgent } from './orchestrator-game-state'
 import { stripTerminalControl } from './terminal-control-stripping'
+import { markClaudeUnsentInput } from './claude-unsent-input'
 
 /** One member in one call, bounded so it fits in a lead's turn: `orca game member`. */
 
@@ -40,6 +41,8 @@ export type GameMemberReport = {
     limitedUntil: string | null
     /** The last terminal lines, oldest first, without escape codes. */
     terminal: string[]
+    /** Text left in Claude's input box: never sent, whether typed or suggested (ORCA-859). */
+    unsentInput: string | null
   }
   since: {
     /** Every attempt for its task, oldest first; the live one carries its stage. */
@@ -116,6 +119,11 @@ export function gameMemberReportOf(input: GameMemberReportInput): GameMemberRepo
   const live = input.dispatches.at(-1)
   const messages = messagesOf(input)
   const activity = agent.activity
+  const terminal = markClaudeUnsentInput(
+    (input.terminalLines ?? [])
+      .map((line) => stripTerminalControl(line).trimEnd())
+      .slice(-GAME_MEMBER_TERMINAL_LINES)
+  )
   return {
     ticket: ticketOfMember(agent),
     name: agent.displayName ?? agent.paneKey,
@@ -133,9 +141,8 @@ export function gameMemberReportOf(input: GameMemberReportInput): GameMemberRepo
         agent.limit?.resetsAt === undefined || agent.limit.resetsAt === null
           ? null
           : new Date(agent.limit.resetsAt).toISOString(),
-      terminal: (input.terminalLines ?? [])
-        .map((line) => cut(stripTerminalControl(line).trimEnd(), LINE_MAX))
-        .slice(-GAME_MEMBER_TERMINAL_LINES)
+      terminal: terminal.lines.map((line) => cut(line, LINE_MAX)),
+      unsentInput: terminal.unsent === null ? null : cut(terminal.unsent, GAME_MEMBER_BODY_MAX)
     },
     since: {
       dispatches: input.dispatches.map((one) =>
