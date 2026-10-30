@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { parseGameState } from '../hooks/game-state'
 import { setGameLocale } from '../hooks/game-strings'
 import { agentTagOf, limitTagOf } from '../hooks/member-tags'
+import { memberPhaseOf } from '../hooks/state-report'
 import type { GameMemberAccount } from '../types'
 
 const NOW = 1_000_000
@@ -32,6 +33,9 @@ describe('member limit', () => {
     expect(parseGameState(stateWith({ limit: { resetsAt: null } }))?.agents[0]?.limit).toEqual({
       resetsAt: null
     })
+    expect(
+      parseGameState(stateWith({ limit: { resetsAt: null, loggedOut: true } }))?.agents[0]?.limit
+    ).toEqual({ resetsAt: null, loggedOut: true })
     expect(parseGameState(stateWith({ limit: 'soon' }))?.agents[0]?.limit).toBeUndefined()
     expect(parseGameState(stateWith({}))?.agents[0]?.limit).toBeUndefined()
   })
@@ -43,9 +47,22 @@ describe('member limit', () => {
     try {
       expect(limitTagOf({ resetsAt: NOW + 45 * MINUTE }, NOW)).toBe('limitado · vuelve en 45m')
       expect(limitTagOf({ resetsAt: null }, NOW)).toBe('limitado')
+      expect(limitTagOf({ resetsAt: null, loggedOut: true }, NOW)).toBe(
+        'sesión cerrada · /login en su panel'
+      )
     } finally {
       setGameLocale('en')
     }
+  })
+
+  // Why (ORCA-907): a logged-out member waits on a person, not on a reset.
+  it('says a member logged out, and shows it as needing you', () => {
+    expect(limitTagOf({ resetsAt: null, loggedOut: true }, NOW)).toBe(
+      'logged out · /login in its pane'
+    )
+    const agent = parseGameState(stateWith({ limit: { resetsAt: null, loggedOut: true } }))
+      ?.agents[0]
+    expect(agent && memberPhaseOf(agent)).toBe('needs-you')
   })
 })
 

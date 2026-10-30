@@ -65,7 +65,14 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
       ? { stateStartedAt }
       : {}),
     ...(limit && (resetsAt === null || typeof resetsAt === 'number')
-      ? { limit: { resetsAt } }
+      ? {
+          limit: {
+            resetsAt,
+            ...((limit as { loggedOut?: unknown }).loggedOut === true
+              ? { loggedOut: true as const }
+              : {})
+          }
+        }
       : {}),
     ...(relayed ? { account: relayed } : {})
   }
