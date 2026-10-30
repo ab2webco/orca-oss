@@ -1,26 +1,35 @@
 # Own identity and services: decisions the owner must make (ORCA-329)
 
-Nothing in ORCA-329 can be built until five decisions are made: the **domain**, the **hosting
-target**, the **identity provider**, and who owns the **Apple** and **Google Play** enrollments.
-This document lists each decision with its options and tradeoffs and stops there. No code changes
-until the owner has chosen, because code that points at a service that does not exist yet would
-be an incomplete feature.
+ORCA-329 depends on five decisions: the **domain**, the **hosting target**, the **identity
+provider**, and who owns the **Apple** and **Google Play** enrollments. This document lists each
+decision with its options and tradeoffs, and records where each one stands. Nothing changes in
+the code until the owner has chosen, because code that points at a service that does not exist
+yet would be an incomplete feature.
+
+**Status.** ORCA-329 comment `79c72dcf-633b-432d-a56d-fb2e9e36653c` (2026-10-30) records what
+the owner told the lead on 2026-10-28:
+
+- D4 (Apple) and D5 (Google Play) are resolved. The owner's current accounts stay, and they work:
+  macOS builds are notarized, iOS reaches TestFlight, and Android uploads to the Play internal
+  track.
+- D1 (domain), D2 (identity provider) and D3 (hosting) are paused by the owner until after the
+  release. Their sections below keep the options for when the work resumes.
 
 Background: [`upstream-runtime-dependencies.md`](./upstream-runtime-dependencies.md) explains
 why `login.onorca.dev`, `relay.onorca.dev` and `share.onorca.dev` are still upstream's.
 
 ## Decisions at a glance
 
-| # | Decision | Blocks | Recommended default |
-| --- | --- | --- | --- |
-| D1 | Domain for the three services | IdP, relay, artifacts | One domain for `login.` and `relay.`, plus a **separate registrable domain** for shared artifacts |
-| D2 | Identity provider vendor | IdP, and then relay and artifacts | A self-hosted OIDC server behind a small Orca-owned desktop auth gateway |
-| D3 | Hosting target | All three services | One VPS for the IdP and the gateway; decide relay hosting after D2 ships |
-| D4 | Apple enrollment owner | macOS notarization, iOS | Organization enrollment under Ab2Web |
-| D5 | Google Play enrollment owner | Android distribution | Organization account under Ab2Web |
+| # | Decision | Blocks | Status | Recommended default |
+| --- | --- | --- | --- | --- |
+| D1 | Domain for the three services | IdP, relay, artifacts | Paused until after the release | One domain for `login.` and `relay.`, plus a **separate registrable domain** for shared artifacts |
+| D2 | Identity provider vendor | IdP, and then relay and artifacts | Paused until after the release | A self-hosted OIDC server behind a small Orca-owned desktop auth gateway |
+| D3 | Hosting target | All three services | Paused until after the release | One VPS for the IdP and the gateway; decide relay hosting after D2 ships |
+| D4 | Apple enrollment owner | macOS notarization, iOS | Resolved: the owner's current account stays | — |
+| D5 | Google Play enrollment owner | Android distribution | Resolved: the owner's current account stays | — |
 
-Order of work once decided: **identity, then relay, then artifacts**, because relay and artifacts
-both authenticate against the identity service. D4 and D5 run in parallel with everything else.
+When D1 to D3 resume, the order of work is **identity, then relay, then artifacts**, because relay
+and artifacts both authenticate against the identity service.
 
 ## What the desktop actually expects from the server
 
@@ -57,6 +66,8 @@ a request with credentials, which this run was not authorized to make.
 
 ## D1. Domain
 
+**Paused** by the owner until after the release.
+
 | Option | Pros | Cons |
 | --- | --- | --- |
 | Subdomains of an existing Ab2Web domain (`login.`, `relay.`, `share.`) | Uses existing DNS and brand; no purchase | User-uploaded artifact HTML on the same registrable domain as `login.` can set cookies on the parent domain, so a shared page could interfere with sign-in sessions |
@@ -67,6 +78,8 @@ The owner has to choose the domain names and decide whether artifacts get their 
 domain.
 
 ## D2. Identity provider
+
+**Paused** by the owner until after the release.
 
 Each option needs the desktop auth gateway described above (the `/v1/desktop/auth/*` contract,
 including minting the relay token). The exception is rewriting the desktop client to plain OIDC.
@@ -84,6 +97,8 @@ The owner has to choose self-hosted or managed, pick the vendor, and choose whic
 to offer at launch (email, GitHub, Google).
 
 ## D3. Hosting target
+
+**Paused** by the owner until after the release.
 
 Each service puts different load on its host. The IdP and gateway are small and stateful
 (Postgres). The relay holds long-lived WebSocket connections and benefits from regions close to
@@ -105,42 +120,22 @@ that client code. Treat its size as unknown until someone reads the origin pool 
 
 ## D4. Apple enrollment owner
 
-One enrollment covers both macOS notarization and iOS distribution.
-
-Current state, as of the ticket comment from 2026-08-29: signing works with team `44FZN9TC23`
-("Developer ID Application: Fabian Altahona"), but notarization hangs on Apple's side and is under
-support case 20000151321604. macOS users stay on lab.42. The comment in
-`.github/workflows/lab-release.yml:404` still names the earlier ANTAKARANA team. Whether the
-support case has been resolved since then has **not** been checked in this run.
-
-| Option | Pros | Cons |
-| --- | --- | --- |
-| Keep the individual enrollment (`44FZN9TC23`) | Already paid for and signing | The App Store and Gatekeeper show a person's name; no team roles, so only one person can manage it |
-| Organization enrollment under Ab2Web | Company name as the publisher; members can have roles | Needs a D-U-N-S number and Apple's review of the legal entity (days to weeks); means re-signing and moving secrets again |
-
-The owner has to choose the legal entity, and decide whether to wait for the support case to
-clear before moving to an organization enrollment.
+**Resolved.** The owner's current Apple account stays. It covers both macOS notarization and iOS
+distribution: macOS builds are notarized and iOS reaches TestFlight (ORCA-329 comment
+`79c72dcf-633b-432d-a56d-fb2e9e36653c`).
 
 ## D5. Google Play enrollment owner
 
-`.github/workflows/mobile-android-release.yml` already builds a signed upload with the
-`ANDROID_UPLOAD_*` secrets. What it lacks is a Play Console account to publish to (ORCA-194).
-
-| Option | Pros | Cons |
-| --- | --- | --- |
-| Personal developer account | Fastest to open | New personal accounts must run a closed test with a minimum number of testers for a minimum period before production (Google policy; check the current numbers before choosing); a person's name as the publisher |
-| Organization account under Ab2Web | No closed-testing minimum for production; company as the publisher | Needs a D-U-N-S number and organization verification |
-
-The owner has to choose the legal entity, which should match D4 so that both stores show the
-same publisher.
+**Resolved.** The owner's current Google Play account stays, and Android uploads reach the Play
+internal track (same comment). `.github/workflows/mobile-android-release.yml` builds the signed
+upload with the `ANDROID_UPLOAD_*` secrets.
 
 ## Next step
 
-The lead takes D1 to D5 to the owner. Once they are answered, ORCA-329 splits into child tickets
-in sequence:
+D4 and D5 need no further work. D1 to D3 wait until after the release. When the owner answers
+them, ORCA-329 splits into child tickets in sequence:
 
 1. IdP and desktop auth gateway, deployed on the D3 host and tested with `ORCA_CLOUD_API_URL` overrides.
 2. Point packaged builds at the new login host.
 3. Relay director and first cell.
 4. Artifact store, plus the code change that replaces the `onorca.dev` allowlist with the D1 domain.
-5. Apple and Google enrollment, each tracked separately.
