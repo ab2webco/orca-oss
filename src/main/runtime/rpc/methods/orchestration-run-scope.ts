@@ -55,9 +55,14 @@ export function assertCallerHandleMatchesEvidence(
   if (freshLaunch?.terminalHandle === callerTerminalHandle) {
     return
   }
+  const declaredHandle = callerEvidence?.terminalHandle?.trim()
+  const staleHint =
+    declaredHandle && declaredHandle !== callerTerminalHandle
+      ? ` This caller's ORCA_TERMINAL_HANDLE is ${declaredHandle}: if this is the same pane resumed after an Orca restart, that handle is stale — export ORCA_TERMINAL_HANDLE=${callerTerminalHandle} (the pane's current handle in \`orca terminal list\`) and retry.`
+      : ' A session resumed after an Orca restart may still name its old terminal.'
   throw new OrchestrationError(
     'consumer_fenced',
-    `Terminal ${callerTerminalHandle} is an attested agent pane, so this caller must present its launch evidence (the ORCA_AGENT_LAUNCH_TOKEN Orca put in that pane's environment) to act as it: run the command from that pane. A session resumed after an Orca restart may still name its old terminal.`,
+    `Terminal ${callerTerminalHandle} is an attested agent pane, so this caller must present its launch evidence (the ORCA_AGENT_LAUNCH_TOKEN Orca put in that pane's environment) to act as it: run the command from that pane.${staleHint}`,
     { effectsApplied: false }
   )
 }

@@ -137,7 +137,8 @@ async function pressFindInBrowserGuest(
               browserPageId: targetBrowserPageId,
               webContentsId
             })
-            if (!registered) {
+            // Why: a guest registers at did-attach; a keystroke sent before its first navigation settles can be dropped silently.
+            if (!registered || webview.isLoading() || !webview.getURL()) {
               return false
             }
             webview.focus()

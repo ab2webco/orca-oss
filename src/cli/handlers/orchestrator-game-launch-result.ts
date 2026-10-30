@@ -13,6 +13,8 @@ export type GameLaunchResult = GameGlobalLoginLaunch & {
   /** The managed account's email and id; absent when Orca's own account selection applies. */
   account?: string
   accountId?: string
+  /** Why `auto` picked the account. */
+  accountWhy?: string
   runId: string
   taskId: string
   /** Absent while the member waits for the host's setup slot. */
@@ -32,7 +34,7 @@ export const formatGameLaunch = (launched: GameLaunchResult): string => {
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.accountWhy ? `\n${launched.accountWhy}` : ''}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
 }
 
 /** A queued member is on its way, not a failed launch. */
