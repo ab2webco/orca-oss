@@ -641,6 +641,27 @@ describe('orca game launch', () => {
     expect(result).not.toHaveProperty('accountId')
   })
 
+  it('on a paired host, sends only an account the project allows, and never its global login (ORCA-896)', async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
+    const remote: [string, string][] = [
+      ['on', 'imac'],
+      ['repo', 'name:cineco']
+    ]
+    const allowed = fakeClient(stateWith({ lead }))
+    await launch(allowed.client, 'CIN-12', [...remote, ['account', 'ANA@koombea.com']])
+    expect(allowed.calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ remoteAccount: 'ANA@koombea.com' })
+    )
+
+    for (const extra of [[], [['account', 'cy@koombea.com']]] as [string, string][][]) {
+      const refused = fakeClient(stateWith({ lead }))
+      await expect(launch(refused.client, 'CIN-12', [...remote, ...extra])).rejects.toThrow(
+        /this project allows only ana@koombea\.com.*--account/
+      )
+      expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+    }
+  })
+
   it('runs the member on another agent, model and effort for this launch only', async () => {
     const { client, calls } = fakeClient(
       stateWith({
@@ -792,7 +813,8 @@ describe('orca game launch', () => {
       })
     )
     expect(formatGameLaunch(launched)).toBe(
-      'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself'
+      'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself\n' +
+        'ana@example.com: no reading yet, the first Claude account (5h —, 7d —)'
     )
   })
 

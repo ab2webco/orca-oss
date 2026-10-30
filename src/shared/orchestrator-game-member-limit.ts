@@ -9,7 +9,11 @@ import {
 import type { ProviderRateLimits, RateLimitState } from './rate-limit-types'
 
 /** A member stopped by its account's usage limit; `resetsAt` is Unix ms, null when unknown. */
-export type GameMemberLimit = { resetsAt: number | null }
+export type GameMemberLimit = { resetsAt: number | null; spend?: true }
+
+// Why: a spend cap is billed money, which the 5h and 7d readings never count (ORCA-896).
+const SPEND_LIMIT_TEXT =
+  /\b(?:hit|reached|exceeded)\b[\s\S]{0,60}?\b(?:spend(?:ing)?|billing|credit)\s+limit\b|\/usage-credits\b/i
 
 /** The usage reading Orca holds for one managed account, active or cached. */
 export function accountLimitsOf(
@@ -59,6 +63,9 @@ export function gameMemberLimitOf(args: {
   const said =
     args.terminalTail !== null &&
     detectAgentRateLimitOutput(provider, args.terminalTail, { tail: '' })
+  if (said && SPEND_LIMIT_TEXT.test(args.terminalTail ?? '')) {
+    return { resetsAt: null, spend: true }
+  }
   // Why: like Orca's auto-switch, text on screen is stale once its account verifiably has quota.
   return said && !(args.accountLimits && hasQuota(args.accountLimits)) ? { resetsAt: null } : null
 }
