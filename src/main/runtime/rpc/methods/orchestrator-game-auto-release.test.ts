@@ -179,6 +179,29 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
     expect(postEvent).toHaveBeenCalledTimes(1)
   })
 
+  // ORCA-887: the lead's poll never sees this member merged, so its rewards read the recorded merge.
+  it('records the merge with its review before dropping the row, once', async () => {
+    await startMember(true)
+    const member = memberOf({
+      worktree: { id: 'wt-41', branch: 'feat/orca-41', displayName: 'orca-41' },
+      review: { ...merged, perfectMerge: true }
+    })
+
+    const state = await leadReads(member)
+
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual([COORD_PANE])
+    expect(postEvent).toHaveBeenCalledWith({
+      worktreeId: 'wt-lead',
+      kind: 'merged',
+      ticket: 'ORCA-41',
+      text: 'PR #41 merged',
+      key: 'merged ORCA-41 #41',
+      merge: { provider: 'github', number: 41, worktreeId: 'wt-41', perfect: true }
+    })
+    await leadReads(member)
+    expect(postEvent.mock.calls.filter(([one]) => one.kind === 'merged')).toHaveLength(1)
+  })
+
   it('never touches a member its live state reports working (ORCA-862)', async () => {
     await startMember(true)
     const request = vi.spyOn(db, 'requestWorkerTerminalRelease')

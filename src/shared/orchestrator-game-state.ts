@@ -7,6 +7,7 @@ import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
+import type { GameMerge } from './orchestrator-game-events'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
@@ -202,6 +203,8 @@ export type OrchestratorGameState = {
   githubBudget?: GameGitHubBudget
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
+  /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
+  merges?: GameMerge[]
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i

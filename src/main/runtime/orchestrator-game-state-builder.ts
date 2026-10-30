@@ -57,6 +57,7 @@ import type {
   OrchestratorGameTodoSource
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
+import type { GameMerge } from '../../shared/orchestrator-game-events'
 import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
@@ -118,6 +119,8 @@ export type OrchestratorGameStateInput = {
   readInboxes?: () => Promise<GameInboxSummary[]>
   /** Questions the lead asked the person that wait for an answer; read only for a lead. */
   readOpenOwnerQuestions?: () => Promise<number>
+  /** The members' latest recorded merges; read only for a lead. */
+  readMerges?: () => Promise<GameMerge[]>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
@@ -162,7 +165,8 @@ export async function buildOrchestratorGameState(
     leadElsewhere,
     suggested,
     openOwnerQuestions,
-    githubBudget
+    githubBudget,
+    merges
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -174,7 +178,8 @@ export async function buildOrchestratorGameState(
     readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
     leadOnly(readOpenOwnerQuestions),
-    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null)
+    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
+    leadOnly(input.readMerges)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -312,6 +317,7 @@ export async function buildOrchestratorGameState(
     ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
+    ...(merges ? { merges } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

@@ -368,6 +368,19 @@ export type GameState = {
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
   /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
   githubLow?: { remaining: number; limit: number }
+  /** The project's latest member merges, newest last; only for a lead, absent from an older host. */
+  merges?: GameMerge[]
+}
+
+/** A member's merge as Orca recorded it, which outlives the member's row (ORCA-887). */
+export type GameMerge = {
+  /** The game event's key, one per merge. */
+  key: string
+  ticket: string | null
+  provider: GameReview['provider']
+  number: number
+  worktreeId: string
+  perfect: boolean
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

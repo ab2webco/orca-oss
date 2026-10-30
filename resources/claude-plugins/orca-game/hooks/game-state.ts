@@ -28,6 +28,7 @@ import { memberAccountOf, memberLimitOf, memberRemoteOf } from './member-tags'
 import { memberAdvisorOf, memberLaunchOf } from './member-advisor'
 import { GAME_LOCALES } from './game-strings'
 import { githubLowOf } from './github-budget'
+import { gameMergesOf } from './member-merges'
 
 const parseJson = (text: string): unknown => {
   try {
@@ -326,6 +327,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     ...rewardWeightsOf(body.rewardWeights),
     ...localeOf(body.locale),
     ...viewSwitchOf(body),
-    ...githubLowOf(body)
+    ...githubLowOf(body),
+    ...gameMergesOf(body.merges)
   }
 }
