@@ -6,7 +6,7 @@ import { onGameInboxChanged } from './game-inbox-signal'
 
 const NO_THREADS: GameInboxThreads = { threads: [], waiting: [], answered: [] }
 
-/** The project's threads: read once per worktree, and live (on pushed mail) only while the Inbox is open; pass a memoized scope. */
+/** The project's threads, reread on pushed mail while the Inbox is open or the project has no team yet; pass a memoized scope. */
 export function useGameInboxThreads(
   scope: GameInboxScope | null,
   open: boolean
@@ -30,26 +30,28 @@ export function useGameInboxThreads(
     }
   }, [])
 
-  // Why: one read per worktree tells the sidebar whether the project has a team at all.
+  const current = loaded && loaded.scope === scope ? loaded.threads : NO_THREADS
+  // Why: closed, it only has to learn the project has a team; open, it follows every message.
+  const live = open || current.threads.length === 0
+
   useEffect(() => {
     if (scope) {
       void read(scope)
     }
-  }, [scope, read])
+  }, [scope, open, read])
 
   useEffect(() => {
-    if (!scope || !open) {
+    if (!scope || !live) {
       return
     }
     const readNow = (): void => void read(scope)
-    readNow()
     const stopLocal = window.api.runtime.onGameInboxChanged?.(readNow)
     const stopPaired = onGameInboxChanged(readNow)
     return () => {
       stopLocal?.()
       stopPaired()
     }
-  }, [scope, open, read])
+  }, [scope, live, read])
 
   const reload = useCallback(async () => {
     if (scope) {
@@ -57,6 +59,5 @@ export function useGameInboxThreads(
     }
   }, [scope, read])
 
-  const current = loaded && loaded.scope === scope ? loaded.threads : NO_THREADS
   return { ...current, reload }
 }

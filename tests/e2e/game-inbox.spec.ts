@@ -84,6 +84,7 @@ test('the Inbox lists every open question for the person and sends the answer th
   for (const theme of ['dark', 'light'] as const) {
     await setTheme(orcaPage, theme)
     await orcaPage.screenshot({
+      animations: 'disabled',
       path: testInfo.outputPath(`game-inbox-entry-1440-${theme}.png`)
     })
   }
@@ -91,7 +92,7 @@ test('the Inbox lists every open question for the person and sends the answer th
   const sheet = orcaPage.getByTestId('game-inbox-sheet')
   await expect(sheet.getByText('For you')).toBeVisible()
   await expect(sheet.locator('[data-game-owner-question]')).toHaveCount(6)
-  const list = sheet.locator('.scrollbar-sleek')
+  const list = sheet.getByRole('tabpanel', { name: /For you/ })
   // A screenshot of a list that does not scroll proves nothing about the rows below the fold.
   expect(await list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
 
@@ -101,6 +102,7 @@ test('the Inbox lists every open question for the person and sends the answer th
       await setTheme(orcaPage, theme)
       await settleSheet(orcaPage, width)
       await orcaPage.screenshot({
+        animations: 'disabled',
         path: testInfo.outputPath(`game-inbox-${width}-${theme}.png`)
       })
     }

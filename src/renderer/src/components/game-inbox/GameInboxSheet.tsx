@@ -24,6 +24,9 @@ function TabCount({ count }: { count: number }): React.JSX.Element | null {
   ) : null
 }
 
+// Why smaller below sm: four tabs must fit a 320px window.
+const TAB = 'px-1.5 text-xs sm:px-2 sm:text-sm'
+
 const LIST_PANEL = 'scrollbar-sleek mt-0 min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4'
 
 /** The project's Orca Game Inbox: what the lead asked the person, what waits on the lead, each ticket's thread. */
@@ -62,18 +65,18 @@ export function GameInboxSheet({
         <Tabs defaultValue="for-you" className="min-h-0 flex-1 gap-0">
           <div className="px-4 pt-3">
             <TabsList className="w-full">
-              <TabsTrigger value="for-you">
+              <TabsTrigger value="for-you" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.forYou', 'For you')}
                 <TabCount count={questions.length} />
               </TabsTrigger>
-              <TabsTrigger value="waiting">
+              <TabsTrigger value="waiting" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.waiting', 'Waiting')}
                 <TabCount count={threads.waiting.length} />
               </TabsTrigger>
-              <TabsTrigger value="threads">
+              <TabsTrigger value="threads" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.threads', 'Threads')}
               </TabsTrigger>
-              <TabsTrigger value="answered">
+              <TabsTrigger value="answered" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.answered', 'Answered')}
               </TabsTrigger>
             </TabsList>
