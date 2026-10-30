@@ -182,10 +182,18 @@ export async function startFederatedWorker(args: {
       )
       return federatedUnknownReceipt(worker, task.id, server.name, launch)
     }
+    const settledOnTerminal =
+      remote.failedStage === 'agent_readiness' && params.terminal
+        ? db.findReopenableFederatedDispatchOnTerminal(server.environmentId, params.terminal)
+        : undefined
+    // Why: a busy settled member takes follow-up mail on its next turn instead (ORCA-838).
+    const followUpHint = settledOnTerminal
+      ? ` Its agent is still busy; to queue this work for its next turn, send it to its settled Dispatch: orca orchestration send --to dispatch:${settledOnTerminal}.`
+      : ''
     const worker = db.failWorkerStart(
       started.dispatch.id,
       remote.failedStage ?? 'remote_attach',
-      remote.lastError ?? `The worker server returned ${remote.state}.`
+      `${remote.lastError ?? `The worker server returned ${remote.state}.`}${followUpHint}`
     )
     return {
       runId,

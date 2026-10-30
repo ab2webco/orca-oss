@@ -137,7 +137,7 @@ describe('orchestration federation', () => {
     const attachment = workerDb.getRemoteDispatchAttachment(dispatch.id)
     expect(attachment).toMatchObject({
       task_id: task.id,
-      protocol_version: 4,
+      protocol_version: 5,
       state: 'ready',
       worktree_id: 'repo::windows-worktree',
       terminal_handle: 'term_windows_worker'

@@ -3,6 +3,8 @@ import {
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
@@ -18,7 +20,7 @@ import type { WorkerStartInput } from './orchestration-worker-start-schema'
 import { assertWorkerLaunchPreferencesRuntimeSupported } from './orchestration-worker-launch-preferences'
 
 export type FederatedWorkerNegotiation = {
-  federationProtocolVersion: 1 | 2 | 3 | 4
+  federationProtocolVersion: 1 | 2 | 3 | 4 | 5
   /** Sent only to a host that confirmed it honors them. */
   gameMember: { game?: true; setupAdmission?: 'queue' }
   /** An older host drops the lead's scene, so it is read only for a host that keeps it. */
@@ -80,15 +82,20 @@ export function negotiateFederatedWorkerStart(args: {
   const supportsLifecycleSettlement =
     supportsControlMail &&
     capabilities.includes(ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY)
-  const federationProtocolVersion =
+  const supportsMemberReopen =
     supportsLifecycleSettlement &&
     capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY)
-      ? ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION
-      : supportsLifecycleSettlement
-        ? ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
-        : supportsControlMail
-          ? ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
-          : 1
+  const federationProtocolVersion =
+    supportsMemberReopen &&
+    capabilities.includes(ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY)
+      ? ORCHESTRATION_FEDERATION_FOLLOW_UP_PROTOCOL_VERSION
+      : supportsMemberReopen
+        ? ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION
+        : supportsLifecycleSettlement
+          ? ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+          : supportsControlMail
+            ? ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
+            : 1
   return {
     federationProtocolVersion,
     gameMember: params.game
