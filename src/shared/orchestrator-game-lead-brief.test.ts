@@ -194,14 +194,17 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('--account <email|id>')
     expect(brief).toContain('`orca game move <ticket>`')
     expect(brief).toContain('when the first account is back')
-    expect(brief).not.toContain('accounts: auto')
   })
 
-  it('leaves the account to Orca with accounts: auto unless the person names one', () => {
-    const brief = gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, accounts: 'auto' }, 'cineco')
-
-    expect(brief).toContain('accounts: auto')
-    expect(brief).toContain("don't pick an account yourself unless the person names one")
+  it('leaves the account to Orca unless the person names one, also with accounts unset', () => {
+    for (const lead of [DEFAULT_GAME_LEAD, { ...DEFAULT_GAME_LEAD, accounts: 'auto' as const }]) {
+      const brief = gameLeadBriefOf(lead, 'cineco')
+      expect(brief).toContain('freest account')
+      expect(brief).toContain("don't pick an account yourself unless the person names one")
+    }
+    expect(gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, accounts: 'default' }, 'cineco')).not.toContain(
+      'freest account'
+    )
   })
 
   it('answers about members from Orca, not from memory: member, fleet and history', () => {

@@ -60,6 +60,32 @@ export function stateWith(overrides: Record<string, unknown> = {}) {
   }
 }
 
+const reading = (provider: string, accountId: string) => ({
+  accountId,
+  rateLimits: {
+    provider,
+    status: 'ok',
+    session: { usedPercent: 10, windowMinutes: 300, resetsAt: null, resetDescription: null },
+    weekly: null,
+    updatedAt: 0,
+    error: null
+  },
+  updatedAt: 0,
+  isFetching: false
+})
+
+// Why one managed account per provider: a wave with no --account picks one (ORCA-809).
+export const GAME_TEST_ACCOUNTS = {
+  claude: { accounts: [{ id: 'acct_ana', email: 'ana@example.com' }], activeAccountId: null },
+  codex: { accounts: [{ id: 'acct_bo', email: 'bo@example.com' }], activeAccountId: null },
+  rateLimits: {
+    claude: null,
+    codex: null,
+    inactiveClaudeAccounts: [reading('claude', 'acct_ana')],
+    inactiveCodexAccounts: [reading('codex', 'acct_bo')]
+  }
+}
+
 export function fakeClient(state: unknown, overrides: Record<string, unknown> = {}) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
@@ -69,6 +95,7 @@ export function fakeClient(state: unknown, overrides: Record<string, unknown> = 
     'orchestration.runCurrent': { run: { id: 'run_1' } },
     'orchestration.taskCreate': { task: { id: 'task_1' } },
     'game.stopSwitch': { stopped: null },
+    'accounts.snapshot': GAME_TEST_ACCOUNTS,
     'orchestration.workerStart': {
       runId: 'run_1',
       taskId: 'task_1',

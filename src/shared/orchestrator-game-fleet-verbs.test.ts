@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
-  gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf,
   ticketInText
 } from './orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
 

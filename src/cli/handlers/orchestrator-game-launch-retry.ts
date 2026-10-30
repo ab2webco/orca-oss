@@ -8,6 +8,10 @@ const UNKNOWN_OUTCOME_CODES: ReadonlySet<string> = new Set([
   'invalid_runtime_response'
 ])
 
+/** The runtime answered and refused, so the launch surely started nothing. */
+export const isLaunchRefusal = (error: unknown): boolean =>
+  error instanceof RuntimeClientError && !UNKNOWN_OUTCOME_CODES.has(error.code)
+
 /** Pauses before the 2nd and 3rd attempt; a launch is retried at most twice. */
 export const GAME_LAUNCH_RETRY_DELAYS_MS: readonly number[] = [1_000, 3_000]
 

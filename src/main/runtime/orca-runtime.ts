@@ -744,7 +744,7 @@ import {
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
-import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
@@ -31212,6 +31212,19 @@ export class OrcaRuntimeService {
     member: { paneKey: string; agentType: string | null; worktreeId: string | null },
     worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
   ): ReturnType<typeof gameMemberAccountOf> {
+    return this.readGameMemberSeat(member, worktreesById, gameMemberAccountOf)
+  }
+
+  private readGameMemberSeat<T>(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>,
+    read: (seat: {
+      agentType: string | null
+      live: ManagedPtyAccountOwner | null
+      pinnedAccountId: string | null | undefined
+      accounts: readonly { id: string; email: string }[]
+    }) => T
+  ): T | null {
     const provider = accountProviderOfAgent(member.agentType)
     const services = this.accountServices
     if (!provider || !services) {
@@ -31221,7 +31234,7 @@ export class OrcaRuntimeService {
       const handle = this.getTerminalHandleForPaneKey(member.paneKey)
       const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
       const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
-      return gameMemberAccountOf({
+      return read({
         agentType: member.agentType,
         live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
         pinnedAccountId:
@@ -31460,6 +31473,8 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      globalLoginOf: (member) =>
+        this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin) === true,
       limitOf: (member) => this.gameMemberLimitFor(member),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
