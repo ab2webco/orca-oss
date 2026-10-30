@@ -30,7 +30,12 @@ import {
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
-import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
+import {
+  postGameEvents,
+  readCallerGameState,
+  recordGameMember
+} from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
@@ -44,6 +49,8 @@ import {
   setupAdmissionOf,
   type GameSetupQueue
 } from './orchestrator-game-setup-queue'
+
+export { readCallerGameState }
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -99,14 +106,6 @@ function requireLaunchPreferences(capabilities: readonly string[]): void {
     )
   }
 }
-
-// Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
-export const readCallerGameState = (client: Client) =>
-  client.call<OrchestratorGameState>('game.state', {
-    worktreeId: process.env.ORCA_WORKTREE_ID,
-    terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-    paneKey: process.env.ORCA_PANE_KEY
-  })
 
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: {
@@ -207,10 +206,12 @@ export async function launchGameMember(args: {
     account: memberAccount.account?.email,
     lastState: 'launching'
   })
+  const createsWorktree = where.worktree === 'new-child' || where.worktree === 'new-top-level'
   const workerParams = {
     task: task.result.task.id,
     ...where,
-    name: ticket.toLowerCase(),
+    // Why: workerStart refuses creation options for the existing worktree a relaunch reuses (ORCA-894).
+    ...(createsWorktree ? { name: ticket.toLowerCase() } : {}),
     displayName: title,
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
@@ -228,7 +229,7 @@ export async function launchGameMember(args: {
       workerParams,
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
-  )
+  ).catch(forgetOnRefusal({ client, state, ticket, worktree: where.worktree }))
   await recordGameMember(client, {
     ticket,
     dispatchId: worker.result.dispatchId,
