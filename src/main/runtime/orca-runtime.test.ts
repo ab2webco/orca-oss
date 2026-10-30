@@ -1021,6 +1021,10 @@ const CLAUDE_STARTUP_DIALOGS = JSON.parse(
     'utf8'
   )
 ) as { folderTrust: string; bypassPermissions: string }
+// Why: real Claude bytes; a resize repaints from `CSI H` and walks down with `CSI B`.
+const CLAUDE_FIRST_RUN = JSON.parse(
+  readFileSync(new URL('./__fixtures__/claude-first-run-2.1.314.json', import.meta.url), 'utf8')
+) as { themePicker: string; themePickerAfterResize: string }
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
 
 /**
@@ -17132,6 +17136,54 @@ describe('OrcaRuntimeService', () => {
     await expect(
       runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
     ).resolves.toMatchObject({ satisfied: false, blockedReason })
+  })
+
+  it.each([
+    ['theme picker', [CLAUDE_FIRST_RUN.themePicker]],
+    [
+      'theme picker repainted by a resize',
+      [CLAUDE_FIRST_RUN.themePicker, CLAUDE_FIRST_RUN.themePickerAfterResize]
+    ]
+  ] as const)(
+    'names the %s of a never-signed-in Claude config, despite its welcome banner (ORCA-872)',
+    async (_label, chunks) => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'claude'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      for (const chunk of chunks) {
+        runtime.onPtyData('pty-bg', chunk, Date.now())
+      }
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+      ).resolves.toMatchObject({ satisfied: false, blockedReason: 'claude-first-run-setup' })
+    }
+  )
+
+  it('does not read a first-run marker after a signed-in session banner as setup (ORCA-872)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      `${CLAUDE_FIRST_RUN.themePicker}\u001b[2J\u001b[H Claude Code v2.1.314\r\n  Opus 5.5\r\n` +
+        ' grep: Choose the text style that looks best\r\n\u276f \r\n\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
   })
 
   it('resolves tui-idle for a Claude lane past its answered startup dialogs (ORCA-855)', async () => {
