@@ -50,14 +50,14 @@ export class GamePairedHostReader {
       return cached.reading
     }
     if (cached) {
-      cached.refresh ??= this.fetch(id)
+      cached.refresh ??= this.reread(id)
       return cached.reading
     }
-    await this.fetch(id)
+    await this.reread(id)
     return this.cache.get(id)!.reading
   }
 
-  private async fetch(id: string): Promise<void> {
+  private async reread(id: string): Promise<void> {
     const reading = await this.deps.statusOf(id).then(
       (status): PairedGameHostReading => {
         const host = pairedGameHostOf((status as { gameHost?: unknown } | null)?.gameHost)
