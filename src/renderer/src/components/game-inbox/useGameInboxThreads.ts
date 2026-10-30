@@ -6,7 +6,7 @@ import { onGameInboxChanged } from './game-inbox-signal'
 
 const NO_THREADS: GameInboxThreads = { threads: [], waiting: [], answered: [] }
 
-/** The project's threads, read only while the Inbox is open and reread on pushed mail; pass a memoized scope. */
+/** The project's threads: read once per worktree, and live (on pushed mail) only while the Inbox is open; pass a memoized scope. */
 export function useGameInboxThreads(
   scope: GameInboxScope | null,
   open: boolean
@@ -29,6 +29,13 @@ export function useGameInboxThreads(
       setLoaded({ scope: current, threads })
     }
   }, [])
+
+  // Why: one read per worktree tells the sidebar whether the project has a team at all.
+  useEffect(() => {
+    if (scope) {
+      void read(scope)
+    }
+  }, [scope, read])
 
   useEffect(() => {
     if (!scope || !open) {

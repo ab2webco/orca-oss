@@ -3,6 +3,7 @@ import type {
   GameOwnerQuestion,
   GameOwnerReply
 } from '../../../../shared/orchestrator-game-owner-questions'
+import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import {
   Sheet,
   SheetContent,
@@ -10,20 +11,34 @@ import {
   SheetHeader,
   SheetTitle
 } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { GameOwnerQuestionCard } from './GameOwnerQuestionCard'
+import { GameInboxWaitingList } from './GameInboxWaitingList'
+import { GameInboxAnsweredList } from './GameInboxAnsweredList'
+import { GameInboxThreadsView } from './GameInboxThreadsView'
 
-/** The project's Orca Game Inbox; "For you" lists what the lead asked the person. */
+function TabCount({ count }: { count: number }): React.JSX.Element | null {
+  return count > 0 ? (
+    <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+  ) : null
+}
+
+const LIST_PANEL = 'scrollbar-sleek mt-0 min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4'
+
+/** The project's Orca Game Inbox: what the lead asked the person, what waits on the lead, each ticket's thread. */
 export function GameInboxSheet({
   open,
   onOpenChange,
   questions,
-  onAnswer
+  onAnswer,
+  threads
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   questions: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
+  threads: GameInboxThreads
 }): React.JSX.Element {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -40,34 +55,57 @@ export function GameInboxSheet({
           <SheetDescription>
             {translate(
               'auto.components.game-inbox.GameInboxSheet.description',
-              "What the project's lead asked you to decide."
+              'What the lead asked you, what waits on it, and how it talks with each member.'
             )}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h3 className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
-            {translate('auto.components.game-inbox.GameInboxSheet.forYou', 'For you')}
-          </h3>
-          <span className="text-xs text-muted-foreground tabular-nums">{questions.length}</span>
-        </div>
-        <div className="scrollbar-sleek min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
-          {questions.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {translate(
-                'auto.components.game-inbox.GameInboxSheet.empty',
-                'No questions are waiting for you.'
-              )}
-            </p>
-          ) : (
-            questions.map((question) => (
-              <GameOwnerQuestionCard
-                key={question.id}
-                question={question}
-                onAnswer={(reply) => onAnswer(question.id, reply)}
-              />
-            ))
-          )}
-        </div>
+        <Tabs defaultValue="for-you" className="min-h-0 flex-1 gap-0">
+          <div className="px-4 pt-3">
+            <TabsList className="w-full">
+              <TabsTrigger value="for-you">
+                {translate('auto.components.game-inbox.GameInboxSheet.forYou', 'For you')}
+                <TabCount count={questions.length} />
+              </TabsTrigger>
+              <TabsTrigger value="waiting">
+                {translate('auto.components.game-inbox.GameInboxSheet.waiting', 'Waiting')}
+                <TabCount count={threads.waiting.length} />
+              </TabsTrigger>
+              <TabsTrigger value="threads">
+                {translate('auto.components.game-inbox.GameInboxSheet.threads', 'Threads')}
+              </TabsTrigger>
+              <TabsTrigger value="answered">
+                {translate('auto.components.game-inbox.GameInboxSheet.answered', 'Answered')}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="for-you" className={`${LIST_PANEL} space-y-3`}>
+            {questions.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {translate(
+                  'auto.components.game-inbox.GameInboxSheet.empty',
+                  'No questions are waiting for you.'
+                )}
+              </p>
+            ) : (
+              questions.map((question) => (
+                <GameOwnerQuestionCard
+                  key={question.id}
+                  question={question}
+                  onAnswer={(reply) => onAnswer(question.id, reply)}
+                />
+              ))
+            )}
+          </TabsContent>
+          <TabsContent value="waiting" className={LIST_PANEL}>
+            <GameInboxWaitingList items={threads.waiting} />
+          </TabsContent>
+          <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col pt-2">
+            <GameInboxThreadsView threads={threads.threads} />
+          </TabsContent>
+          <TabsContent value="answered" className={LIST_PANEL}>
+            <GameInboxAnsweredList items={threads.answered} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   )

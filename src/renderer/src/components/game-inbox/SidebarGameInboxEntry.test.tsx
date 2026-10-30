@@ -64,3 +64,27 @@ describe('SidebarGameInboxEntry', () => {
     expect(view.getByText('Which account?')).toBeTruthy()
   })
 })
+
+describe('SidebarGameInboxEntry with a team (ORCA-878)', () => {
+  it('shows the entry without a count when members talk but nothing waits for the person', async () => {
+    call.mockImplementation(async (args: { method: string; params?: unknown }) => ({
+      id: 'r',
+      ok: true,
+      result:
+        args.method === 'game.inboxThreads'
+          ? {
+              threads: [
+                { ticket: 'ORCA-12', messages: [], last: '2026-10-29T10:00:00Z', waiting: 1 }
+              ],
+              waiting: [],
+              answered: []
+            }
+          : { questions: [] },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const view = render(<SidebarGameInboxEntry />)
+
+    const entry = await view.findByRole('button', { name: /Inbox/ })
+    expect(entry.textContent).toBe('Inbox')
+  })
+})

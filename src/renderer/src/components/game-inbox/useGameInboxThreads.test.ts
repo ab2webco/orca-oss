@@ -40,15 +40,15 @@ afterEach(() => {
 })
 
 describe('useGameInboxThreads', () => {
-  it('reads nothing while the Inbox is closed, a pushed change included', () => {
+  it('while closed reads once per worktree, to know the project has a team, and ignores pushed mail', async () => {
     const runtime = stubRuntime(() => ({ threads: [thread('ORCA-1')], waiting: [], answered: [] }))
     const { result } = renderHook(() => useGameInboxThreads(SCOPE, false))
+    await waitFor(() => expect(result.current.threads).toHaveLength(1))
 
     act(() => runtime.push())
     act(() => signalGameInboxChanged())
 
-    expect(result.current.threads).toEqual([])
-    expect(runtime.call).not.toHaveBeenCalled()
+    expect(runtime.call).toHaveBeenCalledTimes(1)
   })
 
   it('reads while open and rereads when the local runtime or a paired host says mail arrived', async () => {
