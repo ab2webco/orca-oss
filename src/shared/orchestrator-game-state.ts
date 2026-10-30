@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
@@ -62,8 +63,8 @@ export type GameAgent = {
   account?: GameMemberAccount
   /** Runs on the host's global login, which Orca cannot move or refresh (ORCA-809); absent from an older host. */
   globalLogin?: true
-  /** Set while a member is stopped by its account's usage limit; absent from an older host. */
-  limit?: { resetsAt: number | null }
+  /** Set while a member is stopped by its account's usage limit, or `loggedOut` (ORCA-907); absent from an older host. */
+  limit?: { resetsAt: number | null; loggedOut?: true }
   /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
   advisor?: GameMemberAdvisor
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
@@ -180,6 +181,8 @@ export type OrchestratorGameState = {
   actions?: GameAction[]
   /** How this project's lead orchestrates; absent from an older host. */
   lead?: OrchestratorGameLead
+  /** Each host's member cap, local first, which `lead.cap` sums; only for a lead, absent from an older host (ORCA-888). */
+  hosts?: GameHostCap[]
   /** XP per reward after every layer; absent from an older host, whose mod uses the baseline. */
   rewardWeights?: GameRewardWeights
   /** Whether the calling pane leads or was launched by a lead; absent from an older host. */

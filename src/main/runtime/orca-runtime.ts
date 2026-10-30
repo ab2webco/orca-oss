@@ -200,6 +200,11 @@ import {
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+
+const gameHostProfileOfThisMachine = (): GameHostProfile => ({
+  totalMemory: totalmem(),
+  cpuCoreCount: Math.max(1, cpus().length)
+})
 import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
 import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -745,6 +750,12 @@ import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
+import {
+  ClaudePaneLiveSessions,
+  claudePaneLiveSessionOf,
+  type ClaudePaneLiveSession
+} from '../claude/claude-pane-live-session'
+import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
@@ -754,6 +765,8 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
+import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
@@ -803,6 +816,7 @@ import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
+  freshestLimitsOf,
   type GameMemberLimit
 } from '../../shared/orchestrator-game-member-limit'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
@@ -3766,6 +3780,7 @@ export class OrcaRuntimeService {
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
   private readonly gameSuggestedView = createGameSuggestedView()
+  private readonly claudePaneSessions = new ClaudePaneLiveSessions()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
     read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
@@ -3793,6 +3808,21 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
+  private readonly gamePairedHosts = new GamePairedHostReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    statusOf: async (environmentId) => {
+      const response = await this.orchestrationEnvironmentTransport!.call(
+        environmentId,
+        'status.get',
+        undefined,
+        REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+      )
+      if (response.ok === false) {
+        throw new Error(response.error.message)
+      }
+      return response.result
+    }
+  })
   private readonly gamePausedMembers = new GamePausedMembers({
     store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
@@ -5857,6 +5887,9 @@ export class OrcaRuntimeService {
       hostPlatform: process.platform,
       terminalWindowsShell: this.store?.getSettings?.().terminalWindowsShell ?? null,
       floatingWorkspaceEnabled: this.store?.getSettings?.().floatingTerminalEnabled !== false,
+      gameHost: ((profile) => ({ ...profile, memberCap: defaultGameMemberCapOf(profile) }))(
+        gameHostProfileOfThisMachine()
+      ),
       protocolVersion: RUNTIME_PROTOCOL_VERSION,
       minCompatibleMobileVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
     }
@@ -31260,12 +31293,38 @@ export class OrcaRuntimeService {
     return this.readGameMemberSeat(member, worktreesById, gameMemberAccountOf)
   }
 
+  /** Files what a pane's running Claude reported, so its member's account is the live one (ORCA-907). */
+  noteClaudePaneStatusLine(event: ClaudeStatusLineRateLimits, managedRoot: string | null): void {
+    const handle = event.paneKey ? this.getTerminalHandleForPaneKey(event.paneKey) : null
+    const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+    if (!ptyId || !this.accountServices) {
+      return
+    }
+    this.claudePaneSessions.note(
+      ptyId,
+      claudePaneLiveSessionOf({
+        event,
+        managedRoot,
+        boundAccountId: this.getManagedPtyAccountOwner(ptyId, 'claude').accountId,
+        now: Date.now()
+      })
+    )
+  }
+
+  private claudePaneSessionOf(ptyId: string): ClaudePaneLiveSession | null {
+    return this.claudePaneSessions.of(
+      ptyId,
+      this.getManagedPtyAccountOwner(ptyId, 'claude').accountId
+    )
+  }
+
   private readGameMemberSeat<T>(
     member: { paneKey: string; agentType: string | null; worktreeId: string | null },
     worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>,
     read: (seat: {
       agentType: string | null
       live: ManagedPtyAccountOwner | null
+      session: ClaudePaneLiveSession | null
       pinnedAccountId: string | null | undefined
       accounts: readonly { id: string; email: string }[]
     }) => T
@@ -31282,6 +31341,7 @@ export class OrcaRuntimeService {
       return read({
         agentType: member.agentType,
         live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
+        session: ptyId && provider === 'claude' ? this.claudePaneSessionOf(ptyId) : null,
         pinnedAccountId:
           provider === 'claude' ? worktree?.claudeAccountId : worktree?.codexAccountId,
         accounts: (provider === 'claude'
@@ -31406,7 +31466,7 @@ export class OrcaRuntimeService {
     const roster = services
       ? (provider === 'claude' ? services.claudeAccounts : services.codexAccounts).listAccounts()
       : null
-    const accountLimits =
+    const cachedLimits =
       services && roster && member.account
         ? accountLimitsOf(
             services.rateLimits.getState(),
@@ -31416,6 +31476,12 @@ export class OrcaRuntimeService {
           )
         : null
     const handle = this.getTerminalHandleForPaneKey(member.paneKey)
+    const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
+    const pane = ptyId && provider === 'claude' ? this.claudePaneSessionOf(ptyId) : null
+    const accountLimits = freshestLimitsOf(
+      cachedLimits,
+      pane && pane.accountId === member.account?.id ? pane.limits : null
+    )
     const read = handle
       ? await this.readTerminal(handle, { limit: GAME_MEMBER_LIMIT_TAIL_LINES }).catch(() => null)
       : null
@@ -31485,7 +31551,8 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
-      host: { totalMemory: totalmem(), cpuCoreCount: Math.max(1, cpus().length) },
+      host: gameHostProfileOfThisMachine(),
+      readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
         ? {
             id: worktree.id,

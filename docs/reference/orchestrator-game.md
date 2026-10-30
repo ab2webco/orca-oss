@@ -525,7 +525,7 @@ project Settings edits all but the two prompts, `rules` and `mcpServers`, which 
 orchestratorGame:
   orchestrator:
     autostart: true # a plain session in this project starts as the lead
-    cap: 4 # members running at once, 1 to 12; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1
+    cap: 4 # members running at once, 1 to 100; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1 and at most 12. With a paired host, the ceiling over every host's cap (below)
     agent: claude # what a member runs, as `orca orchestration worker-start --agent` names it
     model: opus # optional
     effort: high # optional, used only with a model
@@ -619,6 +619,13 @@ The lead's verbs, run from the lead's terminal
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
+- **Per-host caps (ORCA-888).** With a saved environment, the lead's cap is the sum of each
+  reachable host's: this Orca's from its memory and cores (one per 4 GB and 2 cores, 1 to 12), each
+  paired host's `memberCap` from `status.get`, cached 30 s. A layer's `orchestrator.cap` only caps
+  that sum. A host that does not answer adds nothing; an older one publishes no cap, so its members
+  take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
+  carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
+  `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
@@ -871,6 +878,18 @@ next step, `game push` leaves it alone, and the Panel card turns red with `limit
 `codex · ana@…` tag: the email's domain never shows, and the name shortens, then drops, as the card
 narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
 its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
+
+A member's account is the one its running Claude reports, not only what Orca recorded at spawn
+(ORCA-907). Each status-line post carries the pane's `CLAUDE_CONFIG_DIR`; a managed vault there
+names the account `game fleet`, `game move`, the Panel and a paired host's relay show, ahead of the
+pane's spawn record and the worktree pin. A post from before an account switch no longer counts.
+The same post's 5h and 7d windows decide whether that member is limited when they are newer than
+Orca's cached reading, so the card matches the pane's own status line. A stopped member whose last
+lines ask for `/login` (`Not logged in`, an expired or revoked OAuth token, Codex's `sign in again`)
+is `limit: { resetsAt: null, loggedOut: true }`: phase `needs-you` with
+`log <email> in again (/login in its pane), or game move <ticket>`, the card says
+`logged out · /login in its pane`, and `game accounts` shows its account as logged out, which
+`auto` skips. An older host relays no `loggedOut`, and an older home shows such a member as limited.
 
 ### The lead's XP
 

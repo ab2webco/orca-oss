@@ -1,5 +1,9 @@
 import type { AccountListEntry } from './managed-account-list-entries'
-import type { GameAccountUsage, GameQuotaWindow } from './orchestrator-game-account-pick'
+import type {
+  GameAccountStop,
+  GameAccountUsage,
+  GameQuotaWindow
+} from './orchestrator-game-account-pick'
 import { ticketOfMember } from './orchestrator-game-fleet-verbs'
 import type { GameAccountProvider } from './orchestrator-game-member-agent'
 import type { GameAgent } from './orchestrator-game-state'
@@ -35,10 +39,8 @@ export function isAutoPickableAccount(entry: AccountListEntry): boolean {
 }
 
 /** The latest limit a member stopped on, by the account id it runs on. */
-function stoppedByAccountOf(
-  agents: readonly GameAgent[]
-): Map<string, { resetsAt: number | null }> {
-  const byAccount = new Map<string, { resetsAt: number | null }>()
+function stoppedByAccountOf(agents: readonly GameAgent[]): Map<string, GameAccountStop> {
+  const byAccount = new Map<string, GameAccountStop>()
   for (const agent of agents) {
     if (agent.isMember && !agent.isLeader && agent.account && agent.limit) {
       const seen = byAccount.get(agent.account.id)
@@ -48,7 +50,8 @@ function stoppedByAccountOf(
           : seen.resetsAt === null || agent.limit.resetsAt === null
             ? null
             : Math.max(seen.resetsAt, agent.limit.resetsAt)
-      byAccount.set(agent.account.id, { resetsAt })
+      const loggedOut = seen?.loggedOut === true || agent.limit.loggedOut === true
+      byAccount.set(agent.account.id, loggedOut ? { resetsAt: null, loggedOut } : { resetsAt })
     }
   }
   return byAccount
