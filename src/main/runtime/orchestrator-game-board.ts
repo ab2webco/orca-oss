@@ -44,6 +44,19 @@ export type GameBoardProject = {
 
 export type GameBoardLead = { handle: string; paneKey: string | null }
 
+/** The person's Inbox calls with a worktree, never a terminal: its lead is the project's live one. */
+export async function withProjectLead(
+  project: GameBoardProject,
+  liveLeadOf: (projectKey: string) => Promise<string | null>,
+  paneOf: (handle: string) => string | null
+): Promise<GameBoardProject> {
+  if (project.lead || project.isMember) {
+    return project
+  }
+  const handle = await liveLeadOf(project.key)
+  return handle ? { ...project, lead: { handle, paneKey: paneOf(handle) } } : project
+}
+
 /** Mail the host sends the lead itself; tellLead returns false when it could not be stored. */
 export type GameLeadNote = { subject: string; body: string; payload: Record<string, unknown> }
 

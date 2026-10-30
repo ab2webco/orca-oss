@@ -766,7 +766,7 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
@@ -3869,7 +3869,12 @@ export class OrcaRuntimeService {
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
     stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
-    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    projectOf: async (caller) =>
+      withProjectLead(
+        await this.gameBoardProjectOf(caller),
+        (projectKey) => this.gameLeads.liveLeadOf(projectKey),
+        (handle) => this.getPaneKeyForTerminalHandle(handle) ?? null
+      ),
     inboxSourceOf: (lead) =>
       gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
     tellLead: (lead, note) => {
