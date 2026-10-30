@@ -43,6 +43,8 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  carries a `deliveryId`; once you handled every message in it, wait again with',
     `  ${run('orchestration check --ack <deliveryId> --wait --watch --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json')}.`,
     '  Until you ack it, every check replays the same messages and newer reports wait behind them.',
+    '  Mail from another lead or the person wakes it whatever its type; never add `status` to --types,',
+    "  which would wake you for every member's status ping.",
     `- Answer a member question or decision gate you can with ${run('orchestration reply --id <msg_id> --body <answer>')};`,
     `  if that reply fails, send the answer to the member's terminal handle with ${run('orchestration send --to <member terminal handle> --subject "Answer" --body <answer>')}.`,
     `  If the member is idle, ${run('game push')} it to continue.`,

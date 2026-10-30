@@ -990,6 +990,11 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - While the lead's watch is pending, nothing is pointed at, not even mail outside its `--types`:
   that mail rides in the watch's next batch, ahead of the message that wakes it (ORCA-824). Without
   a pending watch, Run mail is pointed at as before.
+- `--types` filters only the Run's own traffic. Mail no member sent wakes the watch whatever its
+  type: another lead's `status` reply, the owner. A member is the assignee handle or pane of any
+  dispatch in the Run, a remote member's relayed mail (`dispatch:<id>`), or the runtime's own
+  `task:`/`run:` notices; their `status` pings still ride in the next batch without waking it
+  (ORCA-861).
 - A Run's mailbox outlives its lead, so before a check builds a batch (and before the pointer counts),
   mail already settled moves to history: a question answered or closed, or whose dispatch is gone;
   and a `worker_done`, escalation or status from a finished member, sent before the current lead

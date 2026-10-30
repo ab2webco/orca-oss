@@ -991,7 +991,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           typeFilter: typeFilter as string[] | undefined,
           timeoutMs: params.timeoutMs ?? undefined,
           signal,
-          exclusive: true
+          exclusive: true,
+          wakesOutsideTypeFilter: () => db.hasUnreadOutsideMemberRunMail(run.id, terminalHandle)
         })
         try {
           revalidateLegacyCoordinator?.()

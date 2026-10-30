@@ -99,6 +99,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('replays the same messages')
   })
 
+  // Why: leads added status to --types to hear other leads, and woke on every member ping (ORCA-861).
+  it('says mail from outside its members wakes the watch, so status stays out of --types', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('Mail from another lead or the person wakes it whatever its type')
+    expect(brief).toContain('never add `status` to --types')
+    expect(brief).not.toContain('decision_gate,status')
+  })
+
   // Why: a quiet timeout used to print a result the lead had to re-arm for, one turn per window with no event (ORCA-746 T6b).
   it('watches with --watch so a quiet window never wakes the lead', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
