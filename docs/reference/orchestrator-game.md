@@ -806,6 +806,14 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
   rules, is the project's lead, and has no other live lead gets it; a fresh start reads the fleet
   through the lead skill instead. A resumed lead also runs the lead skill again: a restart killed its
   report watcher, and its rules then resume the paused members or ask first.
+- **Former leads** (ORCA-728). A restore can bring back several sessions that once ran the lead
+  rules; only the recorded lead keeps leading. For two minutes after the roster loads, a recorded
+  lead whose pane has not reconnected still leads: `leadElsewhere` names it once its pane has a
+  handle, and a `game lead` claim waits up to 20 s for it to settle before it reopens the stored
+  conversation or takes the project
+  ([`orchestrator-game-leads.ts`](../../src/main/runtime/orchestrator-game-leads.ts)). A resumed or
+  compacted former lead is unmarked, told which pane leads and to stop its report watcher, and a
+  toast names that pane.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
   of any saved member that has not finished, paused or live, even with `--force`, which only waives
