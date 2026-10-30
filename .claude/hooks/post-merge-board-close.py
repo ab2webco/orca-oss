@@ -8,6 +8,10 @@ Progress para abrir el PR— y nunca al salir. MEDIDO: 11 tickets en In Progress
 Nunca bloquea: es higiene, no una compuerta. Un fallo acá no puede costar un merge.
 """
 
+# Why: el python3 de macOS es 3.9 y ahí `str | None` revienta al importar; la guarda sale
+# con 1 y Claude Code deja pasar el comando sin revisar (ORCA-884).
+from __future__ import annotations
+
 import json
 import re
 import subprocess

@@ -2,6 +2,10 @@
 """Rechaza merges a `main` fuera de la sesión del workspace primario, salvo el auto-merge
 que GitHub sólo completa con los checks requeridos en verde."""
 
+# Why: el python3 de macOS es 3.9 y ahí `str | None` revienta al importar; la guarda sale
+# con 1 y Claude Code deja pasar el comando sin revisar (ORCA-884).
+from __future__ import annotations
+
 import json
 import os
 import re
