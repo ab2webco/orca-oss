@@ -15,6 +15,7 @@ import {
   workItemTextOf
 } from './fleet-labels'
 import { gameStrings, localizedNameOf } from './game-strings'
+import { githubLowTextOf } from './github-budget'
 import { listActionOf } from './lead-actions'
 import { reviewLabelOf } from './rewards'
 import type { SceneDefinition } from './scenes/index'
@@ -235,6 +236,15 @@ export const stateChipsOf = (
     },
     ...countChipsOf(counts)
   ]
+  if (state.githubLow !== undefined) {
+    const left = state.githubLow.remaining
+    chips.push({
+      key: 'band-github-low',
+      priority: 1,
+      labels: [`! ${githubLowTextOf(left)}`, `! GitHub ${left}`],
+      color: 'yellow'
+    })
+  }
   chips.push(...linkChipsOf(state))
   if (note !== '') {
     chips.push({ key: 'note', priority: 6, labels: [note] })

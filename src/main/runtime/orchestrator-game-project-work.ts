@@ -6,6 +6,7 @@ import type { JiraIssue } from '../../shared/jira-types'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import type { PlaneWorkItem } from '../../shared/plane-types'
 import { derivePRCheckStatus } from '../../shared/pr-check-status'
+import { gameCacheTtlMs, type GameCacheTtl } from './orchestrator-game-read-cache'
 import {
   GAME_PROJECT_ITEMS_MAX,
   GAME_TODO_ITEMS_MAX,
@@ -301,14 +302,14 @@ export class GameProjectWorkCache {
   private readonly entries = new Map<string, { at: number; value: Promise<GameProjectWork> }>()
 
   constructor(
-    private readonly ttlMs: number,
+    private readonly ttlMs: GameCacheTtl,
     private readonly now: () => number = Date.now
   ) {}
 
   read(key: string, load: () => Promise<GameProjectWork>): Promise<GameProjectWork> {
     const at = this.now()
     const cached = this.entries.get(key)
-    if (cached && at - cached.at < this.ttlMs) {
+    if (cached && at - cached.at < gameCacheTtlMs(this.ttlMs)) {
       return cached.value
     }
     const value = load().catch(() => ({ reviews: null, todo: null }))

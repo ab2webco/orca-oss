@@ -265,7 +265,7 @@ describe('orca game fleet verbs', () => {
     }
 
     expect(formatFleet(fleet, now).split('\n').slice(1)).toEqual([
-      'GitHub API LOW: GraphQL 400/5000 left, Orca made 12 calls (resets in 10m) · REST 4000/5000 left, Orca made 12 calls (resets in 10m)',
+      'GitHub API LOW, game reads slowed 5x: GraphQL 400/5000 left, Orca made 12 calls (resets in 10m) · REST 4000/5000 left, Orca made 12 calls (resets in 10m)',
       "Orca's busiest calls this hour: pr checks 9"
     ])
   })

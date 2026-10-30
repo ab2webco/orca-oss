@@ -21,11 +21,14 @@ export type GameGitHubBudget = {
 const LOW_SHARE = 0.2
 
 // Why limit > 0: an unknown bucket reads 0/0 and must not raise the alarm.
-const bucketIsLow = (bucket: GameGitHubBucket): boolean =>
+export const gameGitHubBucketIsLow = (bucket: GameGitHubBucket): boolean =>
   bucket.limit > 0 && bucket.remaining < bucket.limit * LOW_SHARE
 
 export function gameGitHubBudgetOf(budget: Omit<GameGitHubBudget, 'low'>): GameGitHubBudget {
-  return { ...budget, low: bucketIsLow(budget.graphql) || bucketIsLow(budget.core) }
+  return {
+    ...budget,
+    low: gameGitHubBucketIsLow(budget.graphql) || gameGitHubBucketIsLow(budget.core)
+  }
 }
 
 function resetsIn(resetAt: number, now: number): string {
@@ -40,7 +43,7 @@ export function formatGameGitHubBudget(
   budget: GameGitHubBudget,
   now: number = Date.now()
 ): string[] {
-  const head = budget.low ? 'GitHub API LOW:' : 'GitHub API:'
+  const head = budget.low ? 'GitHub API LOW, game reads slowed 5x:' : 'GitHub API:'
   const top = budget.top.map((one) => `${one.shape} ${one.calls}`).join(' · ')
   return [
     `${head} ${bucketLine('GraphQL', budget.graphql, now)} · ${bucketLine('REST', budget.core, now)}`,

@@ -224,6 +224,8 @@ export const registerBand = (on: On): void => {
           return pill(chip.key, chip.label, 'cyan')
         case 'done':
           return pill(chip.key, chip.label, 'green')
+        case 'band-github-low':
+          return pill(chip.key, chip.label, 'yellow', true)
         case 'waiting':
           return pill(chip.key, chip.label, counts.waiting > 0 ? 'red' : 'gray', counts.waiting > 0)
         case 'note':

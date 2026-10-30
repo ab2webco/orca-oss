@@ -1,4 +1,4 @@
-import type { GameMode, GameRender } from '../types'
+import type { GameMode, GameRender, GameState } from '../types'
 
 // Mirrors Orca's src/shared/orchestrator-game-view.ts, which the mod cannot import.
 
@@ -20,6 +20,21 @@ type ViewLook = { mode: GameMode; render: GameRender }
 
 export const isGameViewId = (value: unknown): value is GameViewId =>
   GAME_VIEWS.some((view) => view.id === value)
+
+// Why filtered: a newer Orca may add scopes or views this mod cannot store or draw.
+export const viewSwitchOf = (
+  body: Record<string, unknown>
+): Pick<GameState, 'viewScopes' | 'suggestedView'> => {
+  const scopes = Array.isArray(body.viewScopes)
+    ? body.viewScopes.filter(
+        (one): one is 'project' | 'global' => one === 'project' || one === 'global'
+      )
+    : undefined
+  return {
+    ...(scopes === undefined ? {} : { viewScopes: scopes }),
+    ...(isGameViewId(body.suggestedView) ? { suggestedView: body.suggestedView } : {})
+  }
+}
 
 export function gameViewOf({ mode, render }: ViewLook): GameViewId {
   if (mode !== 'on') {

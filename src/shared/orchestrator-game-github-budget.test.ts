@@ -45,7 +45,7 @@ describe('formatGameGitHubBudget', () => {
 
   it('leads with a warning when the budget is low', () => {
     expect(formatGameGitHubBudget(budget(400), NOW)[0]).toMatch(
-      /^GitHub API LOW: GraphQL 400\/5000 left/
+      /^GitHub API LOW, game reads slowed 5x: GraphQL 400\/5000 left/
     )
   })
 })

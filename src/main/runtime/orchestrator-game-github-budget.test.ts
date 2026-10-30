@@ -4,7 +4,7 @@ const { getRateLimitMock } = vi.hoisted(() => ({ getRateLimitMock: vi.fn() }))
 
 vi.mock('../github/rate-limit', () => ({ getRateLimit: getRateLimitMock }))
 
-import { readGameGitHubBudget } from './orchestrator-game-github-budget'
+import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import { _resetGhSpendLedger, recordGhSpend } from '../git/gh-spend-ledger'
 
 const NOW = 1_800_000_000_000
@@ -52,5 +52,38 @@ describe('readGameGitHubBudget', () => {
   it('is null when the budget cannot be read', async () => {
     getRateLimitMock.mockResolvedValue({ ok: false, error: 'gh: not logged in' })
     expect(await readGameGitHubBudget(NOW)).toBeNull()
+  })
+})
+
+describe('gameGitHubPollStretch', () => {
+  it('stretches game polls while a low bucket waits for its reset, and not after', async () => {
+    getRateLimitMock.mockResolvedValue({
+      ok: true,
+      snapshot: {
+        graphql: bucket(800, 10),
+        core: bucket(4900, 50),
+        search: bucket(30, 1),
+        fetchedAt: NOW
+      }
+    })
+    await readGameGitHubBudget(NOW)
+
+    expect(gameGitHubPollStretch(NOW)).toBe(5)
+    expect(gameGitHubPollStretch(NOW + 11 * 60_000)).toBe(1)
+  })
+
+  it('leaves game polls alone with budget to spare', async () => {
+    getRateLimitMock.mockResolvedValue({
+      ok: true,
+      snapshot: {
+        graphql: bucket(4000, 10),
+        core: bucket(4900, 50),
+        search: bucket(30, 1),
+        fetchedAt: NOW
+      }
+    })
+    await readGameGitHubBudget(NOW)
+
+    expect(gameGitHubPollStretch(NOW)).toBe(1)
   })
 })
