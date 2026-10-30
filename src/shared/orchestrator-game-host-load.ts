@@ -89,16 +89,12 @@ export function gameHostLoadsOf(
     )
   ]
   const older = new Set(all.filter((one) => one.status === 'older').map((one) => one.host))
-  const count = (host: string) => runningOn.filter((one) => one === host).length
+  const onOlder = runningOn.filter((host) => older.has(host)).length
   return all.map((one) => {
     const running =
-      count(one.host) +
-      (one.host === LOCAL_GAME_HOST ? runningOn.filter((host) => older.has(host)).length : 0)
-    return {
-      ...one,
-      running,
-      free: one.status === 'ok' ? Math.max(0, one.cap - running) : 0
-    }
+      runningOn.filter((host) => host === one.host).length +
+      (one.host === LOCAL_GAME_HOST ? onOlder : 0)
+    return { ...one, running, free: one.status === 'ok' ? Math.max(0, one.cap - running) : 0 }
   })
 }
 

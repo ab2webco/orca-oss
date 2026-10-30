@@ -199,17 +199,13 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
     state.hosts &&
     gameFleetHostLoadsOf(state.hosts, gameFleetMembersOf(state), holding.length + queued.length)
   const free = Math.max(0, cap - running)
+  const hostsFree = hosts?.reduce((total, one) => total + one.free, 0) ?? free
   return {
     rows,
     counts,
     cap,
     running,
-    free: hosts
-      ? Math.min(
-          free,
-          hosts.reduce((total, one) => total + one.free, 0)
-        )
-      : free,
+    free: Math.min(free, hostsFree),
     ...(hosts ? { hosts } : {}),
     paused: state.pausedMembers ?? [],
     queued,

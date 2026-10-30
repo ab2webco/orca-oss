@@ -160,9 +160,10 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
   const hosts = fleet.hosts ? [`Hosts: ${gameHostLoadLineOf(fleet.hosts)}`] : []
   const budget = fleet.githubBudget ? formatGameGitHubBudget(fleet.githubBudget, now) : []
+  const top = [head, ...hosts, ...budget]
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
   if (fleet.rows.length === 0) {
-    return [head, ...hosts, ...budget, ...paused].join('\n')
+    return [...top, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
     row.phase,
@@ -192,13 +193,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     'AGENT',
     'ACCOUNT'
   ]
-  return [
-    head,
-    ...hosts,
-    ...budget,
-    tableOf([[...header, 'NEXT', 'NAME'], ...rows]),
-    ...paused
-  ].join('\n')
+  return [...top, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }
 
 export function formatWave(wave: GameWaveResult): string {
