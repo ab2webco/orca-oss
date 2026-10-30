@@ -484,9 +484,9 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
   await expect(lead.getByText("Orca's account · this machine")).toBeVisible()
 
   const cap = lead.getByRole('textbox', { name: 'Member cap' })
-  await cap.fill('40')
+  await cap.fill('400')
   await cap.press('Enter')
-  await expect(lead.getByRole('alert')).toHaveText('Enter a whole number from 1 to 12.')
+  await expect(lead.getByRole('alert')).toHaveText('Enter a whole number from 1 to 100.')
   expect((await savedGameSettings(orcaPage)).orchestratorGameProjects).toEqual({
     [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'default' } }
   })
