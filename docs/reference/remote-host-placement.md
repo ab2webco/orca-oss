@@ -174,6 +174,12 @@ host (decision O3).
   with changes stays. Both servers then mark the dispatch `stage = released` and it leaves the
   fleet. A host without the capability keeps the member `retained` with `federation_unsupported`
   and nothing is called there.
+- Built in ORCA-856: `orchestration.federation-member-reopen.v1` (federation protocol 4). A remote
+  member that already sent `worker_done` can still `ask`: the host keeps its capability proof at
+  settlement (`settled_capability_hash`, migration 38), reopens the attachment, and the home pulls
+  settled members every 10 s, so the question reopens the home Dispatch and lands in the lead's
+  waiting list. Against a home at protocol 3 the host refuses with `dispatch_reopen_unsupported`
+  and a message telling the member to ask the lead for a follow-up dispatch.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the

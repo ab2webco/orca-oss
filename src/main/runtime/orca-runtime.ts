@@ -3200,6 +3200,7 @@ export class OrcaRuntimeService {
   private orchestrationTerminalHistoryRecoveryInFlight: Promise<void> | null = null
   private orchestrationTerminalRecoveryRowId = 0
   private orchestrationFederationRelayGeneration = 0
+  private orchestrationFederationReopenWatchTimer: ReturnType<typeof setInterval> | null = null
   private readonly orchestrationFederationSyncs = new Map<
     string,
     { db: OrchestrationDb; promise: Promise<void> }
@@ -5503,6 +5504,14 @@ export class OrcaRuntimeService {
       this.orchestrationFederationTimers.set(dispatch.dispatch_id, timer)
       tick()
     }
+    if (!this.orchestrationFederationReopenWatchTimer) {
+      // Why slow: the host cannot call home, and a settled member rarely asks again.
+      this.orchestrationFederationReopenWatchTimer = setInterval(
+        () => this.syncOrchestrationFederationReopenWatch(),
+        10_000
+      )
+      this.orchestrationFederationReopenWatchTimer.unref?.()
+    }
     this.ensureTerminalHistoryRecovery()
   }
 
@@ -5549,12 +5558,29 @@ export class OrcaRuntimeService {
     this.orchestrationTerminalHistoryRecoveryTimer.unref?.()
   }
 
+  /** One pull per settled member a host may reopen with a question (ORCA-856). */
+  syncOrchestrationFederationReopenWatch(): void {
+    let dispatchIds: string[]
+    try {
+      dispatchIds = this.getOrchestrationDb().listReopenableFederatedDispatchIds()
+    } catch {
+      return
+    }
+    for (const dispatchId of dispatchIds) {
+      void this.syncOrchestrationFederatedDispatch(dispatchId).catch(() => undefined)
+    }
+  }
+
   stopOrchestrationFederationRelay(): void {
     this.orchestrationFederationRelayGeneration += 1
     for (const timer of this.orchestrationFederationTimers.values()) {
       clearInterval(timer)
     }
     this.orchestrationFederationTimers.clear()
+    if (this.orchestrationFederationReopenWatchTimer) {
+      clearInterval(this.orchestrationFederationReopenWatchTimer)
+      this.orchestrationFederationReopenWatchTimer = null
+    }
     if (this.orchestrationTerminalHistoryRecoveryTimer) {
       clearTimeout(this.orchestrationTerminalHistoryRecoveryTimer)
       this.orchestrationTerminalHistoryRecoveryTimer = null

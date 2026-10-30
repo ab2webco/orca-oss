@@ -36,6 +36,7 @@ import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-met
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
+import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
@@ -1658,7 +1659,23 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       // Why: echoed on every return so a clamped caller reports the budget actually waited, not the one it asked for.
       const timeoutMs = clampOrchestrationAskTimeoutMs(params.timeoutMs)
       const paneKey = sender.paneKey ?? runtime.getTerminalPaneKey(from) ?? undefined
-      const remoteAttachment = paneKey ? db.findActiveRemoteAttachmentForPane(paneKey) : undefined
+      const activeRemoteAttachment = paneKey
+        ? db.findActiveRemoteAttachmentForPane(paneKey)
+        : undefined
+      // Why skip an explicit target: the federated path would refuse it after the reopen committed.
+      const reopenedRemoteAttachment =
+        activeRemoteAttachment ||
+        !paneKey ||
+        params.to ||
+        params.run ||
+        db.getActiveDispatchForIdentity(from, paneKey)
+          ? undefined
+          : reopenSettledRemoteAttachmentForAsk(db, {
+              paneKey,
+              capability: orchestrationCapability,
+              processIncarnation: runtime.getTerminalProcessIncarnation(from)
+            })
+      const remoteAttachment = activeRemoteAttachment ?? reopenedRemoteAttachment
       if (remoteAttachment) {
         rejectFederatedExplicitTarget(params)
         return askRemoteRunHome({
@@ -1670,7 +1687,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           from,
           paneKey: paneKey as string,
           dispatchId: remoteAttachment.dispatch_id,
-          taskId: remoteAttachment.task_id
+          taskId: remoteAttachment.task_id,
+          reopened: reopenedRemoteAttachment !== undefined
         })
       }
       let activeDispatch = db.getActiveDispatchForIdentity(from, paneKey)
@@ -1849,9 +1867,11 @@ async function askRemoteRunHome(args: {
   paneKey: string
   dispatchId: string
   taskId: string
+  reopened: boolean
 }): Promise<unknown> {
   const db = args.runtime.getOrchestrationDb()
   const timeoutMs = clampOrchestrationAskTimeoutMs(args.params.timeoutMs)
+  const reopened = args.reopened ? { reopenedDispatchId: args.dispatchId } : {}
   const authority = {
     dispatchId: args.dispatchId,
     capability: args.orchestrationCapability,
@@ -1910,7 +1930,8 @@ async function askRemoteRunHome(args: {
     timedOut: false,
     cancelled: false,
     connectionLost: false,
-    timeoutMs
+    timeoutMs,
+    ...reopened
   })
   const deadline = Date.now() + timeoutMs
   while (true) {
@@ -1930,7 +1951,8 @@ async function askRemoteRunHome(args: {
         timedOut: false,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     if (args.signal?.aborted) {
@@ -1941,7 +1963,8 @@ async function askRemoteRunHome(args: {
         timedOut: false,
         cancelled: true,
         connectionLost: true,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     const remainingMs = deadline - Date.now()
@@ -1953,7 +1976,8 @@ async function askRemoteRunHome(args: {
         timedOut: true,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     await args.runtime.waitForMessage(`dispatch:${args.dispatchId}`, {

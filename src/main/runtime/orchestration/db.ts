@@ -64,7 +64,8 @@ import {
 import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../../shared/orchestration-run-pagination'
 import {
   ORCHESTRATION_CONTRACT_VERSION,
-  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION
 } from '../../../shared/protocol-version'
 import {
   releaseContextOnlyDispatch,
@@ -1173,6 +1174,14 @@ export class OrchestrationDb {
       }
       if (current < 37 && !this.hasColumn('remote_dispatch_attachments', 'game_scene')) {
         this.db.exec('ALTER TABLE remote_dispatch_attachments ADD COLUMN game_scene TEXT')
+      }
+      if (
+        current < 38 &&
+        !this.hasColumn('remote_dispatch_attachments', 'settled_capability_hash')
+      ) {
+        this.db.exec(
+          'ALTER TABLE remote_dispatch_attachments ADD COLUMN settled_capability_hash TEXT'
+        )
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -5519,6 +5528,60 @@ export class OrchestrationDb {
     return rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
   }
 
+  /** The pane's newest attachment, only when it succeeded and its member is still here. */
+  findLatestSettledRemoteAttachmentForPane(
+    paneKey: string
+  ): RemoteDispatchAttachmentRow | undefined {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM remote_dispatch_attachments
+         WHERE pane_key IS NOT NULL ORDER BY rowid DESC`
+      )
+      .all() as RemoteDispatchAttachmentRow[]
+    const latest = rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
+    return latest?.state === 'succeeded' && latest.stage !== 'released' ? latest : undefined
+  }
+
+  /** Whether the caller holds the capability its attachment had when it settled successfully. */
+  verifySettledRemoteAttachmentAuthority(params: {
+    dispatchId: string
+    capability: string | undefined
+    paneKey: string
+    processIncarnation: string | null
+  }): boolean {
+    const attachment = this.getRemoteDispatchAttachment(params.dispatchId)
+    if (
+      !attachment?.settled_capability_hash ||
+      !params.capability ||
+      !attachment.pane_key ||
+      !isEquivalentPaneKey(attachment.pane_key, params.paneKey) ||
+      !attachment.process_incarnation ||
+      attachment.process_incarnation !== params.processIncarnation
+    ) {
+      return false
+    }
+    const expected = Buffer.from(attachment.settled_capability_hash, 'hex')
+    const observed = Buffer.from(hashDispatchCapability(params.capability), 'hex')
+    return expected.length === observed.length && timingSafeEqual(expected, observed)
+  }
+
+  /** Back to ready with the member's own capability; shared with ORCA-838's lead-side reopen. */
+  reopenSettledRemoteAttachment(
+    dispatchId: string,
+    stage: string
+  ): RemoteDispatchAttachmentRow | undefined {
+    const reopened = this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET state = 'ready', stage = ?, capability_hash = settled_capability_hash,
+             updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state = 'succeeded' AND stage != 'released'
+           AND protocol_version >= ? AND settled_capability_hash IS NOT NULL`
+      )
+      .run(stage, dispatchId, ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION)
+    return reopened.changes === 1 ? this.getRemoteDispatchAttachment(dispatchId) : undefined
+  }
+
   enqueueFederationRelay(params: {
     dispatchId: string
     direction: FederationRelayDirection
@@ -5877,6 +5940,8 @@ export class OrchestrationDb {
     message: MessageRow
     duplicate: boolean
     lifecycle?: WorkerReportSettlement | { action: 'rejected'; code: string; reason: string }
+    /** A question reopened its completed Dispatch, so the relay pump must resume. */
+    reopened: boolean
   } {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -5914,7 +5979,20 @@ export class OrchestrationDb {
           `Federated relay message ${params.message.id} conflicts with an existing message.`
         )
       }
+      let reopened = false
       if (message.type === 'question') {
+        // Why: the host reopened its settled member to ask; the home side follows so the answer can flow back.
+        const worker = this.getWorkerDispatch(params.dispatchId)
+        reopened =
+          !duplicate &&
+          federated.protocol_version >= ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION &&
+          worker?.state === 'succeeded' &&
+          worker.stage !== 'released' &&
+          this.renewCompletedDispatchInTransaction({
+            dispatchId: params.dispatchId,
+            reason: 'Reopened by a question from its remote member after worker_done.',
+            federated: true
+          })
         this.registerFederatedQuestion({
           messageId: message.id,
           runId: params.message.runId,
@@ -5963,7 +6041,7 @@ export class OrchestrationDb {
         this.setFederatedHomeImportSequence(params.dispatchId, params.sequence)
       }
       this.db.exec('COMMIT')
-      return { message, duplicate, ...(lifecycle ? { lifecycle } : {}) }
+      return { message, duplicate, reopened, ...(lifecycle ? { lifecycle } : {}) }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -6091,10 +6169,12 @@ export class OrchestrationDb {
       .prepare(
         `UPDATE remote_dispatch_attachments
          SET state = ?, stage = ?, capability_hash = NULL,
+             settled_capability_hash = CASE WHEN ? = 'succeeded'
+               THEN capability_hash ELSE NULL END,
              updated_at = datetime('now')
          WHERE dispatch_id = ? AND state = 'ready'`
       )
-      .run(state, stage, dispatchId)
+      .run(state, stage, state, dispatchId)
   }
 
   isDispatchProcessCurrent(params: {
@@ -7731,35 +7811,63 @@ export class OrchestrationDb {
   }): DispatchContextRow | undefined {
     this.db.exec('BEGIN IMMEDIATE')
     try {
-      const restored = this.db
-        .prepare(
-          `UPDATE dispatch_contexts
-           SET status = 'dispatched', completed_at = NULL, capability_revoked_at = NULL
-           WHERE id = ? AND status = 'completed' AND capability_hash IS NOT NULL`
-        )
-        .run(params.dispatchId)
-      if (restored.changes !== 1) {
-        this.db.exec('COMMIT')
-        return undefined
-      }
-      this.db
-        .prepare(
-          "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'completed'"
-        )
-        .run(params.dispatchId)
-      this.db
-        .prepare(
-          `UPDATE worker_dispatches
-           SET state = 'ready', stage = 'renewed_for_follow_up', last_error = ?, updated_at = datetime('now')
-           WHERE dispatch_id = ? AND state = 'succeeded'`
-        )
-        .run(params.reason, params.dispatchId)
+      const restored = this.renewCompletedDispatchInTransaction({ ...params, federated: false })
       this.db.exec('COMMIT')
-      return this.getDispatchContextById(params.dispatchId)
+      return restored ? this.getDispatchContextById(params.dispatchId) : undefined
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  // Why federated: the home row has no capability hash; the host holds the member's (ORCA-856).
+  private renewCompletedDispatchInTransaction(params: {
+    dispatchId: string
+    reason: string
+    federated: boolean
+  }): boolean {
+    const restored = this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET status = 'dispatched', completed_at = NULL, capability_revoked_at = NULL
+         WHERE id = ? AND status = 'completed' AND (? = 1 OR capability_hash IS NOT NULL)`
+      )
+      .run(params.dispatchId, params.federated ? 1 : 0)
+    if (restored.changes !== 1) {
+      return false
+    }
+    this.db
+      .prepare(
+        "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'completed'"
+      )
+      .run(params.dispatchId)
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches
+         SET state = 'ready', stage = 'renewed_for_follow_up', last_error = ?, updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state = 'succeeded'`
+      )
+      .run(params.reason, params.dispatchId)
+    return true
+  }
+
+  /** Settled federated members whose host may reopen them with a question (ORCA-856). */
+  listReopenableFederatedDispatchIds(): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT fd.dispatch_id FROM federated_dispatches fd
+         INNER JOIN dispatch_contexts dc ON dc.id = fd.dispatch_id
+         INNER JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
+         WHERE fd.protocol_version >= ? AND dc.status = 'completed'
+           AND wd.state = 'succeeded' AND wd.stage != 'released'
+           AND NOT EXISTS (
+             SELECT 1 FROM dispatch_contexts newer
+             WHERE newer.task_id = dc.task_id AND newer.rowid > dc.rowid
+           )
+         ORDER BY fd.rowid`
+      )
+      .all(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION) as { dispatch_id: string }[]
+    return rows.map((row) => row.dispatch_id)
   }
 
   /** Inference failures whose terminal showed something since `sinceIso`, failure time included (ORCA-658). */

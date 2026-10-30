@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 37
+export const ORCHESTRATION_SCHEMA_VERSION = 38
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -150,5 +150,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     lineage: 'lab',
     summary: "a remote game member's scene from its lead (ORCA-794)",
     effects: ['column:remote_dispatch_attachments.game_scene']
+  },
+  {
+    version: 38,
+    lineage: 'lab',
+    summary: "a settled remote member's capability proof, so it can reopen (ORCA-856)",
+    effects: ['column:remote_dispatch_attachments.settled_capability_hash']
   }
 ]
