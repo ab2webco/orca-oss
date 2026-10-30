@@ -393,7 +393,7 @@ Common recoveries:
 - `orca sonar symbol <name> --json`: where a symbol is declared.
 - `orca sonar index --root <worktree>`: build or refresh the index. Queries also refresh changed files.
 
-If it reports `sonar_not_installed`, use plain `rg` and file reads and do not reinstall the plugin yourself. On a remote Orca host it reports `sonar_remote_unavailable`; use plain search there.
+If it reports `sonar_not_installed`, use plain `rg` and file reads and do not reinstall the plugin yourself. If `find` or `symbol` exits 1 saying Sonar is turned off for agents, the owner switched it off in Sonar's settings: use plain search and do not switch it back on. On a remote Orca host it reports `sonar_remote_unavailable`; use plain search there.
 
 ## Next Action
 

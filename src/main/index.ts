@@ -350,7 +350,7 @@ import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
-import { scheduleSonarIndexWarmup } from './sonar-index-warmup'
+import { isSonarPluginActive, scheduleSonarIndexWarmup } from './sonar-index-warmup'
 import { wirePluginAgentStatusEvents } from './plugins/plugin-agent-status-event'
 import { PluginKillListService } from './plugins/plugin-kill-list-service'
 import { forwardOrcaNotificationsToPlugins } from './plugins/plugin-notification-event-bridge'
@@ -467,6 +467,7 @@ function warmSonarIndexOnWorktreeCreate(event: RuntimeWorktreeLifecycleEvent): v
   scheduleSonarIndexWarmup({
     userDataDir: app.getPath('userData'),
     worktreePath: event.path,
+    isPluginActive: () => isSonarPluginActive(pluginService),
     debug: (message, error) => console.debug(message, error)
   })
 }
