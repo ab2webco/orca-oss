@@ -74,3 +74,10 @@ export async function recordGameMember(
 ): Promise<void> {
   await client.call('game.memberRecord', { ...gameBoardCaller(), member }).catch(() => undefined)
 }
+
+/** Drops a member record a refused launch left, so it never reads as paused; never fails the caller. */
+export async function forgetGameMember(client: Client, ticket: string): Promise<void> {
+  await client
+    .call('game.memberDiscard', { ...gameBoardCaller(), tickets: [ticket] })
+    .catch(() => undefined)
+}

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import type { RuntimeClient } from '../runtime-client'
+import { RuntimeClientError } from '../runtime-client'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 
 const LEAD_WORKTREE = 'repo1::/repo'
@@ -61,6 +62,19 @@ type Fake = {
   unlisted?: unknown[]
   /** Review state per branch, as hostedReview.forBranch reports it. */
   reviews?: Record<string, string>
+  /** What workerStart throws after the host's own validation passes. */
+  startError?: Error
+}
+
+// Why the host's rule: the CLI once sent `name` with an existing worktree, which only the host refused (ORCA-894).
+function refuseLikeHost(params: Record<string, unknown>): void {
+  const creates = params.worktree === 'new-child' || params.worktree === 'new-top-level'
+  if (!creates && ['name', 'repo', 'baseBranch', 'setup'].some((key) => params[key])) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Creation and setup options apply only to new-child or new-top-level worktrees.'
+    )
+  }
 }
 
 function fakeClient(worktrees: unknown[], fake: Fake = {}) {
@@ -86,6 +100,12 @@ function fakeClient(worktrees: unknown[], fake: Fake = {}) {
       if (method === 'hostedReview.forBranch') {
         const state = fake.reviews?.[String(params.branch)]
         return { ok: true, result: state ? { provider: 'github', number: 925, state } : null }
+      }
+      if (method === 'orchestration.workerStart') {
+        refuseLikeHost(params)
+        if (fake.startError) {
+          throw fake.startError
+        }
       }
       return { ok: true, result: results[method] }
     }
@@ -127,10 +147,49 @@ describe('game launch: the ticket keeps its worktree', () => {
     )
     expect(start()).toEqual(expect.objectContaining({ worktree: 'id:repo1::/ws/cin-12-2' }))
     expect(start()).not.toHaveProperty('repo')
+    expect(start()).not.toHaveProperty('name')
     // Why: the fleet reads the member's PR from the worktree this record names.
     expect(calls.findLast(([method]) => method === 'game.memberRecord')?.[1]).toEqual(
       expect.objectContaining({ member: expect.objectContaining({ worktreeId: old.id }) })
     )
+  })
+
+  it('relaunches into the idle worktree on a named account', async () => {
+    const old = worktree('/ws/cin-12', 'fab/cin-12')
+    const { client, calls, start } = fakeClient([MAIN, old])
+    const account = { id: 'acct-2', email: 'two@example.com' }
+    const call = client.call.bind(client)
+    client.call = (async (method: string, params: Record<string, unknown>) =>
+      method === 'accounts.snapshot'
+        ? {
+            ok: true,
+            result: {
+              claude: { accounts: [account], activeAccountId: null },
+              codex: { accounts: [], activeAccountId: null }
+            }
+          }
+        : call(method, params)) as RuntimeClient['call']
+
+    await launch(client, 'cin-12', [['account', 'two@example.com']])
+
+    expect(start()).toEqual(
+      expect.objectContaining({ worktree: `id:${old.id}`, claudeAccountId: 'acct-2' })
+    )
+    expect(calls.map(([method]) => method)).not.toContain('game.memberDiscard')
+  })
+
+  it('frees the member record a refused start wrote, so the ticket never reads as paused', async () => {
+    const { client, calls } = fakeClient([MAIN, worktree('/ws/cin-12', 'fab/cin-12')], {
+      startError: new RuntimeClientError('agent_unconfigured', 'no launcher')
+    })
+
+    await expect(launch(client)).rejects.toThrow('no launcher')
+
+    const recorded = calls.findIndex(([method]) => method === 'game.memberRecord')
+    const freed = calls.findIndex(([method]) => method === 'game.memberDiscard')
+    expect(recorded).toBeGreaterThan(-1)
+    expect(freed).toBeGreaterThan(recorded)
+    expect(calls[freed][1]).toEqual(expect.objectContaining({ tickets: ['CIN-12'] }))
   })
 
   it('refuses, naming the worktree and the live member, when an agent already works there', async () => {

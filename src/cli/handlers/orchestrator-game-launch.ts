@@ -19,10 +19,10 @@ import {
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
-import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { callWithLaunchRetry, isLaunchRefusal } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
-import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { forgetGameMember, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
@@ -194,10 +194,12 @@ export async function launchGameMember(args: {
     account: memberAccount.account?.email,
     lastState: 'launching'
   })
+  const createsWorktree = where.worktree === 'new-child' || where.worktree === 'new-top-level'
   const workerParams = {
     task: task.result.task.id,
     ...where,
-    name: ticket.toLowerCase(),
+    // Why: workerStart refuses creation options for the existing worktree a relaunch reuses (ORCA-894).
+    ...(createsWorktree ? { name: ticket.toLowerCase() } : {}),
     displayName: title,
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
@@ -215,7 +217,13 @@ export async function launchGameMember(args: {
       workerParams,
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
-  )
+  ).catch(async (error: unknown) => {
+    // Why: the record above would read as a paused member and block the next launch (ORCA-894).
+    if (isLaunchRefusal(error)) {
+      await forgetGameMember(client, ticket)
+    }
+    throw error
+  })
   await recordGameMember(client, {
     ticket,
     dispatchId: worker.result.dispatchId,
