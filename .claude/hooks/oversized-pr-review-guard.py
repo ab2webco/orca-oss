@@ -17,6 +17,10 @@ Lo que esto compra es que saltárselo sea un acto deliberado que deja dicho cont
 lineage, en vez de una deriva de cuatro rondas que nadie nombra.
 """
 
+# Why: macOS ships python3 3.9 at /usr/bin; `str | None` crashes there at import, the hook
+# exits 1 and Claude Code runs the merge unchecked (ORCA-803).
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -295,8 +299,9 @@ def authored_additions(number: str, repo: str, directory: str | None) -> int | N
 
 UNRESOLVED_REPO = (
     "oversized-pr-review-guard: no se pudo resolver el repositorio de este `gh pr merge`, "
-    "así que no se midió el tamaño de su PR. El comando se deja pasar; pasá `-R owner/repo` "
-    "para que la guarda lo mida."
+    "así que no se puede medir el tamaño de su PR.\n\n"
+    "Pasá `-R owner/repo` (o la URL del PR), o corré el merge desde un checkout de ese repo "
+    "con un `cd` a una ruta literal."
 )
 UNRESOLVED_NUMBER = (
     "oversized-pr-review-guard: no se pudo resolver el número del PR, así que no se "
@@ -317,13 +322,14 @@ def check_call(call: MergeCall, ack: re.Match[str] | None) -> str | None:
 
     explicit = url.group("repo") if url else flag if flag is not None else call.env_repo
     repo = repo_slug(explicit) if explicit is not None else directory_repo(call.directory)
+    # Why fail closed: sin repo no hay medición, igual que con un diff ilegible (ORCA-803).
     if repo is None:
-        return UNRESOLVED_REPO
+        deny(UNRESOLVED_REPO)
 
     number = url.group("number") if url else selector
     if number is None:
         if call.directory is None:
-            return UNRESOLVED_REPO
+            deny(UNRESOLVED_REPO)
         number = pr_number(repo, call.directory)
     if number is None:
         deny(UNRESOLVED_NUMBER)
