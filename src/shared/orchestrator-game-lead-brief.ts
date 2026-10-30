@@ -104,9 +104,9 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  `--agent <id>`, `--account <email|id>`, `--model <id>` or `--effort <level>` to game launch or game wave.',
     `- ${run('game accounts')} lists each managed account per agent with its 5h and 7d use, when it resets`,
     '  and the members on it; read it before choosing an account or answering about quota.',
-    ...(lead.accounts === 'auto'
+    ...(lead.accounts !== 'default'
       ? [
-          "- This project uses accounts: auto: Orca puts each member on its agent's freest account, so",
+          "- Orca puts each member on its agent's freest account (accounts: auto, the default), so",
           "  don't pick an account yourself unless the person names one."
         ]
       : []),

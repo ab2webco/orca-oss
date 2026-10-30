@@ -527,7 +527,7 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    accounts: default # optional: auto (unset: the freest managed account, see below) or default (Orca's own selection)
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
@@ -817,8 +817,9 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
 
 ### Accounts and limited members
 
-`accounts: auto` (orca.yaml or the project Settings' **Member accounts**) puts each new member on
-the managed account of its agent with the most free quota
+`accounts: auto`, also when unset (orca.yaml or the project Settings' **Member accounts**), puts
+each new member that `game launch` or `game wave` starts without `--account` on the managed account
+of its agent with the most free quota
 ([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
 
 - An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
@@ -831,7 +832,14 @@ the managed account of its agent with the most free quota
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
 - When every account is near or limited the launch is refused with when the first is back.
-  `default` (or unset) keeps Orca's own account selection.
+- A launch never falls back to the host's global login (`~/.claude`, `~/.codex`) while the agent
+  has managed accounts: Orca cannot refresh, `game move` or `account switch` a member there
+  (ORCA-809). When none of them is usable the launch is refused and says to name one with
+  `--account`. With no managed account at all, one member runs on the global login and the launch
+  says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
+  `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
+- `default` keeps Orca's own account selection, which can be the global login. A member placed
+  with `--on` sends the host only what was typed or set to `auto`.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
