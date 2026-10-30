@@ -20,18 +20,15 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
-import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import {
-  memberDisplayNameOf,
-  memberNameOf,
-  memberRosterOf,
-  nextMemberName
-} from '../../shared/orchestrator-game-member-names'
+import { memberDisplayNameOf, memberNameOf } from '../../shared/orchestrator-game-member-names'
+import { memberNameFor } from './orchestrator-game-member-name-reserve'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
@@ -101,33 +98,6 @@ export const readCallerGameState = (client: Client) =>
     paneKey: process.env.ORCA_PANE_KEY
   })
 
-// Why the host picks: it sees every lead's members and holds the pick against a concurrent launch.
-async function memberNameFor(
-  client: Client,
-  state: OrchestratorGameState,
-  ticket: string,
-  taken: readonly string[]
-): Promise<string | null> {
-  const roster = memberRosterOf(state)
-  const locale = process.env.ORCA_GAME_LOCALE ?? 'en'
-  const reserved = await client
-    .call<{ name?: unknown }>('game.memberNameReserve', {
-      ...gameBoardCaller(),
-      ticket,
-      roster,
-      locale,
-      taken
-    })
-    .then(
-      (response) => response.result,
-      () => undefined
-    )
-  // Why a local pick on any failure: an older Orca cannot reserve, and a name never blocks a launch.
-  return reserved?.name === null || typeof reserved?.name === 'string'
-    ? reserved.name
-    : nextMemberName(roster, taken, locale)
-}
-
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: {
   client: Client
@@ -169,6 +139,18 @@ export async function launchGameMember(args: {
         agents: state.agents,
         launched: args.launched
       })
+  await checkGameMemberMcpServers({
+    client,
+    state,
+    ticket,
+    agent: choice.agent,
+    required: lead.mcpServers,
+    skip: args.flags.get('skip-mcp-check') === true,
+    repo,
+    remote: args.remote ?? null,
+    account: memberAccount.account,
+    remoteAccount: choice.account
+  })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
   if (choice.model) {
