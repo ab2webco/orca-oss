@@ -2325,6 +2325,7 @@ type RuntimeNotifier = {
   worktreeBaseStatus?(event: WorktreeBaseStatusEvent): void
   worktreeRemoteBranchConflict?(event: WorktreeRemoteBranchConflictEvent): void
   reposChanged(): void
+  gameOwnerQuestionsChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -3871,6 +3872,10 @@ export class OrcaRuntimeService {
       } catch {
         return false
       }
+    },
+    ownerQuestionsChanged: () => {
+      this.notifier?.gameOwnerQuestionsChanged?.()
+      this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
     }
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null

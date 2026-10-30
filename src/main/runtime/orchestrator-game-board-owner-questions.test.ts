@@ -31,6 +31,7 @@ function board(project: (caller: { terminalHandle?: string }) => GameBoardProjec
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-owner-'))
   dirs.push(dir)
   const told: { lead: GameBoardLead; note: GameLeadNote }[] = []
+  const changed: string[] = []
   const game = new GameBoard({
     store: new GameHistoryStore(() => dir),
     stops: new GameStopSwitch(() => join(dir, 'stop')),
@@ -40,9 +41,10 @@ function board(project: (caller: { terminalHandle?: string }) => GameBoardProjec
       told.push({ lead, note })
       return true
     },
+    ownerQuestionsChanged: (projectKey) => changed.push(projectKey),
     now: () => new Date(Date.UTC(2026, 9, 29, 10, 0, 0))
   })
-  return { game, told }
+  return { game, told, changed }
 }
 
 const ask = {
@@ -146,5 +148,15 @@ describe('GameBoard owner questions', () => {
     await expect(
       game.answerOwner({ terminalHandle: 'term_member', id: question.id, text: 'Yes' })
     ).rejects.toThrow(/member cannot answer/)
+  })
+
+  it('signals the project when a question is asked or answered, not when nothing changed', async () => {
+    const { game, changed } = board(() => LEAD)
+    const { question } = await game.askOwner(ask)
+    await game.answerOwner({ id: question.id, text: 'Yes' })
+    await game.answerOwner({ id: question.id, text: 'Yes' })
+    await game.ownerQuestions({ terminalHandle: 'term_lead' })
+
+    expect(changed).toEqual(['repo:r1', 'repo:r1'])
   })
 })
