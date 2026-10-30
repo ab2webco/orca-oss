@@ -78,14 +78,24 @@ apart:
   rewords **any** CDP error on `Runtime.callFunctionOn` that is not a JS exception or a closed
   session.
 
-The case seen in CI is V8's `Promise was collected`: the promise the evaluate awaited was
-garbage-collected before it settled, which means nothing could ever have resolved it. In both
-ORCA-885 occurrences that was an awaited `window.api.settings.set(...)`, with no navigation, no
-reload and no crash. `page-context-loss-evidence.ts` reports this as `protocol-error` when the
-test's error has the period and nothing navigated. To read the raw error, rerun with
-`DEBUG=pw:protocol` and grep for `"error":{"code":-32000`.
-`page.evaluate(() => new Promise(() => {}))` followed by `HeapProfiler.collectGarbage` reproduces
-the message deterministically.
+The case seen in CI is V8's `Promise was collected`. In both ORCA-885 occurrences the evaluate
+awaited `window.api.settings.set(...)`, with no navigation, no reload and no crash.
+`page-context-loss-evidence.ts` reports this as `protocol-error` when the test's error has the
+period and nothing navigated. To read the raw error, rerun with `DEBUG=pw:protocol` and grep for
+`"error":{"code":-32000`.
+
+**Cause (ORCA-895): the call succeeded and the V8 inspector lost the answer.** Electron 43.x ships
+V8 15.0, whose inspector holds an `awaitPromise` result only weakly. Once the promise settles, its
+reaction jobs no longer reference it, so a GC that lands before the inspector's own job runs
+collects it and the inspector replies `Promise was collected`, though `settings.set` resolved and
+main applied the setting. Under load, right after startup or a screenshot, GCs are frequent enough
+to hit that window about 1 run in 20. Nothing in Orca drops a resolver: a full GC while the invoke
+is still pending never collects it. V8 fixed this in `5177b10891` ("hold on to promises",
+crbug 536271637), which reaches Electron 44 (V8 15.2) and no 43.x release, 43.8.4 included.
+`tests/e2e/settings-set-cdp-promise-lifetime.spec.ts` reproduces it deterministically with
+`--js-flags=--expose-gc` and a `gc()` queued one microtask after the await (two for
+`page.evaluate`, whose utility script adds an async step). It asserts the failure below Electron 44
+and the answer from 44 on. Retrying the evaluate repeats a write that already happened.
 
 ## Reading the automated evidence (ORCA-280)
 
