@@ -146,14 +146,4 @@ describe('GameInboxSheet', () => {
     act(() => fireEvent.click(view.getByRole('button', { name: /All threads/ })))
     expect(view.getByTestId('game-inbox-thread-ORCA-14')).toBeTruthy()
   })
-
-  it('audits under Answered what the lead answered and when', () => {
-    const view = renderSheet()
-    tab(view, /Answered/)
-
-    const row = view.getByTestId('game-inbox-answered-q0')
-    expect(within(row).getByText('Rebase onto main?')).toBeTruthy()
-    expect(within(row).getByText('Yes, rebase.')).toBeTruthy()
-    expect(within(row).getByText('Decision')).toBeTruthy()
-  })
 })

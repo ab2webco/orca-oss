@@ -16273,8 +16273,7 @@
           "forYou": "For you",
           "empty": "No questions are waiting for you.",
           "waiting": "Waiting",
-          "threads": "Threads",
-          "answered": "Answered"
+          "threads": "Threads"
         },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
@@ -16298,10 +16297,6 @@
         "GameInboxWaitingList": {
           "empty": "No member is waiting for an answer.",
           "answerer": "{{answerer}} must answer"
-        },
-        "GameInboxAnsweredList": {
-          "empty": "The lead has not answered a member yet.",
-          "answeredAt": "answered {{when}}"
         },
         "GameInboxThreadsView": {
           "rejected": "Rejected",

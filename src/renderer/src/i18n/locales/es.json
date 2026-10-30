@@ -15330,8 +15330,7 @@
           "forYou": "Para ti",
           "empty": "No hay preguntas esperando tu respuesta.",
           "waiting": "Esperando",
-          "threads": "Hilos",
-          "answered": "Respondidas"
+          "threads": "Hilos"
         },
         "GameOwnerQuestionCard": {
           "failed": "La respuesta no se envió.",
@@ -15355,10 +15354,6 @@
         "GameInboxWaitingList": {
           "empty": "Ningún miembro espera una respuesta.",
           "answerer": "Debe responder: {{answerer}}"
-        },
-        "GameInboxAnsweredList": {
-          "empty": "El lead todavía no ha respondido a ningún miembro.",
-          "answeredAt": "respondida {{when}}"
         },
         "GameInboxThreadsView": {
           "rejected": "Rechazado",

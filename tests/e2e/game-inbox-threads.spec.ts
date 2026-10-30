@@ -22,7 +22,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 // The person reads how the lead and each member talk, and what waits on the lead (ORCA-878).
-test("the Inbox shows each ticket's thread, what waits on the lead and what it answered", async ({
+test("the Inbox shows each ticket's thread and what waits on the lead", async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -190,11 +190,6 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     }
     await settleGameInboxSheet(orcaPage, 1440)
 
-    await sheet.getByRole('tab', { name: /Answered/ }).click()
-    const answered = sheet.locator('[data-testid^="game-inbox-answered-"]')
-    await expect(answered).toHaveCount(1)
-    await expect(answered).toContainText('8080')
-
     await sheet.getByRole('tab', { name: /Threads/ }).click()
     await expect(sheet.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
     await sheet.getByTestId('game-inbox-thread-ORCA-12').click()
@@ -225,16 +220,6 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('threads-1440-light.png')
-    })
-    await sheet.getByRole('tab', { name: /Answered/ }).click()
-    await expect(sheet.getByRole('tab', { name: /Answered/ })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    )
-    await settleGameInboxSheet(orcaPage, 1440)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('answered-1440-light.png')
     })
   } finally {
     agent.dispose()
