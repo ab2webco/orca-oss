@@ -129,6 +129,11 @@ export type QuestionRow = {
   closed_at: string | null
 }
 
+export type GameAnsweredQuestionRow = MessageRow & {
+  answer_body: string | null
+  answered_at: string | null
+}
+
 export type MutationState = 'pending' | 'completed'
 
 export type MutationReceiptRow = {

@@ -36,7 +36,8 @@ import type {
   RemoteDispatchAttachmentRow,
   FederationRelayDirection,
   FederationRelayItemRow,
-  RemoteAttachmentRefusal
+  RemoteAttachmentRefusal,
+  GameAnsweredQuestionRow
 } from './types'
 import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestration-task-display'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
@@ -4080,7 +4081,7 @@ export class OrchestrationDb {
 
   // Why: a question stays waiting on the lead after its mail is acked, until someone answers or closes it.
   listPendingQuestions(runId: string): MessageRow[] {
-    return this.db
+    const rows = this.db
       .prepare(
         `SELECT m.* FROM question_threads q
            JOIN messages m ON m.id = q.message_id
@@ -4088,6 +4089,26 @@ export class OrchestrationDb {
           ORDER BY m.sequence`
       )
       .all(runId) as MessageRow[]
+    // Why: the Inbox ages these; a timezone-less time would read as local.
+    return exposeMessageListTimestamps(rows)
+  }
+
+  // Why: the Inbox audits what the lead answered, newest first.
+  listAnsweredQuestions(runId: string, limit: number): GameAnsweredQuestionRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.*, q.answer_body, q.answered_at FROM question_threads q
+           JOIN messages m ON m.id = q.message_id
+          WHERE q.run_id = ? AND q.status = 'answered'
+          ORDER BY q.answered_at DESC, m.sequence DESC
+          LIMIT ?`
+      )
+      .all(runId, limit) as GameAnsweredQuestionRow[]
+    return rows.map((row) => ({
+      ...exposeMessageTimestamps(row),
+      answer_body: row.answer_body,
+      answered_at: exposeUtcTimestamp(row.answered_at)
+    }))
   }
 
   private getQuestionRaw(messageId: string): QuestionRow | undefined {

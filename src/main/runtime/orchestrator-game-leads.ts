@@ -140,6 +140,12 @@ export class GameLeads {
     return live && live.handle !== project.lead.handle ? live.handle : null
   }
 
+  /** The project's live lead, for a caller that is no terminal: the person's Inbox. */
+  async liveLeadOf(projectKey: string): Promise<string | null> {
+    await this.settle(projectKey)
+    return (await this.leadOf(projectKey))?.handle ?? null
+  }
+
   async list(): Promise<{ leads: GameLeadListing[] }> {
     await this.settle()
     const live = this.directory.live(this.deps.isLive)

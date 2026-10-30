@@ -9,6 +9,10 @@ import {
   type GameInboxSummary
 } from '../../shared/orchestrator-game-inbox'
 import {
+  gameInboxThreadsOf,
+  type GameInboxThreads
+} from '../../shared/orchestrator-game-inbox-threads'
+import {
   filterGameEvents,
   type GameEvent,
   type GameEventKind
@@ -39,6 +43,19 @@ export type GameBoardProject = {
 }
 
 export type GameBoardLead = { handle: string; paneKey: string | null }
+
+/** The person's Inbox calls with a worktree, never a terminal: its lead is the project's live one. */
+export async function withProjectLead(
+  project: GameBoardProject,
+  liveLeadOf: (projectKey: string) => Promise<string | null>,
+  paneOf: (handle: string) => string | null
+): Promise<GameBoardProject> {
+  if (project.lead || project.isMember) {
+    return project
+  }
+  const handle = await liveLeadOf(project.key)
+  return handle ? { ...project, lead: { handle, paneKey: paneOf(handle) } } : project
+}
 
 /** Mail the host sends the lead itself; tellLead returns false when it could not be stored. */
 export type GameLeadNote = { subject: string; body: string; payload: Record<string, unknown> }
@@ -114,6 +131,17 @@ export class GameBoard {
         waiting: inbox.waiting
       }
     })
+  }
+
+  /** The person's Inbox: every ticket's thread, what waits on the lead and what it answered; reads, never marks. */
+  async inboxThreads(caller: GameBoardCaller): Promise<GameInboxThreads> {
+    const project = await this.deps.projectOf(caller)
+    if (project.isMember) {
+      throw new Error("A member reads only its own ticket's inbox: use `game inbox`.")
+    }
+    return project.lead
+      ? gameInboxThreadsOf(this.deps.inboxSourceOf(project.lead))
+      : { threads: [], waiting: [], answered: [] }
   }
 
   private async inboxesOf(project: GameBoardProject): Promise<GameInbox[]> {
