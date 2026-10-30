@@ -40,6 +40,8 @@ export type PageContextLossObservation = {
    */
   handleWindowIndex: number
   windowUrlsAtReport: string[]
+  /** The test failed with Playwright's rewording of a CDP protocol error. */
+  rewrittenProtocolError: boolean
 }
 
 export type PageContextLossVerdict =
@@ -53,6 +55,9 @@ export type PageContextLossVerdict =
   | 'page-closed'
   /** No navigation on this page, and the app no longer lists it. */
   | 'wrong-window'
+  /** Nothing navigated; Chromium answered the call with a protocol error
+   *  (e.g. 'Promise was collected') that Playwright reworded. */
+  | 'protocol-error'
   /** Nothing observed — the loss came from somewhere this recorder cannot see. */
   | 'no-navigation'
 
@@ -84,7 +89,19 @@ export function classifyPageContextLoss(
   if (observation.handleWindowIndex < 0) {
     return 'wrong-window'
   }
+  if (observation.rewrittenProtocolError) {
+    return 'protocol-error'
+  }
   return 'no-navigation'
+}
+
+/**
+ * Playwright 1.59.1 prints the same sentence for two causes. frames.js (a
+ * context Chromium destroyed) omits the final period; crExecutionContext.js
+ * `rewriteError` (any CDP error on the call) keeps it.
+ */
+export function isRewrittenProtocolError(message: string): boolean {
+  return message.includes('Execution context was destroyed, most likely because of a navigation.')
 }
 
 /** One log line, in the shape `renderer-recovery-evidence` already prints. */
@@ -99,14 +116,16 @@ export function formatPageContextLossLine(
   const detail =
     verdict === 'no-navigation'
       ? 'the page never navigated, never reloaded, and is still the app window — this recorder cannot see the cause'
-      : `navigations: [${nav || 'none'}], loads: ${observation.loads}, ` +
-        `windows ${observation.windowsAtAttach}→${observation.windowsAtReport}, ` +
-        `handle index ${observation.handleWindowIndex}`
+      : verdict === 'protocol-error'
+        ? 'nothing navigated and the context was not destroyed: Chromium returned a protocol error for the call (e.g. "Promise was collected"); rerun with DEBUG=pw:protocol to read it'
+        : `navigations: [${nav || 'none'}], loads: ${observation.loads}, ` +
+          `windows ${observation.windowsAtAttach}→${observation.windowsAtReport}, ` +
+          `handle index ${observation.handleWindowIndex}`
   return `[page-context-loss] ${testTitle} :: ${verdict} — ${detail}`
 }
 
 type Recorder = {
-  observe: (app: ElectronApplication) => PageContextLossObservation
+  observe: (app: ElectronApplication) => Omit<PageContextLossObservation, 'rewrittenProtocolError'>
 }
 
 const recorders = new WeakMap<Page, Recorder>()
@@ -188,7 +207,12 @@ export async function reportPageContextLoss(
   }
   let observation: PageContextLossObservation
   try {
-    observation = recorder.observe(app)
+    observation = {
+      ...recorder.observe(app),
+      rewrittenProtocolError: testInfo.errors.some((error) =>
+        isRewrittenProtocolError(error.message ?? '')
+      )
+    }
   } catch {
     // Never let diagnosis mask the assertion that actually failed.
     return

@@ -74,6 +74,16 @@ bloqueos falsos en una sesión, misma causa (ORCA-362).
 Lo que no cambió es la severidad: un comando ilegible que sí nombra un merge sigue rechazado,
 y `gh pr create` sin ticket sigue rechazado. Se corrigió el alcance del análisis.
 
+### Las guardas corren en Python 3.9
+
+El `python3` de macOS (`/usr/bin/python3`) es 3.9, y una sesión cuyo PATH lo encuentra primero
+corre las guardas con él. Una guarda que revienta sale con 1, y Claude Code trata ese exit como
+un error no bloqueante: el comando pasa sin revisar. Así estuvieron apagadas
+`board-state-guard`, `main-merge-guard`, `post-merge-board-close` y
+`oversized-pr-review-guard` en esas sesiones, por un `str | None` en una firma (ORCA-884,
+ORCA-803). Las que anotan `X | Y` abren con `from __future__ import annotations`, y el job
+`Claude hooks on Python 3.9` de PR CI corre cada hook y las suites de las guardas sobre 3.9.
+
 ### Ciclo de vida del guard de merge
 
 `minimumVersion` fija Claude Code 2.1.229 como piso de actualizaciones, no un requisito de arranque:

@@ -63,6 +63,9 @@ nuevo desde ese handoff. Nadie sigue coordinando después de la tercera compacta
 pierde detalle, y las correcciones más fuertes de la ventana de 65 días cayeron al final de las dos
 sesiones que llegaron a 11 y 21 compactaciones.
 
+El lead nuevo se abre, con el anterior ya cerrado, con `/orca-game:lead fresh` (`orca game lead --fresh`):
+sin ese flag Orca reabre la conversación compactada del lead anterior.
+
 ## Atribución en los commits
 
 Los mensajes acreditan personas, no herramientas: nada de `Co-Authored-By` de un asistente ni

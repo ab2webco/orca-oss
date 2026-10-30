@@ -5,6 +5,7 @@ import type { Level } from './fleet-hud'
 import { flatLine } from './flat-block'
 import { cellWidthOf } from './cell-width'
 import { flatMemberLinesOf, flatNameOf, flatScoreLineOf } from './flat-view'
+import { teamOrderOf } from './party'
 import { currentScene } from './quest-runtime'
 import { tapButtonsOf } from './tap-buttons'
 
@@ -67,7 +68,7 @@ export function flatPaneMembers(
     columns: isTap ? columns : Math.max(1, columns - viewCells),
     maxMembers: PANE_MEMBER_LINES
   })
-  const viewable = state.agents.flatMap((agent, index) =>
+  const viewable = teamOrderOf(state).flatMap((agent, index) =>
     agent.terminalHandle === undefined ? [] : [{ agent, handle: agent.terminalHandle, index }]
   )
   const byKey = new Map(viewable.map((one) => [one.agent.paneKey, one]))
