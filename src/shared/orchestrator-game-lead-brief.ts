@@ -1,13 +1,5 @@
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
-import { quotePosixShell } from './wsl-login-shell-command'
-
-const BASH_SAFE_WORD = /^[A-Za-z0-9_./:@%+=,-]+$/
-
-// Why: the lead runs these in Claude Code's Bash tool, Git Bash on Windows, where `\` escapes and a space splits.
-const bashWordOfCli = (cli: string): string => {
-  const path = /^[A-Za-z]:\\/.test(cli) ? cli.replaceAll('\\', '/') : cli
-  return BASH_SAFE_WORD.test(path) ? path : quotePosixShell(path)
-}
+import { bashWordOfCli } from './bash-cli-word'
 
 /**
  * The standing rules that turn a session into the project's lead; `orca game lead` prints them.
@@ -43,6 +35,7 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  carries a `deliveryId`; once you handled every message in it, wait again with',
     `  ${run('orchestration check --ack <deliveryId> --wait --watch --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json')}.`,
     '  Until you ack it, every check replays the same messages and newer reports wait behind them.',
+    '  A watch event cuts long text: when a result lists `readInFull`, run each of those commands before you act on its message.',
     '  Mail from another lead or the person wakes it whatever its type; never add `status` to --types,',
     "  which would wake you for every member's status ping.",
     `- Answer a member question or decision gate you can with ${run('orchestration reply --id <msg_id> --body <answer>')};`,

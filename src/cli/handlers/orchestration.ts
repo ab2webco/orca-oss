@@ -780,9 +780,16 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
     }
     result = {
       ...result,
-      result: prepareOrchestrationCheckOutput(result.result, terminal, flags.has('format'))
+      result: prepareOrchestrationCheckOutput(
+        result.result,
+        terminal,
+        flags.has('format'),
+        resolveCompatibilityCliCommand()
+      )
     }
-    printResult(result, json, (r) => formatOrchestrationCheckText(r, terminal))
+    printResult(result, json, (r) =>
+      formatOrchestrationCheckText(r, terminal, resolveCompatibilityCliCommand())
+    )
     const compatibilityAck = result.result.legacyCompatibility?.ackMessageIds
     if (compatibilityAck && compatibilityAck.length > 0) {
       await flushStdout()
@@ -818,14 +825,28 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
   },
 
   'orchestration inbox': async ({ flags, client, json }) => {
-    const full = flags.has('full')
-    const result = await client.call<{
+    const id = getOptionalStringFlag(flags, 'id')
+    const terminal = getOptionalStringFlag(flags, 'terminal')
+    const full = flags.has('full') || id !== undefined
+    let result = await client.call<{
       messages: MessageSummary[]
       count: number
     }>('orchestration.inbox', {
       limit: getOptionalPositiveIntegerFlag(flags, 'limit'),
-      terminal: getOptionalStringFlag(flags, 'terminal')
+      terminal,
+      id
     })
+    if (id !== undefined) {
+      // Why: a runtime without the id param returns the handle's whole window.
+      const messages = result.result.messages.filter((m) => m.id === id)
+      if (messages.length === 0) {
+        throw new RuntimeClientError(
+          'message_not_found',
+          `No message ${id}${terminal ? ` to ${terminal}` : ''}.`
+        )
+      }
+      result = { ...result, result: { messages, count: messages.length } }
+    }
     printResult(result, json, (r) => {
       if (r.count === 0) {
         return 'No messages.'

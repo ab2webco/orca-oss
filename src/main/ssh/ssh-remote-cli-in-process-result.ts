@@ -23,7 +23,8 @@ export function formatInProcessRemoteCliResult(
           response,
           json,
           resolveRemoteCliHandle(parsed.flags, env, 'terminal'),
-          parsed.flags.has('format')
+          parsed.flags.has('format'),
+          env.ORCA_CLI_COMMAND || undefined
         )
       : command === 'orchestration ask'
         ? formatRemoteOrchestrationAsk(response, json)
