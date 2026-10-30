@@ -86,6 +86,22 @@ describe('orca game fleet verbs', () => {
     expect(text).toMatch(/claude\s+ana@example\.com/)
   })
 
+  it('fleet flags a member on the global login', async () => {
+    const { client } = fakeClient(stateWith({ agents: [LEAD, member({ globalLogin: true })] }))
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(output.join('\n')).toMatch(/claude\s+global login\s/)
+    output = []
+    await run('game fleet', client)
+    expect(printed().rows).toEqual([expect.objectContaining({ account: null, globalLogin: true })])
+  })
+
   it('fleet text lists members paused by a restart and how to resume or discard them', async () => {
     const { client } = fakeClient(
       stateWith({

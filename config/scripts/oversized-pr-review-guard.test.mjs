@@ -1,7 +1,15 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
@@ -61,14 +69,31 @@ function makeFakeGhBin({ number = '1', files = null, repos = {} } = {}) {
   return bin
 }
 
-function runGuard(command, ghOptions, cwd = makeDir()) {
+// Why every python3 and not only the first: the shebang runs whichever one the hook's PATH
+// finds, and macOS ships 3.9 at /usr/bin. A crash there exits 1 and Claude Code lets the
+// merge through (ORCA-803).
+function python3Interpreters() {
+  const candidates = [
+    ...(process.env.PATH ?? '').split(delimiter).map((dir) => join(dir, 'python3')),
+    '/usr/bin/python3'
+  ]
+  const byRealPath = new Map()
+  for (const candidate of candidates) {
+    if (existsSync(candidate) && !byRealPath.has(realpathSync(candidate))) {
+      byRealPath.set(realpathSync(candidate), candidate)
+    }
+  }
+  return [...byRealPath.values()]
+}
+
+function runGuard(command, ghOptions, cwd = makeDir(), python = 'python3') {
   const env = { ...process.env }
   // Why: a GH_REPO exported in the developer's shell would silently retarget these cases.
   delete env.GH_REPO
   if (ghOptions !== undefined) {
     env.PATH = `${makeFakeGhBin(ghOptions)}:${env.PATH}`
   }
-  const result = spawnSync('python3', [hookScript], {
+  const result = spawnSync(python, [hookScript], {
     cwd,
     env,
     encoding: 'utf8',
@@ -134,7 +159,10 @@ describe('oversized-pr-review-guard', () => {
 
   // Why este caso primero: es el que se rompe si alguien afloja el predicado.
   it('denies a merge over the threshold with no acknowledgement', () => {
-    const result = runGuard('gh pr merge 12 --squash', { number: '12', files: bigProd })
+    const result = runGuard('gh pr merge 12 --squash', {
+      number: '12',
+      files: bigProd
+    })
     expect(result.denied).toBe(true)
     expect(result.reason).toContain('401')
     expect(result.reason).toContain('Cortar la tajada')
@@ -202,7 +230,10 @@ describe('oversized-pr-review-guard', () => {
   })
 
   it('does not count test files toward the threshold', () => {
-    const result = runGuard('gh pr merge 12 --squash', { number: '12', files: bigTests })
+    const result = runGuard('gh pr merge 12 --squash', {
+      number: '12',
+      files: bigTests
+    })
     expect(result.denied).toBe(false)
   })
 
@@ -219,7 +250,10 @@ describe('oversized-pr-review-guard', () => {
   })
 
   it('denies when the diff cannot be read', () => {
-    const result = runGuard('gh pr merge 12 --squash', { number: '12', files: null })
+    const result = runGuard('gh pr merge 12 --squash', {
+      number: '12',
+      files: null
+    })
     expect(result.denied).toBe(true)
     expect(result.reason).toContain('no se pudo leer el diff')
   })
@@ -231,7 +265,10 @@ describe('oversized-pr-review-guard', () => {
   })
 
   it('denies a branch selector it cannot map to a pr number', () => {
-    const result = runGuard('gh pr merge feature-x --squash', { number: '1', files: bigProd })
+    const result = runGuard('gh pr merge feature-x --squash', {
+      number: '1',
+      files: bigProd
+    })
     expect(result.denied).toBe(true)
     expect(result.reason).toContain('no se pudo resolver el número')
   })
@@ -294,16 +331,57 @@ describe('oversized-pr-review-guard', () => {
     expect(result.denied).toBe(true)
   })
 
-  it('fails open with a clear note when the repo cannot be resolved', () => {
+  // ORCA-803: un merge sin repo conocido no se mide, así que se niega igual que un diff ilegible.
+  it('denies when the repo cannot be resolved and says how to name it', () => {
     const result = runGuard('gh pr merge 1 --squash', { files: bigProd }, makeDir(''))
-    expect(result.denied).toBe(false)
-    expect(result.note).toContain('no se pudo resolver el repositorio')
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('no se pudo resolver el repositorio')
+    expect(result.reason).toContain('-R owner/repo')
   })
 
-  it('fails open when a cd target cannot be known statically', () => {
-    const result = runGuard('cd "$HOME/orca" && gh pr merge 1 --squash', { files: bigProd })
+  it('denies when a cd target cannot be known statically', () => {
+    const result = runGuard('cd "$HOME/orca" && gh pr merge 1 --squash', {
+      files: bigProd
+    })
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('no se pudo resolver el repositorio')
+  })
+
+  it('measures the -R repo even when a cd target cannot be known statically', () => {
+    const result = runGuard(`cd "$HOME/orca" && gh pr merge 1 -R ${SONAR_REPO} --squash`, {
+      files: bigProd,
+      repos: { [SONAR_REPO]: sonarPr }
+    })
     expect(result.denied).toBe(false)
-    expect(result.note).toContain('no se pudo resolver el repositorio')
+  })
+
+  it.each(python3Interpreters())('still denies an oversized merge under %s', (python) => {
+    const result = runGuard(
+      'gh pr merge 12 --squash',
+      { number: '12', files: bigProd },
+      makeDir(),
+      python
+    )
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('suma 401 líneas propias')
+  })
+
+  // ORCA-803: un body escrito por heredoc que nombra el merge se leía como el merge.
+  it('does not read a merge named inside a heredoc body as a merge', () => {
+    const command = [
+      "gh pr create --title t --body \"$(cat <<'EOF'",
+      'gh pr merge feature-x -R ab2webco/orca-sonar',
+      'EOF',
+      ')"'
+    ].join('\n')
+    const result = runGuard(command, { number: '1', files: bigProd })
+    expect(result.denied).toBe(false)
+  })
+
+  it('does not read a heredoc body as a command when its opener has trailing spaces', () => {
+    const command = ["cat > body.md <<'EOF'  ", 'gh pr merge feature-x --squash', 'EOF'].join('\n')
+    const result = runGuard(command, { number: '1', files: bigProd })
+    expect(result.denied).toBe(false)
   })
 
   // ORCA-781: la guarda buscaba el texto del comando, así que una mención entre comillas

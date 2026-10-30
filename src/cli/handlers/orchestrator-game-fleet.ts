@@ -149,6 +149,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     }
     const launchedOnAccount = new Map<string, string[]>()
     const namesTaken: string[] = []
+    const onGlobalLogin: string[] = []
     for (const ticket of dryRun ? [] : wave.launch) {
       // Why re-read: STOP set while this wave runs refuses every ticket not yet launched.
       const stopped = await readStopNow(client)
@@ -167,10 +168,14 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           cwd,
           overrides,
           launched: launchedOnAccount,
-          namesTaken
+          namesTaken,
+          onGlobalLogin
         })
         if (launched.name) {
           namesTaken.push(launched.name)
+        }
+        if (launched.globalLogin) {
+          onGlobalLogin.push(ticket)
         }
         if (launched.accountId) {
           launchedOnAccount.set(launched.accountId, [

@@ -13,7 +13,7 @@ import re
 # propia línea. El cuerpo se reemplaza por un marcador para que la forma del
 # comando —la redirección— siga siendo legible por la guarda.
 _HEREDOC = re.compile(
-    r"<<-?\s*(?P<q>['\"]?)(?P<tag>[A-Za-z_][A-Za-z0-9_]*)(?P=q)\r?\n"
+    r"<<-?\s*(?P<q>['\"]?)(?P<tag>[A-Za-z_][A-Za-z0-9_]*)(?P=q)(?P<rest>[^\n]*?)\r?\n"
     r".*?"
     r"^\s*(?P=tag)\s*$",
     re.DOTALL | re.MULTILINE,
@@ -22,4 +22,5 @@ _HEREDOC = re.compile(
 
 def strip_heredocs(command: str) -> str:
     """El comando sin los cuerpos de sus heredocs."""
-    return _HEREDOC.sub("<<HEREDOC", command)
+    # Why keep `rest`: the opener line goes on after the tag (`> file`, `&& gh ...`).
+    return _HEREDOC.sub(lambda m: "<<HEREDOC" + m.group("rest"), command)

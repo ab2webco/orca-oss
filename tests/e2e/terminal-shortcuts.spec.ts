@@ -34,6 +34,7 @@ import {
   installTerminalPtyWriteSpy as installMainProcessPtyWriteSpy,
   readTerminalPtyWrites as getPtyWrites
 } from './helpers/terminal-pty-write-spy'
+import { buildPendingLineDiscardInputSequence } from './terminal-probe-input-sequence'
 
 async function setActivePaneForegroundAgent(
   page: Page,
@@ -487,8 +488,9 @@ test.describe('Terminal Shortcuts', () => {
 
     // Clear the shell's unconsumed CSI-u line before resetting flags in a settled
     // command; otherwise its line editor can swallow the reset bytes.
-    await sendToTerminal(orcaPage, ptyId, '\x15\x03')
-    await execInTerminal(orcaPage, ptyId, "printf '\\033[=0u'")
+    for (const input of buildPendingLineDiscardInputSequence("printf '\\033[=0u'\r")) {
+      await sendToTerminal(orcaPage, ptyId, input)
+    }
     await expect.poll(() => getKittyKeyboardFlags(orcaPage)).toBe(0)
     await pressAndExpectWrite(orcaPage, electronApp, 'Shift+Enter', '\x1b\r')
   })

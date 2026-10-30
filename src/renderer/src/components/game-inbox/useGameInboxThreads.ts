@@ -14,7 +14,10 @@ const NO_THREADS: GameInboxThreads = { threads: [], waiting: [], answered: [] }
 export function useGameInboxThreads(
   scope: GameInboxScope | null,
   open: boolean
-): GameInboxThreads & { reply: (message: GameMemberReply) => Promise<void> } {
+): GameInboxThreads & {
+  reload: () => Promise<void>
+  reply: (message: GameMemberReply) => Promise<void>
+} {
   const [loaded, setLoaded] = useState<{ scope: GameInboxScope; threads: GameInboxThreads } | null>(
     null
   )
@@ -57,6 +60,12 @@ export function useGameInboxThreads(
     }
   }, [scope, live, read])
 
+  const reload = useCallback(async () => {
+    if (scope) {
+      await read(scope)
+    }
+  }, [scope, read])
+
   const reply = useCallback(
     async (message: GameMemberReply) => {
       if (!scope) {
@@ -68,5 +77,5 @@ export function useGameInboxThreads(
     [scope, read]
   )
 
-  return { ...current, reply }
+  return { ...current, reload, reply }
 }

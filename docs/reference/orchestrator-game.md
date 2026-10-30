@@ -508,7 +508,7 @@ orchestratorGame:
 A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
 own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
 through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
-project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`
+project Settings edits all but the two prompts, `rules` and `mcpServers`, which live in `orca.yaml`
 (**Lead buttons** is `actions`).
 
 ```yaml
@@ -527,13 +527,25 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    accounts: default # optional: auto (unset: the freest managed account, see below) or default (Orca's own selection)
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
+    mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
+
+`mcpServers` makes `game launch` and `game wave` check, before they create anything, that the host
+and account a member would run on load each listed server, and refuse by name when one is missing
+(`mcp_servers_missing`). The host reads the config that account's Claude reads, so `--on <host>`
+answers for the host, and `--account` or `auto` for that account's vault
+([`orchestrator-game-member-mcp.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-member-mcp.ts)).
+A server counts when it is in that config's user-scope `mcpServers`, in an enabled user plugin, or in
+the repo's `.mcp.json`. A claude.ai connector counts when the account has ever connected it, so
+`Gmail` and `claude.ai Gmail` both match. The match ignores case. Launch prints `Warning:` and goes on
+when the host cannot tell: a Codex member, an SSH repo, a WSL vault, or a paired host whose Orca
+predates `game.member-mcp-servers.v1`. `--skip-mcp-check` launches without reading anything.
 
 Each member `game launch`/`game wave` starts is named after the first roster name no live member
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead
@@ -550,6 +562,9 @@ The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
+  project's stored lead conversation and this session becomes the new lead instead of reopening it.
+  A live lead still wins, and an older host that drops the flag reopens the old one and says so.
 - `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
@@ -746,6 +761,12 @@ are saved while they run, so the team picks up where it was:
   `game launch` refuses its ticket and `game wave` skips it (`paused`), so a ticket never gets a
   second member. A member whose PR merged or whose dispatch reported success is never paused, and
   `game sweep --close` and `game stop` forget the members they free.
+- **Worktree gone.** A paused member whose repo answered without its saved worktree carries
+  `worktreeGone` ([`game-member-worktree-presence.ts`](../../src/main/runtime/game-member-worktree-presence.ts));
+  a repo that could not be scanned, such as an SSH host offline, never marks it. It frees its slot,
+  `game fleet` lists it under `Cannot resume, worktree gone`, and `game resume-members` reports it
+  `unresumable` with the `--discard` command, without binding a run or failing the exit code, so a
+  lead start no longer retries it (ORCA-832).
 - **Resume.** `game resume-members` takes the paused members in turn, one at a time and never past
   the cap ([`orchestrator-game-member-resume.ts`](../../src/main/runtime/orchestrator-game-member-resume.ts)):
   - It first binds the run that owns their tasks; it never takes that run over while this lead
@@ -799,8 +820,9 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
 
 ### Accounts and limited members
 
-`accounts: auto` (orca.yaml or the project Settings' **Member accounts**) puts each new member on
-the managed account of its agent with the most free quota
+`accounts: auto`, also when unset (orca.yaml or the project Settings' **Member accounts**), puts
+each new member that `game launch` or `game wave` starts without `--account` on the managed account
+of its agent with the most free quota
 ([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
 
 - An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
@@ -813,7 +835,14 @@ the managed account of its agent with the most free quota
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
 - When every account is near or limited the launch is refused with when the first is back.
-  `default` (or unset) keeps Orca's own account selection.
+- A launch never falls back to the host's global login (`~/.claude`, `~/.codex`) while the agent
+  has managed accounts: Orca cannot refresh, `game move` or `account switch` a member there
+  (ORCA-809). When none of them is usable the launch is refused and says to name one with
+  `--account`. With no managed account at all, one member runs on the global login and the launch
+  says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
+  `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
+- `default` keeps Orca's own account selection, which can be the global login. A member placed
+  with `--on` sends the host only what was typed or set to `auto`.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not

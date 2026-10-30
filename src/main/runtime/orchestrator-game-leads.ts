@@ -43,6 +43,7 @@ export class GameLeads {
       sessions?: {
         read: (projectKey: string) => Promise<GameLeadSession | null>
         write: (projectKey: string, session: GameLeadSession) => Promise<void>
+        clear: (projectKey: string) => Promise<void>
       }
       sessionOf?: (handle: string) => Promise<GameLeadSession | null>
       /** Reopens the conversation in a new pane and returns that pane's handle. */
@@ -62,10 +63,11 @@ export class GameLeads {
 
   /**
    * A member never leads; `registered: false` is a quiet no for it and for a caller Orca cannot place.
-   * With `claim`, the project keeps one live lead and a closed lead's conversation reopens.
+   * With `claim`, the project keeps one live lead and a closed lead's conversation reopens; `fresh`
+   * retires that conversation instead, so the caller becomes the new lead.
    */
   async register(
-    args: GameBoardCaller & { project: string; label: string; claim?: boolean }
+    args: GameBoardCaller & { project: string; label: string; claim?: boolean; fresh?: boolean }
   ): Promise<GameLeadRegistration> {
     const project = await this.deps.projectOf(args)
     if (project.isMember || !project.lead) {
@@ -98,7 +100,8 @@ export class GameLeads {
       }
       const mine = (await this.deps.sessionOf?.(caller).catch(() => null)) ?? null
       let resumeError: string | undefined
-      const stored = live ? null : await this.deps.sessions?.read(project.key).catch(() => null)
+      const stored =
+        live || args.fresh ? null : await this.deps.sessions?.read(project.key).catch(() => null)
       if (stored && stored.sessionId !== mine?.sessionId && this.deps.resume) {
         try {
           const handle = await this.deps.resume(stored)
@@ -115,6 +118,8 @@ export class GameLeads {
       await this.remember(entry, callerPane, mine)
       if (mine) {
         await this.deps.sessions?.write(project.key, mine).catch(() => undefined)
+      } else if (args.fresh) {
+        await this.deps.sessions?.clear(project.key).catch(() => undefined)
       }
       return { registered: true, ...(resumeError === undefined ? {} : { resumeError }) }
     })

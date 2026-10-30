@@ -83,6 +83,8 @@ export const ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY =
 // Why: an older host's attach schema strips `account`, starting the member on its global login (ORCA-798).
 export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY =
   'orchestration.federation-member-account.v1' as const
+// Why: an older host has no game.memberMcpServers, so the home cannot tell what its member would load (ORCA-867).
+export const GAME_MEMBER_MCP_SERVERS_RUNTIME_CAPABILITY = 'game.member-mcp-servers.v1' as const
 // Why: a home without it cannot reopen a settled member, so the host must refuse its ask by name (ORCA-856).
 export const ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY =
   'orchestration.federation-member-reopen.v1' as const
@@ -206,6 +208,7 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+  GAME_MEMBER_MCP_SERVERS_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   BROWSER_SCREENCAST_RUNTIME_CAPABILITY,
   BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,

@@ -68,6 +68,36 @@ describe('game leads RPC', () => {
     ])
   })
 
+  it('passes a fresh claim through, so the host rotates the lead (ORCA-822)', async () => {
+    const seen: unknown[] = []
+    const send = dispatcherWith({
+      register: async (args) => {
+        seen.push(args)
+        return { registered: true }
+      },
+      list: () => ({ leads: [] })
+    })
+
+    await send('game.leadRegister', {
+      terminalHandle: 'term_b',
+      project: 'cineco',
+      label: 'Ana',
+      claim: true,
+      fresh: true
+    })
+
+    expect(seen).toEqual([
+      {
+        worktreeId: undefined,
+        terminalHandle: 'term_b',
+        project: 'cineco',
+        label: 'Ana',
+        claim: true,
+        fresh: true
+      }
+    ])
+  })
+
   it('lists the live leads', async () => {
     const leads = [{ project: 'cineco', label: 'Ana', handle: 'term_a', since: 'x' }]
     const send = dispatcherWith({ register: async () => ({}), list: () => ({ leads }) })

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { GameAgent, GameState } from '../types'
 import { syncHdTeam } from '../hooks/hd-team'
 import { resetQuest } from '../hooks/quest-runtime'
-import { shownResting } from '../hooks/quest-state'
+import { quest, shownResting } from '../hooks/quest-state'
 import { questToolCall } from '../hooks/quest-turns'
 
 const agent = (patch: Partial<GameAgent>): GameAgent => ({
@@ -77,5 +77,25 @@ describe("the lead's own band", () => {
     resetQuest()
     questToolCall('Bash', STATUS_SET, undefined)
     expect(shownResting()).toBe(true)
+  })
+})
+
+describe('the turn banner trail (ORCA-886)', () => {
+  test('walks the working members behind the hero, not the ghosts the host lists first', () => {
+    resetQuest()
+    const silent = { host: 'imac', stateKnown: false }
+    syncHdTeam(
+      state([
+        LEAD_WORKING,
+        agent({ paneKey: 'g1', displayName: 'ORCA-854', state: 'idle', remote: silent }),
+        agent({ paneKey: 'g2', displayName: 'ORCA-861', state: 'done', remote: silent }),
+        agent({ paneKey: 'notch', displayName: 'Notch', state: 'done' }),
+        agent({ paneKey: 'agnes', displayName: 'Agnes', activeAt: 1 }),
+        agent({ paneKey: 'zuri', displayName: 'Zuri', activeAt: 3 }),
+        agent({ paneKey: 'alex', displayName: 'Alex', activeAt: 2 })
+      ]),
+      true
+    )
+    expect(quest.hdParty.map((one) => one.name)).toEqual(['Zuri', 'Alex', 'Agnes', 'Notch'])
   })
 })

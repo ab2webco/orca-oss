@@ -744,7 +744,7 @@ import {
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
-import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
@@ -754,6 +754,7 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
@@ -797,6 +798,7 @@ import {
   gameMemberLaunchOf,
   type GameMemberLaunch
 } from '../../shared/orchestrator-game-member-launch'
+import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
@@ -3799,7 +3801,12 @@ export class OrcaRuntimeService {
       gamePausedCauseOf(
         this.getOrchestrationDbIfAvailable()?.getDispatchContext(member.taskId),
         (handle) => this.isTerminalOpenForHandle(handle)
-      )
+      ),
+    worktreeGone: (worktreeId) =>
+      isGameMemberWorktreeGone(worktreeId, {
+        reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
+        scan: (repo) => this.listRepoWorktreesForResolution(repo)
+      })
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({
@@ -13493,7 +13500,9 @@ export class OrcaRuntimeService {
     if (!terminalHandle || !claimedPaneKey || !launchToken) {
       return null
     }
-    const terminal = this.getOrchestrationDispatchAuthority(terminalHandle)
+    const terminal =
+      this.getOrchestrationDispatchAuthority(terminalHandle) ??
+      this.getOrchestrationDispatchAuthorityForStaleHandle(claimedPaneKey)
     if (
       !terminal?.processIncarnation ||
       !terminal.paneKey ||
@@ -13534,7 +13543,7 @@ export class OrcaRuntimeService {
         terminal,
         terminal.processIncarnation,
         claimedPaneKey,
-        terminalHandle,
+        terminal.terminalHandle,
         launchTokenHash
       )
     }
@@ -13551,9 +13560,21 @@ export class OrcaRuntimeService {
       terminal,
       terminal.processIncarnation,
       attestation.paneKey,
-      terminalHandle,
+      terminal.terminalHandle,
       launchTokenHash
     )
+  }
+
+  // Why: a PTY that outlives an Orca restart can get a new handle while its env keeps the old one
+  // (ORCA-835). The pane key still names it, and the caller's launch token is checked against it.
+  private getOrchestrationDispatchAuthorityForStaleHandle(
+    paneKey: string
+  ): OrchestrationCompatibilityTerminalAuthority | null {
+    if (!this.getPtyRecordForPaneKey(paneKey)?.connected) {
+      return null
+    }
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    return handle ? this.getOrchestrationDispatchAuthority(handle) : null
   }
 
   private freezeOrchestrationCompatibilityCallerAuthority(
@@ -14709,6 +14730,11 @@ export class OrcaRuntimeService {
   // the vault it lands in have to be the same machine's.
   buildGlobalConfigSyncInventory(): GlobalConfigSyncInventory {
     return this.requireAccountServices().claudeAccounts.buildGlobalConfigSyncInventory()
+  }
+
+  /** A host-runtime account's vault, for reading what its Claude loads; null for WSL or an unowned path. */
+  getClaudeManagedAuthPath(accountId: string): string | null {
+    return this.requireAccountServices().claudeAccounts.getOwnedManagedAuthPath(accountId)
   }
 
   syncGlobalConfigForClaudeAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
@@ -23780,7 +23806,9 @@ export class OrcaRuntimeService {
     agent: TuiAgent,
     prompt: string | undefined,
     launchPreferences?: AgentLaunchPreferences,
-    gameMember?: OrchestratorGameMemberLaunch | null
+    gameMember?: OrchestratorGameMemberLaunch | null,
+    /** Set for every game member, also one that gets no game (SSH, mod off). */
+    orchestrationGameMember?: boolean
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -23804,7 +23832,11 @@ export class OrcaRuntimeService {
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
@@ -24306,7 +24338,8 @@ export class OrcaRuntimeService {
             args.startupAgent,
             args.startupPrompt,
             args.startupLaunchPreferences,
-            gameMember
+            gameMember,
+            args.orchestrationGameMember
           )
         : null
     const draftStartup =
@@ -27861,7 +27894,11 @@ export class OrcaRuntimeService {
       prompt: '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        opts.orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform,
@@ -28026,7 +28063,11 @@ export class OrcaRuntimeService {
         request.agentArgs !== undefined
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        request.agent,
+        resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+        launchAccount.orchestrationGameMember
+      ),
       ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,
@@ -31185,6 +31226,19 @@ export class OrcaRuntimeService {
     member: { paneKey: string; agentType: string | null; worktreeId: string | null },
     worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
   ): ReturnType<typeof gameMemberAccountOf> {
+    return this.readGameMemberSeat(member, worktreesById, gameMemberAccountOf)
+  }
+
+  private readGameMemberSeat<T>(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>,
+    read: (seat: {
+      agentType: string | null
+      live: ManagedPtyAccountOwner | null
+      pinnedAccountId: string | null | undefined
+      accounts: readonly { id: string; email: string }[]
+    }) => T
+  ): T | null {
     const provider = accountProviderOfAgent(member.agentType)
     const services = this.accountServices
     if (!provider || !services) {
@@ -31194,7 +31248,7 @@ export class OrcaRuntimeService {
       const handle = this.getTerminalHandleForPaneKey(member.paneKey)
       const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
       const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
-      return gameMemberAccountOf({
+      return read({
         agentType: member.agentType,
         live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
         pinnedAccountId:
@@ -31433,6 +31487,8 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      globalLoginOf: (member) =>
+        this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin) === true,
       limitOf: (member) => this.gameMemberLimitFor(member),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
@@ -42343,7 +42399,7 @@ function isTerminalWaitWhitespace(value: string, index: number): boolean {
 }
 
 const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode/i
+  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode|choose the text style/i
 
 function findTerminalWaitBlockedSignal(
   normalized: string

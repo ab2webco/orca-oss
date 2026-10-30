@@ -126,9 +126,10 @@ describe('counts and needs', () => {
       agent({ paneKey: 'm9', displayName: 'CIN-9', isMember: true, worktree, review: red })
     ]
     const party = partyOf(state({ agents, review: null }), true)
+    // Why CIN-9 first: red CI needs the person, so it takes a slot before a merged member.
     expect(party.map((member) => [member.name, member.phase, member.mood])).toEqual([
-      ['CIN-8', 'handoff', 'cheer'],
-      ['CIN-9', 'pr', 'hurt']
+      ['CIN-9', 'pr', 'hurt'],
+      ['CIN-8', 'handoff', 'cheer']
     ])
     expect(needsOf(state({ agents, review: null }))).toEqual([
       { name: 'CIN-9', text: 'CI failing', url: red.url }
