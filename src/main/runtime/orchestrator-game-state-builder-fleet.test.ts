@@ -119,7 +119,7 @@ describe('buildOrchestratorGameState fleet', () => {
     })
   })
 
-  it("carries a member's last activity and orphaned mark, never a non-member's (ORCA-658)", async () => {
+  it("carries a member's last activity, state start and orphaned mark, never a non-member's (ORCA-658, ORCA-864)", async () => {
     const row = {
       state: 'working' as const,
       agentType: 'claude',
@@ -127,6 +127,7 @@ describe('buildOrchestratorGameState fleet', () => {
       taskTitle: null,
       toolName: null,
       lastActivityAt: '2026-10-22T12:00:00.000Z',
+      stateStartedAt: 1_700,
       orphaned: true
     }
     const state = await buildOrchestratorGameState({
@@ -148,10 +149,12 @@ describe('buildOrchestratorGameState fleet', () => {
     expect(state.agents[1]).toMatchObject({
       isMember: true,
       lastActivityAt: '2026-10-22T12:00:00.000Z',
+      stateSince: 1_700,
       orphaned: true
     })
     expect(state.agents[0]).not.toHaveProperty('orphaned')
     expect(state.agents[0]).not.toHaveProperty('lastActivityAt')
+    expect(state.agents[0]).not.toHaveProperty('stateSince')
   })
 
   it("gives each member in its own worktree that worktree's PR, CI and ticket", async () => {

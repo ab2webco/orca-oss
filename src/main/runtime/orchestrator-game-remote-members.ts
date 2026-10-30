@@ -264,7 +264,8 @@ export async function remoteGameMembersOf(
               }
             }
           : {}),
-        ...(lastActivityAt ? { lastActivityAt } : {})
+        ...(lastActivityAt ? { lastActivityAt } : {}),
+        ...(agent?.stateStartedAt ? { stateSince: agent.stateStartedAt } : {})
       }
     })
   )

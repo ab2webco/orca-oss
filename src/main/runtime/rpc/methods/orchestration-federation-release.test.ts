@@ -3,6 +3,7 @@ import {
   ORCHESTRATION_CONTRACT_VERSION,
   ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
+import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
@@ -12,6 +13,7 @@ import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { createFederationWorkerStartRequest as startRequest } from './orchestration-federation-test-request'
 import { configureWorkerRuntime } from './orchestration-federation-worker-runtime-mocks'
+import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
 import { WORKTREE_METHODS } from './worktree'
 
 // Why: a finished remote member could not be released, so it stayed in the fleet and its
@@ -414,6 +416,91 @@ describe('releasing a remote worker through the relay', () => {
       const response = await release(dispatch.id)
 
       expect(JSON.stringify(response)).toContain(`worker-stop --dispatch ${dispatch.id}`)
+    })
+  })
+
+  // Why: the owner saw finished remote members stay in the fleet and Panel for hours (ORCA-864).
+  describe("when a remote member's work lands after its worker_done (ORCA-864)", () => {
+    async function leadReads(
+      dispatchId: string,
+      state: 'done' | 'working' | 'idle',
+      stateSince = Date.now()
+    ) {
+      const postEvent = vi.fn().mockResolvedValue({ posted: true })
+      vi.spyOn(homeRuntime, 'getGameBoard').mockReturnValue({ postEvent } as never)
+      vi.spyOn(homeRuntime, 'getOrchestratorGameState').mockResolvedValue({
+        role: 'lead',
+        agents: [
+          {
+            paneKey: `remote:${dispatchId}`,
+            displayName: 'ORCA-41 Cartelera',
+            agentType: null,
+            state,
+            toolName: null,
+            isLeader: false,
+            isMember: true,
+            terminalHandle: 'term_windows_worker',
+            review: {
+              provider: 'github',
+              number: 41,
+              title: 'Cartelera',
+              url: 'https://github.com/o/r/pull/41',
+              state: 'merged',
+              ci: 'success'
+            },
+            remote: { host: 'windows', stateKnown: true, ticketDone: true },
+            stateSince
+          }
+        ]
+      } as OrchestratorGameState)
+      const method = ORCHESTRATOR_GAME_METHODS.find((one) => one.name === 'game.state')!
+      const read = (await method.handler(method.params!.parse({ worktreeId: 'wt-lead' }), {
+        runtime: homeRuntime
+      })) as OrchestratorGameState
+      return { read, postEvent }
+    }
+
+    it('releases it on its host, drops its row and posts one line for the lead', async () => {
+      const { run, task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+
+      const { read, postEvent } = await leadReads(dispatch.id, 'done')
+
+      expect(read.agents).toEqual([])
+      await vi.waitFor(() => expect(postEvent).toHaveBeenCalledTimes(1))
+      expect(workerRuntime.closeTerminal).toHaveBeenCalledWith('term_windows_worker')
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+      expect(postEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'stopped',
+          ticket: 'ORCA-41',
+          key: `auto-release:${dispatch.id}`,
+          text: 'Released automatically: PR #41 merged after worker_done; its terminal on windows closed.'
+        })
+      )
+    })
+
+    it('never touches a remote member that worked past its worker_done on a chained PR', async () => {
+      const { task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+
+      const { read, postEvent } = await leadReads(dispatch.id, 'idle', Date.now() + 20 * 60_000)
+
+      expect(read.agents).toHaveLength(1)
+      expect(remoteMethods).not.toContain('orchestration.federationRelease')
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
+      expect(postEvent).not.toHaveBeenCalled()
+    })
+
+    it('never touches a remote member its host reports working (ORCA-862)', async () => {
+      const { task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+
+      const { read } = await leadReads(dispatch.id, 'working')
+
+      expect(read.agents).toHaveLength(1)
+      expect(remoteMethods).not.toContain('orchestration.federationRelease')
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
     })
   })
 })
