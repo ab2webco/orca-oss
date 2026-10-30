@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrchestrationDb } from './orchestration/db'
@@ -439,6 +440,56 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
     expect(agent?.account).toEqual({ provider: 'claude', email: 'ana@koombea.com' })
     expect(JSON.stringify(agent)).not.toContain('imac-ana')
     expect(limitFor).toHaveBeenCalledWith(expect.objectContaining({ account }))
+  })
+  // Why (ORCA-907): `game move` said "already runs on" the spawn record while the process ran elsewhere.
+  it('relays the account its running Claude reported, until a switch rebinds the pane', async () => {
+    const runtime = new OrcaRuntimeService(null, undefined, {
+      getAgentStatusSnapshot: () => [hook('done')]
+    })
+    const seams = runtime as unknown as {
+      getTerminalWorktreeIdForPaneKey: () => string | null
+      resolveClaudeAccountPtyRecordForHandle: () => { ptyId: string }
+      gameMemberLimitFor: () => Promise<unknown>
+    }
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab:817')
+    vi.spyOn(runtime, 'getTerminalHandleForPaneKey').mockReturnValue('term_817')
+    vi.spyOn(seams, 'getTerminalWorktreeIdForPaneKey').mockReturnValue(null)
+    vi.spyOn(seams, 'resolveClaudeAccountPtyRecordForHandle').mockReturnValue({ ptyId: 'pty-817' })
+    vi.spyOn(seams, 'gameMemberLimitFor').mockResolvedValue(null)
+    let bound = 'imac-ana'
+    vi.spyOn(runtime, 'getManagedPtyAccountOwner').mockImplementation(() => ({
+      known: true,
+      accountId: bound,
+      customEndpoint: false
+    }))
+    const roster = ['ana', 'bo', 'cy'].map((name) => ({
+      id: `imac-${name}`,
+      email: `${name}@koombea.com`
+    }))
+    runtime.setAccountServices({
+      claudeAccounts: { listAccounts: () => ({ accounts: roster, activeAccountId: null }) },
+      codexAccounts: { listAccounts: () => ({ accounts: [], activeAccountId: null }) },
+      rateLimits: { getState: () => ({}) }
+    } as never)
+    const root = join('/data', 'claude-accounts')
+
+    runtime.noteClaudePaneStatusLine(
+      {
+        configDir: join(root, 'imac-bo', 'auth'),
+        fiveHour: null,
+        sevenDay: { used_percentage: 5 },
+        paneKey: 'tab:817'
+      },
+      root
+    )
+
+    expect((await runtime.getFederatedMemberAgent('term_817'))?.account?.email).toBe(
+      'bo@koombea.com'
+    )
+    bound = 'imac-cy'
+    expect((await runtime.getFederatedMemberAgent('term_817'))?.account?.email).toBe(
+      'cy@koombea.com'
+    )
   })
 })
 
