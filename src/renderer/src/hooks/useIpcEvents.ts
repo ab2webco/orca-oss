@@ -193,6 +193,7 @@ import {
 } from './direct-ssh-state-routing'
 import { isDirectSshReconnectCoordinatorRoutingEnabled } from './direct-ssh-reconnect-rollout'
 import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
+import { signalGameInboxChanged } from '@/components/game-inbox/game-inbox-signal'
 
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
@@ -1012,6 +1013,10 @@ export function useIpcEvents(): void {
       }
       if (event.type === 'gameOwnerQuestionsChanged') {
         signalGameOwnerQuestionsChanged()
+        return
+      }
+      if (event.type === 'gameInboxChanged') {
+        signalGameInboxChanged()
         return
       }
       if (event.type === 'linearLinkedIssueUpdated') {

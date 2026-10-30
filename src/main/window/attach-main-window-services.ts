@@ -369,6 +369,7 @@ function registerRuntimeWindowLifecycle(
     worktreeRemoteBranchConflict: (event) => send('worktree:remoteBranchConflict', event),
     reposChanged: () => send('repos:changed'),
     gameOwnerQuestionsChanged: () => send('runtime:gameOwnerQuestionsChanged'),
+    gameInboxChanged: () => send('runtime:gameInboxChanged'),
     activateWorktree: (
       repoId,
       worktreeId,

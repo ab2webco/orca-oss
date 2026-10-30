@@ -56,6 +56,7 @@ export type RuntimeApi = {
       callback: (event: { browserPageId: string; driver: RuntimeBrowserDriverState }) => void
     ) => () => void
     onGameOwnerQuestionsChanged?: (callback: () => void) => () => void
+    onGameInboxChanged?: (callback: () => void) => () => void
   }
   runtimeEnvironments: {
     list: () => Promise<PublicKnownRuntimeEnvironment[]>
