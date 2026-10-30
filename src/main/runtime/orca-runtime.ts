@@ -31422,6 +31422,14 @@ export class OrcaRuntimeService {
           worktreeId: worktree?.id,
           terminalHandle: callerHandle ?? undefined
         }),
+      // Why worktreeId: the map can miss a worktree it has not scanned yet; the board keys by the id's repo.
+      readOpenOwnerQuestions: async () =>
+        (
+          await this.gameBoard.ownerQuestions({
+            worktreeId,
+            terminalHandle: callerHandle ?? undefined
+          })
+        ).open,
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
           worktreeId: worktree?.id,
