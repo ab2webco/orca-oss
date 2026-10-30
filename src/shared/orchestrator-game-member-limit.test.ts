@@ -67,6 +67,19 @@ describe('gameMemberLimitOf', () => {
     ).toBeNull()
   })
 
+  it('keeps a spend limit while its 5h and 7d windows still have quota, which they do not count', () => {
+    expect(
+      gameMemberLimitOf({
+        state: 'idle',
+        agentType: 'claude',
+        accountLimits: limits(20),
+        terminalTail:
+          "You've hit your individual spend limit · your weekly limit resets Nov 2 · /usage-credits",
+        now: NOW
+      })
+    ).toEqual({ resetsAt: null, spend: true })
+  })
+
   it('never calls a context or token limit a usage limit, nor an agent with no managed accounts', () => {
     expect(
       gameMemberLimitOf({

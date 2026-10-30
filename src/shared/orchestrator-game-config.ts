@@ -113,11 +113,8 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
 const KEYS = Object.keys(DEFAULT_ORCHESTRATOR_GAME_CONFIG) as (keyof OrchestratorGameConfig)[]
 
 // Why: later layers win — the repo owner's orca.yaml over global Settings, the dev's local override over both.
-export const ORCHESTRATOR_GAME_LAYER_ORDER: readonly Exclude<OrchestratorGameSource, 'default'>[] = [
-  'global',
-  'project',
-  'local'
-]
+export const ORCHESTRATOR_GAME_LAYER_ORDER: readonly Exclude<OrchestratorGameSource, 'default'>[] =
+  ['global', 'project', 'local']
 
 export function resolveOrchestratorGameConfig(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
@@ -222,7 +219,9 @@ export function resolveOrchestratorGameLead(
 export function resolveOrchestratorGameRewardWeights(
   layers: Partial<Record<Exclude<OrchestratorGameSource, 'default'>, OrchestratorGameLayer>>
 ): GameRewardWeights {
-  return resolveGameRewardWeights(ORCHESTRATOR_GAME_LAYER_ORDER.map((source) => layers[source]?.rewardWeights))
+  return resolveGameRewardWeights(
+    ORCHESTRATOR_GAME_LAYER_ORDER.map((source) => layers[source]?.rewardWeights)
+  )
 }
 
 const isMode = (value: unknown): value is OrchestratorGameMode =>

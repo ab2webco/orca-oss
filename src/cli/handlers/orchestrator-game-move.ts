@@ -74,6 +74,7 @@ async function targetOf(
 ): Promise<GameMemberAccountChoice | { wait: string }> {
   const agent = member.agentType ?? ''
   const provider = accountProviderOfAgent(agent)
+  const lead = state.lead ?? DEFAULT_GAME_LEAD
   if (provider === null) {
     throw new RuntimeClientError(
       'invalid_argument',
@@ -83,7 +84,7 @@ async function targetOf(
   try {
     const target = await resolveGameMemberAccount(
       client,
-      { agent, account: selector },
+      { agent, account: selector, allowedAccounts: gameLaunchChoiceOf({}, lead).allowedAccounts },
       { agents: state.agents, exclude: member.account?.id }
     )
     if (target.account === null) {

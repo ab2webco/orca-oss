@@ -286,4 +286,15 @@ describe('orca game move', () => {
       /CIN-5 already runs on ana@example.com/
     )
   })
+
+  it("moves only onto an account the project's orchestrator.accounts allows", async () => {
+    const state = {
+      ...stateWith(CLAUDE_MEMBER),
+      lead: { autostart: false, cap: 4, agent: 'claude', accounts: ['ana@example.com'] }
+    }
+    const { client, methods } = fakeClient(state, snapshotWith(limits(10)))
+
+    await expect(move(client)).rejects.toThrow(/this project allows only ana@example\.com/)
+    expect(methods()).not.toContain('accounts.switchClaudeTerminal')
+  })
 })

@@ -43,7 +43,8 @@ export type OrchestratorGameLead = {
   mcpServers?: string[]
 }
 
-export type OrchestratorGameAccounts = 'default' | 'auto'
+/** A list restricts `auto` to those accounts (emails or ids). */
+export type OrchestratorGameAccounts = 'default' | 'auto' | string[]
 
 export type OrchestratorGameLeadLayer = Partial<OrchestratorGameLead>
 
@@ -138,9 +139,15 @@ const switchKey =
 const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   accounts: (value) => {
     const text = typeof value === 'string' ? value.trim() : ''
-    return text === 'default' || text === 'auto'
-      ? { accounts: text }
-      : `${at('accounts')} must be default or auto`
+    if (text === 'default' || text === 'auto') {
+      return { accounts: text }
+    }
+    const list = Array.isArray(value)
+      ? value.map((one) => (typeof one === 'string' ? one.trim() : ''))
+      : []
+    return list.length > 0 && list.every((one) => one !== '')
+      ? { accounts: list }
+      : `${at('accounts')} must be default, auto, or a list of account emails or ids`
   },
   autostart: switchKey('autostart'),
   askBeforeResume: switchKey('askBeforeResume'),
