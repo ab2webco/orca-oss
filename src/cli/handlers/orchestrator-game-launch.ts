@@ -20,6 +20,7 @@ import {
 } from './orchestrator-game-launch-options'
 import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
+import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
@@ -138,6 +139,18 @@ export async function launchGameMember(args: {
         agents: state.agents,
         launched: args.launched
       })
+  await checkGameMemberMcpServers({
+    client,
+    state,
+    ticket,
+    agent: choice.agent,
+    required: lead.mcpServers,
+    skip: args.flags.get('skip-mcp-check') === true,
+    repo,
+    remote: args.remote ?? null,
+    account: memberAccount.account,
+    remoteAccount: choice.account
+  })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
   if (choice.model) {

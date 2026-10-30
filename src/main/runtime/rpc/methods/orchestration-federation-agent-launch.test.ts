@@ -105,58 +105,68 @@ describe('federated worker agent launch', () => {
     )
   })
 
-  it('refuses a remote Claude terminal parked on the bypass dialog by name, not timeout (ORCA-855)', async () => {
-    db = new OrchestrationDb(':memory:')
-    const runtime = new OrcaRuntimeService()
-    runtime.setOrchestrationDb(db)
-    vi.spyOn(runtime, 'validateOrchestrationAgentLauncher').mockImplementation(() => {})
-    vi.spyOn(runtime, 'showManagedTerminalWorkspace').mockResolvedValue({
-      id: 'repo::/remote/member'
-    } as never)
-    vi.spyOn(runtime, 'showTerminal').mockResolvedValue({
-      handle: 'term_remote_member',
-      worktreeId: 'repo::/remote/member'
-    } as never)
-    vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
-    vi.spyOn(runtime, 'waitForTerminal').mockResolvedValue({
-      handle: 'term_remote_member',
-      condition: 'tui-idle',
-      satisfied: false,
-      status: 'running',
-      exitCode: null,
-      blockedReason: 'claude-bypass-permissions-prompt'
-    })
-    const sendTerminalAgentPrompt = vi.spyOn(runtime, 'sendTerminalAgentPrompt')
-    const method = ORCHESTRATION_METHODS.find(
-      (candidate) => candidate.name === 'orchestration.federationAttachStart'
-    )
-    if (!method) {
-      throw new Error('federationAttachStart method is not registered')
-    }
-
-    const result = (await method.handler(
-      method.params!.parse({
-        dispatchId: 'ctx_remote_claude',
-        taskId: 'task_remote_claude',
-        taskSpec: 'remote claude member',
-        protocolVersion: 3,
-        worktree: 'repo::/remote/member',
-        terminal: 'term_remote_member'
-      }),
-      {
-        runtime,
-        orchestrationMutation: {
-          callerFingerprint: 'home_peer',
-          requestId: 'request_remote_claude',
-          method: 'orchestration.federationAttachStart',
-          payloadHash: 'remote_claude_payload'
-        }
+  it.each([
+    ['the bypass dialog (ORCA-855)', 'claude-bypass-permissions-prompt', "choose 'Yes, I accept'"],
+    [
+      'first-run setup (ORCA-872)',
+      'claude-first-run-setup',
+      "Launch on one of this host's managed accounts"
+    ]
+  ] as const)(
+    'refuses a remote Claude terminal parked on %s by name, not timeout',
+    async (_label, blockedReason, nextStep) => {
+      db = new OrchestrationDb(':memory:')
+      const runtime = new OrcaRuntimeService()
+      runtime.setOrchestrationDb(db)
+      vi.spyOn(runtime, 'validateOrchestrationAgentLauncher').mockImplementation(() => {})
+      vi.spyOn(runtime, 'showManagedTerminalWorkspace').mockResolvedValue({
+        id: 'repo::/remote/member'
+      } as never)
+      vi.spyOn(runtime, 'showTerminal').mockResolvedValue({
+        handle: 'term_remote_member',
+        worktreeId: 'repo::/remote/member'
+      } as never)
+      vi.spyOn(runtime, 'isTerminalRunningAgent').mockResolvedValue(true)
+      vi.spyOn(runtime, 'waitForTerminal').mockResolvedValue({
+        handle: 'term_remote_member',
+        condition: 'tui-idle',
+        satisfied: false,
+        status: 'running',
+        exitCode: null,
+        blockedReason
+      })
+      const sendTerminalAgentPrompt = vi.spyOn(runtime, 'sendTerminalAgentPrompt')
+      const method = ORCHESTRATION_METHODS.find(
+        (candidate) => candidate.name === 'orchestration.federationAttachStart'
+      )
+      if (!method) {
+        throw new Error('federationAttachStart method is not registered')
       }
-    )) as { state: string; failedStage?: string; lastError?: string }
 
-    expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
-    expect(result.lastError).toContain('Agent startup blocked: claude-bypass-permissions-prompt.')
-    expect(result.lastError).toContain("choose 'Yes, I accept'")
-    expect(sendTerminalAgentPrompt).not.toHaveBeenCalled()
-  })
+      const result = (await method.handler(
+        method.params!.parse({
+          dispatchId: 'ctx_remote_claude',
+          taskId: 'task_remote_claude',
+          taskSpec: 'remote claude member',
+          protocolVersion: 3,
+          worktree: 'repo::/remote/member',
+          terminal: 'term_remote_member'
+        }),
+        {
+          runtime,
+          orchestrationMutation: {
+            callerFingerprint: 'home_peer',
+            requestId: 'request_remote_claude',
+            method: 'orchestration.federationAttachStart',
+            payloadHash: 'remote_claude_payload'
+          }
+        }
+      )) as { state: string; failedStage?: string; lastError?: string }
+
+      expect(result).toMatchObject({ state: 'failed', failedStage: 'agent_readiness' })
+      expect(result.lastError).toContain(`Agent startup blocked: ${blockedReason}.`)
+      expect(result.lastError).toContain(nextStep)
+      expect(sendTerminalAgentPrompt).not.toHaveBeenCalled()
+    }
+  )
 })

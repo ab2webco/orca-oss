@@ -767,6 +767,7 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
@@ -2329,6 +2330,7 @@ type RuntimeNotifier = {
   worktreeRemoteBranchConflict?(event: WorktreeRemoteBranchConflictEvent): void
   reposChanged(): void
   gameOwnerQuestionsChanged?(): void
+  gameInboxChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -3900,6 +3902,10 @@ export class OrcaRuntimeService {
         lead,
         args
       )
+  })
+  private readonly gameInboxChange = new GameInboxChangeSignal(() => {
+    this.notifier?.gameInboxChanged?.()
+    this.emitClientEvent({ type: 'gameInboxChanged' })
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
@@ -14704,6 +14710,11 @@ export class OrcaRuntimeService {
   // the vault it lands in have to be the same machine's.
   buildGlobalConfigSyncInventory(): GlobalConfigSyncInventory {
     return this.requireAccountServices().claudeAccounts.buildGlobalConfigSyncInventory()
+  }
+
+  /** A host-runtime account's vault, for reading what its Claude loads; null for WSL or an unowned path. */
+  getClaudeManagedAuthPath(accountId: string): string | null {
+    return this.requireAccountServices().claudeAccounts.getOwnedManagedAuthPath(accountId)
   }
 
   syncGlobalConfigForClaudeAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
@@ -36363,6 +36374,7 @@ export class OrcaRuntimeService {
 
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
+    this.gameInboxChange.mailArrived(messageType)
     const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
     const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
     const dispatch =
@@ -42352,7 +42364,7 @@ function isTerminalWaitWhitespace(value: string, index: number): boolean {
 }
 
 const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode/i
+  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode|choose the text style/i
 
 function findTerminalWaitBlockedSignal(
   normalized: string
