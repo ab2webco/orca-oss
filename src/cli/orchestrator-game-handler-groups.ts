@@ -20,6 +20,12 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-fleet.js')).ORCHESTRATOR_GAME_FLEET_HANDLERS
   },
   {
+    name: 'orchestrator-game-watch',
+    keys: ['game watch'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-watch.js')).ORCHESTRATOR_GAME_WATCH_HANDLERS
+  },
+  {
     name: 'orchestrator-game-view',
     keys: ['game view'],
     load: async () =>

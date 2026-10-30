@@ -114,7 +114,25 @@ const GameHistoryParams = z
   })
   .optional()
 
+export const GAME_FLEET_WAIT_MAX_MS = 60_000
+
+const GameFleetWaitParams = z
+  .object({
+    since: z.number().int().nonnegative().optional(),
+    timeoutMs: z.number().int().positive().max(GAME_FLEET_WAIT_MAX_MS).optional()
+  })
+  .optional()
+
 export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
+  defineMethod({
+    name: 'game.fleetWait',
+    params: GameFleetWaitParams,
+    handler: async (params, { runtime }) =>
+      runtime.waitGameFleetChange({
+        since: params?.since,
+        timeoutMs: params?.timeoutMs ?? 25_000
+      })
+  }),
   defineMethod({
     name: 'game.openLink',
     params: GameOpenLinkParams,

@@ -382,6 +382,10 @@ export type FleetState = {
   xp: number
   /** The latest rewards, newest first; absent in an atom an older mod stored. */
   recent?: readonly RecentReward[]
+  /** When `state` was read; absent in an atom an older mod stored. */
+  stateAt?: number
+  /** The last read failed and `state` is the one before it. */
+  isStale?: boolean
 }
 
 export type RewardKind =

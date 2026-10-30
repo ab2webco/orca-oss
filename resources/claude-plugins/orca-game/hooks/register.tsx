@@ -8,6 +8,7 @@ import { clearAllies, registerAllies } from './allies-strip'
 import { registerBand } from './band'
 import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
+import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
@@ -42,10 +43,12 @@ export const register: Register = (on) => {
     await clearAllies($)
     const started = await next(e)
     await questSessionStart($).catch(() => undefined)
+    // Why the poll stays: PR and CI changes, paired hosts and an older Orca push nothing.
     $.clock.every(POLL_EVERY_MS, () => {
       void refreshSoon($).catch(() => undefined)
       void syncLeadName($).catch(() => undefined)
     })
+    void watchFleet($, () => void refreshSoon($).catch(() => undefined)).catch(() => undefined)
     // Why not awaited: the skill runs once the session is idle, and session.start must not wait on it.
     void leadAutostart($).catch(() => undefined)
     return started
