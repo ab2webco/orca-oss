@@ -83,16 +83,20 @@ export function gameMetricsSummaryOf(
   const days = options.days ?? GAME_METRICS_DAYS
   const today = wallClockOf(now, timezone)
   const todayUtc = Date.UTC(today.year, today.month - 1, today.day)
-  const mergedPerDay = Array.from({ length: days }, (_, index) => {
-    const day = dayKeyOf(todayUtc - (days - 1 - index) * DAY_MS)
-    return {
-      day,
-      merged: computeGameMetrics(stores, gameDayWindowOf(day, timezone)).ticketsDone.length
-    }
+  const dayKeys = Array.from({ length: days }, (_, index) =>
+    dayKeyOf(todayUtc - (days - 1 - index) * DAY_MS)
+  )
+  const { leadTime, ticketsDoneAt } = computeGameMetrics(stores, {
+    since: gameDayWindowOf(dayKeys[0], timezone).since
   })
-  const { leadTime } = computeGameMetrics(stores, {
-    since: gameDayWindowOf(mergedPerDay[0].day, timezone).since
-  })
+  // Why one query bucketed: a ticket freed one day and merged the next is done once, on its last.
+  const merged = new Map<string, number>()
+  for (const at of Object.values(ticketsDoneAt)) {
+    const wall = wallClockOf(Date.parse(at), timezone)
+    const day = dayKeyOf(Date.UTC(wall.year, wall.month - 1, wall.day))
+    merged.set(day, (merged.get(day) ?? 0) + 1)
+  }
+  const mergedPerDay = dayKeys.map((day) => ({ day, merged: merged.get(day) ?? 0 }))
   return {
     computedAt: new Date(now).toISOString(),
     timezone,

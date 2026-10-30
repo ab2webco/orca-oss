@@ -658,8 +658,9 @@ matches …` (ORCA-866).
   known ones ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
   With no filter it also prints the scene's metrics widget window: tickets done per calendar day
   for the last 14 days and their median lead time, in `--timezone <zone>` (default this machine's
-  zone). Each day's count is `computeGameMetrics` over that day's `--since`/`--until`, so the
-  same query gives the same number.
+  zone). Each done ticket counts once, on the day of its `ticketsDoneAt` in `--json` (its last
+  merged event, else when its member was freed), so a ticket merged one evening and freed the
+  next morning is not counted on both days the way two one-day `--since`/`--until` queries would.
 - Game state's optional `metrics` (lead only, absent from an older host or for a member) carries
   that same 14-day summary in the game's own timezone plus each managed Claude account's 5h and 7d
   use (active first, then the busiest, at most 8, readings Orca already holds, never a refresh).

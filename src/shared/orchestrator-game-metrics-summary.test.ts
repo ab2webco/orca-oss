@@ -46,16 +46,33 @@ describe('gameMetricsSummaryOf', () => {
     expect(stores.history).toHaveLength(recorded.history.length)
   })
 
-  it('counts merged tickets per day as `orca game metrics --since --until` does for that day', () => {
+  it('counts each ticket once, on the day `orca game metrics` says it was done', () => {
     const summary = gameMetricsSummaryOf(stores, { now, timezone })
     expect(summary.mergedPerDay).toHaveLength(GAME_METRICS_DAYS)
     expect(summary.mergedPerDay.at(-1)?.day).toBe('2026-10-30')
     expect(summary.mergedPerDay[0].day).toBe('2026-10-17')
+    const cli = computeGameMetrics(stores, { since: gameDayWindowOf('2026-10-17', timezone).since })
+    const total = summary.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)
+    expect(total).toBeGreaterThan(0)
+    expect(total).toBe(cli.ticketsDone.length)
     for (const { day, merged } of summary.mergedPerDay) {
-      const window = gameDayWindowOf(day, timezone)
-      expect(merged, day).toBe(computeGameMetrics(stores, window).ticketsDone.length)
+      const { since, until } = gameDayWindowOf(day, timezone)
+      const doneThatDay = Object.values(cli.ticketsDoneAt).filter((at) => at >= since && at < until)
+      expect(merged, day).toBe(doneThatDay.length)
     }
-    expect(summary.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)).toBeGreaterThan(0)
+  })
+
+  it('does not count a ticket again on the day its member was freed after the merge', () => {
+    // Why: ORCA-606 merged on the 17th (Bogota) and its member was freed with PR merged on the 18th.
+    const doneOn = (day: string): string[] =>
+      computeGameMetrics(stores, gameDayWindowOf(day, timezone)).ticketsDone
+    expect(doneOn('2026-10-17')).toContain('ORCA-606')
+    expect(doneOn('2026-10-18')).toContain('ORCA-606')
+    const summary = gameMetricsSummaryOf(stores, { now, timezone })
+    const on = (day: string): number | undefined =>
+      summary.mergedPerDay.find((one) => one.day === day)?.merged
+    expect(on('2026-10-17')).toBe(doneOn('2026-10-17').length)
+    expect(on('2026-10-18')).toBe(doneOn('2026-10-18').length - 1)
   })
 
   it('takes lead time over the whole window, as the CLI does from its first day', () => {
