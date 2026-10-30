@@ -92,9 +92,61 @@ export const memberOf = (agent: GameAgent, state: GameState, hasRewards: boolean
   }
 }
 
-// The lead is the HUD's hero, so the party is everyone else.
+/** A remote member whose host does not answer, or whose terminal is gone before it finished. */
+export const isGhostOf = (agent: GameAgent): boolean => {
+  const { remote } = agent
+  if (remote === undefined) {
+    return false
+  }
+  // Why gone first: an older Orca also sends `stateKnown: false` with it, though the host answered.
+  return remote.gone === true ? agent.state !== 'done' : !remote.stateKnown
+}
+
+// Needs-you, working, idle, done; a ghost after all of them.
+const rankOf = (agent: GameAgent, state: GameState): number => {
+  if (isGhostOf(agent)) {
+    return 4
+  }
+  const member = memberOf(agent, state, false)
+  if (member.state === 'waiting' || member.mood === 'hurt') {
+    return 0
+  }
+  if (member.state === 'working') {
+    return 1
+  }
+  return member.isDone || isFinished(workOf(agent, state)) ? 3 : 2
+}
+
+/** The team in the order the band fills its slots and the Panel lists its cards: the lead first. */
+export const teamOrderOf = (state: GameState): GameAgent[] => {
+  const ranked = state.agents.map((agent) => ({
+    agent,
+    rank: agent.isLeader ? -1 : rankOf(agent, state)
+  }))
+  // Why a stable sort: members with no activity time keep the host's order.
+  return ranked
+    .sort((a, b) => a.rank - b.rank || (b.agent.activeAt ?? 0) - (a.agent.activeAt ?? 0))
+    .map((one) => one.agent)
+}
+
+/** The members the band leaves out because nobody can say what they are doing. */
+export const ghostCountOf = (state: GameState): number =>
+  state.agents.filter((agent) => !agent.isLeader && isGhostOf(agent)).length
+
+// The lead is the HUD's hero, so the party is everyone else that is not a ghost.
 export const partyOf = (state: GameState, hasRewards: boolean): PartyMember[] =>
-  state.agents.filter((agent) => !agent.isLeader).map((agent) => memberOf(agent, state, hasRewards))
+  teamOrderOf(state)
+    .filter((agent) => !agent.isLeader && !isGhostOf(agent))
+    .map((agent) => memberOf(agent, state, hasRewards))
+
+/** The party the band draws and how many ghosts its `+N` adds. */
+export const drawnPartyOf = (
+  state: GameState,
+  hasRewards: boolean
+): { party: PartyMember[]; unseen: number } => ({
+  party: partyOf(state, hasRewards),
+  unseen: ghostCountOf(state)
+})
 
 export const countsOf = (agents: readonly GameAgent[]) => {
   const team = agents.filter((agent) => !agent.isLeader)
