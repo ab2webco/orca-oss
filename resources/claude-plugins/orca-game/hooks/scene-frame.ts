@@ -35,6 +35,7 @@ export const stageOf = (columns: number, viewportRows?: number): Stage => {
 const demoPartyOf = (hasRewards: boolean): HdMember[] =>
   partyOf(demoNow().state, hasRewards).map((one) => ({
     key: one.key,
+    name: one.name,
     phase: one.phase,
     state: one.state
   }))
