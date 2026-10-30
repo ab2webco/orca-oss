@@ -165,8 +165,8 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     }
     const portQuestion = await pendingQuestion('Which port')
     await client.call('orchestration.reply', { id: portQuestion, body: '8080', from: lead })
-    void ask('May I rename the Inbox tab to Mail?')
-    await pendingQuestion('rename the Inbox')
+    const renameAsk = ask('May I rename the Inbox tab to Mail?')
+    const renameQuestion = await pendingQuestion('rename the Inbox')
 
     const entry = orcaPage.getByTestId('game-inbox-entry')
     // Pushed by the runtime as the team's mail lands; nothing is for the person, so no count.
@@ -235,6 +235,51 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('answered-1440-light.png')
+    })
+
+    // The person answers a member for the lead: the member's blocked ask returns their words.
+    const leadMail = async () =>
+      (
+        await client.call<{ inbox: { messages: { subject: string }[] } }>('game.inbox', {
+          terminalHandle: lead
+        })
+      ).result.inbox.messages.map((one) => one.subject)
+    await sheet.getByRole('tab', { name: /Waiting/ }).click()
+    const renameRow = sheet.getByTestId(`game-inbox-waiting-${renameQuestion}`)
+    await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Keep Inbox')
+    await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
+    await expect(renameRow).toHaveCount(0)
+    await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('1')
+    expect(JSON.stringify(await renameAsk)).toContain('Keep Inbox')
+    await expect.poll(leadMail).toContainEqual(expect.stringContaining('Owner answered ORCA-14'))
+
+    // And overrides an answer the lead gave: the member hears it on that question's thread.
+    await sheet.getByRole('tab', { name: /Answered/ }).click()
+    const portRow = sheet.getByTestId(`game-inbox-answered-${portQuestion}`)
+    await portRow.getByRole('button', { name: 'Override' }).click()
+    await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
+    await orcaPage.setViewportSize({ width: 390, height: 900 })
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath('override-390-light.png')
+    })
+    await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
+    await expect(portRow.getByRole('textbox')).toHaveValue('')
+    await expect
+      .poll(async () => {
+        const read = await client.call<GameInboxThreads>('game.inboxThreads', { worktreeId })
+        return read.result.threads
+          .find((thread) => thread.ticket === 'ORCA-14')
+          ?.messages.some((one) => one.from === 'lead' && one.body.includes('Use 3000'))
+      })
+      .toBe(true)
+    await expect
+      .poll(leadMail)
+      .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
+    await expect(portRow).toContainText('You replaced it: Use 3000')
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath('answered-after-390-light.png')
     })
   } finally {
     agent.dispose()

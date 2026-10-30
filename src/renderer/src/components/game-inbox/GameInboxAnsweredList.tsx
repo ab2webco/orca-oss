@@ -45,6 +45,15 @@ export function GameInboxAnsweredList({
           <p className="border-l-2 border-border pl-3 text-sm break-words whitespace-pre-wrap text-muted-foreground">
             {item.answer}
           </p>
+          {item.overriddenBy ? (
+            <p className="border-l-2 border-foreground pl-3 text-sm break-words whitespace-pre-wrap">
+              {translate(
+                'auto.components.game-inbox.GameInboxAnsweredList.overridden',
+                'You replaced it: {{text}}',
+                { text: item.overriddenBy.text }
+              )}
+            </p>
+          ) : null}
           {renderActions?.(item)}
         </li>
       ))}

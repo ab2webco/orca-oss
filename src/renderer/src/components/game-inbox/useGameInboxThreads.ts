@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
-import { readGameInboxThreads } from './game-inbox-threads-client'
+import {
+  readGameInboxThreads,
+  replyToGameMember,
+  type GameMemberReply
+} from './game-inbox-threads-client'
 import type { GameInboxScope } from './game-owner-questions-client'
 import { onGameInboxChanged } from './game-inbox-signal'
 
@@ -10,7 +14,7 @@ const NO_THREADS: GameInboxThreads = { threads: [], waiting: [], answered: [] }
 export function useGameInboxThreads(
   scope: GameInboxScope | null,
   open: boolean
-): GameInboxThreads & { reload: () => Promise<void> } {
+): GameInboxThreads & { reply: (message: GameMemberReply) => Promise<void> } {
   const [loaded, setLoaded] = useState<{ scope: GameInboxScope; threads: GameInboxThreads } | null>(
     null
   )
@@ -53,11 +57,16 @@ export function useGameInboxThreads(
     }
   }, [scope, live, read])
 
-  const reload = useCallback(async () => {
-    if (scope) {
+  const reply = useCallback(
+    async (message: GameMemberReply) => {
+      if (!scope) {
+        return
+      }
+      await replyToGameMember(scope, message)
       await read(scope)
-    }
-  }, [scope, read])
+    },
+    [scope, read]
+  )
 
-  return { ...current, reload }
+  return { ...current, reply }
 }

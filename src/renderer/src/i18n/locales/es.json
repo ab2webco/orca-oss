@@ -15331,7 +15331,8 @@
           "empty": "No hay preguntas esperando tu respuesta.",
           "waiting": "Esperando",
           "threads": "Hilos",
-          "answered": "Respondidas"
+          "answered": "Respondidas",
+          "answerInstead": "Responde en lugar del lead"
         },
         "GameOwnerQuestionCard": {
           "failed": "La respuesta no se envió.",
@@ -15358,7 +15359,8 @@
         },
         "GameInboxAnsweredList": {
           "empty": "El lead todavía no ha respondido a ningún miembro.",
-          "answeredAt": "respondida {{when}}"
+          "answeredAt": "respondida {{when}}",
+          "overridden": "La reemplazaste: {{text}}"
         },
         "GameInboxThreadsView": {
           "rejected": "Rechazado",
@@ -15366,6 +15368,13 @@
           "back": "Todos los hilos",
           "empty": "Ningún miembro ha hablado con el lead todavía.",
           "waiting": "{{count}} esperando"
+        },
+        "GameMemberReplyForm": {
+          "failed": "La respuesta no se envió.",
+          "label": "Tu respuesta para {{ticket}}",
+          "send": "Enviar",
+          "overridePlaceholder": "Reemplaza la respuesta del lead",
+          "override": "Corregir"
         }
       }
     },

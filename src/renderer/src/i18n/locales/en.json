@@ -16274,7 +16274,8 @@
           "empty": "No questions are waiting for you.",
           "waiting": "Waiting",
           "threads": "Threads",
-          "answered": "Answered"
+          "answered": "Answered",
+          "answerInstead": "Answer instead of the lead"
         },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
@@ -16301,7 +16302,8 @@
         },
         "GameInboxAnsweredList": {
           "empty": "The lead has not answered a member yet.",
-          "answeredAt": "answered {{when}}"
+          "answeredAt": "answered {{when}}",
+          "overridden": "You replaced it: {{text}}"
         },
         "GameInboxThreadsView": {
           "rejected": "Rejected",
@@ -16309,6 +16311,13 @@
           "back": "All threads",
           "empty": "No member has talked with the lead yet.",
           "waiting": "{{count}} waiting"
+        },
+        "GameMemberReplyForm": {
+          "failed": "The reply was not sent.",
+          "label": "Your answer to {{ticket}}",
+          "send": "Send",
+          "overridePlaceholder": "Replace the lead's answer",
+          "override": "Override"
         }
       }
     },
