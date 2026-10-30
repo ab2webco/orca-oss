@@ -1,0 +1,84 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { parseGameEvent } from './orchestrator-game-events'
+import { parseGameHistoryRecord } from './orchestrator-game-history'
+import { computeGameMetrics } from './orchestrator-game-metrics'
+import {
+  GAME_METRICS_COMPUTE_BUDGET_MS,
+  GAME_METRICS_DAYS,
+  GAME_METRICS_PAYLOAD_BUDGET_BYTES,
+  gameDayWindowOf,
+  gameMetricsSummaryOf
+} from './orchestrator-game-metrics-summary'
+
+// Why recorded: this project's real game.events and game.history on 2026-10-30, `text` and accounts blanked.
+const recorded = JSON.parse(
+  readFileSync(
+    new URL('./__fixtures__/orchestrator-game-recorded-stores.json', import.meta.url),
+    'utf8'
+  )
+) as { recordedAt: string; events: unknown[]; history: unknown[] }
+const stores = {
+  events: recorded.events.map(parseGameEvent).filter((one) => one !== null),
+  history: recorded.history.map(parseGameHistoryRecord).filter((one) => one !== null)
+}
+const now = Date.parse(recorded.recordedAt)
+const timezone = 'America/Bogota'
+
+describe('gameDayWindowOf', () => {
+  it('spans one calendar day in the zone', () => {
+    expect(gameDayWindowOf('2026-10-30', 'America/Bogota')).toEqual({
+      since: '2026-10-30T05:00:00.000Z',
+      until: '2026-10-31T05:00:00.000Z'
+    })
+  })
+
+  it('is 25 hours on the day daylight saving ends', () => {
+    expect(gameDayWindowOf('2026-11-01', 'America/New_York')).toEqual({
+      since: '2026-11-01T04:00:00.000Z',
+      until: '2026-11-02T05:00:00.000Z'
+    })
+  })
+})
+
+describe('gameMetricsSummaryOf', () => {
+  it('reads the recorded stores', () => {
+    expect(stores.events).toHaveLength(recorded.events.length)
+    expect(stores.history).toHaveLength(recorded.history.length)
+  })
+
+  it('counts merged tickets per day as `orca game metrics --since --until` does for that day', () => {
+    const summary = gameMetricsSummaryOf(stores, { now, timezone })
+    expect(summary.mergedPerDay).toHaveLength(GAME_METRICS_DAYS)
+    expect(summary.mergedPerDay.at(-1)?.day).toBe('2026-10-30')
+    expect(summary.mergedPerDay[0].day).toBe('2026-10-17')
+    for (const { day, merged } of summary.mergedPerDay) {
+      const window = gameDayWindowOf(day, timezone)
+      expect(merged, day).toBe(computeGameMetrics(stores, window).ticketsDone.length)
+    }
+    expect(summary.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)).toBeGreaterThan(0)
+  })
+
+  it('takes lead time over the whole window, as the CLI does from its first day', () => {
+    const summary = gameMetricsSummaryOf(stores, { now, timezone })
+    const { since } = gameDayWindowOf('2026-10-17', timezone)
+    const cli = computeGameMetrics(stores, { since }).leadTime
+    expect(summary.leadTime).toEqual({ medianMs: cli.medianMs, measured: cli.tickets.length })
+    expect(summary.leadTime.measured).toBeGreaterThan(0)
+  })
+
+  it('states when and in which zone it was computed', () => {
+    const summary = gameMetricsSummaryOf(stores, { now, timezone })
+    expect(summary.computedAt).toBe(recorded.recordedAt)
+    expect(summary.timezone).toBe(timezone)
+  })
+
+  it('stays inside the payload and compute budgets on the recorded stores', () => {
+    const started = performance.now()
+    const summary = gameMetricsSummaryOf(stores, { now, timezone })
+    const elapsed = performance.now() - started
+    const carried = { ...summary, claudeUsage: { sessionPercent: 100, weeklyPercent: 100 } }
+    expect(JSON.stringify(carried).length).toBeLessThanOrEqual(GAME_METRICS_PAYLOAD_BUDGET_BYTES)
+    expect(elapsed).toBeLessThan(GAME_METRICS_COMPUTE_BUDGET_MS)
+  })
+})
