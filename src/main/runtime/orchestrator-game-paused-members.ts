@@ -1,8 +1,10 @@
 import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
-import { isFinishedMember, ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import { finishedSignalOf } from '../../shared/orchestrator-game-member-finished'
 import {
   pausedMembersOf,
   queuedMembersOf,
+  type GameMemberSession,
   type GameMemberSessionPatch,
   type GamePausedCauseOf,
   type GamePausedMember,
@@ -28,6 +30,8 @@ type Deps = {
   sessionIdOf: (terminalHandle: string) => string | null
   /** Why a saved member is not live while its terminal is open; null when the terminal is gone. */
   causeOf?: GamePausedCauseOf
+  /** True only when its repo answered without it; an unreachable host is not gone. */
+  worktreeGone?: (worktreeId: string) => Promise<boolean>
 }
 
 const errorText = (error: unknown): string =>
@@ -56,9 +60,12 @@ export class GamePausedMembers {
     })
     let error: string | null = null
     try {
+      // Why: a remote member has no local session to save or resume, but its launch record must not read as paused (ORCA-824, ORCA-864).
       await this.deps.store.upsert(
         projectKey,
-        live.map(({ agent, ticket }) => this.patchOf(agent, ticket))
+        live
+          .filter(({ agent }) => !agent.remote)
+          .map(({ agent, ticket }) => this.patchOf(agent, ticket))
       )
     } catch (failure) {
       error = errorText(failure)
@@ -70,8 +77,9 @@ export class GamePausedMembers {
     const tickets = new Set(live.map((one) => one.ticket))
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     const liveNow = { tickets, worktreeIds: liveWorktreeIds }
+    const gone = await this.goneWorktreesOf(read.members.filter((one) => !tickets.has(one.ticket)))
     return {
-      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf),
+      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf, gone),
       unlisted: unlistedMembersOf(read.members, liveNow, starting),
       queued: queuedMembersOf(read.members, setup.queued),
       error
@@ -87,12 +95,28 @@ export class GamePausedMembers {
     await this.deps.store.remove(projectKey, tickets)
   }
 
+  private async goneWorktreesOf(members: readonly GameMemberSession[]): Promise<Set<string>> {
+    const worktreeGone = this.deps.worktreeGone
+    if (!worktreeGone) {
+      return new Set()
+    }
+    const ids = new Set(
+      members.flatMap((one) =>
+        one.worktreeId !== null && one.lastState !== 'finished' ? [one.worktreeId] : []
+      )
+    )
+    const gone = await Promise.all(
+      [...ids].map(async (id) => ((await worktreeGone(id).catch(() => false)) ? [id] : []))
+    )
+    return new Set(gone.flat())
+  }
+
   private patchOf(agent: GameAgent, ticket: string): GameMemberSessionPatch {
     const handle = agent.terminalHandle
     const context = handle ? this.deps.contextOf(handle) : undefined
     const sessionId = handle ? this.deps.sessionIdOf(handle) : null
-    // Why a completed dispatch counts: its worker_done succeeded, so it is never resumed.
-    const finished = isFinishedMember(agent) || context?.dispatchStatus === 'completed'
+    // Why: done work is never resumed, busy or not; a completed dispatch's worker_done succeeded.
+    const finished = finishedSignalOf(agent) !== null || context?.dispatchStatus === 'completed'
     return {
       ticket,
       name: agent.displayName,

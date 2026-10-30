@@ -14,6 +14,8 @@ export type ArcadeWords = {
   unlocked: string
   offerLeft: (seconds: number) => string
   offerHeld: (seconds: number) => string
+  /** How to give the offer the keyboard while the prompt holds it. */
+  offerReach: string
   play: string
   pass: string
   over: (score: number) => string
@@ -33,6 +35,7 @@ const EN: ArcadeWords = {
   unlocked: 'Arcade unlocked!',
   offerLeft: (seconds) => `A run is yours · ${seconds}s to choose`,
   offerHeld: (seconds) => `On hold · someone needs you · ${seconds}s left`,
+  offerReach: 'ctrl+x tab, then j',
   play: 'play',
   pass: 'pass',
   over: (score) => `Game over · ${score} · j to run again`
@@ -52,6 +55,7 @@ const ES: ArcadeWords = {
   unlocked: '¡Arcade desbloqueado!',
   offerLeft: (seconds) => `Te ganaste una partida · ${seconds}s para elegir`,
   offerHeld: (seconds) => `En espera · alguien te necesita · quedan ${seconds}s`,
+  offerReach: 'ctrl+x tab y luego j',
   play: 'jugar',
   pass: 'pasar',
   over: (score) => `Fin · ${score} · j para otra`

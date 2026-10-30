@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../../theme/dynamic-type-text'
 import * as Clipboard from 'expo-clipboard'
 import { Check, Copy, FileWarning, Sparkles } from 'lucide-react-native'
 import { colors } from '../../theme/mobile-theme'

@@ -234,6 +234,81 @@ describe('orchestration worker workspace resolution', () => {
     )
   })
 
+  describe('a paired client registered this host repo again under its runtime host id', () => {
+    const pairedRepo = {
+      id: 'repo-paired',
+      path: REPO_PATH,
+      displayName: 'App',
+      badgeColor: 'blue',
+      addedAt: 2,
+      executionHostId: 'runtime:paired-env'
+    } satisfies Repo
+    const pairedWorktreeId = `${pairedRepo.id}::${WORKTREE_PATH}`
+
+    function makeDuplicatedStore() {
+      // The paired record is listed first so a first-match pick would return it.
+      return makeStore({
+        repos: [pairedRepo, { ...makeStore().getRepos()[0], executionHostId: 'local' }],
+        meta: {
+          [pairedWorktreeId]: makeMeta('feature', 'runtime:paired-env'),
+          [WORKTREE_ID]: makeMeta('Feature', 'local')
+        }
+      })
+    }
+
+    it.each([
+      ['path', `path:${WORKTREE_PATH}`],
+      ['branch', 'branch:feature'],
+      ['name', 'name:Feature'],
+      ['id', `id:${WORKTREE_ID}`]
+    ])('resolves the %s selector to the host-owned record', async (_label, selector) => {
+      const runtime = new OrcaRuntimeService(makeDuplicatedStore() as never)
+
+      await expect(runtime.showManagedTerminalWorkspace(selector)).resolves.toMatchObject({
+        id: WORKTREE_ID
+      })
+    })
+
+    // ORCA-866: the lead's `worktree rm --environment imac --worktree branch:…` hit a tree already gone.
+    it('finds no worktree by a branch no longer checked out, but still finds it by path', async () => {
+      scanLocalRepoWorktreesForResolution.mockResolvedValue({
+        ok: true,
+        worktrees: [
+          { path: WORKTREE_PATH, head: 'a', branch: '', isBare: false, isMainWorktree: false }
+        ]
+      })
+      const runtime = new OrcaRuntimeService(makeDuplicatedStore() as never)
+
+      await expect(runtime.showManagedTerminalWorkspace('branch:feature')).rejects.toThrow(
+        'selector_not_found'
+      )
+      await expect(
+        runtime.showManagedTerminalWorkspace(`path:${WORKTREE_PATH}`)
+      ).resolves.toMatchObject({ id: WORKTREE_ID })
+    })
+
+    it('still rejects a branch checked out at two different paths', async () => {
+      scanLocalRepoWorktreesForResolution.mockResolvedValue({
+        ok: true,
+        worktrees: [
+          {
+            path: WORKTREE_PATH,
+            head: 'a',
+            branch: 'feature',
+            isBare: false,
+            isMainWorktree: false
+          },
+          { path: '/repo/copy', head: 'a', branch: 'feature', isBare: false, isMainWorktree: false }
+        ]
+      })
+      const runtime = new OrcaRuntimeService(makeDuplicatedStore() as never)
+
+      await expect(runtime.showManagedTerminalWorkspace('branch:feature')).rejects.toThrow(
+        'selector_ambiguous'
+      )
+    })
+  })
+
   it('resolves local and SSH folder workspaces without a Git catalog scan', async () => {
     const localPath = await mkdtemp(join(tmpdir(), 'orca-worker-local-folder-'))
     tempPaths.push(localPath)

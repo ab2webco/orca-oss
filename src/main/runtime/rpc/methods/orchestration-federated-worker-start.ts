@@ -56,11 +56,12 @@ export async function startFederatedWorker(args: {
     undefined,
     params.timeoutMs
   )) as RuntimeStatus
-  const { federationProtocolVersion, gameMember } = negotiateFederatedWorkerStart({
-    status,
-    serverName: server.name,
-    params
-  })
+  const { federationProtocolVersion, gameMember, carriesGameScene, memberAccount } =
+    negotiateFederatedWorkerStart({ status, serverName: server.name, params })
+  // Why never blocking: without the scene the host draws its own, as before.
+  const gameScene = carriesGameScene
+    ? await runtime.readCallerGameScene(params.from).catch(() => null)
+    : null
 
   const setupDecision = createsWorktree ? (params.setup ?? 'run') : 'not_applicable'
   const started = db.createStartingWorkerDispatch({
@@ -121,7 +122,9 @@ export async function startFederatedWorker(args: {
         effort: params.effort,
         timeoutMs: params.timeoutMs,
         devMode: params.devMode,
-        ...gameMember
+        ...gameMember,
+        ...memberAccount,
+        ...(gameScene ? { gameScene } : {})
       },
       (params.timeoutMs ?? 60_000) + 15_000,
       { orchestrationRequestId: orchestrationMutation.requestId }
@@ -165,6 +168,7 @@ export async function startFederatedWorker(args: {
         server: { environmentId: server.environmentId, name: server.name },
         setup: remote.setup,
         launch,
+        ...(remote.account ? { account: remote.account } : {}),
         timeoutMs: params.timeoutMs ?? 60_000,
         effects: remote.effects ?? [],
         residualResources: remote.residualResources ?? []
@@ -178,10 +182,18 @@ export async function startFederatedWorker(args: {
       )
       return federatedUnknownReceipt(worker, task.id, server.name, launch)
     }
+    const settledOnTerminal =
+      remote.failedStage === 'agent_readiness' && params.terminal
+        ? db.findReopenableFederatedDispatchOnTerminal(server.environmentId, params.terminal)
+        : undefined
+    // Why: a busy settled member takes follow-up mail on its next turn instead (ORCA-838).
+    const followUpHint = settledOnTerminal
+      ? ` Its agent is still busy; to queue this work for its next turn, send it to its settled Dispatch: orca orchestration send --to dispatch:${settledOnTerminal}.`
+      : ''
     const worker = db.failWorkerStart(
       started.dispatch.id,
       remote.failedStage ?? 'remote_attach',
-      remote.lastError ?? `The worker server returned ${remote.state}.`
+      `${remote.lastError ?? `The worker server returned ${remote.state}.`}${followUpHint}`
     )
     return {
       runId,
@@ -230,6 +242,8 @@ type RemoteStartReceipt = {
   terminalHandle?: string
   setup?: { state: string }
   launch?: OrchestrationWorkerLaunchReceipt
+  /** The host's own account the member runs on; only its email crosses back (ORCA-798). */
+  account?: { provider: string; email: string }
   effects?: unknown[]
   residualResources?: unknown[]
   failedStage?: string
@@ -243,7 +257,8 @@ function isKnownRemoteStartFailure(code: string): boolean {
     'worktree_not_found_on_server',
     'terminal_worktree_mismatch',
     'capability_unsupported',
-    'setup_slot_busy'
+    'setup_slot_busy',
+    'accounts_limited'
   ].includes(code)
 }
 

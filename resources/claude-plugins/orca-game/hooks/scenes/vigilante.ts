@@ -1,4 +1,4 @@
-import type { SceneDefinition } from './scene-definition'
+import { sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const WHITE = 0xf4f4f4
@@ -9,6 +9,28 @@ const INK = 0x06070c
 const SUIT = 0x5d6475
 const BELT = 0xd8b23c
 const HERO_SKIN = 0xe2b48c
+
+// A hero's skin, and the cape, hat or hair each phase's costume wears.
+const hero = (
+  name: string,
+  skin: number,
+  gear: number,
+  ...accessory: [Parameters<typeof sceneCharacter>[2], number]
+) => sceneCharacter(name, { S: skin, C: gear, F: gear, H: gear, B: gear }, ...accessory)
+
+const CHARACTERS = [
+  hero('Raven', 0xf6d5b8, 0x2a2a3a, 'feather', 0x8a8ab0),
+  hero('Lynx', 0xc68e5e, 0x8a6a2a, 'horns', 0xc8a050),
+  hero('Vesper', 0x9a6440, 0x6a2a6a, 'bow', 0xd83a8a),
+  hero('Specter', 0xe8e8f0, 0x4a5a6a, 'halo', 0xc8f0ff),
+  hero('Onyx', 0x6b4428, 0x1a1a1a, 'cape', 0x9a9aaa),
+  hero('Talon', 0xd8a070, 0x7a3a1a, 'feather', 0xc04a2a),
+  hero('Nova', 0xfadcc0, 0x2a4a9a, 'antenna', 0xfff06a),
+  hero('Shade', 0x8a5a38, 0x2a3a2a, 'cape', 0x5fa07a),
+  hero('Ember', 0xf0c8a0, 0xb03a1a, 'horns', 0xff7a2a),
+  hero('Falcon', 0xb57a50, 0x5a4a2a, 'crown', 0xd8b040),
+  hero('Cipher', 0xa87048, 0x2a6a5a, 'antenna', 0x5fe0a0)
+]
 
 // Night Watch by Jucer Orozco (koombea/cineco-orchestrator PR #32): a caped vigilante over a
 // night skyline with a signal in the sky, and a masked rogue on red CI.
@@ -182,6 +204,9 @@ export const VIGILANTE_SCENE: SceneDefinition = {
   },
   finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' },
   // Jev's advisor: the commissioner, grey mustache and trench coat, by the signal.
+  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  roster: ['Nightjar', ...CHARACTERS.map((one) => one.name)],
+  characters: CHARACTERS,
   cast: {
     advisor: {
       name: { en: 'Commissioner', es: 'Comisionado' },

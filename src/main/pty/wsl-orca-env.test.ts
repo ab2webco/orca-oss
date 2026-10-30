@@ -53,6 +53,7 @@ describe('addOrcaWslInteropEnv', () => {
       ORCA_PANE_KEY: 'tab-1:leaf-1',
       ORCA_TAB_ID: 'tab-1',
       ORCA_WORKTREE_ID: 'repo::\\\\wsl.localhost\\Ubuntu\\home\\jin\\repo',
+      ORCA_WORKTREE_SLUG: 'repo_0a1b2c3d',
       ORCA_AGENT_LAUNCH_TOKEN: 'launch-secret',
       ORCA_AGENT_HOOK_PORT: '4567',
       ORCA_AGENT_HOOK_TOKEN: 'token',
@@ -75,6 +76,7 @@ describe('addOrcaWslInteropEnv', () => {
     expect(env.WSLENV).toContain('ORCA_PANE_KEY/u')
     expect(env.WSLENV).toContain('ORCA_TAB_ID/u')
     expect(env.WSLENV).toContain('ORCA_WORKTREE_ID/u')
+    expect(env.WSLENV).toContain('ORCA_WORKTREE_SLUG/u')
     expect(env.WSLENV).toContain('ORCA_AGENT_LAUNCH_TOKEN/u')
     expect(env.WSLENV).toContain('ORCA_AGENT_HOOK_PORT/u')
     expect(env.WSLENV).toContain('ORCA_AGENT_HOOK_TOKEN/u')

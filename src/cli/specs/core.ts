@@ -4,6 +4,7 @@ import { ORCA_REPOSITORY_SLUG } from '../../shared/orca-repository-url'
 import { SERVE_COMMAND_SPECS } from './serve'
 import { TERMINAL_CREATE_COMMAND_SPECS } from './terminal-create'
 import { TERMINAL_SPLIT_COMMAND_SPECS } from './terminal-split'
+import { WORKTREE_RM_COMMAND_SPECS } from './worktree-rm'
 
 export const CORE_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -167,21 +168,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'orca worktree set --worktree active --linear-issue null --json'
     ]
   },
-  {
-    path: ['worktree', 'rm'],
-    // Why: agents reach for git's `remove`/`delete` verbs; accept them as
-    // aliases so a conventional guess resolves instead of dead-ending.
-    aliases: [
-      ['worktree', 'remove'],
-      ['worktree', 'delete']
-    ],
-    destructive: true,
-    summary: 'Remove a worktree from Orca Lab and git',
-    usage:
-      'orca worktree rm --worktree <selector> [--force] [--force-member] [--run-hooks] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'force', 'force-member', 'run-hooks'],
-    notes: ['Repo-defined orca.yaml archive hooks are skipped unless --run-hooks is passed.']
-  },
+  ...WORKTREE_RM_COMMAND_SPECS,
   {
     path: ['worktree', 'ps'],
     summary: 'Show a compact orchestration summary across worktrees',

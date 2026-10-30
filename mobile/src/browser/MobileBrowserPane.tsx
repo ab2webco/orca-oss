@@ -11,12 +11,11 @@ import {
   PixelRatio,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   type GestureResponderEvent,
   type PanResponderGestureState
 } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { ArrowUp, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react-native'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcFailure, RpcSuccess } from '../transport/types'

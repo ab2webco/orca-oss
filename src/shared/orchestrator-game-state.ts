@@ -11,6 +11,7 @@ import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
+import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
@@ -59,6 +60,8 @@ export type GameAgent = {
   workItem?: GameWorkItem
   /** The managed account a member's agent runs on; absent when Orca cannot tell or from an older host. */
   account?: GameMemberAccount
+  /** Runs on the host's global login, which Orca cannot move or refresh (ORCA-809); absent from an older host. */
+  globalLogin?: true
   /** Set while a member is stopped by its account's usage limit; absent from an older host. */
   limit?: { resetsAt: number | null }
   /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
@@ -67,8 +70,23 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** When the host last saw the member's terminal work (ORCA-746); absent when unknown or from an older host. */
   lastActivityAt?: string
+  /** When the member's current agent state began, on its host's clock (ms); absent from an older host. */
+  stateSince?: number
   /** Failed for silence yet still working, not reopened because something replaced it (ORCA-658). */
   orphaned?: true
+  /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */
+  remote?: GameRemoteHost
+}
+
+export type GameRemoteHost = {
+  host: string
+  stateKnown: boolean
+  /** Launched by a lead that no longer leads it; read from the home Run DB (ORCA-793). */
+  earlierLead?: true
+  /** The home Run completed the member's task. */
+  ticketDone?: true
+  /** The host answered and the member's terminal is no longer there (ORCA-790). */
+  gone?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
@@ -172,6 +190,8 @@ export type OrchestratorGameState = {
   stopped?: GameStop | null
   /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
   inboxes?: GameInboxSummary[]
+  /** Questions the lead asked the person (`game ask-owner`) still unanswered; only for the lead, absent from an older host. */
+  openOwnerQuestions?: number
   /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
   pausedMembers?: GamePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
@@ -180,6 +200,8 @@ export type OrchestratorGameState = {
   unlistedMembers?: GameUnlistedMember[]
   /** Why the saved members could not be read or saved; absent when they could. */
   pausedMembersError?: string
+  /** github.com's budget and Orca's share of it; absent when it cannot be read or from an older host. */
+  githubBudget?: GameGitHubBudget
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
 }
@@ -239,6 +261,9 @@ const AGENT_STATES: Record<AgentStatusState, GameAgent['state']> = {
   done: 'done'
 }
 
+export const gameAgentStateOf = (state: AgentStatusState): GameAgent['state'] =>
+  AGENT_STATES[state] ?? 'idle'
+
 export function gameAgentOf(
   row: Pick<
     RuntimeWorktreeAgentRow,
@@ -251,7 +276,7 @@ export function gameAgentOf(
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
-    state: AGENT_STATES[row.state] ?? 'idle',
+    state: gameAgentStateOf(row.state),
     toolName: row.toolName,
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})

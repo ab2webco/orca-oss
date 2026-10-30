@@ -6,7 +6,7 @@ import {
   gameAccountUsagesOf,
   isAutoPickableAccount,
   type GameLaunchedOnAccount
-} from './orchestrator-game-account-usage'
+} from '../../shared/orchestrator-game-account-usage'
 import type { GameLaunchChoice } from './orchestrator-game-launch-options'
 import {
   GAME_ACCOUNT_NEAR_LIMIT_PERCENT,
@@ -19,6 +19,7 @@ import {
   type GameAccountProvider
 } from '../../shared/orchestrator-game-member-agent'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
+import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -27,10 +28,17 @@ export type GameMemberAccountContext = {
   agents: readonly GameAgent[]
   launched?: GameLaunchedOnAccount
   exclude?: string
+  /** A launch: with no managed account at all, `auto` may use the global login unless this member holds it. */
+  globalLoginHolder?: string | null
 }
+
+/** How `game fleet` and a launch name the host's own login, which no managed account owns. */
+export const GAME_GLOBAL_LOGIN_LABEL = 'global login'
 
 /** The error code of an `auto` pick that found every account at or near its limit. */
 export const GAME_ACCOUNTS_LIMITED = 'accounts_limited'
+export const GAME_ACCOUNTS_UNUSABLE = 'accounts_unusable'
+export const GAME_GLOBAL_LOGIN_TAKEN = 'global_login_taken'
 
 export type GameAccountPin = { claudeAccountId?: string; codexAccountId?: string }
 
@@ -38,6 +46,8 @@ export type GameAccountPin = { claudeAccountId?: string; codexAccountId?: string
 export type GameMemberAccountChoice = {
   pin: GameAccountPin
   account: { id: string; email: string } | null
+  /** No managed account exists, so the member runs on the host's global login. */
+  globalLogin?: true
 }
 
 // Why bounded: accounts.list waits on provider usage APIs that can stall behind broken auth.
@@ -76,6 +86,47 @@ function namedAccount(
   return { pin: pinOf(provider, id), account: { id, email } }
 }
 
+/** The member already on the global login for this agent's provider, if any; one at a time. */
+export function globalLoginHolderOf(
+  agents: readonly GameAgent[],
+  agent: string,
+  launchedThere: readonly string[]
+): string | null {
+  const provider = accountProviderOfAgent(agent)
+  const holders = agents
+    .filter(
+      (one) =>
+        one.isMember &&
+        !one.isLeader &&
+        one.globalLogin === true &&
+        accountProviderOfAgent(one.agentType) === provider
+    )
+    .map((one) => ticketOfMember(one) ?? one.displayName ?? one.paneKey)
+  return [...holders, ...launchedThere][0] ?? null
+}
+
+// Why: Orca cannot refresh, move or switch a member on the global login (ORCA-809).
+function globalLoginChoice(
+  snapshot: RuntimeAccountsSnapshot,
+  provider: GameAccountProvider,
+  holder: string | null
+): GameMemberAccountChoice {
+  const label = GAME_ACCOUNT_PROVIDER_LABELS[provider]
+  if (snapshot[provider].accounts.length > 0) {
+    throw new RuntimeClientError(
+      GAME_ACCOUNTS_UNUSABLE,
+      `No managed ${label} account here can take a member (each is on WSL, a custom endpoint, or its sign-in failed), and Orca does not fall back to the global login while managed accounts exist. Name one with --account <email|id>, or fix its sign-in. See \`orca game accounts\`.`
+    )
+  }
+  if (holder !== null) {
+    throw new RuntimeClientError(
+      GAME_GLOBAL_LOGIN_TAKEN,
+      `No managed ${label} account here, and ${holder} already runs on the global login; Orca puts one member there at a time because it cannot move or refresh it. Add an account in Settings → Accounts, or wait for ${holder}.`
+    )
+  }
+  return { ...NO_ACCOUNT, globalLogin: true }
+}
+
 async function autoAccount(
   client: Client,
   provider: GameAccountProvider,
@@ -90,7 +141,8 @@ async function autoAccount(
       agents: context.agents,
       launched: context.launched
     })
-  let usages = usagesOf(await readAccounts(client))
+  let snapshot = await readAccounts(client)
+  let usages = usagesOf(snapshot)
   // Why one refresh: Orca reads an inactive account's usage lazily, so a cold cache would make it look unknown.
   if (usages.some((usage) => usage.session === null && usage.weekly === null)) {
     const refreshed = await client
@@ -100,12 +152,15 @@ async function autoAccount(
         { timeoutMs: USAGE_REFRESH_TIMEOUT_MS }
       )
       .catch(() => null)
-    usages = refreshed ? usagesOf(refreshed.result) : usages
+    snapshot = refreshed?.result ?? snapshot
+    usages = usagesOf(snapshot)
   }
   const now = Date.now()
   const pick = pickGameMemberAccount(usages, now)
   if (pick.kind === 'none') {
-    return NO_ACCOUNT
+    return context.globalLoginHolder === undefined
+      ? NO_ACCOUNT
+      : globalLoginChoice(snapshot, provider, context.globalLoginHolder)
   }
   if (pick.kind === 'limited') {
     throw new RuntimeClientError(
@@ -119,7 +174,7 @@ async function autoAccount(
 /** The managed account a new member runs on: the one named, the freest one for `auto`, or Orca's default. */
 export async function resolveGameMemberAccount(
   client: Client,
-  choice: GameLaunchChoice,
+  choice: Pick<GameLaunchChoice, 'agent' | 'account'>,
   context: GameMemberAccountContext
 ): Promise<GameMemberAccountChoice> {
   const provider = accountProviderOfAgent(choice.agent)

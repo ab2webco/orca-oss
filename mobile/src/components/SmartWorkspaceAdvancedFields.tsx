@@ -1,4 +1,5 @@
-import { Platform, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { Platform, StyleSheet, Switch, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import type { MobileComposerSource } from '../tasks/use-mobile-composer-source'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 

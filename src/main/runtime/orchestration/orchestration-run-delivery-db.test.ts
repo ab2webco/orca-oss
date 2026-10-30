@@ -107,7 +107,12 @@ describe('OrchestrationDb Run state', () => {
     it('uses type filters only as wake predicates and returns the full oldest batch', () => {
       const d = createDb()
       const run = createBoundRun(d)
-      d.insertMessage({ from: 'a', to: `run:${run.id}`, subject: 'status', runId: run.id })
+      d.insertMessage({
+        from: 'dispatch:ctx_a',
+        to: `run:${run.id}`,
+        subject: 'status',
+        runId: run.id
+      })
       expect(
         d.getOrCreateRunDelivery({
           runId: run.id,
@@ -129,6 +134,95 @@ describe('OrchestrationDb Run state', () => {
         wakeTypes: ['worker_done']
       })
       expect(delivery?.messages.map((message) => message.subject)).toEqual(['status', 'done'])
+    })
+
+    describe('mail from outside the Run members (ORCA-861)', () => {
+      const LEAD_WATCH = ['worker_done', 'escalation', 'question', 'decision_gate'] as const
+      const memberOf = (d: OrchestrationDb, runId: string, handle: string, paneKey?: string) =>
+        d.createDispatchContext(d.createTask({ spec: 'work', runId }).id, handle, paneKey)
+      const watch = (d: OrchestrationDb, run: { id: string; consumer_generation: number }) =>
+        d.getOrCreateRunDelivery({
+          runId: run.id,
+          consumerGeneration: run.consumer_generation,
+          terminalHandle: 'term_coord',
+          wakeTypes: [...LEAD_WATCH]
+        })
+
+      it("wakes the lead's typed watch on another lead's status reply", () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        const other = d.createRun({
+          objective: 'CineCo',
+          coordinatorHandle: 'term_other_lead',
+          coordinatorPaneKey: 'tab_other:33333333-3333-4333-8333-333333333333'
+        })
+        d.insertMessage({
+          from: 'term_other_lead',
+          to: 'term_coord',
+          subject: 'CineCo lead: failures',
+          runId: other.id
+        })
+
+        expect(d.hasUnreadOutsideMemberRunMail(run.id, 'term_coord')).toBe(true)
+        expect(watch(d, run)?.messages.map((message) => message.subject)).toEqual([
+          'CineCo lead: failures'
+        ])
+      })
+
+      it('keeps member and runtime status pings from waking it', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        memberOf(d, run.id, 'term_member', 'tab_member:44444444-4444-4444-8444-444444444444')
+        const status = (from: string, senderPaneKey?: string) =>
+          d.insertMessage({
+            from,
+            to: `run:${run.id}`,
+            subject: from,
+            runId: run.id,
+            senderPaneKey
+          })
+        status('term_member')
+        status('term_member_reminted', 'tab_member:44444444-4444-4444-8444-444444444444')
+        status('dispatch:ctx_remote')
+        status('task:task_queued')
+        status(`run:${run.id}`)
+        status('term_coord')
+
+        expect(d.hasUnreadOutsideMemberRunMail(run.id, 'term_coord')).toBe(false)
+        expect(watch(d, run)).toBeUndefined()
+      })
+
+      it('wakes on the outside status even behind member status rows, and carries them', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        memberOf(d, run.id, 'term_member')
+        for (let index = 0; index < 55; index++) {
+          d.insertMessage({
+            from: 'term_member',
+            to: `run:${run.id}`,
+            subject: `member ${index}`,
+            runId: run.id
+          })
+        }
+        d.insertMessage({ from: 'term_other_lead', to: 'term_coord', subject: 'outside' })
+
+        const delivery = watch(d, run)
+
+        expect(delivery?.messages).toHaveLength(50)
+        expect(delivery?.messages.at(-1)?.subject).toBe('outside')
+      })
+
+      it('never retires an unacknowledged batch that holds outside mail', () => {
+        const d = createDb()
+        const run = createBoundRun(d)
+        d.insertMessage({ from: 'term_other_lead', to: 'term_coord', subject: 'outside' })
+        const first = watch(d, run)!
+
+        const replay = watch(d, run)
+
+        expect(replay?.delivery.id).toBe(first.delivery.id)
+        expect(replay?.replayed).toBe(true)
+      })
     })
 
     describe('heartbeats (ORCA-637)', () => {

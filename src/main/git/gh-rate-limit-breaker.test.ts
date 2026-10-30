@@ -35,7 +35,15 @@ describe('classifyGhRateLimitBucket', () => {
   it('classifies graphql and defaults everything else to core', () => {
     expect(classifyGhRateLimitBucket(['api', 'graphql', '-f', 'query=…'])).toBe('graphql')
     expect(classifyGhRateLimitBucket(['api', 'repos/a/b/pulls?per_page=36'])).toBe('core')
-    expect(classifyGhRateLimitBucket(['pr', 'list', '--limit', '36'])).toBe('core')
+    expect(classifyGhRateLimitBucket(['run', 'list', '--limit', '1'])).toBe('core')
+  })
+
+  it('files the pr, issue and repo commands under graphql, where gh sends them', () => {
+    expect(classifyGhRateLimitBucket(['pr', 'list', '--limit', '36'])).toBe('graphql')
+    expect(classifyGhRateLimitBucket(['pr', 'view', '7', '--json', 'state'])).toBe('graphql')
+    expect(classifyGhRateLimitBucket(['pr', 'checks', '7'])).toBe('graphql')
+    expect(classifyGhRateLimitBucket(['issue', 'list'])).toBe('graphql')
+    expect(classifyGhRateLimitBucket(['repo', 'view', '--json', 'name'])).toBe('graphql')
   })
 })
 

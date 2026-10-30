@@ -1,12 +1,17 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ClaudeVaultSettingInheritance, ClaudeVaultSettingInheritanceKey, ClaudeVaultSettingsInheritanceReport } from '../../shared/managed-account-types'
+import type {
+  ClaudeVaultSettingInheritance,
+  ClaudeVaultSettingInheritanceKey,
+  ClaudeVaultSettingsInheritanceReport
+} from '../../shared/managed-account-types'
 import { ensureVaultOutputStyleLinks, outputStyleResolvesInVault } from './vault-output-styles'
 import {
   INHERITABLE_VAULT_SETTING_KEYS,
   describeSettingInheritance,
   mergeUserSettingsIntoVaultSettings,
   parseSettingsObject,
+  seedBypassPermissionsAcceptance,
   selectInheritableSettings
 } from './vault-user-settings'
 
@@ -22,10 +27,9 @@ function readHomeSettingsJson(homeDir: string): string | null {
 /** The user's inheritable home settings, with `outputStyle` dropped when this
  *  vault cannot load the named style (see vault-output-styles for why). */
 function resolveInheritableForVault(
-  homeDir: string,
+  homeSettings: Record<string, unknown> | null,
   vaultAuthPath: string
 ): Partial<Record<ClaudeVaultSettingInheritanceKey, unknown>> {
-  const homeSettings = parseSettingsObject(readHomeSettingsJson(homeDir))
   if (homeSettings === null) {
     return {}
   }
@@ -54,10 +58,12 @@ export function buildInheritedVaultSettings(
   existingSettingsJson: string | null
 ): string | null {
   ensureVaultOutputStyleLinks(vaultAuthPath, homeDir)
-  return mergeUserSettingsIntoVaultSettings(
+  const homeSettings = parseSettingsObject(readHomeSettingsJson(homeDir))
+  const merged = mergeUserSettingsIntoVaultSettings(
     existingSettingsJson,
-    resolveInheritableForVault(homeDir, vaultAuthPath)
+    resolveInheritableForVault(homeSettings, vaultAuthPath)
   )
+  return seedBypassPermissionsAcceptance(merged ?? existingSettingsJson, homeSettings) ?? merged
 }
 
 /**

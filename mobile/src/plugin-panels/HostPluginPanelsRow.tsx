@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react-native'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { useHostProtocolGates } from '../components/HostProtocolGate'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ConnectionState } from '../transport/types'

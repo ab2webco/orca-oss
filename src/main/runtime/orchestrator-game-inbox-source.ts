@@ -1,5 +1,9 @@
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
-import type { GameInboxMail, GameInboxSource } from '../../shared/orchestrator-game-inbox'
+import type {
+  GameAnsweredQuestionMail,
+  GameInboxMail,
+  GameInboxSource
+} from '../../shared/orchestrator-game-inbox'
 
 /** The orchestration database reads the game inbox needs; mail is never deleted when a member closes. */
 export type GameInboxDb = {
@@ -12,10 +16,12 @@ export type GameInboxDb = {
   getTask: (id: string) => { task_title: string | null; display_name: string | null } | undefined
   getAllMessagesForHandle: (handle: string, limit?: number) => GameInboxMail[]
   listPendingQuestions: (runId: string) => GameInboxMail[]
+  listAnsweredQuestions: (runId: string, limit: number) => GameAnsweredQuestionMail[]
 }
 
 // Why 100: what `orca orchestration inbox` reads per address; older mail stays there.
 const MAIL_PER_ADDRESS = 100
+const ANSWERED_QUESTIONS_MAX = 100
 
 /** The lead's addresses and every ticket's, from the lead's current run, with their mail. */
 export function gameInboxSourceOf(
@@ -52,5 +58,6 @@ export function gameInboxSourceOf(
   )
   // Why: read apart from the mail window, so an old question still waits after a hundred newer messages.
   const pendingQuestions = run ? db.listPendingQuestions(run.id) : []
-  return { leadAddresses, members, mail, peerLeads, pendingQuestions }
+  const answeredQuestions = run ? db.listAnsweredQuestions(run.id, ANSWERED_QUESTIONS_MAX) : []
+  return { leadAddresses, members, mail, peerLeads, pendingQuestions, answeredQuestions }
 }

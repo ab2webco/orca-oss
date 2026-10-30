@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { MobileMarkdown } from '../components/MobileMarkdown'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatUpdatedAt } from '../tasks/task-updated-at-time'

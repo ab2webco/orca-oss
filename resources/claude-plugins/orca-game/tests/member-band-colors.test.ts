@@ -123,6 +123,15 @@ describe('member band colors', () => {
     await ui.unmount()
   })
 
+  test("a member's menu paints no panel either", async ($, on) => {
+    const ui = await mount($, on, { ORCA_GAME_ROLE: 'member' }, STATE)
+    const menu = await ui.find({ type: 'Box', key: 'band-member-menu' })
+    expect(menu).toBeDefined()
+    expect(propsOf(menu, 'backgroundColor').filter((one) => one !== undefined)).toEqual([])
+    expect(propsOf(menu, 'color')).not.toContain(PARCHMENT)
+    await ui.unmount()
+  })
+
   test(
     "a member's strip of other plugins' lines paints no panel either",
     WITH_JEV,

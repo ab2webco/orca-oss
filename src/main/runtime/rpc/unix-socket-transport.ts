@@ -1,6 +1,6 @@
 // Why: this is the original Unix socket / named pipe transport extracted from
 // runtime-rpc.ts. It preserves the exact same behavior: newline-delimited JSON,
-// 30s idle timeout, 1MB max message, 32 max connections, chmod 0o600 on Unix.
+// 30s idle timeout, 1MB max message, 64 max connections, chmod 0o600 on Unix.
 // It also owns the keepalive timer and per-connection abort signal so the
 // server-side handler can cancel long-poll dispatches when the client goes
 // away. See design doc §3.1.
@@ -10,9 +10,17 @@ import type { LocalStreamWrite, RpcMessageContext, RpcTransport } from './transp
 
 const MAX_RUNTIME_RPC_MESSAGE_BYTES = 1024 * 1024
 const RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS = 30_000
-const MAX_RUNTIME_RPC_CONNECTIONS = 32
+// Why: long-polls (16) and event streams (8) are fenced in runtime-rpc, so they hold at most 24
+// slots; the other 40 cover short RPCs piling up while main is busy (ORCA-830).
+const MAX_RUNTIME_RPC_CONNECTIONS = 64
 const DEFAULT_KEEPALIVE_INTERVAL_MS = 10_000
 const MAX_LOCAL_STREAM_BACKLOG_BYTES = 1024 * 1024
+
+export type UnixSocketTransportDiagnostics = {
+  activeConnections: number
+  droppedConnections: number
+  lastServerError: string | null
+}
 
 export type UnixSocketTransportOptions = {
   endpoint: string
@@ -37,6 +45,8 @@ export class UnixSocketTransport implements RpcTransport {
   private server: Server | null = null
   private messageHandler: MessageHandler | null = null
   private readonly activeSockets = new Set<Socket>()
+  private droppedConnections = 0
+  private lastServerError: string | null = null
 
   constructor({ endpoint, kind, keepaliveIntervalMs }: UnixSocketTransportOptions) {
     this.endpoint = endpoint
@@ -52,7 +62,10 @@ export class UnixSocketTransport implements RpcTransport {
     if (this.server) {
       return
     }
+    this.server = await this.listen()
+  }
 
+  private async listen(): Promise<Server> {
     if (this.kind === 'unix' && existsSync(this.endpoint)) {
       rmSync(this.endpoint, { force: true })
     }
@@ -69,18 +82,28 @@ export class UnixSocketTransport implements RpcTransport {
         resolve()
       })
     })
+    // Why: past maxConnections Node closes new clients silently; the CLI reads that as "could not connect" (ORCA-830).
+    server.on('drop', () => {
+      this.droppedConnections += 1
+    })
+    // Why: an accept error (EMFILE under load) would otherwise throw in main with no listener attached.
+    server.on('error', (error) => {
+      this.lastServerError = error instanceof Error ? error.message : String(error)
+      console.error('[runtime] Local RPC transport error:', error)
+    })
 
     if (this.kind === 'unix') {
       chmodSync(this.endpoint, 0o600)
     }
-
-    this.server = server
+    return server
   }
 
   async stop(): Promise<void> {
     const server = this.server
     this.server = null
     if (!server) {
+      // Why: a failed relisten leaves no listener but still owns the connections it accepted before.
+      this.destroyActiveSockets()
       return
     }
     const closePromise = new Promise<void>((resolve, reject) => {
@@ -94,12 +117,37 @@ export class UnixSocketTransport implements RpcTransport {
     })
     // Why: server.close() stops accepting new connections but waits for
     // existing sockets; long-poll keepalives can otherwise hold shutdown open.
-    for (const socket of Array.from(this.activeSockets)) {
-      socket.destroy()
-    }
+    this.destroyActiveSockets()
     await closePromise
     if (this.kind === 'unix' && existsSync(this.endpoint)) {
       rmSync(this.endpoint, { force: true })
+    }
+  }
+
+  /** False once a Unix socket file is gone from disk; a named pipe lives as long as its listener. */
+  hasEndpoint(): boolean {
+    return this.kind === 'named-pipe' || existsSync(this.endpoint)
+  }
+
+  /** Binds a fresh listener at the endpoint; connections the old one accepted keep running. */
+  async relisten(): Promise<void> {
+    // Why: closing the handle unlinks its path synchronously, so it must go before the new bind.
+    this.server?.close()
+    this.server = null
+    this.server = await this.listen()
+  }
+
+  private destroyActiveSockets(): void {
+    for (const socket of Array.from(this.activeSockets)) {
+      socket.destroy()
+    }
+  }
+
+  getDiagnostics(): UnixSocketTransportDiagnostics {
+    return {
+      activeConnections: this.activeSockets.size,
+      droppedConnections: this.droppedConnections,
+      lastServerError: this.lastServerError
     }
   }
 

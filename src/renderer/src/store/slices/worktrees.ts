@@ -137,6 +137,7 @@ import type { DirectSshAuthority } from '../../../../shared/ssh-types'
 import { findIndexedWorktreeOwnerForHost } from '@/lib/worktree-runtime-owner-index'
 import { catalogRowsEqual, reuseEqualCatalogRows } from './worktree-catalog-reconciliation'
 import { reuseEqualRecordMap } from './repo-identity-reconcile'
+import { showWorktreeCreateWarningToast } from './worktrees/create/worktree-create-warning-toast'
 export type { WorktreeSlice, WorktreeDeleteState } from './worktree-helpers'
 
 // Why: old runtime servers only have `worktree.list`; preserve the large-list UI hydration parity used before `worktree.detectedList` existed.
@@ -4118,6 +4119,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             }
           })
           showLocalBaseRefRefreshToast(result.localBaseRefRefresh, result.worktree)
+          showWorktreeCreateWarningToast(result.warning, result.worktree)
           if (result.baseFallback) {
             requestWorktreeBaseFallbackNotice(result.baseFallback)
           }

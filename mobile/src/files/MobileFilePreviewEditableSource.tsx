@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import type { MobileFilePreviewLineColumn } from './mobile-file-preview-line-column'
 import { textOffsetForLineColumn } from './mobile-file-preview-line-column'
 import { filePreviewStyles as styles } from './mobile-file-preview-styles'

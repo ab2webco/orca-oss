@@ -3,9 +3,15 @@ import {
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import { orchestrationMigrationData } from '../../../../shared/orchestration-rpc-contract'
@@ -14,9 +20,13 @@ import type { WorkerStartInput } from './orchestration-worker-start-schema'
 import { assertWorkerLaunchPreferencesRuntimeSupported } from './orchestration-worker-launch-preferences'
 
 export type FederatedWorkerNegotiation = {
-  federationProtocolVersion: 1 | 2 | 3
+  federationProtocolVersion: 1 | 2 | 3 | 4 | 5
   /** Sent only to a host that confirmed it honors them. */
   gameMember: { game?: true; setupAdmission?: 'queue' }
+  /** An older host drops the lead's scene, so it is read only for a host that keeps it. */
+  carriesGameScene: boolean
+  /** The typed selector, sent only to a host that resolves it against its own roster. */
+  memberAccount: { account?: string }
 }
 
 /** Refuses, before any effect, a host that cannot run this start as asked. */
@@ -56,20 +66,44 @@ export function negotiateFederatedWorkerStart(args: {
       { capability: ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY }
     )
   }
+  if (
+    params.remoteAccount &&
+    !capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
+  ) {
+    throw new OrchestrationError(
+      'capability_unsupported',
+      `Connected server ${serverName} cannot pick a member account (${ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY}); update Orca there. No effects were applied.`,
+      { capability: ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY }
+    )
+  }
   const supportsControlMail = capabilities.includes(
     ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY
   )
-  const federationProtocolVersion =
+  const supportsLifecycleSettlement =
     supportsControlMail &&
     capabilities.includes(ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY)
-      ? ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
-      : supportsControlMail
-        ? ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
-        : 1
+  const supportsMemberReopen =
+    supportsLifecycleSettlement &&
+    capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY)
+  const federationProtocolVersion =
+    supportsMemberReopen &&
+    capabilities.includes(ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY)
+      ? ORCHESTRATION_FEDERATION_FOLLOW_UP_PROTOCOL_VERSION
+      : supportsMemberReopen
+        ? ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION
+        : supportsLifecycleSettlement
+          ? ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+          : supportsControlMail
+            ? ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
+            : 1
   return {
     federationProtocolVersion,
     gameMember: params.game
       ? { game: true, ...(params.setupAdmission ? { setupAdmission: params.setupAdmission } : {}) }
-      : {}
+      : {},
+    carriesGameScene:
+      params.game === true &&
+      capabilities.includes(ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY),
+    memberAccount: params.remoteAccount ? { account: params.remoteAccount } : {}
   }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native'
+import { View, StyleSheet, Pressable, Platform } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'

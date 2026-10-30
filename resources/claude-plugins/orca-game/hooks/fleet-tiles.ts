@@ -1,3 +1,4 @@
+import { characterCostumeOf } from './character-look'
 import {
   isBlink,
   isRestingOf,
@@ -12,6 +13,19 @@ import type { Costume, SceneDefinition, ScenePhase } from './scenes/index'
 
 export const TILE_COLUMNS = 22
 export const TILE_ROWS = 4
+// A card's round border and the text column's padding on each side.
+const CARD_FRAME = 4
+// Why 20: below it the head row cuts the ticket (`LU… idle`), so the tile goes first (ORCA-827).
+const CARD_TEXT_MIN = 20
+
+/** A card's text room, and whether the tile still fits beside it at `columns`. */
+export const cardLayoutOf = (columns: number): { withTile: boolean; room: number } => {
+  const withTile = columns - TILE_COLUMNS - CARD_FRAME >= CARD_TEXT_MIN
+  return {
+    withTile,
+    room: Math.max(1, columns - CARD_FRAME - (withTile ? TILE_COLUMNS : 0))
+  }
+}
 
 const TILE_PIXELS = TILE_ROWS * 2
 const TILE_FLOOR = TILE_PIXELS - 1
@@ -123,9 +137,10 @@ const tileClawd = (
   x: number,
   y: number,
   tick: number,
-  mood: Mood
+  mood: Mood,
+  name: string | undefined
 ): number | undefined => {
-  const costume = scene.costumes[kind === 'handed' ? 'handoff' : kind]
+  const costume = characterCostumeOf(scene, name, kind === 'handed' ? 'handoff' : kind)
   const isResting = isRestingOf(state, mood)
   const isHopping =
     !isResting &&
@@ -159,7 +174,9 @@ export const tileGridOf = (
   kind: TileKind,
   state: MemberState,
   tick: number,
-  mood: Mood = 'none'
+  mood: Mood = 'none',
+  /** The member's name, which picks its character's look. */
+  name?: string
 ): number[][] => {
   const moving = state === 'idle' && mood === 'none' ? 0 : tick
   const prop =
@@ -170,7 +187,7 @@ export const tileGridOf = (
   for (let row = 0; row < TILE_ROWS; row += 1) {
     for (let x = 0; x < TILE_COLUMNS; x += 1) {
       const pixel = (y: number): number =>
-        tileClawd(scene, kind, state, x, y, moving, mood) ??
+        tileClawd(scene, kind, state, x, y, moving, mood, name) ??
         (y === TILE_FLOOR ? WOOD : (prop(x, y, moving) ?? tileBackdropOf(y)))
       grid.push([UPPER_HALF, pixel(row * 2), pixel(row * 2 + 1)])
     }

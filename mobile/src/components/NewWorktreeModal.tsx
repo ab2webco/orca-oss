@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   View,
-  Text,
-  TextInput,
   Pressable,
   Switch,
   StyleSheet,
@@ -10,6 +8,7 @@ import {
   ActivityIndicator,
   Keyboard
 } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { ChevronDown, ChevronUp, Monitor } from 'lucide-react-native'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse, RpcSuccess } from '../transport/types'

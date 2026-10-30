@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { ProviderTaskOrderBy } from '../tasks/linear-mobile-issue-grouping'
 import type { PlaneMobileWorkItem } from '../tasks/plane-mobile-work-item-read'

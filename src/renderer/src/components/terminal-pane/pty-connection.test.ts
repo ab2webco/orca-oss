@@ -34,6 +34,7 @@ import {
   resetAgentStartupDelayedDeliveryForTests
 } from '@/lib/agent-startup-delayed-delivery'
 import type { PaneForegroundAgentEntry } from '@/store/slices/pane-foreground-agent'
+import { worktreeSlugOf } from '../../../../shared/worktree/slug'
 
 // Built, never re-spelled: the replay prologue is a shared contract and typing
 // its literals here is what drifted them from production before (#12101).
@@ -8624,6 +8625,7 @@ describe('connectPanePty', () => {
             ORCA_PANE_KEY: paneKey,
             ORCA_TAB_ID: 'tab-1',
             ORCA_WORKTREE_ID: 'wt-1',
+            ORCA_WORKTREE_SLUG: worktreeSlugOf('wt-1'),
             ORCA_WORKSPACE_ID: 'wt-1',
             ORCA_AGENT_LAUNCH_TOKEN: expect.stringMatching(new RegExp(`^${UUID_RE}$`))
           })

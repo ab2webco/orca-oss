@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '@/constants/terminal'
 import { toAppSshPtyId } from '../../../shared/ssh-pty-id'
+import { worktreeSlugOf } from '../../../shared/worktree/slug'
 import {
   AGENT_BACKGROUND_SESSION_UUID_RE as UUID_RE,
   createAgentBackgroundSessionTestState,
@@ -126,7 +127,8 @@ describe('launchAgentBackgroundSession', () => {
         command: "claude '--dangerously-skip-permissions' 'run the automation'",
         env: expect.objectContaining({
           ORCA_TAB_ID: tabId,
-          ORCA_WORKTREE_ID: 'wt-1'
+          ORCA_WORKTREE_ID: 'wt-1',
+          ORCA_WORKTREE_SLUG: worktreeSlugOf('wt-1')
         }),
         connectionId: null,
         worktreeId: 'wt-1',

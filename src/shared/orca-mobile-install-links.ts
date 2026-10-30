@@ -3,7 +3,7 @@
 import { ORCA_REPOSITORY_URL } from './orca-repository-url'
 
 /** Kept equal to mobile/app.json's version; the mobile release PR bumps both. */
-export const ORCA_MOBILE_ANDROID_VERSION = '0.0.56'
+export const ORCA_MOBILE_ANDROID_VERSION = '0.0.58'
 
 export const ORCA_MOBILE_ANDROID_APK_URL = `${ORCA_REPOSITORY_URL}/releases/download/mobile-android-v${ORCA_MOBILE_ANDROID_VERSION}/app-release.apk`
 

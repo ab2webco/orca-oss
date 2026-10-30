@@ -12,8 +12,9 @@ import { quest } from './quest-state'
 // What the scene learns from each refresh: the party it draws, who marched in or out, the crown, the
 // lead's own state, and the team events (a reward, a teammate waiting, a merge, CI turning red) it acts out.
 
-const memberOf = (one: { key: string; phase: HdMember['phase']; state: HdMember['state'] }) => ({
+const memberOf = (one: Required<HdMember>) => ({
   key: one.key,
+  name: one.name,
   phase: one.phase,
   state: one.state
 })

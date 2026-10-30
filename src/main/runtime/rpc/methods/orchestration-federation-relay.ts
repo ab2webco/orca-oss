@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
 import { importFederatedControlMessage } from '../../orchestration/federation-control-message'
+import { FEDERATED_FOLLOW_UP_RELAY_KIND } from '../../orchestration/federated-follow-up'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import {
   areFederatedLifecycleSettlementsEqual,
@@ -163,11 +164,17 @@ export const ORCHESTRATION_FEDERATION_RELAY_METHODS: RpcMethod[] = [
         if (item.sequence <= cursor) {
           continue
         }
-        const currentAttachment = requireHomeAttachment(
+        let currentAttachment = requireHomeAttachment(
           runtime,
           params.dispatchId,
           authenticatedCallerFingerprint
         )
+        const followUp = item.kind === FEDERATED_FOLLOW_UP_RELAY_KIND
+        if (followUp && currentAttachment.state === 'succeeded') {
+          currentAttachment =
+            db.reopenSettledRemoteAttachment(params.dispatchId, 'reopened_by_lead_follow_up') ??
+            currentAttachment
+        }
         if (currentAttachment.state !== 'ready') {
           throw new OrchestrationError(
             'dispatch_inactive',
@@ -183,7 +190,7 @@ export const ORCHESTRATION_FEDERATION_RELAY_METHODS: RpcMethod[] = [
             body: reply.body
           })
           runtime.notifyMessageArrived(`dispatch:${params.dispatchId}`, 'status')
-        } else if (item.kind === 'control_message') {
+        } else if (item.kind === 'control_message' || followUp) {
           if (
             currentAttachment.protocol_version <
             ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION

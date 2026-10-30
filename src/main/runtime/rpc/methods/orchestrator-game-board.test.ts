@@ -113,4 +113,103 @@ describe('game board RPC', () => {
       ]
     ])
   })
+
+  it('asks, lists and answers owner questions, refusing a malformed call', async () => {
+    const { send, calls } = dispatcherWith({
+      askOwner: async () => ({ question: { id: 'oq_1' } }),
+      ownerQuestions: async () => ({ questions: [], open: 0 }),
+      answerOwner: async () => ({ delivered: true })
+    })
+
+    await expect(
+      send('game.ownerAsk', {
+        terminalHandle: 'h1',
+        ticket: 'CIN-1',
+        question: 'Ship it?',
+        options: ['Yes', 'No'],
+        context: 'PR #4'
+      })
+    ).resolves.toMatchObject({ ok: true, result: { question: { id: 'oq_1' } } })
+    await expect(send('game.ownerQuestions', { all: true })).resolves.toMatchObject({ ok: true })
+    await expect(send('game.ownerAnswer', { id: 'oq_1', option: 2 })).resolves.toMatchObject({
+      ok: true,
+      result: { delivered: true }
+    })
+    await expect(
+      send('game.ownerAsk', { question: 'x', options: ['1', '2', '3', '4', '5', '6', '7'] })
+    ).resolves.toMatchObject({ ok: false })
+    await expect(send('game.ownerAnswer', { id: 'oq_1', option: 0 })).resolves.toMatchObject({
+      ok: false
+    })
+    await expect(send('game.ownerAnswer', { id: 'oq_1' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      [
+        'askOwner',
+        {
+          worktreeId: undefined,
+          terminalHandle: 'h1',
+          ticket: 'CIN-1',
+          question: 'Ship it?',
+          options: ['Yes', 'No'],
+          context: 'PR #4'
+        }
+      ],
+      ['ownerQuestions', { worktreeId: undefined, terminalHandle: undefined, all: true }],
+      [
+        'answerOwner',
+        {
+          worktreeId: undefined,
+          terminalHandle: undefined,
+          id: 'oq_1',
+          option: 2,
+          text: undefined
+        }
+      ]
+    ])
+  })
+})
+
+describe('game board RPC: Inbox threads (ORCA-878)', () => {
+  it("reads the caller's project threads for the person's Inbox", async () => {
+    const threads = { threads: [], waiting: [], answered: [] }
+    const { send, calls } = dispatcherWith({ inboxThreads: async () => threads })
+
+    await expect(send('game.inboxThreads', { worktreeId: 'wt_1' })).resolves.toMatchObject({
+      ok: true,
+      result: threads
+    })
+    expect(calls).toEqual([['inboxThreads', { worktreeId: 'wt_1', terminalHandle: undefined }]])
+  })
+})
+
+describe('game board RPC: the person answers a member (ORCA-878)', () => {
+  it('passes the reply to the board and refuses an empty one', async () => {
+    const { send, calls } = dispatcherWith({
+      replyToMember: async () => ({ mode: 'answered', delivered: true })
+    })
+
+    await expect(
+      send('game.ownerReplyToMember', {
+        worktreeId: 'wt_1',
+        id: 'msg_1',
+        text: '8080',
+        ticket: 'ORCA-14'
+      })
+    ).resolves.toMatchObject({ ok: true, result: { mode: 'answered', delivered: true } })
+    await expect(
+      send('game.ownerReplyToMember', { worktreeId: 'wt_1', id: 'msg_1', text: '' })
+    ).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([
+      [
+        'replyToMember',
+        {
+          worktreeId: 'wt_1',
+          terminalHandle: undefined,
+          id: 'msg_1',
+          text: '8080',
+          ticket: 'ORCA-14'
+        }
+      ]
+    ])
+  })
 })

@@ -1,4 +1,5 @@
 import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
+import { describeAgentStartupBlocked } from '../../claude-startup-dialog-signal'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
@@ -18,6 +19,7 @@ import {
   persistFederatedSetupWaitOutcome
 } from './orchestration-federation-setup'
 import { claimFederatedSetupSlot } from './orchestration-federation-setup-admission'
+import { resolveHostMemberAccount } from './orchestration-federation-member-account'
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { holdSlotForSetup } from './orchestration-worker-setup-queue'
@@ -53,6 +55,15 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           existingPlacement: 'an exact existing folder workspace'
         })
       }
+      const memberAccount = params.account
+        ? await resolveHostMemberAccount({
+            runtime,
+            agent,
+            selector: params.account,
+            reusesTerminal: Boolean(params.terminal)
+          })
+        : null
+      const accountPin = memberAccount?.pin ?? {}
       const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
       const gameMember = params.game ? { orchestrationGameMember: true } : {}
 
@@ -63,6 +74,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
         homePeerFingerprint: orchestrationMutation.callerFingerprint,
         protocolVersion: params.protocolVersion,
         runtimeEpoch: runtime.getRuntimeId(),
+        ...(params.game && params.gameScene ? { gameScene: params.gameScene } : {}),
         mutationReceipt: orchestrationMutation
       })
       const effects: FederationEffect[] = []
@@ -101,6 +113,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             createdWithAgent: agent as TuiAgent,
             startupAgent: agent as TuiAgent,
             ...gameMember,
+            ...accountPin,
             ...(launch.preferences ? { startupLaunchPreferences: launch.preferences } : {}),
             activate: false,
             lineage: { noParent: true }
@@ -176,6 +189,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               // its CLI is `cursor-agent`); resolve through the TUI agent config.
               startupAgent: agent as TuiAgent,
               ...gameMember,
+              ...accountPin,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
               title: `worker-${params.taskId}`,
               presentation: 'background'
@@ -218,7 +232,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           }
           throw new Error(
             wait.blockedReason
-              ? `Agent startup blocked: ${wait.blockedReason}`
+              ? describeAgentStartupBlocked(wait.blockedReason)
               : `Agent did not become ready (${wait.status}).`
           )
         }
@@ -267,6 +281,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           terminalHandle,
           setup,
           launch: launch.receipt,
+          ...(memberAccount ? { account: memberAccount.account } : {}),
           effects,
           residualResources: []
         }

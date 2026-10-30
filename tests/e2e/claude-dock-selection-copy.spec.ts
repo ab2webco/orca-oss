@@ -43,6 +43,7 @@ type FrameLayout = {
   first: Cell
   last: Cell
   border: number
+  hasWrappedRow: boolean
 }
 
 async function readLayout(page: Page): Promise<FrameLayout> {
@@ -57,6 +58,8 @@ async function readLayout(page: Page): Promise<FrameLayout> {
     )
     const lastY = rows.findLastIndex((row) => row.includes(lastCommand))
     return {
+      // Why: the frame positions every row itself, so a wrapped row means it was painted for a wider pty.
+      hasWrappedRow: rows.some((_, y) => buffer.getLine(buffer.viewportY + y)?.isWrapped === true),
       cellWidth: rect.width / terminal.cols,
       cellHeight: rect.height / terminal.rows,
       left: rect.left,
@@ -77,7 +80,12 @@ async function paintFrame(page: Page, isDocked: boolean): Promise<FrameLayout> {
     .poll(
       async () => {
         layout = await readLayout(page)
-        return layout.isAltScreen && layout.first.x >= 0 && layout.border >= 0 === isDocked
+        return (
+          layout.isAltScreen &&
+          !layout.hasWrappedRow &&
+          layout.first.x >= 0 &&
+          layout.border >= 0 === isDocked
+        )
       },
       { message: 'the Claude frame never painted at this width' }
     )
@@ -148,6 +156,21 @@ async function setWindowWidth(app: ElectronApplication, page: Page, width: numbe
   await expect.poll(async () => page.evaluate(() => window.innerWidth)).toBe(width)
 }
 
+// Why: a frame started while the pty is still being resized can read the old width and keep it.
+async function runFrameAtPaneSize(page: Page, ptyId: string): Promise<void> {
+  await expect
+    .poll(async () =>
+      page.evaluate(async (id) => {
+        const tabId = window.__store!.getState().activeTabId as string
+        const terminal = window.__paneManagers!.get(tabId)!.getActivePane()!.terminal
+        const size = await window.api.pty.getSize(id)
+        return size?.cols === terminal.cols && size?.rows === terminal.rows
+      }, ptyId)
+    )
+    .toBe(true)
+  await execInTerminal(page, ptyId, RUN_FRAME)
+}
+
 test.describe('copying beside a docked Claude Code pane', () => {
   let ptyId = ''
 
@@ -165,7 +188,7 @@ test.describe('copying beside a docked Claude Code pane', () => {
     await setWindowWidth(electronApp, orcaPage, 1440)
     ptyId = await waitForActivePanePtyId(orcaPage)
     await waitForShellPrompt(orcaPage)
-    await execInTerminal(orcaPage, ptyId, RUN_FRAME)
+    await runFrameAtPaneSize(orcaPage, ptyId)
   })
 
   test('copy-on-select, the copy key and the primary selection take only the chat text', async ({
@@ -199,10 +222,13 @@ test.describe('copying beside a docked Claude Code pane', () => {
     orcaPage
   }, testInfo: TestInfo) => {
     test.setTimeout(300_000)
+    await sendToTerminal(orcaPage, ptyId, 'q')
+    await waitForShellPrompt(orcaPage)
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(orcaPage, theme)
       for (const width of WIDTHS) {
         await setWindowWidth(electronApp, orcaPage, width)
+        await runFrameAtPaneSize(orcaPage, ptyId)
         const layout = await paintFrame(orcaPage, width === 1440)
         await dragOverCommands(orcaPage, layout)
         await orcaPage.screenshot({ path: testInfo.outputPath(`selection-${width}-${theme}.png`) })
@@ -222,7 +248,6 @@ test.describe('copying beside a docked Claude Code pane', () => {
 
         await sendToTerminal(orcaPage, ptyId, '\x03')
         await waitForShellPrompt(orcaPage)
-        await execInTerminal(orcaPage, ptyId, RUN_FRAME)
       }
     }
   })

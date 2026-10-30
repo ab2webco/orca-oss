@@ -436,6 +436,26 @@ describe('GameProjectWorkCache', () => {
     await cache.read('other', load)
     expect(loads).toBe(3)
   })
+
+  it('reads its TTL at each read, so a low GitHub budget can stretch it', async () => {
+    let now = 0
+    let ttl = 90_000
+    let loads = 0
+    const cache = new GameProjectWorkCache(
+      () => ttl,
+      () => now
+    )
+    const load = async () => {
+      loads += 1
+      return { reviews: null, todo: null }
+    }
+
+    await cache.read('repo', load)
+    ttl = 450_000
+    now = 200_000
+    await cache.read('repo', load)
+    expect(loads).toBe(1)
+  })
 })
 
 describe('myOpenPullRequestsOf', () => {

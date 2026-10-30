@@ -1,10 +1,11 @@
 import { memo } from 'react'
 import { Bell, ChevronDown, ChevronRight, GitBranch, GitPullRequest } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { RepoIcon } from '../../../src/shared/repo-icon'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { triggerMediumImpact } from '../platform/haptics'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { MIN_TOUCH_TARGET, colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { AgentSpinner } from './AgentSpinner'
 import { MobileRepoIcon } from './MobileRepoIcon'
 import { WorktreeAgentList } from './WorktreeAgentList'
@@ -75,6 +76,7 @@ function WorktreeListRowComponent<T extends WorktreeListRowItem>({
   const metaText = isFolderWorkspace ? folderMeta : displayBranch(item.branch)
   const lineageDepth = Math.max(0, item.lineageDepth ?? 0)
   const lineageChildCount = item.lineageChildCount ?? 0
+  const lineageChildLabel = `${lineageChildCount} ${lineageChildCount === 1 ? 'child' : 'children'}`
 
   return (
     <Pressable
@@ -170,21 +172,23 @@ function WorktreeListRowComponent<T extends WorktreeListRowItem>({
         ) : null}
         {lineageChildCount > 0 && onToggleLineage ? (
           <Pressable
-            style={styles.lineageToggle}
+            style={styles.lineageToggleTarget}
             onPress={(event) => {
               event.stopPropagation()
               onToggleLineage(item)
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.lineageCollapsed ? 'Show' : 'Hide'} ${lineageChildLabel}`}
           >
-            {item.lineageCollapsed ? (
-              <ChevronRight size={12} color={colors.textSecondary} />
-            ) : (
-              <ChevronDown size={12} color={colors.textSecondary} />
-            )}
-            <GitBranch size={12} color={colors.textSecondary} />
-            <Text style={styles.lineageToggleText}>
-              {lineageChildCount} {lineageChildCount === 1 ? 'child' : 'children'}
-            </Text>
+            <View style={styles.lineageToggle}>
+              {item.lineageCollapsed ? (
+                <ChevronRight size={12} color={colors.textSecondary} />
+              ) : (
+                <ChevronDown size={12} color={colors.textSecondary} />
+              )}
+              <GitBranch size={12} color={colors.textSecondary} />
+              <Text style={styles.lineageToggleText}>{lineageChildLabel}</Text>
+            </View>
           </Pressable>
         ) : null}
       </View>
@@ -304,12 +308,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textMuted
   },
-  lineageToggle: {
+  // Why: the pill stays compact; the transparent wrapper carries the 44 pt target.
+  lineageToggleTarget: {
     alignSelf: 'flex-start',
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center'
+  },
+  lineageToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: spacing.xs,
     backgroundColor: colors.bgRaised,
     paddingHorizontal: 8,
     paddingVertical: 4,

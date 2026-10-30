@@ -1,6 +1,7 @@
 // Runs under `claude plugin test`: /orca-game:demo offer celebrates in the scene, offers a run in a
-// pane that never takes the keyboard, counts down, and leaves nothing once passed or expired; an
-// agent waiting on the user holds the countdown and the run until it is answered.
+// pane that asks for the keyboard so its j and n never reach the prompt, counts down, and leaves
+// nothing once passed or expired; an agent waiting on the user holds the countdown and the run, and
+// keeps the prompt its keyboard, until it is answered.
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
@@ -86,7 +87,7 @@ const start = async ($: Engine, on: On, agents: unknown[] = []) => {
   return { clock, world, writes, blits }
 }
 
-const arcadePane = ($: Engine, columns = 85) =>
+const arcadePane = ($: Engine, columns = 85, isFocused = true) =>
   $.ui.mount({
     plugin: 'orca-game',
     surface: 'terminal',
@@ -95,7 +96,7 @@ const arcadePane = ($: Engine, columns = 85) =>
     viewport: { columns: columns + 4, rows: 40, isFullscreen: true },
     props: {
       title: 'Arcade',
-      isFocused: true,
+      isFocused,
       bodyColumns: columns,
       placement: 'dock',
       scroll: { offset: 0, bodyRows: 30 },
@@ -118,8 +119,8 @@ const BAND = {
   }
 } as const
 
-const hasOfferLine = async ($: Engine, text: RegExp): Promise<boolean> => {
-  const ui = await arcadePane($)
+const hasOfferLine = async ($: Engine, text: RegExp, isFocused = true): Promise<boolean> => {
+  const ui = await arcadePane($, 85, isFocused)
   const line = await ui.find({ type: 'Text', text })
   await ui.unmount()
   return line !== undefined
@@ -133,12 +134,11 @@ const isCelebrating = async ($: Engine): Promise<boolean> => {
 }
 
 describe('/orca-game:demo offer', () => {
-  test('celebrates in the scene and offers a run in a pane that leaves the prompt its keyboard', async ($, on) => {
+  test('celebrates in the scene and offers a run in a pane that asks for the keyboard', async ($, on) => {
     const { world } = await start($, on)
     expect(await isCelebrating($)).toBe(false)
     await $.command.run({ command: 'orca-game:demo', args: 'offer' } as never)
-    expect(world.opened).toMatchObject([{ id: ARCADE_PANE }])
-    expect(world.opened[0]?.focus).toBeUndefined()
+    expect(world.opened).toMatchObject([{ id: ARCADE_PANE, focus: true }])
     expect(await isCelebrating($)).toBe(true)
     const ui = await arcadePane($)
     expect(await ui.find({ type: 'Button', key: 'arcade-play' })).toBeDefined()
@@ -196,9 +196,17 @@ describe('/orca-game:demo offer', () => {
     expect(writes).toEqual(before)
   })
 
+  test('says how to reach its keys while the prompt keeps the keyboard', async ($, on) => {
+    await start($, on)
+    await $.command.run({ command: 'orca-game:demo', args: 'offer' } as never)
+    expect(await hasOfferLine($, /ctrl\+x tab/, false)).toBe(true)
+    expect(await hasOfferLine($, /ctrl\+x tab/, true)).toBe(false)
+  })
+
   test('holds the countdown while a member waits on the user and goes on once answered', async ($, on) => {
     const { clock, world } = await start($, on, [MEMBER])
     await $.command.run({ command: 'orca-game:demo', args: 'offer' } as never)
+    expect(world.opened[0]?.focus).toBeUndefined()
     await clock.advance(10_000)
     expect(world.closed).toEqual([])
     expect(await hasOfferLine($, /needs you · 15s left/)).toBe(true)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   arcadeShotsOf,
   captureOptionsOf,
+  rosterShotsOf,
   scenePhasesOf,
   sceneShotsOf
 } from './orca-game-scene-capture-plan.mjs'
@@ -65,6 +66,16 @@ describe('orca-game scene capture plan', () => {
     ])
     expect(new Set(shots.map((shot) => shot.name)).size).toBe(20)
     expect(shots.filter((shot) => shot.columns === 60)).toHaveLength(10)
+  })
+
+  it('shoots every roster name of a scene in its own look, phase by phase', () => {
+    expect(rosterShotsOf('scene-file', ['build', 'pr'], ['Mario', 'Luigi'])).toEqual([
+      { name: 'roster-scene-file-build-1', phase: 'build', member: 'Mario' },
+      { name: 'roster-scene-file-build-2', phase: 'build', member: 'Luigi' },
+      { name: 'roster-scene-file-pr-1', phase: 'pr', member: 'Mario' },
+      { name: 'roster-scene-file-pr-2', phase: 'pr', member: 'Luigi' }
+    ])
+    expect(rosterShotsOf('quest', ['build'], [])).toEqual([])
   })
 
   it('shoots the runner in each scene by day and by night at 1440, 768, 390 and 320 px', () => {

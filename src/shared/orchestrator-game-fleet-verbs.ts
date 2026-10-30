@@ -1,3 +1,4 @@
+import { idleNextOf, memberTicketStatusOf, remoteNextOf } from './orchestrator-game-member-next'
 import {
   DEFAULT_GAME_LEAD,
   DEFAULT_GAME_PUSH_PROMPT,
@@ -6,9 +7,10 @@ import {
 import type { GameWaitingMessage } from './orchestrator-game-inbox'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 
-export { ticketInText }
+export { ticketInText, isFinishedMember }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -31,12 +33,20 @@ export type GameFleetRow = {
   agent: string | null
   /** The managed account's email; null when Orca's own selection applies or it cannot tell. */
   account: string | null
+  /** Runs on the host's global login: no managed account, so `game move` cannot move it. */
+  globalLogin: boolean
   /** When a limited member's account resets (ISO); null when unknown or not limited. */
   limitedUntil: string | null
   /** When the host last saw its terminal work (ISO); null when unknown. */
   lastActivityAt: string | null
   /** Failed for silence yet still working; its ticket has another live attempt (ORCA-658). */
   orphaned: boolean
+  /** The paired host a remote member runs on; null when local (ORCA-824). */
+  host: string | null
+  /** False while a remote member's host does not answer: `state` is then a guess. */
+  stateKnown: boolean
+  /** A remote member a lead that no longer leads it launched (ORCA-793). */
+  earlierLead: boolean
 }
 
 const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
@@ -45,7 +55,7 @@ export type GameFleet = {
   rows: GameFleetRow[]
   counts: Record<GameMemberPhase, number>
   cap: number
-  /** Members not finished: each holds a ticket and a slot. */
+  /** Members not finished and not gone from their host: each holds a ticket and a slot. */
   running: number
   free: number
   /** Members not live since Orca or the machine restarted: `game resume-members`. */
@@ -55,16 +65,8 @@ export type GameFleet = {
   pausedError?: string
 }
 
-type FleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
+export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
   Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
-
-export function isFinishedMember(agent: GameAgent): boolean {
-  const group = agent.workItem?.statusGroup
-  return (
-    agent.review?.state === 'merged' &&
-    (group === undefined || group === 'review' || group === 'done')
-  )
-}
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   if (isFinishedMember(agent)) {
@@ -111,43 +113,31 @@ function nextOf(agent: GameAgent, phase: GameMemberPhase): string {
 const limitedNextOf = (agent: GameAgent): string =>
   `game move ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}, or wait for the reset`
 
-function idleNextOf(review: GameAgent['review']): string {
-  if (!review) {
-    return 'push'
-  }
-  if (review.state === 'merged') {
-    return 'move the ticket to review'
-  }
-  if (review.state === 'closed') {
-    return `check: PR #${review.number} closed`
-  }
-  if (review.ci === 'failure') {
-    return 'push: CI failing'
-  }
-  return review.ci === 'pending' ? 'wait for CI' : `review PR #${review.number}`
-}
-
-function rowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
+export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
   const phase = memberPhaseOf(agent)
   return {
     name: agent.displayName ?? agent.paneKey,
     ticket: ticketOfMember(agent),
-    ticketStatus: agent.workItem ? agent.workItem.status || agent.workItem.statusGroup : null,
+    ticketStatus: memberTicketStatusOf(agent),
     state: agent.state,
     review: agent.review ? `#${agent.review.number} ${agent.review.state}` : null,
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next: nextWithQuestionOf(agent, phase, question),
+    next: remoteNextOf(agent, ticketOfMember(agent)) ?? nextWithQuestionOf(agent, phase, question),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
+    globalLogin: agent.globalLogin === true,
     limitedUntil:
       agent.limit?.resetsAt === null || agent.limit === undefined
         ? null
         : new Date(agent.limit.resetsAt).toISOString(),
     lastActivityAt: agent.lastActivityAt ?? null,
-    orphaned: agent.orphaned === true
+    orphaned: agent.orphaned === true,
+    host: agent.remote?.host ?? null,
+    stateKnown: agent.remote?.stateKnown !== false,
+    earlierLead: agent.remote?.earlierLead === true
   }
 }
 
@@ -163,7 +153,7 @@ function nextWithQuestionOf(
   return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : nextOf(agent, phase)
 }
 
-const membersOf = (state: FleetInput): GameAgent[] =>
+export const gameFleetMembersOf = (state: GameFleetInput): GameAgent[] =>
   state.agents.filter((agent) => agent.isMember && !agent.isLeader)
 
 const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
@@ -172,12 +162,12 @@ const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(({ item }) => item)
 
-export function gameFleetReportOf(state: FleetInput): GameFleet {
+export function gameFleetReportOf(state: GameFleetInput): GameFleet {
   // Why: questions reach the lead's inbox, and each asking member is one ticket there.
   const waiting = state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? []
   const rows = byPhase(
-    membersOf(state).map((agent) =>
-      rowOf(
+    gameFleetMembersOf(state).map((agent) =>
+      gameFleetRowOf(
         agent,
         waiting.find((question) => question.from === ticketOfMember(agent))
       )
@@ -189,17 +179,22 @@ export function gameFleetReportOf(state: FleetInput): GameFleet {
     counts[row.phase] += 1
   }
   const cap = (state.lead ?? DEFAULT_GAME_LEAD).cap
-  // Why paused ones count: each still holds its ticket until it is resumed or discarded.
-  const paused = state.pausedMembers ?? []
+  // Why paused ones count: each holds its ticket until resumed or discarded; with its worktree gone
+  // nothing can run it again, so it holds no slot (ORCA-832).
+  const holding = (state.pausedMembers ?? []).filter((one) => !one.worktreeGone)
   const queued = state.queuedMembers ?? []
-  const running = rows.length - counts.finished + paused.length + queued.length
+  // Why gone ones do not: their host answered that the terminal is gone, so nothing runs there (ORCA-864).
+  const gone = gameFleetMembersOf(state).filter(
+    (agent) => agent.remote?.gone && !isFinishedMember(agent)
+  )
+  const running = rows.length - counts.finished - gone.length + holding.length + queued.length
   return {
     rows,
     counts,
     cap,
     running,
     free: Math.max(0, cap - running),
-    paused,
+    paused: state.pausedMembers ?? [],
     queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
   }
@@ -217,7 +212,7 @@ export type GameWavePlan = {
 
 /** Named tickets, or the To Do's in list order, up to the free slots; never past the cap. */
 export function gameWavePlanOf(
-  state: FleetInput & Pick<OrchestratorGameState, 'project'>,
+  state: GameFleetInput & Pick<OrchestratorGameState, 'project'>,
   requested: readonly string[]
 ): GameWavePlan {
   const fleet = gameFleetReportOf(state)
@@ -258,20 +253,25 @@ export function gameWavePlanOf(
   return plan
 }
 
-export type GameSweepEntry = { row: GameFleetRow; pending: string[] }
+export type GameSweepEntry = {
+  row: GameFleetRow
+  /** Why it counts as finished, with the live state that let it through. */
+  reason: string
+  pending: string[]
+}
 
 /** Finished members, each with what releasing its tab still leaves for someone to do. */
-export function gameSweepOf(state: FleetInput): GameSweepEntry[] {
-  return membersOf(state)
+export function gameSweepOf(state: GameFleetInput): GameSweepEntry[] {
+  return gameFleetMembersOf(state)
     .filter(isFinishedMember)
     .map((agent) => {
       const pending: string[] = []
       if (agent.worktree) {
         pending.push(`worktree ${agent.worktree.branch} stays`)
       }
-      if (!agent.workItem) {
+      if (!agent.workItem && !agent.remote?.ticketDone) {
         pending.push('no linked ticket to confirm')
-      } else if (agent.workItem.statusGroup !== 'done') {
+      } else if (agent.workItem && agent.workItem.statusGroup !== 'done') {
         pending.push(
           `ticket ${agent.workItem.identifier} is ${agent.workItem.status || agent.workItem.statusGroup}, not done`
         )
@@ -279,7 +279,11 @@ export function gameSweepOf(state: FleetInput): GameSweepEntry[] {
       if (!agent.terminalHandle) {
         pending.push('no terminal to close')
       }
-      return { row: rowOf(agent), pending }
+      return {
+        row: gameFleetRowOf(agent),
+        reason: `${finishedSignalOf(agent)}; agent ${agent.state}`,
+        pending
+      }
     })
 }
 
@@ -292,12 +296,12 @@ export type GamePushEntry = {
 }
 
 /** Every member not finished: idle ones get the project's continue prompt, the rest are left alone. */
-export function gamePushPlanOf(state: FleetInput): GamePushEntry[] {
+export function gamePushPlanOf(state: GameFleetInput): GamePushEntry[] {
   const template = state.lead?.pushPrompt ?? DEFAULT_GAME_PUSH_PROMPT
-  const entries = membersOf(state)
+  const entries = gameFleetMembersOf(state)
     .filter((agent) => !isFinishedMember(agent))
     .map((agent): GamePushEntry => {
-      const row = rowOf(agent)
+      const row = gameFleetRowOf(agent)
       const base = { row }
       if (row.phase === 'needs-you') {
         return {
@@ -324,25 +328,4 @@ export function gamePushPlanOf(state: FleetInput): GamePushEntry[] {
       return { ...base, action: 'push', reason: 'idle', prompt }
     })
   return byPhase(entries, (entry) => entry.row.phase)
-}
-
-export type GameStopTarget = { row: GameFleetRow; worktreeId: string | null }
-
-/** Members `orca game stop` ends, in list order; never the lead. */
-export function gameStopTargetsOf(
-  state: FleetInput,
-  tickets: 'all' | readonly string[]
-): { targets: GameStopTarget[]; missing: string[] } {
-  const all = membersOf(state).map((agent) => ({
-    row: rowOf(agent),
-    worktreeId: agent.worktree?.id ?? null
-  }))
-  if (tickets === 'all') {
-    return { targets: all, missing: [] }
-  }
-  const named = [...new Set(tickets.map((ticket) => ticket.trim().toUpperCase()))]
-  return {
-    targets: all.filter((target) => target.row.ticket && named.includes(target.row.ticket)),
-    missing: named.filter((ticket) => !all.some((target) => target.row.ticket === ticket))
-  }
 }

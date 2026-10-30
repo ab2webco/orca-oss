@@ -4,6 +4,7 @@ import {
   renderGameWorkPrompt,
   unknownPlaceholderOf
 } from './orchestrator-game-actions'
+import { GAME_MCP_SERVER_NAME_MAX } from './orchestrator-game-member-mcp'
 import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
 
 /** How the project's lead orchestrates: what it launches, how many at once, and its own rules. */
@@ -35,6 +36,8 @@ export type OrchestratorGameLead = {
   accounts?: OrchestratorGameAccounts
   /** Names members take in order, in place of the scene's roster. */
   memberNames?: GameMemberName[]
+  /** MCP servers every member needs; launch refuses a host and account that lack one. */
+  mcpServers?: string[]
 }
 
 export type OrchestratorGameAccounts = 'default' | 'auto'
@@ -47,6 +50,7 @@ const GAME_LEAD_LABEL_MAX = 32
 const AGENT_ID = /^[a-z][a-z0-9-]{0,31}$/
 const MODEL_ID = /^[A-Za-z0-9._:[\]/-]{1,80}$/
 const EFFORT = /^[a-z]{1,16}$/
+const GAME_MCP_SERVERS_MAX = 20
 
 export const DEFAULT_GAME_LEAD: OrchestratorGameLead = { autostart: false, cap: 4, agent: 'claude' }
 
@@ -74,6 +78,12 @@ export function defaultGameMemberCapOf(host: GameHostProfile | null): number {
 
 export const DEFAULT_GAME_PUSH_PROMPT =
   'Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.'
+
+// Why: members' own gh CI loops spent the GitHub budget the lead needs to merge (ORCA-877).
+export const GAME_MEMBER_CI_NOTE =
+  "CI: read your PR's checks from Orca with `orca game state --json` (`.review.ci` is pending, success or failure); it shares one cached GitHub read with your lead. Do not poll `gh pr checks` or `gh run view`: they spend the GitHub budget the whole team shares."
+
+export const withGameMemberCiNote = (spec: string): string => `${spec}\n\n${GAME_MEMBER_CI_NOTE}`
 
 const at = (key: string): string => `orchestratorGame.orchestrator.${key}`
 
@@ -141,6 +151,16 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   rules: textKey('rules', GAME_LEAD_RULES_MAX),
   launchPrompt: promptKey('launchPrompt'),
   pushPrompt: promptKey('pushPrompt'),
+  mcpServers: (value) => {
+    const names = Array.isArray(value)
+      ? value.map((one) => textOf(one, GAME_MCP_SERVER_NAME_MAX))
+      : []
+    return names.length > 0 &&
+      names.length <= GAME_MCP_SERVERS_MAX &&
+      names.every((one) => one !== null)
+      ? { mcpServers: [...new Set(names as string[])] }
+      : `${at('mcpServers')} must be a list of 1 to ${GAME_MCP_SERVERS_MAX} MCP server names`
+  },
   memberNames: (value) => {
     const { roster, problems } = parseMemberRoster(value)
     if (roster !== undefined) {

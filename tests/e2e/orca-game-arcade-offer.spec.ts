@@ -6,7 +6,8 @@ import { claudeVersionOk, screenRows, startGameBand } from './helpers/orchestrat
 
 // The arcade's offer drawn by the orca-game mod inside a real Claude Code, in two scenes and the
 // app's light and dark theme at 1440, 768, 390 and 320 px: the scene celebrates, the countdown
-// ticks on screen, and the pane closes by itself when it ends.
+// ticks on screen, and the pane closes by itself when it ends; its `j` plays instead of reaching the
+// prompt.
 const WIDTHS = [1440, 768, 390, 320]
 const SCENES = ['quest', 'vigilante']
 // Why joined with spaces: a narrow pane wraps the countdown line.
@@ -122,3 +123,60 @@ for (const scene of SCENES) {
     })
   }
 }
+
+test('the arcade offer takes j from an empty prompt and plays, typing nothing in the chat', async ({
+  electronApp,
+  orcaPage,
+  testRepoPath
+}, testInfo) => {
+  test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+  test.setTimeout(180_000)
+  await waitForSessionReady(orcaPage)
+  await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
+  const band = await startGameBand(orcaPage, testRepoPath, {
+    state: gameState('quest'),
+    theme: 'dark',
+    locale: 'en',
+    scene: 'quest'
+  })
+  try {
+    await expect
+      .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
+      .toContain('Panel')
+    await closeSidebars(orcaPage)
+    await orcaPage.keyboard.type('/orca-game:demo offer')
+    await expect.poll(() => screenOf(orcaPage), { timeout: 20_000 }).toContain('demo offer')
+    await expect
+      .poll(
+        async () => {
+          const left = await secondsLeftOf(orcaPage)
+          if (left === undefined) {
+            await orcaPage.keyboard.press('Enter')
+          }
+          return left
+        },
+        { timeout: 30_000, intervals: [2_000], message: 'no offer' }
+      )
+      .toBeDefined()
+    expect(await screenOf(orcaPage), 'the pane holds the keyboard').not.toContain('ctrl+x tab')
+    await orcaPage.keyboard.press('j')
+    await expect
+      .poll(() => screenOf(orcaPage), { timeout: 10_000, message: 'j never started the run' })
+      .toContain('j: jump')
+    expect(await secondsLeftOf(orcaPage), 'the offer is gone once played').toBeUndefined()
+    await orcaPage.screenshot({
+      path: testInfo.outputPath('offer-played.png'),
+      animations: 'disabled'
+    })
+    // Esc closes the run and hands the keyboard back: a j the prompt had taken would show there now.
+    await orcaPage.keyboard.press('Escape')
+    await expect.poll(() => screenOf(orcaPage), { timeout: 10_000 }).not.toContain('j: jump')
+    await orcaPage.screenshot({
+      path: testInfo.outputPath('offer-closed.png'),
+      animations: 'disabled'
+    })
+    expect((await screenRows(orcaPage)).some((row) => /^\s*[>❯]\s*j\s*$/.test(row))).toBe(false)
+  } finally {
+    await rm(band.root, { recursive: true, force: true })
+  }
+})

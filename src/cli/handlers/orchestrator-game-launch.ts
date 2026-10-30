@@ -4,31 +4,40 @@ import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
-import { DEFAULT_GAME_LEAD, renderGameLaunchPrompt } from '../../shared/orchestrator-game-lead'
+import {
+  DEFAULT_GAME_LEAD,
+  renderGameLaunchPrompt,
+  withGameMemberCiNote
+} from '../../shared/orchestrator-game-lead'
 import {
   gameLaunchChoiceOf,
   parseGameLaunchFlags,
+  remotePlacementOf,
   requiredTicket,
-  type GameLaunchFlags
+  taskPromptOf,
+  type GameLaunchFlags,
+  type GameRemotePlacement
 } from './orchestrator-game-launch-options'
-import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
+import {
+  GAME_GLOBAL_LOGIN_LABEL,
+  globalLoginHolderOf,
+  resolveGameMemberAccount
+} from './orchestrator-game-launch-account'
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
-import { gameBoardCaller, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
+import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
+import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
+import {
+  postGameEvents,
+  readCallerGameState,
+  recordGameMember
+} from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
-import type { GameLaunchedOnAccount } from './orchestrator-game-account-usage'
-import {
-  GAME_PROMPT_MAX,
-  GAME_WORK_PROMPT_PLACEHOLDERS,
-  unknownPlaceholderOf
-} from '../../shared/orchestrator-game-actions'
+import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import {
-  memberDisplayNameOf,
-  memberNameOf,
-  memberRosterOf,
-  nextMemberName
-} from '../../shared/orchestrator-game-member-names'
+import { memberDisplayNameOf, memberNameOf } from '../../shared/orchestrator-game-member-names'
+import { memberNameFor } from './orchestrator-game-member-name-reserve'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
@@ -36,6 +45,8 @@ import {
   setupAdmissionOf,
   type GameSetupQueue
 } from './orchestrator-game-setup-queue'
+
+export { readCallerGameState }
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -47,6 +58,8 @@ export type GameLaunchResult = {
   /** The managed account's email and id; absent when Orca's own account selection applies. */
   account?: string
   accountId?: string
+  /** No managed account exists, so the member runs on the host's global login. */
+  globalLogin?: true
   runId: string
   taskId: string
   /** Absent while the member waits for the host's setup slot. */
@@ -59,32 +72,13 @@ export type GameLaunchResult = {
 type WorkerStartResult = Pick<
   GameLaunchResult,
   'runId' | 'taskId' | 'dispatchId' | 'state' | 'setupQueue' | 'lastError'
-> & { effects?: { kind: string; id?: string }[] }
+> & {
+  effects?: { kind: string; id?: string }[]
+  /** The host's own account for a member placed with --on; only its email crosses back (ORCA-798). */
+  account?: { provider: string; email: string }
+}
 
 const DISPLAY_NAME_MAX = 60
-
-// Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
-function taskPromptOf(flags: Map<string, string | boolean>): string | null {
-  if (!flags.has('prompt')) {
-    return null
-  }
-  const raw = flags.get('prompt')
-  const text = typeof raw === 'string' ? raw.trim() : ''
-  if (text.length === 0 || text.length > GAME_PROMPT_MAX) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `--prompt must be 1 to ${GAME_PROMPT_MAX} characters.`
-    )
-  }
-  const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
-  if (unknown !== null) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `--prompt uses an unknown placeholder {${unknown}}; use {id}, {title}, {url} or {status}.`
-    )
-  }
-  return text
-}
 
 async function boundRunId(client: Client, from: string, objective: string): Promise<string> {
   const current = await client.call<{ run: { id: string } | null }>('orchestration.runCurrent', {
@@ -109,41 +103,6 @@ function requireLaunchPreferences(capabilities: readonly string[]): void {
   }
 }
 
-// Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
-export const readCallerGameState = (client: Client) =>
-  client.call<OrchestratorGameState>('game.state', {
-    worktreeId: process.env.ORCA_WORKTREE_ID,
-    terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-    paneKey: process.env.ORCA_PANE_KEY
-  })
-
-// Why the host picks: it sees every lead's members and holds the pick against a concurrent launch.
-async function memberNameFor(
-  client: Client,
-  state: OrchestratorGameState,
-  ticket: string,
-  taken: readonly string[]
-): Promise<string | null> {
-  const roster = memberRosterOf(state)
-  const locale = process.env.ORCA_GAME_LOCALE ?? 'en'
-  const reserved = await client
-    .call<{ name?: unknown }>('game.memberNameReserve', {
-      ...gameBoardCaller(),
-      ticket,
-      roster,
-      locale,
-      taken
-    })
-    .then(
-      (response) => response.result,
-      () => undefined
-    )
-  // Why a local pick on any failure: an older Orca cannot reserve, and a name never blocks a launch.
-  return reserved?.name === null || typeof reserved?.name === 'string'
-    ? reserved.name
-    : nextMemberName(roster, taken, locale)
-}
-
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: {
   client: Client
@@ -160,10 +119,17 @@ export async function launchGameMember(args: {
   launched?: GameLaunchedOnAccount
   /** Names this same command already gave, for the same reason. */
   namesTaken?: readonly string[]
+  /** Tickets this same command put on the global login, which takes one member at a time. */
+  onGlobalLogin?: readonly string[]
+  /** A paired host instead of this Orca; named from the same roster as a local member. */
+  remote?: GameRemotePlacement | null
 }): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
   const lead = state.lead ?? DEFAULT_GAME_LEAD
   const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead)
+  const where = args.remote
+    ? { ...args.remote, worktree: 'new-top-level' }
+    : await memberWorktreeParamsOf({ client, state, ticket, repo })
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
   const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
@@ -173,9 +139,25 @@ export async function launchGameMember(args: {
     DISPLAY_NAME_MAX,
     item?.id ?? ticket
   )
-  const memberAccount = await resolveGameMemberAccount(client, choice, {
-    agents: state.agents,
-    launched: args.launched
+  // Why: a host resolves the typed selector against its own roster and refuses a local pin.
+  const memberAccount = args.remote
+    ? { pin: {}, account: null }
+    : await resolveGameMemberAccount(client, choice, {
+        agents: state.agents,
+        launched: args.launched,
+        globalLoginHolder: globalLoginHolderOf(state.agents, choice.agent, args.onGlobalLogin ?? [])
+      })
+  await checkGameMemberMcpServers({
+    client,
+    state,
+    ticket,
+    agent: choice.agent,
+    required: lead.mcpServers,
+    skip: args.flags.get('skip-mcp-check') === true,
+    repo,
+    remote: args.remote ?? null,
+    account: memberAccount.account,
+    remoteAccount: choice.remoteAccount
   })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
@@ -190,12 +172,14 @@ export async function launchGameMember(args: {
   )
   const taskParams = {
     spec: withGameLessons(
-      renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
-        id: item?.id ?? ticket,
-        title: item?.title ?? '',
-        url: item?.url ?? '',
-        status: item?.status
-      }),
+      withGameMemberCiNote(
+        renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
+          id: item?.id ?? ticket,
+          title: item?.title ?? '',
+          url: item?.url ?? '',
+          status: item?.status
+        })
+      ),
       await gameLessonBriefFor(client, item?.id ?? ticket)
     ),
     taskTitle: title,
@@ -218,15 +202,17 @@ export async function launchGameMember(args: {
     account: memberAccount.account?.email,
     lastState: 'launching'
   })
+  const createsWorktree = where.worktree === 'new-child' || where.worktree === 'new-top-level'
   const workerParams = {
     task: task.result.task.id,
-    // Why: a project whose tickets live in other repos (cineco FE/BE) names one; new-child stays in the lead's.
-    ...(repo ? { worktree: 'new-top-level', repo } : { worktree: 'new-child' }),
-    name: ticket.toLowerCase(),
+    ...where,
+    // Why: workerStart refuses creation options for the existing worktree a relaunch reuses (ORCA-894).
+    ...(createsWorktree ? { name: ticket.toLowerCase() } : {}),
     displayName: title,
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
     ...memberAccount.pin,
+    ...(args.remote && choice.remoteAccount ? { remoteAccount: choice.remoteAccount } : {}),
     run: runId,
     from,
     devMode: isDevCliInvocation(),
@@ -239,13 +225,14 @@ export async function launchGameMember(args: {
       workerParams,
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
-  )
+  ).catch(forgetOnRefusal({ client, state, ticket, worktree: where.worktree }))
   await recordGameMember(client, {
     ticket,
     dispatchId: worker.result.dispatchId,
     worktreeId: worker.result.effects?.find((one) => one.kind === 'worktree')?.id,
     lastState: worker.result.state
   })
+  const { account: hostAccount, ...started } = worker.result
   const launched: GameLaunchResult = {
     ticket,
     ...(name === null ? {} : { name }),
@@ -253,7 +240,9 @@ export async function launchGameMember(args: {
     ...(memberAccount.account
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
       : {}),
-    ...worker.result
+    ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
+    ...(hostAccount ? { account: hostAccount.email } : {}),
+    ...started
   }
   await postGameEvents(client, [
     {
@@ -265,12 +254,20 @@ export async function launchGameMember(args: {
   return launched
 }
 
+const GLOBAL_LOGIN_NOTE =
+  'no managed account here, so it runs on the global login: Orca cannot move or refresh it, and puts one member there at a time'
+
 export const formatGameLaunch = (launched: GameLaunchResult): string => {
-  const who = [launched.agent, launched.account].filter(Boolean).join(' · ')
+  const who = [
+    launched.agent,
+    launched.account ?? (launched.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : undefined)
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${GLOBAL_LOGIN_NOTE}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
 }
 
 /** A queued member is on its way, not a failed launch. */
@@ -284,6 +281,7 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const overrides = parseGameLaunchFlags(flags)
     const rawRepo = flags.get('repo')
     const repo = typeof rawRepo === 'string' && rawRepo.trim() !== '' ? rawRepo.trim() : null
+    const remote = remotePlacementOf(flags, repo)
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, ticket)
     if (response.result.pausedMembers?.some((one) => one.ticket === ticket)) {
@@ -316,7 +314,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       flags,
       cwd,
       prompt,
-      overrides
+      overrides,
+      remote
     })
     if (!isLaunchUnderway(launched)) {
       process.exitCode = 1

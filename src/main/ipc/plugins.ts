@@ -193,7 +193,9 @@ export function registerPluginHandlers(
     'plugins:panelAction',
     async (event, args: unknown): Promise<PluginPanelActionOutcome> => {
       await pluginService.whenReady()
-      return pluginService.panels.execute(rendererPanelOwner(event.sender.id), args)
+      return pluginService.panels.execute(rendererPanelOwner(event.sender.id), args, {
+        canRunCommands: true
+      })
     }
   )
 

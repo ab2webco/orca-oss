@@ -16,7 +16,8 @@ const {
   killWithDescendantSweepMock,
   isWslAvailableAsyncMock,
   wslUncDirectoryExistsMock,
-  createShellPromptReadinessProbeMock
+  createShellPromptReadinessProbeMock,
+  sweepEndedSessionOrphansMock
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   statSyncMock: vi.fn(),
@@ -30,7 +31,8 @@ const {
   killWithDescendantSweepMock: vi.fn(),
   isWslAvailableAsyncMock: vi.fn(),
   wslUncDirectoryExistsMock: vi.fn(),
-  createShellPromptReadinessProbeMock: vi.fn()
+  createShellPromptReadinessProbeMock: vi.fn(),
+  sweepEndedSessionOrphansMock: vi.fn(async () => ({ status: 'swept', pids: [] }))
 }))
 
 vi.mock('fs', () => ({
@@ -60,6 +62,10 @@ vi.mock('./macos-tcc-login-shell', async (importOriginal) => ({
 
 vi.mock('../pty-descendant-termination', () => ({
   killWithDescendantSweep: killWithDescendantSweepMock
+}))
+
+vi.mock('../pty/ended-session-orphan-sweep', () => ({
+  sweepEndedSessionOrphans: sweepEndedSessionOrphansMock
 }))
 
 // Resolve PowerShell family names to deterministic absolute paths (the fs mock
@@ -1604,6 +1610,32 @@ describe('LocalPtyProvider', () => {
       const { id } = await provider.spawn({ cols: 80, rows: 24 })
       await provider.shutdown(id, { immediate: true })
       expect(killSpy).toHaveBeenCalled()
+    })
+
+    it('sweeps the worktree orphans of an agent session once its root exits (ORCA-678)', async () => {
+      sweepEndedSessionOrphansMock.mockClear()
+      const before = Date.now()
+      const { id } = await provider.spawn({
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp',
+        launchAgent: 'claude'
+      })
+      expect(sweepEndedSessionOrphansMock).not.toHaveBeenCalled()
+      exitCb?.({ exitCode: 0 })
+      expect(sweepEndedSessionOrphansMock).toHaveBeenCalledTimes(1)
+      expect(sweepEndedSessionOrphansMock).toHaveBeenCalledWith(
+        '/tmp',
+        expect.toSatisfy((startedAtMs: number) => startedAtMs >= before)
+      )
+      await provider.shutdown(id, { immediate: true })
+    })
+
+    it('does not sweep the worktree when a plain terminal exits', async () => {
+      sweepEndedSessionOrphansMock.mockClear()
+      await provider.spawn({ cols: 80, rows: 24, cwd: '/tmp' })
+      exitCb?.({ exitCode: 0 })
+      expect(sweepEndedSessionOrphansMock).not.toHaveBeenCalled()
     })
 
     it('invokes onExit callback via the node-pty exit handler', async () => {

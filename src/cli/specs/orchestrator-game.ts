@@ -1,12 +1,8 @@
-import type { CommandSpec } from '../args'
-import { GLOBAL_FLAGS } from '../args'
-
-const GAME_LAUNCH_OVERRIDE_FLAGS = ['agent', 'account', 'model', 'effort'] as const
-
-const GAME_LAUNCH_OVERRIDE_NOTES = [
-  "--agent, --model and --effort override the lead config for this member; another agent than the lead's gets its own default model unless --model is given. --effort needs a model.",
-  "--account (email or id from `orca game accounts`) pins a claude or codex member to that managed account; another provider's account, or an agent with no managed accounts, is refused."
-]
+import { GLOBAL_FLAGS, type CommandSpec } from '../args'
+import {
+  GAME_LAUNCH_OVERRIDE_FLAGS,
+  GAME_LAUNCH_OVERRIDE_NOTES
+} from './orchestrator-game-launch-flags'
 
 export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
@@ -19,15 +15,16 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'lead'],
     summary: "Print the standing rules that make this session the project's lead",
-    usage: 'orca game lead [--json]',
-    allowedFlags: [...GLOBAL_FLAGS],
+    usage: 'orca game lead [--fresh] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'fresh'],
     notes: [
       "Orca's rules plus the project's own from orchestratorGame.orchestrator.rules in orca.yaml.",
       'A session a lead launched gets no rules: it reports to its lead.',
       "One live lead per project: with the project's lead live in another pane, Orca focuses that pane and prints `Not the lead:` instead of the rules.",
-      "With the lead's pane closed, Orca reopens its last conversation in a new tab; when that fails, this session becomes a new lead and the output says why."
+      "With the lead's pane closed, Orca reopens its last conversation in a new tab; when that fails, this session becomes a new lead and the output says why.",
+      '--fresh rotates the lead: with the outgoing lead closed, Orca retires its stored conversation and this session becomes the new lead instead of reopening it.'
     ],
-    examples: ['orca game lead']
+    examples: ['orca game lead', 'orca game lead --fresh']
   },
   {
     path: ['game', 'leads'],
@@ -68,16 +65,25 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['game', 'launch'],
-    summary: "Start one member for a ticket in its own child worktree, as this project's lead",
+    summary: "Start one member for a ticket in its own worktree, as this project's lead",
     usage:
-      'orca game launch <ticket> [--repo <selector>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'repo', 'prompt', ...GAME_LAUNCH_OVERRIDE_FLAGS],
+      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--skip-mcp-check] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'ticket',
+      'repo',
+      'on',
+      'prompt',
+      ...GAME_LAUNCH_OVERRIDE_FLAGS
+    ],
     positionalArgs: ['ticket'],
     notes: [
       'Run it from the lead terminal: the member reports to it through Orca orchestration.',
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
       "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
+      "--on <host> starts the member on that paired host (a saved environment) in a new worktree of --repo, which is then the host's repo selector and required; it takes the same roster name and game as a local member. --account (or the project's accounts: auto) is resolved by the host against its own accounts and refused there when it has none usable; the result names the email it used.",
+      "A relaunch reuses the ticket's idle worktree in that repo (its previous member's, else linked to the ticket, else named after it; an open PR breaks a tie); refused when an agent is live there or two still match.",
       '--prompt replaces the project launchPrompt for this member, for a task that is not implementing the ticket; {id}, {title}, {url} and {status} are filled.',
       ...GAME_LAUNCH_OVERRIDE_NOTES
     ],
@@ -85,6 +91,8 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'orca game launch CIN-1232 --json',
       'orca game launch CIN-1232 --prompt "Run the Tambora test run of {id} and report pass/fail"',
       'orca game launch CIN-1232 --repo name:cineco-frontend --json',
+      'orca game launch ORCA-831 --on imac --repo name:orca-oss',
+      'orca game launch CIN-1631 --on imac --repo name:cineco-backend --account ana@example.com',
       'orca game launch CIN-1232 --agent codex --account ana@example.com'
     ]
   },
@@ -116,16 +124,22 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'move'],
     summary: 'Move a member its account limit stopped onto another managed account',
-    usage: 'orca game move <ticket> [--account <email|id|auto>] [--dry-run] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'account', 'dry-run'],
+    usage:
+      'orca game move <ticket> [--account <email|id|auto>] [--on <host> --repo <selector>] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'account', 'on', 'repo', 'dry-run'],
     positionalArgs: ['ticket'],
     notes: [
       "--account defaults to auto: the other account of the member's agent with the most free quota.",
       'A Claude member is switched in its own terminal and resumes the same session (`orca account switch`); any other member is stopped and started again in its own worktree on the new account, linked with --retry-of.',
       'When every other account is at or near its limit, nothing moves and the result says when the first is usable again.',
-      'Agents without Orca-managed accounts cannot move; wait for their reset.'
+      'Agents without Orca-managed accounts cannot move; wait for their reset.',
+      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept. A member on a paired host moves only this way."
     ],
-    examples: ['orca game move CIN-12', 'orca game move CIN-12 --account ana@example.com --json']
+    examples: [
+      'orca game move CIN-12',
+      'orca game move CIN-12 --account ana@example.com --json',
+      'orca game move CIN-12 --on m1 --repo name:cineco-backend --account ana@example.com'
+    ]
   },
   {
     path: ['game', 'member'],
@@ -134,7 +148,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'member'],
     positionalArgs: ['member'],
     notes: [
-      'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes.',
+      'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes; text left in a Claude input box is marked unsent (typed or a Claude suggestion) and given as unsentInput.',
       'Since launch: every dispatch of its task, the last 10 messages between it and the lead (questions, answers, worker_done), its last 10 commits since the base, PR, CI and ticket status.',
       'A part Orca cannot read is listed under notes; the rest still prints. Read-only.',
       'A member already freed is in `orca game history`.'
@@ -182,14 +196,14 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:
-      'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--dry-run] [--json]',
+      'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--skip-mcp-check] [--dry-run] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'repo', 'dry-run', ...GAME_LAUNCH_OVERRIDE_FLAGS],
     positionalArgs: ['tickets'],
     notes: [
       'Without tickets, picks the To Do items in list order, skipping tickets a member already holds.',
       'Each launch goes through `orca game launch`; tickets past the cap are skipped, never launched.',
       '--dry-run prints the plan without launching anything.',
-      '--agent, --account, --model and --effort apply to every member the wave launches.'
+      '--agent, --account, --model, --effort and --skip-mcp-check apply to every member the wave launches.'
     ],
     examples: ['orca game wave --dry-run', 'orca game wave CIN-12,CIN-14 --json']
   },
@@ -200,7 +214,8 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'close'],
     notes: [
       '--close records each finished member in `orca game history`, then releases its dispatch, or closes its terminal when it has none.',
-      'Working and waiting members and the lead are never touched; worktrees are left in place.'
+      'Working and waiting members and the lead are never touched, even with a merged PR or a completed Run; worktrees are left in place.',
+      'Each row names its host, last activity and why it counts as finished.'
     ],
     examples: ['orca game sweep', 'orca game sweep --close --json']
   },

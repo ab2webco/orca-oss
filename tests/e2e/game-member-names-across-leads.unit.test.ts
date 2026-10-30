@@ -12,6 +12,7 @@ vi.mock('electron', () => ({
 }))
 
 import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
+import { GAME_TEST_ACCOUNTS } from '../../src/cli/handlers/orchestrator-game-fleet-test-fixtures'
 import { RpcDispatcher } from '../../src/main/runtime/rpc/dispatcher'
 import { ORCHESTRATOR_GAME_METHODS } from '../../src/main/runtime/rpc/methods/orchestrator-game'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from '../../src/cli/handlers/orchestrator-game-launch'
@@ -72,9 +73,10 @@ function projectRuntime(): OrcaRuntimeService {
 }
 
 const ORCHESTRATION_RESULTS: Record<string, unknown> = {
+  'worktree.list': { worktrees: [] },
   'terminal.show': { terminal: { handle: 'term_lead_b' } },
   'orchestration.runCurrent': { run: { id: 'run_b' } },
-  'accounts.snapshot': { claude: { accounts: [], activeAccountId: null } },
+  'accounts.snapshot': GAME_TEST_ACCOUNTS,
   'orchestration.taskCreate': { task: { id: 'task_1' } },
   'orchestration.workerStart': {
     runId: 'run_b',

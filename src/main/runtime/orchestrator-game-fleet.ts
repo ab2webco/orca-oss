@@ -25,7 +25,7 @@ export type GameAgentRow = Pick<
   | 'toolName'
   | 'lastActivityAt'
   | 'orphaned'
-> & { parentPaneKey?: string | null }
+> & { parentPaneKey?: string | null; stateStartedAt?: number }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
 export type GameMemberAccountOf = (member: {
@@ -33,6 +33,13 @@ export type GameMemberAccountOf = (member: {
   agentType: string | null
   worktreeId: string | null
 }) => GameMemberAccount | null
+
+/** Whether a member runs on the host's global login instead of a managed account. */
+export type GameMemberGlobalLoginOf = (member: {
+  paneKey: string
+  agentType: string | null
+  worktreeId: string | null
+}) => boolean
 
 /** Whether a stopped member hit its account's usage limit; read only for members. */
 export type GameMemberLimitOf = (member: {
@@ -99,6 +106,7 @@ export async function gameFleetOf(args: {
   readMemberWork: ((worktreeId: string) => Promise<GameMemberWork | null>) | undefined
   readLinkedStatus: ReadLinkedStatus | undefined
   accountOf?: GameMemberAccountOf
+  globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
   /** What a member pane's own Jev last reported; read only for members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
@@ -137,13 +145,13 @@ export async function gameFleetOf(args: {
         : null
       const activity = args.activityOf(row.paneKey)
       const isMember = isMemberRow(row) || worktree !== undefined
-      const account = isMember
-        ? (args.accountOf?.({
-            paneKey: row.paneKey,
-            agentType: row.agentType,
-            worktreeId: worktree?.id ?? args.leadWorktreeId ?? null
-          }) ?? null)
-        : null
+      const seat = {
+        paneKey: row.paneKey,
+        agentType: row.agentType,
+        worktreeId: worktree?.id ?? args.leadWorktreeId ?? null
+      }
+      const account = isMember ? (args.accountOf?.(seat) ?? null) : null
+      const globalLogin = isMember && account === null && args.globalLoginOf?.(seat) === true
       const agent = gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null)
       const limitOf = args.limitOf
       const limit =
@@ -167,10 +175,12 @@ export async function gameFleetOf(args: {
         ...(workItem ? { workItem } : {}),
         ...(activity ? { activity } : {}),
         ...(account ? { account } : {}),
+        ...(globalLogin ? { globalLogin: true as const } : {}),
         ...(limit ? { limit } : {}),
         ...(advisor ? { advisor } : {}),
         ...(launch ? { launch } : {}),
         ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
+        ...(isMember && row.stateStartedAt ? { stateSince: row.stateStartedAt } : {}),
         ...(isMember && row.orphaned ? { orphaned: true as const } : {})
       }
     })

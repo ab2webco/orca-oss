@@ -5,11 +5,13 @@ import {
   settle,
   type GameAgentRow,
   type GameMemberAccountOf,
+  type GameMemberGlobalLoginOf,
   type GameMemberLimitOf,
   type GameMemberWork,
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
-import { readSceneFile } from './orchestrator-game-scene-file-read'
+import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
@@ -58,6 +60,7 @@ import type {
 import type { GlobalSettings } from '../../shared/types'
 import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
+import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
@@ -102,18 +105,25 @@ export type OrchestratorGameStateInput = {
   readLinear: () => Promise<TrackerItem | null>
   readLinkedStatus?: ReadLinkedStatus
   accountOf?: GameMemberAccountOf
+  globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>
+  /** The scene a member's lead draws; used only when the worktree's own file does not read. */
+  readCarriedScene?: () => Promise<CarriedGameScene | null>
   /** The project's STOP; absent leaves `stopped` out, as from an older host. */
   readStop?: () => Promise<GameStop | null>
   /** The project's inboxes; read only for a lead. */
   readInboxes?: () => Promise<GameInboxSummary[]>
+  /** Questions the lead asked the person that wait for an answer; read only for a lead. */
+  readOpenOwnerQuestions?: () => Promise<number>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
+  /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
+  readGitHubBudget?: () => Promise<GameGitHubBudget | null>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -139,24 +149,44 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere } = input
-  const [review, plane, linear, sceneSources, sceneFile, stop, inboxes, leadElsewhere, suggested] =
-    await Promise.all([
-      input.worktree ? settle(input.readReview) : Promise.resolve(null),
-      tracker ? settle(input.readPlane) : Promise.resolve(null),
-      tracker ? settle(input.readLinear) : Promise.resolve(null),
-      readScenes ? settle(readScenes) : Promise.resolve(null),
-      readSceneFile(resolved, input.worktree),
-      readStop ? settleGameStop(readStop) : Promise.resolve(null),
-      readInboxes && !input.callerParentPaneKey ? settle(readInboxes) : Promise.resolve(null),
-      readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
-      input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null)
-    ])
+  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions, readGitHubBudget } =
+    input
+  const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
+    read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
+  const [
+    review,
+    plane,
+    linear,
+    sceneSources,
+    sceneFile,
+    stop,
+    inboxes,
+    leadElsewhere,
+    suggested,
+    openOwnerQuestions,
+    githubBudget
+  ] = await Promise.all([
+    input.worktree ? settle(input.readReview) : Promise.resolve(null),
+    tracker ? settle(input.readPlane) : Promise.resolve(null),
+    tracker ? settle(input.readLinear) : Promise.resolve(null),
+    readScenes ? settle(readScenes) : Promise.resolve(null),
+    readSceneFileOrCarried(resolved, input.worktree, input.readCarriedScene),
+    readStop ? settleGameStop(readStop) : Promise.resolve(null),
+    leadOnly(readInboxes),
+    readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
+    input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
+    leadOnly(readOpenOwnerQuestions),
+    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null)
+  ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
     ...resolved.config,
     mode: shownOrchestratorGameModeOf(resolved.config),
-    ...(sceneFile?.warning === undefined ? {} : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
+    ...(sceneFile?.scene
+      ? { scene: sceneFile.scene.id }
+      : sceneFile?.warning === undefined
+        ? {}
+        : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
     timezone: desktopGameTimezoneOf(resolved.config.timezone)
   }
   let workItem: GameWorkItem | null = null
@@ -235,6 +265,7 @@ export async function buildOrchestratorGameState(
     readMemberWork: input.readMemberWork,
     readLinkedStatus: input.readLinkedStatus,
     accountOf: input.accountOf,
+    globalLoginOf: input.globalLoginOf,
     limitOf: input.limitOf,
     advisorOf: input.advisorOf,
     launchOf: input.launchOf,
@@ -281,7 +312,9 @@ export async function buildOrchestratorGameState(
     ...(leaderActivity ? { activity: leaderActivity } : {}),
     ...(stop ? { stopped: stop.stopped } : {}),
     ...(inboxes ? { inboxes } : {}),
+    ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
+    ...(githubBudget ? { githubBudget } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

@@ -4,6 +4,7 @@ import { registerRuntimeTerminalTab } from '@/runtime/sync-runtime-graph'
 import { awaitsCodexRestartAnswer, blocksCodexPaneInput } from '../codex-restart-notice-state'
 import { ptyDataHandlers } from './pty-dispatcher'
 import { sweepUnclaimedCodexPaneRestarts } from './codex-detached-pane-restart'
+import { worktreeSlugOf } from '../../../../shared/worktree/slug'
 import {
   hasAddedPendingCodexPaneRestart,
   installCodexDetachedPaneRestartExecutor,
@@ -122,6 +123,7 @@ describe('codex detached pane restart executor', () => {
         ORCA_PANE_KEY: `tab-1:${LEAF_ID}`,
         ORCA_TAB_ID: 'tab-1',
         ORCA_WORKTREE_ID: 'wt1',
+        ORCA_WORKTREE_SLUG: worktreeSlugOf('wt1'),
         ORCA_WORKSPACE_ID: 'wt1'
       })
     )

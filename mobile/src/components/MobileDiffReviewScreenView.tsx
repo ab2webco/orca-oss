@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Text, View, type LayoutChangeEvent } from 'react-native'
+import { View, type LayoutChangeEvent } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import type { useMobileDiffReviewController } from '../session/use-mobile-diff-review-controller'
 import { useResponsiveLayout } from '../layout/responsive-layout'
 import { MobileDiffReviewBody } from './MobileDiffReviewBody'

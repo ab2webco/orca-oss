@@ -333,7 +333,9 @@
           "localBaseRefRefreshFailedDetailNotFastForward": "Local {{value0}} does not exist or cannot be fast-forwarded cleanly from the remote base. Check for local-only commits before updating it manually.",
           "localBaseRefRefreshFailedDetailError": "Git returned an error while updating local {{value0}}. Check the repo for locked refs or unusual worktree state, then update local {{value0}} manually.",
           "c6cf133786": "This workspace is no longer available.",
-          "a17f4d2e93": "Could not update this workspace."
+          "a17f4d2e93": "Could not update this workspace.",
+          "createWarningForWorktree": "Workspace \"{{value0}}\" was created with a warning",
+          "createWarning": "Workspace created with a warning"
         },
         "repos": {
           "2975400634": "Update Orca Lab server to open non-Git folders on this runtime.",
@@ -16263,6 +16265,23 @@
         "theUpdate": "the update",
         "cancel": "Cancel",
         "restartNow": "Restart now"
+      },
+      "game-inbox": {
+        "GameInboxSheet": {
+          "title": "Inbox",
+          "description": "What the project's lead asked you to decide.",
+          "forYou": "For you",
+          "empty": "No questions are waiting for you."
+        },
+        "GameOwnerQuestionCard": {
+          "failed": "The answer was not sent.",
+          "yourAnswer": "Your answer",
+          "placeholder": "Answer in your own words",
+          "send": "Send"
+        },
+        "SidebarGameInboxEntry": {
+          "inbox": "Inbox"
+        }
       }
     },
     "i18n": {

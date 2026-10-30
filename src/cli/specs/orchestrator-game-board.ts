@@ -80,5 +80,45 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
       'orca game inbox --ticket CIN-12 --json',
       'orca game inbox --mark-read'
     ]
+  },
+  {
+    path: ['game', 'ask-owner'],
+    summary: 'Ask the person a question as a record they can find and answer, not chat text',
+    usage:
+      'orca game ask-owner --question <text> [--ticket <id>] [--option <text>]... [--context <link or line>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'question', 'ticket', 'option', 'context'],
+    notes: [
+      'Only the lead asks the person; a member asks its lead with `orchestration ask`. Kept on the Orca host that runs the lead, next to `game events`, until it is answered.',
+      'Repeat --option for each choice, at most 6. --context is a link or one line that lets the person answer without your chat.',
+      "The person's answer reaches you once as an escalation from `owner`, which your mail watch already passes. Record it on the ticket and act on it."
+    ],
+    examples: [
+      'orca game ask-owner --ticket ORCA-12 --question "Ship the arcade in lab.111?" --option Yes --option "Wait for lab.112" --context "PR #41"'
+    ]
+  },
+  {
+    path: ['game', 'owner-questions'],
+    summary: 'What the lead asked the person that still waits for an answer',
+    usage: 'orca game owner-questions [--all] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'all'],
+    notes: [
+      'Open questions oldest first, with ticket, time asked, numbered options and context. --all adds the answered ones kept for the audit, the last 200.'
+    ],
+    examples: ['orca game owner-questions', 'orca game owner-questions --all --json']
+  },
+  {
+    path: ['game', 'answer-owner'],
+    summary: 'Answer a question the lead asked the person; the lead is told',
+    usage: 'orca game answer-owner <id> (--pick <n> | --answer <text>) [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id', 'pick', 'answer'],
+    positionalArgs: ['id'],
+    notes: [
+      "The person's answer: --pick takes an option by its number in `game owner-questions`, --answer is free text.",
+      'The lead receives it once as an escalation. The same answer again is a no-op; a different one is refused. A member cannot answer.'
+    ],
+    examples: [
+      'orca game answer-owner oq_1a2b3c4d5e6f --pick 2',
+      'orca game answer-owner oq_1a2b3c4d5e6f --answer "Wait until Monday"'
+    ]
   }
 ]

@@ -41,17 +41,20 @@ const mark = (step) => {
 }
 
 async function run() {
+  await app.whenReady()
+  mark('ready')
+  // Why after ready: a loaded runner can spend the whole budget booting Electron; the spawn's timeout bounds that.
   const timeout = setTimeout(() => {
     writeFileSync(resultPath, JSON.stringify({ step: 'timed out after ' + currentStep }))
     app.exit(1)
   }, 15000)
-  await app.whenReady()
-  mark('ready')
   const partition = 'persist:partition-cookie-test'
   const targetSession = session.fromPartition(partition)
   const window = new BrowserWindow({ show: false, webPreferences: { partition } })
   mark('window created')
-  await window.loadURL('data:text/html,<title>cookie fixture</title>')
+  const page = 'data:text/html,<title>cookie fixture</title>'
+  // Why twice: on a loaded CI runner the first navigation can stop before it commits (ERR_FAILED -2).
+  await window.loadURL(page).catch(() => window.loadURL(page))
   mark('window loaded')
   const debug = window.webContents.debugger
   debug.attach('1.3')

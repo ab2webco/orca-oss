@@ -84,8 +84,7 @@ export const mobileSessionFrameStyles = StyleSheet.create({
     borderTopColor: colors.borderSubtle
   },
   tabScroll: {
-    flex: 1,
-    maxHeight: 36
+    flex: 1
   },
   tabContent: {
     paddingLeft: spacing.sm,

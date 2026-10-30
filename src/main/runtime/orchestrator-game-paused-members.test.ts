@@ -36,7 +36,10 @@ const context = (ticket: string): AgentStatusOrchestrationContext => ({
   taskTitle: ticket
 })
 
-function setup(contexts: Record<string, AgentStatusOrchestrationContext> = {}) {
+function setup(
+  contexts: Record<string, AgentStatusOrchestrationContext> = {},
+  goneWorktrees: ReadonlySet<string> = new Set()
+) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-paused-'))
   dirs.push(dir)
   const store = new GameMemberSessionStore(
@@ -47,7 +50,8 @@ function setup(contexts: Record<string, AgentStatusOrchestrationContext> = {}) {
   const paused = new GamePausedMembers({
     store,
     contextOf: (handle) => contexts[handle],
-    sessionIdOf: (handle) => sessions[handle] ?? null
+    sessionIdOf: (handle) => sessions[handle] ?? null,
+    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId)
   })
   return { dir, store, paused, sessions }
 }
@@ -94,6 +98,63 @@ describe('GamePausedMembers.note', () => {
       ['ORCA-1', true, 'working']
     ])
     expect((await paused.note('repo:a', [], new Set(['wt-ORCA-1']))).paused).toEqual([])
+  })
+
+  // ORCA-677: liveness comes from the pane, so a leftover heartbeat loop cannot keep a gone member listed as live.
+  it('lists a member whose pane is gone as paused while its dispatch is still dispatched', async () => {
+    const contexts = { 'term-ORCA-1': context('ORCA-1') }
+    const { paused } = setup(contexts)
+    await paused.note('repo:a', [member('ORCA-1')])
+
+    const after = await paused.note('repo:a', [])
+
+    expect(contexts['term-ORCA-1'].dispatchStatus).toBe('dispatched')
+    expect(after.paused.map((one) => one.ticket)).toEqual(['ORCA-1'])
+  })
+
+  // Why: live imac members for ORCA-862 and ORCA-855 also showed as paused ready rows, each taking a slot.
+  it('keeps a live remote member out of paused without saving it as a local session (ORCA-864)', async () => {
+    const { paused, store } = setup()
+    await paused.record('repo:a', {
+      ticket: 'ORCA-862',
+      name: 'Merlin · ORCA-862',
+      runId: 'run_1',
+      taskId: 'task_ORCA-862',
+      lastState: 'ready'
+    })
+    const remote = member('ORCA-862', {
+      paneKey: 'remote:ctx_862',
+      terminalHandle: 'term-remote',
+      worktree: { id: 'imac-wt', branch: 'orca-862', displayName: 'orca-862' },
+      remote: { host: 'imac', stateKnown: true }
+    })
+
+    expect((await paused.note('repo:a', [remote])).paused).toEqual([])
+    const saved = await store.read('repo:a')
+    expect(saved.ok && saved.members.map((one) => [one.ticket, one.worktreeId])).toEqual([
+      ['ORCA-862', null]
+    ])
+  })
+
+  it('marks a paused member whose worktree is gone, so it is not resumed (ORCA-832)', async () => {
+    const { paused, sessions } = setup(
+      { 'term-ORCA-1': context('ORCA-1'), 'term-ORCA-2': context('ORCA-2') },
+      new Set(['wt-ORCA-1'])
+    )
+    sessions['term-ORCA-1'] = 'sess-1'
+    sessions['term-ORCA-2'] = 'sess-2'
+    await paused.note('repo:a', [member('ORCA-1'), member('ORCA-2')])
+
+    const after = (await paused.note('repo:a', [])).paused
+
+    expect(after[0]).toMatchObject({ ticket: 'ORCA-1', resumable: false, worktreeGone: true })
+    expect(after[1]).toMatchObject({ ticket: 'ORCA-2', resumable: true })
+    expect(after[1]).not.toHaveProperty('worktreeGone')
+  })
+
+  it('never marks a worktree gone while the member is live', async () => {
+    const { paused } = setup({ 'term-ORCA-1': context('ORCA-1') }, new Set(['wt-ORCA-1']))
+    expect((await paused.note('repo:a', [member('ORCA-1')])).paused).toEqual([])
   })
 
   it('lists a member whose start waits for the setup in flight as queued, not paused', async () => {

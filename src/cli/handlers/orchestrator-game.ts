@@ -5,6 +5,7 @@ import { DEFAULT_GAME_LEAD, type OrchestratorGameLead } from '../../shared/orche
 import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
+import { withGameMemberIdentity } from '../../shared/orchestrator-game-member-identity'
 
 type GameLeadRegistration = {
   registered?: boolean
@@ -21,6 +22,7 @@ type GameLeadResult = {
   outcome?: 'live' | 'resumed'
   handle?: string
   resumeError?: string
+  fresh?: boolean
 }
 
 // Why the prefix: the game mod reads it to keep this session from counting as the lead.
@@ -28,10 +30,15 @@ const NOT_LEAD = 'Not the lead:'
 
 function leadOutcomeText(result: GameLeadResult, project: string): string | null {
   if (result.outcome === 'live') {
-    return `${NOT_LEAD} ${project}'s lead is live in another pane (${result.handle}), and Orca focused it. Keep working here as a plain session.`
+    const rotate = result.fresh
+      ? ' To rotate, close that lead, then run `orca game lead --fresh` again here.'
+      : ''
+    return `${NOT_LEAD} ${project}'s lead is live in another pane (${result.handle}), and Orca focused it. Keep working here as a plain session.${rotate}`
   }
   if (result.outcome === 'resumed') {
-    return `${NOT_LEAD} Orca reopened ${project}'s lead conversation in a new tab (${result.handle}), with its context. Use that tab; this one is a plain session.`
+    // Why: a host that never answers `resumed` to a fresh claim is one that dropped the flag.
+    const old = result.fresh ? ' (this Orca host does not support --fresh)' : ''
+    return `${NOT_LEAD} Orca reopened ${project}'s lead conversation in a new tab (${result.handle}), with its context${old}. Use that tab; this one is a plain session.`
   }
   return null
 }
@@ -103,13 +110,19 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, () => `Opened ${url} in the system browser`)
   },
   'game state': async ({ client, json }) => {
-    const result = await client.call<OrchestratorGameState>('game.state', {
+    const response = await client.call<OrchestratorGameState>('game.state', {
       ...callerParams(),
       ...advisorParams()
     })
-    printResult(result, json, formatGameState)
+    // Why here, not on the host: an older host's members get the fields too.
+    printResult(
+      { ...response, result: withGameMemberIdentity(response.result) },
+      json,
+      formatGameState
+    )
   },
-  'game lead': async ({ client, json }) => {
+  'game lead': async ({ flags, client, json }) => {
+    const fresh = flags.get('fresh') === true
     const response = await client.call<OrchestratorGameState>('game.state', callerParams())
     const state = response.result
     const lead = state.lead ?? DEFAULT_GAME_LEAD
@@ -125,7 +138,8 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
             terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
             project,
             label: lead.label ?? '',
-            claim: true
+            claim: true,
+            ...(fresh ? { fresh: true } : {})
           })
           .then((one) => one.result)
           .catch(() => undefined)) ?? {}
@@ -141,7 +155,8 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       ...(elsewhere
         ? { outcome: registration.live ? 'live' : 'resumed', handle: elsewhere.handle }
         : {}),
-      ...(registration.resumeError ? { resumeError: registration.resumeError } : {})
+      ...(registration.resumeError ? { resumeError: registration.resumeError } : {}),
+      ...(fresh ? { fresh: true } : {})
     }
     printResult<GameLeadResult>({ ...response, result }, json, (one) => {
       if (one.role === 'member') {
@@ -151,8 +166,11 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       if (notLead !== null || one.brief === null) {
         return notLead ?? ''
       }
-      return one.resumeError
-        ? `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${one.brief}`
+      if (one.resumeError) {
+        return `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${one.brief}`
+      }
+      return one.fresh
+        ? `Orca retired ${project}'s previous lead conversation, so this session is the new lead.\n\n${one.brief}`
         : one.brief
     })
   }

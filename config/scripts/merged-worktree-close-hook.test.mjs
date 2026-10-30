@@ -76,6 +76,10 @@ function runHook(root, payload, prs, { extraEnv = {}, script = hookScript } = {}
   // Why: inside an Orca terminal the closer would remove through the Orca app, not this temp repo's git.
   delete env.ORCA_TERMINAL_HANDLE
   delete env.ORCA_CLI_COMMAND
+  // Why: a member pane running these tests would otherwise skip every session-start case.
+  if (!('ORCA_GAME_ROLE' in extraEnv)) {
+    delete env.ORCA_GAME_ROLE
+  }
   if (!('CLAUDE_PROJECT_DIR' in extraEnv)) {
     delete env.CLAUDE_PROJECT_DIR
   }
@@ -399,6 +403,23 @@ describe('merged-worktree-close hook', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${feature.path}`)
     expect(existsSync(feature.path)).toBe(false)
+  })
+
+  // Why: closing worktrees is the lead's; each member start listed every worktree's PRs (ORCA-877).
+  it('leaves session start alone in a member session', () => {
+    const { root, repo, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+
+    const result = runHook(
+      root,
+      { hook_event_name: 'SessionStart', cwd: repo },
+      { 'fix/a': [{ number: 12, headRefOid: feature.head }] },
+      { extraEnv: { ORCA_GAME_ROLE: 'member' } }
+    )
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.json).toBeNull()
+    expect(existsSync(feature.path)).toBe(true)
   })
 
   it('never closes the worktree CLAUDE_PROJECT_DIR points at', () => {

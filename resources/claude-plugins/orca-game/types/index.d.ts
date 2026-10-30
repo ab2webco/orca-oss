@@ -52,6 +52,17 @@ export type GameAgent = {
   advisor?: GameMemberAdvisor
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older Orca. */
   launch?: GameMemberLaunch
+  /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
+  remote?: GameMemberRemote
+  /** When its host last saw it work or change state (ms); absent when unknown or from an older host. */
+  activeAt?: number
+}
+
+export type GameMemberRemote = {
+  host: string
+  stateKnown: boolean
+  /** The host answered and the member's terminal is no longer there. */
+  gone?: true
 }
 
 export type GameMemberLaunch = { model: string | null; effort: string | null }
@@ -211,6 +222,22 @@ export type Costume = {
   colors: Readonly<Record<string, number>>
 }
 
+export type CharacterAccessory = 'crown' | 'halo' | 'horns' | 'antenna' | 'bow' | 'feather' | 'cape'
+
+/** A palette laid over the phase costumes, glyph by glyph, and an accessory drawn around the head. */
+export type CharacterVariant = {
+  colors?: Readonly<Record<string, number>>
+  accessory?: CharacterAccessory
+  accessoryColor?: number
+}
+
+/** A roster entry with a look of its own: a variant of the phase costumes, or costumes of its own. */
+export type SceneCharacter = {
+  name: LocalizedName
+  variant?: CharacterVariant
+  costumes?: Readonly<Record<ScenePhase, Costume>>
+}
+
 export type Card = { icon: string; name: LocalizedName; color: string }
 
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
@@ -281,6 +308,8 @@ export type SceneDefinition = {
   cast?: SceneCast
   /** Names Orca gives a lead's members, in order. */
   roster?: readonly LocalizedName[]
+  /** The roster entries drawn in their own look; every other member wears the phase costume. */
+  characters?: readonly SceneCharacter[]
   /** Palette variants; the band shows one a day in turn with the plain looks. */
   themes?: readonly SceneTheme[]
 }
@@ -337,6 +366,8 @@ export type GameState = {
   viewScopes?: ('project' | 'global')[]
   /** The view this machine's resources suggest; absent from an older host. */
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
+  /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
+  githubLow?: { remaining: number; limit: number }
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

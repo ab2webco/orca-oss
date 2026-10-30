@@ -56,19 +56,38 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve release version and version code
-        id: release
-        env:
-          MOBILE_ANDROID_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
-          MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_github_release }}
-        run: node scripts/prepare-android-release.mjs
-
       - name: Setup Ruby and fastlane
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: mobile
+
+      # Why before the build: Play rejects a used versionCode only at upload, after the
+      # 30-minute build and the GitHub release (ORCA-829, run 40603049262).
+      - name: Read the highest Play versionCode
+        id: play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo 'PLAY_SERVICE_ACCOUNT_JSON is unset: skipping the Play versionCode check.'
+            exit 0
+          fi
+
+          bundle exec fastlane android play_highest_version_code
+
+      - name: Resolve release version and version code
+        id: release
+        env:
+          MOBILE_ANDROID_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
+          MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_github_release }}
+          MOBILE_ANDROID_PLAY_HIGHEST_VERSION_CODE: ${{ steps.play.outputs.highest_version_code }}
+        run: node scripts/prepare-android-release.mjs
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5

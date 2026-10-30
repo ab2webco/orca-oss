@@ -80,6 +80,7 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     'ORCA_PANE_KEY/u',
     'ORCA_TAB_ID/u',
     'ORCA_WORKTREE_ID/u',
+    'ORCA_WORKTREE_SLUG/u',
     'ORCA_AGENT_LAUNCH_TOKEN/u',
     `${SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV}/u`,
     `${SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV}/u`,

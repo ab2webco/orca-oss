@@ -229,10 +229,118 @@
     }
   },
   "roster": [
-    { "en": "Arthur", "es": "Arturo" },
-    { "en": "Merlin", "es": "Merlín" },
-    "Morgana",
-    "Percival"
+    {
+      "en": "Arthur",
+      "es": "Arturo"
+    },
+    {
+      "name": {
+        "en": "Merlin",
+        "es": "Merlín"
+      },
+      "variant": {
+        "colors": {
+          "O": "#6f8fe0"
+        },
+        "accessory": "halo",
+        "accessoryColor": "#fff3a0"
+      }
+    },
+    {
+      "name": {
+        "en": "Lancelot",
+        "es": "Lanzarote"
+      },
+      "variant": {
+        "colors": {
+          "O": "#c8ccd4"
+        },
+        "accessory": "feather",
+        "accessoryColor": "#4fc3f7"
+      }
+    },
+    {
+      "name": {
+        "en": "Guinevere",
+        "es": "Ginebra"
+      },
+      "variant": {
+        "colors": {
+          "O": "#f0a0c0"
+        },
+        "accessory": "crown",
+        "accessoryColor": "#ffd84a"
+      }
+    },
+    {
+      "name": {
+        "en": "Gawain",
+        "es": "Galván"
+      },
+      "variant": {
+        "colors": {
+          "O": "#7ccf6a"
+        },
+        "accessory": "horns",
+        "accessoryColor": "#e8e0c8"
+      }
+    },
+    {
+      "name": "Morgana",
+      "variant": {
+        "colors": {
+          "O": "#9a6ad0"
+        },
+        "accessory": "horns",
+        "accessoryColor": "#d0a0f0"
+      }
+    },
+    {
+      "name": "Percival",
+      "variant": {
+        "colors": {
+          "O": "#e8c860"
+        },
+        "accessory": "cape",
+        "accessoryColor": "#e05060"
+      }
+    },
+    {
+      "name": {
+        "en": "Tristan",
+        "es": "Tristán"
+      },
+      "variant": {
+        "colors": {
+          "O": "#4fb8b0"
+        },
+        "accessory": "cape",
+        "accessoryColor": "#5f9ae8"
+      }
+    },
+    {
+      "name": {
+        "en": "Isolde",
+        "es": "Isolda"
+      },
+      "variant": {
+        "colors": {
+          "O": "#f2d0a0"
+        },
+        "accessory": "bow",
+        "accessoryColor": "#e0405a"
+      }
+    },
+    {
+      "name": "Galahad",
+      "variant": {
+        "colors": {
+          "O": "#f4f4f0"
+        },
+        "accessory": "halo",
+        "accessoryColor": "#ffd84a"
+      }
+    }
   ],
   "finale": {
     "en": "★ QUEST COMPLETE ★",
@@ -300,9 +408,16 @@
   },
   "themes": [
     {
-      "name": { "en": "Autumn", "es": "Otoño" },
+      "name": {
+        "en": "Autumn",
+        "es": "Otoño"
+      },
       "weight": 0.4,
-      "look": { "near": "#b8742f", "plant": "#a5521f", "ground": "#7a4a2a" }
+      "look": {
+        "near": "#b8742f",
+        "plant": "#a5521f",
+        "ground": "#7a4a2a"
+      }
     }
   ]
 }

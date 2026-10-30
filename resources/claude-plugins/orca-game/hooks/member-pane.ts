@@ -28,6 +28,15 @@ export const askedQuestionOf = (command: unknown): string | undefined => {
 }
 
 let pending: string | undefined
+// Why session-only, like the text toggle: a reload opens the band again.
+let isCollapsed = false
+
+/** A collapsed member band is its menu row only, and its turn draws no scene. */
+export const isMemberBandCollapsed = (): boolean => isCollapsed
+
+export const setMemberBandCollapsed = (collapsed: boolean): void => {
+  isCollapsed = collapsed
+}
 
 export const pendingQuestion = (): string | undefined => pending
 

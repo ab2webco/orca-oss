@@ -332,13 +332,14 @@ describe('orchestration RPC methods', () => {
       expect(revoked.lifecycle.code).toBe('dispatch_capability_invalid')
     })
 
-    it('does not wake waiters for a heartbeat suppressed at send time', async () => {
+    it('rejects a late heartbeat for a completed dispatch without waking waiters', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
       const dispatch = db.createDispatchContext(task.id, 'term_worker')
       db.updateTaskStatus(task.id, 'completed')
       vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
       const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const result = (await call('orchestration.send', {
         from: 'term_worker',
@@ -346,8 +347,9 @@ describe('orchestration RPC methods', () => {
         subject: 'alive',
         type: 'heartbeat',
         payload: JSON.stringify({ dispatchId: dispatch.id })
-      })) as { message: { id: string } }
+      })) as { message: { id: string }; lifecycle?: { action: string; code: string } }
 
+      expect(result.lifecycle).toMatchObject({ action: 'rejected', code: 'inactive_dispatch' })
       expect(notify).not.toHaveBeenCalled()
       expect(db.getMessageById(result.message.id)).toMatchObject({ read: 1 })
     })

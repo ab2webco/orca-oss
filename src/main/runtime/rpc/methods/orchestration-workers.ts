@@ -1,4 +1,5 @@
 import type { TuiAgent } from '../../../../shared/types'
+import { describeAgentStartupBlocked } from '../../claude-startup-dialog-signal'
 import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { AGENT_COMPOSER_READY_TIMEOUT_MS } from '../../agent-composer-readiness'
@@ -230,7 +231,7 @@ async function startWorker(
       }
       throw new Error(
         wait.blockedReason
-          ? `Agent startup blocked: ${wait.blockedReason}`
+          ? describeAgentStartupBlocked(wait.blockedReason)
           : `Agent did not become ready (${wait.status}).`
       )
     }

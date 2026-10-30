@@ -6,6 +6,7 @@ import {
   WorktreeActivate,
   WorktreeForceDeleteBranch,
   WorktreePrefetchCreateBase,
+  WorktreeProcesses,
   WorktreeRemove,
   WorktreeResolveMrBase,
   WorktreeResolvePrBase,
@@ -49,6 +50,15 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     handler: async (params, { runtime }) => ({
       worktree: await runtime.showManagedWorktree(params.worktree)
     })
+  }),
+  defineMethod({
+    name: 'worktree.processes',
+    params: WorktreeProcesses,
+    handler: async (params, { runtime }) =>
+      runtime.listManagedWorktreeProcesses(params.worktree, {
+        stop: params.stop === true,
+        ...(params.callerPid ? { callerPid: params.callerPid } : {})
+      })
   }),
   defineMethod({
     name: 'worktree.sleep',

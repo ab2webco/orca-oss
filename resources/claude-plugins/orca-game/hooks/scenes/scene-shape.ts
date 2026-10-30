@@ -1,3 +1,4 @@
+import { ACCESSORIES } from '../character-look'
 import { isRasterText, type LocalizedName } from '../game-strings'
 import { castOf } from './cast-shape'
 import {
@@ -5,15 +6,17 @@ import {
   SCENERIES,
   type BandPalette,
   type Card,
+  type CharacterVariant,
   type Costume,
   type HudPalette,
   type Look,
   type LookColor,
+  type SceneCharacter,
   type SceneDefinition,
   type ScenePhase,
   type SceneTheme
 } from './scene-definition'
-import { colorOf, glyphColorsOf, hexOf, isShape, nameOf, textOf } from './scene-values'
+import { colorOf, glyphColorsOf, hexOf, isShape, nameOf, textOf, type Shape } from './scene-values'
 
 // Re-validates a scene Orca served, so bad data drops the scene instead of crashing the mod.
 
@@ -98,8 +101,57 @@ const rosterOf = (value: unknown): LocalizedName[] | undefined => {
   if (!Array.isArray(value) || value.length === 0 || value.length > ROSTER_MAX) {
     return undefined
   }
-  const names = value.map((one) => nameOf(one))
+  const names = value.map((one) => nameOf(isCharacterEntry(one) ? one.name : one))
   return names.every((one) => one !== undefined) ? names : undefined
+}
+
+// Why `name`: a localized name is `{ en, es }`, so only a character entry carries that key.
+const isCharacterEntry = (value: unknown): value is Shape & { name: unknown } =>
+  isShape(value) && 'name' in value
+
+const variantOf = (value: unknown): CharacterVariant | undefined => {
+  if (!isShape(value)) {
+    return undefined
+  }
+  const colors = optionalOf(value.colors, glyphColorsOf)
+  const accessory = optionalOf(value.accessory, (one) => ACCESSORIES.find((kind) => kind === one))
+  const accessoryColor = optionalOf(value.accessoryColor, colorOf)
+  if (colors === null || accessory === null || accessoryColor === null) {
+    return undefined
+  }
+  const isEmpty = accessoryColor !== undefined || Object.keys(colors ?? {}).length === 0
+  if (accessory === undefined && isEmpty) {
+    return undefined
+  }
+  return {
+    ...(colors === undefined ? {} : { colors }),
+    ...(accessory === undefined ? {} : { accessory }),
+    ...(accessoryColor === undefined ? {} : { accessoryColor })
+  }
+}
+
+const characterOf = (value: unknown): SceneCharacter | undefined => {
+  if (!isCharacterEntry(value)) {
+    return undefined
+  }
+  const name = nameOf(value.name)
+  const variant = optionalOf(value.variant, variantOf)
+  const costumes = optionalOf(value.costumes, (one) => byPhaseOf(one, costumeOf))
+  if (!name || variant === null || costumes === null || !variant === !costumes) {
+    return undefined
+  }
+  return { name, ...(variant ? { variant } : {}), ...(costumes ? { costumes } : {}) }
+}
+
+// Orca serves the looks apart from the names; a scene file read as written keeps them in `roster`.
+const charactersOf = (value: Shape): SceneCharacter[] | undefined => {
+  const entries = Array.isArray(value.characters)
+    ? value.characters
+    : Array.isArray(value.roster)
+      ? value.roster.filter(isCharacterEntry)
+      : []
+  const characters = entries.flatMap((one) => characterOf(one) ?? [])
+  return characters.length === 0 ? undefined : characters
 }
 
 const cardOf = (value: unknown): Card | undefined => {
@@ -189,6 +241,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const hud = optionalOf(value.hud, hudOf)
     const cast = castOf(value.cast)
     const roster = rosterOf(value.roster)
+    const characters = roster === undefined ? undefined : charactersOf(value)
     const themes = themesOf(value.themes)
     if (
       !looks ||
@@ -214,6 +267,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       ...(hud === undefined ? {} : { hud }),
       ...(cast === undefined ? {} : { cast }),
       ...(roster === undefined ? {} : { roster }),
+      ...(characters === undefined ? {} : { characters }),
       ...(themes === undefined ? {} : { themes })
     }
   } catch {

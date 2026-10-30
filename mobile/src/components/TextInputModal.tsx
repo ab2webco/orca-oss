@@ -1,13 +1,6 @@
 import { useState } from 'react'
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  Platform,
-  type KeyboardTypeOptions
-} from 'react-native'
+import { View, Pressable, StyleSheet, Platform, type KeyboardTypeOptions } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { colors, spacing, radii, typography } from '../theme/mobile-theme'
 import { BottomDrawer } from './BottomDrawer'
 

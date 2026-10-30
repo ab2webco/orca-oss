@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GAME_TEST_ACCOUNTS } from './orchestrator-game-fleet-test-fixtures'
 import { ORCHESTRATOR_GAME_HOLD_HANDLERS } from './orchestrator-game-hold'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
@@ -195,8 +196,10 @@ describe('the persistent STOP', () => {
     const { client, methods } = fakeClient({
       'game.state': state(null),
       'game.stopSwitch': () => (++reads > 1 ? { stopped: STOP } : { stopped: null }),
+      'worktree.list': { worktrees: [] },
       'terminal.show': { terminal: { handle: 'term_lead' } },
       'orchestration.runCurrent': { run: { id: 'run_1' } },
+      'accounts.snapshot': GAME_TEST_ACCOUNTS,
       'orchestration.taskCreate': { task: { id: 'task_1' } },
       'orchestration.workerStart': {
         runId: 'run_1',

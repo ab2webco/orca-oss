@@ -30,6 +30,7 @@ function board(projectOf: (caller: { terminalHandle?: string }) => GameBoardProj
     stops: new GameStopSwitch(() => join(dir, 'stop')),
     projectOf: async (caller) => projectOf(caller),
     inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
+    tellLead: () => true,
     now: () => new Date(Date.UTC(2026, 9, 16, 10, 0, tick++))
   })
 }

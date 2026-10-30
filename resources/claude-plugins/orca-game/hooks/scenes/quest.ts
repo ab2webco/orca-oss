@@ -1,8 +1,29 @@
-import type { SceneDefinition } from './scene-definition'
+import { sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const CLAUDE = 0xd77757
 const EYES = 0x1a1a1a
 const SKIN = { O: CLAUDE, E: EYES }
+
+// Clawd's own body takes each knight's color.
+const knight = (
+  name: Parameters<typeof sceneCharacter>[0],
+  body: number,
+  ...accessory: [Parameters<typeof sceneCharacter>[2], number]
+) => sceneCharacter(name, { O: body }, ...accessory)
+
+const CHARACTERS = [
+  knight({ en: 'Merlin', es: 'Merlín' }, 0x6f8fe0, 'halo', 0xfff3a0),
+  knight({ en: 'Lancelot', es: 'Lanzarote' }, 0xc8ccd4, 'feather', 0x4fc3f7),
+  knight({ en: 'Guinevere', es: 'Ginebra' }, 0xf0a0c0, 'crown', 0xffd84a),
+  knight({ en: 'Gawain', es: 'Galván' }, 0x7ccf6a, 'horns', 0xe8e0c8),
+  knight('Morgana', 0x9a6ad0, 'horns', 0xd0a0f0),
+  knight('Percival', 0xe8c860, 'cape', 0xe05060),
+  knight({ en: 'Tristan', es: 'Tristán' }, 0x4fb8b0, 'cape', 0x5f9ae8),
+  knight({ en: 'Isolde', es: 'Isolda' }, 0xf2d0a0, 'bow', 0xe0405a),
+  knight('Galahad', 0xf4f4f0, 'halo', 0xffd84a),
+  knight('Bedivere', 0xb07a50, 'feather', 0xd83a2e),
+  knight('Elaine', 0xe07070, 'bow', 0x5fb8ff)
+]
 
 // Squire, Sage, Blacksmith, Knight, Herald and King walking a parallax landscape.
 export const QUEST_SCENE: SceneDefinition = {
@@ -158,6 +179,9 @@ export const QUEST_SCENE: SceneDefinition = {
   },
   band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' },
   // Jev's advisor: a wizard whose staff glows while it waits.
+  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  roster: [{ en: 'Arthur', es: 'Arturo' }, ...CHARACTERS.map((one) => one.name)],
+  characters: CHARACTERS,
   cast: {
     advisor: {
       name: { en: 'Wizard', es: 'Mago' },

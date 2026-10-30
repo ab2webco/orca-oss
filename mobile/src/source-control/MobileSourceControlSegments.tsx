@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import {
   SOURCE_CONTROL_HUB_TABS,
   SOURCE_CONTROL_HUB_TAB_LABELS,
@@ -34,6 +35,8 @@ export function MobileSourceControlSegments({ active, onSelect }: Props) {
             <Text
               style={[hubStyles.segmentText, isActive && hubStyles.segmentTextActive]}
               numberOfLines={1}
+              // Why: the capped text outgrows a third of 320 dp ("Pull Requ…"); shrink before truncating.
+              adjustsFontSizeToFit
             >
               {SOURCE_CONTROL_HUB_TAB_LABELS[tab]}
             </Text>

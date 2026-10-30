@@ -85,7 +85,7 @@ describe('built-in scenes', () => {
 
   it.each(PORTED)('%s passes both validators unchanged, foe and finale included', (id) => {
     const served = JSON.parse(JSON.stringify(scene(id))) as Record<string, unknown>
-    const orca = parseOrchestratorGameScene(JSON.stringify(served), id)
+    const orca = parseOrchestratorGameScene(JSON.stringify(sceneFileOf(scene(id))), id)
     expect(orca.ok).toBe(true)
     expect(sceneDefinitionOf(served, id)).toEqual(scene(id))
     expect(orca.ok ? orca.definition : undefined).toEqual(scene(id))
@@ -100,6 +100,13 @@ describe('built-in scenes', () => {
     }
   })
 })
+
+// Why: a file writes each look in its roster entry; Orca serves the looks apart as `characters`.
+function sceneFileOf({ characters, ...rest }: SceneDefinition): Record<string, unknown> {
+  const lookOf = (name: unknown) =>
+    characters?.find((one) => JSON.stringify(one.name) === JSON.stringify(name)) ?? name
+  return JSON.parse(JSON.stringify({ ...rest, roster: rest.roster?.map(lookOf) }))
+}
 
 describe('built-in scenes draw', () => {
   it('every phase, action, reaction and rest, at fixed ticks', () => {

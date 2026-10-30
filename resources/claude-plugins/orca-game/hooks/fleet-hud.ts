@@ -1,5 +1,6 @@
 import { actionPixel } from './action-props'
-import { fitCells } from './cell-width'
+import { characterCostumeOf } from './character-look'
+import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
 import { crownAtOf, crownPixel } from './hd-party'
 import { shortMemberNameOf } from './member-character'
@@ -57,6 +58,8 @@ export type HudExtras = {
   isDemo?: boolean
   /** This pane's lead title, as the band's `quest.lead`; the hero wears the crown only when set. */
   lead?: string
+  /** Members left out of `members` (ghosts), which the `+N` counts too. */
+  unseen?: number
 }
 
 const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => {
@@ -68,7 +71,7 @@ const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => 
   return isStar ? hud.star : mix(hud.skyTop, hud.skyBottom, y / (HUD_PIXELS - 1))
 }
 
-type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number }
+type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number; name?: string }
 
 const spriteTopOf = (sprite: Sprite, tick: number): number =>
   2 -
@@ -84,7 +87,8 @@ const hudSprite = (
 ): number | undefined => {
   // A member on red CI trades turns with the scene's foe.
   const isFoeTurn = sprite.mood === 'hurt' && Math.floor(tick / 6) % 2 === 1
-  const costume = (isFoeTurn ? scene.foe : undefined) ?? scene.costumes[sprite.phase]
+  const costume =
+    (isFoeTurn ? scene.foe : undefined) ?? characterCostumeOf(scene, sprite.name, sprite.phase)
   const isResting = isRestingOf(sprite.state, sprite.mood)
   const top = spriteTopOf(sprite, tick)
   const column = x - sprite.at
@@ -218,17 +222,19 @@ export const hudGridOf = (
   if (heroState === 'idle') {
     hudWrite(grid, columns, 1, heroAt + SPRITE_WIDTH, snoreGlyph(tick), IDLE, 1)
   }
-  if (extras.level !== undefined && columns > PARTY_AT + 4) {
-    hudWrite(grid, columns, 0, PARTY_AT, ` ${xpTextOf(extras.level)} `, hud.frame, room)
+  const hidden = members.length - shown.length + (extras.unseen ?? 0)
+  const plus = hidden > 0 ? ` +${hidden} ` : ''
+  const plusAt = columns - 2 - plus.length
+  // Why the +N first: it says who the band could not draw, and the XP text shortens instead.
+  const xpRoom = Math.min(room, plusAt - PARTY_AT - (plus === '' ? 0 : 1))
+  if (extras.level !== undefined && xpRoom >= 4) {
+    hudWrite(grid, columns, 0, PARTY_AT, ` ${xpTextOf(extras.level)} `, hud.frame, xpRoom)
   }
   if (extras.isDemo === true && columns > 10) {
     hudWrite(grid, columns, 0, 2, ' DEMO ', WAITING, 6)
   }
-  const hidden = members.length - shown.length
-  const xpEnd = extras.level === undefined ? PARTY_AT : PARTY_AT + xpTextOf(extras.level).length + 2
-  const plus = ` +${hidden} `
-  if (hidden > 0 && columns - 2 - plus.length > xpEnd) {
-    hudWrite(grid, columns, 0, columns - 2 - plus.length, plus, hud.text, plus.length)
+  if (plus !== '' && plusAt > PARTY_AT) {
+    hudWrite(grid, columns, 0, plusAt, plus, hud.text, plus.length)
   }
   return grid
 }
@@ -250,16 +256,24 @@ export const hudLineOf = (
   extras: HudExtras = {}
 ): string => {
   const art = gameStrings().art
-  const party =
-    members.length === 0
-      ? art.noParty
-      : members.map((one) => `${markOf(one)} ${shortMemberNameOf(one.name)}`).join('  ')
-  const parts = [
+  const unseen = extras.unseen ?? 0
+  const head = [
     ...(extras.isDemo === true ? ['DEMO'] : []),
-    ...(extras.level === undefined ? [] : [`${art.level} ${extras.level.level}`]),
-    party
+    ...(extras.level === undefined ? [] : [`${art.level} ${extras.level.level}`])
   ]
-  return fitCells(parts.join(' · '), columns)
+  const names = members.map((one) => `${markOf(one)} ${shortMemberNameOf(one.name)}`)
+  const lineOf = (shown: number): string => {
+    const hidden = members.length - shown + unseen
+    const party = members.length === 0 ? art.noParty : names.slice(0, shown).join('  ')
+    return [...head, [party, hidden > 0 ? `+${hidden}` : ''].filter(Boolean).join('  ')].join(' · ')
+  }
+  // Why drop names from the end: the `+N` must stay readable, and the first names are the busiest.
+  for (let shown = members.length; shown > 0; shown -= 1) {
+    if (cellWidthOf(lineOf(shown)) <= columns) {
+      return lineOf(shown)
+    }
+  }
+  return fitCells(lineOf(Math.min(1, members.length)), columns)
 }
 
 export const hudCellsOf = (...args: Parameters<typeof hudGridOf>): string =>

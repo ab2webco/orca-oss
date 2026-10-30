@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { recognizeAgentProcess } from '../../shared/agent-process-recognition'
 import { isShellProcess } from '../../shared/shell-process-detection'
@@ -128,6 +128,11 @@ export class GameLeadSessions {
     const temp = `${file}.${randomUUID()}.tmp`
     await writeFile(temp, JSON.stringify(session), 'utf8')
     await rename(temp, file)
+  }
+
+  /** Retires a project's stored lead conversation, so the next claim does not reopen it. */
+  async clear(projectKey: string): Promise<void> {
+    await rm(this.fileOf(projectKey), { force: true })
   }
 
   private fileOf(projectKey: string): string {

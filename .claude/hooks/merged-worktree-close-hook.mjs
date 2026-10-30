@@ -483,6 +483,10 @@ function handle(payload) {
   const cwd = resolve(payload.cwd || process.cwd())
   const command = payload.tool_input?.command ?? ''
   if (event === 'SessionStart') {
+    // Why: closing worktrees is the lead's; each member start listed every worktree's PRs (ORCA-877).
+    if (process.env.ORCA_GAME_ROLE === 'member') {
+      return null
+    }
     const { lines } = runCloser(cwd, [])
     return lines.length
       ? {

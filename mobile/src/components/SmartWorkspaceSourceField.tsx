@@ -1,4 +1,5 @@
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import {
   CircleDot,
   ExternalLink,

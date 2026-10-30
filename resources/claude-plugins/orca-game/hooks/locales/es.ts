@@ -117,6 +117,7 @@ export const ES: GameCatalog = {
       `/${command} ya lo usa otro comando; usa su botón en la banda o en el Panel`,
     actionCommandGone: (command) => `/${command} ya no es una acción de este proyecto`,
     limited: (backIn) => (backIn === null ? 'limitado' : `limitado · vuelve en ${backIn}`),
+    remoteHost: (host, answering) => (answering ? `en ${host}` : `${host} no responde`),
     advisorPinned: ({ model, effort }) =>
       model && effort
         ? 'modelo y esfuerzo fijados'

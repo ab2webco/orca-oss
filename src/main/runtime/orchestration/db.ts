@@ -35,7 +35,9 @@ import type {
   FederatedDispatchRow,
   RemoteDispatchAttachmentRow,
   FederationRelayDirection,
-  FederationRelayItemRow
+  FederationRelayItemRow,
+  RemoteAttachmentRefusal,
+  GameAnsweredQuestionRow
 } from './types'
 import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestration-task-display'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
@@ -45,7 +47,7 @@ import { startSpan } from '../../observability/tracer'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import { ORCHESTRATION_SCHEMA_VERSION } from './orchestration-schema-migration-ledger'
 import { workerObservedModelOf, type WorkerObservedModel } from './worker-observed-model'
-import { isBatchRetirableForWait } from './run-delivery-wake'
+import { isBatchRetirableForWait, outsideMemberMailSql } from './run-delivery-wake'
 import {
   deriveWorkerTerminalListState,
   WORKER_SETTLED_STATES,
@@ -63,12 +65,14 @@ import {
 import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../../shared/orchestration-run-pagination'
 import {
   ORCHESTRATION_CONTRACT_VERSION,
-  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
+  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
+  ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION
 } from '../../../shared/protocol-version'
 import {
   releaseContextOnlyDispatch,
   type ContextOnlyDispatchReleaseResult
 } from './context-only-dispatch-release'
+import { retireSettledRunMail, type RetiredRunMail } from './run-mail-settlement'
 import {
   ensureMutationReceiptCapacity,
   migrateMutationReceiptCapacity
@@ -1168,6 +1172,17 @@ export class OrchestrationDb {
       }
       if (current < 36 && !this.hasColumn('dispatch_contexts', 'last_activity_at')) {
         this.db.exec('ALTER TABLE dispatch_contexts ADD COLUMN last_activity_at TEXT')
+      }
+      if (current < 37 && !this.hasColumn('remote_dispatch_attachments', 'game_scene')) {
+        this.db.exec('ALTER TABLE remote_dispatch_attachments ADD COLUMN game_scene TEXT')
+      }
+      if (
+        current < 38 &&
+        !this.hasColumn('remote_dispatch_attachments', 'settled_capability_hash')
+      ) {
+        this.db.exec(
+          'ALTER TABLE remote_dispatch_attachments ADD COLUMN settled_capability_hash TEXT'
+        )
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -2938,6 +2953,7 @@ export class OrchestrationDb {
     this.db.exec('BEGIN IMMEDIATE')
     try {
       this.requireCurrentConsumer(params.runId, params.consumerGeneration)
+      retireSettledRunMail(this.db, params.runId)
       const address = `run:${params.runId}`
       const terminalHandle = params.terminalHandle ?? address
       // Why: a heartbeat's liveness is recorded at send; batching it only replays "alive" ahead of real mail.
@@ -2966,7 +2982,8 @@ export class OrchestrationDb {
         const retiredForWait =
           params.wakeTypes !== undefined &&
           params.wakeTypes.length > 0 &&
-          isBatchRetirableForWait(messages, params.wakeTypes)
+          isBatchRetirableForWait(messages, params.wakeTypes) &&
+          !this.holdsOutsideMemberMail(params.runId, messages)
         if (
           !retiredForWait &&
           (!consumesHeartbeats || !messages.every((message) => message.type === 'heartbeat'))
@@ -2984,20 +3001,14 @@ export class OrchestrationDb {
           .run(existing.id)
       }
 
-      if (params.wakeTypes && params.wakeTypes.length > 0) {
-        const placeholders = params.wakeTypes.map(() => '?').join(',')
-        const matching = this.db
-          .prepare(
-            `SELECT 1 FROM messages
-             WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
-               AND delivery_contract = 'current_delivery'
-               AND type IN (${placeholders}) LIMIT 1`
-          )
-          .get(params.runId, address, terminalHandle, ...params.wakeTypes)
-        if (!matching) {
-          this.db.exec('COMMIT')
-          return undefined
-        }
+      const wakeTypes = params.wakeTypes ?? []
+      const firstWake =
+        wakeTypes.length > 0
+          ? this.firstRunMailWakeSequence(params.runId, address, terminalHandle, wakeTypes)
+          : undefined
+      if (wakeTypes.length > 0 && firstWake === undefined) {
+        this.db.exec('COMMIT')
+        return undefined
       }
 
       const oldest = this.db
@@ -3008,10 +3019,9 @@ export class OrchestrationDb {
            ORDER BY sequence ASC LIMIT ?`
         )
         .all(params.runId, address, terminalHandle, limit) as MessageRow[]
-      const wakeTypes = params.wakeTypes ?? []
       const messages = exposeMessageListTimestamps(
-        wakeTypes.length > 0 && !oldest.some((message) => wakeTypes.includes(message.type))
-          ? this.runMailEndingAtFirstWake(params.runId, address, terminalHandle, wakeTypes, limit)
+        firstWake !== undefined && (oldest.at(-1)?.sequence ?? -1) < firstWake
+          ? this.runMailEndingAt(params.runId, address, terminalHandle, firstWake, limit)
           : oldest
       )
       if (messages.length === 0) {
@@ -3040,37 +3050,74 @@ export class OrchestrationDb {
     }
   }
 
-  // Why: 50+ unread status rows ahead of a worker_done would fill a FIFO batch without it; the older
-  // rows stay unread for a later batch instead of being consumed unseen (ORCA-701).
-  private runMailEndingAtFirstWake(
+  // Why (ORCA-861): a typed watch also wakes on mail its own members did not send, whatever its type.
+  private firstRunMailWakeSequence(
     runId: string,
     address: string,
     terminalHandle: string,
-    wakeTypes: readonly MessageType[],
+    wakeTypes: readonly MessageType[]
+  ): number | undefined {
+    const placeholders = wakeTypes.map(() => '?').join(',')
+    const outside = outsideMemberMailSql(runId)
+    const row = this.db
+      .prepare(
+        `SELECT MIN(sequence) AS sequence FROM messages
+         WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+           AND delivery_contract = 'current_delivery'
+           AND (type IN (${placeholders}) OR ${outside.sql})`
+      )
+      .get(runId, address, terminalHandle, ...wakeTypes, ...outside.params) as
+      | { sequence: number | null }
+      | undefined
+    return row?.sequence ?? undefined
+  }
+
+  private holdsOutsideMemberMail(runId: string, messages: readonly MessageRow[]): boolean {
+    if (messages.length === 0) {
+      return false
+    }
+    const outside = outsideMemberMailSql(runId)
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM messages WHERE id IN (${messages.map(() => '?').join(',')})
+           AND ${outside.sql} LIMIT 1`
+        )
+        .get(...messages.map((message) => message.id), ...outside.params) !== undefined
+    )
+  }
+
+  /** Whether a typed Run watch has unread mail from outside its members to wake on (ORCA-861). */
+  hasUnreadOutsideMemberRunMail(runId: string, terminalHandle = `run:${runId}`): boolean {
+    const outside = outsideMemberMailSql(runId)
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM messages
+           WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+             AND delivery_contract = 'current_delivery' AND ${outside.sql} LIMIT 1`
+        )
+        .get(runId, `run:${runId}`, terminalHandle, ...outside.params) !== undefined
+    )
+  }
+
+  // Why: 50+ unread status rows ahead of a worker_done would fill a FIFO batch without it; the older
+  // rows stay unread for a later batch instead of being consumed unseen (ORCA-701).
+  private runMailEndingAt(
+    runId: string,
+    address: string,
+    terminalHandle: string,
+    lastSequence: number,
     limit: number
   ): MessageRow[] {
-    const mailbox = `((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
-      AND delivery_contract = 'current_delivery'`
-    const placeholders = wakeTypes.map(() => '?').join(',')
     const newestFirst = this.db
       .prepare(
         `SELECT * FROM messages
-         WHERE ${mailbox}
-           AND sequence <= (
-             SELECT MIN(sequence) FROM messages WHERE ${mailbox} AND type IN (${placeholders})
-           )
+         WHERE ((run_id = ? AND to_handle = ?) OR to_handle = ?) AND read = 0
+           AND delivery_contract = 'current_delivery' AND sequence <= ?
          ORDER BY sequence DESC LIMIT ?`
       )
-      .all(
-        runId,
-        address,
-        terminalHandle,
-        runId,
-        address,
-        terminalHandle,
-        ...wakeTypes,
-        limit
-      ) as MessageRow[]
+      .all(runId, address, terminalHandle, lastSequence, limit) as MessageRow[]
     return newestFirst.toReversed()
   }
 
@@ -3778,6 +3825,7 @@ export class OrchestrationDb {
   }
 
   getUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+    this.retireSettledMailFor(toHandle)
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
@@ -3827,6 +3875,7 @@ export class OrchestrationDb {
 
   // Why: delivered_at IS NULL filter — push-on-idle delivers each row at most once; read (set only by check) wouldn't prevent replay.
   getUndeliveredUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+    this.retireSettledMailFor(toHandle)
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
       return exposeMessageListTimestamps(
@@ -3850,6 +3899,17 @@ export class OrchestrationDb {
         )
         .all(toHandle) as MessageRow[]
     )
+  }
+
+  retireSettledRunMail(runId: string): RetiredRunMail[] {
+    return retireSettledRunMail(this.db, runId)
+  }
+
+  // Why: the pointer counts these reads, so settled Run mail must leave them too, not only the check batch (ORCA-824).
+  private retireSettledMailFor(toHandle: string): void {
+    if (toHandle.startsWith('run:')) {
+      retireSettledRunMail(this.db, toHandle.slice('run:'.length))
+    }
   }
 
   getUndeliveredUnreadMailboxHandles(): string[] {
@@ -4021,7 +4081,7 @@ export class OrchestrationDb {
 
   // Why: a question stays waiting on the lead after its mail is acked, until someone answers or closes it.
   listPendingQuestions(runId: string): MessageRow[] {
-    return this.db
+    const rows = this.db
       .prepare(
         `SELECT m.* FROM question_threads q
            JOIN messages m ON m.id = q.message_id
@@ -4029,6 +4089,26 @@ export class OrchestrationDb {
           ORDER BY m.sequence`
       )
       .all(runId) as MessageRow[]
+    // Why: the Inbox ages these; a timezone-less time would read as local.
+    return exposeMessageListTimestamps(rows)
+  }
+
+  // Why: the Inbox audits what the lead answered, newest first.
+  listAnsweredQuestions(runId: string, limit: number): GameAnsweredQuestionRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.*, q.answer_body, q.answered_at FROM question_threads q
+           JOIN messages m ON m.id = q.message_id
+          WHERE q.run_id = ? AND q.status = 'answered'
+          ORDER BY q.answered_at DESC, m.sequence DESC
+          LIMIT ?`
+      )
+      .all(runId, limit) as GameAnsweredQuestionRow[]
+    return rows.map((row) => ({
+      ...exposeMessageTimestamps(row),
+      answer_body: row.answer_body,
+      answered_at: exposeUtcTimestamp(row.answered_at)
+    }))
   }
 
   private getQuestionRaw(messageId: string): QuestionRow | undefined {
@@ -5093,6 +5173,8 @@ export class OrchestrationDb {
     homePeerFingerprint: string
     protocolVersion: number
     runtimeEpoch: string
+    /** The lead's scene, kept so the member's band draws it after a restart too. */
+    gameScene?: { id: string; text: string }
     mutationReceipt: {
       callerFingerprint: string
       requestId: string
@@ -5138,15 +5220,17 @@ export class OrchestrationDb {
       this.db
         .prepare(
           `INSERT INTO remote_dispatch_attachments (
-             dispatch_id, task_id, home_peer_fingerprint, protocol_version, runtime_epoch
-           ) VALUES (?, ?, ?, ?, ?)`
+             dispatch_id, task_id, home_peer_fingerprint, protocol_version, runtime_epoch,
+             game_scene
+           ) VALUES (?, ?, ?, ?, ?, ?)`
         )
         .run(
           params.dispatchId,
           params.taskId,
           params.homePeerFingerprint,
           params.protocolVersion,
-          params.runtimeEpoch
+          params.runtimeEpoch,
+          params.gameScene ? JSON.stringify(params.gameScene) : null
         )
       this.db.exec('COMMIT')
       return this.getRemoteDispatchAttachment(params.dispatchId) as RemoteDispatchAttachmentRow
@@ -5160,6 +5244,18 @@ export class OrchestrationDb {
     return this.db
       .prepare('SELECT * FROM remote_dispatch_attachments WHERE dispatch_id = ?')
       .get(dispatchId) as RemoteDispatchAttachmentRow | undefined
+  }
+
+  /** The scene the newest remote member in this worktree brought from its lead. */
+  getGameSceneForWorktree(worktreeId: string): { id: string; text: string } | null {
+    const row = this.db
+      .prepare(
+        `SELECT game_scene FROM remote_dispatch_attachments
+         WHERE worktree_id = ? AND game_scene IS NOT NULL
+         ORDER BY created_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(worktreeId) as { game_scene: string } | undefined
+    return row ? (JSON.parse(row.game_scene) as { id: string; text: string }) : null
   }
 
   recordRemoteAttachmentStage(params: {
@@ -5330,21 +5426,60 @@ export class OrchestrationDb {
     paneKey: string | null
     processIncarnation: string | null
   }): boolean {
+    return this.diagnoseRemoteAttachmentAuthority(params) === null
+  }
+
+  /** Null when the caller holds the attachment's authority, else why it does not. */
+  diagnoseRemoteAttachmentAuthority(params: {
+    dispatchId: string
+    capability: string | undefined
+    paneKey: string | null
+    processIncarnation: string | null
+  }): RemoteAttachmentRefusal | null {
     const attachment = this.getRemoteDispatchAttachment(params.dispatchId)
+    if (!attachment?.capability_hash) {
+      return 'capability_revoked'
+    }
     if (
-      !attachment?.capability_hash ||
-      !params.capability ||
       !attachment.pane_key ||
       !params.paneKey ||
       !isEquivalentPaneKey(attachment.pane_key, params.paneKey) ||
       !attachment.process_incarnation ||
       attachment.process_incarnation !== params.processIncarnation
     ) {
-      return false
+      return 'process_mismatch'
+    }
+    if (!params.capability) {
+      return 'capability_missing'
     }
     const expected = Buffer.from(attachment.capability_hash, 'hex')
     const observed = Buffer.from(hashDispatchCapability(params.capability), 'hex')
     return expected.length === observed.length && timingSafeEqual(expected, observed)
+      ? null
+      : 'capability_mismatch'
+  }
+
+  hasRecentFederationRelayKind(params: {
+    dispatchId: string
+    direction: FederationRelayDirection
+    kind: string
+    withinSeconds: number
+  }): boolean {
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM federation_relay_items
+           WHERE dispatch_id = ? AND direction = ? AND kind = ?
+             AND (acked_at IS NULL OR created_at > datetime('now', ?))
+           LIMIT 1`
+        )
+        .get(
+          params.dispatchId,
+          params.direction,
+          params.kind,
+          `-${params.withinSeconds} seconds`
+        ) !== undefined
+    )
   }
 
   isRemoteAttachmentProcessCurrent(params: {
@@ -5401,6 +5536,27 @@ export class OrchestrationDb {
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
   }
 
+  // Why stage, not state: the settled outcome stays readable; only the resources are gone.
+  markRemoteAttachmentReleased(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET stage = 'released', updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('succeeded', 'failed', 'stopped', 'abandoned')`
+      )
+      .run(dispatchId)
+  }
+
+  markFederatedWorkerReleased(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches
+         SET stage = 'released', updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('succeeded', 'failed', 'stopped', 'abandoned')`
+      )
+      .run(dispatchId)
+  }
+
   markRemoteAttachmentStopUnknown(dispatchId: string, reason: string): RemoteDispatchAttachmentRow {
     this.db
       .prepare(
@@ -5424,6 +5580,60 @@ export class OrchestrationDb {
     return rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
   }
 
+  /** The pane's newest attachment, only when it succeeded and its member is still here. */
+  findLatestSettledRemoteAttachmentForPane(
+    paneKey: string
+  ): RemoteDispatchAttachmentRow | undefined {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM remote_dispatch_attachments
+         WHERE pane_key IS NOT NULL ORDER BY rowid DESC`
+      )
+      .all() as RemoteDispatchAttachmentRow[]
+    const latest = rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
+    return latest?.state === 'succeeded' && latest.stage !== 'released' ? latest : undefined
+  }
+
+  /** Whether the caller holds the capability its attachment had when it settled successfully. */
+  verifySettledRemoteAttachmentAuthority(params: {
+    dispatchId: string
+    capability: string | undefined
+    paneKey: string
+    processIncarnation: string | null
+  }): boolean {
+    const attachment = this.getRemoteDispatchAttachment(params.dispatchId)
+    if (
+      !attachment?.settled_capability_hash ||
+      !params.capability ||
+      !attachment.pane_key ||
+      !isEquivalentPaneKey(attachment.pane_key, params.paneKey) ||
+      !attachment.process_incarnation ||
+      attachment.process_incarnation !== params.processIncarnation
+    ) {
+      return false
+    }
+    const expected = Buffer.from(attachment.settled_capability_hash, 'hex')
+    const observed = Buffer.from(hashDispatchCapability(params.capability), 'hex')
+    return expected.length === observed.length && timingSafeEqual(expected, observed)
+  }
+
+  /** Back to ready with the member's own capability; shared with ORCA-838's lead-side reopen. */
+  reopenSettledRemoteAttachment(
+    dispatchId: string,
+    stage: string
+  ): RemoteDispatchAttachmentRow | undefined {
+    const reopened = this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET state = 'ready', stage = ?, capability_hash = settled_capability_hash,
+             updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state = 'succeeded' AND stage != 'released'
+           AND protocol_version >= ? AND settled_capability_hash IS NOT NULL`
+      )
+      .run(stage, dispatchId, ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION)
+    return reopened.changes === 1 ? this.getRemoteDispatchAttachment(dispatchId) : undefined
+  }
+
   enqueueFederationRelay(params: {
     dispatchId: string
     direction: FederationRelayDirection
@@ -5432,6 +5642,8 @@ export class OrchestrationDb {
     messageId?: string
     settleRemoteOutcome?: WorkerReportOutcome
     remoteQuestion?: true
+    /** Reopens the settled home Dispatch in the same transaction as the follow-up (ORCA-838). */
+    reopenSettledReason?: string
   }): FederationRelayItemRow {
     const byteCount = Buffer.byteLength(params.payload, 'utf8')
     const messageId = params.messageId ?? generateId('relay')
@@ -5451,6 +5663,19 @@ export class OrchestrationDb {
             `Remote Dispatch ${params.dispatchId} is not active.`
           )
         }
+      }
+      if (
+        params.reopenSettledReason &&
+        !this.renewCompletedDispatchInTransaction({
+          dispatchId: params.dispatchId,
+          reason: params.reopenSettledReason,
+          federated: true
+        })
+      ) {
+        throw new OrchestrationError(
+          'dispatch_inactive',
+          `Federated Dispatch ${params.dispatchId} is no longer settled; check it again.`
+        )
       }
       if (params.kind === 'heartbeat') {
         const heartbeat = this.db
@@ -5782,6 +6007,8 @@ export class OrchestrationDb {
     message: MessageRow
     duplicate: boolean
     lifecycle?: WorkerReportSettlement | { action: 'rejected'; code: string; reason: string }
+    /** A question reopened its completed Dispatch, so the relay pump must resume. */
+    reopened: boolean
   } {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -5819,7 +6046,20 @@ export class OrchestrationDb {
           `Federated relay message ${params.message.id} conflicts with an existing message.`
         )
       }
+      let reopened = false
       if (message.type === 'question') {
+        // Why: the host reopened its settled member to ask; the home side follows so the answer can flow back.
+        const worker = this.getWorkerDispatch(params.dispatchId)
+        reopened =
+          !duplicate &&
+          federated.protocol_version >= ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION &&
+          worker?.state === 'succeeded' &&
+          worker.stage !== 'released' &&
+          this.renewCompletedDispatchInTransaction({
+            dispatchId: params.dispatchId,
+            reason: 'Reopened by a question from its remote member after worker_done.',
+            federated: true
+          })
         this.registerFederatedQuestion({
           messageId: message.id,
           runId: params.message.runId,
@@ -5868,7 +6108,7 @@ export class OrchestrationDb {
         this.setFederatedHomeImportSequence(params.dispatchId, params.sequence)
       }
       this.db.exec('COMMIT')
-      return { message, duplicate, ...(lifecycle ? { lifecycle } : {}) }
+      return { message, duplicate, reopened, ...(lifecycle ? { lifecycle } : {}) }
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
@@ -5996,10 +6236,12 @@ export class OrchestrationDb {
       .prepare(
         `UPDATE remote_dispatch_attachments
          SET state = ?, stage = ?, capability_hash = NULL,
+             settled_capability_hash = CASE WHEN ? = 'succeeded'
+               THEN capability_hash ELSE NULL END,
              updated_at = datetime('now')
          WHERE dispatch_id = ? AND state = 'ready'`
       )
-      .run(state, stage, dispatchId)
+      .run(state, stage, state, dispatchId)
   }
 
   isDispatchProcessCurrent(params: {
@@ -7039,6 +7281,8 @@ export class OrchestrationDb {
     capability: string | undefined
     paneKey: string | undefined
     processIncarnation: string | undefined
+    /** Proves the holder of a completed Dispatch, whose capability worker_done revoked (ORCA-856). */
+    acceptRevoked?: boolean
   }): { valid: true } | { valid: false; reason: string } {
     const dispatch = this.getDispatchContextById(params.dispatchId)
     if (!dispatch) {
@@ -7047,7 +7291,7 @@ export class OrchestrationDb {
     if (!dispatch.capability_hash) {
       return { valid: false, reason: `Dispatch ${params.dispatchId} has no lifecycle capability.` }
     }
-    if (dispatch.capability_revoked_at) {
+    if (dispatch.capability_revoked_at && !params.acceptRevoked) {
       return { valid: false, reason: `Dispatch ${params.dispatchId} capability is revoked.` }
     }
     if (!params.capability) {
@@ -7634,35 +7878,86 @@ export class OrchestrationDb {
   }): DispatchContextRow | undefined {
     this.db.exec('BEGIN IMMEDIATE')
     try {
-      const restored = this.db
-        .prepare(
-          `UPDATE dispatch_contexts
-           SET status = 'dispatched', completed_at = NULL, capability_revoked_at = NULL
-           WHERE id = ? AND status = 'completed' AND capability_hash IS NOT NULL`
-        )
-        .run(params.dispatchId)
-      if (restored.changes !== 1) {
-        this.db.exec('COMMIT')
-        return undefined
-      }
-      this.db
-        .prepare(
-          "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'completed'"
-        )
-        .run(params.dispatchId)
-      this.db
-        .prepare(
-          `UPDATE worker_dispatches
-           SET state = 'ready', stage = 'renewed_for_follow_up', last_error = ?, updated_at = datetime('now')
-           WHERE dispatch_id = ? AND state = 'succeeded'`
-        )
-        .run(params.reason, params.dispatchId)
+      const restored = this.renewCompletedDispatchInTransaction({ ...params, federated: false })
       this.db.exec('COMMIT')
-      return this.getDispatchContextById(params.dispatchId)
+      return restored ? this.getDispatchContextById(params.dispatchId) : undefined
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  // Why federated: the home row has no capability hash; the host holds the member's (ORCA-856).
+  private renewCompletedDispatchInTransaction(params: {
+    dispatchId: string
+    reason: string
+    federated: boolean
+  }): boolean {
+    const restored = this.db
+      .prepare(
+        `UPDATE dispatch_contexts
+         SET status = 'dispatched', completed_at = NULL, capability_revoked_at = NULL
+         WHERE id = ? AND status = 'completed' AND (? = 1 OR capability_hash IS NOT NULL)`
+      )
+      .run(params.dispatchId, params.federated ? 1 : 0)
+    if (restored.changes !== 1) {
+      return false
+    }
+    this.db
+      .prepare(
+        "UPDATE tasks SET status = 'dispatched', completed_at = NULL WHERE id = (SELECT task_id FROM dispatch_contexts WHERE id = ?) AND status = 'completed'"
+      )
+      .run(params.dispatchId)
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches
+         SET state = 'ready', stage = 'renewed_for_follow_up', last_error = ?, updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state = 'succeeded'`
+      )
+      .run(params.reason, params.dispatchId)
+    return true
+  }
+
+  /** Settled federated members whose host may reopen them with a question (ORCA-856). */
+  listReopenableFederatedDispatchIds(): string[] {
+    return this.reopenableFederatedDispatchIds('', [])
+  }
+
+  /** Whether the lead may reopen this settled remote member with a follow-up (ORCA-838). */
+  isReopenableFederatedDispatch(dispatchId: string): boolean {
+    return this.reopenableFederatedDispatchIds('AND fd.dispatch_id = ?', [dispatchId]).length > 0
+  }
+
+  /** The settled remote member still holding this host terminal, newest first (ORCA-838). */
+  findReopenableFederatedDispatchOnTerminal(
+    environmentId: string,
+    terminalHandle: string
+  ): string | undefined {
+    return this.reopenableFederatedDispatchIds(
+      'AND fd.environment_id = ? AND fd.remote_terminal_handle = ?',
+      [environmentId, terminalHandle]
+    ).at(-1)
+  }
+
+  private reopenableFederatedDispatchIds(filter: string, args: string[]): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT fd.dispatch_id FROM federated_dispatches fd
+         INNER JOIN dispatch_contexts dc ON dc.id = fd.dispatch_id
+         INNER JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
+         WHERE fd.protocol_version >= ? AND dc.status = 'completed'
+           AND wd.state = 'succeeded' AND wd.stage != 'released'
+           AND NOT EXISTS (
+             SELECT 1 FROM dispatch_contexts newer
+             WHERE newer.task_id = dc.task_id AND newer.rowid > dc.rowid
+           )
+           ${filter}
+         ORDER BY fd.rowid`
+      )
+      .all(ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION, ...args) as {
+      dispatch_id: string
+    }[]
+    return rows.map((row) => row.dispatch_id)
   }
 
   /** Inference failures whose terminal showed something since `sinceIso`, failure time included (ORCA-658). */

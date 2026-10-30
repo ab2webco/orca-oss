@@ -127,6 +127,7 @@ docs/**
 !docs/reference/windows-setup-shell.md
 !docs/reference/worktree-scan-fingerprint.md
 !docs/reference/orca-sonar.md
+!docs/reference/worktree-test-resources.md
 
 # Stably CLI (only docs/ are tracked)
 .stably/*

@@ -17,6 +17,11 @@ import {
   reconcileLifecycleMessage
 } from '../../orchestration/lifecycle-reconciliation'
 import { waitForFederatedLifecycleSettlement } from '../../orchestration/federation-lifecycle-settlement'
+import {
+  describeDeadHeartbeatSender,
+  logHeartbeatRejection,
+  rejectHeartbeatQuietly
+} from '../../orchestration/dead-heartbeat-sender'
 import { abbreviateOrchestrationTasks } from '../../../../shared/orchestration-task-summary'
 import {
   ORCHESTRATION_LEGACY_RUN_ID,
@@ -30,11 +35,15 @@ import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
+import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
+import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
+import { routeFederatedMail } from '../../orchestration/federated-follow-up'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
 import type { RunRow } from '../../orchestration/types'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
+import { refuseRemoteMemberMail } from '../../orchestration/remote-member-mail-refusal'
 import {
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
@@ -164,7 +173,9 @@ const ReplyParams = z.object({
 const InboxParams = z.object({
   limit: OptionalFiniteNumber,
   // Why: filters the inbox to a handle so inbox and check --all give agreeing results (design doc §3.3).
-  terminal: OptionalString
+  terminal: OptionalString,
+  // Why (ORCA-858): a check names this exact read for a body its watch line cannot hold.
+  id: OptionalString
 })
 
 const TaskCreateParams = z.object({
@@ -411,6 +422,38 @@ function interruptedAcknowledgedCheck(
   }
 }
 
+// Why: a remote member refused here has no other way to reach its lead (ORCA-857).
+function authenticateRemoteAwareSender(
+  runtime: OrcaRuntimeService,
+  params: { from?: string; senderPaneKey?: string; senderLaunchToken?: string },
+  type: string
+): { handle: string; paneKey?: string } {
+  try {
+    return runtime.authenticateOrchestrationSender({
+      claimedHandle: params.from,
+      paneKey: params.senderPaneKey,
+      launchToken: params.senderLaunchToken
+    })
+  } catch (error) {
+    const db = runtime.getOrchestrationDb()
+    const attachment =
+      error instanceof Error &&
+      error.message === 'orchestration_sender_unauthenticated' &&
+      params.senderPaneKey &&
+      type !== 'heartbeat'
+        ? db.findActiveRemoteAttachmentForPane(params.senderPaneKey)
+        : undefined
+    if (!attachment) {
+      throw error
+    }
+    throw refuseRemoteMemberMail(db, {
+      dispatchId: attachment.dispatch_id,
+      type,
+      refusal: 'sender_unauthenticated'
+    })
+  }
+}
+
 function rejectFederatedExplicitTarget(params: { to?: string; run?: string }): void {
   if (params.to || params.run) {
     throw new OrchestrationError(
@@ -440,11 +483,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     ) => {
       const db = runtime.getOrchestrationDb()
       // Why: lifecycle authority starts with proof of the local sender pane, never its claimed handle.
-      const sender = runtime.authenticateOrchestrationSender({
-        claimedHandle: params.from,
-        paneKey: params.senderPaneKey,
-        launchToken: params.senderLaunchToken
-      })
+      const sender = authenticateRemoteAwareSender(runtime, params, params.type ?? 'status')
       const from = sender.handle
       // Why keep the attested caller as well: hook identity survives a graph remount, where the
       // runtime can no longer resolve the pane from the handle alone. It is matched against the
@@ -461,18 +500,30 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         rejectFederatedExplicitTarget(params)
         const processIncarnation =
           attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from)
-        if (
-          !db.verifyRemoteAttachmentAuthority({
+        const authority = {
+          dispatchId: remoteAttachment.dispatch_id,
+          capability: orchestrationCapability,
+          paneKey: senderPaneKey ?? null,
+          processIncarnation
+        }
+        if (!db.verifyRemoteAttachmentAuthority(authority)) {
+          const refusal = db.diagnoseRemoteAttachmentAuthority(authority) ?? 'capability_mismatch'
+          if (params.type === 'heartbeat') {
+            logHeartbeatRejection(
+              { from_handle: from, sender_pane_key: senderPaneKey ?? null },
+              remoteAttachment.dispatch_id,
+              refusal
+            )
+            throw new OrchestrationError(
+              'dispatch_capability_invalid',
+              'The remote Dispatch capability or exact worker process is invalid.'
+            )
+          }
+          throw refuseRemoteMemberMail(db, {
             dispatchId: remoteAttachment.dispatch_id,
-            capability: orchestrationCapability,
-            paneKey: senderPaneKey ?? null,
-            processIncarnation
+            type: params.type ?? 'status',
+            refusal
           })
-        ) {
-          throw new OrchestrationError(
-            'dispatch_capability_invalid',
-            'The remote Dispatch capability or exact worker process is invalid.'
-          )
         }
         const type = (params.type ?? 'status') as MessageType
         const payload = parseRemoteWorkerPayload(params.payload)
@@ -603,27 +654,24 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               `Federated Dispatch ${dispatchId} does not support coordinator control mail; start a fresh worker after updating its Orca Lab server.`
             )
           }
-          if (db.getWorkerDispatch(dispatchId)?.state !== 'ready') {
-            throw new OrchestrationError(
-              'dispatch_inactive',
-              `Federated Dispatch ${dispatchId} is not active.`
-            )
-          }
           if (params.type === 'worker_done' || params.type === 'heartbeat') {
             throw new OrchestrationError(
               'invalid_argument',
               'Coordinator-to-worker control mail cannot report worker lifecycle.'
             )
           }
+          const route = routeFederatedMail(db, federatedTarget)
+          const followUp = route.kind === 'control_message' ? undefined : route
           revalidateLegacyCoordinator?.()
           const relay = db.enqueueFederationRelay({
             dispatchId,
             direction: 'to_worker',
-            kind: 'control_message',
+            kind: route.kind,
+            ...(followUp ? { reopenSettledReason: followUp.reopenSettledReason } : {}),
             payload: encodeFederatedControlMessage({
               from,
               subject: params.subject,
-              body: params.body ?? '',
+              body: followUp ? `${params.body ?? ''}\n\n${followUp.note}` : (params.body ?? ''),
               type: (params.type ?? 'status') as MessageType,
               priority: (params.priority ?? 'normal') as MessagePriority,
               threadId: params.threadId ?? null,
@@ -638,7 +686,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
               dispatchId: relay.dispatch_id,
               destination: 'worker',
               accepted: true
-            }
+            },
+            ...(followUp ? { reopenedDispatchId: dispatchId } : {})
           }
         }
         // Point-to-point — existing single-recipient behavior
@@ -666,6 +715,28 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // failed for never having sent a periodic beat.
         if (msg.type === 'escalation' && dispatch && hasLifecycleAuthority(dispatch, msg)) {
           db.recordDispatchLifecycleSignal(dispatch.id, msg.created_at)
+        }
+        // Why (ORCA-677): a loop that outlived its terminal still presents the pane key, so the
+        // beat must also come from the pane's live process — checked before the ORCA-299 reopen.
+        const deadSender =
+          msg.type === 'heartbeat' && dispatch && hasLifecycleAuthority(dispatch, msg)
+            ? describeDeadHeartbeatSender(
+                dispatch.process_incarnation,
+                attestedCaller?.processIncarnation ??
+                  runtime.getTerminalProcessIncarnation(
+                    // Why: the pane outranks the claimed handle, which a remint leaves stale.
+                    (senderPaneKey
+                      ? runtime.getAgentStatusTerminalHandleForPaneKey(senderPaneKey)
+                      : null) ?? from
+                  )
+              )
+            : null
+        if (dispatch && deadSender) {
+          return rejectHeartbeatQuietly(db, msg, dispatch.id, {
+            action: 'rejected',
+            code: 'sender_not_assignee',
+            reason: `heartbeat not recorded: ${deadSender}`
+          })
         }
         // Why (ORCA-299): the first-signal expiry revokes the capability, and the
         // check below rejects every heartbeat and worker_done while that is set —
@@ -710,6 +781,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
                 'dispatch_capability_invalid',
                 authority.reason
               ) ?? msg
+            if (msg.type === 'heartbeat') {
+              logHeartbeatRejection(msg, capabilityDispatch.id, authority.reason)
+            }
             runtime.notifyMessageArrived(to, rejection.type)
             return {
               message: rejection,
@@ -730,7 +804,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           }
           if (reconciled.action === 'rejected') {
             const rejection = db.getMessageById(msg.id) ?? msg
-            runtime.notifyMessageArrived(to, rejection.type)
+            if (msg.type === 'heartbeat') {
+              logHeartbeatRejection(msg, routing.dispatchId, reconciled.reason)
+            }
+            // Why: a rejection reconcile already archived (inactive dispatch) has nothing to wake a waiter for.
+            if (!rejection.read) {
+              runtime.notifyMessageArrived(to, rejection.type)
+            }
             return { message: rejection, lifecycle: reconciled }
           }
           runtime.notifyMessageArrived(to, msg.type)
@@ -870,6 +950,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             )
           }
         }
+        // Why: a new lead gets one line for its predecessor's settled backlog, not the backlog (ORCA-824).
+        const retired = db.retireSettledRunMail(run.id)
+        const retiredNotice =
+          retired.length > 0 ? { retired: await runtime.summarizeRetiredRunMail(retired) } : {}
         let current = readDelivery(params.wait ? typeFilter : undefined)
         if (current) {
           recordHandedOut(current)
@@ -883,12 +967,14 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: false,
             connectionLost: false,
+            ...retiredNotice,
             ...(params.format || params.inject
               ? { formatted: current.messages.map(formatMessageBanner).join('\n\n') }
               : {})
           }
         }
-        if (!params.wait) {
+        // Why a retired notice ends a wait: a background watch would otherwise hold the line for its whole window.
+        if (!params.wait || retired.length > 0) {
           return {
             runId: run.id,
             deliveryId: null,
@@ -897,7 +983,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             acknowledged: acknowledged?.delivery.id ?? null,
             timedOut: false,
             cancelled: false,
-            connectionLost: false
+            connectionLost: false,
+            ...retiredNotice
           }
         }
 
@@ -905,7 +992,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           typeFilter: typeFilter as string[] | undefined,
           timeoutMs: params.timeoutMs ?? undefined,
           signal,
-          exclusive: true
+          exclusive: true,
+          wakesOutsideTypeFilter: () => db.hasUnreadOutsideMemberRunMail(run.id, terminalHandle)
         })
         try {
           revalidateLegacyCoordinator?.()
@@ -1231,6 +1319,12 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: InboxParams,
     handler: (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
+      if (params.id) {
+        const message = db.getMessageById(params.id)
+        const messages =
+          message && (!params.terminal || message.to_handle === params.terminal) ? [message] : []
+        return { messages, count: messages.length }
+      }
       // Why: stale/unknown handles return empty rather than error — historical rows survive handle deletion (design doc §3.3).
       const messages = params.terminal
         ? db.getAllMessagesForHandle(params.terminal, params.limit)
@@ -1568,16 +1662,28 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       }
 
       const db = runtime.getOrchestrationDb()
-      const sender = runtime.authenticateOrchestrationSender({
-        claimedHandle: params.from,
-        paneKey: params.senderPaneKey,
-        launchToken: params.senderLaunchToken
-      })
+      const sender = authenticateRemoteAwareSender(runtime, params, 'question')
       const from = sender.handle
       // Why: echoed on every return so a clamped caller reports the budget actually waited, not the one it asked for.
       const timeoutMs = clampOrchestrationAskTimeoutMs(params.timeoutMs)
       const paneKey = sender.paneKey ?? runtime.getTerminalPaneKey(from) ?? undefined
-      const remoteAttachment = paneKey ? db.findActiveRemoteAttachmentForPane(paneKey) : undefined
+      const activeRemoteAttachment = paneKey
+        ? db.findActiveRemoteAttachmentForPane(paneKey)
+        : undefined
+      // Why skip an explicit target: the federated path would refuse it after the reopen committed.
+      const reopenedRemoteAttachment =
+        activeRemoteAttachment ||
+        !paneKey ||
+        params.to ||
+        params.run ||
+        db.getActiveDispatchForIdentity(from, paneKey)
+          ? undefined
+          : reopenSettledRemoteAttachmentForAsk(db, {
+              paneKey,
+              capability: orchestrationCapability,
+              processIncarnation: runtime.getTerminalProcessIncarnation(from)
+            })
+      const remoteAttachment = activeRemoteAttachment ?? reopenedRemoteAttachment
       if (remoteAttachment) {
         rejectFederatedExplicitTarget(params)
         return askRemoteRunHome({
@@ -1589,16 +1695,28 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           from,
           paneKey: paneKey as string,
           dispatchId: remoteAttachment.dispatch_id,
-          taskId: remoteAttachment.task_id
+          taskId: remoteAttachment.task_id,
+          reopened: reopenedRemoteAttachment !== undefined
         })
       }
-      const activeDispatch = db.getActiveDispatchForIdentity(from, paneKey)
+      let activeDispatch = db.getActiveDispatchForIdentity(from, paneKey)
+      const reopenedDispatch = activeDispatch
+        ? undefined
+        : renewDispatchForMemberAsk(db, {
+            handle: from,
+            paneKey,
+            capability: orchestrationCapability,
+            processIncarnation: runtime.getTerminalProcessIncarnation(from) ?? undefined
+          })
+      activeDispatch ??= reopenedDispatch
       if (!activeDispatch) {
         throw new OrchestrationError(
           'dispatch_inactive',
           'ask requires an active supervised Dispatch.'
         )
       }
+      // Why: the member must send worker_done again, so the CLI tells it its Dispatch reopened.
+      const reopened = reopenedDispatch ? { reopenedDispatchId: reopenedDispatch.id } : {}
       if (activeDispatch.capability_hash) {
         const authority = db.verifyDispatchCapability({
           dispatchId: activeDispatch.id,
@@ -1663,7 +1781,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         timedOut: false,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       })
       const deadline = Date.now() + timeoutMs
       while (true) {
@@ -1683,7 +1802,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: false,
             connectionLost: false,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         if (signal?.aborted) {
@@ -1694,7 +1814,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: false,
             cancelled: true,
             connectionLost: true,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         const remainingMs = deadline - Date.now()
@@ -1706,7 +1827,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             timedOut: true,
             cancelled: false,
             connectionLost: false,
-            timeoutMs
+            timeoutMs,
+            ...reopened
           }
         }
         await runtime.waitForMessage(`dispatch:${activeDispatch.id}`, {
@@ -1753,21 +1875,23 @@ async function askRemoteRunHome(args: {
   paneKey: string
   dispatchId: string
   taskId: string
+  reopened: boolean
 }): Promise<unknown> {
   const db = args.runtime.getOrchestrationDb()
   const timeoutMs = clampOrchestrationAskTimeoutMs(args.params.timeoutMs)
-  if (
-    !db.verifyRemoteAttachmentAuthority({
+  const reopened = args.reopened ? { reopenedDispatchId: args.dispatchId } : {}
+  const authority = {
+    dispatchId: args.dispatchId,
+    capability: args.orchestrationCapability,
+    paneKey: args.paneKey,
+    processIncarnation: args.runtime.getTerminalProcessIncarnation(args.from)
+  }
+  if (!db.verifyRemoteAttachmentAuthority(authority)) {
+    throw refuseRemoteMemberMail(db, {
       dispatchId: args.dispatchId,
-      capability: args.orchestrationCapability,
-      paneKey: args.paneKey,
-      processIncarnation: args.runtime.getTerminalProcessIncarnation(args.from)
+      type: 'question',
+      refusal: db.diagnoseRemoteAttachmentAuthority(authority) ?? 'capability_mismatch'
     })
-  ) {
-    throw new OrchestrationError(
-      'dispatch_capability_invalid',
-      'The remote Dispatch capability or exact worker process is invalid.'
-    )
   }
   const options =
     args.params.options
@@ -1814,7 +1938,8 @@ async function askRemoteRunHome(args: {
     timedOut: false,
     cancelled: false,
     connectionLost: false,
-    timeoutMs
+    timeoutMs,
+    ...reopened
   })
   const deadline = Date.now() + timeoutMs
   while (true) {
@@ -1834,7 +1959,8 @@ async function askRemoteRunHome(args: {
         timedOut: false,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     if (args.signal?.aborted) {
@@ -1845,7 +1971,8 @@ async function askRemoteRunHome(args: {
         timedOut: false,
         cancelled: true,
         connectionLost: true,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     const remainingMs = deadline - Date.now()
@@ -1857,7 +1984,8 @@ async function askRemoteRunHome(args: {
         timedOut: true,
         cancelled: false,
         connectionLost: false,
-        timeoutMs
+        timeoutMs,
+        ...reopened
       }
     }
     await args.runtime.waitForMessage(`dispatch:${args.dispatchId}`, {

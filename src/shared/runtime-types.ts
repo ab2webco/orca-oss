@@ -785,6 +785,12 @@ export type RuntimeTerminalWaitBlockedReason =
   | 'codex-model-migration-prompt'
   | 'codex-hooks-review-prompt'
   | 'codex-interactive-prompt'
+  /** Claude Code's folder-trust and Bypass Permissions dialogs; Codex-named
+   *  reasons predate them and stay as they are for mixed-version clients (ORCA-855). */
+  | 'claude-folder-trust-prompt'
+  | 'claude-bypass-permissions-prompt'
+  /** Claude Code's first-run theme/login screens: the launch used a config that was never signed in (ORCA-872). */
+  | 'claude-first-run-setup'
   /** The pane's launch command is still unwritten because the shell never
    *  reached a prompt within the shell-ready budget — waiting for an agent that
    *  was never started would burn the whole timeout as `unobserved` (ORCA-210). */

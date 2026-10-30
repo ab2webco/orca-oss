@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Plus, QrCode } from 'lucide-react-native'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text, useCompactTextLayout } from '../theme/dynamic-type-text'
 import type { HostProfile } from '../transport/types'
 import { hostEndpointLabel } from '../transport/host-endpoint-label'
 import { colors, radii, spacing } from '../theme/mobile-theme'
@@ -36,6 +37,7 @@ export function MobileHomeQuickActions(props: Props) {
   const [hostPickerForHostSet, setHostPickerForHostSet] = useState<string | null>(null)
   const pendingHostIdRef = useRef<string | null>(null)
   const canCreateWorkspace = props.connectedHosts.length > 0
+  const compact = useCompactTextLayout()
   const hostSetKey = JSON.stringify(props.connectedHosts.map((host) => host.id))
   const hostPickerVisible = hostPickerForHostSet === hostSetKey
   if (hostPickerForHostSet !== null && !hostPickerVisible) {
@@ -69,10 +71,14 @@ export function MobileHomeQuickActions(props: Props) {
   return (
     <>
       <Text style={styles.sectionHeading}>Quick Actions</Text>
-      <View style={styles.quickActions}>
+      <View style={[styles.quickActions, compact && styles.quickActionsStacked]}>
         <Pressable
           accessibilityRole="button"
-          style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+          style={({ pressed }) => [
+            styles.quickAction,
+            compact && styles.quickActionStacked,
+            pressed && styles.quickActionPressed
+          ]}
           onPress={props.onPairDesktop}
         >
           <View style={styles.quickActionIcon}>
@@ -86,6 +92,7 @@ export function MobileHomeQuickActions(props: Props) {
           disabled={!canCreateWorkspace}
           style={({ pressed }) => [
             styles.quickAction,
+            compact && styles.quickActionStacked,
             !canCreateWorkspace && styles.quickActionDisabled,
             pressed && styles.quickActionPressed
           ]}
@@ -137,6 +144,13 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     backgroundColor: colors.bgPanel
   },
+  // Why: one per row when the capped text cannot fit side by side ("New Wor / kspace" at 320 dp).
+  quickActionsStacked: {
+    flexDirection: 'column'
+  },
+  quickActionStacked: {
+    flex: 0
+  },
   quickActionPressed: {
     backgroundColor: colors.bgRaised
   },
@@ -152,6 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgRaised
   },
   quickActionLabel: {
+    flexShrink: 1,
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600'

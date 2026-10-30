@@ -6,6 +6,7 @@ import {
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
 import type { OrchestratorGameStateInput } from './orchestrator-game-state-builder'
+import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 
 // `notes` are parts of a scene that still draws, left out; `warning` means it fell back to Quest.
 export type SceneFileOutcome =
@@ -41,4 +42,25 @@ export async function readSceneFile(
         notes: parsed.warnings.map((one) => `Scene file ${path}: ${one}; drawn without it`)
       }
     : failed(parsed.error)
+}
+
+/** The worktree's own scene file, else the one its member's lead draws. */
+export async function readSceneFileOrCarried(
+  resolved: ResolvedOrchestratorGameConfig,
+  worktree: NonNullable<OrchestratorGameStateInput['worktree']> | null,
+  readCarried: (() => Promise<CarriedGameScene | null>) | undefined
+): Promise<SceneFileOutcome | null> {
+  const own = await readSceneFile(resolved, worktree)
+  const carried = own?.scene || !readCarried ? null : await readCarried().catch(() => null)
+  const parsed = carried ? parseOrchestratorGameScene(carried.text, carried.id) : null
+  return carried && parsed?.ok
+    ? {
+        scene: {
+          id: carried.id,
+          pluginId: ORCHESTRATOR_GAME_SCENE_FILE_SOURCE,
+          definition: parsed.definition
+        },
+        notes: []
+      }
+    : own
 }

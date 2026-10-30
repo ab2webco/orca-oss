@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   gameFleetReportOf,
   gamePushPlanOf,
-  gameStopTargetsOf,
   gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf,
   ticketInText
 } from './orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
 
@@ -83,13 +83,47 @@ const finished = member({
 describe('memberPhaseOf', () => {
   it('is finished only with a merged PR and a ticket in review or done, or no ticket', () => {
     expect(memberPhaseOf(finished)).toBe('finished')
-    expect(memberPhaseOf(member({ review: review('merged') }))).toBe('finished')
+    expect(memberPhaseOf(member({ state: 'idle', review: review('merged') }))).toBe('finished')
     expect(
       memberPhaseOf(member({ review: review('merged'), workItem: ticket('CIN-1', 'in_progress') }))
     ).toBe('working')
     expect(memberPhaseOf(member({ state: 'waiting', review: review('open') }))).toBe('needs-you')
     expect(memberPhaseOf(member({ state: 'done' }))).toBe('idle')
     expect(memberPhaseOf(member({ state: 'idle' }))).toBe('idle')
+  })
+})
+
+// Why (ORCA-862): sweep listed a member `game state` showed working, so --close would have freed it.
+describe('a member its live state reports busy', () => {
+  const busy = [
+    member({ paneKey: 'm', displayName: 'CIN-3', review: review('merged') }),
+    member({
+      paneKey: 'remote:ctx_8eba552ae8ed',
+      displayName: 'CIN-1295',
+      lastActivityAt: '2026-10-29T19:34:00.000Z',
+      remote: { host: 'imac', stateKnown: true, ticketDone: true }
+    }),
+    member({ paneKey: 'q', displayName: 'CIN-4', state: 'waiting', review: review('merged') })
+  ]
+
+  it('is never finished, so sweep leaves it and the fleet keeps its slot', () => {
+    expect(busy.map(memberPhaseOf)).toEqual(['working', 'working', 'needs-you'])
+    expect(gameSweepOf({ lead: DEFAULT_GAME_LEAD, agents: busy })).toEqual([])
+    const fleet = gameFleetReportOf({ lead: { ...DEFAULT_GAME_LEAD, cap: 3 }, agents: busy })
+    expect(fleet.counts.finished).toBe(0)
+    expect(fleet.running).toBe(3)
+  })
+
+  it('is swept once it stops, with its host, last activity and why', () => {
+    const [swept] = gameSweepOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [{ ...busy[1]!, state: 'idle' }]
+    })
+
+    expect(swept?.reason).toBe('its home Run completed the task; agent idle')
+    expect(swept?.row).toEqual(
+      expect.objectContaining({ host: 'imac', lastActivityAt: '2026-10-29T19:34:00.000Z' })
+    )
   })
 })
 
@@ -237,6 +271,115 @@ describe('gameFleetReportOf', () => {
     ])
   })
 
+  it('names the host a remote member runs on, and asks to check it while the host is silent (ORCA-824)', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({ remote: { host: 'imac', stateKnown: true } }),
+        member({
+          paneKey: 'remote:ctx_2',
+          displayName: 'CIN-2 Combos',
+          state: 'idle',
+          remote: { host: 'imac', stateKnown: false }
+        }),
+        member({ paneKey: 'p3', displayName: 'CIN-3 Local' })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({ ticket: 'CIN-1', host: 'imac', stateKnown: true }),
+      expect.objectContaining({ ticket: 'CIN-3', host: null, stateKnown: true }),
+      expect.objectContaining({
+        ticket: 'CIN-2',
+        host: 'imac',
+        stateKnown: false,
+        next: 'imac does not answer: orca orchestration worker-show --dispatch ctx_2'
+      })
+    ])
+  })
+
+  // Why: a closed terminal on an answering host read as a silent host (ORCA-854).
+  it('asks to stop a member gone from an answering host, and leaves a finished one to its phase', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          paneKey: 'remote:ctx_2',
+          displayName: 'CIN-2 Combos',
+          state: 'idle',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        }),
+        member({
+          paneKey: 'remote:ctx_3',
+          displayName: 'CIN-3 Snacks',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        ticket: 'CIN-2',
+        stateKnown: true,
+        next: 'gone from imac: orca game stop CIN-2'
+      }),
+      expect.objectContaining({ ticket: 'CIN-3', state: 'done', next: 'push' })
+    ])
+  })
+
+  it("flags an earlier lead's remote member whose ticket is done and counts it once as finished (ORCA-793)", () => {
+    const fleet = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          paneKey: 'remote:ctx_829',
+          displayName: 'ORCA-829 versionCode',
+          state: 'done',
+          terminalHandle: 'term_5c58ff4d',
+          remote: {
+            host: 'imac',
+            stateKnown: true,
+            earlierLead: true,
+            ticketDone: true
+          }
+        }),
+        member({
+          paneKey: 'remote:ctx_826',
+          displayName: 'ORCA-826 stall',
+          remote: { host: 'imac', stateKnown: true, earlierLead: true }
+        })
+      ]
+    })
+
+    expect(fleet.rows).toEqual([
+      expect.objectContaining({
+        ticket: 'ORCA-826',
+        phase: 'working',
+        earlierLead: true
+      }),
+      expect.objectContaining({
+        ticket: 'ORCA-829',
+        ticketStatus: 'done',
+        phase: 'finished',
+        earlierLead: true,
+        next: 'left by an earlier lead, ticket done: orca game stop ORCA-829'
+      })
+    ])
+    expect(fleet.running).toBe(1)
+    const [swept] = gameSweepOf({
+      agents: [
+        member({
+          paneKey: 'remote:ctx_829',
+          displayName: 'ORCA-829',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, ticketDone: true }
+        })
+      ]
+    })
+    expect(swept.pending).toEqual([])
+  })
+
   it('names the agent and the managed account each member runs on', () => {
     const rows = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,
@@ -269,6 +412,30 @@ describe('gameFleetReportOf', () => {
     }).rows
 
     expect(rows.map((row) => row.ticket)).toEqual(['CIN-7', 'CIN-8', null])
+  })
+
+  // Why: three imac rows whose terminals were gone held 3 of 10 slots, so a new launch was refused.
+  it('does not count a member gone from its host against the cap (ORCA-864)', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 2 },
+      agents: [
+        member({ paneKey: 'local' }),
+        member({
+          paneKey: 'remote:ctx_854',
+          displayName: 'ORCA-854 relay',
+          state: 'done',
+          remote: { host: 'imac', stateKnown: true, gone: true }
+        }),
+        member({
+          paneKey: 'remote:ctx_silent',
+          displayName: 'ORCA-857 mail',
+          remote: { host: 'imac', stateKnown: false }
+        })
+      ]
+    })
+
+    expect(fleet.rows.map((row) => row.ticket)).toEqual(['CIN-1', 'ORCA-857', 'ORCA-854'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 0 })
   })
 })
 
@@ -332,15 +499,24 @@ describe('gameSweepOf', () => {
         member({
           paneKey: 'n',
           displayName: 'CIN-6',
+          state: 'idle',
           review: review('merged'),
           terminalHandle: undefined
         })
       ]
     })
 
-    expect(swept.map((entry) => [entry.row.ticket, entry.pending])).toEqual([
-      ['CIN-9', ['worktree cin-9 stays', 'ticket CIN-9 is QA, not done']],
-      ['CIN-6', ['no linked ticket to confirm', 'no terminal to close']]
+    expect(swept.map((entry) => [entry.row.ticket, entry.reason, entry.pending])).toEqual([
+      [
+        'CIN-9',
+        'PR #41 merged, ticket QA; agent done',
+        ['worktree cin-9 stays', 'ticket CIN-9 is QA, not done']
+      ],
+      [
+        'CIN-6',
+        'PR #41 merged; agent idle',
+        ['no linked ticket to confirm', 'no terminal to close']
+      ]
     ])
   })
 })
@@ -444,6 +620,16 @@ describe('paused members after a restart', () => {
     })
     expect(fleet.paused.map((one) => one.ticket)).toEqual(['CIN-7'])
     expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 1 })
+  })
+
+  it('frees the slot of a member whose worktree is gone, since nothing can run it (ORCA-832)', () => {
+    const fleet = gameFleetReportOf({
+      lead: { ...DEFAULT_GAME_LEAD, cap: 3 },
+      agents: [],
+      pausedMembers: [paused('CIN-7'), { ...paused('CIN-8'), worktreeGone: true }]
+    })
+    expect(fleet.paused.map((one) => one.ticket)).toEqual(['CIN-7', 'CIN-8'])
+    expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 1, free: 2 })
   })
 
   it('carries why the saved members could not be read', () => {

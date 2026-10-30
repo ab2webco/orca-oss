@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { View, Text, StyleSheet, Pressable, FlatList, Alert } from 'react-native'
+import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { QrCode, Settings, ChevronRight, Terminal, ListTodo } from 'lucide-react-native'
+import { QrCode, ChevronRight, Terminal, ListTodo } from 'lucide-react-native'
 import { ClaudeIcon, OpenAIIcon } from '../src/components/AgentIcons'
 import {
   type AccountsSnapshot,
@@ -21,6 +22,7 @@ import { useOpenMobileHostEdit } from '../src/transport/use-open-mobile-host-edi
 import { removeHostAndCloseClient } from '../src/transport/host-removal-lifecycle'
 import { fetchHomeHostWorktreeInfo } from '../src/worktree/home-host-worktree-fetch'
 import { totalHomeStats, type HomeStatsSummary } from '../src/stats/home-stats-total'
+import { HomeStatsRow } from '../src/components/HomeStatsRow'
 import type { HomeWorktreeSummary, HostWorktreeInfo } from '../src/worktree/home-worktree-info'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { createHostConnectRefetchGate } from '../src/transport/host-connect-refetch-gate'
@@ -56,6 +58,7 @@ import { TaskProviderLogo } from '../src/components/TaskProviderLogo'
 import { ActionSheetModal } from '../src/components/ActionSheetModal'
 import { getHostListActionSheetActions } from '../src/host-list-action-sheet-actions'
 import { ConfirmModal } from '../src/components/ConfirmModal'
+import { HomeSettingsButton } from '../src/components/HomeSettingsButton'
 import {
   setCachedWorktrees,
   getCachedWorktrees,
@@ -104,21 +107,6 @@ const TASK_PROVIDER_LABELS: Record<TaskProvider, string> = {
   gitlab: 'GitLab',
   linear: 'Linear',
   plane: 'Plane'
-}
-
-function formatDuration(ms: number): string {
-  const totalMinutes = Math.floor(ms / 60_000)
-  const totalHours = Math.floor(totalMinutes / 60)
-  const days = Math.floor(totalHours / 24)
-  const hours = totalHours % 24
-  if (days > 0) {
-    return `${days}d ${hours}h`
-  }
-  const minutes = totalMinutes % 60
-  if (totalHours > 0) {
-    return `${totalHours}h ${minutes}m`
-  }
-  return `${totalMinutes}m`
 }
 
 // Why: stable per-instance RpcClient identity so wireUp's dep key changes when forceReconnect swaps the client, re-attaching listeners.
@@ -770,12 +758,7 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.brandName}>Orca Lab</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
-          onPress={() => router.push('/settings')}
-        >
-          <Settings size={18} color={colors.textSecondary} />
-        </Pressable>
+        <HomeSettingsButton onPress={() => router.push('/settings')} />
       </View>
 
       {hostCatalog.length === 0 ? (
@@ -831,24 +814,7 @@ export default function HomeScreen() {
                 <Text style={styles.heroTitle}>Welcome back</Text>
               </View>
 
-              {stats && (
-                <View style={styles.statsRow}>
-                  <View style={styles.statCard}>
-                    <Text style={styles.statValue}>
-                      {stats.totalAgentsSpawned.toLocaleString()}
-                    </Text>
-                    <Text style={styles.statLabel}>Agents spawned</Text>
-                  </View>
-                  <View style={styles.statCard}>
-                    <Text style={styles.statValue}>{formatDuration(stats.totalAgentTimeMs)}</Text>
-                    <Text style={styles.statLabel}>Agent time</Text>
-                  </View>
-                  <View style={styles.statCard}>
-                    <Text style={styles.statValue}>{stats.totalPRsCreated.toLocaleString()}</Text>
-                    <Text style={styles.statLabel}>PRs created</Text>
-                  </View>
-                </View>
-              )}
+              {stats && <HomeStatsRow stats={stats} />}
 
               <Text style={styles.sectionHeading}>Desktops</Text>
             </View>
@@ -1155,16 +1121,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700'
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  iconButtonPressed: {
-    backgroundColor: colors.bgRaised
-  },
 
   /* ─── Hero / greeting ─── */
   hero: {
@@ -1179,32 +1135,6 @@ const styles = StyleSheet.create({
   },
 
   /* ─── Stat cards ─── */
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: spacing.lg
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(26,26,26,0.6)',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: spacing.md
-  },
-  statValue: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2
-  },
 
   /* ─── Section heading ─── */
   sectionHeading: {

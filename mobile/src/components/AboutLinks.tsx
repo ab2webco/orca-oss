@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
-import { View, Text, StyleSheet, Pressable, Linking } from 'react-native'
+import { View, StyleSheet, Pressable, Linking } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { UserRound } from 'lucide-react-native'
 import Svg, { Path } from 'react-native-svg'
 import { ORCA_REPOSITORY_LABEL, ORCA_REPOSITORY_URL } from '../../../src/shared/orca-repository-url'

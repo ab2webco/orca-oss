@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 
 // Pure types and selectors live in account-usage-state.ts (no RN imports) so
@@ -73,7 +74,10 @@ export function UsageBar({
             style={styles.usageSpinner}
           />
         ) : (
-          <Text style={styles.usageValue}>{unavailable || used == null ? '—' : `${used}%`}</Text>
+          // Why: the fixed column keeps tracks aligned, so "100%" shrinks rather than splitting.
+          <Text style={styles.usageValue} numberOfLines={1} adjustsFontSizeToFit>
+            {unavailable || used == null ? '—' : `${used}%`}
+          </Text>
         )}
       </View>
       {resetText ? (

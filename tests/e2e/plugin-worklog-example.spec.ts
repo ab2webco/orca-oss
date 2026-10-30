@@ -1,7 +1,8 @@
 /**
  * Invariant: the `worklog` example — the plugin the authoring guide tells people
  * to copy — installs, stays inert before consent, and once approved mounts its
- * settings-surface panel, which reads its data back over the panel bridge.
+ * settings-surface panel, which starts its stopped worker with panel.runCommand
+ * and reads the data it publishes back over the panel bridge.
  * The write half is a known, measured gap; see the comment where it was removed.
  * Needs E2E: the panel is an opaque-origin sandboxed iframe whose only route to
  * the host is postMessage, so nothing below the real app exercises it.
@@ -144,23 +145,25 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     await expect(consent).toBeHidden()
     await expect(row).toContainText('Enabled')
 
-    // Worker: lazy until invoked, then it publishes the settings mirror the
-    // panel reads — the whole reason the mirror pattern exists.
-    const published = await orcaPage.evaluate(
-      async (pluginKey) =>
-        window.api.plugins.invokeCommand({ pluginKey, commandId: 'worklog.publish-settings' }),
-      installed.pluginKey
-    )
-    expect(published).toMatchObject({ author: 'me', recordNewWorktrees: true, maxEntries: 50 })
-
     const panelRow = orcaPage.getByRole('button', { name: PANEL_TITLE, exact: true })
     await expect(panelRow).toBeVisible({ timeout: 15_000 })
     await panelRow.click()
     await expect(orcaPage.locator(`iframe[title="${PANEL_TITLE}"]`)).toBeVisible({
       timeout: 15_000
     })
-    // The mirror reaching the panel proves storage.get works over the bridge.
-    await expect(panelFrame(orcaPage).locator('#settings')).toContainText('Author')
+    // The worker has never run, so the settings mirror the panel reads is absent.
+    await expect(panelFrame(orcaPage).locator('#settings-empty')).toBeVisible({ timeout: 20_000 })
+
+    // The panel's own button starts the stopped worker through panel.runCommand,
+    // and the mirror it publishes reaching the panel proves storage.get works too.
+    // A DOM click, not a pointer gesture: see the known gap below.
+    const publish = panelFrame(orcaPage).locator('#publish')
+    await expect(publish).toBeEnabled()
+    await publish.evaluate((button) => (button as HTMLButtonElement).click())
+    await expect(panelFrame(orcaPage).locator('#settings')).toContainText('Author', {
+      timeout: 20_000
+    })
+    await expect(panelFrame(orcaPage).locator('#settings')).toContainText('me')
     await expect(panelFrame(orcaPage).locator('#settings-empty')).toBeHidden()
 
     // ── Known gap: the write half of the bridge is not covered here ──────────
@@ -183,9 +186,10 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     // on this project, so it is the headless event route into a plugin panel
     // iframe, not the example. Tracked separately.
     //
-    // What stays below still covers the real integration: install, the command
-    // refused before consent, the consent dialog, the worker, the panel mounting
-    // and `storage.get` answering over the bridge.
+    // What stays still covers the real integration: install, the command
+    // refused before consent, the consent dialog, the panel mounting, the panel
+    // starting the worker with `panel.runCommand`, and `storage.get` answering
+    // over the bridge.
     await waitForPanelLoaded(orcaPage)
 
     for (const width of SCREENSHOT_WIDTHS) {
@@ -242,10 +246,12 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
     // 390px window the panel is handed ~80px, so they say nothing about the
     // panel's own layout at 390. Widen the window until the FRAME is the target
     // width, then photograph the frame itself.
+    // Why: innerWidth, not clientWidth — on Linux a clipped frame shows a 15px classic
+    // scrollbar that clientWidth subtracts, so the loop oscillated across it (405 vs 375).
     const frameWidthOf = async (): Promise<number> =>
       panelFrame(orcaPage)
         .locator('body')
-        .evaluate((body) => body.ownerDocument.documentElement.clientWidth)
+        .evaluate((body) => body.ownerDocument.defaultView?.innerWidth ?? 0)
     // Why: innerWidth reaches the target before the sidebar re-clamps from it, so an
     // early read is stale and the correction overshoots; wait for the width to stop moving.
     const settledFrameWidthOf = async (): Promise<number> => {

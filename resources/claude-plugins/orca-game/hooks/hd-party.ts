@@ -1,3 +1,4 @@
+import { characterCostumeOf } from './character-look'
 import { costumeSpriteOf, type HdSprite } from './hd-sprite'
 import { hash, mix } from './pixel-canvas'
 import type { MemberState } from './party-sprites'
@@ -11,7 +12,7 @@ export const MAX_SHOWN = 4
 export type March = { kind: 'in' | 'out'; at: number }
 
 /** A teammate as the hd scene draws it. */
-export type HdMember = { key: string; phase: ScenePhase; state: MemberState }
+export type HdMember = { key: string; name?: string; phase: ScenePhase; state: MemberState }
 
 export const STATE_RING: Readonly<Record<MemberState, number>> = {
   working: 0x4fc3f7,
@@ -109,7 +110,7 @@ export const placedPartyOf = (args: {
       const left = home + marchShiftOf(args.marches.get(member.key), tick, columns - home)
       const isSitting = args.isResting || member.state === 'idle'
       const sprite = costumeSpriteOf(
-        args.scene.costumes[member.phase],
+        characterCostumeOf(args.scene, member.name, member.phase),
         Math.floor((tick + i * 3) / 4),
         isSitting
       )

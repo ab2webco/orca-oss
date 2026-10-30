@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks'
 import { EventEmitter } from 'node:events'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { lstat, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, win32 } from 'node:path'
@@ -131,6 +131,7 @@ import {
   setTerminalViewAttributes
 } from './terminal-view-attribute-store'
 import { clearConfiguredWorktreeSharedDirectoriesCacheForTests } from '../git/worktree-shared-directories'
+import { worktreeSlugOf } from '../../shared/worktree/slug'
 
 const ORIGINAL_PLATFORM = process.platform
 const ORIGINAL_PLATFORM_DESCRIPTOR = Object.getOwnPropertyDescriptor(process, 'platform')
@@ -1013,6 +1014,17 @@ const TEST_WINDOW_ID = 1
 const TEST_REPO_ID = 'repo-1'
 const TEST_REPO_PATH = '/tmp/repo'
 const TEST_WORKTREE_PATH = '/tmp/worktree-a'
+// Why: real Claude bytes; it lays words out with cursor moves, not spaces.
+const CLAUDE_STARTUP_DIALOGS = JSON.parse(
+  readFileSync(
+    new URL('./__fixtures__/claude-startup-dialogs-2.1.312.json', import.meta.url),
+    'utf8'
+  )
+) as { folderTrust: string; bypassPermissions: string }
+// Why: real Claude bytes; a resize repaints from `CSI H` and walks down with `CSI B`.
+const CLAUDE_FIRST_RUN = JSON.parse(
+  readFileSync(new URL('./__fixtures__/claude-first-run-2.1.314.json', import.meta.url), 'utf8')
+) as { themePicker: string; themePickerAfterResize: string }
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
 
 /**
@@ -2599,6 +2611,30 @@ describe('OrcaRuntimeService', () => {
       authoritativeWindowId: null,
       rendererGraphEpoch: 2
     })
+  })
+
+  it('names a reload failure only when a reload was in flight', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const runtime = createRuntime()
+    runtime.attachWindow(TEST_WINDOW_ID)
+    runtime.markGraphReady(TEST_WINDOW_ID)
+
+    runtime.markGraphReloadFailed(TEST_WINDOW_ID, 'renderer-process-gone')
+
+    expect(runtime.getStatus().graphStatus).toBe('unavailable')
+    expect(errors).toHaveBeenCalledWith(
+      '[runtime] renderer gone while graph ready (renderer-process-gone); failing closed.'
+    )
+
+    runtime.attachWindow(TEST_WINDOW_ID)
+    runtime.markGraphReady(TEST_WINDOW_ID)
+    runtime.markRendererReloading(TEST_WINDOW_ID)
+    runtime.markGraphReloadFailed(TEST_WINDOW_ID, 'renderer-process-gone')
+
+    expect(errors).toHaveBeenLastCalledWith(
+      '[runtime] renderer graph reload failed (renderer-process-gone); failing closed.'
+    )
+    errors.mockRestore()
   })
 
   it('stays unavailable during initial loads before a graph is published', () => {
@@ -12931,6 +12967,7 @@ describe('OrcaRuntimeService', () => {
     expectStablePaneKeyEnv(spawnedEnv)
     const spawnedLeafId = spawnedEnv.ORCA_PANE_KEY.slice(`${spawnedEnv.ORCA_TAB_ID}:`.length)
     expect(spawnedEnv.ORCA_WORKTREE_ID).toBe(TEST_WORKTREE_ID)
+    expect(spawnedEnv.ORCA_WORKTREE_SLUG).toBe(worktreeSlugOf(TEST_WORKTREE_ID))
     expect(spawnedEnv.ORCA_AGENT_LAUNCH_TOKEN).toMatch(UUID_RE)
     expect(revealTerminalSession).toHaveBeenCalledWith(TEST_WORKTREE_ID, {
       ptyId: 'pty-bg',
@@ -13904,6 +13941,52 @@ describe('OrcaRuntimeService', () => {
     }
   )
 
+  it('launches and resumes a Claude game member with prompt suggestions off, even without the mod', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    for (const [agent, gameMember] of [
+      ['claude', true],
+      ['codex', true],
+      ['claude', false]
+    ] as const) {
+      await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+        startupAgent: agent,
+        orchestrationWorker: true,
+        ...(gameMember ? { orchestrationGameMember: true } : {}),
+        title: 'member'
+      })
+    }
+    await runtime.ensureAgentSession(
+      {
+        kind: 'explicit',
+        worktree: `id:${TEST_WORKTREE_ID}`,
+        agent: 'claude',
+        providerSession: { key: 'session_id', id: 'member-session' }
+      },
+      {},
+      { orchestrationGameMember: true }
+    )
+
+    const [member, codex, worker, resumed] = spawn.mock.calls.map(
+      (call) =>
+        call[0] as {
+          env?: Record<string, string>
+          launchConfig?: { agentEnv?: Record<string, string> }
+        }
+    )
+    expect(member?.env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
+    expect(resumed?.env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
+    expect(codex?.env ?? {}).not.toHaveProperty('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION')
+    expect(worker?.env ?? {}).not.toHaveProperty('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION')
+  })
+
   it('resolves a startupAgent to the CLI binary on Windows, where `cursor` is the IDE', async () => {
     setPlatform('win32')
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
@@ -14646,6 +14729,7 @@ describe('OrcaRuntimeService', () => {
     expect(spawnedEnv.ORCA_PROJECT_GROUP_ID).toBe(TEST_FOLDER_PROJECT_GROUP_ID)
     expect(spawnedEnv.ORCA_WORKSPACE_ROOT).toBe(folderPath)
     expect(spawnedEnv.ORCA_WORKTREE_ID).toBe(TEST_FOLDER_WORKSPACE_KEY)
+    expect(spawnedEnv.ORCA_WORKTREE_SLUG).toBe(worktreeSlugOf(TEST_FOLDER_WORKSPACE_KEY))
   })
 
   it.each([
@@ -17003,6 +17087,147 @@ describe('OrcaRuntimeService', () => {
       status: 'running',
       blockedReason: 'codex-trust-workspace'
     })
+  })
+
+  it.each([
+    ['folderTrust', 'claude-folder-trust-prompt'],
+    ['bypassPermissions', 'claude-bypass-permissions-prompt']
+  ] as const)(
+    'returns a blocked wait result for the Claude %s dialog a fresh config shows (ORCA-855)',
+    async (dialog, blockedReason) => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'claude'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      runtime.onPtyData('pty-bg', CLAUDE_STARTUP_DIALOGS[dialog], Date.now())
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+      ).resolves.toMatchObject({ handle, satisfied: false, blockedReason })
+    }
+  )
+
+  it.each([
+    [
+      'the trust dialog with its option rows intact',
+      ' Accessing workspace:\n\n /workspace/member\n\n Quick safety check: Is this a project you created or one you trust?\n\n \u276f No, exit\n   Yes, I trust this folder\n\n Enter to confirm \u00b7 Esc to cancel\n',
+      'claude-folder-trust-prompt'
+    ],
+    [
+      'the bypass dialog after an accepted trust dialog',
+      `${CLAUDE_STARTUP_DIALOGS.folderTrust}\r\n${CLAUDE_STARTUP_DIALOGS.bypassPermissions}`,
+      'claude-bypass-permissions-prompt'
+    ]
+  ] as const)('names %s by its Claude reason (ORCA-855)', async (_label, output, blockedReason) => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData('pty-bg', output, Date.now())
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: false, blockedReason })
+  })
+
+  it.each([
+    ['theme picker', [CLAUDE_FIRST_RUN.themePicker]],
+    [
+      'theme picker repainted by a resize',
+      [CLAUDE_FIRST_RUN.themePicker, CLAUDE_FIRST_RUN.themePickerAfterResize]
+    ]
+  ] as const)(
+    'names the %s of a never-signed-in Claude config, despite its welcome banner (ORCA-872)',
+    async (_label, chunks) => {
+      const runtime = new OrcaRuntimeService(store)
+      runtime.setPtyController({
+        spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+        write: () => true,
+        kill: () => true,
+        getForegroundProcess: async () => 'claude'
+      })
+      const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+      for (const chunk of chunks) {
+        runtime.onPtyData('pty-bg', chunk, Date.now())
+      }
+
+      await expect(
+        runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+      ).resolves.toMatchObject({ satisfied: false, blockedReason: 'claude-first-run-setup' })
+    }
+  )
+
+  it('does not read a first-run marker after a signed-in session banner as setup (ORCA-872)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      `${CLAUDE_FIRST_RUN.themePicker}\u001b[2J\u001b[H Claude Code v2.1.314\r\n  Opus 5.5\r\n` +
+        ' grep: Choose the text style that looks best\r\n\u276f \r\n\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
+  })
+
+  it('resolves tui-idle for a Claude lane past its answered startup dialogs (ORCA-855)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      `${CLAUDE_STARTUP_DIALOGS.folderTrust}\r\n${CLAUDE_STARTUP_DIALOGS.bypassPermissions}\r\n` +
+        '\u001b[2J\u001b[H Claude Code v2.1.312\r\n  Opus 5.5\r\n\u276f \r\n\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
+  })
+
+  it('does not read a started Claude session quoting the dialog text as blocked (ORCA-855)', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'claude'
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData(
+      'pty-bg',
+      ' Claude Code v2.1.312\r\n\u276f read the matcher\r\n' +
+        "  const CLAUDE_FOLDER_TRUST_HEADING = 'accessing workspace:' // trust\r\n" +
+        "  const CLAUDE_BYPASS_PERMISSIONS_HEADING = 'running in bypass permissions mode'\r\n" +
+        '\u001b]0;\u2733 Claude Code\u0007',
+      Date.now()
+    )
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ satisfied: true })
   })
 
   it('resolves tui-idle for an idle Cursor lane past its dismissed trust dialog (#8210)', async () => {
@@ -46156,6 +46381,7 @@ describe('OrcaRuntimeService', () => {
       expect(options.command ?? '').not.toContain('--plugin-dir')
       expect(options.env ?? {}).not.toHaveProperty('ORCA_GAME_ROLE')
     }
+    expect(spawn.mock.calls.at(-1)?.[0].env?.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION).toBe('false')
   })
 
   it('sends follow-up prompts for CLI-created stdin-after-start startup agents', async () => {
@@ -48936,6 +49162,32 @@ describe('OrcaRuntimeService', () => {
     expect(result.warning).toBe(
       `orca.yaml archive hook skipped for ${TEST_WORKTREE_PATH}; pass --run-hooks to run it.`
     )
+  })
+
+  it("forgets a paired client's record of the same worktree but not an SSH host's", async () => {
+    const pairedWorktreeId = `repo-paired::${TEST_WORKTREE_PATH}`
+    const sshWorktreeId = `repo-ssh::${TEST_WORKTREE_PATH}`
+    const { runtimeStore, removeWorktreeMeta } = createStaleRuntimeWorktreeStore(TEST_WORKTREE_ID)
+    runtimeStore.setWorktreeMeta(pairedWorktreeId, { hostId: 'runtime:paired-env' })
+    runtimeStore.setWorktreeMeta(sshWorktreeId, {})
+    const repos = [
+      ...store.getRepos(),
+      { ...store.getRepos()[0], id: 'repo-paired', executionHostId: 'runtime:paired-env' },
+      { ...store.getRepos()[0], id: 'repo-ssh', connectionId: 'ssh-1' }
+    ]
+    const runtime = createWorktreeRemovalRuntime({
+      ...runtimeStore,
+      getRepos: () => repos,
+      getRepo: (id: string) => repos.find((repo) => repo.id === id)
+    })
+    vi.mocked(removeWorktree).mockResolvedValue({})
+
+    await runtime.removeManagedWorktree(TEST_WORKTREE_ID)
+
+    expect(removeWorktreeMeta).toHaveBeenCalledWith(pairedWorktreeId, 'runtime:paired-env')
+    expect(deleteWorktreeHistoryDirMock).toHaveBeenCalledWith(pairedWorktreeId)
+    expect(removeWorktreeMeta).not.toHaveBeenCalledWith(sshWorktreeId)
+    expect(deleteWorktreeHistoryDirMock).not.toHaveBeenCalledWith(sshWorktreeId)
   })
 
   it('passes project shared links through the runtime removal preflight and cleanup', async () => {

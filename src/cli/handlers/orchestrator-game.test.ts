@@ -43,6 +43,56 @@ describe('orca game state', () => {
     expect(output.join('')).toContain('"mode": "zen"')
   })
 
+  it("prints each member's ticket, host, account, branch, PR and CI in the JSON (ORCA-863)", async () => {
+    const remoteMember = {
+      paneKey: 'remote:ctx_1',
+      displayName: 'RECOVERY BRIEF. Orca restarted while you were working.',
+      agentType: 'claude',
+      state: 'working',
+      toolName: null,
+      isLeader: false,
+      isMember: true,
+      remote: { host: 'imac', stateKnown: true },
+      worktree: { id: 'wt-b', branch: 'fab/cin-1231-retry', displayName: 'RECOVERY BRIEF.' },
+      review: {
+        provider: 'github',
+        number: 42,
+        title: 't',
+        url: 'u',
+        state: 'open',
+        ci: 'failure'
+      },
+      account: { provider: 'claude', id: 'remote:env:two@cineco.co', email: 'two@cineco.co' }
+    }
+    const client = {
+      call: async () => ({
+        ok: true,
+        result: { config: { mode: 'on' }, worktree: null, review: null, agents: [remoteMember] }
+      })
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game state']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: true
+    })
+
+    const printed = JSON.parse(output.join('')) as { result: { agents: unknown[] } }
+    expect(printed.result.agents).toEqual([
+      {
+        ...remoteMember,
+        ticket: 'CIN-1231',
+        host: 'imac',
+        accountEmail: 'two@cineco.co',
+        worktreeId: 'wt-b',
+        branch: 'fab/cin-1231-retry',
+        pr: 42,
+        ci: 'failure'
+      }
+    ])
+  })
+
   it("hands on the member pane's Jev report from the env, dropping one that is not JSON", async () => {
     const calls: unknown[] = []
     const client = {
@@ -270,6 +320,52 @@ describe('orca game state', () => {
       /^Orca could not reopen cineco's previous lead conversation \(agent_session_legacy_required\), so this session is a new lead\./
     )
     expect(text).toContain('You are the lead of cineco')
+  })
+
+  it('asks the host for a fresh lead with --fresh and prints the rules (ORCA-822)', async () => {
+    const calls: [string, unknown][] = []
+    const host = leadHost({ registered: true })
+    const client = {
+      call: async (method: string, params: unknown) => {
+        calls.push([method, params])
+        return host.call(method, params)
+      }
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map([['fresh', true]]),
+      client,
+      cwd: '/tmp',
+      json: false
+    })
+
+    expect(calls[1]?.[1]).toMatchObject({ claim: true, fresh: true })
+    expect(output.join('\n')).toMatch(/^Orca retired cineco's previous lead conversation/)
+    expect(output.join('\n')).toContain('You are the lead of cineco')
+  })
+
+  it('says to close the live lead first when --fresh finds one (ORCA-822)', async () => {
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map([['fresh', true]]),
+      client: leadHost({ registered: false, live: { handle: 'term_a' } }),
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toMatch(/^Not the lead: cineco's lead is live in another pane \(term_a\)/)
+    expect(text).toContain('close that lead, then run `orca game lead --fresh` again')
+  })
+
+  it('says an older host reopened the old lead instead of rotating on --fresh (ORCA-822)', async () => {
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map([['fresh', true]]),
+      client: leadHost({ registered: false, resumed: { handle: 'term_r' } }),
+      cwd: '/tmp',
+      json: false
+    })
+
+    expect(output.join('\n')).toContain('this Orca host does not support --fresh')
   })
 
   it('tells a member it is not the lead instead of handing it the lead rules', async () => {

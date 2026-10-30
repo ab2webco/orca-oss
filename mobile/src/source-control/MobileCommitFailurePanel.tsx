@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 import type { MobileCommitFailureRecovery } from './mobile-commit-failure-recovery'

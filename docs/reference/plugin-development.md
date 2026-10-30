@@ -10,13 +10,13 @@ A plugin is a folder with an `orca-plugin.json` at its root
 ([`plugin-manifest.ts:190`](../../src/shared/plugins/plugin-manifest.ts)). It can
 contain two kinds of code, and they are very different places to be:
 
-|                | **Panel**                                                                                                                                                      | **Worker**                                                                                                                                                             |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime        | Sandboxed iframe, opaque origin, `sandbox="allow-scripts"` only ([`PluginPanel.tsx:273-276`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)) | `child_process.fork` of the Electron binary as plain Node ([`plugin-host-process.ts:78-93`](../../src/main/plugins/plugin-host-process.ts))                            |
-| Host API reach | 5 of the 13 methods, plus the bridge-level `panel.close` ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts))                         | all 13                                                                                                                                                                 |
-| Network        | CSP `default-src 'none'; connect-src 'none'` ([`plugin-panel-shell.ts:25-27`](../../src/shared/plugins/plugin-panel-shell.ts))                                 | only hosts declared under `net:fetch` ([`plugin-host-preload.ts:66-78`](../../src/main/plugins/plugin-host-preload.ts))                                                |
-| Filesystem     | none                                                                                                                                                           | read-only, own folder ([`plugin-worker-sandbox-args.ts:11-19`](../../src/main/plugins/plugin-worker-sandbox-args.ts))                                                  |
-| Lifetime       | while its surface is mounted                                                                                                                                   | lazy: forked on the first command or subscribed event, reaped after 5 min idle ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
+|                | **Panel**                                                                                                                                                      | **Worker**                                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime        | Sandboxed iframe, opaque origin, `sandbox="allow-scripts"` only ([`PluginPanel.tsx:273-276`](../../src/renderer/src/components/right-sidebar/PluginPanel.tsx)) | `child_process.fork` of the Electron binary as plain Node ([`plugin-host-process.ts:78-93`](../../src/main/plugins/plugin-host-process.ts))                                                            |
+| Host API reach | 5 of the 13 methods, plus the bridge-level `panel.close` and `panel.runCommand` ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts))  | all 13                                                                                                                                                                                                 |
+| Network        | CSP `default-src 'none'; connect-src 'none'` ([`plugin-panel-shell.ts:25-27`](../../src/shared/plugins/plugin-panel-shell.ts))                                 | only hosts declared under `net:fetch` ([`plugin-host-preload.ts:66-78`](../../src/main/plugins/plugin-host-preload.ts))                                                                                |
+| Filesystem     | none                                                                                                                                                           | read-only, own folder ([`plugin-worker-sandbox-args.ts:11-19`](../../src/main/plugins/plugin-worker-sandbox-args.ts))                                                                                  |
+| Lifetime       | while its surface is mounted                                                                                                                                   | lazy: forked on the first command (palette or `panel.runCommand`) or subscribed event, reaped after 5 min idle ([`plugin-host-protocol.ts:110-112`](../../src/shared/plugins/plugin-host-protocol.ts)) |
 
 Two worked examples ship in this repo:
 [`examples/plugins/hello-orca`](../../examples/plugins/hello-orca) (minimal) and
@@ -287,11 +287,11 @@ Reply: `{ type: 'orca-panel-action-result', requestId, ok, value?, errorCode?, e
 ([`plugin-panel-bridge.ts:15-19, 68-108`](../../src/shared/plugins/plugin-panel-bridge.ts)).
 `requestId` is yours, 1–128 chars.
 
-Six actions are panel-callable: five host API methods, derived from the host
+Seven actions are panel-callable: five host API methods, derived from the host
 API table so they can never drift from the gate
 ([`plugin-host-api.ts:273-275`](../../src/shared/plugins/plugin-host-api.ts)),
-plus one bridge-level action
-([`plugin-panel-bridge.ts:58-66`](../../src/shared/plugins/plugin-panel-bridge.ts)):
+plus two bridge-level actions
+([`plugin-panel-bridge.ts:58-76`](../../src/shared/plugins/plugin-panel-bridge.ts)):
 
 | Action                  | Capability           | Notes                                                                                                       |
 | ----------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -301,6 +301,7 @@ plus one bridge-level action
 | `storage.get`           | `storage`            | plugin-private namespace                                                                                    |
 | `storage.set`           | `storage`            | plugin-private namespace                                                                                    |
 | `panel.close`           | none                 | asks the host to close the page this panel is on; params must be absent or `{}`; answers `{ closed: true }` |
+| `panel.runCommand`      | none                 | runs one of your plugin's worker commands; params `{ commandId }`; answers `{ ran: true }` once it finished |
 
 `panel.close` is not a host API method, so workers cannot call it (they have no
 page) and it needs no capability — closing its own page grants the panel
@@ -308,7 +309,7 @@ nothing the user cannot do with one click, and a new capability kind would fail
 manifest validation on every older Orca. It still passes every bridge check the
 other five do: the sending-window check and message budget in the renderer, then
 the session binding, admission budget and approval checks in main
-([`plugin-panel-controller.ts:74-103`](../../src/main/plugins/plugin-panel-controller.ts)).
+([`plugin-panel-controller.ts:79-121`](../../src/main/plugins/plugin-panel-controller.ts)).
 Only `nav` pages close; on `worktree` and `settings` surfaces, where Orca's own
 chrome already closes the sidebar or leaves Settings, it answers
 `ok: false, errorCode: 'unavailable'`
@@ -321,10 +322,28 @@ is in your panel Escape is yours: if your panel should close on Escape, listen
 for it and call `panel.close` — after your own dialogs and inputs had their
 turn.
 
+`panel.runCommand` is how a button in your panel gets work done in your worker.
+It runs the command exactly as the palette would, so a stopped worker starts
+first, and it answers when the handler returns — or with
+`ok: false, errorCode: 'action_failed'` and the handler's error message. The
+command must be one of yours and handled by your worker: another plugin's
+command, a host command, or a built-in action alias in your own manifest
+answers `invalid_params` and runs nothing
+([`plugin-panel-controller.ts:124-155`](../../src/main/plugins/plugin-panel-controller.ts)).
+It needs no capability: the user already approved your plugin with that command
+in it, and the panel could only ask for what the palette already offers. Only
+the desktop app's own panels may use it; a panel hosted over a remote
+connection gets `unavailable`, because running commands stays a desktop
+decision there. An older Orca answers `invalid_request` (the action is not
+panel-callable), so feature-detect by the answer, not by version. The handler
+has the usual 30-second command budget; for longer work, start it and return,
+then report progress through storage.
+
 Notably **not** panel-callable: `storage.delete`, `storage.keys`, all of
 `secrets.*`, all of `settings.*`, `events.subscribe`. A panel that needs a
 declared setting has to have the worker mirror it into a storage key — that is
-what `examples/plugins/worklog` does.
+what `examples/plugins/worklog` does, with a **Publish now** button that runs
+the mirroring command through `panel.runCommand`.
 
 `errorCode` is one of `invalid_request`, `unknown_method`, `capability_denied`,
 `consent_required`, `panel_forbidden`, `invalid_params`, `rate_limited`,
@@ -864,6 +883,9 @@ Every phase — `working`, `docs`, `build`, `verify`, `pr`, `handoff` — must b
   ([`scene-theme.ts`](../../resources/claude-plugins/orca-game/hooks/scenes/scene-theme.ts)). Bad
   `themes` are left out with a warning and the scene still draws; an Orca or mod older than
   `themes` ignores it and draws the plain looks.
+- Optional `roster` lists the names members take; an entry can give its name a look of its own (a
+  `variant` palette and accessory, or `costumes`). See
+  [Characters](./orchestrator-game.md#characters-a-look-per-roster-name).
 - Unknown keys are ignored, so a scene written for a newer Orca still loads.
 
 Orca reads the files of enabled, consented plugins on every `orca game state` call and sends the

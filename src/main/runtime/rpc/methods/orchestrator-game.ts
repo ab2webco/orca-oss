@@ -9,6 +9,7 @@ import {
   parseGameHistoryRecord,
   type GameHistoryRecord
 } from '../../../../shared/orchestrator-game-history'
+import { withGameAutoRelease } from './orchestrator-game-auto-release'
 
 const GameStateParams = z
   .object({
@@ -211,11 +212,15 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
     name: 'game.state',
     params: GameStateParams,
     handler: async (params, { runtime }) =>
-      runtime.getOrchestratorGameState({
-        worktreeId: params?.worktreeId,
-        terminalHandle: params?.terminalHandle,
-        paneKey: params?.paneKey,
-        advisor: params?.advisor
-      })
+      withGameAutoRelease(
+        runtime,
+        await runtime.getOrchestratorGameState({
+          worktreeId: params?.worktreeId,
+          terminalHandle: params?.terminalHandle,
+          paneKey: params?.paneKey,
+          advisor: params?.advisor
+        }),
+        { worktreeId: params?.worktreeId, terminalHandle: params?.terminalHandle }
+      )
   })
 ]

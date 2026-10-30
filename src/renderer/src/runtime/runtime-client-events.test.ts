@@ -164,6 +164,36 @@ describe('subscribeRuntimeClientEvents', () => {
     ])
   })
 
+  it('forwards a changed owner question so a paired Inbox refreshes', async () => {
+    let capturedOnResponse: ((response: unknown) => void) | undefined
+    const subscribe = vi.fn(async (_args, nextCallbacks) => {
+      capturedOnResponse = (nextCallbacks as { onResponse: (response: unknown) => void }).onResponse
+      return { unsubscribe: vi.fn(), sendBinary: vi.fn() }
+    })
+    const onEvent = vi.fn()
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { subscribe } } })
+
+    await subscribeRuntimeClientEvents('env-1', onEvent)
+    capturedOnResponse?.({ ok: true, result: { type: 'gameOwnerQuestionsChanged' } })
+
+    expect(onEvent).toHaveBeenCalledWith({ type: 'gameOwnerQuestionsChanged' })
+  })
+
+  it('forwards new orchestration mail so a paired Inbox refreshes its threads (ORCA-878)', async () => {
+    let capturedOnResponse: ((response: unknown) => void) | undefined
+    const subscribe = vi.fn(async (_args, nextCallbacks) => {
+      capturedOnResponse = (nextCallbacks as { onResponse: (response: unknown) => void }).onResponse
+      return { unsubscribe: vi.fn(), sendBinary: vi.fn() }
+    })
+    const onEvent = vi.fn()
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { subscribe } } })
+
+    await subscribeRuntimeClientEvents('env-1', onEvent)
+    capturedOnResponse?.({ ok: true, result: { type: 'gameInboxChanged' } })
+
+    expect(onEvent).toHaveBeenCalledWith({ type: 'gameInboxChanged' })
+  })
+
   it('preserves full SSH authority in retained snapshots and live client events', async () => {
     let capturedOnResponse: ((response: unknown) => void) | undefined
     const subscribe = vi.fn(async (_args, nextCallbacks) => {

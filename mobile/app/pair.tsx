@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
 import { extractPairingCodeFromUrl } from '../src/transport/pairing'

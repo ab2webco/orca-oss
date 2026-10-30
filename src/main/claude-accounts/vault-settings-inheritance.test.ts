@@ -193,3 +193,21 @@ describe('describeVaultSettingsInheritance', () => {
     expect(stateOf('outputStyle')).toBe('stale')
   })
 })
+
+describe('bypass permissions acceptance (ORCA-855)', () => {
+  it('carries the home acceptance into a fresh vault so its first launch skips the dialog', () => {
+    writeHomeSettings({ skipDangerousModePermissionPrompt: true })
+    expect(JSON.parse(buildInheritedVaultSettings(vault, home, null) ?? '{}')).toEqual({
+      skipDangerousModePermissionPrompt: true
+    })
+  })
+
+  it("keeps the vault's own answer and accepts nothing the user never accepted", () => {
+    writeHomeSettings({ skipDangerousModePermissionPrompt: true })
+    expect(
+      buildInheritedVaultSettings(vault, home, '{"skipDangerousModePermissionPrompt": false}')
+    ).toBeNull()
+    writeHomeSettings({})
+    expect(buildInheritedVaultSettings(vault, home, null)).toBeNull()
+  })
+})

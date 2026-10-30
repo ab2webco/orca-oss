@@ -128,11 +128,14 @@ function reconcileHeartbeatMessage(
       db.recordHeartbeat(dispatchId, msg.created_at)
       return { action: 'heartbeat_recorded', dispatchId, reopened: true }
     }
-    // Why: an in-flight heartbeat can arrive after completion; retain it for
-    // audit history without surfacing obsolete liveness to the coordinator.
+    // Why (ORCA-677): the sender learns the beat was not recorded — a leftover loop
+    // must not read as alive — but the row stays read so the coordinator is not woken.
+    const code = dispatch ? 'inactive_dispatch' : 'unknown_dispatch'
+    const reason = `heartbeat not recorded: ${revived.explanation}`
+    db.convertLifecycleMessageToRejection(msg.id, code, reason)
     db.markAsReadAndDelivered([msg.id])
-    onLog(`Heartbeat for inactive dispatch ${dispatchId} suppressed: ${revived.explanation}`)
-    return { action: 'suppressed' }
+    onLog(`Heartbeat for dispatch ${dispatchId} rejected: ${revived.explanation}`)
+    return { action: 'rejected', code, reason }
   }
 
   if (!hasLifecycleAuthority(dispatch, msg)) {

@@ -17,14 +17,15 @@ import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
 import { reviewSectionOf } from './fleet-review-section'
-import { focusTerminal, openGameLink, viewOf } from './fleet-sync'
-import { TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
+import { viewMember } from './member-view-press'
+import { openGameLink, viewOf } from './fleet-sync'
+import { cardLayoutOf, TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
 import { cardStateOf, leadStateOf } from './lead-state'
 import { runAction } from './game-actions'
 import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
-import { countsOf, memberOf, needsOf } from './party'
+import { countsOf, drawnPartyOf, memberOf, needsOf, teamOrderOf } from './party'
 import { animate } from './quest'
 import { currentScene, gameConfig, isSceneShown, ready, shownLead } from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
@@ -40,8 +41,6 @@ import { isTapLayout } from './tap-layout'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
-// A card's text column: the pane less the tile, the round border and the padding on each side.
-const CARD_CHROME = TILE_COLUMNS + 4
 const FLEET_CHIP_COLORS: Readonly<Record<string, string>> = {
   'fleet-working': 'cyan',
   'fleet-idle': 'gray',
@@ -72,6 +71,8 @@ export const registerFleetPane = (on: On): void => {
     const close = () => void $.ui.close({ id: PANE_ID }).catch(() => undefined)
     const columns = Math.max(1, Math.min(512, e.props.bodyColumns))
     const isTap = isTapLayout(columns)
+    const cardLayout = cardLayoutOf(columns)
+    const cardRoom = cardLayout.room
     const tapOf = (one: Omit<TapButton, 'color' | 'backgroundColor'>): TapButton => ({
       ...one,
       color: palette.parchment,
@@ -83,12 +84,7 @@ export const registerFleetPane = (on: On): void => {
       </Button>
     )
     // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
-    const viewPressOf = (agent: GameAgent, handle: string) => () =>
-      void focusTerminal($, handle).then((isFocused) => {
-        if (!isFocused) {
-          $.ui.toast(text.couldNotOpen(agent.displayName))
-        }
-      })
+    const viewPressOf = (agent: GameAgent, handle: string) => () => viewMember($, agent, handle)
     const viewHotkeyOf = (index: number) => (index < 9 ? String(index + 1) : undefined)
     const view = (agent: GameAgent, handle: string, index: number) => (
       <Button
@@ -158,11 +154,18 @@ export const registerFleetPane = (on: On): void => {
     const advisorView = await advisorCardViewOf($, { isLead, members: cardMembers })
     const ownJev = isLead ? advisorNow() : null
     const ownAdvisor = ownJev === null ? undefined : ownAdvisorOf(ownJev, await advisorPinsOf($))
-    const advisorTiles = advisorView === null ? [] : [advisorView.tile]
+    const advisorTiles = advisorView === null || !cardLayout.withTile ? [] : [advisorView.tile]
     const advisorOf = (art: Map<string, RenderElement>) =>
       advisorView === null
         ? null
-        : advisorCard($, e, palette, advisorView.card, art.get(ADVISOR_TILE_KEY), !isFlat)
+        : advisorCard(
+            $,
+            e,
+            palette,
+            advisorView.card,
+            art.get(ADVISOR_TILE_KEY),
+            !isFlat && cardLayout.withTile
+          )
     if (v.state === null) {
       return (
         <Box flexDirection="column">
@@ -179,15 +182,15 @@ export const registerFleetPane = (on: On): void => {
     const catalog = catalogPickerOf($, e, palette, columns, project, layout)
     const marks = sectionMarksOf($, e, project, layout)
     const { isCollapsed } = marks
-    const members = state.agents.map((agent) => ({
+    const members = teamOrderOf(state).map((agent) => ({
       agent,
       member: memberOf(agent, state, config.rewards)
     }))
-    const party = members.filter((one) => !one.agent.isLeader).map((one) => one.member)
+    const { party, unseen } = drawnPartyOf(state, config.rewards)
     const level = config.rewards ? levelOf(v.xp) : undefined
     const lead = leadStateOf(state)
     const isLeadAwake = lead !== undefined && lead !== 'sleeping'
-    const extras = { isHeroWorking: isSceneShown() || isLeadAwake, level, isDemo: v.isDemo }
+    const extras = { isHeroWorking: isSceneShown() || isLeadAwake, level, isDemo: v.isDemo, unseen }
     const art = await animate($, e, [
       {
         key: HUD_KEY,
@@ -196,12 +199,19 @@ export const registerFleetPane = (on: On): void => {
         draw: (at: number) =>
           hudCellsOf(scene, party, columns, at, { ...extras, lead: shownLead() })
       },
-      ...(isShown('team') ? members : []).map(({ member }) => ({
+      ...(isShown('team') && cardLayout.withTile ? members : []).map(({ member }) => ({
         key: `tile-${member.key}`,
         columns: TILE_COLUMNS,
         rows: TILE_ROWS,
         draw: (at: number) =>
-          tileCellsOf(scene, member.isDone ? 'handed' : member.phase, member.state, at, member.mood)
+          tileCellsOf(
+            scene,
+            member.isDone ? 'handed' : member.phase,
+            member.state,
+            at,
+            member.mood,
+            member.name
+          )
       })),
       ...(isShown('team') ? advisorTiles : [])
     ])
@@ -238,7 +248,6 @@ export const registerFleetPane = (on: On): void => {
     )
     const fleetModels = fleetAdvisorSummaryOf(state.agents.filter((agent) => agent.isMember))
     const needs = needsOf(state)
-    const cardRoom = Math.max(1, columns - CARD_CHROME)
     const advisorRowsOf = (agent: GameAgent) => {
       const advisor = agent.isLeader ? (agent.advisor ?? ownAdvisor) : agent.advisor
       return memberModelLinesOf({ advisor, launch: agent.launch }, cardRoom).map((line, row) => (
@@ -318,6 +327,7 @@ export const registerFleetPane = (on: On): void => {
               leadTitle: agent.isLeader ? leadTitleOf(state, text.lead) : null,
               cardState: cardStateOf(agent, state),
               tile: art.get(`tile-${member.key}`),
+              withTile: cardLayout.withTile,
               view:
                 agent.terminalHandle === undefined || isTap
                   ? undefined

@@ -152,6 +152,20 @@ describe('pausedMembersOf', () => {
     expect(paused[2]).not.toHaveProperty('cause')
     expect(paused[2]).not.toHaveProperty('terminal')
   })
+
+  it('marks a member whose worktree is gone as not resumable (ORCA-832)', () => {
+    const members = [
+      member('ORCA-1', { sessionId: 'abc', worktreeId: 'wt-1', lastState: 'working' }),
+      member('ORCA-2', { sessionId: 'def', worktreeId: 'wt-2', lastState: 'working' })
+    ]
+    const live = { tickets: new Set<string>(), worktreeIds: new Set<string>() }
+
+    const paused = pausedMembersOf(members, live, new Set(), () => null, new Set(['wt-1']))
+
+    expect(paused[0]).toMatchObject({ ticket: 'ORCA-1', resumable: false, worktreeGone: true })
+    expect(paused[1]).toMatchObject({ ticket: 'ORCA-2', resumable: true })
+    expect(paused[1]).not.toHaveProperty('worktreeGone')
+  })
 })
 
 // Why (ORCA-764): a member whose agent runs but whose lead does not list it was dropped silently.

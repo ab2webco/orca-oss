@@ -89,6 +89,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'worktree ps',
       'worktree list',
       'worktree show',
+      'worktree processes',
       'worktree current',
       'worktree create',
       'worktree set',
@@ -100,6 +101,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'file',
     keys: ['file open', 'file diff', 'file open-changed'],
     load: async () => (await import('./handlers/file.js')).FILE_HANDLERS
+  },
+  {
+    name: 'file-content',
+    keys: ['file read', 'file list'],
+    load: async () => (await import('./handlers/file-content.js')).FILE_CONTENT_HANDLERS
   },
   {
     name: 'events',

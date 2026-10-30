@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GAME_TEST_ACCOUNTS } from './orchestrator-game-fleet-test-fixtures'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
@@ -52,8 +53,10 @@ function fakeClient(gameState: unknown, boardFails = false) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': gameState,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
+    'accounts.snapshot': GAME_TEST_ACCOUNTS,
     'orchestration.taskCreate': { task: { id: 'task_1' } },
     'orchestration.workerStart': {
       runId: 'run_1',
@@ -115,7 +118,7 @@ describe('game commands post what they did and saw to the event record', () => {
         terminalHandle: 'term_lead',
         kind: 'claimed',
         ticket: 'CIN-7',
-        text: 'member d1 [ready] claude'
+        text: 'member d1 [ready] claude · ana@example.com'
       }
     ])
   })

@@ -31,12 +31,18 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         authenticatedCallerFingerprint
       )
       const observation = await inspectRemoteAttachment(runtime, params.dispatchId)
+      // Why optional: an older home ignores it, and the home reads its absence as an older host (ORCA-837).
+      const agent =
+        observation.exact && observation.terminal
+          ? await runtime.getFederatedMemberAgent(observation.terminal.handle).catch(() => null)
+          : null
       return {
         dispatchId: params.dispatchId,
         runtimeEpoch: runtime.getRuntimeId(),
         attachment: exposeRemoteAttachment(attachment),
         terminal: observation.exact ? observation.terminal : null,
-        observation: { status: observation.status, exactWorker: observation.exact }
+        observation: { status: observation.status, exactWorker: observation.exact },
+        ...(agent ? { agent } : {})
       }
     }
   }),
@@ -119,6 +125,15 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         }
       }
       const observation = await inspectRemoteAttachment(runtime, params.dispatchId)
+      if (observation.status === 'gone') {
+        const attachment = db.settleRemoteAttachmentStop(params.dispatchId)
+        return {
+          dispatchId: params.dispatchId,
+          state: attachment.state,
+          alreadySettled: false,
+          processAction: 'none'
+        }
+      }
       if (!observation.exact || !observation.terminal) {
         const attachment = db.markRemoteAttachmentStopUnknown(
           params.dispatchId,
@@ -157,7 +172,7 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
   })
 ]
 
-function requireHomeAttachment(
+export function requireHomeAttachment(
   runtime: OrcaRuntimeService,
   dispatchId: string,
   callerFingerprint: string | undefined
@@ -172,7 +187,7 @@ function requireHomeAttachment(
   return attachment
 }
 
-async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispatchId: string) {
+export async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispatchId: string) {
   const db = runtime.getOrchestrationDb()
   const attachment = db.getRemoteDispatchAttachment(dispatchId)
   if (!attachment?.terminal_handle) {
@@ -187,6 +202,10 @@ async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispatchId: 
     paneKey: runtime.getTerminalPaneKey(attachment.terminal_handle),
     processIncarnation: runtime.getTerminalProcessIncarnation(attachment.terminal_handle)
   })
+  // Why: a dead PTY runs nobody's agent, so its changed identity is not another process (ORCA-864).
+  if (!exact && terminal.liveness === 'gone') {
+    return { terminal: null, exact: false, status: 'gone' as const }
+  }
   return {
     terminal,
     exact,

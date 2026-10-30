@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { PlaneBoardWriteErrorRow } from './plane-board-write-error-row'
 

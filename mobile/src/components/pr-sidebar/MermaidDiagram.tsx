@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../../theme/dynamic-type-text'
 import { WebView } from 'react-native-webview'
 import { colors, radii, spacing, typography } from '../../theme/mobile-theme'
 import { MERMAID_ENGINE_JS } from './mermaid-webview-engine.generated'

@@ -10,6 +10,7 @@ import { retireUnownedTerminal } from '@/lib/retire-unowned-background-terminal'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { makePaneKey } from '../../../shared/stable-pane-id'
+import { worktreeSlugEnv } from '../../../shared/worktree/slug'
 import {
   buildSetupRunnerCommand,
   getSetupRunnerCommandPlatformForPath
@@ -58,7 +59,8 @@ function buildPaneEnv(
     ...env,
     ORCA_PANE_KEY: makePaneKey(tabId, leafId),
     ORCA_TAB_ID: tabId,
-    ORCA_WORKTREE_ID: worktreeId
+    ORCA_WORKTREE_ID: worktreeId,
+    ...worktreeSlugEnv(worktreeId)
   }
 }
 

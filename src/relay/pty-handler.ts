@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { resolveWindowsGitBashShellPath } from '../main/git-bash'
 import { WINDOWS_GIT_BASH_SHELL } from '../shared/windows-terminal-shell'
+import { ORCA_WORKTREE_SLUG_ENV } from '../shared/worktree/slug'
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import {
   resolveDefaultShell,
@@ -46,6 +47,7 @@ import {
 import { isTuiAgent } from '../shared/tui-agent-config'
 import type { TuiAgent } from '../shared/tui-agent'
 import { forceKillPosixPtyProcessGroups } from '../main/pty/posix-pty-process-groups'
+import { sweepEndedSessionOrphans } from '../main/pty/ended-session-orphan-sweep'
 import { stripInheritedBuildModeEnv } from '../main/pty/build-mode-env'
 import { stripInheritedClaudeSessionEnv } from '../main/pty/claude-session-env'
 import {
@@ -150,10 +152,13 @@ type ManagedPty = {
   /** Attach-only identity metadata (RPC). Separate from paneKey/tabId, which also drive shell env/revive hooks. */
   attachIdentity?: PtyIdentity
   worktreeId?: string
+  worktreeSlug?: string
   terminalHandle?: string
   explicitTerm?: string
   shellPath?: string
   shellCwd?: string
+  /** Set for agent PTYs; consumed once on exit to reap the worktree orphans the agent left (ORCA-678). */
+  orphanSweep?: { root: string; startedAtMs: number }
   shellPathEnv?: string
   envToDelete: string[]
   gitCredentialPromptGuarded: boolean
@@ -321,12 +326,18 @@ type SerializedPtyEntry = {
   tabId?: string
   attachIdentity?: PtyIdentity
   worktreeId?: string
+  /** Kept apart from worktreeId: SSH spawns with hooks off strip the id but keep the slug. */
+  worktreeSlug?: string
   terminalHandle?: string
   explicitTerm?: string
   envToDelete?: string[]
   /** Optional for state serialized by relays predating the credential guard. */
   gitCredentialPromptGuarded?: boolean
   agentSessionOwners?: AgentSessionOwnerBinding[]
+}
+
+function sanitizeWorktreeSlug(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[a-z0-9_]{1,64}$/.test(value) ? value : undefined
 }
 
 function sanitizeEnvToDelete(value: unknown): string[] {
@@ -773,6 +784,18 @@ export class PtyHandler {
     })
     managed.pty.onExit(({ exitCode }: { exitCode: number }) => {
       managed.physicalExit?.markExited()
+      // Why: double-forked agent pollers are reparented before the root dies, out of every ppid sweep (ORCA-678).
+      const orphanSweep = managed.orphanSweep
+      if (orphanSweep) {
+        managed.orphanSweep = undefined
+        void sweepEndedSessionOrphans(orphanSweep.root, orphanSweep.startedAtMs).then((result) => {
+          if (result.status === 'skipped') {
+            console.warn(
+              `[relay-pty] orphan sweep skipped for ${orphanSweep.root}: ${result.reason}`
+            )
+          }
+        })
+      }
       if (managed.disposed) {
         return
       }
@@ -1587,6 +1610,7 @@ export class PtyHandler {
       tabId: typeof params.tabId === 'string' ? params.tabId : tabId
     }
     const worktreeId = typeof env?.ORCA_WORKTREE_ID === 'string' ? env.ORCA_WORKTREE_ID : undefined
+    const worktreeSlug = sanitizeWorktreeSlug(env?.[ORCA_WORKTREE_SLUG_ENV])
     const startupIngressIntent =
       params.startupIngressVersion === PTY_STARTUP_INGRESS_VERSION
         ? parsePtyStartupIngressIntent(params.startupIngress)
@@ -1604,11 +1628,15 @@ export class PtyHandler {
       tabId,
       ...(attachIdentity.paneKey || attachIdentity.tabId ? { attachIdentity } : {}),
       worktreeId,
+      ...(worktreeSlug ? { worktreeSlug } : {}),
       ...(explicitTerm !== undefined ? { explicitTerm } : {}),
       envToDelete,
       gitCredentialPromptGuarded,
       shellPath: shell,
       shellCwd: cwd,
+      ...(launchAgent && process.platform !== 'win32'
+        ? { orphanSweep: { root: cwd, startedAtMs: Date.now() } }
+        : {}),
       shellPathEnv: spawnEnv.PATH,
       ownerBackend: resolvePtyOwnerBackend({
         platform: process.platform,
@@ -2024,6 +2052,7 @@ export class PtyHandler {
         tabId: managed.tabId,
         attachIdentity: managed.attachIdentity,
         worktreeId: managed.worktreeId,
+        ...(managed.worktreeSlug ? { worktreeSlug: managed.worktreeSlug } : {}),
         ...(managed.explicitTerm !== undefined ? { explicitTerm: managed.explicitTerm } : {}),
         envToDelete: managed.envToDelete,
         gitCredentialPromptGuarded: managed.gitCredentialPromptGuarded,
@@ -2077,6 +2106,10 @@ export class PtyHandler {
     if (entry.worktreeId) {
       revivedEnv.ORCA_WORKTREE_ID = entry.worktreeId
     }
+    const worktreeSlug = sanitizeWorktreeSlug(entry.worktreeSlug)
+    if (worktreeSlug) {
+      revivedEnv[ORCA_WORKTREE_SLUG_ENV] = worktreeSlug
+    }
     if (entry.terminalHandle) {
       revivedEnv.ORCA_TERMINAL_HANDLE = entry.terminalHandle
     }
@@ -2127,6 +2160,7 @@ export class PtyHandler {
       tabId: entry.tabId,
       attachIdentity: entry.attachIdentity,
       worktreeId: entry.worktreeId,
+      ...(worktreeSlug ? { worktreeSlug } : {}),
       ...(explicitTerm !== undefined ? { explicitTerm } : {}),
       envToDelete,
       gitCredentialPromptGuarded,

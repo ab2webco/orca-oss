@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text } from '../../theme/dynamic-type-text'
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
 import type { PRState } from '../../../../src/shared/github/pull-request-types'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'

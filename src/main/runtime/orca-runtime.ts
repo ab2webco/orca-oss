@@ -14,6 +14,7 @@ import {
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
+import { worktreeSlugEnv } from '../../shared/worktree/slug'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { sortDirEntries } from '../../shared/file-name-sort'
 import {
@@ -189,6 +190,18 @@ import {
 } from './orchestration/federation-ack-checkpoints'
 import { syncFederatedDispatch } from './orchestration/federation-sync'
 import { formatMessagePointer } from './orchestration/formatter'
+import {
+  listEarlierLeadRemoteMemberSources,
+  listRemoteGameMemberSources,
+  liveRemoteMemberTitlesOf,
+  remoteGameMembersOf,
+  type RemoteGameMemberShow
+} from './orchestrator-game-remote-members'
+
+// Why short: a silent host must not hold the lead's game state; its member shows as unknown.
+const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
+import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
 import {
   selectExactWorkerProviderSession,
@@ -316,6 +329,11 @@ import {
   toSshExecutionHostId,
   type ExecutionHostId
 } from '../../shared/execution-host'
+import {
+  collapseSameDiskWorktreeRecords,
+  findSameDiskSiblingWorktreeIds,
+  toRuntimeDiskHostId
+} from './same-disk-worktree-records'
 import { preservedBranchCleanupScopeKey } from '../../shared/preserved-branch-cleanup'
 import { getRegisteredSshState } from '../ipc/ssh'
 import type {
@@ -526,6 +544,10 @@ import {
 } from '../agent-trust-presets'
 import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
 import { claudeLaunchRequiresFolderTrust } from '../claude-accounts/claude-folder-trust'
+import {
+  findClaudeBannerIndex,
+  findClaudeStartupDialogSignals
+} from './claude-startup-dialog-signal'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
 import { recordManagedHookInstallFailure } from '../agent-hooks/install-telemetry'
 import {
@@ -688,6 +710,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
   orchestratorGameViewSettingsOf,
@@ -699,6 +722,7 @@ import type {
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
+import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
   GameProjectWorkCache,
   myOpenPullRequestsOf,
@@ -707,11 +731,20 @@ import {
   type GameProjectWorkPort
 } from './orchestrator-game-project-work'
 import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources'
-import { statusGroupOfJira, type OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import {
+  gameAgentStateOf,
+  statusGroupOfJira,
+  type OrchestratorGameState
+} from '../../shared/orchestrator-game-state'
+import {
+  parseRemoteMemberAgent,
+  remoteMemberAgentOf,
+  type RemoteMemberAgent
+} from '../../shared/orchestrator-game-remote-agent'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
-import { gameMemberAccountOf } from './orchestrator-game-member-account'
+import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
@@ -721,6 +754,7 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
@@ -733,7 +767,9 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
+import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
@@ -746,6 +782,7 @@ import {
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
+import { tellGameLead } from './orchestrator-game-lead-note'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
@@ -761,6 +798,7 @@ import {
   gameMemberLaunchOf,
   type GameMemberLaunch
 } from '../../shared/orchestrator-game-member-launch'
+import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
@@ -1327,6 +1365,11 @@ import {
   getSshGitProviderGeneration,
   requireSshGitProvider
 } from '../providers/ssh-git-dispatch'
+import { runWorktreeProcesses } from './worktree-processes'
+import type {
+  WorktreeProcessesOptions,
+  WorktreeProcessesResult
+} from '../../shared/worktree-processes'
 import { detectGitHubAvatarIcon, detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import type {
@@ -2287,6 +2330,8 @@ type RuntimeNotifier = {
   worktreeBaseStatus?(event: WorktreeBaseStatusEvent): void
   worktreeRemoteBranchConflict?(event: WorktreeRemoteBranchConflictEvent): void
   reposChanged(): void
+  gameOwnerQuestionsChanged?(): void
+  gameInboxChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -2480,6 +2525,8 @@ type TerminalWaiter = {
 type MessageWaiter = {
   handle: string
   typeFilter: string[] | undefined
+  /** Wakes a typed waiter on a type it filters out; a lead watch's mail from outside its members (ORCA-861). */
+  wakesOutsideTypeFilter?: () => boolean
   resolve: (result: MessageWaitResult) => void
   timeout: NodeJS.Timeout | null
   abortCleanup: (() => void) | null
@@ -3162,6 +3209,7 @@ export class OrcaRuntimeService {
   private orchestrationTerminalHistoryRecoveryInFlight: Promise<void> | null = null
   private orchestrationTerminalRecoveryRowId = 0
   private orchestrationFederationRelayGeneration = 0
+  private orchestrationFederationReopenWatchTimer: ReturnType<typeof setInterval> | null = null
   private readonly orchestrationFederationSyncs = new Map<
     string,
     { db: OrchestrationDb; promise: Promise<void> }
@@ -3722,8 +3770,16 @@ export class OrcaRuntimeService {
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
   })
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
-  private readonly gameProjectWork = new GameProjectWorkCache(90_000)
-  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(60_000)
+  private readonly gameProjectWork = new GameProjectWorkCache(
+    () => 90_000 * gameGitHubPollStretch()
+  )
+  private readonly gameMemberWork = new GameReadCache<GameMemberWork>(
+    () => 60_000 * gameGitHubPollStretch()
+  )
+  // Why TTL 0 otherwise: each pane's own review stays fresh until the GitHub budget runs low (ORCA-877).
+  private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
+    () => (gameGitHubPollStretch() > 1 ? 300_000 : 0)
+  )
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
@@ -3745,7 +3801,12 @@ export class OrcaRuntimeService {
       gamePausedCauseOf(
         this.getOrchestrationDbIfAvailable()?.getDispatchContext(member.taskId),
         (handle) => this.isTerminalOpenForHandle(handle)
-      )
+      ),
+    worktreeGone: (worktreeId) =>
+      isGameMemberWorktreeGone(worktreeId, {
+        reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
+        scan: (repo) => this.listRepoWorktreesForResolution(repo)
+      })
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({
@@ -3816,9 +3877,41 @@ export class OrcaRuntimeService {
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
     stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
-    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    projectOf: async (caller) =>
+      withProjectLead(
+        await this.gameBoardProjectOf(caller),
+        (projectKey) => this.gameLeads.liveLeadOf(projectKey),
+        (handle) => this.getPaneKeyForTerminalHandle(handle) ?? null
+      ),
     inboxSourceOf: (lead) =>
-      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels())
+      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
+    tellLead: (lead, note) => {
+      try {
+        return tellGameLead(
+          this.getOrchestrationDb(),
+          (handle, type) => this.notifyMessageArrived(handle, type),
+          lead.handle,
+          note
+        )
+      } catch {
+        return false
+      }
+    },
+    ownerQuestionsChanged: () => {
+      this.notifier?.gameOwnerQuestionsChanged?.()
+      this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
+    },
+    replyToMember: (lead, args) =>
+      replyToMemberAsLead(
+        this.getOrchestrationDb(),
+        (handle, type) => this.notifyMessageArrived(handle, type),
+        lead,
+        args
+      )
+  })
+  private readonly gameInboxChange = new GameInboxChangeSignal(() => {
+    this.notifier?.gameInboxChanged?.()
+    this.emitClientEvent({ type: 'gameInboxChanged' })
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
@@ -5453,6 +5546,14 @@ export class OrcaRuntimeService {
       this.orchestrationFederationTimers.set(dispatch.dispatch_id, timer)
       tick()
     }
+    if (!this.orchestrationFederationReopenWatchTimer) {
+      // Why slow: the host cannot call home, and a settled member rarely asks again.
+      this.orchestrationFederationReopenWatchTimer = setInterval(
+        () => this.syncOrchestrationFederationReopenWatch(),
+        10_000
+      )
+      this.orchestrationFederationReopenWatchTimer.unref?.()
+    }
     this.ensureTerminalHistoryRecovery()
   }
 
@@ -5499,12 +5600,29 @@ export class OrcaRuntimeService {
     this.orchestrationTerminalHistoryRecoveryTimer.unref?.()
   }
 
+  /** One pull per settled member a host may reopen with a question (ORCA-856). */
+  syncOrchestrationFederationReopenWatch(): void {
+    let dispatchIds: string[]
+    try {
+      dispatchIds = this.getOrchestrationDb().listReopenableFederatedDispatchIds()
+    } catch {
+      return
+    }
+    for (const dispatchId of dispatchIds) {
+      void this.syncOrchestrationFederatedDispatch(dispatchId).catch(() => undefined)
+    }
+  }
+
   stopOrchestrationFederationRelay(): void {
     this.orchestrationFederationRelayGeneration += 1
     for (const timer of this.orchestrationFederationTimers.values()) {
       clearInterval(timer)
     }
     this.orchestrationFederationTimers.clear()
+    if (this.orchestrationFederationReopenWatchTimer) {
+      clearInterval(this.orchestrationFederationReopenWatchTimer)
+      this.orchestrationFederationReopenWatchTimer = null
+    }
     if (this.orchestrationTerminalHistoryRecoveryTimer) {
       clearTimeout(this.orchestrationTerminalHistoryRecoveryTimer)
       this.orchestrationTerminalHistoryRecoveryTimer = null
@@ -14600,6 +14718,11 @@ export class OrcaRuntimeService {
     return this.requireAccountServices().claudeAccounts.buildGlobalConfigSyncInventory()
   }
 
+  /** A host-runtime account's vault, for reading what its Claude loads; null for WSL or an unowned path. */
+  getClaudeManagedAuthPath(accountId: string): string | null {
+    return this.requireAccountServices().claudeAccounts.getOwnedManagedAuthPath(accountId)
+  }
+
   syncGlobalConfigForClaudeAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
     this.requireAccountServices().claudeAccounts.syncGlobalConfigForAccount(accountId, selection)
   }
@@ -21889,10 +22012,42 @@ export class OrcaRuntimeService {
   private async getGameReviewForBranch(
     args: Parameters<OrcaRuntimeService['getHostedReviewForBranch']>[0]
   ): ReturnType<typeof withGameReviewFacts> {
-    const review = await this.getHostedReviewForBranch(args)
-    return review
-      ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
-      : null
+    return this.gameReviews.read(JSON.stringify(args), async () => {
+      const review = await this.getHostedReviewForBranch(args)
+      return review
+        ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
+        : null
+    })
+  }
+
+  // Why: a retired worker_done must not hide a member whose PR still waits for the lead (ORCA-824).
+  async summarizeRetiredRunMail(retired: readonly RetiredRunMail[]): Promise<RetiredRunMailNotice> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    const db = this._orchestrationDb
+    return summarizeRetiredRunMail(retired, async (dispatchId) => {
+      const worktreeId = db?.getWorkerDispatch(dispatchId)?.worktree_id
+      const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
+      if (!worktree) {
+        return null
+      }
+      const task = db?.getTask(db.getDispatchContextById(dispatchId)?.task_id ?? '')
+      const linked = worktree.linkedWorkItem
+      const ticket =
+        linked?.planeIdentifier ??
+        linked?.jiraIdentifier ??
+        linked?.linearIdentifier ??
+        task?.task_title ??
+        worktree.displayName ??
+        dispatchId
+      const review =
+        worktree.repoId && worktree.branch
+          ? await this.getHostedReviewForBranch({
+              repoSelector: `id:${worktree.repoId}`,
+              branch: worktree.branch
+            }).catch(() => null)
+          : null
+      return { ticket, pr: review ? { number: review.number, state: review.state } : null }
+    })
   }
 
   async getHostedReviewCreationEligibility(
@@ -23390,6 +23545,17 @@ export class OrcaRuntimeService {
     return await this.resolveWorktreeSelector(worktreeSelector)
   }
 
+  async listManagedWorktreeProcesses(
+    worktreeSelector: string,
+    options: WorktreeProcessesOptions
+  ): Promise<WorktreeProcessesResult> {
+    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
+    const connectionId = this.store?.getRepo(worktree.repoId)?.connectionId ?? null
+    return await runWorktreeProcesses({ path: worktree.path, connectionId }, options, {
+      getSshGitProvider
+    })
+  }
+
   async showManagedTerminalWorkspace(worktreeSelector: string) {
     const target = await this.resolveTerminalWorkspaceLaunchTarget(worktreeSelector)
     if (!target.managedWorktree) {
@@ -23626,7 +23792,9 @@ export class OrcaRuntimeService {
     agent: TuiAgent,
     prompt: string | undefined,
     launchPreferences?: AgentLaunchPreferences,
-    gameMember?: OrchestratorGameMemberLaunch | null
+    gameMember?: OrchestratorGameMemberLaunch | null,
+    /** Set for every game member, also one that gets no game (SSH, mod off). */
+    orchestrationGameMember?: boolean
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
@@ -23650,7 +23818,11 @@ export class OrcaRuntimeService {
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform: agentLaunchPlatform,
@@ -24152,7 +24324,8 @@ export class OrcaRuntimeService {
             args.startupAgent,
             args.startupPrompt,
             args.startupLaunchPreferences,
-            gameMember
+            gameMember,
+            args.orchestrationGameMember
           )
         : null
     const draftStartup =
@@ -26763,6 +26936,27 @@ export class OrcaRuntimeService {
     })
   }
 
+  // Why: a paired client can register this host's repo again under its own `runtime:` id, so
+  // one deleted tree is listed under both records; leaving the sibling turns it into a ghost.
+  private forgetSameDiskSiblingWorktreeRecords(
+    store: RuntimeStore,
+    repo: Repo,
+    worktreePath: string
+  ): void {
+    const siblings = findSameDiskSiblingWorktreeIds(
+      repo,
+      worktreePath,
+      store.getRepos(),
+      normalizeRuntimePathForComparison
+    )
+    for (const sibling of siblings) {
+      this.clearOptimisticReconcileToken(sibling.worktreeId)
+      this.removeWorktreeMetadataAndHistory(store, sibling.worktreeId)
+      this.invalidateWorktreeScanCacheForRepo(sibling.repoId)
+      this.notifyWorktreesChanged(sibling.repoId)
+    }
+  }
+
   private removeWorktreeMetadataAndHistory(store: RuntimeStore, worktreeId: string): void {
     // Why: worktree IDs are path-derived and can be recreated, so removal must
     // purge history and process-local caches before the ID points at new state.
@@ -27157,6 +27351,7 @@ export class OrcaRuntimeService {
             }
             this.clearOptimisticReconcileToken(removalTarget.id)
             this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+            this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
             this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
             this.invalidateResolvedWorktreeCache()
             this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27206,6 +27401,7 @@ export class OrcaRuntimeService {
               )
               this.clearOptimisticReconcileToken(removalTarget.id)
               this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+              this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
               this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
               this.invalidateResolvedWorktreeCache()
               this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27242,6 +27438,7 @@ export class OrcaRuntimeService {
                 ))
             this.clearOptimisticReconcileToken(removalTarget.id)
             this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+            this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
             this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
             this.invalidateResolvedWorktreeCache()
             this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27296,6 +27493,7 @@ export class OrcaRuntimeService {
           )
           this.clearOptimisticReconcileToken(removalTarget.id)
           this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+          this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
           this.invalidateResolvedWorktreeCache()
           this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
           invalidateAuthorizedRootsCache()
@@ -27342,6 +27540,7 @@ export class OrcaRuntimeService {
           )
           this.clearOptimisticReconcileToken(removalTarget.id)
           this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+          this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
           this.invalidateResolvedWorktreeCache()
           this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
           invalidateAuthorizedRootsCache()
@@ -27498,6 +27697,7 @@ export class OrcaRuntimeService {
               )
               this.clearOptimisticReconcileToken(removalTarget.id)
               this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+              this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
               this.preservedBranchCleanupByScope.delete(cleanupScopeKey)
               this.invalidateResolvedWorktreeCache()
               this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
@@ -27532,6 +27732,7 @@ export class OrcaRuntimeService {
         )
         this.clearOptimisticReconcileToken(removalTarget.id)
         this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+        this.forgetSameDiskSiblingWorktreeRecords(store, repo, removalTarget.path)
         this.invalidateResolvedWorktreeCache()
         this.invalidateWorktreeScanCacheForRepo(removalTarget.repoId)
         invalidateAuthorizedRootsCache()
@@ -27679,7 +27880,11 @@ export class OrcaRuntimeService {
       prompt: '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
       agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        agent,
+        resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+        opts.orchestrationGameMember
+      ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
       platform,
@@ -27844,7 +28049,11 @@ export class OrcaRuntimeService {
         request.agentArgs !== undefined
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+      agentEnv: gameMemberAgentEnvOf(
+        request.agent,
+        resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+        launchAccount.orchestrationGameMember
+      ),
       ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,
@@ -30696,12 +30905,27 @@ export class OrcaRuntimeService {
         ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
         : undefined)
     const worktree = worktreeId ? worktreesById.get(worktreeId) : undefined
+    return {
+      key: this.gameProjectKeyOfWorktree(worktreeId, worktreesById) ?? 'no-project',
+      worktreesById,
+      worktree
+    }
+  }
+
+  private gameProjectKeyOfWorktree(
+    worktreeId: string | null | undefined,
+    worktreesById: ReadonlyMap<string, ResolvedWorktree>
+  ): string | null {
+    if (!worktreeId) {
+      return null
+    }
     // Why the id's own repo: before the first worktree scan lands the map is empty, and a record
     // keyed `no-project` then would split the project's history and lessons in two.
-    const idRepoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined
+    const idRepoId = splitWorktreeId(worktreeId)?.repoId
     const repoId =
-      worktree?.repoId ?? (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
-    return { key: repoId ? `repo:${repoId}` : 'no-project', worktreesById, worktree }
+      worktreesById.get(worktreeId)?.repoId ??
+      (idRepoId && this.store?.getRepo(idRepoId) ? idRepoId : undefined)
+    return repoId ? `repo:${repoId}` : null
   }
 
   getGameBoard(): GameBoard {
@@ -30830,7 +31054,8 @@ export class OrcaRuntimeService {
     const live = liveProjectMemberNamesOf({
       worktrees: ps.worktrees,
       inProject: (one) => `repo:${one.repoId}` === project.key,
-      saved: saved.ok ? saved.members : []
+      saved: saved.ok ? saved.members : [],
+      remote: this._orchestrationDb ? liveRemoteMemberTitlesOf(this._orchestrationDb) : []
     })
     return {
       name: this.gameMemberNames.reserve({
@@ -30987,6 +31212,19 @@ export class OrcaRuntimeService {
     member: { paneKey: string; agentType: string | null; worktreeId: string | null },
     worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>
   ): ReturnType<typeof gameMemberAccountOf> {
+    return this.readGameMemberSeat(member, worktreesById, gameMemberAccountOf)
+  }
+
+  private readGameMemberSeat<T>(
+    member: { paneKey: string; agentType: string | null; worktreeId: string | null },
+    worktreesById: Map<string, { claudeAccountId?: string | null; codexAccountId?: string | null }>,
+    read: (seat: {
+      agentType: string | null
+      live: ManagedPtyAccountOwner | null
+      pinnedAccountId: string | null | undefined
+      accounts: readonly { id: string; email: string }[]
+    }) => T
+  ): T | null {
     const provider = accountProviderOfAgent(member.agentType)
     const services = this.accountServices
     if (!provider || !services) {
@@ -30996,7 +31234,7 @@ export class OrcaRuntimeService {
       const handle = this.getTerminalHandleForPaneKey(member.paneKey)
       const ptyId = handle ? this.resolveClaudeAccountPtyRecordForHandle(handle)?.ptyId : undefined
       const worktree = member.worktreeId ? worktreesById.get(member.worktreeId) : undefined
-      return gameMemberAccountOf({
+      return read({
         agentType: member.agentType,
         live: ptyId ? this.getManagedPtyAccountOwner(ptyId, provider) : null,
         pinnedAccountId:
@@ -31082,6 +31320,32 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */
+  async getFederatedMemberAgent(handle: string): Promise<RemoteMemberAgent | null> {
+    const paneKey = this.getTerminalPaneKey(handle)
+    const agent = remoteMemberAgentOf(this.getAgentStatusSnapshotFn?.() ?? [], paneKey)
+    if (!agent || !paneKey) {
+      return null
+    }
+    const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
+    const account = this.gameMemberAccountFor(
+      { paneKey, agentType: agent.agentType, worktreeId },
+      worktreeId ? await this.getResolvedWorktreeMap().catch(() => new Map()) : new Map()
+    )
+    const limit = await this.gameMemberLimitFor({
+      paneKey,
+      agentType: agent.agentType,
+      state: gameAgentStateOf(agent.state),
+      account
+    }).catch(() => null)
+    return {
+      ...agent,
+      // Why the email only: an account id means nothing on the home and must not leave this host (ORCA-798).
+      ...(account ? { account: { provider: account.provider, email: account.email } } : {}),
+      ...(limit ? { limit } : {})
+    }
+  }
+
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
   private async gameMemberLimitFor(member: {
     paneKey: string
@@ -31119,6 +31383,23 @@ export class OrcaRuntimeService {
     })
   }
 
+  /** The scene file a lead pane draws, sent with its remote game members (ORCA-794). */
+  async readCallerGameScene(handle: string): Promise<CarriedGameScene | null> {
+    const worktreeId = (await this.showTerminal(handle).catch(() => null))?.worktreeId
+    const worktree = worktreeId ? (await this.getResolvedWorktreeMap()).get(worktreeId) : undefined
+    if (!worktree) {
+      return null
+    }
+    return readLeadGameScene({
+      settings: this.store?.getSettings?.(),
+      worktree: {
+        repoId: worktree.repoId ?? null,
+        path: worktree.path,
+        connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null
+      }
+    })
+  }
+
   async getOrchestratorGameState(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -31152,6 +31433,10 @@ export class OrcaRuntimeService {
       : []
     const callerHandle =
       args.terminalHandle ?? (args.paneKey ? this.getTerminalHandleForPaneKey(args.paneKey) : null)
+    const callerParentPaneKey = args.paneKey
+      ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
+          ?.parentPaneKey
+      : null
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -31188,37 +31473,53 @@ export class OrcaRuntimeService {
           return { review, linkedWorkItem: member.linkedWorkItem }
         }),
       accountOf: (member) => this.gameMemberAccountFor(member, worktreesById),
+      globalLoginOf: (member) =>
+        this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin) === true,
       limitOf: (member) => this.gameMemberLimitFor(member),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
-      callerParentPaneKey: args.paneKey
-        ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
-            ?.parentPaneKey
-        : null,
+      callerParentPaneKey,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
       readScenes: () => readPluginGameSceneSources(),
+      // Why the lead's pane too: a scene file its checkout leaves untracked is not in a member's worktree.
+      readCarriedScene: async () => {
+        const sent = worktree ? this._orchestrationDb?.getGameSceneForWorktree(worktree.id) : null
+        const lead = callerParentPaneKey
+          ? this.getTerminalHandleForPaneKey(callerParentPaneKey)
+          : null
+        return sent ?? (lead ? this.readCallerGameScene(lead) : null)
+      },
+      // Why worktreeId: the map can miss a worktree it has not scanned yet; the board keys by the id's repo.
       readInboxes: () =>
         this.gameBoard.inboxSummary({
-          worktreeId: worktree?.id,
+          worktreeId,
           terminalHandle: callerHandle ?? undefined
         }),
+      readOpenOwnerQuestions: async () =>
+        (
+          await this.gameBoard.ownerQuestions({
+            worktreeId,
+            terminalHandle: callerHandle ?? undefined
+          })
+        ).open,
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
-          worktreeId: worktree?.id,
+          worktreeId,
           terminalHandle: callerHandle ?? undefined
         }),
       readStop: async () =>
         (
           await this.gameBoard.stopState({
-            worktreeId: worktree?.id,
+            worktreeId,
             terminalHandle: callerHandle ?? undefined
           })
         ).stopped,
+      readGitHubBudget: () => readGameGitHubBudget(),
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {
@@ -31308,12 +31609,84 @@ export class OrcaRuntimeService {
         return null
       }
     })
-    return await this.withPausedGameMembers(state, {
+    const withRemote = await this.withRemoteGameMembers(
+      state,
+      args.paneKey,
+      worktree,
+      worktreesById
+    )
+    return await this.withPausedGameMembers(withRemote, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
       liveWorktreeIds: new Set(
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
+  }
+
+  private async withRemoteGameMembers(
+    state: OrchestratorGameState,
+    leadPaneKey: string | undefined,
+    worktree: ResolvedWorktree | null,
+    worktreesById: ReadonlyMap<string, ResolvedWorktree>
+  ): Promise<OrchestratorGameState> {
+    const run = leadPaneKey ? this._orchestrationDb?.getCurrentRunForPane?.(leadPaneKey) : undefined
+    if (state.role !== 'lead' || !leadPaneKey || !run || !this._orchestrationDb) {
+      return state
+    }
+    const repoId = worktree?.repoId
+    const projectOfPane = (paneKey: string | null): string | null =>
+      paneKey
+        ? this.gameProjectKeyOfWorktree(
+            this.getTerminalWorktreeIdForPaneKey(paneKey),
+            worktreesById
+          )
+        : null
+    const sources = [
+      ...listRemoteGameMemberSources(this._orchestrationDb, run.id),
+      // Why: a new lead opens a new Run, so its predecessor's members are only found here.
+      ...listEarlierLeadRemoteMemberSources(
+        this._orchestrationDb,
+        {
+          runId: run.id,
+          projectKey: worktree
+            ? this.gameProjectKeyOfWorktree(worktree.id, worktreesById)
+            : projectOfPane(leadPaneKey)
+        },
+        (other) => ({
+          // Why the pane too: a restart fences the Run's handle while its lead pane runs on (ORCA-835).
+          live:
+            (other.coordinatorHandle !== null &&
+              this.getTerminalPaneKey(other.coordinatorHandle) !== null) ||
+            (other.coordinatorPaneKey !== null &&
+              this.getPtyRecordForPaneKey(other.coordinatorPaneKey)?.connected === true),
+          projectKey: projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey)
+        })
+      )
+    ]
+    if (sources.length === 0) {
+      return state
+    }
+    const remote = await remoteGameMembersOf(sources, {
+      // Why federationShow: every federation-capable host already answers it, so no wire change.
+      showOf: async (source) => {
+        const shown = (await this.callOrchestrationWorkerServer(
+          source.environmentId,
+          'orchestration.federationShow',
+          { dispatchId: source.dispatchId },
+          REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+        ).catch((error: unknown) => {
+          // Why: a host that no longer knows the dispatch answered; only silence rejects (ORCA-854).
+          if (error instanceof OrchestrationError && error.code === 'dispatch_not_found') {
+            return { terminal: null }
+          }
+          throw error
+        })) as { terminal: RemoteGameMemberShow | null; agent?: unknown }
+        return shown.terminal && { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
+      },
+      reviewOf: async (branch) =>
+        repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null
+    })
+    return { ...state, agents: [...state.agents, ...remote] }
   }
 
   // Why only a lead pane: it is the one whose members are saved, and the one that resumes them.
@@ -32241,7 +32614,12 @@ export class OrcaRuntimeService {
     if (windowId !== this.authoritativeWindowId) {
       return
     }
-    console.error(`[runtime] renderer graph reload failed (${reason}); failing closed.`)
+    // Why: a teardown kill of a ready renderer is not a failed reload; saying so sent ORCA-826 after the wrong cause.
+    console.error(
+      this.graphStatus === 'reloading'
+        ? `[runtime] renderer graph reload failed (${reason}); failing closed.`
+        : `[runtime] renderer gone while graph ${this.graphStatus} (${reason}); failing closed.`
+    )
     this.markGraphUnavailable(windowId)
   }
 
@@ -32540,7 +32918,8 @@ export class OrcaRuntimeService {
       ...this.buildAgentHookPtyEnv?.(),
       ORCA_PANE_KEY: paneKey,
       ORCA_TAB_ID: tabId,
-      ORCA_WORKTREE_ID: scope.id
+      ORCA_WORKTREE_ID: scope.id,
+      ...worktreeSlugEnv(scope.id)
     }
     if (!scope.folderWorkspace) {
       return env
@@ -32602,18 +32981,6 @@ export class OrcaRuntimeService {
       candidates = worktrees.filter((worktree) =>
         runtimePathsEqual(worktree.path, selector.slice(5))
       )
-      if (candidates.length > 1) {
-        const hostIds = new Set(
-          candidates.map((worktree) => {
-            const repo = this.store?.getRepo(worktree.repoId)
-            return getWorktreeExecutionHostId(worktree, repo)
-          })
-        )
-        // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
-        if (hostIds.size === 1) {
-          candidates = [candidates[0]]
-        }
-      }
     } else if (selector.startsWith('branch:')) {
       const branchSelector = selector.slice(7)
       candidates = worktrees.filter((worktree) =>
@@ -32634,6 +33001,23 @@ export class OrcaRuntimeService {
           runtimePathsEqual(worktree.path, selector) ||
           branchSelectorMatches(worktree.branch, selector)
       )
+    }
+
+    if (candidates.length > 1 && !selector.startsWith('id:')) {
+      const getHostId = (worktree: ResolvedWorktree): ExecutionHostId =>
+        getWorktreeExecutionHostId(worktree, this.store?.getRepo(worktree.repoId))
+      candidates = collapseSameDiskWorktreeRecords(
+        candidates,
+        getHostId,
+        normalizeRuntimePathForComparison
+      )
+      // Why: duplicate registrations on one host describe one path; identical paths on different hosts do not.
+      if (
+        selector.startsWith('path:') &&
+        new Set(candidates.map((worktree) => toRuntimeDiskHostId(getHostId(worktree)))).size === 1
+      ) {
+        candidates = [candidates[0]]
+      }
     }
 
     if (candidates.length === 1) {
@@ -36011,6 +36395,7 @@ export class OrcaRuntimeService {
 
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
+    this.gameInboxChange.mailArrived(messageType)
     const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
     const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
     const dispatch =
@@ -36066,7 +36451,10 @@ export class OrcaRuntimeService {
       ? [...waiters].filter((waiter) =>
           runHeartbeat
             ? waiter.typeFilter?.includes('heartbeat') === true
-            : !messageType || !waiter.typeFilter || waiter.typeFilter.includes(messageType)
+            : !messageType ||
+              !waiter.typeFilter ||
+              waiter.typeFilter.includes(messageType) ||
+              waiter.wakesOutsideTypeFilter?.() === true
         )
       : []
     if (consumers.length === 0) {
@@ -36098,6 +36486,7 @@ export class OrcaRuntimeService {
       timeoutMs?: number
       signal?: AbortSignal
       exclusive?: boolean
+      wakesOutsideTypeFilter?: () => boolean
     }
   ): Promise<MessageWaitResult> {
     return new Promise((resolve) => {
@@ -36111,6 +36500,7 @@ export class OrcaRuntimeService {
       const waiter: MessageWaiter = {
         handle,
         typeFilter: options?.typeFilter,
+        wakesOutsideTypeFilter: options?.wakesOutsideTypeFilter,
         resolve,
         timeout: null,
         abortCleanup: null
@@ -36998,6 +37388,10 @@ export class OrcaRuntimeService {
     // still-blocked case; reservedTypes carries the notify-time snapshot for a
     // waiter resolved later in the same drain, which is already gone from the map.
     const waiters = this.messageWaitersByHandle.get(mailboxHandle)
+    // Why: a lead watch's next batch carries older Run mail with its wake, so a pointer for other types only interrupts (ORCA-824).
+    if (mailboxHandle.startsWith('run:') && waiters && waiters.size > 0) {
+      return
+    }
     const recipientHandles =
       run && mailboxHandle === `run:${run.id}`
         ? [handle, mailboxHandle]
@@ -41900,7 +42294,8 @@ function findDismissedStartupModalIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorActivePromptIndex(normalized)
+    findCursorActivePromptIndex(normalized),
+    findClaudeBannerIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
 }
@@ -41990,7 +42385,7 @@ function isTerminalWaitWhitespace(value: string, index: number): boolean {
 }
 
 const TERMINAL_WAIT_BLOCKED_SENTINEL_RE =
-  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always/i
+  /update available|choose working directory to|codex just got an upgrade|hooks need review|do you trust|trust this|trusted workspace|press enter to (?:confirm|continue|view|insert)|press t to trust|permission required|requires permission|allow once|allow always|accessing workspace:|bypass permissions mode|choose the text style/i
 
 function findTerminalWaitBlockedSignal(
   normalized: string
@@ -41999,7 +42394,8 @@ function findTerminalWaitBlockedSignal(
   if (!TERMINAL_WAIT_BLOCKED_SENTINEL_RE.test(normalized)) {
     return null
   }
-  const candidates: { reason: RuntimeTerminalWaitBlockedReason; index: number }[] = []
+  const candidates: { reason: RuntimeTerminalWaitBlockedReason; index: number }[] =
+    findClaudeStartupDialogSignals(normalized)
   const updateIndex = normalized.lastIndexOf('update available')
   if (updateIndex !== -1 && normalized.includes('press enter to continue', updateIndex)) {
     candidates.push({ reason: 'codex-update-prompt', index: updateIndex })

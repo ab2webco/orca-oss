@@ -57,6 +57,9 @@ export const spacing = {
   xl: 24
 } as const
 
+// Smallest touch target in pt/dp (Apple HIG).
+export const MIN_TOUCH_TARGET = 44
+
 export const radii = {
   row: 6,
   card: 14,

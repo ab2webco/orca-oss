@@ -9,8 +9,9 @@ live run was made and no remote host was contacted.
 
 ## Summary
 
-- Remote placement exists only in `orchestration worker-start --on <saved-environment>`. The Run and
-  the coordinator stay on the home host. `game launch` and `game wave` have no placement.
+- Remote placement exists in `orchestration worker-start --on <saved-environment>` and, since
+  ORCA-794, `game launch --on <host> --repo <host repo>`. The Run and the coordinator stay on the
+  home host. `game wave` has no placement.
 - The home Run DB already records each federated dispatch's environment (`federated_dispatches`), so
   a cross-host fleet can come from the lead's own DB without scanning remote hosts.
 - Per-host capacity needs no new RPC. `diagnostics.memory` returns the host fields the game's cap
@@ -38,12 +39,12 @@ live run was made and no remote host was contacted.
 | Relay polls every 1 s; sync errors are swallowed                                                         | `src/main/runtime/orca-runtime.ts:5424-5447`                                                                                               |
 | A federated first signal gets a 60 s transport grace                                                     | `src/main/runtime/orchestration/dispatch-lifecycle-deadline.ts:10-13`                                                                      |
 | The default member cap comes from one host's total memory and cores                                      | `src/shared/orchestrator-game-lead.ts:64-72`                                                                                               |
-| The launch refusal compares running members with the cap                                                 | `src/cli/handlers/orchestrator-game-launch.ts:300-301`                                                                                     |
+| The launch refusal compares running members with the cap                                                 | `src/cli/handlers/orchestrator-game-launch.ts:297-298`                                                                                     |
 | `diagnostics.memory` returns the runtime memory snapshot                                                 | `src/main/runtime/rpc/methods/diagnostics.ts:5-9`                                                                                          |
 | Host memory carries `totalMemory`, `availableMemory`, `cpuCoreCount`                                     | `src/shared/process-stats-types.ts:61-70`                                                                                                  |
 | The setup queue is keyed per host (`ssh:<connectionId>` or local)                                        | `src/main/runtime/rpc/methods/orchestration-worker-setup-queue.ts:21-23`                                                                   |
 | Setup admission reads local memory pressure                                                              | `src/main/runtime/orchestration/worker-setup-admission.ts:11-20`                                                                           |
-| Under `accounts: auto`, a member's account comes from this host's roster only                            | `docs/reference/orchestrator-game.md:746-775`                                                                                              |
+| Under `accounts: auto`, a member's account comes from this host's roster only                            | `docs/reference/orchestrator-game.md:812-837`                                                                                              |
 | An older host drops `setupAdmission`; a capability guards it                                             | `src/shared/protocol-version.ts:70-72`                                                                                                     |
 | The wire harness covers the terminal stream only                                                         | `docs/reference/remote-wire-compatibility.md`, "Enforcement"                                                                               |
 | Environments are saved in `orca-environments.json`                                                       | `src/shared/runtime-environment-store.ts:20`                                                                                               |
@@ -128,6 +129,12 @@ host (decision O3).
 - Proposal: a remote member picks its account on the remote, from that host's roster. No new pin
   field. The accounts must be registered on the remote over SSH
   (`docs/reference/headless-linux-server.md:764-775`).
+- Shipped (ORCA-798, decision O5 revised): `auto` alone could land on an account a project forbids,
+  so `game launch --on` forwards the typed selector (`auto` or an email) in the optional
+  `account` field of `federationAttachStart`, gated by
+  `orchestration.federation-member-account.v1`. The host resolves it in
+  `orchestration-federation-member-account.ts`, refuses before any effect, and returns only the
+  email. No account id crosses hosts.
 - A cross-host `game move` is a new dispatch on the other host, not an in-place switch. The current
   `game move` restart path (`src/cli/handlers/orchestrator-game-move.ts:139-149`) is **unverified**;
   child 8 reads it before changing it.
@@ -161,6 +168,26 @@ host (decision O3).
   the existing ones (`src/shared/protocol-version.ts:64-78`). The home sends `game` and
   `setupAdmission` only after the remote confirms the capability. An older host is refused for game
   placement with a named error. Plain `worker-start --on` keeps working on older hosts.
+- Built in ORCA-790: `orchestration.federation-release.v1`. `worker-release` and `game stop` on a
+  settled remote member call `orchestration.federationRelease` on its host. That closes the agent
+  terminal the dispatch created and removes the worktree it created, without `--force`, so a tree
+  with changes stays. Both servers then mark the dispatch `stage = released` and it leaves the
+  fleet. A host without the capability keeps the member `retained` with `federation_unsupported`
+  and nothing is called there.
+- Built in ORCA-856: `orchestration.federation-member-reopen.v1` (federation protocol 4). A remote
+  member that already sent `worker_done` can still `ask`: the host keeps its capability proof at
+  settlement (`settled_capability_hash`, migration 38), reopens the attachment, and the home pulls
+  settled members every 10 s, so the question reopens the home Dispatch and lands in the lead's
+  waiting list. Against a home at protocol 3 the host refuses with `dispatch_reopen_unsupported`
+  and a message telling the member to ask the lead for a follow-up dispatch.
+- Built in ORCA-838: `orchestration.federation-follow-up.v1` (federation protocol 5). The lead's
+  `orchestration send --to dispatch:<id>` to a settled, unreleased remote member reopens that same
+  Dispatch at home and relays a `follow_up` item; the host reopens the attachment with the member's
+  own capability, so push-on-idle hands the mail to the agent on its next turn and the Panel tracks
+  it again. The body ends with a note to send `worker_done` again. A protocol-4 member is refused
+  with `dispatch_inactive` naming `worker-start --on <host> --worktree … --terminal …`, and a
+  `worker-start --on --terminal` that fails `agent_readiness` on a settled member's pane names the
+  `send --to dispatch:<id>` follow-up.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the
@@ -214,6 +241,19 @@ takes the host records, each host's running count from the home DB, each host's 
 requested role. It returns the chosen host or a named refusal.
 
 **Fleet and state.** The cross-host fleet is read from the home DB. Per-host process scans are not used.
+Built in ORCA-793: a new lead opens a new Run, so the fleet also lists unreleased remote members of a
+Run whose lead is gone, and of the current Run from before this lead claimed it, as long as their
+host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
+task is completed carries `remote.ticketDone`, counts as finished, and its next step is `game stop`.
+Another live lead's members are never listed. Both fields are optional on the wire.
+Scoped in ORCA-848: an earlier Run counts only when its lead pane belongs to this lead's project
+(`repo:<id>`, the key the game board and paused members use). The pane is the Run's coordinator pane,
+or, once a newer Run took that pane, the pane that created the member's task. A Run whose lead pane
+still runs is live even when a restart fenced its handle (ORCA-835). A Run Orca cannot place is left out.
+Built in ORCA-837: `federationShow` also returns an optional `agent` (the host's latest Claude/Codex
+hook state, its time and a usage limit), and that wins over the dispatch's status, so a member that
+keeps working after `worker_done` reads as working. A host that omits it keeps the dispatch-and-title
+reading, so no capability is needed: the read is the same RPC with one more optional field (Rule 1).
 
 **Wire.** Capability `orchestration.federation-game-member.v1` (name proposed). `game` and
 `setupAdmission` are forwarded only after the remote confirms it.

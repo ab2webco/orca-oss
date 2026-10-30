@@ -12,6 +12,7 @@ import type {
   Costume,
   Look,
   SceneCast,
+  SceneCharacter,
   SceneDefinition
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import { joinPath } from '../../lib/path'
@@ -65,6 +66,31 @@ const castText = (cast: SceneCast): Record<string, unknown> => ({
   ...(cast.advisor ? { advisor: { ...cast.advisor, colors: colorsText(cast.advisor.colors) } } : {})
 })
 
+const characterText = ({ name, variant, costumes }: SceneCharacter): Record<string, unknown> => ({
+  name,
+  ...(variant
+    ? {
+        variant: {
+          ...variant,
+          ...(variant.colors ? { colors: colorsText(variant.colors) } : {}),
+          ...(variant.accessoryColor === undefined
+            ? {}
+            : { accessoryColor: hex(variant.accessoryColor) })
+        }
+      }
+    : {}),
+  ...(costumes ? { costumes: byPhase(costumes, costumeText) } : {})
+})
+
+// Why: a file writes each look in its roster entry; the definition carries the looks apart.
+const rosterText = (scene: SceneDefinition): unknown[] | undefined =>
+  scene.roster?.map((name) => {
+    const character = scene.characters?.find(
+      (one) => JSON.stringify(one.name) === JSON.stringify(name)
+    )
+    return character ? characterText(character) : name
+  })
+
 const byPhase = <T>(
   values: Record<string, T>,
   of: (value: T) => unknown
@@ -88,7 +114,8 @@ export function sceneFileTextOf(scene: SceneDefinition): string {
           )
         }
       : {}),
-    ...(scene.cast ? { cast: castText(scene.cast) } : {})
+    ...(scene.cast ? { cast: castText(scene.cast) } : {}),
+    ...(scene.roster ? { roster: rosterText(scene) } : {})
   }
   return `${JSON.stringify(file, null, 2)}\n`
 }

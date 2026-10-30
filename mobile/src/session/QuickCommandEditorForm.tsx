@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, Pressable, TextInput, StyleSheet, Switch } from 'react-native'
+import { View, Pressable, StyleSheet, Switch } from 'react-native'
+import { Text, TextInput } from '../theme/dynamic-type-text'
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
 import { colors, spacing, radii, typography } from '../theme/mobile-theme'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'

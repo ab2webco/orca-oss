@@ -27,6 +27,10 @@ import type { CommitMessagePlan } from '../../shared/commit-message-plan'
 import type { RemoteCommitMessageExecResult } from '../text-generation/commit-message-text-generation'
 import type { RemoteHostPlatform } from '../ssh/ssh-remote-platform'
 import {
+  RELAY_WORKTREE_PROCESSES_METHOD,
+  type WorktreeProcessesResult
+} from '../../shared/worktree-processes'
+import {
   describeMaxBufferOverflowError,
   isMaxBufferOverflowError
 } from '../git/max-buffer-overflow'
@@ -898,6 +902,25 @@ export class SshGitProvider implements IGitProvider {
         unsubscribe?.()
       }
     })
+  }
+
+  /** Lists (and with `stop`, terminates) the processes with a cwd inside `root` on the remote host. */
+  async listWorktreeProcesses(root: string, stop: boolean): Promise<WorktreeProcessesResult> {
+    try {
+      return (await this.mux.request(RELAY_WORKTREE_PROCESSES_METHOD, {
+        root,
+        stop
+      })) as WorktreeProcessesResult
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code === JsonRpcErrorCode.MethodNotFound) {
+        return {
+          supported: false,
+          root,
+          reason: 'the SSH relay on this host is too old to list processes; reconnect to update it'
+        }
+      }
+      throw error
+    }
   }
 
   async isGitRepoAsync(dirPath: string): Promise<{ isRepo: boolean; rootPath: string | null }> {

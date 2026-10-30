@@ -220,7 +220,8 @@ const BRANCH_MIN_CELLS = 8
 
 /** `claude · ana@… · ⎇ feat/x`: the tag shortens before the branch loses its minimum. */
 export const memberMetaOf = (
-  agent: Pick<GameAgent, 'agentType' | 'account' | 'worktree'>,
+  agent: Pick<GameAgent, 'agentType' | 'account' | 'worktree' | 'remote'> &
+    Partial<Pick<GameAgent, 'state'>>,
   room: number
 ): string => {
   const branch = agent.worktree?.branch || agent.worktree?.displayName || ''

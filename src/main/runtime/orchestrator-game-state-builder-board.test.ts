@@ -62,3 +62,58 @@ describe('buildOrchestratorGameState inboxes', () => {
     expect('inboxes' in failed).toBe(false)
   })
 })
+
+describe('buildOrchestratorGameState owner questions', () => {
+  it('gives the lead the count of questions waiting on the person, a member none', async () => {
+    const lead = await buildOrchestratorGameState({
+      ...base,
+      readOpenOwnerQuestions: async () => 2
+    })
+    expect(lead.openOwnerQuestions).toBe(2)
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readOpenOwnerQuestions: async () => 2
+    })
+    expect('openOwnerQuestions' in member).toBe(false)
+    const failed = await buildOrchestratorGameState({
+      ...base,
+      readOpenOwnerQuestions: async () => {
+        throw new Error('EACCES')
+      }
+    })
+    expect('openOwnerQuestions' in failed).toBe(false)
+  })
+})
+
+describe('buildOrchestratorGameState GitHub budget', () => {
+  const budget = {
+    graphql: { limit: 5000, remaining: 400, resetAt: 1, orcaCalls: 30 },
+    core: { limit: 5000, remaining: 4000, resetAt: 1, orcaCalls: 2 },
+    top: [],
+    low: true
+  }
+
+  it('carries the GitHub budget to the lead and to a member', async () => {
+    const readGitHubBudget = async () => budget
+    expect((await buildOrchestratorGameState({ ...base, readGitHubBudget })).githubBudget).toEqual(
+      budget
+    )
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readGitHubBudget
+    })
+    expect(member.githubBudget).toEqual(budget)
+  })
+
+  it('leaves it out when it cannot be read', async () => {
+    const state = await buildOrchestratorGameState({
+      ...base,
+      readGitHubBudget: async () => {
+        throw new Error('gh not found')
+      }
+    })
+    expect('githubBudget' in state).toBe(false)
+  })
+})

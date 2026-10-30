@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Linking,
-  ActivityIndicator,
-  ScrollView
-} from 'react-native'
+import { View, StyleSheet, Pressable, Linking, ActivityIndicator, ScrollView } from 'react-native'
+import { Text } from '../src/theme/dynamic-type-text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router'
 import {

@@ -12,6 +12,7 @@ import { chromium } from 'playwright'
 import {
   arcadeShotsOf,
   captureOptionsOf,
+  rosterShotsOf,
   scenePhasesOf,
   sceneShotsOf
 } from './orca-game-scene-capture-plan.mjs'
@@ -30,7 +31,7 @@ import { advisorCardOf } from './advisor-card-rows'
 import { advisorTileGridOf } from './advisor-tile'
 import { advisorOf, allyPartsOf, allyRowsOf } from './allies'
 import { TILE_COLUMNS, tileGridOf } from './fleet-tiles'
-import { gameStrings, setGameLocale } from './game-strings'
+import { gameStrings, localizedNameOf, setGameLocale } from './game-strings'
 import { memberAdvisorLinesOf } from './member-advisor'
 import { HERO_LEFT, runnerOf, runnerStartOf } from './arcade-runner'
 import { ARCADE_RUNNER } from './arcade-runner-data'
@@ -103,6 +104,12 @@ export const stripOf = ({ scene, isPanelShown, columns }) => {
 }
 const MEMBER_JEV = { model: 'Sonnet 5.5', effort: 'high', pinned: { model: true, effort: false },
   previous: { model: 'Opus 5.5', effort: 'high' } }
+// The English name of each roster entry, the key the game finds a member's character by.
+export const rosterOf = (scene) =>
+  (typeof scene === 'string' ? SCENES[scene] : scene).roster?.map((name) => localizedNameOf(name, 'en')) ?? []
+// A roster name's Panel tile in a phase: the character it is drawn as.
+export const rosterTileOf = ({ scene, phase, member }) => ({ tileColumns: TILE_COLUMNS,
+  tile: tileGridOf(typeof scene === 'string' ? SCENES[scene] : scene, phase, 'working', 0, 'none', member) })
 // A member card of the lead's Panel, with the row its own Jev reports or without one.
 export const memberCardOf = ({ scene, withJev, columns }) => {
   setGameLocale('es')
@@ -245,9 +252,17 @@ const main = async () => {
     outfile: bundle,
     logLevel: 'warning'
   })
-  const { SCENE_IDS, arcadeOf, gridOf, cardsOf, memberCardOf, stripOf, sceneOfFile } = await import(
-    pathToFileURL(bundle).href
-  )
+  const {
+    SCENE_IDS,
+    arcadeOf,
+    gridOf,
+    cardsOf,
+    memberCardOf,
+    stripOf,
+    sceneOfFile,
+    rosterOf,
+    rosterTileOf
+  } = await import(pathToFileURL(bundle).href)
   const custom = sceneFile === undefined ? [] : [sceneOfFile(await readFile(sceneFile, 'utf8'))]
   const browser = await chromium.launch()
   const page = await browser.newPage({ deviceScaleFactor: 1 })
@@ -338,6 +353,21 @@ p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</di
     'members',
     shots.slice(memberShots).map((path) => path.slice(out.length + 1, -'.png'.length))
   )
+  // A scene file's characters, one sheet per phase: the check that every name looks like itself.
+  for (const scene of custom) {
+    for (const phase of scenePhasesOf(phases, true)) {
+      const before = shots.length
+      for (const shot of rosterShotsOf('scene-file', [phase], rosterOf(scene))) {
+        const { tile, tileColumns } = rosterTileOf({ scene, ...shot })
+        const grid = cardGridOf(40, tile, tileColumns, [[[shot.member, 'cyan']]], colorOf('cyan'))
+        await shoot(shot.name, grid, 40)
+      }
+      const names = shots.slice(before).map((path) => path.slice(out.length + 1, -'.png'.length))
+      if (names.length > 0) {
+        await sheetOf(`roster-scene-file-${phase}`, names)
+      }
+    }
+  }
   await browser.close()
   await rm(bundle)
   await writeFile(join(out, 'index.txt'), `${shots.join('\n')}\n`)

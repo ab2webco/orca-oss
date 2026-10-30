@@ -523,7 +523,7 @@ describe('lifecycle reconciliation', () => {
     expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).not.toBeNull()
   })
 
-  it('suppresses same-dispatch heartbeats once worker_done is reconciled', () => {
+  it('rejects same-dispatch heartbeats once worker_done is reconciled, without surfacing them', () => {
     db = new OrchestrationDb(':memory:')
     const task = db.createTask({ spec: 'work' })
     const dispatch = db.createDispatchContext(task.id, 'term_worker')
@@ -566,9 +566,59 @@ describe('lifecycle reconciliation', () => {
     expect(archived?.delivered_at).not.toBeNull()
 
     const lateHeartbeat = insertHeartbeat(dispatch.id, 'term_worker')
-    expect(reconcileLifecycleMessage(db, lateHeartbeat)).toEqual({ action: 'suppressed' })
+    expect(reconcileLifecycleMessage(db, lateHeartbeat)).toMatchObject({
+      action: 'rejected',
+      code: 'inactive_dispatch',
+      reason: expect.stringContaining('completed')
+    })
     expect(db.getMessageById(lateHeartbeat.id)).toMatchObject({ read: 1 })
     expect(db.getMessageById(lateHeartbeat.id)?.delivered_at).not.toBeNull()
+  })
+})
+
+describe('heartbeats for a dispatch that is not running (ORCA-677)', () => {
+  let db: OrchestrationDb
+
+  afterEach(() => db?.close())
+
+  function heartbeat(dispatchId: string) {
+    return db.insertMessage({
+      from: 'term_worker',
+      to: 'term_coordinator',
+      subject: 'alive',
+      type: 'heartbeat',
+      payload: JSON.stringify({ dispatchId })
+    })
+  }
+
+  it('rejects a heartbeat for a failed dispatch and leaves its rows unchanged', () => {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'work' })
+    const dispatch = db.createDispatchContext(task.id, 'term_worker')
+    db.failDispatch(dispatch.id, 'worker exited with code 1')
+    const before = db.getDispatchContextById(dispatch.id)
+    const taskBefore = db.getTask(task.id)
+    const logs: string[] = []
+
+    const msg = heartbeat(dispatch.id)
+    const result = reconcileLifecycleMessage(db, msg, (l) => logs.push(l))
+
+    expect(result).toMatchObject({ action: 'rejected', code: 'inactive_dispatch' })
+    expect(db.getDispatchContextById(dispatch.id)).toEqual(before)
+    expect(db.getTask(task.id)).toEqual(taskBefore)
+    // Why: a ghost loop beats every few minutes; it must not land in the coordinator's inbox.
+    expect(db.getUnreadMessages('term_coordinator', ['heartbeat'])).toHaveLength(0)
+    expect(db.getMessageById(msg.id)?.delivered_at).not.toBeNull()
+    expect(logs.some((l) => l.includes('rejected'))).toBe(true)
+  })
+
+  it('rejects a heartbeat that names an unknown dispatch', () => {
+    db = new OrchestrationDb(':memory:')
+
+    const result = reconcileLifecycleMessage(db, heartbeat('ctx_missing'))
+
+    expect(result).toMatchObject({ action: 'rejected', code: 'unknown_dispatch' })
+    expect(db.getUnreadMessages('term_coordinator', ['heartbeat'])).toHaveLength(0)
   })
 })
 
@@ -660,7 +710,7 @@ describe('reopening a Dispatch failed by inference', () => {
 
     const result = reconcileLifecycleMessage(db, lateHeartbeat(dispatchId), (l) => logs.push(l))
 
-    expect(result).toEqual({ action: 'suppressed' })
+    expect(result).toMatchObject({ action: 'rejected', code: 'inactive_dispatch' })
     expect(db.getDispatchContextById(dispatchId)?.status).toBe('failed')
     expect(db.getDispatchContextById(dispatchId)?.last_failure).toBe('worker exited with code 1')
     expect(db.getTask(taskId)?.status).not.toBe('dispatched')
@@ -682,7 +732,7 @@ describe('reopening a Dispatch failed by inference', () => {
 
     const result = reconcileLifecycleMessage(db, lateHeartbeat(dispatchId))
 
-    expect(result).toEqual({ action: 'suppressed' })
+    expect(result).toMatchObject({ action: 'rejected', code: 'inactive_dispatch' })
     expect(db.getDispatchContextById(dispatchId)?.status).toBe('failed')
     expect(db.getTask(taskId)?.status).not.toBe('dispatched')
   })

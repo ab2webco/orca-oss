@@ -42,6 +42,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain("don't relaunch or re-arm watchers until asked")
   })
 
+  it('asks the person through a recorded question, never only in chat', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca game ask-owner --ticket <id> --question <text> --option <a> --option <b>`'
+    )
+    expect(brief).toContain('an escalation from `owner`')
+  })
+
   it('resumes the members a restart paused at once, then tells the person', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
@@ -70,6 +79,13 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('read `orca game events` and `orca game inbox` first')
   })
 
+  it('relays a retired backlog as one line and verifies what is still open (ORCA-824)', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
+
+    expect(brief).toContain('A check result with `retired`')
+    expect(brief).toContain('under `unverified` with `/opt/orca-dev game member <ticket>`')
+  })
+
   it('reads and relays its orchestration messages when Orca says it has some, never echoing the line', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', '/opt/orca-dev')
 
@@ -92,6 +108,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('replays the same messages')
   })
 
+  // Why: leads added status to --types to hear other leads, and woke on every member ping (ORCA-861).
+  it('says mail from outside its members wakes the watch, so status stays out of --types', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain('Mail from another lead or the person wakes it whatever its type')
+    expect(brief).toContain('never add `status` to --types')
+    expect(brief).not.toContain('decision_gate,status')
+  })
+
   // Why: a quiet timeout used to print a result the lead had to re-arm for, one turn per window with no event (ORCA-746 T6b).
   it('watches with --watch so a quiet window never wakes the lead', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
@@ -107,6 +132,15 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain(
       'For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.'
     )
+  })
+
+  it('places a member on a paired host with game launch --on, never a plain worker-start (ORCA-794)', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca game launch <ticket> --on <host> --repo <selector of the repo on that host>`'
+    )
+    expect(brief).toContain('never with `orchestration worker-start --on`')
   })
 
   it('writes every command with the CLI this session runs', () => {
@@ -160,14 +194,17 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('--account <email|id>')
     expect(brief).toContain('`orca game move <ticket>`')
     expect(brief).toContain('when the first account is back')
-    expect(brief).not.toContain('accounts: auto')
   })
 
-  it('leaves the account to Orca with accounts: auto unless the person names one', () => {
-    const brief = gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, accounts: 'auto' }, 'cineco')
-
-    expect(brief).toContain('accounts: auto')
-    expect(brief).toContain("don't pick an account yourself unless the person names one")
+  it('leaves the account to Orca unless the person names one, also with accounts unset', () => {
+    for (const lead of [DEFAULT_GAME_LEAD, { ...DEFAULT_GAME_LEAD, accounts: 'auto' as const }]) {
+      const brief = gameLeadBriefOf(lead, 'cineco')
+      expect(brief).toContain('freest account')
+      expect(brief).toContain("don't pick an account yourself unless the person names one")
+    }
+    expect(gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, accounts: 'default' }, 'cineco')).not.toContain(
+      'freest account'
+    )
   })
 
   it('answers about members from Orca, not from memory: member, fleet and history', () => {

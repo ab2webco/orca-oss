@@ -129,6 +129,14 @@ export const listStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm
   },
+  // Why: at 320 dp and the capped text size the input beside both buttons clipped "Commit mes".
+  commitRowStacked: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end'
+  },
+  commitInputStacked: {
+    flexBasis: '100%'
+  },
   commitInput: {
     flex: 1,
     minHeight: 42,

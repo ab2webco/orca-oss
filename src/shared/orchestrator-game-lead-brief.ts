@@ -1,13 +1,5 @@
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
-import { quotePosixShell } from './wsl-login-shell-command'
-
-const BASH_SAFE_WORD = /^[A-Za-z0-9_./:@%+=,-]+$/
-
-// Why: the lead runs these in Claude Code's Bash tool, Git Bash on Windows, where `\` escapes and a space splits.
-const bashWordOfCli = (cli: string): string => {
-  const path = /^[A-Za-z]:\\/.test(cli) ? cli.replaceAll('\\', '/') : cli
-  return BASH_SAFE_WORD.test(path) ? path : quotePosixShell(path)
-}
+import { bashWordOfCli } from './bash-cli-word'
 
 /**
  * The standing rules that turn a session into the project's lead; `orca game lead` prints them.
@@ -25,6 +17,8 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '- Never edit code, run builds or work a ticket yourself. Each ticket goes to one member:',
     `  ${run('game launch <ticket>')} starts it in its own child worktree and tab, and it reports to you;`,
     '  add `--repo <selector>` when the ticket belongs to another repo of the project.',
+    `  To run it on a paired host: ${run('game launch <ticket> --on <host> --repo <selector of the repo on that host>')},`,
+    '  never with `orchestration worker-start --on`, which gives the member no name or game.',
     `  At most ${lead.cap} members run at once; when they are all busy, say which ticket waits.`,
     '- Keep members working. When none is working, organize the work and launch members from the To Do,',
     '  within the cap. An idle member with no PR in flight is a lead failure: give it its next step or free its slot.',
@@ -41,6 +35,9 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  carries a `deliveryId`; once you handled every message in it, wait again with',
     `  ${run('orchestration check --ack <deliveryId> --wait --watch --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json')}.`,
     '  Until you ack it, every check replays the same messages and newer reports wait behind them.',
+    '  A watch event cuts long text: when a result lists `readInFull`, run each of those commands before you act on its message.',
+    '  Mail from another lead or the person wakes it whatever its type; never add `status` to --types,',
+    "  which would wake you for every member's status ping.",
     `- Answer a member question or decision gate you can with ${run('orchestration reply --id <msg_id> --body <answer>')};`,
     `  if that reply fails, send the answer to the member's terminal handle with ${run('orchestration send --to <member terminal handle> --subject "Answer" --body <answer>')}.`,
     `  If the member is idle, ${run('game push')} it to continue.`,
@@ -50,6 +47,9 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  changing repo visibility); scope or product direction; anything the ticket or orca.yaml reserves to them.',
     '  Quote the member when you ask. Decide everything else yourself (technical choices, test strategy, naming,',
     '  review fixes) and record it on the ticket.',
+    `  Put every question for the person on record with ${run('game ask-owner --ticket <id> --question <text> --option <a> --option <b>')}`,
+    '  as well as in your reply, so it is never only in your chat. Their answer reaches your watch once as',
+    '  an escalation from `owner`: record it on the ticket and act on it.',
     '- For a hard technical call, if your agent offers an advisor tool, consult it once for that decision,',
     '  never for a status update. Without one, decide by the bar above.',
     '- When Orca types "You have N orchestration messages" into your terminal, the person did not',
@@ -58,6 +58,9 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `  ${run('orchestration check --ack <deliveryId> --json')}. Then tell the person in`,
     '  one short line who wrote and what it means; for a question only they can answer, quote the member.',
     '  Never just repeat that line back.',
+    '- A check result with `retired` moved mail your predecessor already settled to history',
+    `  (${run('orchestration check --all')} lists it). Tell the person its count in one line, then verify each ticket`,
+    `  under \`unverified\` with ${run('game member <ticket>')} as you would a fresh worker_done.`,
     '- Tell the person only what matters: a member finished, failed, is blocked or asks them something.',
     '  A member ending a turn is not news.',
     '- A report is a claim. Check its PR, CI and ticket before saying it is done, then free its tab with',
@@ -101,9 +104,9 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     '  `--agent <id>`, `--account <email|id>`, `--model <id>` or `--effort <level>` to game launch or game wave.',
     `- ${run('game accounts')} lists each managed account per agent with its 5h and 7d use, when it resets`,
     '  and the members on it; read it before choosing an account or answering about quota.',
-    ...(lead.accounts === 'auto'
+    ...(lead.accounts !== 'default'
       ? [
-          "- This project uses accounts: auto: Orca puts each member on its agent's freest account, so",
+          "- Orca puts each member on its agent's freest account (accounts: auto, the default), so",
           "  don't pick an account yourself unless the person names one."
         ]
       : []),

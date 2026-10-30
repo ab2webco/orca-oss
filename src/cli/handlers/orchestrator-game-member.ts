@@ -65,21 +65,36 @@ async function inputOf(
     state.agents.find((agent) => agent.isLeader)?.terminalHandle ??
     process.env.ORCA_TERMINAL_HANDLE ??
     null
-  const worktreeId = member.worktree?.id ?? null
+  // Why: a remote member's terminal and worktree live on its host; the home dispatch reads them (ORCA-824).
+  const remoteDispatchId = member.remote ? member.paneKey.replace(/^remote:/, '') : null
+  const worktreeId = remoteDispatchId ? null : (member.worktree?.id ?? null)
   const [terminal, workers, leadInbox, memberInbox, history] = await Promise.all([
-    handle
+    remoteDispatchId
       ? part(
           notes,
           'terminal',
           async () =>
             (
-              await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
-                terminal: handle,
+              await client.call<{ terminal: RuntimeTerminalRead }>('orchestration.workerRead', {
+                dispatch: remoteDispatchId,
+                source: 'terminal',
                 limit: GAME_MEMBER_TERMINAL_LINES
               })
             ).result.terminal.tail
         )
-      : null,
+      : handle
+        ? part(
+            notes,
+            'terminal',
+            async () =>
+              (
+                await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
+                  terminal: handle,
+                  limit: GAME_MEMBER_TERMINAL_LINES
+                })
+              ).result.terminal.tail
+          )
+        : null,
     part(
       notes,
       'dispatches',
@@ -103,7 +118,9 @@ async function inputOf(
         )
       : null
   ])
-  const live = dispatchOf({ row: { terminalHandle: handle }, worktreeId }, workers ?? [])
+  const live = remoteDispatchId
+    ? { dispatchId: remoteDispatchId, taskId: null }
+    : dispatchOf({ row: { terminalHandle: handle }, worktreeId }, workers ?? [])
   const attempts = (workers ?? []).filter((one) =>
     live?.taskId ? one.taskId === live.taskId : one === live
   )
@@ -147,7 +164,7 @@ const readInbox = async (client: Client, terminal: string) =>
 export function formatGameMember(report: GameMemberReport): string {
   const { now, since } = report
   const lines = [
-    `${report.ticket ?? report.name} · ${now.phase} · ${[report.agent, report.account].filter(Boolean).join(' · ')}${report.branch ? ` · ⎇ ${report.branch}` : ''}`,
+    `${report.ticket ?? report.name} · ${now.phase} · ${[report.agent, report.account, report.host && `on ${report.host}`].filter(Boolean).join(' · ')}${report.branch ? ` · ⎇ ${report.branch}` : ''}`,
     `now: ${now.state}${now.tool ? `, last tool ${now.tool}` : ''}${now.activity ? `, ${now.activity}` : ''}${now.limitedUntil ? `, limited until ${now.limitedUntil}` : ''}`,
     ...now.terminal.map((line) => `  | ${line}`),
     `PR ${since.review ?? '-'} · CI ${since.ci ?? '-'} · ticket ${since.ticketStatus ?? '-'}`,

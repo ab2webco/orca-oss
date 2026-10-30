@@ -1,3 +1,4 @@
+import { bashWord, bashWordOfCli } from './bash-cli-word'
 import { ORCHESTRATION_LEGACY_RUN_ID } from './orchestration-rpc-contract'
 
 export type OrchestrationMessageSummary = {
@@ -13,6 +14,9 @@ export type OrchestrationMessageSummary = {
   priority?: string
   read?: number
 }
+
+// Why (ORCA-858): a lead watches check under Claude Code's Monitor, which cuts each line at ~500 characters and each event at ~3000.
+const OUTPUT_LINE_MAX = 400
 
 export type LegacyCompatibilityResult = {
   recovery?: boolean
@@ -32,6 +36,8 @@ export type LegacyCompatibilityResult = {
 }
 
 export type OrchestrationCheckOutput = {
+  /** Commands that print each message whose body or payload a watch line would cut; first so a cut event keeps them. */
+  readInFull?: string[]
   messages: OrchestrationMessageSummary[]
   count: number
   formatted?: string
@@ -40,6 +46,28 @@ export type OrchestrationCheckOutput = {
   cancelled?: boolean
   connectionLost?: boolean
   legacyCompatibility?: LegacyCompatibilityResult
+  retired?: RetiredRunMailNotice
+}
+
+/** Run mail a check moved to history because a previous lead's era settled it (ORCA-824). */
+export type RetiredRunMailNotice = {
+  count: number
+  /** Retired member reports whose PR is not merged or closed yet. */
+  unverified: { ticket: string; pr: string | null }[]
+}
+
+function formatRetiredNotice(retired: RetiredRunMailNotice | undefined): string {
+  if (!retired || retired.count === 0) {
+    return ''
+  }
+  const noun = retired.count === 1 ? 'message' : 'messages'
+  const unverified =
+    retired.unverified.length > 0
+      ? ` Still unverified: ${retired.unverified
+          .map((report) => `${report.ticket} (${report.pr ? `PR ${report.pr}` : 'no PR'})`)
+          .join(', ')}.`
+      : ''
+  return `${retired.count} inherited ${noun} retired to history (check --all).${unverified}\n`
 }
 
 export function formatMessageReadOnlyTag(
@@ -62,12 +90,14 @@ export function isLegacyReadOnlyMessage(
 
 export function formatOrchestrationCheckText(
   result: OrchestrationCheckOutput,
-  checkedTerminal: string
+  checkedTerminal: string,
+  cli?: string
 ): string {
   const prepared = prepareOrchestrationCheckOutput(
     result,
     checkedTerminal,
-    result.formatted !== undefined
+    result.formatted !== undefined,
+    cli
   )
   const compatibilityActive = Boolean(
     prepared.legacyCompatibility && !prepared.legacyCompatibility.readOnly
@@ -80,6 +110,56 @@ export function formatOrchestrationCheckText(
         : '[LEGACY COMPATIBILITY]\n'
     : ''
   const deliveryNotice = formatCurrentDeliveryNotice(prepared.legacyCompatibility?.currentDelivery)
+  const readInFull = (prepared.readInFull ?? []).map((command) => `Read in full: ${command}\n`)
+  return wrapLongLines(
+    `${readInFull.join('')}${formatRetiredNotice(prepared.retired)}${formatCheckBody(prepared, legacyHeader, deliveryNotice, compatibilityActive)}`
+  )
+}
+
+function wrapLongLines(text: string): string {
+  return text
+    .split('\n')
+    .flatMap((line) => {
+      if (line.length <= OUTPUT_LINE_MAX) {
+        return [line]
+      }
+      const indent = /^ {0,8}/.exec(line)?.[0] ?? ''
+      const pieces: string[] = []
+      let piece = ''
+      for (const character of line.slice(indent.length)) {
+        if (indent.length + piece.length + character.length > OUTPUT_LINE_MAX) {
+          pieces.push(`${indent}${piece}`)
+          piece = ''
+        }
+        piece += character
+      }
+      return [...pieces, `${indent}${piece}`]
+    })
+    .join('\n')
+}
+
+const fitsOneLine = (text: string | null | undefined): boolean =>
+  !text || JSON.stringify(text).length <= OUTPUT_LINE_MAX
+
+function readInFullCommands(
+  messages: readonly OrchestrationMessageSummary[],
+  checkedTerminal: string,
+  cli: string
+): string[] {
+  return messages
+    .filter((message) => !fitsOneLine(message.body) || !fitsOneLine(message.payload))
+    .map(
+      (message) =>
+        `${bashWordOfCli(cli)} orchestration inbox --terminal ${bashWord(message.to_handle ?? checkedTerminal)} --id ${bashWord(message.id)}`
+    )
+}
+
+function formatCheckBody(
+  prepared: OrchestrationCheckOutput,
+  legacyHeader: string,
+  deliveryNotice: string,
+  compatibilityActive: boolean
+): string {
   if (prepared.formatted) {
     return `${legacyHeader}${prepared.formatted}${deliveryNotice}`
   }
@@ -119,19 +199,23 @@ export function formatOrchestrationCheckText(
 export function prepareOrchestrationCheckOutput<T extends OrchestrationCheckOutput>(
   result: T,
   checkedTerminal: string,
-  formattedRequested: boolean
+  formattedRequested: boolean,
+  /** The CLI the reader runs, so the read it names is not a bare `orca` that may be another program. */
+  cli = 'orca'
 ): T {
   const compatibilityActive = Boolean(
     result.legacyCompatibility && !result.legacyCompatibility.readOnly
   )
+  const readInFull = readInFullCommands(result.messages, checkedTerminal, cli)
+  const sized = readInFull.length > 0 ? { readInFull, ...result } : result
   if (
     !formattedRequested ||
     !result.messages.some((message) => isLegacyReadOnlyMessage(message, compatibilityActive))
   ) {
-    return result
+    return sized
   }
   return {
-    ...result,
+    ...sized,
     formatted: formatLegacyAwareCheckMessages(result.messages, checkedTerminal, compatibilityActive)
   }
 }

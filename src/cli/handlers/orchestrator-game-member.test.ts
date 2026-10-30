@@ -203,3 +203,66 @@ describe('orca game member', () => {
     expect(text).toContain('aaaaaaa feat: seats')
   })
 })
+
+describe('orca game member for a member on a remote host (ORCA-824)', () => {
+  let output: string[] = []
+
+  beforeEach(() => {
+    output = []
+    vi.spyOn(console, 'log').mockImplementation((line: string) => {
+      output.push(line)
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reads its terminal and dispatch through the home dispatch, and names its host', async () => {
+    const remote = {
+      paneKey: 'remote:ctx_805',
+      displayName: 'ORCA-805 regression gate',
+      agentType: null,
+      state: 'working',
+      toolName: null,
+      isLeader: false,
+      isMember: true,
+      terminalHandle: 'term_on_imac',
+      remote: { host: 'imac', stateKnown: true },
+      worktree: { id: 'repo::/home/me/orca-805', branch: 'orca-805', displayName: 'ORCA-805' }
+    }
+    const calls: [string, unknown][] = []
+    const results: Record<string, unknown> = {
+      'game.state': { ...STATE, agents: [STATE.agents[0], remote] },
+      'orchestration.workerRead': {
+        dispatchId: 'ctx_805',
+        source: 'terminal',
+        terminal: { handle: 'term_on_imac', tail: ['running the gate'] }
+      },
+      'orchestration.workerList': { workers: [] },
+      'orchestration.workerShow': {
+        worker: { state: 'ready', stage: 'agent_ready', last_error: null, created_at: 'x' }
+      },
+      'orchestration.inbox': { messages: [], count: 0 }
+    }
+    const client = {
+      call: async (method: string, params: unknown) => {
+        calls.push([method, params])
+        return { ok: true, result: results[method] }
+      }
+    } as unknown as RuntimeClient
+
+    await run(client, 'ORCA-805', false)
+
+    const text = output.join('\n')
+    expect(text).toContain('ORCA-805 · working · on imac')
+    expect(text).toContain('  | running the gate')
+    expect(calls).toContainEqual([
+      'orchestration.workerRead',
+      { dispatch: 'ctx_805', source: 'terminal', limit: 20 }
+    ])
+    expect(calls).toContainEqual(['orchestration.workerShow', { dispatch: 'ctx_805' }])
+    expect(calls.map(([method]) => method)).not.toContain('terminal.read')
+    expect(calls.map(([method]) => method)).not.toContain('git.history')
+  })
+})

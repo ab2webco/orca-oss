@@ -32,6 +32,7 @@ import { arcadeWords } from './arcade-words'
 import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
 import { flatPhaseLineOf } from './flat-view'
+import { isMemberBandCollapsed } from './member-pane'
 import { shownCaption } from './quest-state'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
@@ -191,10 +192,12 @@ const registerNotes = (on: On) => {
 const registerSpinner = (on: On) => {
   on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
     await ready($)
-    if (!isSceneDrawn() || e.surface !== 'terminal') {
+    // Why: a member who collapsed its band asked for Claude's own spinner, with no scene above it.
+    const isCollapsed = isMemberBandCollapsed()
+    if (isCollapsed || !isSceneDrawn() || e.surface !== 'terminal') {
       quest.stages.delete(e.requestId)
       forgetFrames(e.requestId)
-      if (isOff() || e.surface !== 'terminal') {
+      if (isCollapsed || isOff() || e.surface !== 'terminal') {
         return next(e)
       }
       // Flat keeps what the hero shows, the phase's card and the caption, as one line of text.

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 import type { GameInboxMail } from '../../shared/orchestrator-game-inbox'
@@ -57,7 +57,8 @@ function board(rows: GameInboxMail[], pendingQuestions: GameInboxMail[] = []) {
         mail: rows,
         pendingQuestions
       }
-    }
+    },
+    tellLead: () => true
   })
   return { game, asked }
 }
@@ -129,5 +130,62 @@ describe('GameBoard inbox', () => {
       },
       { key: 'CIN-1', unread: 0, last: null, waiting: [] }
     ])
+  })
+
+  it("gives the person's Inbox every ticket's thread and what waits on the lead, without marking anything read (ORCA-878)", async () => {
+    const question = mail(2, 'term_lead', 'term_1')
+    const { game } = board([mail(1, 'term_1', 'term_lead'), question], [question])
+
+    const read = await game.inboxThreads({ worktreeId: 'wt_lead' })
+
+    expect(
+      read.threads.map((thread) => [thread.ticket, thread.messages.length, thread.waiting])
+    ).toEqual([['CIN-1', 2, 1]])
+    expect(read.waiting.map((item) => [item.id, item.ticket, item.answerer])).toEqual([
+      ['msg_2', 'CIN-1', 'lead']
+    ])
+    expect(read.answered).toEqual([])
+    expect((await game.inbox({ terminalHandle: 'term_lead' })).inbox.unread).toBe(1)
+  })
+
+  it("refuses a member the project's threads: it reads only its own ticket", async () => {
+    const { game } = board([])
+
+    await expect(game.inboxThreads({ terminalHandle: 'term_1' })).rejects.toThrow(/member/)
+  })
+})
+
+describe('withProjectLead (ORCA-878)', () => {
+  const PERSON: GameBoardProject = {
+    key: 'repo:r1',
+    isMember: false,
+    memberTicket: null,
+    lead: null
+  }
+
+  it("gives a caller with only a worktree its project's live lead, with that lead's pane", async () => {
+    await expect(
+      withProjectLead(
+        PERSON,
+        async () => 'term_lead',
+        (handle) => `tab:${handle}`
+      )
+    ).resolves.toEqual({ ...PERSON, lead: { handle: 'term_lead', paneKey: 'tab:term_lead' } })
+    await expect(
+      withProjectLead(
+        PERSON,
+        async () => null,
+        () => null
+      )
+    ).resolves.toEqual(PERSON)
+  })
+
+  it('keeps a terminal caller and a member as they are', async () => {
+    const lookup = async () => 'term_other'
+    await expect(withProjectLead(LEAD, lookup, () => null)).resolves.toBe(LEAD)
+    await expect(withProjectLead({ ...MEMBER, lead: null }, lookup, () => null)).resolves.toEqual({
+      ...MEMBER,
+      lead: null
+    })
   })
 })

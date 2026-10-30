@@ -1,4 +1,5 @@
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, ScrollView, View } from 'react-native'
+import { Text } from '../../theme/dynamic-type-text'
 import { colors } from '../../theme/mobile-theme'
 import type { PRCheckRunDetails } from '../../../../src/shared/github/check-types'
 import { presentCheckDetail, type CheckDetailJob } from './pr-check-detail-content'

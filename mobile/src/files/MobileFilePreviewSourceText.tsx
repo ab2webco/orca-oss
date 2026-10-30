@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { ScrollView, Text } from 'react-native'
+import { ScrollView } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { MobileSyntaxSegments } from '../components/MobileSyntaxSegments'
 import { formatPreviewByteLength } from './mobile-file-preview-request'
 import { scrollOffsetForPreviewLine } from './mobile-file-preview-line-column'

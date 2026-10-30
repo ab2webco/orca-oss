@@ -10,6 +10,7 @@
  */
 import { isTerminalLeafId, makePaneKey } from '../../../../shared/stable-pane-id'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { worktreeSlugEnv } from '../../../../shared/worktree/slug'
 import type { TerminalPaneLayoutNode, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { AppState } from '@/store'
 import { useAppStore } from '@/store'
@@ -157,7 +158,8 @@ function buildPaneIdentityEnv(
       : {}),
     ORCA_PANE_KEY: makePaneKey(tabId, leafId),
     ORCA_TAB_ID: tabId,
-    ORCA_WORKTREE_ID: worktreeId
+    ORCA_WORKTREE_ID: worktreeId,
+    ...worktreeSlugEnv(worktreeId)
   }
 }
 

@@ -129,6 +129,11 @@ export type QuestionRow = {
   closed_at: string | null
 }
 
+export type GameAnsweredQuestionRow = MessageRow & {
+  answer_body: string | null
+  answered_at: string | null
+}
+
 export type MutationState = 'pending' | 'completed'
 
 export type MutationReceiptRow = {
@@ -215,11 +220,21 @@ export type RemoteDispatchAttachmentRow = {
   residual_resources: string
   to_worker_imported_sequence: number
   last_error: string | null
+  /** JSON of the lead's scene `{ id, text }`; null for a plain worker or an older home. */
+  game_scene: string | null
+  /** The capability hash at a successful settlement; lets its member reopen it with `ask` (ORCA-856). */
+  settled_capability_hash: string | null
   created_at: string
   updated_at: string
 }
 
 export type FederationRelayDirection = 'to_home' | 'to_worker'
+
+export type RemoteAttachmentRefusal =
+  | 'capability_missing'
+  | 'capability_mismatch'
+  | 'capability_revoked'
+  | 'process_mismatch'
 
 export type FederationRelayItemRow = {
   dispatch_id: string

@@ -107,6 +107,9 @@ describe('GameLeads claim', () => {
         read: async (key) => stored.get(key) ?? null,
         write: async (key, session) => {
           stored.set(key, session)
+        },
+        clear: async (key) => {
+          stored.delete(key)
         }
       },
       sessionOf: async () => args.caller ?? null,
@@ -127,7 +130,11 @@ describe('GameLeads claim', () => {
     const game = new GameLeads({
       projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
       isLive: () => true,
-      sessions: { read: async () => null, write: async () => undefined },
+      sessions: {
+        read: async () => null,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
       sessionOf: async () => null,
       resume: async () => 'never',
       focus: async (handle) => {
@@ -203,6 +210,54 @@ describe('GameLeads claim', () => {
     expect(stored.get('repo:a')).toEqual(SESSION)
   })
 
+  it('rotates on fresh: the caller becomes the lead and its conversation replaces the stored one (ORCA-822)', async () => {
+    const caller = { ...SESSION, sessionId: 'sess-new' }
+    const { game, stored, resumed } = claiming({ live: ['term_a'], stored: SESSION, caller })
+
+    await expect(
+      game.register({ project: 'cineco', label: 'Ana', claim: true, fresh: true })
+    ).resolves.toEqual({ registered: true })
+    expect(resumed).toEqual([])
+    expect(stored.get('repo:a')).toEqual(caller)
+    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_a'])
+  })
+
+  it('retires the stored conversation on fresh even when the caller reports none yet (ORCA-822)', async () => {
+    const { game, stored, resumed } = claiming({ live: ['term_a'], stored: SESSION, caller: null })
+
+    await expect(
+      game.register({ project: 'cineco', label: 'Ana', claim: true, fresh: true })
+    ).resolves.toEqual({ registered: true })
+    expect(resumed).toEqual([])
+    expect(stored.has('repo:a')).toBe(false)
+  })
+
+  it('keeps the live lead on fresh: rotation needs the outgoing lead closed first (ORCA-822)', async () => {
+    let caller = 'term_a'
+    const focused: string[] = []
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
+      isLive: () => true,
+      sessions: {
+        read: async () => SESSION,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
+      sessionOf: async () => null,
+      resume: async () => 'never',
+      focus: async (handle) => {
+        focused.push(handle)
+      }
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true, fresh: true })
+
+    caller = 'term_b'
+    await expect(
+      game.register({ project: 'cineco', label: 'Ana', claim: true, fresh: true })
+    ).resolves.toEqual({ registered: false, live: { handle: 'term_a' } })
+    expect(focused).toEqual(['term_a'])
+  })
+
   it('neither enforces nor resumes for a caller Orca cannot place in a project', async () => {
     const { game, resumed, stored } = claiming({
       project: { ...LEAD, key: 'no-project' },
@@ -225,7 +280,11 @@ describe('GameLeads claim', () => {
       projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
       isLive: () => true,
       isRunning: async (handle) => handle !== 'term_a',
-      sessions: { read: async () => null, write: async () => undefined },
+      sessions: {
+        read: async () => null,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
       sessionOf: async () => null,
       focus: async (handle) => {
         focused.push(handle)
@@ -248,7 +307,11 @@ describe('GameLeads claim', () => {
     const game = new GameLeads({
       projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: null } }),
       isLive: () => true,
-      sessions: { read: async () => SESSION, write: async () => undefined },
+      sessions: {
+        read: async () => SESSION,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
       sessionOf: async () => null,
       resume: async (session) => {
         resumed.push(session.sessionId)
@@ -452,5 +515,18 @@ describe('GameLeads after a restart', () => {
     await registeredBefore(dir, { ...WITH_PANE, key: 'no-project' })
 
     await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
+  })
+})
+
+describe('GameLeads.liveLeadOf (ORCA-878)', () => {
+  it("names a project's live lead for a caller that is no terminal, and none once it is gone", async () => {
+    const live = ['term_a']
+    const game = leads(LEAD, live)
+    await game.register({ terminalHandle: 'term_a', project: 'cineco', label: 'Ana' })
+
+    await expect(game.liveLeadOf('repo:a')).resolves.toBe('term_a')
+    await expect(game.liveLeadOf('repo:other')).resolves.toBeNull()
+    live.length = 0
+    await expect(game.liveLeadOf('repo:a')).resolves.toBeNull()
   })
 })

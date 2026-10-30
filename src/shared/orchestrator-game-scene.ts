@@ -4,14 +4,18 @@ import {
   type OrchestratorGameSceneCast
 } from './orchestrator-game-scene-cast'
 import {
+  byPhase,
   color,
+  costumeSchema,
   displayText,
-  glyph,
   hexColor,
-  localizedSceneName,
-  uncoloredGlyphOf
+  localizedSceneName
 } from './orchestrator-game-scene-values'
-import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
+import type { GameMemberName } from './orchestrator-game-member-names'
+import {
+  sceneRosterOf,
+  type OrchestratorGameSceneCharacter
+} from './orchestrator-game-scene-characters'
 import {
   orchestratorGameScene3dOf,
   type OrchestratorGameScene3d
@@ -29,11 +33,7 @@ export const ORCHESTRATOR_GAME_SCENE_PHASES = [
 ] as const
 
 export const ORCHESTRATOR_GAME_SCENE_MAX_BYTES = 64 * 1024
-// Why: the mod draws a costume as six rows plus a legs row inside an eight-pixel tile.
-export const ORCHESTRATOR_GAME_COSTUME_ROWS = 6
 
-// Why ASCII: the mod indexes rows by UTF-16 unit, so one glyph must be one unit.
-const spriteRow = z.string().regex(/^[!-~]{10}$/, 'must be ten printable ASCII glyphs')
 const lookSchema = z.object({
   skyTop: color,
   skyBottom: color,
@@ -49,19 +49,6 @@ const lookSchema = z.object({
   scenery: z.enum(['peaks', 'skyline', 'crystals', 'meadow']).optional(),
   isSignal: z.boolean().optional()
 })
-
-const costumeSchema = z
-  .object({
-    rows: z.array(spriteRow).length(ORCHESTRATOR_GAME_COSTUME_ROWS),
-    legs: z.tuple([spriteRow, spriteRow]),
-    colors: z.record(glyph, color)
-  })
-  .superRefine((costume, ctx) => {
-    const missing = uncoloredGlyphOf([...costume.rows, ...costume.legs], costume.colors)
-    if (missing !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['colors'], message: `glyph "${missing}" has no color` })
-    }
-  })
 
 const cardSchema = z.object({ icon: displayText(4), name: localizedSceneName, color: hexColor })
 
@@ -89,16 +76,6 @@ const finaleSchema = z.union([
     es: pixelArtText.optional()
   })
 ])
-
-const byPhase = <T extends z.ZodType>(schema: T) =>
-  z.object({
-    working: schema,
-    docs: schema,
-    build: schema,
-    verify: schema,
-    pr: schema,
-    handoff: schema
-  })
 
 // Why not strict: a scene written for a newer Orca keeps working on an older one.
 const sceneFileSchema = z.object({
@@ -157,6 +134,8 @@ export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & 
   cast?: OrchestratorGameSceneCast
   /** Names a lead's members take, in order. */
   roster?: GameMemberName[]
+  /** The roster entries that bring a look of their own; the rest wear the phase costumes. */
+  characters?: OrchestratorGameSceneCharacter[]
   /** Palette variants the band shows one a day, in turn with the plain looks. */
   themes?: OrchestratorGameSceneTheme[]
   /** What the WebGL panel draws; without it the scene is 2D only. */
@@ -171,15 +150,19 @@ const rawCastOf = (raw: unknown): unknown =>
   typeof raw === 'object' && raw !== null && 'cast' in raw ? raw.cast : undefined
 
 // Why apart, like the cast: a bad roster only costs the names, never the scene.
-function rosterOf(raw: unknown): { roster?: GameMemberName[]; issues: string[] } {
+function rosterOf(
+  raw: unknown,
+  costumes: Record<string, { colors: Record<string, number> }> | undefined
+): ReturnType<typeof sceneRosterOf> {
   if (typeof raw !== 'object' || raw === null || !('roster' in raw)) {
     return { issues: [] }
   }
-  const { roster, problems } = parseMemberRoster(raw.roster)
-  return {
-    roster,
-    issues: problems.map(({ path, message }) => `roster${path ? `.${path}` : ''}: ${message}`)
-  }
+  // Why only with costumes: a palette glyph is checked against them, and a broken scene has none.
+  const glyphs =
+    costumes === undefined
+      ? undefined
+      : new Set(Object.values(costumes).flatMap((one) => Object.keys(one.colors)))
+  return sceneRosterOf(raw.roster, glyphs)
 }
 
 // Why apart, like the roster: bad themes only cost the variants, never the scene.
@@ -224,7 +207,7 @@ export function orchestratorGameSceneIssues(text: string): string[] {
           (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
         )),
     ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
-    ...rosterOf(raw).issues,
+    ...rosterOf(raw, parsed.success ? parsed.data.costumes : undefined).issues,
     ...themesOf(raw).issues,
     ...orchestratorGameScene3dOf(raw).issues
   ]
@@ -247,7 +230,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   }
   // Why apart: a bad pet or advisor is left out with a warning; the scene and its hero still draw.
   const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
-  const { roster, issues: rosterIssues } = rosterOf(raw)
+  const { roster, characters, issues: rosterIssues } = rosterOf(raw, parsed.data.costumes)
   const { themes, issues: themeIssues } = themesOf(raw)
   const { scene3d, issues: scene3dIssues } = orchestratorGameScene3dOf(raw)
   return {
@@ -256,6 +239,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
       ...parsed.data,
       ...(cast === undefined ? {} : { cast }),
       ...(roster === undefined ? {} : { roster }),
+      ...(characters === undefined ? {} : { characters }),
       ...(themes === undefined ? {} : { themes }),
       ...(scene3d === undefined ? {} : { scene3d }),
       id

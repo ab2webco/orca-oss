@@ -4,6 +4,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { cellWidthOf } from '../hooks/cell-width'
+import { SCENE_KEY } from '../hooks/scene'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -116,6 +117,15 @@ const mount = async (
   return { ui, clock }
 }
 
+const spinnerOf = ($: Engine) =>
+  $.ui.mount({
+    plugin: 'orca-game',
+    surface: 'terminal',
+    component: 'Spinner',
+    viewport: { columns: 124, rows: 40, isFullscreen: true },
+    props: { word: 'Working', message: null, suffix: '', mode: 'thinking' }
+  })
+
 const leadRowsOf = async (ui: Awaited<ReturnType<typeof mount>>['ui']) =>
   (await ui.findAll({ type: 'Box' })).filter(
     (one) => one.key !== undefined && /^band-(chips|menu|actions|tap|hud)/.test(one.key)
@@ -193,6 +203,51 @@ describe('member band', () => {
     await call
     await clock.settle()
     expect(await ui.find({ type: 'Box', key: 'band-member-question' })).toBeUndefined()
+    await ui.unmount()
+  })
+
+  test('a member collapses its band to the menu, and its turn draws no scene banner', async ($, on) => {
+    const { ui } = await mount($, on, { columns: 120, env: { ORCA_GAME_ROLE: 'member' } })
+    const turn = await spinnerOf($)
+    expect(await turn.find({ type: 'Raster', key: SCENE_KEY })).toBeDefined()
+    await turn.unmount()
+
+    await ui.press({ key: 'band-member-collapse' })
+    await ui.redraw()
+    expect(await ui.find({ type: 'Box', key: 'band-member-self' })).toBeUndefined()
+    expect(await ui.find({ type: 'Box', key: 'band-member-menu' })).toBeDefined()
+    const collapsed = await spinnerOf($)
+    expect(await collapsed.findAll({ type: 'Raster' })).toEqual([])
+    expect(await collapsed.find({ type: 'Box', key: 'flat-phase' })).toBeUndefined()
+    await collapsed.unmount()
+
+    await ui.press({ key: 'band-member-collapse' })
+    await ui.redraw()
+    expect(await ui.find({ type: 'Box', key: 'band-member-self' })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test("a member's menu speaks the pane's language", async ($, on) => {
+    const { ui } = await mount($, on, {
+      columns: 120,
+      env: { ORCA_GAME_ROLE: 'member', ORCA_GAME_LOCALE: 'es' }
+    })
+    const menu = shownOf(await ui.find({ type: 'Box', key: 'band-member-menu' }))
+    expect(menu).toContain('Plegar')
+    expect(menu).toContain('Texto')
+    expect(menu).toContain('Actualizar')
+    await ui.unmount()
+  })
+
+  test('a member band toggles text mode, so its turn draws a text line', async ($, on) => {
+    const { ui } = await mount($, on, { columns: 120, env: { ORCA_GAME_ROLE: 'member' } })
+    await ui.press({ key: 'band-member-flat' })
+    await ui.redraw()
+    const turn = await spinnerOf($)
+    expect(await turn.findAll({ type: 'Raster' })).toEqual([])
+    expect(await turn.find({ type: 'Box', key: 'flat-phase' })).toBeDefined()
+    await turn.unmount()
+    expect(await ui.find({ type: 'Box', key: 'band-member-self' })).toBeDefined()
     await ui.unmount()
   })
 

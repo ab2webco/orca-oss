@@ -291,6 +291,7 @@ import { _resetWslCachesForTests, _setWslCachesForTests } from '../wsl'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { acquireWatcherRemovalGate } from './watcher-removal-gate'
 import { __resetShellStartupEnvCache } from '../pty/shell-startup-env'
+import { worktreeSlugOf } from '../../shared/worktree/slug'
 import {
   acceptSshPtyOutputData,
   acceptSshPtyOutputExit,
@@ -8004,12 +8005,15 @@ describe('registerPtyHandlers', () => {
               FOO: 'bar',
               ORCA_PANE_KEY: 'tab-1:0',
               ORCA_TAB_ID: 'tab-1',
-              ORCA_WORKTREE_ID: 'wt-1'
+              ORCA_WORKTREE_ID: 'wt-1',
+              ORCA_WORKTREE_SLUG: 'wt_1_0a1b2c3d'
             },
             connectionId: 'ssh-1'
           })
           const env = sshSpawn.mock.calls.at(-1)![0].env
           expect(env.FOO).toBe('bar')
+          // Why: the slug names test resources, not the pane, so it survives the hooks-off strip.
+          expect(env.ORCA_WORKTREE_SLUG).toBe('wt_1_0a1b2c3d')
           expect(env.ORCA_PANE_KEY).toBeUndefined()
           expect(env.ORCA_TAB_ID).toBeUndefined()
           expect(env.ORCA_WORKTREE_ID).toBeUndefined()
@@ -8068,6 +8072,7 @@ describe('registerPtyHandlers', () => {
               ORCA_WORKTREE_ID: 'wt-2'
             },
             connectionId: 'ssh-1',
+            worktreeId: 'wt-2',
             tabId: 'tab-2',
             leafId
           })
@@ -8075,6 +8080,7 @@ describe('registerPtyHandlers', () => {
           expect(env.ORCA_PANE_KEY).toBe(paneKey)
           expect(env.ORCA_TAB_ID).toBe('tab-2')
           expect(env.ORCA_WORKTREE_ID).toBe('wt-2')
+          expect(env.ORCA_WORKTREE_SLUG).toBe(worktreeSlugOf('wt-2'))
           // Local hook server coords must NOT cross the wire — the relay is the source of truth.
           expect(env.ORCA_AGENT_HOOK_TOKEN).toBeUndefined()
           expect(env.ORCA_AGENT_HOOK_PORT).toBeUndefined()

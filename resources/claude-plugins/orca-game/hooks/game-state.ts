@@ -19,14 +19,15 @@ import { rewardWeightsOf } from './rewards'
 import { gameSourcesOf } from './game-sources'
 import { isTerminalHandle } from './game-config'
 import { lookConfigOf } from './game-render'
-import { isGameViewId } from './game-view'
+import { viewSwitchOf } from './game-view'
 import { httpUrlOf } from './http-url'
 import { isQuestMode } from './quest-policy'
 import { isShape, oneOf, reviewOf, STATUS_GROUPS, str, workItemOf } from './game-state-shapes'
 import { sceneDefinitionOf } from './scenes/scene-shape'
-import { memberAccountOf, memberLimitOf } from './member-tags'
+import { memberAccountOf, memberLimitOf, memberRemoteOf } from './member-tags'
 import { memberAdvisorOf, memberLaunchOf } from './member-advisor'
 import { GAME_LOCALES } from './game-strings'
+import { githubLowOf } from './github-budget'
 
 const parseJson = (text: string): unknown => {
   try {
@@ -193,6 +194,18 @@ const memberWorktreeOf = (value: unknown): GameMemberWorktree | undefined => {
     : undefined
 }
 
+// The host's last work seen (an ISO time) and its state start (ms), whichever is later.
+// Why `activeAt` too: the band re-reads the state it stored, already parsed.
+const activeAtOf = (value: Record<string, unknown>): number | undefined => {
+  const { lastActivityAt, stateSince, activeAt } = value
+  const times = [
+    typeof lastActivityAt === 'string' ? Date.parse(lastActivityAt) : undefined,
+    stateSince,
+    activeAt
+  ].filter((one): one is number => typeof one === 'number' && Number.isFinite(one))
+  return times.length === 0 ? undefined : Math.max(...times)
+}
+
 const agentOf = (value: unknown): GameAgent[] => {
   if (!isShape(value)) {
     return []
@@ -213,6 +226,8 @@ const agentOf = (value: unknown): GameAgent[] => {
   const account = memberAccountOf(value.account)
   const advisor = memberAdvisorOf(value.advisor)
   const launch = memberLaunchOf(value.launch)
+  const remote = memberRemoteOf(value.remote)
+  const activeAt = activeAtOf(value)
   return [
     {
       paneKey,
@@ -230,7 +245,9 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(limit === undefined ? {} : { limit }),
       ...(account === undefined ? {} : { account }),
       ...(advisor === undefined ? {} : { advisor }),
-      ...(launch === undefined ? {} : { launch })
+      ...(launch === undefined ? {} : { launch }),
+      ...(remote === undefined ? {} : { remote }),
+      ...(activeAt === undefined ? {} : { activeAt })
     }
   ]
 }
@@ -277,21 +294,6 @@ const localeOf = (value: unknown): { locale?: GameLocale } => {
   return locale === undefined ? {} : { locale }
 }
 
-// Why filtered: a newer Orca may add scopes or views this mod cannot store or draw.
-const viewSwitchOf = (
-  body: Record<string, unknown>
-): Pick<GameState, 'viewScopes' | 'suggestedView'> => {
-  const scopes = Array.isArray(body.viewScopes)
-    ? body.viewScopes.filter(
-        (one): one is 'project' | 'global' => one === 'project' || one === 'global'
-      )
-    : undefined
-  return {
-    ...(scopes === undefined ? {} : { viewScopes: scopes }),
-    ...(isGameViewId(body.suggestedView) ? { suggestedView: body.suggestedView } : {})
-  }
-}
-
 // Orca's CLI may answer the bare state or wrap it as { result }; anything else is no data.
 export const parseGameState = (stdout: string): GameState | undefined => {
   const parsed = parseJson(stdout)
@@ -323,6 +325,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     ...gameLeadOf(body),
     ...rewardWeightsOf(body.rewardWeights),
     ...localeOf(body.locale),
-    ...viewSwitchOf(body)
+    ...viewSwitchOf(body),
+    ...githubLowOf(body)
   }
 }

@@ -4,8 +4,10 @@ import type {
 } from '../../shared/plugins/plugin-panel-bridge'
 import {
   PANEL_CLOSE_ACTION,
+  PANEL_RUN_COMMAND_ACTION,
   panelActionCallSchema,
-  panelCloseParamsSchema
+  panelCloseParamsSchema,
+  panelRunCommandParamsSchema
 } from '../../shared/plugins/plugin-panel-bridge'
 import {
   admitPluginPanelCall,
@@ -14,6 +16,7 @@ import {
 } from '../../shared/plugins/plugin-panel-call-admission'
 import { buildPluginPanelShellHtml } from '../../shared/plugins/plugin-panel-shell'
 import type { ValidDiscoveredPlugin } from './plugin-discovery'
+import { isPluginWorkerCommand } from './plugin-command-invocation'
 import type { PluginContentVerifier } from './plugin-content-integrity'
 import {
   PLUGIN_PANEL_ENTRY_MAX_BYTES,
@@ -29,8 +32,15 @@ type PluginPanelControllerOptions = {
     method: string,
     params: unknown
   ) => Promise<PluginPanelActionOutcome>
+  runCommand?: (pluginKey: string, commandId: string) => Promise<unknown>
   log: (pluginKey: string, line: string) => void
   panelAdmission?: PluginPanelCallAdmission
+}
+
+type PluginPanelExecuteOptions = {
+  /** Only the desktop app's own panels may run commands; over a remote
+   *  connection, running commands stays a desktop decision. */
+  canRunCommands?: boolean
 }
 
 type LoadedPluginPanel = {
@@ -66,7 +76,11 @@ export class PluginPanelController {
     }
   }
 
-  async execute(ownerKey: string, call: unknown): Promise<PluginPanelActionOutcome> {
+  async execute(
+    ownerKey: string,
+    call: unknown,
+    options: PluginPanelExecuteOptions = {}
+  ): Promise<PluginPanelActionOutcome> {
     const sessionToken = this.extractSessionToken(call)
     if (!sessionToken) {
       return { ok: false, code: 'invalid_request', error: 'invalid panel session' }
@@ -101,7 +115,42 @@ export class PluginPanelController {
         ? { ok: true, value: null }
         : { ok: false, code: 'invalid_params', error: 'panel.close takes no params' }
     }
+    if (parsed.data.action === PANEL_RUN_COMMAND_ACTION) {
+      return this.runCommand(plugin, parsed.data.params, options)
+    }
     return this.options.executeHostCall(binding.pluginKey, parsed.data.action, parsed.data.params)
+  }
+
+  private async runCommand(
+    plugin: ValidDiscoveredPlugin,
+    params: unknown,
+    options: PluginPanelExecuteOptions
+  ): Promise<PluginPanelActionOutcome> {
+    const parsed = panelRunCommandParamsSchema.safeParse(params)
+    if (!parsed.success) {
+      return { ok: false, code: 'invalid_params', error: 'panel.runCommand takes { commandId }' }
+    }
+    const { commandId } = parsed.data
+    if (!isPluginWorkerCommand(plugin, commandId)) {
+      return {
+        ok: false,
+        code: 'invalid_params',
+        error: `${commandId} is not a worker command of this plugin`
+      }
+    }
+    if (!options.canRunCommands || !this.options.runCommand) {
+      return { ok: false, code: 'unavailable', error: 'this panel host cannot run commands' }
+    }
+    try {
+      await this.options.runCommand(plugin.pluginKey, commandId)
+      return { ok: true, value: { ran: true } }
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'action_failed',
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
   }
 
   release(ownerKey: string, sessionToken: string): boolean {

@@ -52,9 +52,16 @@ its words from it. A Raster only takes width-1 characters, so a wide character i
 A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws a member
 band in place of the lead's: one line with its character, ticket, the phase card it shows, its PR
 and CI ([`member-band.tsx`](../../resources/claude-plugins/orca-game/hooks/member-band.tsx)). It has
-no menu, team chips, party HUD or buttons. While the member's `orca orchestration ask` waits on
-the lead, a second line shows the question (`? Asked <lead>: …`), cleared when the answer returns.
-Its replies use the same cards as the lead's, and the scene still draws above the spinner.
+no Panel, team chips, party HUD or lead buttons, only a menu row on the pane's own colors:
+**Collapse** folds the band to that row and takes the scene off the spinner for the session,
+**Text** is the lead's text toggle, and **Refresh** reads `game state` again. While the member's
+`orca orchestration ask` waits on the lead, a line shows the question (`? Asked <lead>: …`), kept
+when collapsed and cleared when the answer returns. Its replies use the same cards as the lead's,
+and the scene still draws above the spinner unless collapsed or in text mode.
+
+A local member draws its lead's scene file when its own worktree cannot read it: `.orca/` is often
+git-excluded, so a fresh member worktree lacks the file the lead draws, and `game state` reads the
+lead's copy through the member's parent pane before falling back to Quest (ORCA-870).
 
 ### A member's one-line brief
 
@@ -304,7 +311,9 @@ is in that project's own `orca.yaml`.
 
 The plugin polls this every 30 seconds and after each turn. It resolves the calling pane from
 `ORCA_WORKTREE_ID`, `ORCA_TERMINAL_HANDLE` and `ORCA_PANE_KEY`
-([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)):
+([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)). Members also get
+`ORCA_WORKTREE_SLUG` to keep parallel test suites apart
+([pattern](./worktree-test-resources.md)). The state contains:
 
 - `config`, `sources`, `warnings` — the resolved layers above;
 - `agents` — the worktree's agent rows (`working`, `waiting`, `idle`, `done`, current tool,
@@ -499,7 +508,7 @@ orchestratorGame:
 A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
 own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
 through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
-project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`
+project Settings edits all but the two prompts, `rules` and `mcpServers`, which live in `orca.yaml`
 (**Lead buttons** is `actions`).
 
 ```yaml
@@ -518,13 +527,25 @@ orchestratorGame:
       Continue {id} to the end on your own. Report to your lead when it is done or when only the person can decide.
     rules: Members report TERMINADO CIN-NNN. # optional: appended to Orca's own rules
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
-    accounts: auto # optional: default (Orca's own account selection) or auto (see below)
+    accounts: default # optional: auto (unset: the freest managed account, see below) or default (Orca's own selection)
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
+    mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
+
+`mcpServers` makes `game launch` and `game wave` check, before they create anything, that the host
+and account a member would run on load each listed server, and refuse by name when one is missing
+(`mcp_servers_missing`). The host reads the config that account's Claude reads, so `--on <host>`
+answers for the host, and `--account` or `auto` for that account's vault
+([`orchestrator-game-member-mcp.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-member-mcp.ts)).
+A server counts when it is in that config's user-scope `mcpServers`, in an enabled user plugin, or in
+the repo's `.mcp.json`. A claude.ai connector counts when the account has ever connected it, so
+`Gmail` and `claude.ai Gmail` both match. The match ignores case. Launch prints `Warning:` and goes on
+when the host cannot tell: a Codex member, an SSH repo, a WSL vault, or a paired host whose Orca
+predates `game.member-mcp-servers.v1`. `--skip-mcp-check` launches without reading anything.
 
 Each member `game launch`/`game wave` starts is named after the first roster name no live member
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead
@@ -532,17 +553,24 @@ pane's `ORCA_GAME_LOCALE`. The name goes before the ticket (`Merlin · CIN-12 Ca
 reaches the tab title, `game fleet`, the HUD and the member card. It is freed when the member is
 released, and a member gets its ticket alone once every name is taken or the scene has none
 ([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
-The project Settings' **Member names** takes plain names separated by commas.
+The project Settings' **Member names** takes plain names separated by commas. A member on a paired
+host (`game launch --on`) takes its name from the same pool: the lead's Orca picks it and keeps it
+in the home task title, and the names of every unreleased remote member in its Run DB count as held,
+so a local and a remote member never share one.
 
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
+  project's stored lead conversation and this session becomes the new lead instead of reopening it.
+  A live lead still wins, and an older host that drops the flag reopens the old one and says so.
 - `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
-- `orca game launch <ticket> [--repo <selector>] [--prompt <task>]` — one member for one ticket;
-  `--repo` starts it in another repo of the project. `--prompt` replaces `launchPrompt` for that
+- `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — one member for
+  one ticket; `--repo` starts it in another repo of the project, and `--on` on a paired host (see
+  the fleet section below; `--repo` is then the host's repo and required). `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
   investigation. Per-launch overrides of the lead config (also on `game wave`, for every member it
   launches):
@@ -557,8 +585,14 @@ The lead's verbs, run from the lead's terminal
   - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
     3 s apart, with the same orchestration request id, so the runtime never starts a second member
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
-    `game launch` has no `--on`: the member runs on the lead's own Orca, whose accounts it uses (an
-    `orchestration worker-start --on` refuses account pins because the server resolves its own).
+    A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends only
+    what was typed, `--account <email|id>` or the project's `accounts: auto`, and the host resolves
+    it against its own roster. An email the host does not have, or whose sign-in failed, is refused
+    there, as is `auto` with no usable account or every account at its limit (with the first
+    reset); nothing falls back to the host's global login. The result names the email the host
+    used. A host older than `orchestration.federation-member-account.v1` refuses `--account` and
+    `auto` by name. Without either, the host keeps its own selection, as before.
+    `orchestration worker-start --on` still refuses `--claude-account` and `--codex-account`.
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
     agent's process env, so a model router outside Orca can leave that choice alone (Jev 0.13.1+
@@ -585,7 +619,10 @@ The lead's verbs, run from the lead's terminal
 - `orca game sweep [--close]` — lists finished members and what each leaves (its worktree, a
   ticket not yet done). `--close` records each in `game history`, then releases each one's dispatch, or closes its terminal when no
   dispatch owns it; an unproven release is reported, never followed by a close. It leaves the worktrees; the lead's
-  rules then remove each merged member's worktree and branch with `orca worktree rm`.
+  rules then remove each merged member's worktree and branch with `orca worktree rm`; a member's
+  worktree on a paired host with `orca worktree rm --environment <host> --worktree <selector>`, not
+  ssh. The host may already have removed a merged tree itself, which reads `No worktree on <host>
+matches …` (ORCA-866).
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
 - `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn
@@ -633,6 +670,12 @@ The lead's verbs, run from the lead's terminal
   (`orca account switch --terminal`); a Codex member is stopped and started again in its own
   worktree on the new account, linked to the old dispatch with `--retry-of`. When every other
   account is near or limited, nothing moves and the result says when the first one is back.
+  `--on <host> --repo <selector>` moves it to a paired host instead (ORCA-798): a new member starts
+  there on `--account` or the project's account policy, resolved by that host; only once it
+  starts does the old dispatch stop, without a release, so the old host keeps its worktree and the
+  result names it. When that host has every account near or limited, nothing moves and the result
+  names when its first account is back. A member already on a paired host moves only this way;
+  `--account` alone is refused for it.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
@@ -643,6 +686,9 @@ The lead's verbs, run from the lead's terminal
 - `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` and
   `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
   have it read events and inbox before answering "qué pasó".
+- `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
+[--all]` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
+  to the person as records, below.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
 
@@ -715,6 +761,12 @@ are saved while they run, so the team picks up where it was:
   `game launch` refuses its ticket and `game wave` skips it (`paused`), so a ticket never gets a
   second member. A member whose PR merged or whose dispatch reported success is never paused, and
   `game sweep --close` and `game stop` forget the members they free.
+- **Worktree gone.** A paused member whose repo answered without its saved worktree carries
+  `worktreeGone` ([`game-member-worktree-presence.ts`](../../src/main/runtime/game-member-worktree-presence.ts));
+  a repo that could not be scanned, such as an SSH host offline, never marks it. It frees its slot,
+  `game fleet` lists it under `Cannot resume, worktree gone`, and `game resume-members` reports it
+  `unresumable` with the `--discard` command, without binding a run or failing the exit code, so a
+  lead start no longer retries it (ORCA-832).
 - **Resume.** `game resume-members` takes the paused members in turn, one at a time and never past
   the cap ([`orchestrator-game-member-resume.ts`](../../src/main/runtime/orchestrator-game-member-resume.ts)):
   - It first binds the run that owns their tasks; it never takes that run over while this lead
@@ -768,8 +820,9 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
 
 ### Accounts and limited members
 
-`accounts: auto` (orca.yaml or the project Settings' **Member accounts**) puts each new member on
-the managed account of its agent with the most free quota
+`accounts: auto`, also when unset (orca.yaml or the project Settings' **Member accounts**), puts
+each new member that `game launch` or `game wave` starts without `--account` on the managed account
+of its agent with the most free quota
 ([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
 
 - An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
@@ -782,7 +835,14 @@ the managed account of its agent with the most free quota
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
 - When every account is near or limited the launch is refused with when the first is back.
-  `default` (or unset) keeps Orca's own account selection.
+- A launch never falls back to the host's global login (`~/.claude`, `~/.codex`) while the agent
+  has managed accounts: Orca cannot refresh, `game move` or `account switch` a member there
+  (ORCA-809). When none of them is usable the launch is refused and says to name one with
+  `--account`. With no managed account at all, one member runs on the global login and the launch
+  says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
+  `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
+- `default` keeps Orca's own account selection, which can be the global login. A member placed
+  with `--on` sends the host only what was typed or set to `auto`.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
@@ -947,10 +1007,49 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- What the lead asks the person is a record, not chat text (ORCA-782): `game ask-owner` keeps the
+  question with its ticket, up to 6 options, a context line and the time asked in the project's board
+  file, next to its events ([`orchestrator-game-owner-questions.ts`](../../src/shared/orchestrator-game-owner-questions.ts)).
+  Open ones are never dropped; the last 200 answered stay for the audit. `game state --json` gives
+  the lead `openOwnerQuestions`. `game answer-owner` (and later the Inbox) answers once: the host
+  writes an `escalation` from `owner` to the lead's terminal, a type the lead's watch passes, and
+  the lead records it on the ticket. The same answer again is a no-op, a different one is refused,
+  and a member can neither ask the person nor answer for them.
+- Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
+  its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
+  their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`
+  reports. A host that does not answer within 3 s keeps its member listed with state `unknown`
+  and NEXT `worker-show --dispatch <id>`. The fleet holds the lead Run's live remote dispatches and
+  those that finished since the current lead claimed the Run. A remote agent started any other way
+  (a plain terminal on the host) has no record on the lead's machine and cannot be listed;
+  `orca game launch <ticket> --on <host> --repo <selector of the repo on that host>` is the
+  game's remote launch: the same roster name, task title, member record and `game: true` as a
+  local launch, sent as `worker-start --on <host>` with a `new-top-level` worktree. The host
+  starts the pane as a game member (band and character) when it has the game-member capability.
+  The lead's Orca also sends the scene file the lead draws, as written, to a host advertising
+  `orchestration.federation-game-scene.v1`. The host keeps it on the member's attach record and
+  draws it only when the member's worktree has no readable scene file of its own (`.orca/` is often
+  git-excluded, so a new host worktree lacks it). An older host draws its own scene, or Quest. A plain
+  `worker-start --on` gives the member neither a name nor the game. There is no host repo map
+  yet, so `--repo` names the host's own repo.
 - The lead's watch is `orchestration check --wait --watch`: a quiet window waits again silently and
   returns only for a message, so an idle hour costs the lead no turn (ORCA-746 T6b).
 - A batch the lead's check handed out is not pointed at again ("You have N orchestration messages")
   until the pane restarts; the watch's delivery is the one wake for that event (ORCA-746 T6b).
+- While the lead's watch is pending, nothing is pointed at, not even mail outside its `--types`:
+  that mail rides in the watch's next batch, ahead of the message that wakes it (ORCA-824). Without
+  a pending watch, Run mail is pointed at as before.
+- `--types` filters only the Run's own traffic. Mail no member sent wakes the watch whatever its
+  type: another lead's `status` reply, the owner. A member is the assignee handle or pane of any
+  dispatch in the Run, a remote member's relayed mail (`dispatch:<id>`), or the runtime's own
+  `task:`/`run:` notices; their `status` pings still ride in the next batch without waking it
+  (ORCA-861).
+- A Run's mailbox outlives its lead, so before a check builds a batch (and before the pointer counts),
+  mail already settled moves to history: a question answered or closed, or whose dispatch is gone;
+  and a `worker_done`, escalation or status from a finished member, sent before the current lead
+  claimed the Run (ORCA-824). The check that retired them carries `retired: { count, unverified }`
+  and the text output says it in one line; `unverified` lists the retired reports whose PR is not
+  merged or closed, so the new lead still verifies them. `check --all` shows the retired mail.
 - A `worker_done` lands once: a second one for the same dispatch (a retried send, or the member and
   a watcher both sending its `TERMINADO`) is dropped from the inbox and its count.
 - A worker's setup that succeeds sends no mail (ORCA-746): it is recorded on the dispatch
@@ -1007,6 +1106,10 @@ handed-off tile animation are not ported: they need logic beyond what a scene's 
 Each also dresses Jev's advisor ([The cast](#the-cast-a-pet-and-jevs-advisor)): Quest a wizard,
 Night Watch the commissioner, Crystal Saga an oracle and Beast Tamer the professor. None has a pet,
 so Pet hearts Clawd, the hero, as before.
+
+Each ships Orca's built-in roster for the scene (`ORCHESTRATOR_GAME_BUILT_IN_ROSTERS`, 12 names; a
+mod test pins the two equal) and dresses every name after the first as a
+[character](#characters-a-look-per-roster-name) of its own.
 
 ## Render: classic, hd or hd-compact
 
@@ -1315,6 +1418,43 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   heading counts either. The card's rows without a gesture take the terminal's own foreground, not
   the scene's parchment, which a light theme's near-white panel would hide.
 
+## Characters: a look per roster name
+
+A scene's `roster` entry is a plain name, drawn in the phase costumes, or an object that gives that
+name a look of its own, so members in the same phase are told apart
+([`orchestrator-game-scene-characters.ts`](../../src/shared/orchestrator-game-scene-characters.ts),
+[`character-look.ts`](../../resources/claude-plugins/orca-game/hooks/character-look.ts)):
+
+```json
+"roster": [
+  "Arthur",
+  { "name": "Merlin", "variant": { "colors": { "O": "#6f8fe0" }, "accessory": "halo", "accessoryColor": "#fff3a0" } },
+  { "name": "Elaine", "costumes": { "working": { "rows": [], "legs": [], "colors": {} } } }
+]
+```
+
+- **`variant`.** `colors` (glyph → color) is laid over every phase costume's `colors`; a glyph no
+  costume draws is refused. `accessory` is one of `crown`, `halo`, `horns`, `antenna`, `bow`,
+  `feather`, `cape`, drawn only on empty cells around the head, in `accessoryColor` or its own
+  default. A variant needs `colors` or an `accessory`; `accessoryColor` needs an accessory.
+- **`costumes`.** A costume for every phase, validated like the scene's own.
+- **Validation.** An entry with both looks, or any bad look, drops the whole roster with a
+  `roster.N…` warning (names included) and the scene still draws; `orca game scene validate`
+  lists every issue.
+- **Who is whom.** The mod finds a member's character by the name before the `·` of its display name,
+  in any language, case-insensitively and without a ` 2` suffix. A member with no character, or any
+  member of a scene without characters, draws exactly as before. The band, the Panel tiles and the
+  hd party draw the character; the flat view puts a `■` in its color before the name.
+- **On the wire.** `roster` stays names only, so `game.memberName.reserve` and an older mod see what
+  they always did. The looks travel in the definition's optional `characters` field
+  (`[{ name, variant?, costumes? }]`), which an older mod ignores. An Orca older than this drops a
+  file roster with object entries with a warning and keeps the scene.
+- **Making them.** `orca game scene new` starts with ten characters. Settings' **Create from**
+  writes a scene's characters back as roster entries. The
+  [scenes skill](../../skill-guides/orca-game-scenes.md#characters-for-an-existing-scene) adds or
+  regenerates them in an existing file in place, and the scene captures draw every roster name as its
+  Panel tile (`sheet-roster-scene-file-<phase>.png`).
+
 ## Scenes from plugins
 
 An Orca plugin can add more scenes as JSON (`contributes.gameScenes`); `game.state`
@@ -1368,21 +1508,28 @@ out of the backdrop, since anything on the ground line reads as something to jum
   first press, none once the pane is hidden or loses the keyboard (it pauses), none after a crash.
 - At 160 columns a frame costs about 1 ms, so a run in play takes under 2% of a core.
 
-`/orca-game:demo arcade` (or `/quest demo arcade`) opens a practice run in a pane of its own. It is
-the only way to open the runner until a perfect merge offers a play: it earns no points or XP, writes
-nothing to Orca or the store, adds no setting, and closing the pane drops the run.
+`/orca-game:demo arcade` (or `/quest demo arcade`) opens a practice run in a pane of its own: it
+earns no points or XP, writes nothing to Orca or the store, adds no setting, and closing the pane
+drops the run.
 
-`/orca-game:demo offer` (or `/quest demo offer`) plays the offer a perfect merge will make
+A lead pane (`role` not `member`, rewards on) offers one run when a member's review turns
+`perfectMerge: true` between two polls
+([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The offer
+is keyed by the perfect-merge reward's id and kept under `arcade-offers` in `$.store`, so a merge
+seen again after a replay or a reload never offers twice. `/orca-game:demo offer` (or
+`/quest demo offer`) plays the same offer
 ([`arcade-offer.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), keeping
-nothing either:
+nothing:
 
 - The scene celebrates (the merge float and the level-up stars, drawn in the band while idle) and
-  the arcade pane opens without taking the keyboard, so the prompt keeps what the user is typing.
-- A line under the frame counts down 15 seconds. `j` (or a click on Play) takes the keyboard and
-  starts the run; `n`, Esc or the end of the countdown closes the pane and drops the offer.
+  the arcade pane opens asking for the keyboard, so `j` and `n` reach the pane and never the
+  prompt. Claude Code grants that only over an empty composer with no dialog or survey up, so text
+  the user is typing stays theirs; then the line names `ctrl+x tab, then j`, which is true there.
+- A line under the frame counts down 15 seconds. `j` (or a click on Play) starts the run; `n`, Esc
+  or the end of the countdown closes the pane and drops the offer.
 - While a teammate waits on the user (the band's "Needs you"), or a member's own question waits on
-  its lead, the countdown stands still and a run in play holds with no frames; both go on by
-  themselves once it is answered.
+  its lead, the countdown stands still, a run in play holds with no frames, and an offer opened then
+  leaves the keyboard to the prompt for the answer; both go on by themselves once it is answered.
 - Points a real offer's run earns stay apart from member XP; a demo offer writes none.
 
 ## Other plugins in a game pane

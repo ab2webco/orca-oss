@@ -74,8 +74,27 @@ export const ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY =
 // Why: an older host's attach schema strips `game` and `setupAdmission`, starting a silent plain worker (ORCA-792).
 export const ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY =
   'orchestration.federation-game-member.v1' as const
+// Why: an older host's attach schema strips `gameScene`, so its member draws only a scene in its own checkout (ORCA-794).
+export const ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY =
+  'orchestration.federation-game-scene.v1' as const
+// Why: an older host has no federationRelease, so the home must keep its member retained (ORCA-790).
+export const ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY =
+  'orchestration.federation-release.v1' as const
+// Why: an older host's attach schema strips `account`, starting the member on its global login (ORCA-798).
+export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY =
+  'orchestration.federation-member-account.v1' as const
+// Why: an older host has no game.memberMcpServers, so the home cannot tell what its member would load (ORCA-867).
+export const GAME_MEMBER_MCP_SERVERS_RUNTIME_CAPABILITY = 'game.member-mcp-servers.v1' as const
+// Why: a home without it cannot reopen a settled member, so the host must refuse its ask by name (ORCA-856).
+export const ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY =
+  'orchestration.federation-member-reopen.v1' as const
+// Why: an older host refuses mail on a settled attachment, so the home must name the next step (ORCA-838).
+export const ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY =
+  'orchestration.federation-follow-up.v1' as const
 export const ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION = 2 as const
 export const ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION = 3 as const
+export const ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION = 4 as const
+export const ORCHESTRATION_FEDERATION_FOLLOW_UP_PROTOCOL_VERSION = 5 as const
 export const ORCHESTRATION_CONTRACT_VERSION = 1 as const
 export const ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY = 'orchestration.contract.v1' as const
 export const FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY =
@@ -181,9 +200,15 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
+  GAME_MEMBER_MCP_SERVERS_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   BROWSER_SCREENCAST_RUNTIME_CAPABILITY,
   BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,

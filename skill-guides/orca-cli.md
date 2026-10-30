@@ -116,8 +116,12 @@ ORCA worktree create --name independent-task --no-parent --json
 ORCA worktree set --worktree id:<repoId>::<worktreePath> --display-name "My Task" --json
 ORCA worktree set --worktree active --comment "reproduced bug; testing fix" --json
 ORCA worktree set --worktree active --workspace-status in-review --json
+ORCA worktree processes --worktree active --json
+ORCA worktree processes --worktree id:<repoId>::<worktreePath> --stop --json
 ORCA worktree rm --worktree id:<repoId>::<worktreePath> --force --json
 ```
+
+`worktree processes` lists the processes whose cwd is inside the worktree or folder (pid, ppid, command, cwd), on the SSH host for a remote worktree. Run it when `worktree rm` reports the folder busy; `--stop` terminates only orphans left behind (reparented to init); anything with a live owner — an open terminal or agent, an editor, Orca, the calling shell — or another user's process is listed as kept.
 
 Selectors:
 
@@ -167,6 +171,23 @@ ORCA worktree set --worktree active --comment "fix implemented; running integrat
 Update after meaningful state changes such as repro, fix, validation, handoff, or blocker. Keep comments short/current; failures are best-effort unless Orca Lab state was requested.
 
 Card status uses `--workspace-status <id>`; defaults are `todo`, `in-progress`, `in-review`, `completed`.
+
+## Workspace Files
+
+Read and list files of a worktree or folder workspace, on this host or a paired one, without SSH or asking another agent to print them:
+
+```text
+ORCA file list --worktree active --json
+ORCA file list src --worktree branch:main --environment <env> --json
+ORCA file read src/App.tsx --worktree active --json
+ORCA file read README.md --worktree branch:main --environment <env> --json
+ORCA file read logs/app.log --offset 0 --limit 65536 --worktree active --json
+```
+
+- Paths stay confined to the selected workspace; the runtime rejects anything outside it.
+- With `--environment` (or `--pairing-code`), `--worktree` is required.
+- A whole-file read is capped by the runtime preview budget (512 KiB, less over a paired connection). For larger files read byte ranges with `--offset`/`--limit` (at most 512 KiB) and continue from `nextOffset` until `eof` is true. Ranged reads are unavailable for SSH worktrees.
+- Binary files come back with `isBinary: true` and no content.
 
 ## Terminals
 

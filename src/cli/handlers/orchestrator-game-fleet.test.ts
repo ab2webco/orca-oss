@@ -1,125 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
-import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { RuntimeClientError } from '../runtime-client'
 import { formatStop } from './orchestrator-game-stop'
 import { formatFleet } from './orchestrator-game-fleet-format'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
-
-const merged = {
-  provider: 'github',
-  number: 41,
-  title: 'x',
-  url: 'https://github.com/o/r/pull/41',
-  state: 'merged',
-  ci: 'success'
-}
-
-const member = (overrides: Record<string, unknown>) => ({
-  paneKey: 'p',
-  displayName: 'CIN-1 Cartelera',
-  agentType: 'claude',
-  state: 'working',
-  toolName: null,
-  isLeader: false,
-  isMember: true,
-  terminalHandle: 'term_1',
-  ...overrides
-})
-
-const LEAD = {
-  paneKey: 'lead',
-  displayName: 'Lead',
-  agentType: 'claude',
-  state: 'idle',
-  toolName: null,
-  isLeader: true,
-  terminalHandle: 'term_lead'
-}
-
-const todoItem = (id: string, group = 'todo') => ({
-  id,
-  title: `${id} title`,
-  url: `https://jira/${id}`,
-  status: 'To Do',
-  group
-})
-
-function stateWith(overrides: Record<string, unknown> = {}) {
-  return {
-    config: { mode: 'on' },
-    agents: [LEAD],
-    worktree: { id: 'wt1', path: '/repo', branch: 'main', displayName: 'cineco' },
-    project: {
-      reviews: null,
-      todo: {
-        provider: 'jira',
-        total: 3,
-        url: null,
-        items: [todoItem('CIN-1'), todoItem('CIN-2'), todoItem('CIN-3')]
-      }
-    },
-    lead: { autostart: false, cap: 2, agent: 'claude' },
-    ...overrides
-  }
-}
-
-function fakeClient(state: unknown, overrides: Record<string, unknown> = {}) {
-  const calls: [string, unknown][] = []
-  const results: Record<string, unknown> = {
-    'game.state': state,
-    'terminal.show': { terminal: { handle: 'term_lead' } },
-    'orchestration.runCurrent': { run: { id: 'run_1' } },
-    'orchestration.taskCreate': { task: { id: 'task_1' } },
-    'game.stopSwitch': { stopped: null },
-    'orchestration.workerStart': {
-      runId: 'run_1',
-      taskId: 'task_1',
-      dispatchId: 'd1',
-      state: 'ready'
-    },
-    'orchestration.workerList': { workers: [], counts: {} },
-    'orchestration.workerRelease': { dispatchId: 'd9', state: 'released', processAction: 'closed' },
-    'terminal.close': { close: { handle: 'term_9', tabId: 't', ptyKilled: true } },
-    'terminal.send': { send: { handle: 'term_1', accepted: true } },
-    ...overrides
-  }
-  const client = {
-    call: async (method: string, params: unknown) => {
-      calls.push([method, params])
-      return { id: 'r', ok: true, result: results[method] }
-    }
-  } as unknown as RuntimeClient
-  return { client, calls }
-}
-
-const run = (
-  command: 'game fleet' | 'game wave' | 'game sweep' | 'game push' | 'game stop',
-  client: RuntimeClient,
-  flags: [string, string | boolean][] = []
-) =>
-  ORCHESTRATOR_GAME_FLEET_HANDLERS[command]({
-    flags: new Map(flags),
-    client,
-    cwd: '/repo',
-    json: true
-  })
-
-// Why: event posts and STOP reads are checked on their own (event-posts and hold tests).
-const BOARD_CALLS = new Set(['game.eventPost', 'game.stopSwitch'])
-const methods = (calls: [string, unknown][]) =>
-  calls.map(([method]) => method).filter((method) => !BOARD_CALLS.has(method))
-
-// Why: freeing a member first records it; these reads and the write are checked on their own.
-const HISTORY_CALLS = new Set([
-  ...BOARD_CALLS,
-  'game.historyRecord',
-  'orchestration.inbox',
-  'orchestration.workerShow'
-])
-const freeing = (calls: [string, unknown][]) =>
-  calls.filter(([method]) => !HISTORY_CALLS.has(method))
+import {
+  LEAD,
+  fakeClient,
+  freeing,
+  member,
+  merged,
+  methods,
+  run,
+  stateWith
+} from './orchestrator-game-fleet-test-fixtures'
 
 describe('orca game fleet verbs', () => {
   const saved = { ...process.env }
@@ -188,6 +84,22 @@ describe('orca game fleet verbs', () => {
     expect(text).toMatch(/limited\s+CIN-1.*game move CIN-1, or wait for the reset/)
     expect(text).toMatch(/AGENT\s+ACCOUNT/)
     expect(text).toMatch(/claude\s+ana@example\.com/)
+  })
+
+  it('fleet flags a member on the global login', async () => {
+    const { client } = fakeClient(stateWith({ agents: [LEAD, member({ globalLogin: true })] }))
+
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+
+    expect(output.join('\n')).toMatch(/claude\s+global login\s/)
+    output = []
+    await run('game fleet', client)
+    expect(printed().rows).toEqual([expect.objectContaining({ account: null, globalLogin: true })])
   })
 
   it('fleet text lists members paused by a restart and how to resume or discard them', async () => {
@@ -341,6 +253,39 @@ describe('orca game fleet verbs', () => {
     ])
   })
 
+  it("fleet carries the host's GitHub budget", async () => {
+    const githubBudget = {
+      graphql: { limit: 5000, remaining: 400, resetAt: 1, orcaCalls: 12 },
+      core: { limit: 5000, remaining: 4000, resetAt: 1, orcaCalls: 1 },
+      top: [],
+      low: true
+    }
+    const { client } = fakeClient(stateWith({ agents: [LEAD], githubBudget }))
+
+    await run('game fleet', client)
+
+    expect(printed().githubBudget).toEqual(githubBudget)
+  })
+
+  it("fleet text shows the GitHub budget and Orca's busiest calls under the head line", () => {
+    const now = 1_800_000_000_000
+    const bucket = { limit: 5000, remaining: 400, resetAt: now / 1000 + 600, orcaCalls: 12 }
+    const fleet = {
+      ...gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [] }),
+      githubBudget: {
+        graphql: bucket,
+        core: { ...bucket, remaining: 4000 },
+        top: [{ shape: 'pr checks', bucket: 'graphql' as const, calls: 9 }],
+        low: true
+      }
+    }
+
+    expect(formatFleet(fleet, now).split('\n').slice(1)).toEqual([
+      'GitHub API LOW, game reads slowed 5x: GraphQL 400/5000 left, Orca made 12 calls (resets in 10m) · REST 4000/5000 left, Orca made 12 calls (resets in 10m)',
+      "Orca's busiest calls this hour: pr checks 9"
+    ])
+  })
+
   it("fleet text shows each member's last host-observed activity and an orphaned member's next step", () => {
     const now = Date.parse('2026-10-22T12:10:00.000Z')
     const fleet = gameFleetReportOf({
@@ -410,6 +355,7 @@ describe('orca game fleet verbs', () => {
     const finished = member({
       paneKey: 'f',
       displayName: 'CIN-9',
+      state: 'done',
       review: merged,
       terminalHandle: 'term_9'
     })
@@ -435,8 +381,20 @@ describe('orca game fleet verbs', () => {
     const agents = [
       LEAD,
       member({ state: 'waiting', terminalHandle: 'term_busy' }),
-      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' }),
-      member({ paneKey: 'g', displayName: 'CIN-8', review: merged, terminalHandle: 'term_8' })
+      member({
+        paneKey: 'f',
+        displayName: 'CIN-9',
+        state: 'done',
+        review: merged,
+        terminalHandle: 'term_9'
+      }),
+      member({
+        paneKey: 'g',
+        displayName: 'CIN-8',
+        state: 'done',
+        review: merged,
+        terminalHandle: 'term_8'
+      })
     ]
     const { client, calls } = fakeClient(stateWith({ agents }), {
       'orchestration.workerList': {
@@ -462,10 +420,35 @@ describe('orca game fleet verbs', () => {
     ])
   })
 
+  it('sweep --close never frees a member game state reports working, even with its ticket done (ORCA-862)', async () => {
+    const agents = [
+      LEAD,
+      member({
+        paneKey: 'remote:ctx_8eba552ae8ed',
+        displayName: 'CIN-1295',
+        terminalHandle: 'term_91c7514f',
+        remote: { host: 'imac', stateKnown: true, ticketDone: true }
+      }),
+      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }))
+
+    await run('game sweep', client, [['close', true]])
+
+    expect(methods(calls)).toEqual(['game.state'])
+    expect(printed()).toEqual({ closed: true, finished: [] })
+  })
+
   it('sweep --close leaves a release Orca could not prove as a failure, never a terminal close', async () => {
     const agents = [
       LEAD,
-      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+      member({
+        paneKey: 'f',
+        displayName: 'CIN-9',
+        state: 'done',
+        review: merged,
+        terminalHandle: 'term_9'
+      })
     ]
     const { client, calls } = fakeClient(stateWith({ agents }), {
       'orchestration.workerList': {
@@ -491,6 +474,7 @@ describe('orca game fleet verbs', () => {
       member({
         paneKey: 'f',
         displayName: 'Arthur · CIN-9 Seats',
+        state: 'done',
         review: merged,
         terminalHandle: 'term_9',
         workItem: {
@@ -555,7 +539,13 @@ describe('orca game fleet verbs', () => {
   it('still frees a member when its record cannot be written, and says so', async () => {
     const agents = [
       LEAD,
-      member({ paneKey: 'f', displayName: 'CIN-9', review: merged, terminalHandle: 'term_9' })
+      member({
+        paneKey: 'f',
+        displayName: 'CIN-9',
+        state: 'done',
+        review: merged,
+        terminalHandle: 'term_9'
+      })
     ]
     const { client, calls } = fakeClient(stateWith({ agents }), {
       'orchestration.workerList': {

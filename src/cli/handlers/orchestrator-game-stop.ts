@@ -1,6 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
-import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-fleet-verbs'
+import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-stop-targets'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
 
@@ -33,7 +33,7 @@ export type GameStopEntry = {
 export type GameStopResult = { members: GameStopEntry[] }
 
 // Why: a stop on any other state is a no-op receipt; those dispatches only keep a terminal, if anything.
-const STOPPABLE: ReadonlySet<string> = new Set([
+export const STOPPABLE: ReadonlySet<string> = new Set([
   'starting',
   'ready',
   'start_unknown',
@@ -67,8 +67,10 @@ export function dispatchOf(
 export async function stopOne(
   client: Client,
   target: {
-    row: Pick<GameStopTarget['row'], 'ticket' | 'name' | 'terminalHandle'>
+    row: Pick<GameStopTarget['row'], 'ticket' | 'name' | 'terminalHandle'> &
+      Partial<Pick<GameStopTarget['row'], 'host'>>
     worktreeId: string | null
+    remoteDispatchId?: string | null
   },
   workers: GameStopWorker[]
 ): Promise<GameStopEntry> {
@@ -76,6 +78,10 @@ export async function stopOne(
     ticket: target.row.ticket,
     name: target.row.name,
     outcome: 'already stopped'
+  }
+  if (target.remoteDispatchId) {
+    const remote = { row: target.row, remoteDispatchId: target.remoteDispatchId }
+    return await stopRemote(client, entry, remote, workers)
   }
   const dispatch = dispatchOf(target, workers)
   let closedByStop: string | null = null
@@ -113,6 +119,38 @@ export async function stopOne(
     }
   } else if (dispatch && entry.dispatchState === undefined) {
     entry.outcome = 'failed'
+  }
+  return entry
+}
+
+/** A remote member ends on its host: stop it if live, then release its terminal and worktree there. */
+async function stopRemote(
+  client: Client,
+  entry: GameStopEntry,
+  target: { row: Partial<Pick<GameStopTarget['row'], 'host'>>; remoteDispatchId: string },
+  workers: GameStopWorker[]
+): Promise<GameStopEntry> {
+  const dispatchId = target.remoteDispatchId
+  entry.dispatchId = dispatchId
+  const worker = workers.find((candidate) => candidate.dispatchId === dispatchId)
+  try {
+    if (worker && STOPPABLE.has(worker.workerState)) {
+      await client.call('orchestration.workerStop', { dispatch: dispatchId })
+    }
+    const { result } = await client.call<{ state: string; reason?: string; recovery?: string }>(
+      'orchestration.workerRelease',
+      { dispatch: dispatchId }
+    )
+    entry.dispatchState = result.state
+    if (result.state === 'released' || result.state === 'already_released') {
+      entry.outcome = 'stopped'
+    } else {
+      entry.outcome = 'failed'
+      entry.reason = `${target.row.host ?? 'its host'} kept it (${result.reason ?? result.state})${result.recovery ? `: ${result.recovery}` : ''}`
+    }
+  } catch (error) {
+    entry.outcome = 'failed'
+    entry.reason = `remote release failed: ${errorText(error)}`
   }
   return entry
 }

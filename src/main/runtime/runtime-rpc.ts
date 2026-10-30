@@ -12,6 +12,11 @@ import {
   watchRuntimeMetadataOwnership,
   type RuntimeMetadataOwnershipWatch
 } from './runtime-metadata-ownership-watch'
+import {
+  RUNTIME_SOCKET_LIVENESS_POLL_MS,
+  watchRuntimeSocketLiveness,
+  type RuntimeSocketLivenessWatch
+} from './runtime-socket-liveness-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
 import type { RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse, successResponse } from './rpc/errors'
@@ -87,6 +92,8 @@ type OrcaRuntimeRpcServerOptions = {
   longPollCap?: number
   // Why: test-only override for the ownership reclaim cadence.
   metadataOwnershipPollMs?: number
+  // Why: test-only override for the local socket liveness cadence.
+  socketLivenessPollMs?: number
 }
 
 export type PairingOfferUnavailableReason =
@@ -158,11 +165,11 @@ export type MobilePairingConnectionContext = Readonly<{
 // Why: keepalive frames count as socket activity, resetting both idle timers so long-polls outlive the 30s/60s idle caps. See §3.1.
 const KEEPALIVE_INTERVAL_MS = 10_000
 
-// Why: cap long-polls at half the 32-slot connection budget so they can't starve short RPCs; overflow → runtime_busy. See §7 risk #2.
+// Why: cap long-polls at a quarter of the local socket's 64 slots so they can't starve short RPCs; overflow → runtime_busy. See §7 risk #2.
 const LONG_POLL_CAP = 16
 // Why: only these streams run on the local socket; the rest assume a paired WebSocket's lifecycle.
 const LOCAL_STREAMING_METHODS: ReadonlySet<string> = new Set(['events.subscribe'])
-// Why: each stream holds one of the socket's 32 connections for as long as it runs.
+// Why: each stream holds one of the socket's 64 connections for as long as it runs.
 const MAX_LOCAL_STREAMS = 8
 
 // Why: orchestration.ask blocks on a human/agent reply for minutes, an order of
@@ -553,6 +560,7 @@ export class OrcaRuntimeRpcServer {
   private readonly keepaliveIntervalMs: number
   private readonly longPollCap: number
   private readonly metadataOwnershipPollMs: number
+  private readonly socketLivenessPollMs: number
   private readonly askLongPollCap: number
   private readonly relayRevokeOutbox: RelayRevokeOutbox
   private deviceRegistry: DeviceRegistry | null = null
@@ -562,6 +570,7 @@ export class OrcaRuntimeRpcServer {
   private activeTransports: RpcTransport[] = []
   private transports: RuntimeTransportMetadata[] = []
   private metadataOwnershipWatch: RuntimeMetadataOwnershipWatch | null = null
+  private socketLivenessWatch: RuntimeSocketLivenessWatch | null = null
   private mobileSocketWiring: MobileSocketWiring | null = null
   // Why: detaches the current WebSocketTransport from the session wiring so a pairing rebind can swap
   // transports under the SAME wiring (see ensureMobileSocketWiring) instead of orphaning relay sockets.
@@ -605,7 +614,8 @@ export class OrcaRuntimeRpcServer {
     webClientRoot,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP,
-    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS
+    metadataOwnershipPollMs = RUNTIME_METADATA_OWNERSHIP_POLL_MS,
+    socketLivenessPollMs = RUNTIME_SOCKET_LIVENESS_POLL_MS
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
     this.dispatcher = new RpcDispatcher({ runtime })
@@ -620,6 +630,7 @@ export class OrcaRuntimeRpcServer {
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
     this.metadataOwnershipPollMs = metadataOwnershipPollMs
+    this.socketLivenessPollMs = socketLivenessPollMs
     // Why: derived, not configurable — the reservation must hold for whatever cap a caller picks.
     this.askLongPollCap = Math.max(1, Math.floor(longPollCap * ASK_LONG_POLL_SHARE))
     this.relayRevokeOutbox = new RelayRevokeOutbox(userDataPath)
@@ -1313,6 +1324,33 @@ export class OrcaRuntimeRpcServer {
         )
       }
     })
+
+    this.socketLivenessWatch = watchRuntimeSocketLiveness({
+      pollIntervalMs: this.socketLivenessPollMs,
+      hasEndpoint: () => socketTransport.hasEndpoint(),
+      describe: () => socketTransport.getDiagnostics(),
+      rebind: async () => {
+        if (!this.activeTransports.includes(socketTransport)) {
+          return
+        }
+        if (this.platform !== 'win32') {
+          // Why: recreates a purged $TMPDIR fallback directory before listening again.
+          createRuntimeTransportMetadata(
+            this.userDataPath,
+            this.pid,
+            this.platform,
+            this.runtime.getRuntimeId()
+          )
+        }
+        await socketTransport.relisten()
+        // Why: a stop() that raced the rebind must not leave a listener outside activeTransports.
+        if (!this.activeTransports.includes(socketTransport)) {
+          await socketTransport.stop()
+          return
+        }
+        this.metadataOwnershipWatch?.check()
+      }
+    })
   }
 
   // Why: STA-2370 — a desktop with no previously-connected device stays on loopback until the user
@@ -1569,6 +1607,11 @@ export class OrcaRuntimeRpcServer {
     this.metadataOwnershipWatch?.check()
   }
 
+  /** Why: test-only seam — runs one socket liveness check instead of waiting out the poll interval. */
+  checkRuntimeSocketLiveness(): Promise<void> {
+    return this.socketLivenessWatch?.check() ?? Promise.resolve()
+  }
+
   async stop(): Promise<void> {
     // Why: STA-2370 — refuse new widens, then let any in-flight pairing widen settle into the live
     // transport arrays before snapshotting them, so a racing rebind can't strand a wide 0.0.0.0 listener
@@ -1585,6 +1628,8 @@ export class OrcaRuntimeRpcServer {
     this.transports = []
     this.metadataOwnershipWatch?.stop()
     this.metadataOwnershipWatch = null
+    this.socketLivenessWatch?.stop()
+    this.socketLivenessWatch = null
     this.mobileSocketWiring = null
     this.detachWebSocketWiring = null
     const stopResults = await Promise.allSettled(

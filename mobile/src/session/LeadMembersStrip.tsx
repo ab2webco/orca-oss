@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../theme/dynamic-type-text'
 import { Users } from 'lucide-react-native'
 import { colors, spacing } from '../theme/mobile-theme'
 import type { LeadMember } from './lead-members'

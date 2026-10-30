@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
 import {
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
@@ -41,6 +42,7 @@ function fakeClient(
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': {
       capabilities: [
@@ -129,7 +131,10 @@ describe('orca game launch', () => {
 
     expect(calls.map(([method]) => method)).toEqual([
       'game.state',
+      'worktree.list',
       'game.memberNameReserve',
+      'accounts.snapshot',
+      'accounts.list',
       'terminal.show',
       'status.get',
       'orchestration.runCurrent',
@@ -140,12 +145,12 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[6]?.[1]).toEqual({
-      spec: 'Implement CIN-12: Cartelera page',
+    expect(calls[9]?.[1]).toEqual({
+      spec: withGameMemberCiNote('Implement CIN-12: Cartelera page'),
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[8]?.[1]).toEqual(
+    expect(calls[11]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',
@@ -153,6 +158,7 @@ describe('orca game launch', () => {
         name: 'cin-12',
         displayName: 'Arthur · CIN-12 Cartelera page',
         agent: 'claude',
+        claudeAccountId: 'acct_ana',
         run: 'run_1',
         from: 'h1',
         game: true
@@ -167,6 +173,20 @@ describe('orca game launch', () => {
         })
       })
     )
+  })
+
+  // Why: members' own gh CI loops spent the GitHub budget the lead needs to merge (ORCA-877).
+  it("tells the member to read its PR's CI from Orca instead of polling gh", async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client)
+
+    const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1] as
+      | { spec: string }
+      | undefined
+    expect(create?.spec).toBe(`Implement CIN-12: Cartelera page\n\n${GAME_MEMBER_CI_NOTE}`)
+    expect(GAME_MEMBER_CI_NOTE).toContain('`orca game state --json`')
+    expect(GAME_MEMBER_CI_NOTE).toContain('gh pr checks')
   })
 
   it("ends the member's brief with the project's lessons as untrusted data", async () => {
@@ -219,7 +239,9 @@ describe('orca game launch', () => {
       await launch(client)
 
       const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]
-      expect(create).toMatchObject({ spec: 'Implement CIN-12: Cartelera page' })
+      expect(create).toMatchObject({
+        spec: withGameMemberCiNote('Implement CIN-12: Cartelera page')
+      })
     }
   })
 
@@ -494,7 +516,10 @@ describe('orca game launch', () => {
     await launch(client, 'CIN-99')
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
-      expect.objectContaining({ spec: 'Implement CIN-99:', taskTitle: 'Arthur · CIN-99' })
+      expect.objectContaining({
+        spec: withGameMemberCiNote('Implement CIN-99:'),
+        taskTitle: 'Arthur · CIN-99'
+      })
     )
   })
 
@@ -507,7 +532,9 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
       expect.objectContaining({
-        spec: 'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
+        spec: withGameMemberCiNote(
+          'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
+        )
       })
     )
   })
@@ -529,6 +556,89 @@ describe('orca game launch', () => {
     expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
       expect.objectContaining({ worktree: 'new-top-level', repo: 'name:cineco-frontend' })
     )
+    expect(
+      calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    ).not.toHaveProperty('on')
+  })
+
+  it('starts the member on a paired host with the same roster name and game as a local one (ORCA-794)', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('worktree.list')
+    expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
+      expect.objectContaining({ taskTitle: 'Arthur · CIN-12 Cartelera page' })
+    )
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({
+        on: 'imac',
+        worktree: 'new-top-level',
+        repo: 'name:cineco',
+        name: 'cin-12',
+        displayName: 'Arthur · CIN-12 Cartelera page',
+        game: true
+      })
+    )
+    expect(JSON.parse(output.join('')).result).toEqual(
+      expect.objectContaining({ ticket: 'CIN-12', name: 'Arthur' })
+    )
+  })
+
+  it('refuses --on without the host repo before any call (ORCA-794)', async () => {
+    const { client, calls } = fakeClient(stateWith())
+
+    await expect(launch(client, 'CIN-12', [['on', 'imac']])).rejects.toThrow(
+      /--on imac needs --repo <selector of the repo on imac>/
+    )
+    expect(calls).toEqual([])
+  })
+
+  it('hands accounts: auto to the host instead of pinning a local account (ORCA-798)', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        lead: { autostart: false, cap: 2, agent: 'claude', accounts: 'auto' }
+      })
+    )
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
+    const started = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+    expect(started).toEqual(expect.objectContaining({ remoteAccount: 'auto' }))
+    expect(started).not.toHaveProperty('claudeAccountId')
+  })
+
+  it('sends a typed account for the host to resolve and shows the email it used (ORCA-798)', async () => {
+    const { client, calls } = fakeClient(stateWith(), undefined, {
+      'orchestration.workerStart': {
+        runId: 'run_1',
+        taskId: 'task_1',
+        dispatchId: 'dispatch_1',
+        state: 'ready',
+        account: { provider: 'claude', email: 'ana@koombea.com' }
+      }
+    })
+
+    await launch(client, 'CIN-12', [
+      ['on', 'imac'],
+      ['repo', 'name:cineco'],
+      ['account', 'ana@koombea.com']
+    ])
+
+    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
+    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
+      expect.objectContaining({ on: 'imac', remoteAccount: 'ana@koombea.com' })
+    )
+    const result = JSON.parse(output.join('')).result
+    expect(result).toEqual(expect.objectContaining({ account: 'ana@koombea.com' }))
+    expect(result).not.toHaveProperty('accountId')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {
@@ -682,7 +792,7 @@ describe('orca game launch', () => {
       })
     )
     expect(formatGameLaunch(launched)).toBe(
-      'CIN-12 (Arthur): queued #2 · claude, waiting on Ford · CIN-9; it starts by itself'
+      'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself'
     )
   })
 

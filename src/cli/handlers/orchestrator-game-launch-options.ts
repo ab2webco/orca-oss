@@ -2,6 +2,11 @@ import { RuntimeClientError } from '../runtime-client'
 import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import {
+  GAME_PROMPT_MAX,
+  GAME_WORK_PROMPT_PLACEHOLDERS,
+  unknownPlaceholderOf
+} from '../../shared/orchestrator-game-actions'
 
 const LEAD_KEY_PREFIX = 'orchestratorGame.orchestrator.'
 
@@ -27,8 +32,10 @@ export type GameLaunchChoice = {
   agent: string
   model?: string
   effort?: string
-  /** An email, an account id, or `auto` (the flag, or orchestrator.accounts: auto); null keeps today's selection. */
+  /** An email, an account id, or `auto` (the flag, or orchestrator.accounts unset or auto); null with accounts: default. */
   account: string | null
+  /** What a paired host resolves: only what the flag or orchestrator.accounts named. */
+  remoteAccount: string | null
 }
 
 function flagText(flags: Map<string, string | boolean>, name: string): string | undefined {
@@ -99,6 +106,52 @@ export function gameLaunchChoiceOf(
     agent,
     ...(model === undefined ? {} : { model }),
     ...(model === undefined || effort === undefined ? {} : { effort }),
-    account: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
+    // Why auto when unset: Orca cannot move or refresh a member on the global login (ORCA-809).
+    account: typed.account ?? (lead.accounts === 'default' ? null : 'auto'),
+    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null)
   }
+}
+
+/** `--on <host>`: the paired host a member runs on, in its own worktree of that host's `repo`. */
+export type GameRemotePlacement = { on: string; repo: string }
+
+export function remotePlacementOf(
+  flags: Map<string, string | boolean>,
+  repo: string | null
+): GameRemotePlacement | null {
+  const on = flagText(flags, 'on')
+  if (on === undefined) {
+    return null
+  }
+  // Why: a remote new-top-level needs the host's own repo selector, and no host repo map exists yet.
+  if (repo === null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--on ${on} needs --repo <selector of the repo on ${on}>.`
+    )
+  }
+  return { on, repo }
+}
+
+// Why: lets the lead hand a member a task that is not implementing the ticket (tests, QA runs).
+export function taskPromptOf(flags: Map<string, string | boolean>): string | null {
+  if (!flags.has('prompt')) {
+    return null
+  }
+  const raw = flags.get('prompt')
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  if (text.length === 0 || text.length > GAME_PROMPT_MAX) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt must be 1 to ${GAME_PROMPT_MAX} characters.`
+    )
+  }
+  const unknown = unknownPlaceholderOf(text, GAME_WORK_PROMPT_PLACEHOLDERS)
+  if (unknown !== null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--prompt uses an unknown placeholder {${unknown}}; use {id}, {title}, {url} or {status}.`
+    )
+  }
+  return text
 }

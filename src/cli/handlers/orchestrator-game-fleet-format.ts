@@ -1,7 +1,12 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch'
+import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import type { GameHold } from './orchestrator-game-hold'
 import { formatSetupQueue } from './orchestrator-game-setup-queue'
+import {
+  formatGameGitHubBudget,
+  type GameGitHubBudget
+} from '../../shared/orchestrator-game-github-budget'
 import type {
   GameFleet,
   GameFleetRow,
@@ -80,12 +85,31 @@ function formatOpenTerminals(paused: GameFleet['paused']): string[] {
   ]
 }
 
+const formatWorktreeGone = (gone: GameFleet['paused']): string[] =>
+  gone.length === 0
+    ? []
+    : [
+        `Cannot resume, worktree gone: ${gone.length} · \`orca game resume-members <ticket> --discard\` frees them`,
+        tableOf([
+          ['TICKET', 'STATE', 'BRANCH', 'AGENT', 'ACCOUNT', 'NAME'],
+          ...gone.map((one) => [
+            one.ticket,
+            one.lastState ?? '-',
+            one.branch ?? '-',
+            one.agent ?? '-',
+            one.account ?? '-',
+            one.name ?? ''
+          ])
+        ])
+      ]
+
 function formatPaused(fleet: GameFleet): string[] {
   if (fleet.pausedError) {
     return [`Could not resume members: ${fleet.pausedError}`]
   }
-  const restarted = fleet.paused.filter((one) => one.cause === undefined)
-  const open = formatOpenTerminals(fleet.paused)
+  const restarted = fleet.paused.filter((one) => one.cause === undefined && !one.worktreeGone)
+  const gone = fleet.paused.filter((one) => one.cause === undefined && one.worktreeGone)
+  const open = [...formatOpenTerminals(fleet.paused), ...formatWorktreeGone(gone)]
   if (restarted.length === 0) {
     return open
   }
@@ -122,24 +146,28 @@ function sinceOf(at: string | null, now: number): string {
   return minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`
 }
 
-export function formatFleet(fleet: GameFleet, now: number = Date.now()): string {
+export type GameFleetWithBudget = GameFleet & { githubBudget?: GameGitHubBudget }
+
+export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const budget = fleet.githubBudget ? formatGameGitHubBudget(fleet.githubBudget, now) : []
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
   if (fleet.rows.length === 0) {
-    return [head, ...paused].join('\n')
+    return [head, ...budget, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
     row.phase,
     row.ticket ?? '-',
     row.ticketStatus ?? '-',
-    row.state,
+    row.stateKnown ? row.state : 'unknown',
     sinceOf(row.lastActivityAt, now),
     row.review ?? '-',
     row.ci ?? '-',
     row.branch ?? '-',
+    row.host ?? 'local',
     row.agent ?? '-',
-    row.account ?? '-',
+    row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.next,
     row.name
   ])
@@ -152,10 +180,11 @@ export function formatFleet(fleet: GameFleet, now: number = Date.now()): string 
     'PR',
     'CI',
     'BRANCH',
+    'HOST',
     'AGENT',
     'ACCOUNT'
   ]
-  return [head, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
+  return [head, ...budget, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }
 
 export function formatWave(wave: GameWaveResult): string {
@@ -182,13 +211,13 @@ function formatSweepClose(closed: SweepClose | null | undefined): string {
     : ` — release ${closed.dispatchId} [${closed.state}]${closed.reason ? ` ${closed.reason}` : ''}`
 }
 
-export function formatSweep(sweep: GameSweepResult): string {
+export function formatSweep(sweep: GameSweepResult, now: number = Date.now()): string {
   if (sweep.finished.length === 0) {
     return 'No finished members.'
   }
   const lines = sweep.finished.map(
     (entry) =>
-      `${ticketLabel(entry.row)} ${entry.row.review ?? ''}${formatSweepClose(entry.closed)}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}${entry.history ? `\n  history ${entry.history}` : ''}`
+      `${ticketLabel(entry.row)} ${entry.row.review ?? ''} on ${entry.row.host ?? 'local'}, active ${sinceOf(entry.row.lastActivityAt, now)}${formatSweepClose(entry.closed)}\n  why: ${entry.reason}${entry.pending.length > 0 ? `\n  left: ${entry.pending.join('; ')}` : ''}${entry.history ? `\n  history ${entry.history}` : ''}`
   )
   return sweep.closed
     ? lines.join('\n')
