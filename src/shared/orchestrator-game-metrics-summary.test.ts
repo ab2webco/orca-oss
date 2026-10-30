@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parseGameEvent } from './orchestrator-game-events'
 import { parseGameHistoryRecord } from './orchestrator-game-history'
@@ -14,10 +15,7 @@ import {
 
 // Why recorded: this project's real game.events and game.history on 2026-10-30, `text` and accounts blanked.
 const recorded = JSON.parse(
-  readFileSync(
-    new URL('./__fixtures__/orchestrator-game-recorded-stores.json', import.meta.url),
-    'utf8'
-  )
+  readFileSync(join(__dirname, '__fixtures__', 'orchestrator-game-recorded-stores.json'), 'utf8')
 ) as { recordedAt: string; events: unknown[]; history: unknown[] }
 const stores = {
   events: recorded.events.map(parseGameEvent).filter((one) => one !== null),

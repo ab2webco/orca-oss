@@ -176,13 +176,14 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     summary:
       "The project's delivery numbers: tickets done, lead time, freed members by outcome, events",
     usage:
-      'orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'since', 'until', 'ticket', 'character'],
+      'orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>] [--timezone <zone>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'since', 'until', 'ticket', 'character', 'timezone'],
     notes: [
       'Computed from `game events` and `game history` on the Orca host that runs the lead, so it also works for SSH and folder projects. Read-only.',
       'Done: a merged event, or a member freed as merged or with a merged PR. Lead time: first claim to last merge, per ticket.',
       '--since keeps entries at or after it, --until entries before it. Metrics with no recorded fact print "not recorded", never 0.',
-      "--character keeps that character's own tasks (its last 20) and shows its level and XP. A ticket counts as done only when its own task on it is; lead time still runs from the ticket's first claim."
+      "--character keeps that character's own tasks (its last 20) and shows its level and XP. A ticket counts as done only when its own task on it is; lead time still runs from the ticket's first claim.",
+      "With no filter it also prints the last 14 days the scene's metrics widget draws: tickets merged per calendar day in --timezone (default this machine's zone; pass the game's own zone to match the widget) and that window's median lead time."
     ],
     examples: [
       'orca game metrics --since 2026-10-13',
