@@ -2,12 +2,15 @@ import type { RuntimeTerminalWaitBlockedReason } from '../../shared/runtime-type
 
 export type ClaudeStartupDialogReason = Extract<
   RuntimeTerminalWaitBlockedReason,
-  'claude-folder-trust-prompt' | 'claude-bypass-permissions-prompt'
+  'claude-folder-trust-prompt' | 'claude-bypass-permissions-prompt' | 'claude-first-run-setup'
 >
 
 // Why: Claude's closing redraw (`CSI 4A`) drops the option rows from the tail, so match the headings that survive it.
 const CLAUDE_FOLDER_TRUST_HEADING = 'accessing workspace:'
 const CLAUDE_BYPASS_PERMISSIONS_HEADING = 'running in bypass permissions mode'
+// Why: a config that never finished onboarding stops on this theme picker before any login.
+const CLAUDE_FIRST_RUN_MARKER = 'choose the text style'
+const CLAUDE_FIRST_RUN_BANNER = 'welcome to claude code'
 const CLAUDE_DIALOG_TAIL_MARKERS = [
   'no, exit',
   'yes, i trust this folder',
@@ -20,6 +23,10 @@ export function findClaudeStartupDialogSignals(
   normalized: string
 ): { reason: ClaudeStartupDialogReason; index: number }[] {
   const signals: { reason: ClaudeStartupDialogReason; index: number }[] = []
+  const firstRun = findClaudeFirstRunSignal(normalized)
+  if (firstRun) {
+    signals.push(firstRun)
+  }
   // Why: the dialogs precede the banner; text after it is the session itself, e.g. a member reading this file.
   if (findClaudeBannerIndex(normalized) !== null) {
     return signals
@@ -39,6 +46,24 @@ export function findClaudeStartupDialogSignals(
     })
   }
   return signals
+}
+
+// Why: first-run screens draw under the welcome banner; a later session banner means onboarding was finished.
+function findClaudeFirstRunSignal(
+  normalized: string
+): { reason: ClaudeStartupDialogReason; index: number } | null {
+  const index = normalized.lastIndexOf(CLAUDE_FIRST_RUN_MARKER)
+  if (index === -1) {
+    return null
+  }
+  const welcomeIndex = normalized.lastIndexOf(CLAUDE_FIRST_RUN_BANNER)
+  const bannerIndex = findClaudeBannerIndex(normalized)
+  const latestBannerIsWelcome =
+    bannerIndex === null ||
+    (welcomeIndex !== -1 && bannerIndex <= welcomeIndex + CLAUDE_FIRST_RUN_BANNER.length)
+  return latestBannerIsWelcome && (bannerIndex ?? -1) < index
+    ? { reason: 'claude-first-run-setup', index }
+    : null
 }
 
 // Why: the latest candidate wins, so anchor at the dialog's last row to outrank the generic "trust this" match inside it.
@@ -70,7 +95,9 @@ const CLAUDE_STARTUP_DIALOG_NEXT_STEPS: Record<ClaudeStartupDialogReason, string
   'claude-folder-trust-prompt':
     'Claude Code is asking whether to trust this folder. Run claude once in that folder on this host, accept the trust prompt, then launch again',
   'claude-bypass-permissions-prompt':
-    "Claude Code is asking to accept Bypass Permissions mode for this account's config. Run claude --dangerously-skip-permissions once on this host with that account, choose 'Yes, I accept', then launch again"
+    "Claude Code is asking to accept Bypass Permissions mode for this account's config. Run claude --dangerously-skip-permissions once on this host with that account, choose 'Yes, I accept', then launch again",
+  'claude-first-run-setup':
+    "Claude Code on this host has never been set up or signed in for the config this launch used (often the host's global ~/.claude login). Launch on one of this host's managed accounts (--account, or the project's accounts: auto), or run claude once on this host with that config, finish its setup and sign in, then launch again"
 }
 
 /** The refusal a launch reports when the agent stopped on a startup prompt; Claude's dialogs carry their next step. */
