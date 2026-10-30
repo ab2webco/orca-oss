@@ -38,6 +38,8 @@ const memberOf = (overrides: Partial<GameAgent> = {}): GameAgent => ({
   isMember: true,
   terminalHandle: 'term_worker',
   review: merged,
+  // Why: the turn that sent worker_done ends right after it.
+  stateSince: Date.now(),
   ...overrides
 })
 
@@ -196,6 +198,35 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
 
     expect(state.agents).toHaveLength(2)
     expect(request).not.toHaveBeenCalled()
+  })
+
+  // Why: a member chains its next PR after worker_done and sits idle while that PR's CI runs.
+  it('never touches a member that worked past its worker_done on a chained PR', async () => {
+    await startMember(true)
+    const request = vi.spyOn(db, 'requestWorkerTerminalRelease')
+
+    const laterTurn = await leadReads(
+      memberOf({ state: 'idle', stateSince: Date.now() + 20 * 60_000 })
+    )
+    const nextPrOpen = await leadReads(
+      memberOf({
+        review: { ...merged, number: 42, state: 'open' },
+        workItem: {
+          provider: 'plane',
+          identifier: 'ORCA-41',
+          title: 'Cartelera',
+          url: 'u',
+          status: 'Done',
+          statusGroup: 'done'
+        }
+      })
+    )
+
+    expect(laterTurn.agents).toHaveLength(2)
+    expect(nextPrOpen.agents).toHaveLength(2)
+    expect(request).not.toHaveBeenCalled()
+    expect(runtime.closeTerminal).not.toHaveBeenCalled()
+    expect(postEvent).not.toHaveBeenCalled()
   })
 
   it('keeps a member a human typed in, says why once, and does not retry', async () => {

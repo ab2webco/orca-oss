@@ -421,7 +421,11 @@ describe('releasing a remote worker through the relay', () => {
 
   // Why: the owner saw finished remote members stay in the fleet and Panel for hours (ORCA-864).
   describe("when a remote member's work lands after its worker_done (ORCA-864)", () => {
-    async function leadReads(dispatchId: string, state: 'done' | 'working') {
+    async function leadReads(
+      dispatchId: string,
+      state: 'done' | 'working' | 'idle',
+      stateSince = Date.now()
+    ) {
       const postEvent = vi.fn().mockResolvedValue({ posted: true })
       vi.spyOn(homeRuntime, 'getGameBoard').mockReturnValue({ postEvent } as never)
       vi.spyOn(homeRuntime, 'getOrchestratorGameState').mockResolvedValue({
@@ -444,7 +448,8 @@ describe('releasing a remote worker through the relay', () => {
               state: 'merged',
               ci: 'success'
             },
-            remote: { host: 'windows', stateKnown: true, ticketDone: true }
+            remote: { host: 'windows', stateKnown: true, ticketDone: true },
+            stateSince
           }
         ]
       } as OrchestratorGameState)
@@ -473,6 +478,18 @@ describe('releasing a remote worker through the relay', () => {
           text: 'Released automatically: PR #41 merged after worker_done; its terminal on windows closed.'
         })
       )
+    })
+
+    it('never touches a remote member that worked past its worker_done on a chained PR', async () => {
+      const { task, dispatch } = await startRemoteMember()
+      await finishRemoteMember(task.id, dispatch.id)
+
+      const { read, postEvent } = await leadReads(dispatch.id, 'idle', Date.now() + 20 * 60_000)
+
+      expect(read.agents).toHaveLength(1)
+      expect(remoteMethods).not.toContain('orchestration.federationRelease')
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
+      expect(postEvent).not.toHaveBeenCalled()
     })
 
     it('never touches a remote member its host reports working (ORCA-862)', async () => {

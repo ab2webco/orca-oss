@@ -401,13 +401,15 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
     expect(await runtime.getFederatedMemberAgent('term_817')).toEqual({
       state: 'working',
       agentType: 'claude',
-      updatedAt: 42
+      updatedAt: 42,
+      stateStartedAt: 40
     })
     rows = [hook('done')]
     expect(await runtime.getFederatedMemberAgent('term_817')).toEqual({
       state: 'done',
       agentType: 'claude',
       updatedAt: 42,
+      stateStartedAt: 40,
       limit: { resetsAt: 9 }
     })
     expect(limitFor).toHaveBeenCalledWith(

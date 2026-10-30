@@ -157,7 +157,8 @@ describe('remote members of a lead (ORCA-824)', () => {
         agent: {
           state: 'working',
           agentType: 'claude',
-          updatedAt: Date.parse('2026-10-27T14:12:00Z')
+          updatedAt: Date.parse('2026-10-27T14:12:00Z'),
+          stateStartedAt: Date.parse('2026-10-27T14:10:00Z')
         }
       }),
       reviewOf: async () => null
@@ -166,7 +167,8 @@ describe('remote members of a lead (ORCA-824)', () => {
     expect(member).toMatchObject({
       state: 'working',
       agentType: 'claude',
-      lastActivityAt: '2026-10-27T14:12:00.000Z'
+      lastActivityAt: '2026-10-27T14:12:00.000Z',
+      stateSince: Date.parse('2026-10-27T14:10:00Z')
     })
   })
 

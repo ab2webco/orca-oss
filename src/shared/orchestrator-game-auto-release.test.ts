@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { gameAutoReleaseCandidatesOf } from './orchestrator-game-auto-release'
+import {
+  gameAutoReleaseCandidatesOf,
+  REPORT_TURN_TAIL_MS,
+  type GameMemberReport
+} from './orchestrator-game-auto-release'
 import type { GameAgent } from './orchestrator-game-state'
 
 const merged = {
@@ -11,6 +15,8 @@ const merged = {
   ci: 'success' as const
 }
 
+const REPORTED_AT = Date.parse('2026-10-29T15:00:00Z')
+
 const member = (overrides: Partial<GameAgent>): GameAgent => ({
   paneKey: 'pane-1',
   displayName: 'CIN-1 Cartelera',
@@ -21,10 +27,15 @@ const member = (overrides: Partial<GameAgent>): GameAgent => ({
   isMember: true,
   terminalHandle: 'term_1',
   review: merged,
+  // Why: the turn that sent worker_done ends a few seconds after it.
+  stateSince: REPORTED_AT + 20_000,
   ...overrides
 })
 
-const reported = (agent: GameAgent): string | null => `ctx_${agent.paneKey}`
+const reported = (agent: GameAgent): GameMemberReport | null => ({
+  dispatchId: `ctx_${agent.paneKey}`,
+  at: REPORTED_AT
+})
 
 describe('gameAutoReleaseCandidatesOf (ORCA-864)', () => {
   it('picks a member whose PR merged after its worker_done', () => {
@@ -60,6 +71,38 @@ describe('gameAutoReleaseCandidatesOf (ORCA-864)', () => {
     const open = member({ paneKey: 'pane-2', review: { ...merged, state: 'open' } })
     expect(gameAutoReleaseCandidatesOf([member({}), open], () => null)).toEqual([])
     expect(gameAutoReleaseCandidatesOf([open], reported)).toEqual([])
+  })
+
+  // Why: members chain PRs after their first worker_done and sit idle while the next one's CI runs.
+  describe('a member working past its worker_done (chained PRs)', () => {
+    it('is kept once a turn ended after the report', () => {
+      const chained = member({ state: 'idle', stateSince: REPORTED_AT + 25 * 60_000 })
+      expect(gameAutoReleaseCandidatesOf([chained], reported)).toEqual([])
+    })
+
+    it('is kept while its worktree has an open PR, even with its ticket Done', () => {
+      const next = member({
+        review: { ...merged, number: 42, state: 'open' },
+        workItem: {
+          provider: 'plane',
+          identifier: 'CIN-1',
+          title: 'x',
+          url: 'u',
+          status: 'Done',
+          statusGroup: 'done'
+        }
+      })
+      expect(gameAutoReleaseCandidatesOf([next], reported)).toEqual([])
+    })
+
+    it('is kept when its host sends no turn time to tell', () => {
+      expect(gameAutoReleaseCandidatesOf([member({ stateSince: undefined })], reported)).toEqual([])
+    })
+
+    it('still counts the turn that sent worker_done as the report itself', () => {
+      const tail = member({ stateSince: REPORTED_AT + REPORT_TURN_TAIL_MS })
+      expect(gameAutoReleaseCandidatesOf([tail], reported)).toHaveLength(1)
+    })
   })
 
   it('never picks the lead', () => {
