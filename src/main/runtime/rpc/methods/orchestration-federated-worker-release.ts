@@ -9,6 +9,7 @@ import {
   isHostDispatchNotFound
 } from './orchestration-federated-worker-gone'
 import type { WorkerReleaseReceipt } from './orchestration-worker-release-completion'
+import { retainedRecoveryOf } from './orchestration-worker-retained-recovery'
 import { resolvePinnedFederatedServer } from './orchestration-worker-observation'
 
 type FederatedWorkerReleaseReceipt = WorkerReleaseReceipt & {
@@ -35,12 +36,37 @@ export async function releaseFederatedWorker(args: {
   if (worker?.stage === 'released') {
     return { ...base, state: 'already_released' }
   }
+  const settleGone = (): FederatedWorkerReleaseReceipt => {
+    db.markFederatedWorkerReleased(dispatchId)
+    runtime.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
+    const remote = { closedTerminals: [], removedWorktree: null, alreadyGone: true as const }
+    return { ...base, state: 'released', remote }
+  }
   if (!worker || !WORKER_SETTLED_STATES.includes(worker.state)) {
+    const stopping = worker?.state === 'stopping' || worker?.state === 'stop_unknown'
+    if (!stopping) {
+      return {
+        ...base,
+        state: 'retained',
+        reason: 'not_settled',
+        recovery: retainedRecoveryOf('not_settled', dispatchId, null)
+      }
+    }
+    // Why: a stop the host could not prove stays stop_unknown, and only the host can show nothing is left (ORCA-864).
+    const server = resolvePinnedFederatedServer(runtime, federated)
+    if (
+      await isFederatedMemberGoneOnHost(runtime, server.environmentId, dispatchId).catch(
+        () => false
+      )
+    ) {
+      db.reconcileFederatedWorkerStop(dispatchId)
+      return settleGone()
+    }
     return {
       ...base,
       state: 'retained',
       reason: 'not_settled',
-      recovery: 'The remote worker has not finished; stop it or wait for worker_done first.'
+      recovery: `Its stop on ${server.name} was not proven: its terminal or worktree is still there, or ${server.name} did not answer. Close its terminal on ${server.name}, then release again.`
     }
   }
   const server = resolvePinnedFederatedServer(runtime, federated)
@@ -50,12 +76,6 @@ export async function releaseFederatedWorker(args: {
     undefined,
     15_000
   )) as RuntimeStatus
-  const settleGone = (): FederatedWorkerReleaseReceipt => {
-    db.markFederatedWorkerReleased(dispatchId)
-    runtime.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
-    const remote = { closedTerminals: [], removedWorktree: null, alreadyGone: true as const }
-    return { ...base, state: 'released', remote }
-  }
   if (!status.capabilities?.includes(ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY)) {
     if (await isFederatedMemberGoneOnHost(runtime, server.environmentId, dispatchId)) {
       return settleGone()
@@ -90,7 +110,15 @@ export async function releaseFederatedWorker(args: {
     ...(remote.worktreeError ? { worktreeError: remote.worktreeError } : {})
   }
   if (remote.state === 'retained') {
-    return { ...base, state: 'retained', reason: remote.reason, remote: detail }
+    return {
+      ...base,
+      state: 'retained',
+      reason: remote.reason,
+      remote: detail,
+      ...(remote.reason
+        ? { recovery: `${server.name}: ${retainedRecoveryOf(remote.reason, dispatchId, null)}` }
+        : {})
+    }
   }
   db.markFederatedWorkerReleased(dispatchId)
   runtime.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')

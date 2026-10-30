@@ -57,9 +57,12 @@ export class GamePausedMembers {
     })
     let error: string | null = null
     try {
+      // Why: a remote member has no local session to save or resume, but its launch record must not read as paused (ORCA-824, ORCA-864).
       await this.deps.store.upsert(
         projectKey,
-        live.map(({ agent, ticket }) => this.patchOf(agent, ticket))
+        live
+          .filter(({ agent }) => !agent.remote)
+          .map(({ agent, ticket }) => this.patchOf(agent, ticket))
       )
     } catch (failure) {
       error = errorText(failure)

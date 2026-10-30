@@ -27,7 +27,7 @@ export async function isFederatedMemberGoneOnHost(
     }
     throw error
   }
-  if (!['missing', 'unattached'].includes(shown.observation.status)) {
+  if (!['missing', 'unattached', 'gone'].includes(shown.observation.status)) {
     return false
   }
   const created = shown.attachment.effects.find(
