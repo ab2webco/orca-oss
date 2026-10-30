@@ -43,7 +43,8 @@ const Answered: z.ZodType<GameAnsweredItem> = z.object({
   question: z.string(),
   answer: z.string(),
   askedAt: z.string(),
-  answeredAt: z.string()
+  answeredAt: z.string(),
+  overriddenBy: z.object({ text: z.string(), at: z.string() }).optional()
 })
 
 // Why per item: a paired host may run another build; one odd row must not blank the Inbox.
@@ -82,5 +83,24 @@ export async function readGameInboxThreads(scope: GameInboxScope): Promise<GameI
     threads: threadsOf(result.threads),
     waiting: itemsOf(result.waiting, Waiting),
     answered: itemsOf(result.answered, Answered)
+  }
+}
+
+export type GameMemberReply = { id: string; text: string; ticket?: string }
+
+/** The person's words for a member's question or gate, sent through the lead's run; throws why it failed. */
+export async function replyToGameMember(
+  scope: GameInboxScope,
+  reply: GameMemberReply
+): Promise<{ mode: string; delivered: boolean }> {
+  const result = await callRuntimeRpc<{ mode?: unknown; delivered?: unknown }>(
+    scope.target,
+    'game.ownerReplyToMember',
+    { worktreeId: scope.worktreeId, ...reply },
+    { timeoutMs: GAME_INBOX_THREADS_RPC_TIMEOUT_MS }
+  )
+  return {
+    mode: typeof result.mode === 'string' ? result.mode : 'reply',
+    delivered: result.delivered === true
   }
 }
