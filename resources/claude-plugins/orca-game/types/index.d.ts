@@ -1,6 +1,3 @@
-import type { GameMerge } from './game-merge'
-
-export type { GameMerge }
 export type GameMode = 'on' | 'zen' | 'flat' | 'off'
 
 /** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
@@ -373,6 +370,15 @@ export type GameState = {
   githubLow?: { remaining: number; limit: number }
   /** The project's latest member merges, newest last; only for a lead, absent from an older host. */
   merges?: GameMerge[]
+}
+
+/** A member's merge as Orca recorded it, which outlives the member's row (ORCA-887). */
+export type GameMerge = Pick<GameReview, 'provider' | 'number'> & {
+  /** The game event's key, one per merge. */
+  key: string
+  ticket: string | null
+  worktreeId: string
+  perfect: boolean
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
