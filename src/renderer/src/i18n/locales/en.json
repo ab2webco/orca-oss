@@ -16265,6 +16265,23 @@
         "theUpdate": "the update",
         "cancel": "Cancel",
         "restartNow": "Restart now"
+      },
+      "game-inbox": {
+        "GameInboxSheet": {
+          "title": "Inbox",
+          "description": "What the project's lead asked you to decide.",
+          "forYou": "For you",
+          "empty": "No questions are waiting for you."
+        },
+        "GameOwnerQuestionCard": {
+          "failed": "The answer was not sent.",
+          "yourAnswer": "Your answer",
+          "placeholder": "Answer in your own words",
+          "send": "Send"
+        },
+        "SidebarGameInboxEntry": {
+          "inbox": "Inbox"
+        }
       }
     },
     "i18n": {

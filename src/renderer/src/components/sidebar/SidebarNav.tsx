@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
 import { SidebarTaskNavButton } from './SidebarTaskNavButton'
 import { PluginNavSidebarEntries } from './PluginNavSidebarEntries'
+import { SidebarGameInboxEntry } from '@/components/game-inbox/SidebarGameInboxEntry'
 import { HideSidebarMenu } from './sidebar-nav-controls'
 import { translate } from '@/i18n/i18n'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
@@ -97,6 +98,7 @@ const SidebarNav = React.memo(function SidebarNav() {
     >
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
+      <SidebarGameInboxEntry />
       {showArtifactsButton ? (
         <ContextMenu>
           <ContextMenuTrigger asChild>
