@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
-import {
-  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
-  ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY
-} from '../../../../shared/protocol-version'
+import { ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
 import type { OrchestrationEnvironmentTransport } from '../../orchestration/environment-transport'
@@ -308,28 +305,16 @@ describe('remote member accounts across hosts (ORCA-798)', () => {
       expect(workerRuntime.createManagedWorktree).not.toHaveBeenCalled()
     })
 
-    it('keeps an older host on its global login instead of refusing, and says so', async () => {
-      for (const dropped of [
-        [ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY],
-        [
-          ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
-          ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY
-        ]
-      ]) {
-        dropCapabilities(...dropped)
-        attachParams = []
+    it('keeps a host that cannot pick an account on its global login, and says so', async () => {
+      dropCapabilities(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
 
-        const response = await homeDispatcher.dispatch({
-          ...claudeStart(createHomeTask().id, unset),
-          orchestrationRequestId: `request_${dropped.length}`
-        })
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
 
-        expect(response).toMatchObject({
-          ok: true,
-          result: { state: 'ready', globalLogin: 'older_host' }
-        })
-        expect(attachParams[0]).not.toHaveProperty('account')
-      }
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', globalLogin: 'older_host' }
+      })
+      expect(attachParams[0]).not.toHaveProperty('account')
     })
 
     it('still refuses accounts: auto on a host older than member accounts', async () => {

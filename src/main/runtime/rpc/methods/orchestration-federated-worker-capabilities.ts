@@ -10,7 +10,6 @@ import {
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
-  ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY
@@ -69,13 +68,10 @@ export function negotiateFederatedWorkerStart(args: {
       { capability: ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY }
     )
   }
-  // Why both: a host with only member-account refuses `auto` when it has no managed account (ORCA-891).
+  // Why member-account alone suffices: managed accounts come first; without global-login that host refuses `auto` only when it has none (ORCA-891).
   const keepsHostGlobalLogin =
     Boolean(params.remoteAccount && params.remoteAccountByDefault) &&
-    !(
-      capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY) &&
-      capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_GLOBAL_LOGIN_RUNTIME_CAPABILITY)
-    )
+    !capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
   if (
     params.remoteAccount &&
     !keepsHostGlobalLogin &&

@@ -594,9 +594,10 @@ The lead's verbs, run from the lead's terminal
     time (`global_login_taken` names the one there); the result says so (`globalLogin: true`,
     `globalLoginHost`) and the host's `game fleet` row shows `global login`. The result names the
     email the host used. A host older than `orchestration.federation-member-account.v1` refuses a
-    typed `--account` and `accounts: auto` by name. The unset policy is sent only to a host that
-    also has `orchestration.federation-member-global-login.v1`; an older one gets no selector and
-    keeps its global login, and the launch says so (`globalLoginOlderHost: true`).
+    typed `--account` and `accounts: auto` by name; with the policy unset it gets no selector and
+    keeps its global login, and the launch says so (`globalLoginOlderHost: true`). A host on
+    member accounts but before ORCA-891 refuses the unset `auto` when it has no managed account,
+    rather than use its global login.
     With `accounts: default` the host keeps its own selection, as before.
     `orchestration worker-start --on` still refuses `--claude-account` and `--codex-account`.
   - A member started with a model or an effort — from these flags or from the lead's
