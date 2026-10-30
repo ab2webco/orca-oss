@@ -200,7 +200,7 @@ export async function launchGameMember(args: {
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
     ...memberAccount.pin,
-    ...(args.remote ? remoteAccountParamsOf(choice) : {}),
+    ...(args.remote ? remoteAccountParamsOf(choice, capabilities) : {}),
     run: runId,
     from,
     devMode: isDevCliInvocation(),

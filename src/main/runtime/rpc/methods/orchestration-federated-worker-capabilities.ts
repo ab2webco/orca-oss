@@ -9,6 +9,7 @@ import {
   ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
@@ -26,7 +27,7 @@ export type FederatedWorkerNegotiation = {
   /** An older host drops the lead's scene, so it is read only for a host that keeps it. */
   carriesGameScene: boolean
   /** The typed selector, sent only to a host that resolves it against its own roster. */
-  memberAccount: { account?: string }
+  memberAccount: { account?: string; allowedAccounts?: string[] }
   /** The unset policy's `auto` this host cannot honor, so its member keeps the host's global login. */
   keepsHostGlobalLogin: boolean
 }
@@ -83,6 +84,17 @@ export function negotiateFederatedWorkerStart(args: {
       { capability: ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY }
     )
   }
+  const allowedAccounts = params.remoteAccount === 'auto' ? params.remoteAllowedAccounts : undefined
+  if (
+    allowedAccounts &&
+    !capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY)
+  ) {
+    throw new OrchestrationError(
+      'capability_unsupported',
+      `Connected server ${serverName} cannot limit its account pick to this project's list (${ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY}); name an allowed account with --account <email>, or update Orca there. No effects were applied.`,
+      { capability: ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY }
+    )
+  }
   const supportsControlMail = capabilities.includes(
     ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY
   )
@@ -112,7 +124,9 @@ export function negotiateFederatedWorkerStart(args: {
       params.game === true &&
       capabilities.includes(ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY),
     memberAccount:
-      params.remoteAccount && !keepsHostGlobalLogin ? { account: params.remoteAccount } : {},
+      params.remoteAccount && !keepsHostGlobalLogin
+        ? { account: params.remoteAccount, ...(allowedAccounts ? { allowedAccounts } : {}) }
+        : {},
     keepsHostGlobalLogin
   }
 }

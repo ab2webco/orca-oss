@@ -64,12 +64,9 @@ export async function attachAccountOf(
 }
 
 /** What the attach receipt tells the home: the account's email, or that it took the global login. */
-export function accountReceiptOf(resolved: FederatedMemberAccount | null): {
-  account?: { provider: GameAccountProvider; email: string }
-  globalLogin?: true
-} {
-  if (resolved?.account) {
-    return { account: resolved.account }
-  }
-  return resolved?.globalLogin ? { globalLogin: true } : {}
-}
+export const accountReceiptOf = (resolved: FederatedMemberAccount | null) =>
+  resolved?.account
+    ? { account: resolved.account }
+    : resolved?.globalLogin
+      ? { globalLogin: true as const }
+      : {}

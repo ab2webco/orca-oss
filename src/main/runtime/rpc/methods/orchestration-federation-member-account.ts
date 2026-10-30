@@ -39,6 +39,10 @@ export function resolveFederatedMemberAccount(args: {
   agent: string | undefined
   selector: string
   now: number
+  /** The project's orchestrator.accounts list, which `auto` picks from. */
+  allowed?: readonly string[]
+  /** This host's agents, so `auto` weighs its members and skips an account one stopped on. */
+  agents?: Parameters<typeof gameAccountUsagesOf>[0]['agents']
 }): FederatedMemberAccount {
   const provider = accountProviderOfAgent(args.agent)
   if (provider === null) {
@@ -49,12 +53,12 @@ export function resolveFederatedMemberAccount(args: {
   }
   const label = GAME_ACCOUNT_PROVIDER_LABELS[provider]
   const entries = args.entries.filter((entry) => entry.provider === provider)
-  if (args.selector === FEDERATED_AUTO_ACCOUNT && entries.length === 0) {
+  if (args.selector === FEDERATED_AUTO_ACCOUNT && entries.length === 0 && !args.allowed) {
     return { pin: {}, account: null, globalLogin: provider }
   }
   const chosen =
     args.selector === FEDERATED_AUTO_ACCOUNT
-      ? autoEntry(entries, provider, label, args.now)
+      ? autoEntry(args, provider, label)
       : namedEntry(entries, label, args.selector)
   return {
     pin: provider === 'claude' ? { claudeAccountId: chosen.id } : { codexAccountId: chosen.id },
@@ -86,17 +90,17 @@ function namedEntry(
 }
 
 function autoEntry(
-  entries: readonly AccountListEntry[],
+  args: Parameters<typeof resolveFederatedMemberAccount>[0],
   provider: GameAccountProvider,
-  label: string,
-  now: number
+  label: string
 ): { id: string; email: string } {
   const usages = gameAccountUsagesOf({
-    entries: entries.filter(isAutoPickableAccount),
+    entries: args.entries.filter(isAutoPickableAccount),
     provider,
-    agents: []
+    agents: args.agents ?? [],
+    allowed: args.allowed
   })
-  const pick = pickGameMemberAccount(usages, now)
+  const pick = pickGameMemberAccount(usages, args.now)
   if (pick.kind === 'account') {
     return pick.account
   }
@@ -107,10 +111,11 @@ function autoEntry(
       { resetsAt: pick.resetsAt }
     )
   }
+  const allowed = args.allowed ? ` the project allows (${args.allowed.join(', ')})` : ''
   // Why no fallback: a member on the global login cannot be moved or refreshed (ORCA-809).
   throw new OrchestrationError(
     'accounts_unusable',
-    `No ${label} account on this host can take a member (each is on WSL, a custom endpoint, or its sign-in failed), and Orca does not fall back to the global login while managed accounts exist; fix one's sign-in there, or name one \`orca account list\` shows.`
+    `No ${label} account${allowed} on this host can take a member (none is there, or each is on WSL, a custom endpoint, or its sign-in failed), and Orca does not fall back to the global login while managed accounts exist or the project lists its own; fix one's sign-in there, or name one \`orca account list\` shows.`
   )
 }
 
@@ -119,9 +124,13 @@ const USAGE_REFRESH_TIMEOUT_MS = 20_000
 
 /** Resolves a home's typed selector on this host, before the attachment creates anything. */
 export async function resolveHostMemberAccount(args: {
-  runtime: Pick<OrcaRuntimeService, 'getAccountsSnapshot' | 'refreshAccountsForMobile'>
+  runtime: Pick<
+    OrcaRuntimeService,
+    'getAccountsSnapshot' | 'refreshAccountsForMobile' | 'gameAgentsOnAccounts'
+  >
   agent: string | undefined
   selector: string
+  allowed?: readonly string[]
   reusesTerminal: boolean
 }): Promise<FederatedMemberAccount> {
   if (args.reusesTerminal) {
@@ -143,6 +152,11 @@ export async function resolveHostMemberAccount(args: {
     entries,
     agent: args.agent,
     selector: args.selector,
-    now: Date.now()
+    now: Date.now(),
+    allowed: args.allowed,
+    agents:
+      args.selector === FEDERATED_AUTO_ACCOUNT
+        ? await args.runtime.gameAgentsOnAccounts().catch(() => [])
+        : []
   })
 }

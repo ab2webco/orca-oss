@@ -587,18 +587,13 @@ The lead's verbs, run from the lead's terminal
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
     A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends the
     typed `--account <email|id|auto>`, or `auto` unless the project sets `accounts: default`
-    (ORCA-891), and the host resolves it against its own roster. An email the host does not have,
-    or whose sign-in failed, is refused there, as is `auto` with every account at its limit (with
-    the first reset) or with managed accounts none of which is usable (`accounts_unusable`). Only a
-    host with no managed account for the agent runs `auto` on its global login, one member at a
-    time (`global_login_taken` names the one there); the result says so (`globalLogin: true`,
-    `globalLoginHost`) and the host's `game fleet` row shows `global login`. The result names the
-    email the host used. A host older than `orchestration.federation-member-account.v1` refuses a
-    typed `--account` and `accounts: auto` by name; with the policy unset it gets no selector and
-    keeps its global login, and the launch says so (`globalLoginOlderHost: true`). A host on
-    member accounts but before ORCA-891 refuses the unset `auto` when it has no managed account,
-    rather than use its global login.
-    With `accounts: default` the host keeps its own selection, as before.
+    (ORCA-891), with the project's list if any. The host resolves it against its own roster as a
+    local launch does (see Accounts). Only a host with no managed account for the agent, and no
+    list, runs `auto` on its global login, one member at a time (`global_login_taken`), and the
+    result says so (`globalLogin`, `globalLoginHost`). A host older than
+    `orchestration.federation-member-account.v1` refuses a typed `--account`, and with the policy
+    unset keeps its global login (`globalLoginOlderHost`); one older than
+    `orchestration.federation-member-account-allowed.v1` refuses a list's `auto` by name.
     `orchestration worker-start --on` still refuses `--claude-account` and `--codex-account`.
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its

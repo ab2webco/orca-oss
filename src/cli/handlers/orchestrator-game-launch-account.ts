@@ -51,16 +51,14 @@ export type GameGlobalLoginLaunch = {
 }
 
 /** What a paired host said about a member it started on its global login (ORCA-891). */
-export function remoteGlobalLoginOf(
+export const remoteGlobalLoginOf = (
   host: string,
   why: 'no_account' | 'older_host'
-): GameGlobalLoginLaunch {
-  return {
-    globalLogin: true,
-    globalLoginHost: host,
-    ...(why === 'older_host' ? { globalLoginOlderHost: true as const } : {})
-  }
-}
+): GameGlobalLoginLaunch => ({
+  globalLogin: true,
+  globalLoginHost: host,
+  ...(why === 'older_host' ? { globalLoginOlderHost: true as const } : {})
+})
 
 export function gameGlobalLoginNoteOf(launched: GameGlobalLoginLaunch): string {
   const host = launched.globalLoginHost

@@ -734,6 +734,7 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import {
   gameAgentStateOf,
   statusGroupOfJira,
+  type GameAgent,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import {
@@ -31354,6 +31355,28 @@ export class OrcaRuntimeService {
         ? [worktreesById.get(row.worktree_id ?? '')?.displayName ?? row.dispatch_id]
         : []
     })
+  }
+
+  /** This host's agents on a managed account, each with the usage limit it stopped on (ORCA-891). */
+  async gameAgentsOnAccounts(): Promise<GameAgent[]> {
+    const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
+    const rows = (this.getAgentStatusSnapshotFn?.() ?? []).filter(
+      (row) => !row.restoredUnconfirmed && !row.providerSessionOnly
+    )
+    const agents = await Promise.all(
+      rows.map(async ({ paneKey, agentType = null, state: hookState }): Promise<GameAgent[]> => {
+        const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
+        const account = this.gameMemberAccountFor({ paneKey, agentType, worktreeId }, worktreesById)
+        if (!account) {
+          return []
+        }
+        const state = gameAgentStateOf(hookState)
+        const limit = await this.gameMemberLimitFor({ paneKey, agentType, state, account })
+        const agent = { paneKey, displayName: null, agentType, state, toolName: null, account }
+        return [{ ...agent, isLeader: false, isMember: true, ...(limit && { limit }) }]
+      })
+    )
+    return agents.flat()
   }
 
   /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */

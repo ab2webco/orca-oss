@@ -60,11 +60,11 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             runtime,
             agent,
             selector: params.account,
+            allowed: params.allowedAccounts,
             reusesTerminal: Boolean(params.terminal),
             dispatchId: params.dispatchId
           })
         : null
-      const accountPin = memberAccount?.pin ?? {}
       const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
       const gameMember = params.game ? { orchestrationGameMember: true } : {}
 
@@ -114,7 +114,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             createdWithAgent: agent as TuiAgent,
             startupAgent: agent as TuiAgent,
             ...gameMember,
-            ...accountPin,
+            ...memberAccount?.pin,
             ...(launch.preferences ? { startupLaunchPreferences: launch.preferences } : {}),
             activate: false,
             lineage: { noParent: true }
@@ -190,7 +190,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               // its CLI is `cursor-agent`); resolve through the TUI agent config.
               startupAgent: agent as TuiAgent,
               ...gameMember,
-              ...accountPin,
+              ...memberAccount?.pin,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
               title: `worker-${params.taskId}`,
               presentation: 'background'

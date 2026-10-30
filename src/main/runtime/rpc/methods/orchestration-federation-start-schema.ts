@@ -33,7 +33,9 @@ export const FederationAttachStartParams = z.object({
     })
     .optional(),
   // Why optional: the home sends it only to a host advertising the member-account capability.
-  account: z.string().min(1).max(320).optional()
+  account: z.string().min(1).max(320).optional(),
+  // Why optional: sent with `auto` only to a host advertising the member-account-allowed capability.
+  allowedAccounts: z.array(z.string().min(1).max(320)).min(1).max(100).optional()
 })
 
 export type FederationAttachStartInput = z.infer<typeof FederationAttachStartParams>

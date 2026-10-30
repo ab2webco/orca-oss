@@ -56,13 +56,8 @@ export async function startFederatedWorker(args: {
     undefined,
     params.timeoutMs
   )) as RuntimeStatus
-  const {
-    federationProtocolVersion,
-    gameMember,
-    carriesGameScene,
-    memberAccount,
-    keepsHostGlobalLogin
-  } = negotiateFederatedWorkerStart({ status, serverName: server.name, params })
+  const negotiation = negotiateFederatedWorkerStart({ status, serverName: server.name, params })
+  const { federationProtocolVersion, gameMember, carriesGameScene, memberAccount } = negotiation
   // Why never blocking: without the scene the host draws its own, as before.
   const gameScene = carriesGameScene
     ? await runtime.readCallerGameScene(params.from).catch(() => null)
@@ -174,7 +169,7 @@ export async function startFederatedWorker(args: {
         setup: remote.setup,
         launch,
         ...(remote.account ? { account: remote.account } : {}),
-        ...(keepsHostGlobalLogin
+        ...(negotiation.keepsHostGlobalLogin
           ? { globalLogin: 'older_host' as const }
           : remote.globalLogin === true
             ? { globalLogin: 'no_account' as const }
