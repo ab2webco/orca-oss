@@ -142,6 +142,36 @@ describe('long bodies under a cutting watch', () => {
     expect(json.split('\n').slice(0, 3).join('\n')).toContain(JSON.stringify(command))
   })
 
+  // Why: outside Orca's terminals a bare `orca` on Linux is the GNOME screen reader.
+  it('names the read with the CLI that printed the check', () => {
+    const prepared = prepareOrchestrationCheckOutput<OrchestrationCheckOutput>(
+      result,
+      'term_lead',
+      false,
+      'orca-ide'
+    )
+
+    expect(prepared.readInFull).toEqual([
+      'orca-ide orchestration inbox --terminal run:run_home --id relay_long'
+    ])
+    expect(formatOrchestrationCheckText(result, 'term_lead', 'orca-ide')).toMatch(
+      /^Read in full: orca-ide orchestration inbox /
+    )
+  })
+
+  it('quotes a CLI path the shell would split, in Git Bash form', () => {
+    const prepared = prepareOrchestrationCheckOutput<OrchestrationCheckOutput>(
+      result,
+      'term_lead',
+      false,
+      'C:\\Program Files\\Orca\\orca.cmd'
+    )
+
+    expect(prepared.readInFull?.[0]).toMatch(
+      /^'C:\/Program Files\/Orca\/orca\.cmd' orchestration inbox /
+    )
+  })
+
   it('names a message whose payload alone is long', () => {
     const prepared = prepareOrchestrationCheckOutput<OrchestrationCheckOutput>(
       {

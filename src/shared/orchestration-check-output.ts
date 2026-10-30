@@ -1,3 +1,4 @@
+import { bashWord, bashWordOfCli } from './bash-cli-word'
 import { ORCHESTRATION_LEGACY_RUN_ID } from './orchestration-rpc-contract'
 
 export type OrchestrationMessageSummary = {
@@ -89,12 +90,14 @@ export function isLegacyReadOnlyMessage(
 
 export function formatOrchestrationCheckText(
   result: OrchestrationCheckOutput,
-  checkedTerminal: string
+  checkedTerminal: string,
+  cli?: string
 ): string {
   const prepared = prepareOrchestrationCheckOutput(
     result,
     checkedTerminal,
-    result.formatted !== undefined
+    result.formatted !== undefined,
+    cli
   )
   const compatibilityActive = Boolean(
     prepared.legacyCompatibility && !prepared.legacyCompatibility.readOnly
@@ -138,18 +141,16 @@ function wrapLongLines(text: string): string {
 const fitsOneLine = (text: string | null | undefined): boolean =>
   !text || JSON.stringify(text).length <= OUTPUT_LINE_MAX
 
-const shellWord = (word: string): string =>
-  /^[\w:.@-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`
-
 function readInFullCommands(
   messages: readonly OrchestrationMessageSummary[],
-  checkedTerminal: string
+  checkedTerminal: string,
+  cli: string
 ): string[] {
   return messages
     .filter((message) => !fitsOneLine(message.body) || !fitsOneLine(message.payload))
     .map(
       (message) =>
-        `orca orchestration inbox --terminal ${shellWord(message.to_handle ?? checkedTerminal)} --id ${shellWord(message.id)}`
+        `${bashWordOfCli(cli)} orchestration inbox --terminal ${bashWord(message.to_handle ?? checkedTerminal)} --id ${bashWord(message.id)}`
     )
 }
 
@@ -198,12 +199,14 @@ function formatCheckBody(
 export function prepareOrchestrationCheckOutput<T extends OrchestrationCheckOutput>(
   result: T,
   checkedTerminal: string,
-  formattedRequested: boolean
+  formattedRequested: boolean,
+  /** The CLI the reader runs, so the read it names is not a bare `orca` that may be another program. */
+  cli = 'orca'
 ): T {
   const compatibilityActive = Boolean(
     result.legacyCompatibility && !result.legacyCompatibility.readOnly
   )
-  const readInFull = readInFullCommands(result.messages, checkedTerminal)
+  const readInFull = readInFullCommands(result.messages, checkedTerminal, cli)
   const sized = readInFull.length > 0 ? { readInFull, ...result } : result
   if (
     !formattedRequested ||

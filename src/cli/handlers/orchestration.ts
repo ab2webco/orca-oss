@@ -780,9 +780,16 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
     }
     result = {
       ...result,
-      result: prepareOrchestrationCheckOutput(result.result, terminal, flags.has('format'))
+      result: prepareOrchestrationCheckOutput(
+        result.result,
+        terminal,
+        flags.has('format'),
+        resolveCompatibilityCliCommand()
+      )
     }
-    printResult(result, json, (r) => formatOrchestrationCheckText(r, terminal))
+    printResult(result, json, (r) =>
+      formatOrchestrationCheckText(r, terminal, resolveCompatibilityCliCommand())
+    )
     const compatibilityAck = result.result.legacyCompatibility?.ackMessageIds
     if (compatibilityAck && compatibilityAck.length > 0) {
       await flushStdout()

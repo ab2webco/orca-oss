@@ -1,13 +1,5 @@
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
-import { quotePosixShell } from './wsl-login-shell-command'
-
-const BASH_SAFE_WORD = /^[A-Za-z0-9_./:@%+=,-]+$/
-
-// Why: the lead runs these in Claude Code's Bash tool, Git Bash on Windows, where `\` escapes and a space splits.
-const bashWordOfCli = (cli: string): string => {
-  const path = /^[A-Za-z]:\\/.test(cli) ? cli.replaceAll('\\', '/') : cli
-  return BASH_SAFE_WORD.test(path) ? path : quotePosixShell(path)
-}
+import { bashWordOfCli } from './bash-cli-word'
 
 /**
  * The standing rules that turn a session into the project's lead; `orca game lead` prints them.

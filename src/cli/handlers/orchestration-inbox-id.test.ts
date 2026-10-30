@@ -71,3 +71,23 @@ describe('orchestration inbox --id', () => {
     expect(printResult).not.toHaveBeenCalled()
   })
 })
+
+describe('orchestration check --json readInFull', () => {
+  it('names the read with the CLI resolved for this host', async () => {
+    vi.stubEnv('ORCA_CLI_COMMAND', 'orca-ide')
+    callMock.mockResolvedValue({ result: { ...inboxWith('relay_long').result, deliveryId: 'd1' } })
+
+    await ORCHESTRATION_HANDLERS['orchestration check']({
+      flags: new Map<string, string | boolean>([['terminal', 'run:run_home']]),
+      client: { call: callMock },
+      cwd: '/repo',
+      json: true
+    } as never)
+
+    const [response] = vi.mocked(printResult).mock.calls[0]!
+    expect((response as { result: { readInFull: string[] } }).result.readInFull).toEqual([
+      'orca-ide orchestration inbox --terminal run:run_home --id relay_long'
+    ])
+    vi.unstubAllEnvs()
+  })
+})
