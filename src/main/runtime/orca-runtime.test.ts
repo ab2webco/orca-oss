@@ -44339,6 +44339,8 @@ describe('OrcaRuntimeService', () => {
     ensurePathWithinWorkspaceMock.mockReturnValue(childPath)
     vi.mocked(listWorktrees)
       .mockResolvedValueOnce(MOCK_GIT_WORKTREES)
+      // The missing parent is rechecked against a fresh scan before it is reported missing.
+      .mockResolvedValueOnce(MOCK_GIT_WORKTREES)
       .mockResolvedValueOnce([
         {
           path: childPath,
