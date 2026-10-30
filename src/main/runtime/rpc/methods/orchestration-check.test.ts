@@ -861,6 +861,37 @@ describe('orchestration RPC methods', () => {
       expect(result.count).toBe(2)
     })
 
+    // Why (ORCA-858): the exact read a check names for a body its watch line cut.
+    it('--id returns that one message, outside the handle window too', async () => {
+      setup()
+      const wanted = db.insertMessage({
+        from: 'a',
+        to: 'b',
+        subject: 'wanted',
+        body: 'x'.repeat(3000)
+      })
+      db.insertMessage({ from: 'a', to: 'b', subject: 'newer' })
+
+      const result = (await call('orchestration.inbox', {
+        terminal: 'b',
+        id: wanted.id,
+        limit: 1
+      })) as { messages: { id: string; body: string }[] }
+
+      expect(result.messages.map((m) => [m.id, m.body.length])).toEqual([[wanted.id, 3000]])
+    })
+
+    it('--id with another recipient returns nothing', async () => {
+      setup()
+      const wanted = db.insertMessage({ from: 'a', to: 'b', subject: 'wanted' })
+
+      const result = (await call('orchestration.inbox', { terminal: 'c', id: wanted.id })) as {
+        count: number
+      }
+
+      expect(result.count).toBe(0)
+    })
+
     it('--terminal <handle> matches check --all output for the same handle', async () => {
       setup()
       db.insertMessage({ from: 'a', to: 'b', subject: 'one' })

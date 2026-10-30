@@ -173,7 +173,9 @@ const ReplyParams = z.object({
 const InboxParams = z.object({
   limit: OptionalFiniteNumber,
   // Why: filters the inbox to a handle so inbox and check --all give agreeing results (design doc §3.3).
-  terminal: OptionalString
+  terminal: OptionalString,
+  // Why (ORCA-858): a check names this exact read for a body its watch line cannot hold.
+  id: OptionalString
 })
 
 const TaskCreateParams = z.object({
@@ -1317,6 +1319,12 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: InboxParams,
     handler: (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
+      if (params.id) {
+        const message = db.getMessageById(params.id)
+        const messages =
+          message && (!params.terminal || message.to_handle === params.terminal) ? [message] : []
+        return { messages, count: messages.length }
+      }
       // Why: stale/unknown handles return empty rather than error — historical rows survive handle deletion (design doc §3.3).
       const messages = params.terminal
         ? db.getAllMessagesForHandle(params.terminal, params.limit)

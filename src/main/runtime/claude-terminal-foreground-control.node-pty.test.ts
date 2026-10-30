@@ -152,6 +152,16 @@ async function startPaneRunningFakeClaude(
   return pane
 }
 
+/**
+ * Why wait instead of reading the transcript once: node-pty reports the spawned
+ * shell as the foreground the moment the fake's process group is gone, while the
+ * quit line it wrote just before exiting can still be in flight to onData (ORCA-801).
+ */
+async function waitForQuitMarker(pane: LivePane): Promise<void> {
+  await waitFor(() => pane.transcript().includes(QUIT_MARKER), 5_000).catch(() => undefined)
+  expect(pane.transcript()).toContain(QUIT_MARKER)
+}
+
 function captureFor(terminal: string): ClaudeTerminalSwitchCapture {
   return {
     operationId: 'claude-switch-orca-167',
@@ -178,7 +188,7 @@ describePosix('stopClaudeTerminalForegroundAgent against a live PTY', () => {
     const stopped = await stopClaudeTerminalForegroundAgent(pane.runtime, captureFor('term_live'))
 
     expect(stopped).toBe(true)
-    expect(pane.transcript()).toContain(QUIT_MARKER)
+    await waitForQuitMarker(pane)
     expect(pane.foreground()).toBe('bash')
   })
 
@@ -189,7 +199,7 @@ describePosix('stopClaudeTerminalForegroundAgent against a live PTY', () => {
 
     expect(stopped).toBe(true)
     expect(pane.transcript()).toContain(CLEARED_MARKER)
-    expect(pane.transcript()).toContain(QUIT_MARKER)
+    await waitForQuitMarker(pane)
     expect(pane.foreground()).toBe('bash')
   })
 
