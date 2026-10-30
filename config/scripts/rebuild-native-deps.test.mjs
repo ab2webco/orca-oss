@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   chmodSync,
   copyFileSync,
@@ -18,6 +18,8 @@ const sourceScriptPath = fileURLToPath(new URL('./rebuild-native-deps.mjs', impo
 const sourceInstallScriptPath = fileURLToPath(
   new URL('./install-electron-package-binary.mjs', import.meta.url)
 )
+const PID_RECORDER_FILE = 'pid-recorder.cjs'
+const SPAWNED_PIDS_FILE = 'spawned-pids.log'
 
 describe('rebuild-native-deps Electron install fallback', () => {
   it('continues non-strict postinstall when Electron retry download fails', () => {
@@ -43,7 +45,7 @@ describe('rebuild-native-deps Electron install fallback', () => {
         'download attempted\n'
       )
     } finally {
-      rmSync(projectDir, { recursive: true, force: true })
+      removeTempProject(projectDir)
     }
   })
 
@@ -67,7 +69,7 @@ describe('rebuild-native-deps Electron install fallback', () => {
         'Continuing postinstall because Electron binary installation failed'
       )
     } finally {
-      rmSync(projectDir, { recursive: true, force: true })
+      removeTempProject(projectDir)
     }
   })
 
@@ -88,7 +90,7 @@ describe('rebuild-native-deps Electron install fallback', () => {
         'Continuing postinstall because Electron binary installation failed'
       )
     } finally {
-      rmSync(projectDir, { recursive: true, force: true })
+      removeTempProject(projectDir)
     }
   })
 
@@ -118,7 +120,7 @@ describe('rebuild-native-deps Electron install fallback', () => {
         'partial cleared\ndownload attempted\n'
       )
     } finally {
-      rmSync(projectDir, { recursive: true, force: true })
+      removeTempProject(projectDir)
     }
   })
 })
@@ -150,7 +152,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
         )
         expect(existsSync(rebuildLogPath)).toBe(false)
       } finally {
-        rmSync(projectDir, { recursive: true, force: true })
+        removeTempProject(projectDir)
       }
     }
   )
@@ -175,7 +177,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
       expect(readFileSync(join(runtimeDir, 'conpty.dll'), 'utf8')).toBe('conpty.dll x64')
       expect(readFileSync(join(runtimeDir, 'OpenConsole.exe'), 'utf8')).toBe('OpenConsole.exe x64')
     } finally {
-      rmSync(projectDir, { recursive: true, force: true })
+      removeTempProject(projectDir)
     }
   })
 
@@ -202,7 +204,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
         const rebuildCall = JSON.parse(readFileSync(rebuildLogPath, 'utf8').trim())
         expect(rebuildCall.onlyModules).toEqual(['windows-native-registry'])
       } finally {
-        rmSync(projectDir, { recursive: true, force: true })
+        removeTempProject(projectDir)
       }
     }
   )
@@ -233,7 +235,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
         expect(rebuildCall.ignoreModules).toEqual(['cpu-features'])
         expect(rebuildCall.force).toBe(true)
       } finally {
-        rmSync(projectDir, { recursive: true, force: true })
+        removeTempProject(projectDir)
       }
     }
   )
@@ -261,7 +263,7 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
         )
         expect(existsSync(rebuildLogPath)).toBe(false)
       } finally {
-        rmSync(projectDir, { recursive: true, force: true })
+        removeTempProject(projectDir)
       }
     }
   )
@@ -291,10 +293,32 @@ describe('rebuild-native-deps patched node-pty rebuild', () => {
         expect(rebuildCall.onlyModules).toEqual(['node-pty'])
         expect(rebuildCall.force).toBe(true)
       } finally {
-        rmSync(projectDir, { recursive: true, force: true })
+        removeTempProject(projectDir)
       }
     }
   )
+})
+
+describe('rebuild-native-deps test cleanup', () => {
+  it('refuses to remove the project while a process it spawned is still running', async () => {
+    const projectDir = mkTempProject()
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      cwd: projectDir,
+      env: { ...process.env, ...pidRecorderEnv(projectDir) },
+      stdio: 'ignore'
+    })
+
+    try {
+      await waitUntil(() => readSpawnedPids(projectDir).includes(child.pid))
+      expect(() => removeTempProject(projectDir)).toThrow(
+        `Spawned processes outlived the test: ${child.pid}`
+      )
+    } finally {
+      child.kill()
+      await waitUntil(() => !isProcessAlive(child.pid))
+      removeTempProject(projectDir)
+    }
+  })
 })
 
 function mkTempProject() {
@@ -305,7 +329,66 @@ function mkTempProject() {
     sourceInstallScriptPath,
     join(projectDir, 'config', 'scripts', 'install-electron-package-binary.mjs')
   )
+  writeFileSync(
+    join(projectDir, PID_RECORDER_FILE),
+    `require('node:fs').appendFileSync(${JSON.stringify(join(projectDir, SPAWNED_PIDS_FILE))}, process.pid + '\\n')\n`
+  )
   return projectDir
+}
+
+// Why: every Node process the rebuild script starts (probe, installer, fake Electron)
+// preloads the recorder, so cleanup can tell a live child from a slow Windows unlock.
+function pidRecorderEnv(projectDir) {
+  const recorderPath = join(projectDir, PID_RECORDER_FILE).replace(/\\/g, '/')
+  return {
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require "${recorderPath}"`]
+      .filter(Boolean)
+      .join(' ')
+  }
+}
+
+function readSpawnedPids(projectDir) {
+  const logPath = join(projectDir, SPAWNED_PIDS_FILE)
+  if (!existsSync(logPath)) {
+    return []
+  }
+  return readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map(Number)
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+function removeTempProject(projectDir) {
+  const survivors = readSpawnedPids(projectDir).filter(isProcessAlive)
+  if (survivors.length > 0) {
+    for (const pid of survivors) {
+      try {
+        process.kill(pid)
+      } catch {}
+    }
+    throw new Error(
+      `Spawned processes outlived the test: ${survivors.join(', ')}; left ${projectDir} in place`
+    )
+  }
+  // Why: Windows keeps a just-exited probe's electron.exe (a fresh node.exe copy) locked
+  // briefly, often while Defender scans it; rmSync retries EPERM/EBUSY and still throws after.
+  rmSync(projectDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+}
+
+async function waitUntil(predicate, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error(`Condition not met within ${timeoutMs} ms`)
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 50))
+  }
 }
 
 function runRebuildScript(projectDir, extraEnv = {}, args = []) {
@@ -327,6 +410,7 @@ function runRebuildScript(projectDir, extraEnv = {}, args = []) {
     encoding: 'utf8',
     env: {
       ...env,
+      ...pidRecorderEnv(projectDir),
       ...extraEnv
     }
   })
