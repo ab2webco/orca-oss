@@ -25,7 +25,8 @@ describe('parseClaudeStatusLineBody', () => {
       configDir: '/home/dev/.config/managed-claude',
       fiveHour: { used_percentage: 23.5, resets_at: 1738425600 },
       sevenDay: { used_percentage: 41.2, resets_at: 1712059200 },
-      model: null
+      model: null,
+      paneKey: null
     })
   })
 
@@ -50,6 +51,15 @@ describe('parseClaudeStatusLineBody', () => {
       formBody({ rate_limits: { five_hour: { used_percentage: 10 } } })
     )
     expect(noModel?.model).toBeNull()
+  })
+
+  // Why (ORCA-907): the pane names which member's running process reported this config dir.
+  it('keeps the reporting pane, and none when the script sent none', () => {
+    const body = formBody({ rate_limits: { five_hour: { used_percentage: 5 } } }, '/vault/auth')
+    expect(parseClaudeStatusLineBody({ ...body, paneKey: ' tab-1:leaf-2 ' })?.paneKey).toBe(
+      'tab-1:leaf-2'
+    )
+    expect(parseClaudeStatusLineBody(body)?.paneKey).toBeNull()
   })
 
   it('treats a missing/empty configDir as a system-default session', () => {

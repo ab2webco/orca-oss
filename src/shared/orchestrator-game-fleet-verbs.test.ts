@@ -162,6 +162,26 @@ describe('limited members', () => {
     )
   })
 
+  // Why (ORCA-907): only someone at the machine can log an account back in.
+  it('puts a member whose account logged out in needs-you, with how to get it back', () => {
+    const loggedOut = member({
+      paneKey: 'o',
+      displayName: 'CIN-6 Out',
+      state: 'idle',
+      account: { provider: 'claude', id: 'acct_ana', email: 'ana@example.com' },
+      limit: { resetsAt: null, loggedOut: true }
+    })
+    expect(memberPhaseOf(loggedOut)).toBe('needs-you')
+    const fleet = gameFleetReportOf({ lead: DEFAULT_GAME_LEAD, agents: [loggedOut] })
+    expect(fleet.rows[0]).toEqual(
+      expect.objectContaining({
+        phase: 'needs-you',
+        limitedUntil: null,
+        next: 'log ana@example.com in again (/login in its pane), or game move CIN-6'
+      })
+    )
+  })
+
   it('never pushes a limited member: a prompt cannot get past its limit', () => {
     expect(gamePushPlanOf({ lead: DEFAULT_GAME_LEAD, agents: [limited] })).toEqual([
       expect.objectContaining({

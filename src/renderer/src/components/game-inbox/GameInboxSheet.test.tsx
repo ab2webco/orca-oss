@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import { GameInboxSheet } from './GameInboxSheet'
+import type { GameMemberReply } from './game-inbox-threads-client'
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
@@ -74,7 +75,8 @@ const THREADS: GameInboxThreads = {
       question: 'Rebase onto main?',
       answer: 'Yes, rebase.',
       askedAt: AN_HOUR_AGO,
-      answeredAt: AN_HOUR_AGO
+      answeredAt: AN_HOUR_AGO,
+      overriddenBy: { text: 'No, merge first.', at: AN_HOUR_AGO }
     }
   ]
 }
@@ -83,7 +85,7 @@ afterEach(() => {
   cleanup()
 })
 
-function renderSheet() {
+function renderSheet(onReply: (reply: GameMemberReply) => Promise<void> = async () => {}) {
   return render(
     <GameInboxSheet
       open
@@ -91,6 +93,7 @@ function renderSheet() {
       questions={[]}
       onAnswer={async () => {}}
       threads={THREADS}
+      onReply={onReply}
     />
   )
 }
@@ -145,5 +148,59 @@ describe('GameInboxSheet', () => {
 
     act(() => fireEvent.click(view.getByRole('button', { name: /All threads/ })))
     expect(view.getByTestId('game-inbox-thread-ORCA-14')).toBeTruthy()
+  })
+
+  it('audits under Answered what the lead answered and when', () => {
+    const view = renderSheet()
+    tab(view, /Answered/)
+
+    const row = view.getByTestId('game-inbox-answered-q0')
+    expect(within(row).getByText('Rebase onto main?')).toBeTruthy()
+    expect(within(row).getByText('Yes, rebase.')).toBeTruthy()
+    expect(within(row).getByText('Decision')).toBeTruthy()
+    expect(row.textContent).toMatch(/You replaced it: No, merge first\./)
+  })
+
+  it('answers a waiting member for the person, and shows why a reply failed', async () => {
+    const onReply = vi.fn(async (reply: GameMemberReply) => {
+      if (reply.text === 'late') {
+        throw new Error('Its member is gone, so the reply was not sent.')
+      }
+    })
+    const view = renderSheet(onReply)
+    tab(view, /Waiting/)
+    const row = view.getByTestId('game-inbox-waiting-q1')
+    const box = within(row).getByRole('textbox', { name: /Your answer to ORCA-12/ })
+
+    act(() => fireEvent.change(box, { target: { value: '8080' } }))
+    act(() => fireEvent.submit(box))
+    await waitFor(() =>
+      expect(onReply).toHaveBeenCalledWith({ id: 'q1', text: '8080', ticket: 'ORCA-12' })
+    )
+
+    act(() => fireEvent.change(box, { target: { value: 'late' } }))
+    act(() => fireEvent.submit(box))
+    expect((await within(row).findByRole('alert')).textContent).toMatch(/member is gone/)
+  })
+
+  it("overrides the lead's answer from Answered", async () => {
+    const onReply = vi.fn(async () => {})
+    const view = renderSheet(onReply)
+    tab(view, /Answered/)
+    const row = view.getByTestId('game-inbox-answered-q0')
+
+    expect(within(row).queryByRole('textbox')).toBeNull()
+    act(() => fireEvent.click(within(row).getByRole('button', { name: /Override/ })))
+    const box = within(row).getByRole('textbox', { name: /Your answer to ORCA-14/ })
+    act(() => fireEvent.change(box, { target: { value: 'No, merge first.' } }))
+    act(() => fireEvent.submit(box))
+
+    await waitFor(() =>
+      expect(onReply).toHaveBeenCalledWith({
+        id: 'q0',
+        text: 'No, merge first.',
+        ticket: 'ORCA-14'
+      })
+    )
   })
 })

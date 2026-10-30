@@ -3,7 +3,7 @@ import { test, expect } from './helpers/orca-app'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { expectGameInboxPlaceholdersFit, settleGameInboxSheet } from './helpers/game-inbox-sheet'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -22,7 +22,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 // The person reads how the lead and each member talk, and what waits on the lead (ORCA-878).
-test("the Inbox shows each ticket's thread and what waits on the lead", async ({
+test("the Inbox shows each ticket's thread, what waits on the lead and what it answered", async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -165,8 +165,8 @@ test("the Inbox shows each ticket's thread and what waits on the lead", async ({
     }
     const portQuestion = await pendingQuestion('Which port')
     await client.call('orchestration.reply', { id: portQuestion, body: '8080', from: lead })
-    void ask('May I rename the Inbox tab to Mail?')
-    await pendingQuestion('rename the Inbox')
+    const renameAsk = ask('May I rename the Inbox tab to Mail?')
+    const renameQuestion = await pendingQuestion('rename the Inbox')
 
     const entry = orcaPage.getByTestId('game-inbox-entry')
     // Pushed by the runtime as the team's mail lands; nothing is for the person, so no count.
@@ -174,21 +174,31 @@ test("the Inbox shows each ticket's thread and what waits on the lead", async ({
     await expect(entry).toHaveText('Inbox')
     await entry.click()
     const sheet = orcaPage.getByTestId('game-inbox-sheet')
+    // Every Inbox screen at each width in both themes, the sheet settled before each capture.
+    const captureEveryWidth = async (name: string): Promise<void> => {
+      for (const width of WIDTHS) {
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          await settleGameInboxSheet(orcaPage, width)
+          await expectGameInboxPlaceholdersFit(orcaPage, width)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`${name}-${width}-${theme}.png`)
+          })
+        }
+      }
+      await settleGameInboxSheet(orcaPage, 1440)
+    }
     await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('2')
 
     await sheet.getByRole('tab', { name: /Waiting/ }).click()
     await expect(sheet.locator('[data-testid^="game-inbox-waiting-"]')).toHaveCount(2)
-    for (const width of WIDTHS) {
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
-        await settleGameInboxSheet(orcaPage, width)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`waiting-${width}-${theme}.png`)
-        })
-      }
-    }
-    await settleGameInboxSheet(orcaPage, 1440)
+    await captureEveryWidth('waiting')
+
+    await sheet.getByRole('tab', { name: /Answered/ }).click()
+    const answered = sheet.locator('[data-testid^="game-inbox-answered-"]')
+    await expect(answered).toHaveCount(1)
+    await expect(answered).toContainText('8080')
 
     await sheet.getByRole('tab', { name: /Threads/ }).click()
     await expect(sheet.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
@@ -204,23 +214,53 @@ test("the Inbox shows each ticket's thread and what waits on the lead", async ({
     await send(busy.handle, lead, 'escalation', 'Blocked on CI', 'The e2e shard 3 is red.')
     await expect(messages.getByText('Blocked on CI')).toBeVisible()
 
-    for (const width of WIDTHS) {
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
-        await settleGameInboxSheet(orcaPage, width)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`thread-${width}-${theme}.png`)
-        })
-      }
-    }
-    await settleGameInboxSheet(orcaPage, 1440)
+    await captureEveryWidth('thread')
     await sheet.getByRole('button', { name: /All threads/ }).click()
-    await settleGameInboxSheet(orcaPage, 1440)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('threads-1440-light.png')
-    })
+    await captureEveryWidth('threads')
+    await sheet.getByRole('tab', { name: /Answered/ }).click()
+    await expect(sheet.getByRole('tab', { name: /Answered/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    await captureEveryWidth('answered')
+
+    // The person answers a member for the lead: the member's blocked ask returns their words.
+    const leadMail = async () =>
+      (
+        await client.call<{ inbox: { messages: { subject: string }[] } }>('game.inbox', {
+          terminalHandle: lead
+        })
+      ).result.inbox.messages.map((one) => one.subject)
+    await sheet.getByRole('tab', { name: /Waiting/ }).click()
+    const renameRow = sheet.getByTestId(`game-inbox-waiting-${renameQuestion}`)
+    await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Keep Inbox')
+    await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
+    await expect(renameRow).toHaveCount(0)
+    await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('1')
+    expect(JSON.stringify(await renameAsk)).toContain('Keep Inbox')
+    await expect.poll(leadMail).toContainEqual(expect.stringContaining('Owner answered ORCA-14'))
+
+    // And overrides an answer the lead gave: the member hears it on that question's thread.
+    await sheet.getByRole('tab', { name: /Answered/ }).click()
+    const portRow = sheet.getByTestId(`game-inbox-answered-${portQuestion}`)
+    await portRow.getByRole('button', { name: 'Override' }).click()
+    await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
+    await captureEveryWidth('override')
+    await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
+    await expect(portRow.getByRole('textbox')).toHaveValue('')
+    await expect
+      .poll(async () => {
+        const read = await client.call<GameInboxThreads>('game.inboxThreads', { worktreeId })
+        return read.result.threads
+          .find((thread) => thread.ticket === 'ORCA-14')
+          ?.messages.some((one) => one.from === 'lead' && one.body.includes('Use 3000'))
+      })
+      .toBe(true)
+    await expect
+      .poll(leadMail)
+      .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
+    await expect(portRow).toContainText('You replaced it: Use 3000')
+    await captureEveryWidth('answered-after')
   } finally {
     agent.dispose()
   }

@@ -51,6 +51,20 @@ describe("a remote member's relayed agent reading (ORCA-837)", () => {
     expect(parseRemoteMemberAgent(undefined)).toBeNull()
   })
 
+  it("keeps a host's word that the member's account logged out (ORCA-907)", () => {
+    expect(
+      parseRemoteMemberAgent({
+        state: 'done',
+        updatedAt: 5,
+        limit: { resetsAt: null, loggedOut: true }
+      })?.limit
+    ).toEqual({ resetsAt: null, loggedOut: true })
+    expect(
+      parseRemoteMemberAgent({ state: 'done', updatedAt: 5, limit: { resetsAt: 7, loggedOut: 1 } })
+        ?.limit
+    ).toEqual({ resetsAt: 7 })
+  })
+
   // Why (ORCA-864): automatic release tells a chained member's later turn from the one that reported.
   it('keeps a relayed state start, which an older host omits', () => {
     const start = (stateStartedAt: unknown) =>
