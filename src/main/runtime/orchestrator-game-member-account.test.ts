@@ -18,6 +18,28 @@ describe('gameMemberAccountOf', () => {
     ).toEqual({ provider: 'claude', id: 'acct_bo', email: 'bo@example.com' })
   })
 
+  // Why (ORCA-907): `game move` said "already runs on" the spawn record while the process ran elsewhere.
+  it('names the account the running process reported before the spawn-time record', () => {
+    expect(
+      gameMemberAccountOf({
+        agentType: 'claude',
+        live: { known: true, accountId: 'acct_ana', customEndpoint: false },
+        session: { accountId: 'acct_bo' },
+        pinnedAccountId: 'acct_ana',
+        accounts: roster
+      })
+    ).toEqual({ provider: 'claude', id: 'acct_bo', email: 'bo@example.com' })
+    expect(
+      gameMemberAccountOf({
+        agentType: 'claude',
+        live: { known: true, accountId: 'acct_ana', customEndpoint: false },
+        session: { accountId: null },
+        pinnedAccountId: null,
+        accounts: roster
+      })
+    ).toEqual({ provider: 'claude', id: 'acct_ana', email: 'ana@example.com' })
+  })
+
   it('falls back to the worktree pin when the pane owner is unknown', () => {
     expect(
       gameMemberAccountOf({
@@ -58,6 +80,17 @@ describe('isGameMemberOnGlobalLogin', () => {
         agentType: 'claude',
         live: globalPane,
         pinnedAccountId: 'acct_ana'
+      })
+    ).toBe(false)
+  })
+
+  it('is false when the running process reported a managed account', () => {
+    expect(
+      isGameMemberOnGlobalLogin({
+        agentType: 'claude',
+        live: globalPane,
+        session: { accountId: 'acct_bo' },
+        pinnedAccountId: null
       })
     ).toBe(false)
   })

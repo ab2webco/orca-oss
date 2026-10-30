@@ -875,6 +875,18 @@ next step, `game push` leaves it alone, and the Panel card turns red with `limit
 narrows. If **Auto-switch** is on in Settings, Orca may already have moved a Claude or Codex pane on
 its own; the lead's rules send it to `game move` otherwise, or to wait for the reset.
 
+A member's account is the one its running Claude reports, not only what Orca recorded at spawn
+(ORCA-907). Each status-line post carries the pane's `CLAUDE_CONFIG_DIR`; a managed vault there
+names the account `game fleet`, `game move`, the Panel and a paired host's relay show, ahead of the
+pane's spawn record and the worktree pin. A post from before an account switch no longer counts.
+The same post's 5h and 7d windows decide whether that member is limited when they are newer than
+Orca's cached reading, so the card matches the pane's own status line. A stopped member whose last
+lines ask for `/login` (`Not logged in`, an expired or revoked OAuth token, Codex's `sign in again`)
+is `limit: { resetsAt: null, loggedOut: true }`: phase `needs-you` with
+`log <email> in again (/login in its pane), or game move <ticket>`, the card says
+`logged out · /login in its pane`, and `game accounts` shows its account as logged out, which
+`auto` skips. An older host relays no `loggedOut`, and an older home shows such a member as limited.
+
 ### The lead's XP
 
 A lead on the base branch has no PR or ticket of its own, so its XP comes from its members
