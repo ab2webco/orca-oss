@@ -36,8 +36,10 @@ function randomRedrawChunk(rng: () => number): string {
   const ops = 1 + Math.floor(rng() * 12)
   for (let i = 0; i < ops; i++) {
     const roll = rng()
-    if (roll < 0.2) {
+    if (roll < 0.15) {
       parts.push(`\x1b[${1 + Math.floor(rng() * 12)}A`)
+    } else if (roll < 0.2) {
+      parts.push(`\x1b[${1 + Math.floor(rng() * 12)}${'BeEF'[Math.floor(rng() * 4)]}`)
     } else if (roll < 0.3) {
       parts.push(`\x1b[${Math.floor(rng() * 3)}J`)
     } else if (roll < 0.4) {
