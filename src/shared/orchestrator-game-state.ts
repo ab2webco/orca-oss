@@ -80,6 +80,8 @@ export type GameAgent = {
 
 export type GameRemoteHost = {
   host: string
+  /** The paired environment View opens the member's terminal through (ORCA-839). */
+  environmentId?: string
   stateKnown: boolean
   /** Launched by a lead that no longer leads it; read from the home Run DB (ORCA-793). */
   earlierLead?: true

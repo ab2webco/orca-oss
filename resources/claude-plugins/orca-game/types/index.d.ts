@@ -60,6 +60,8 @@ export type GameAgent = {
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true

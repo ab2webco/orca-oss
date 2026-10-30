@@ -769,6 +769,14 @@ export type RuntimeTerminalFocus = {
   navigated?: boolean
 }
 
+/** A connected server's terminal this window was asked to open (ORCA-839). */
+export type RuntimePairedTerminalReveal = {
+  handle: string
+  environmentId: string
+  host: string
+  navigated: boolean
+}
+
 export type RuntimeTerminalClose = {
   handle: string
   tabId: string

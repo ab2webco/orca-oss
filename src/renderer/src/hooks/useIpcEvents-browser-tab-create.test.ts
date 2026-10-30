@@ -167,6 +167,7 @@ describe('useIpcEvents browser tab create routing', () => {
           onSplitTerminal: () => () => {},
           onRenameTerminal: () => () => {},
           onFocusTerminal: () => () => {},
+          onRevealPairedTerminal: () => () => {},
           onFocusEditorTab: () => () => {},
           onCloseSessionTab: () => () => {},
           onMoveSessionTab: () => () => {},

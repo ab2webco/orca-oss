@@ -169,6 +169,7 @@ export async function useIpcEventsForCloseRouting({
         onSplitTerminal: () => () => {},
         onRenameTerminal: () => () => {},
         onFocusTerminal: () => () => {},
+        onRevealPairedTerminal: () => () => {},
         onFocusEditorTab: () => () => {},
         onCloseSessionTab: (listener: CloseSessionTabListener) => {
           if (closeSessionTabListenerRef) {
