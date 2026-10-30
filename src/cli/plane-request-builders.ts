@@ -23,6 +23,7 @@ import {
 } from './flags'
 import { RuntimeClientError } from './runtime-client'
 import type { RuntimeClient, RuntimeRpcSuccess } from './runtime-client'
+import { fetchPlaneWriteWorkItem, resolvePlaneWriteProjectId } from './plane-write-project'
 
 export type PlaneWriteTarget = {
   workItemId: string
@@ -67,10 +68,11 @@ export async function resolvePlaneCurrentWorkItem(
 }
 
 // Resolves the {id, project, workspace} a Plane write targets, from either an
-// explicit id (project required) or the `--current` worktree link (project/
-// workspace inherited from the link unless overridden by flags). The Plane REST
-// write routes require the work item UUID, so both paths resolve to `.id`
-// rather than the human identifier (which 404s on the write endpoints).
+// explicit id or the `--current` worktree link. The project always comes from
+// the work item (--project may be its UUID or identifier); the workspace from
+// --workspace, else the link. The Plane REST write routes require the work
+// item UUID, so both paths resolve to `.id` rather than the human identifier
+// (which 404s on the write endpoints).
 export async function resolvePlaneWriteTarget(args: {
   flags: Map<string, string | boolean>
   client: RuntimeClient
@@ -84,6 +86,7 @@ export async function resolvePlaneWriteTarget(args: {
     throw new RuntimeClientError('invalid_argument', 'Pass either <id> or --current, not both')
   }
   const workspaceId = getOptionalStringFlag(flags, 'workspace')
+  const project = getOptionalStringFlag(flags, 'project')
   if (current) {
     const resolved = (await resolvePlaneCurrentWorkItem(client, cwd)).result
     if (!resolved.workItem) {
@@ -94,14 +97,17 @@ export async function resolvePlaneWriteTarget(args: {
     }
     return {
       workItemId: resolved.workItem.id,
-      projectId: getOptionalStringFlag(flags, 'project') ?? resolved.projectId,
+      projectId: resolvePlaneWriteProjectId(resolved.workItem, project),
       workspaceId: workspaceId ?? resolved.workspaceId
     }
   }
   const requestedId = getRequiredStringFlag(flags, 'id')
-  const projectId = getRequiredStringFlag(flags, 'project')
-  const workItemId = await resolvePlaneWorkItemUuid(client, requestedId, projectId, workspaceId)
-  return { workItemId, projectId, workspaceId }
+  const workItem = await fetchPlaneWriteWorkItem(client, requestedId, project, workspaceId)
+  return {
+    workItemId: workItem.id,
+    projectId: resolvePlaneWriteProjectId(workItem, project),
+    workspaceId
+  }
 }
 
 // Resolves the --parent flag to the UUID Plane's write routes require. The
