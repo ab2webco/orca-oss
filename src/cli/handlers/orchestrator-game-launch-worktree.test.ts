@@ -64,6 +64,8 @@ type Fake = {
   reviews?: Record<string, string>
   /** What workerStart throws after the host's own validation passes. */
   startError?: Error
+  /** The live agents game.state lists once workerStart was called. */
+  agentsAfterStart?: unknown[]
 }
 
 // Why the host's rule: the CLI once sent `name` with an existing worktree, which only the host refused (ORCA-894).
@@ -100,6 +102,13 @@ function fakeClient(worktrees: unknown[], fake: Fake = {}) {
       if (method === 'hostedReview.forBranch') {
         const state = fake.reviews?.[String(params.branch)]
         return { ok: true, result: state ? { provider: 'github', number: 925, state } : null }
+      }
+      if (
+        method === 'game.state' &&
+        fake.agentsAfterStart &&
+        calls.some(([one]) => one === 'orchestration.workerStart')
+      ) {
+        return { ok: true, result: stateWith(fake.agentsAfterStart, fake.unlisted) }
       }
       if (method === 'orchestration.workerStart') {
         refuseLikeHost(params)
@@ -190,6 +199,37 @@ describe('game launch: the ticket keeps its worktree', () => {
     expect(recorded).toBeGreaterThan(-1)
     expect(freed).toBeGreaterThan(recorded)
     expect(calls[freed][1]).toEqual(expect.objectContaining({ tickets: ['CIN-12'] }))
+  })
+
+  it('keeps the record of an unlisted member whose worktree the refused start reused', async () => {
+    const old = worktree('/ws/cin-12', 'fab/cin-12')
+    const { client, calls, start } = fakeClient([MAIN, old], {
+      unlisted: [{ ticket: 'CIN-12', name: 'Arthur', branch: 'fab/cin-12', worktreeId: old.id }],
+      startError: new RuntimeClientError('invalid_argument', 'a member is live in that worktree')
+    })
+
+    await expect(launch(client)).rejects.toThrow('a member is live in that worktree')
+
+    expect(start()).toEqual(expect.objectContaining({ worktree: `id:${old.id}` }))
+    expect(calls.map(([method]) => method)).not.toContain('game.memberDiscard')
+  })
+
+  it('keeps the record of a member that went live on the ticket while the start was refused', async () => {
+    const live = {
+      paneKey: 'p',
+      state: 'working',
+      isMember: true,
+      displayName: 'Arthur · CIN-12 Cartelera',
+      worktree: { id: 'repo1::/ws/cin-12', branch: 'fab/cin-12', displayName: 'cin-12' }
+    }
+    const { client, calls } = fakeClient([MAIN], {
+      agentsAfterStart: [live],
+      startError: new RuntimeClientError('invalid_argument', 'CIN-12 already has a member')
+    })
+
+    await expect(launch(client)).rejects.toThrow('CIN-12 already has a member')
+
+    expect(calls.map(([method]) => method)).not.toContain('game.memberDiscard')
   })
 
   it('refuses, naming the worktree and the live member, when an agent already works there', async () => {

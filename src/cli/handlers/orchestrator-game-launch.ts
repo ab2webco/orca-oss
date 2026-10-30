@@ -22,7 +22,8 @@ import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
 import { callWithLaunchRetry, isLaunchRefusal } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
-import { forgetGameMember, postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { forgetRefusedLaunch } from './orchestrator-game-launch-refusal'
+import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
@@ -218,9 +219,9 @@ export async function launchGameMember(args: {
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
   ).catch(async (error: unknown) => {
-    // Why: the record above would read as a paused member and block the next launch (ORCA-894).
     if (isLaunchRefusal(error)) {
-      await forgetGameMember(client, ticket)
+      const reread = () => readCallerGameState(client)
+      await forgetRefusedLaunch({ client, state, ticket, worktree: where.worktree, reread })
     }
     throw error
   })
