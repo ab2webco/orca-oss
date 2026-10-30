@@ -127,16 +127,22 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'move'],
     summary: 'Move a member its account limit stopped onto another managed account',
-    usage: 'orca game move <ticket> [--account <email|id|auto>] [--dry-run] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'account', 'dry-run'],
+    usage:
+      'orca game move <ticket> [--account <email|id|auto>] [--on <host> --repo <selector>] [--dry-run] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'account', 'on', 'repo', 'dry-run'],
     positionalArgs: ['ticket'],
     notes: [
       "--account defaults to auto: the other account of the member's agent with the most free quota.",
       'A Claude member is switched in its own terminal and resumes the same session (`orca account switch`); any other member is stopped and started again in its own worktree on the new account, linked with --retry-of.',
       'When every other account is at or near its limit, nothing moves and the result says when the first is usable again.',
-      'Agents without Orca-managed accounts cannot move; wait for their reset.'
+      'Agents without Orca-managed accounts cannot move; wait for their reset.',
+      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept. A member on a paired host moves only this way."
     ],
-    examples: ['orca game move CIN-12', 'orca game move CIN-12 --account ana@example.com --json']
+    examples: [
+      'orca game move CIN-12',
+      'orca game move CIN-12 --account ana@example.com --json',
+      'orca game move CIN-12 --on m1 --repo name:cineco-backend --account ana@example.com'
+    ]
   },
   {
     path: ['game', 'member'],

@@ -652,6 +652,12 @@ The lead's verbs, run from the lead's terminal
   (`orca account switch --terminal`); a Codex member is stopped and started again in its own
   worktree on the new account, linked to the old dispatch with `--retry-of`. When every other
   account is near or limited, nothing moves and the result says when the first one is back.
+  `--on <host> --repo <selector>` moves it to a paired host instead (ORCA-798): a new member starts
+  there on `--account` or the project's account policy, resolved by that host; only once it
+  starts does the old dispatch stop, without a release, so the old host keeps its worktree and the
+  result names it. When that host has every account near or limited, nothing moves and the result
+  names when its first account is back. A member already on a paired host moves only this way;
+  `--account` alone is refused for it.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
