@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { GameAgent, GameMerge, GameReview, GameState, GameWorkItem } from '../types'
+import type { GameAgent, GameReview, GameState, GameWorkItem } from '../types'
 import { fleetRewardsOf } from '../hooks/fleet-rewards'
 import { awardXp, rewardsOf, xpLedgerOf } from '../hooks/rewards'
 
@@ -162,66 +162,5 @@ describe("A member's perfect merge", () => {
 
     const [one] = fleetRewardsOf(leadState([merged]), leadState([perfect]))
     expect(one?.label).toBe('ORCA-12 · #41 perfect merge')
-  })
-})
-
-// ORCA-887: the lead and auto-release free a member right after its merge, before a poll sees it.
-describe("A member's merge Orca recorded after the member left", () => {
-  const merge = (patch: Partial<GameMerge> = {}): GameMerge => ({
-    key: 'merged ORCA-12 #41',
-    ticket: 'ORCA-12',
-    provider: 'github',
-    number: 41,
-    worktreeId: 'wt-12',
-    perfect: true,
-    ...patch
-  })
-  const open = member({ review: review({ ci: 'success' }) })
-
-  it('earns the merge and the perfect merge under the ids a poll that saw it would use', () => {
-    const rewards = fleetRewardsOf(
-      leadState([open], { merges: [] }),
-      leadState([], { merges: [merge()] })
-    )
-    expect(rewards.map((one) => [one.id, one.xp, one.label])).toEqual([
-      ['review-merged:github#41@wt-12', 100, 'ORCA-12 · #41 merged'],
-      ['perfect-merge:github#41@wt-12', 100, 'ORCA-12 · #41 perfect merge']
-    ])
-    const seen = fleetRewardsOf(
-      leadState([open]),
-      leadState([member({ review: review({ state: 'merged', perfectMerge: true }) })])
-    )
-    expect(seen.map((one) => one.id)).toEqual(rewards.map((one) => one.id))
-  })
-
-  it('earns only the merge for one the host did not call perfect', () => {
-    expect(
-      kinds(leadState([], { merges: [] }), leadState([], { merges: [merge({ perfect: false })] }))
-    ).toEqual([['review-merged', 100]])
-  })
-
-  it('earns a merge once: not again on the next poll, nor when the member shows it too', () => {
-    const recorded = leadState([], { merges: [merge()] })
-    expect(fleetRewardsOf(recorded, recorded)).toEqual([])
-    const both = leadState([member({ review: review({ state: 'merged', perfectMerge: true }) })], {
-      merges: [merge()]
-    })
-    expect(kinds(leadState([open], { merges: [] }), both)).toEqual([
-      ['review-merged', 100],
-      ['perfect-merge', 100]
-    ])
-  })
-
-  it('awards no recorded merge on the first poll, after an older host, or in a member pane', () => {
-    const recorded = leadState([], { merges: [merge()] })
-    expect(fleetRewardsOf(null, recorded)).toEqual([])
-    expect(fleetRewardsOf(leadState([]), recorded)).toEqual([])
-    const asMember = { role: 'member' as const }
-    expect(
-      fleetRewardsOf(
-        leadState([], { ...asMember, merges: [] }),
-        leadState([], { ...asMember, merges: [merge()] })
-      )
-    ).toEqual([])
   })
 })

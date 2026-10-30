@@ -890,11 +890,9 @@ member right after its PR merges, so a refresh rarely sees its review turn `merg
 with that review: provider, number, worktree and whether `perfectMerge` was `true`. Only after that
 does auto-release drop the row
 ([`orchestrator-game-merge-record.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-merge-record.ts)).
-A lead's state lists the 20 newest of these as `merges`. A merge that appears there between two
-refreshes earns `review-merged` and, when perfect, `perfect-merge` and the arcade offer, under the
-same ids the review's change would give, so a merge both seen and recorded earns once. An older
-host sends no `merges`, and the first list a pane reads awards nothing. A merge recorded while its
-review facts could not be read counts as not perfect.
+A lead's state lists the 20 newest of these as `merges`, so the mod can reward a merge whose member
+is already gone (ORCA-906). A merge recorded while its review facts could not be read counts as not
+perfect.
 
 ### The scoring table: `orchestratorGame.rewardWeights`
 
