@@ -13508,7 +13508,9 @@ export class OrcaRuntimeService {
     if (!terminalHandle || !claimedPaneKey || !launchToken) {
       return null
     }
-    const terminal = this.getOrchestrationDispatchAuthority(terminalHandle)
+    const terminal =
+      this.getOrchestrationDispatchAuthority(terminalHandle) ??
+      this.getOrchestrationDispatchAuthorityForStaleHandle(claimedPaneKey)
     if (
       !terminal?.processIncarnation ||
       !terminal.paneKey ||
@@ -13549,7 +13551,7 @@ export class OrcaRuntimeService {
         terminal,
         terminal.processIncarnation,
         claimedPaneKey,
-        terminalHandle,
+        terminal.terminalHandle,
         launchTokenHash
       )
     }
@@ -13566,9 +13568,21 @@ export class OrcaRuntimeService {
       terminal,
       terminal.processIncarnation,
       attestation.paneKey,
-      terminalHandle,
+      terminal.terminalHandle,
       launchTokenHash
     )
+  }
+
+  // Why: a PTY that outlives an Orca restart can get a new handle while its env keeps the old one
+  // (ORCA-835). The pane key still names it, and the caller's launch token is checked against it.
+  private getOrchestrationDispatchAuthorityForStaleHandle(
+    paneKey: string
+  ): OrchestrationCompatibilityTerminalAuthority | null {
+    if (!this.getPtyRecordForPaneKey(paneKey)?.connected) {
+      return null
+    }
+    const handle = this.getTerminalHandleForPaneKey(paneKey)
+    return handle ? this.getOrchestrationDispatchAuthority(handle) : null
   }
 
   private freezeOrchestrationCompatibilityCallerAuthority(

@@ -5,6 +5,8 @@ import { RuntimeClientError } from '../runtime-client'
 import { getRequiredStringFlag } from '../flags'
 import { resolveManagedAccountSelector } from '../account-selector'
 import { resolveCallerTerminalIdentity } from '../caller-terminal-identity'
+import { describeUnswitchableSource } from '../account-switch-source'
+import type { ClaudeTerminalAccountReport } from '../../shared/managed-account-types'
 import {
   describeClaudeTerminalAccountSwitchFailure,
   describeClaudeTerminalAccountSwitchRecovery,
@@ -122,6 +124,20 @@ export async function switchClaudeTerminalAccount(ctx: HandlerContext): Promise<
     accepted.acceptance && !accepted.acceptance.selfSwitch
       ? await pollClaudeTerminalSwitch(client, accepted.acceptance.operationId, accepted.result)
       : accepted.result
+  if (result.failure?.reason === 'source-unknown') {
+    const report = await client
+      .call<ClaudeTerminalAccountReport>('accounts.terminalClaudeAccount', {
+        terminal: identity.terminal
+      })
+      .then(
+        (response) => response.result?.ownership ?? null,
+        () => null
+      )
+    throw new RuntimeClientError(
+      'claude_terminal_switch_source_unknown',
+      describeUnswitchableSource(report, selector)
+    )
+  }
   if (result.failure) {
     // Why not printResult first: a second write would corrupt the JSON envelope.
     // The error carries the operation id so a detached switch stays traceable,
