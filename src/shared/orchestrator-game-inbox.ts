@@ -12,6 +12,8 @@ export type GameInboxMail = {
   sequence: number
   created_at: string
   payload: string | null
+  /** The question or message this one answers. */
+  thread_id?: string | null
 }
 
 /** Every address mail to the lead or to a ticket's member ever went to, and that mail. */

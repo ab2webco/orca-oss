@@ -44,6 +44,13 @@ const GameInboxParams = z
 
 const GameInboxThreadsParams = z.object(Caller).optional()
 
+const GameOwnerReplyToMemberParams = z.object({
+  ...Caller,
+  id: z.string().min(1).max(80),
+  text: z.string().trim().min(1).max(GAME_OWNER_QUESTION_TEXT_MAX),
+  ticket: z.string().max(40).optional()
+})
+
 const GameOwnerAskParams = z.object({
   ...Caller,
   ticket: z.string().max(40).optional(),
@@ -115,6 +122,18 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
       runtime.getGameBoard().inboxThreads({
         worktreeId: params?.worktreeId,
         terminalHandle: params?.terminalHandle
+      })
+  }),
+  defineMethod({
+    name: 'game.ownerReplyToMember',
+    params: GameOwnerReplyToMemberParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameBoard().replyToMember({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        id: params.id,
+        text: params.text,
+        ticket: params.ticket
       })
   }),
   defineMethod({

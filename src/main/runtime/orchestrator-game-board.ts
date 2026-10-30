@@ -13,6 +13,11 @@ import {
   type GameInboxThreads
 } from '../../shared/orchestrator-game-inbox-threads'
 import {
+  ownerMemberReplyNote,
+  type OwnerMemberReply,
+  type OwnerMemberReplyMode
+} from './orchestrator-game-owner-member-reply'
+import {
   filterGameEvents,
   type GameEvent,
   type GameEventKind
@@ -82,9 +87,31 @@ export class GameBoard {
       tellLead: (lead: GameBoardLead, note: GameLeadNote) => boolean
       /** Lets an open Inbox refresh instead of polling. */
       ownerQuestionsChanged?: (projectKey: string) => void
+      /** Sends the person's words to a member through the lead's run; throws why it could not. */
+      replyToMember?: (lead: GameBoardLead, args: { id: string; text: string }) => OwnerMemberReply
       now?: () => Date
     }
   ) {}
+
+  /** The person answers or overrides for a member from the Inbox; the lead hears it once, to record it on the ticket. */
+  async replyToMember(
+    args: GameBoardCaller & { id: string; text: string; ticket?: string }
+  ): Promise<{ mode: OwnerMemberReplyMode; delivered: boolean }> {
+    const project = await this.deps.projectOf(args)
+    if (project.isMember) {
+      throw new Error('A member answers its lead, never another member for the person.')
+    }
+    if (!project.lead || !this.deps.replyToMember) {
+      throw new Error('This project has no live lead to answer its members through.')
+    }
+    const reply = this.deps.replyToMember(project.lead, { id: args.id, text: args.text })
+    const ticket = args.ticket?.trim().toUpperCase() || null
+    const delivered = this.deps.tellLead(
+      project.lead,
+      ownerMemberReplyNote({ id: args.id, ticket, text: args.text, reply })
+    )
+    return { mode: reply.mode, delivered }
+  }
 
   private now(): Date {
     return this.deps.now?.() ?? new Date()

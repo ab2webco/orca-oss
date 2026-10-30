@@ -767,6 +767,7 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
@@ -3891,7 +3892,14 @@ export class OrcaRuntimeService {
     ownerQuestionsChanged: () => {
       this.notifier?.gameOwnerQuestionsChanged?.()
       this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
-    }
+    },
+    replyToMember: (lead, args) =>
+      replyToMemberAsLead(
+        this.getOrchestrationDb(),
+        (handle, type) => this.notifyMessageArrived(handle, type),
+        lead,
+        args
+      )
   })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
