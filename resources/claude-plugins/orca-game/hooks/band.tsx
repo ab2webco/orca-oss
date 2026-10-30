@@ -14,7 +14,7 @@ import { isMemberPane } from './member-pane'
 import { ACTION_CHIP_PREFIX, actionChipsOf } from './lead-actions'
 import { isPaneShown, openPane } from './fleet-pane'
 import { refreshSoon, viewOf } from './fleet-sync'
-import { countsOf, needsOf, partyOf } from './party'
+import { countsOf, drawnPartyOf, needsOf } from './party'
 import { animate } from './quest'
 import {
   clawdReact,
@@ -142,7 +142,7 @@ export const registerBand = (on: On): void => {
       )
     }
     const state = v.state
-    const party = partyOf(state, config.rewards)
+    const { party, unseen } = drawnPartyOf(state, config.rewards)
     const counts = countsOf(state.agents)
     const needs = needsOf(state)
     const level = config.rewards ? levelOf(v.xp) : undefined
@@ -155,7 +155,8 @@ export const registerBand = (on: On): void => {
           isHeroWorking: isSceneShown(),
           level,
           isDemo: v.isDemo,
-          lead: shownLead()
+          lead: shownLead(),
+          unseen
         })
     }
     const isFramed = columns >= HUD_MIN_COLUMNS
@@ -172,7 +173,7 @@ export const registerBand = (on: On): void => {
         </Text>{' '}
       </Text>
     )
-    const chips = stateChipsOf(state, counts, party.length, v.note, v.isLoading)
+    const chips = stateChipsOf(state, counts, party.length + unseen, v.note, v.isLoading)
     const linked = new Map(chips.filter((one) => one.isLink).map((one) => [one.key, one]))
     const actions = new Map(
       (state.actions ?? []).map((one) => [`${ACTION_CHIP_PREFIX}${one.id}`, one])
@@ -307,7 +308,7 @@ export const registerBand = (on: On): void => {
         ) : (
           <Box key="band-hud-line" flexDirection="row" overflow="hidden">
             <Text color={palette.parchment} backgroundColor={palette.panel} wrap="truncate-end">
-              {hudLineOf(party, columns, { level, isDemo: v.isDemo })}
+              {hudLineOf(party, columns, { level, isDemo: v.isDemo, unseen })}
             </Text>
           </Box>
         )}

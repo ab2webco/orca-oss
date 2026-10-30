@@ -1,8 +1,8 @@
 import type { CommandHandler } from '../dispatch'
-import type { RuntimeRpcSuccess } from '../../shared/runtime-rpc-envelope'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
-import { forgetGameMember } from './orchestrator-game-board-call'
+import { forgetGameMember, readCallerGameState } from './orchestrator-game-board-call'
+import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -41,14 +41,13 @@ export async function forgetRefusedLaunch(args: {
   state: OrchestratorGameState
   ticket: string
   worktree: string
-  reread: () => Promise<RuntimeRpcSuccess<OrchestratorGameState>>
 }): Promise<void> {
   const { state, ticket, worktree } = args
   if (gameTicketHeldOf(state, ticket, worktree)) {
     return
   }
   // Why read again: a member that went live after `state` is what the host refused for; unreadable keeps the record.
-  const now = await args.reread().then(
+  const now = await readCallerGameState(args.client).then(
     (response) => response.result,
     () => null
   )
@@ -56,3 +55,13 @@ export async function forgetRefusedLaunch(args: {
     await forgetGameMember(args.client, ticket)
   }
 }
+
+/** workerStart's catch: frees the record only on a refusal, then rethrows. */
+export const forgetOnRefusal =
+  (args: Parameters<typeof forgetRefusedLaunch>[0]) =>
+  async (error: unknown): Promise<never> => {
+    if (isLaunchRefusal(error)) {
+      await forgetRefusedLaunch(args)
+    }
+    throw error
+  }

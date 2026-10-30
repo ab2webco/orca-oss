@@ -2,6 +2,7 @@ import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../../shared/runtime-rpc-envelope'
 import type { GameEventKind } from '../../shared/orchestrator-game-events'
+import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -10,6 +11,14 @@ export const gameBoardCaller = () => ({
   worktreeId: process.env.ORCA_WORKTREE_ID,
   terminalHandle: process.env.ORCA_TERMINAL_HANDLE
 })
+
+// Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
+export const readCallerGameState = (client: Client) =>
+  client.call<OrchestratorGameState>('game.state', {
+    worktreeId: process.env.ORCA_WORKTREE_ID,
+    terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
+    paneKey: process.env.ORCA_PANE_KEY
+  })
 
 export function optionalText(
   flags: Map<string, string | boolean>,

@@ -18,12 +18,20 @@ import {
   type GameLaunchFlags,
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
-import { resolveGameMemberAccount } from './orchestrator-game-launch-account'
-import { callWithLaunchRetry, isLaunchRefusal } from './orchestrator-game-launch-retry'
+import {
+  GAME_GLOBAL_LOGIN_LABEL,
+  globalLoginHolderOf,
+  resolveGameMemberAccount
+} from './orchestrator-game-launch-account'
+import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
-import { forgetRefusedLaunch } from './orchestrator-game-launch-refusal'
-import { postGameEvents, recordGameMember } from './orchestrator-game-board-call'
+import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
+import {
+  postGameEvents,
+  readCallerGameState,
+  recordGameMember
+} from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
@@ -38,6 +46,8 @@ import {
   type GameSetupQueue
 } from './orchestrator-game-setup-queue'
 
+export { readCallerGameState }
+
 type Client = Parameters<CommandHandler>[0]['client']
 
 export type GameLaunchResult = {
@@ -48,6 +58,8 @@ export type GameLaunchResult = {
   /** The managed account's email and id; absent when Orca's own account selection applies. */
   account?: string
   accountId?: string
+  /** No managed account exists, so the member runs on the host's global login. */
+  globalLogin?: true
   runId: string
   taskId: string
   /** Absent while the member waits for the host's setup slot. */
@@ -91,14 +103,6 @@ function requireLaunchPreferences(capabilities: readonly string[]): void {
   }
 }
 
-// Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
-export const readCallerGameState = (client: Client) =>
-  client.call<OrchestratorGameState>('game.state', {
-    worktreeId: process.env.ORCA_WORKTREE_ID,
-    terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-    paneKey: process.env.ORCA_PANE_KEY
-  })
-
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: {
   client: Client
@@ -115,6 +119,8 @@ export async function launchGameMember(args: {
   launched?: GameLaunchedOnAccount
   /** Names this same command already gave, for the same reason. */
   namesTaken?: readonly string[]
+  /** Tickets this same command put on the global login, which takes one member at a time. */
+  onGlobalLogin?: readonly string[]
   /** A paired host instead of this Orca; named from the same roster as a local member. */
   remote?: GameRemotePlacement | null
 }): Promise<GameLaunchResult> {
@@ -138,7 +144,8 @@ export async function launchGameMember(args: {
     ? { pin: {}, account: null }
     : await resolveGameMemberAccount(client, choice, {
         agents: state.agents,
-        launched: args.launched
+        launched: args.launched,
+        globalLoginHolder: globalLoginHolderOf(state.agents, choice.agent, args.onGlobalLogin ?? [])
       })
   await checkGameMemberMcpServers({
     client,
@@ -150,7 +157,7 @@ export async function launchGameMember(args: {
     repo,
     remote: args.remote ?? null,
     account: memberAccount.account,
-    remoteAccount: choice.account
+    remoteAccount: choice.remoteAccount
   })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
@@ -205,7 +212,7 @@ export async function launchGameMember(args: {
     agent: choice.agent,
     ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
     ...memberAccount.pin,
-    ...(args.remote && choice.account ? { remoteAccount: choice.account } : {}),
+    ...(args.remote && choice.remoteAccount ? { remoteAccount: choice.remoteAccount } : {}),
     run: runId,
     from,
     devMode: isDevCliInvocation(),
@@ -218,13 +225,7 @@ export async function launchGameMember(args: {
       workerParams,
       requestId ? { orchestrationRequestId: requestId } : undefined
     )
-  ).catch(async (error: unknown) => {
-    if (isLaunchRefusal(error)) {
-      const reread = () => readCallerGameState(client)
-      await forgetRefusedLaunch({ client, state, ticket, worktree: where.worktree, reread })
-    }
-    throw error
-  })
+  ).catch(forgetOnRefusal({ client, state, ticket, worktree: where.worktree }))
   await recordGameMember(client, {
     ticket,
     dispatchId: worker.result.dispatchId,
@@ -239,6 +240,7 @@ export async function launchGameMember(args: {
     ...(memberAccount.account
       ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
       : {}),
+    ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
     ...(hostAccount ? { account: hostAccount.email } : {}),
     ...started
   }
@@ -252,12 +254,20 @@ export async function launchGameMember(args: {
   return launched
 }
 
+const GLOBAL_LOGIN_NOTE =
+  'no managed account here, so it runs on the global login: Orca cannot move or refresh it, and puts one member there at a time'
+
 export const formatGameLaunch = (launched: GameLaunchResult): string => {
-  const who = [launched.agent, launched.account].filter(Boolean).join(' · ')
+  const who = [
+    launched.agent,
+    launched.account ?? (launched.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : undefined)
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.lastError ? `\n${launched.lastError}` : ''}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.globalLogin ? `\n${GLOBAL_LOGIN_NOTE}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}`
 }
 
 /** A queued member is on its way, not a failed launch. */

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { GAME_TEST_ACCOUNTS } from './orchestrator-game-fleet-test-fixtures'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import type { RuntimeClient } from '../runtime-client'
 import { RuntimeClientError } from '../runtime-client'
@@ -87,6 +88,7 @@ function fakeClient(worktrees: unknown[], fake: Fake = {}) {
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] },
     'orchestration.runCurrent': { run: { id: 'run_1' } },
+    'accounts.snapshot': GAME_TEST_ACCOUNTS,
     'orchestration.taskCreate': { task: { id: 'task_1' } },
     'orchestration.workerStart': {
       runId: 'run_1',
