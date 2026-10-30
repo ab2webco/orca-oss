@@ -454,3 +454,16 @@ describe('GameLeads after a restart', () => {
     await expect(new GameLeadRoster(() => dir).read()).resolves.toEqual([])
   })
 })
+
+describe('GameLeads.liveLeadOf (ORCA-878)', () => {
+  it("names a project's live lead for a caller that is no terminal, and none once it is gone", async () => {
+    const live = ['term_a']
+    const game = leads(LEAD, live)
+    await game.register({ terminalHandle: 'term_a', project: 'cineco', label: 'Ana' })
+
+    await expect(game.liveLeadOf('repo:a')).resolves.toBe('term_a')
+    await expect(game.liveLeadOf('repo:other')).resolves.toBeNull()
+    live.length = 0
+    await expect(game.liveLeadOf('repo:a')).resolves.toBeNull()
+  })
+})

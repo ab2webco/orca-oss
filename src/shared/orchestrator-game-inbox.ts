@@ -25,6 +25,13 @@ export type GameInboxSource = {
   peerLeads?: Readonly<Record<string, string>>
   /** Questions of this run still awaiting an answer, whatever mail window they fall outside. */
   pendingQuestions?: readonly GameInboxMail[]
+  /** Questions of this run the lead answered, with the answer; the Inbox audits them. */
+  answeredQuestions?: readonly GameAnsweredQuestionMail[]
+}
+
+export type GameAnsweredQuestionMail = GameInboxMail & {
+  answer_body: string | null
+  answered_at: string | null
 }
 
 /** A question a member asked that nobody has answered: it waits on the lead until it is. */
@@ -70,7 +77,7 @@ export type GameInboxSummary = {
 // Why 50: a lead's turn reads it whole; older mail stays in `orca orchestration inbox`.
 export const GAME_INBOX_MESSAGES_MAX = 50
 
-const payloadOf = (payload: string | null): Record<string, unknown> => {
+export const payloadOf = (payload: string | null): Record<string, unknown> => {
   try {
     const parsed: unknown = payload ? JSON.parse(payload) : null
     return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
@@ -104,7 +111,7 @@ const dispatchOfRow = (row: GameInboxMail): string | null =>
   dispatchOfPayload(row.payload) ??
   (row.from_handle.startsWith('dispatch:') ? row.from_handle.slice('dispatch:'.length) : null)
 
-const isMemberFailure = (row: GameInboxMail): boolean => {
+export const isMemberFailure = (row: GameInboxMail): boolean => {
   const payload = payloadOf(row.payload)
   return (
     payload.setupState === 'failed' ||

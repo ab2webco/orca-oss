@@ -166,6 +166,50 @@ describe('OrchestrationDb mutation and question state', () => {
 
       expect(d.listPendingQuestions(run.id).map((row) => row.id)).toEqual([pending.message.id])
       expect(d.listPendingQuestions('run_other')).toEqual([])
+      expect(d.listPendingQuestions(run.id)[0]?.created_at).toMatch(/T.*Z$/)
+    })
+
+    it('lists the answered questions with their answer and UTC times, newest first (ORCA-878)', () => {
+      const d = createDb()
+      const run = d.createRun({
+        objective: 'Answered questions',
+        coordinatorHandle: 'term_coord',
+        coordinatorPaneKey: 'tab_coord:11111111-1111-4111-8111-111111111111'
+      })
+      const task = d.createTask({ spec: 'ask', runId: run.id })
+      const dispatch = d.createDispatchContext(task.id, 'term_worker')
+      const ask = (question: string) =>
+        d.createQuestion({
+          runId: run.id,
+          dispatchId: dispatch.id,
+          askerHandle: 'term_worker',
+          question
+        })
+      ask('Still open?')
+      const first = ask('Which port?')
+      const second = ask('Rebase?')
+      for (const [question, body] of [
+        [first, '8080'],
+        [second, 'Yes']
+      ] as const) {
+        d.answerQuestion({
+          messageId: question.message.id,
+          runId: run.id,
+          consumerGeneration: run.consumer_generation,
+          body
+        })
+      }
+
+      const answered = d.listAnsweredQuestions(run.id, 10)
+
+      expect(answered.map((row) => [row.id, row.answer_body])).toEqual([
+        [second.message.id, 'Yes'],
+        [first.message.id, '8080']
+      ])
+      expect(answered[0]?.answered_at).toMatch(/T.*Z$/)
+      expect(answered[0]?.created_at).toMatch(/T.*Z$/)
+      expect(d.listAnsweredQuestions(run.id, 1)).toHaveLength(1)
+      expect(d.listAnsweredQuestions('run_other', 10)).toEqual([])
     })
 
     it('closes pending questions with their Dispatch', () => {

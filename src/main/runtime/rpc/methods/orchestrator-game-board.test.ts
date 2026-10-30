@@ -168,3 +168,16 @@ describe('game board RPC', () => {
     ])
   })
 })
+
+describe('game board RPC: Inbox threads (ORCA-878)', () => {
+  it("reads the caller's project threads for the person's Inbox", async () => {
+    const threads = { threads: [], waiting: [], answered: [] }
+    const { send, calls } = dispatcherWith({ inboxThreads: async () => threads })
+
+    await expect(send('game.inboxThreads', { worktreeId: 'wt_1' })).resolves.toMatchObject({
+      ok: true,
+      result: threads
+    })
+    expect(calls).toEqual([['inboxThreads', { worktreeId: 'wt_1', terminalHandle: undefined }]])
+  })
+})
