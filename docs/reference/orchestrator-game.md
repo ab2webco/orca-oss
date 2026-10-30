@@ -508,7 +508,7 @@ orchestratorGame:
 A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
 own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
 through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
-project Settings edits all but the two prompts and `rules`, which live in `orca.yaml`
+project Settings edits all but the two prompts, `rules` and `mcpServers`, which live in `orca.yaml`
 (**Lead buttons** is `actions`).
 
 ```yaml
@@ -531,9 +531,21 @@ orchestratorGame:
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
+    mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
+
+`mcpServers` makes `game launch` and `game wave` check, before they create anything, that the host
+and account a member would run on load each listed server, and refuse by name when one is missing
+(`mcp_servers_missing`). The host reads the config that account's Claude reads, so `--on <host>`
+answers for the host, and `--account` or `auto` for that account's vault
+([`orchestrator-game-member-mcp.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-member-mcp.ts)).
+A server counts when it is in that config's user-scope `mcpServers`, in an enabled user plugin, or in
+the repo's `.mcp.json`. A claude.ai connector counts when the account has ever connected it, so
+`Gmail` and `claude.ai Gmail` both match. The match ignores case. Launch prints `Warning:` and goes on
+when the host cannot tell: a Codex member, an SSH repo, a WSL vault, or a paired host whose Orca
+predates `game.member-mcp-servers.v1`. `--skip-mcp-check` launches without reading anything.
 
 Each member `game launch`/`game wave` starts is named after the first roster name no live member
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead

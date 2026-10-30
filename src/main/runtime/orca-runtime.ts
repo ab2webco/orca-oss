@@ -14698,6 +14698,11 @@ export class OrcaRuntimeService {
     return this.requireAccountServices().claudeAccounts.buildGlobalConfigSyncInventory()
   }
 
+  /** A host-runtime account's vault, for reading what its Claude loads; null for WSL or an unowned path. */
+  getClaudeManagedAuthPath(accountId: string): string | null {
+    return this.requireAccountServices().claudeAccounts.getOwnedManagedAuthPath(accountId)
+  }
+
   syncGlobalConfigForClaudeAccount(accountId: string, selection?: GlobalConfigSyncSelection): void {
     this.requireAccountServices().claudeAccounts.syncGlobalConfigForAccount(accountId, selection)
   }
