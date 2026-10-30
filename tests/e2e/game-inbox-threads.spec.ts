@@ -258,7 +258,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     const portRow = sheet.getByTestId(`game-inbox-answered-${portQuestion}`)
     await portRow.getByRole('button', { name: 'Override' }).click()
     await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
-    await orcaPage.setViewportSize({ width: 390, height: 900 })
+    await settleGameInboxSheet(orcaPage, 390)
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('override-390-light.png')
@@ -277,6 +277,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
       .poll(leadMail)
       .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
     await expect(portRow).toContainText('You replaced it: Use 3000')
+    await settleGameInboxSheet(orcaPage, 390)
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('answered-after-390-light.png')
