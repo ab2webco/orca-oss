@@ -3,6 +3,7 @@ import { test, expect } from './helpers/orca-app'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -178,16 +179,16 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await sheet.getByRole('tab', { name: /Waiting/ }).click()
     await expect(sheet.locator('[data-testid^="game-inbox-waiting-"]')).toHaveCount(2)
     for (const width of WIDTHS) {
-      await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
+        await settleGameInboxSheet(orcaPage, width)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`waiting-${width}-${theme}.png`)
         })
       }
     }
-    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await settleGameInboxSheet(orcaPage, 1440)
 
     await sheet.getByRole('tab', { name: /Answered/ }).click()
     const answered = sheet.locator('[data-testid^="game-inbox-answered-"]')
@@ -209,17 +210,18 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect(messages.getByText('Blocked on CI')).toBeVisible()
 
     for (const width of WIDTHS) {
-      await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
+        await settleGameInboxSheet(orcaPage, width)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`thread-${width}-${theme}.png`)
         })
       }
     }
-    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await settleGameInboxSheet(orcaPage, 1440)
     await sheet.getByRole('button', { name: /All threads/ }).click()
+    await settleGameInboxSheet(orcaPage, 1440)
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('threads-1440-light.png')
@@ -229,6 +231,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
       'aria-selected',
       'true'
     )
+    await settleGameInboxSheet(orcaPage, 1440)
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('answered-1440-light.png')

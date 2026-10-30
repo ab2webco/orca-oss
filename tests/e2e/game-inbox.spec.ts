@@ -1,6 +1,7 @@
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
 
@@ -14,23 +15,6 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
     )
     .toBe(theme)
-}
-
-// The sheet slides in over 300ms and eases its width over 150ms on each resize, so a capture
-// taken straight after the resize shows a frame mid-motion; wait for the motion, then check the box.
-async function settleSheet(page: Page, width: number): Promise<void> {
-  await page.setViewportSize({ width, height: 900 })
-  const sheet = page.getByTestId('game-inbox-sheet')
-  await expect(sheet).toHaveAttribute('data-state', 'open')
-  await sheet.evaluate(async (node) => {
-    await Promise.allSettled(node.getAnimations({ subtree: true }).map((one) => one.finished))
-  })
-  const box = await sheet.boundingBox()
-  if (!box) {
-    throw new Error(`the Inbox sheet has no box at ${width}px`)
-  }
-  expect(box.x, `left edge at ${width}px`).toBeGreaterThanOrEqual(0)
-  expect(box.x + box.width, `right edge at ${width}px`).toBeLessThanOrEqual(width)
 }
 
 // The person answers the lead's questions in Orca's own Inbox, not in the lead's chat (ORCA-782).
@@ -97,17 +81,17 @@ test('the Inbox lists every open question for the person and sends the answer th
   expect(await list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
 
   for (const width of [1440, 768, 390, 320]) {
-    await settleSheet(orcaPage, width)
+    await settleGameInboxSheet(orcaPage, width)
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
-      await settleSheet(orcaPage, width)
+      await settleGameInboxSheet(orcaPage, width)
       await orcaPage.screenshot({
         animations: 'disabled',
         path: testInfo.outputPath(`game-inbox-${width}-${theme}.png`)
       })
     }
   }
-  await settleSheet(orcaPage, 1440)
+  await settleGameInboxSheet(orcaPage, 1440)
 
   const optionCard = sheet.locator(`[data-game-owner-question="${byOption.result.question.id}"]`)
   await optionCard.getByRole('button', { name: 'Wait for lab.112' }).click()
