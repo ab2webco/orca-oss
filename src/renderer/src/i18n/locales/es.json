@@ -15326,9 +15326,11 @@
       "game-inbox": {
         "GameInboxSheet": {
           "title": "Bandeja",
-          "description": "Lo que el lead del proyecto te pidió decidir.",
+          "description": "Lo que el lead te preguntó, lo que espera su respuesta y cómo habla con cada miembro.",
           "forYou": "Para ti",
-          "empty": "No hay preguntas esperando tu respuesta."
+          "empty": "No hay preguntas esperando tu respuesta.",
+          "waiting": "Esperando",
+          "threads": "Hilos"
         },
         "GameOwnerQuestionCard": {
           "failed": "La respuesta no se envió.",
@@ -15338,6 +15340,27 @@
         },
         "SidebarGameInboxEntry": {
           "inbox": "Bandeja"
+        },
+        "GameInboxKindTag": {
+          "question": "Pregunta",
+          "decisionGate": "Decisión",
+          "workerDone": "Informe",
+          "escalation": "Escalamiento",
+          "status": "Estado",
+          "dispatch": "Encargo",
+          "mergeReady": "Listo para merge",
+          "handoff": "Traspaso"
+        },
+        "GameInboxWaitingList": {
+          "empty": "Ningún miembro espera una respuesta.",
+          "answerer": "Debe responder: {{answerer}}"
+        },
+        "GameInboxThreadsView": {
+          "rejected": "Rechazado",
+          "failed": "Falló",
+          "back": "Todos los hilos",
+          "empty": "Ningún miembro ha hablado con el lead todavía.",
+          "waiting": "{{count}} esperando"
         }
       }
     },
