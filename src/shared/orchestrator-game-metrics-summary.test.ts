@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { parseGameEvent } from './orchestrator-game-events'
 import { parseGameHistoryRecord } from './orchestrator-game-history'
 import { computeGameMetrics } from './orchestrator-game-metrics'
+import { GAME_CLAUDE_ACCOUNTS_MAX } from './orchestrator-game-claude-usage'
 import {
   GAME_METRICS_COMPUTE_BUDGET_MS,
   GAME_METRICS_DAYS,
@@ -77,7 +78,13 @@ describe('gameMetricsSummaryOf', () => {
     const started = performance.now()
     const summary = gameMetricsSummaryOf(stores, { now, timezone })
     const elapsed = performance.now() - started
-    const carried = { ...summary, claudeUsage: { sessionPercent: 100, weeklyPercent: 100 } }
+    const claudeAccounts = Array.from({ length: GAME_CLAUDE_ACCOUNTS_MAX }, (_, index) => ({
+      email: `a-rather-long-account-name-${index}@example-company.com`,
+      active: index === 0,
+      sessionPercent: 100,
+      weeklyPercent: 100
+    }))
+    const carried = { ...summary, claudeAccounts }
     expect(JSON.stringify(carried).length).toBeLessThanOrEqual(GAME_METRICS_PAYLOAD_BUDGET_BYTES)
     expect(elapsed).toBeLessThan(GAME_METRICS_COMPUTE_BUDGET_MS)
   })

@@ -45,13 +45,12 @@ import {
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
-  statusGroupOfName,
-  statusGroupOfPlane,
   type GameActivity,
   type GameMemberWorktree,
   type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
+import { trackerWorkItemOf, type TrackerItem } from './orchestrator-game-tracker-item'
 import type {
   GameProjectWork,
   OrchestratorGameTodoSource
@@ -60,11 +59,10 @@ import type { GlobalSettings } from '../../shared/types'
 import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
+import type { GameMetricsSummary } from '../../shared/orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
-
-type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
 
 export type OrchestratorGameStateInput = {
   settings:
@@ -122,6 +120,8 @@ export type OrchestratorGameStateInput = {
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
   readGitHubBudget?: () => Promise<GameGitHubBudget | null>
+  /** The project's delivery numbers by day in `timezone`; read only for a lead. */
+  readMetrics?: (timezone: string) => Promise<GameMetricsSummary | null>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
@@ -147,8 +147,15 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions, readGitHubBudget } =
-    input
+  const {
+    readStop,
+    readInboxes,
+    readLeadElsewhere,
+    readOpenOwnerQuestions,
+    readGitHubBudget,
+    readMetrics
+  } = input
+  const timezone = desktopGameTimezoneOf(resolved.config.timezone)
   const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
     read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
   const [
@@ -162,7 +169,8 @@ export async function buildOrchestratorGameState(
     leadElsewhere,
     suggested,
     openOwnerQuestions,
-    githubBudget
+    githubBudget,
+    metrics
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -174,7 +182,8 @@ export async function buildOrchestratorGameState(
     readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
     leadOnly(readOpenOwnerQuestions),
-    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null)
+    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
+    leadOnly(readMetrics && (() => readMetrics(timezone)))
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -185,30 +194,13 @@ export async function buildOrchestratorGameState(
       : sceneFile?.warning === undefined
         ? {}
         : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
-    timezone: desktopGameTimezoneOf(resolved.config.timezone)
+    timezone
   }
-  let workItem: GameWorkItem | null = null
-  if (plane) {
-    workItem = {
-      provider: 'plane',
-      identifier: plane.identifier,
-      title: plane.title,
-      url: plane.url,
-      status: plane.stateName,
-      statusGroup: statusGroupOfPlane(plane.stateGroup, plane.stateName)
-    }
-  } else if (linear) {
-    workItem = {
-      provider: 'linear',
-      identifier: linear.identifier,
-      title: linear.title,
-      url: linear.url,
-      status: linear.stateName,
-      statusGroup: statusGroupOfName(linear.stateName)
-    }
-  } else if (tracker) {
-    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
-  }
+  const workItem =
+    trackerWorkItemOf(plane, linear) ??
+    (tracker
+      ? await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
+      : null)
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
   // Why `tracker`: it is already off for a member, whose band shows no project work.
@@ -312,6 +304,7 @@ export async function buildOrchestratorGameState(
     ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
+    ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

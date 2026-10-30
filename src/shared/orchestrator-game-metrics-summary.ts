@@ -1,17 +1,16 @@
 import type { GameEvent } from './orchestrator-game-events'
 import type { GameHistoryRecord } from './orchestrator-game-history'
 import { computeGameMetrics } from './orchestrator-game-metrics'
+import type { GameClaudeAccountUsage } from './orchestrator-game-claude-usage'
 
 /** The scene's metrics widget data: `orca game state`'s optional `metrics` (ORCA-774). */
 
 export const GAME_METRICS_DAYS = 14
 export const GAME_METRICS_REFRESH_MS = 60_000
-export const GAME_METRICS_PAYLOAD_BUDGET_BYTES = 1024
+export const GAME_METRICS_PAYLOAD_BUDGET_BYTES = 2048
 export const GAME_METRICS_COMPUTE_BUDGET_MS = 50
 
 export type GameMetricsDay = { day: string; merged: number }
-
-export type GameClaudeUsage = { sessionPercent: number | null; weeklyPercent: number | null }
 
 export type GameMetricsSummary = {
   computedAt: string
@@ -21,8 +20,8 @@ export type GameMetricsSummary = {
   mergedPerDay: GameMetricsDay[]
   /** Over the whole `mergedPerDay` window. */
   leadTime: { medianMs: number | null; measured: number }
-  /** The host's active Claude account; absent when its limits are not read. */
-  claudeUsage?: GameClaudeUsage
+  /** The managed Claude accounts' use; absent when the host has no account services. */
+  claudeAccounts?: GameClaudeAccountUsage[]
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
