@@ -22,9 +22,10 @@ describe('View on a remote member', () => {
     expect(remoteViewNoticeOf(member())).toBeNull()
   })
 
+  // Why this short: the toast box shows three lines, and at 320 px a longer one cut off `stop`.
   it('says a gone member no longer exists, and how to rebind or free it (CIN-1297)', () => {
     expect(remoteViewNoticeOf(member({ host: 'imac', stateKnown: false, gone: true }))).toBe(
-      'ORCA-826 restart no longer exists on imac; if it runs on in another terminal there: orca game rebind, else orca game stop'
+      'ORCA-826 restart no longer exists on imac: orca game rebind or stop'
     )
   })
 
@@ -55,7 +56,7 @@ describe('View on a remote member', () => {
   it('speaks the pane locale', () => {
     setGameLocale('es')
     expect(remoteViewNoticeOf(member({ host: 'imac', stateKnown: false, gone: true }))).toBe(
-      'ORCA-826 restart ya no existe en imac; si sigue en otra terminal allí: orca game rebind, si no orca game stop'
+      'ORCA-826 restart ya no existe en imac: orca game rebind o stop'
     )
   })
 })
