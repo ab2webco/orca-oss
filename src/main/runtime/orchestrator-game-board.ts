@@ -19,8 +19,11 @@ import {
 } from './orchestrator-game-owner-member-reply'
 import {
   filterGameEvents,
+  gameMergesOf,
   type GameEvent,
-  type GameEventKind
+  type GameEventKind,
+  type GameEventMerge,
+  type GameMerge
 } from '../../shared/orchestrator-game-events'
 import {
   addGameOwnerQuestion,
@@ -67,6 +70,8 @@ export type GameLeadNote = { subject: string; body: string; payload: Record<stri
 
 // Why 20: the lead's and the recent tickets'; game state stays small on every poll.
 const INBOX_SUMMARY_MAX = 20
+// Why 20: more merges than a project lands between two of the lead's polls.
+const MERGES_MAX = 20
 
 export type GameEventPost = GameBoardCaller & {
   kind: GameEventKind
@@ -74,6 +79,7 @@ export type GameEventPost = GameBoardCaller & {
   text?: string
   /** Kept once per project: what sweep and fleet observe on every run. */
   key?: string
+  merge?: GameEventMerge
 }
 
 /** A project's shared board on the Orca host: its events, read and written by lead and members. */
@@ -122,6 +128,14 @@ export class GameBoard {
   ): Promise<{ events: GameEvent[] }> {
     const project = await this.deps.projectOf(args)
     return { events: filterGameEvents(await this.deps.store.events(project.key), args) }
+  }
+
+  /** The members' latest recorded merges, for the lead's rewards. */
+  async merges(caller: GameBoardCaller): Promise<GameMerge[]> {
+    const project = await this.deps.projectOf(caller)
+    return project.isMember
+      ? []
+      : gameMergesOf(await this.deps.store.events(project.key), MERGES_MAX)
   }
 
   /** A member reads only its own ticket's inbox; the lead its own, or a ticket's with `ticket`. */
@@ -293,7 +307,9 @@ export class GameBoard {
       ticket: ticket || null,
       text: args.text?.trim() || null,
       by: project.isMember ? (project.memberTicket ?? 'member') : 'lead',
-      ...(args.key ? { key: args.key } : {})
+      ...(args.key ? { key: args.key } : {}),
+      // Why not over RPC: only the host's own read of the review may call a merge perfect.
+      ...(args.merge && args.kind === 'merged' ? { merge: args.merge } : {})
     }
     const { added } = await this.deps.store.appendEvent(project.key, event)
     return { posted: added, event }
