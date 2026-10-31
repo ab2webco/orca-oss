@@ -1,3 +1,5 @@
+import type { GameMetrics } from '../hooks/metrics-widget'
+
 export type GameMode = 'on' | 'zen' | 'flat' | 'off'
 
 /** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
@@ -369,6 +371,8 @@ export type GameState = {
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
   /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
   githubLow?: { remaining: number; limit: number }
+  /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */
+  metrics?: GameMetrics
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
