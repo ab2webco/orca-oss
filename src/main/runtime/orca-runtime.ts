@@ -732,6 +732,12 @@ import type {
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
+import {
+  GAME_METRICS_REFRESH_MS,
+  gameMetricsSummaryOf,
+  type GameMetricsSummary
+} from '../../shared/orchestrator-game-metrics-summary'
+import { gameClaudeAccountsUsageOf } from '../../shared/orchestrator-game-claude-usage'
 import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
   GameProjectWorkCache,
@@ -3808,6 +3814,8 @@ export class OrcaRuntimeService {
   private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
     () => (gameGitHubPollStretch() > 1 ? 300_000 : 0)
   )
+  // Why cached: the lead's band polls every few seconds and the numbers move by the minute.
+  private readonly gameMetrics = new GameReadCache<GameMetricsSummary>(GAME_METRICS_REFRESH_MS)
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
@@ -17122,10 +17130,33 @@ export class OrcaRuntimeService {
           : targetWorktreeId
             ? []
             : [...worktreesById.values()]
-    const controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+    const parsedTargetWorkspace = targetWorktreeId ? parseWorkspaceKey(targetWorktreeId) : null
+    const folderWorkspace =
+      parsedTargetWorkspace?.type === 'folder'
+        ? this.store
+            ?.getFolderWorkspaces?.()
+            .find((workspace) => workspace.id === parsedTargetWorkspace.folderWorkspaceId)
+        : null
+    const targetRepo = targetWorktree ? this.store?.getRepo?.(targetWorktree.repoId) : null
+    const connectionId = folderWorkspace
+      ? this.resolveFolderWorkspaceConnectionId(folderWorkspace)
+      : targetRepo
+        ? (targetRepo.connectionId ?? null)
+        : undefined
+    let controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
       resolvedWorktrees,
-      targetWorktreeId
+      targetWorktreeId,
+      undefined,
+      connectionId
     )
+    if (!controllerInventory && opts.requireFreshPtyLiveness) {
+      controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+        resolvedWorktrees,
+        targetWorktreeId,
+        undefined,
+        connectionId
+      )
+    }
     const refreshedPtyLiveness = controllerInventory
       ? new Set(controllerInventory.livePtyIds)
       : null
@@ -31349,6 +31380,36 @@ export class OrcaRuntimeService {
     return { characters: await this.gameHistory.characters(key) }
   }
 
+  private async readGameMetrics(
+    caller: { worktreeId?: string; terminalHandle?: string },
+    timezone: string
+  ): Promise<GameMetricsSummary | null> {
+    // Why the board's project: it is the key `orca game metrics` reads game.events and game.history by.
+    const { key } = await this.gameBoardProjectOf(caller)
+    return this.gameMetrics.read(JSON.stringify([key, timezone]), async () => {
+      const [events, history] = await Promise.all([
+        this.gameHistory.events(key),
+        this.gameHistory.list(key)
+      ])
+      const summary = gameMetricsSummaryOf({ events, history }, { now: Date.now(), timezone })
+      const services = this.accountServices
+      if (!services) {
+        return summary
+      }
+      const roster = services.claudeAccounts.listAccounts()
+      return {
+        ...summary,
+        claudeAccounts: gameClaudeAccountsUsageOf(
+          {
+            accounts: roster.accounts,
+            activeAccountId: roster.activeAccountIdsByRuntime?.host ?? roster.activeAccountId
+          },
+          services.rateLimits.getState()
+        )
+      }
+    })
+  }
+
   async listGameHistory(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -31765,6 +31826,8 @@ export class OrcaRuntimeService {
           })
         ).stopped,
       readGitHubBudget: () => readGameGitHubBudget(),
+      readMetrics: (timezone) =>
+        this.readGameMetrics({ worktreeId, terminalHandle: callerHandle ?? undefined }, timezone),
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {

@@ -11,6 +11,15 @@ import { GAME_EVENTS_MAX, parseGameEvent } from '../../shared/orchestrator-game-
 import { GAME_HISTORY_MAX, parseGameHistoryRecord } from '../../shared/orchestrator-game-history'
 import { computeGameMetrics, type GameMetrics } from '../../shared/orchestrator-game-metrics'
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
+import {
+  gameMetricsSummaryOf,
+  type GameMetricsSummary
+} from '../../shared/orchestrator-game-metrics-summary'
+import {
+  desktopGameTimezoneOf,
+  isOrchestratorGameTimezone,
+  ORCHESTRATOR_GAME_LOCAL_TIMEZONE
+} from '../../shared/orchestrator-game-render'
 
 const WIDTH = 80
 const LABEL = 15
@@ -107,9 +116,42 @@ async function characterOf(
   return found
 }
 
-export function formatGameMetrics(metrics: GameMetrics): string {
+function timezoneOf(flags: Map<string, string | boolean>): string {
+  const zone = optionalText(flags, 'timezone')
+  if (zone === undefined || zone === ORCHESTRATOR_GAME_LOCAL_TIMEZONE) {
+    return desktopGameTimezoneOf(ORCHESTRATOR_GAME_LOCAL_TIMEZONE)
+  }
+  if (!isOrchestratorGameTimezone(zone)) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--timezone must be a zone like America/Bogota or UTC, not ${JSON.stringify(zone)}.`
+    )
+  }
+  return zone
+}
+
+function dailyLines(daily: GameMetricsSummary): string[] {
+  const merged = daily.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)
+  const median = daily.leadTime.medianMs
+  return [
+    ...row(`Last ${daily.mergedPerDay.length} days`, [
+      `to ${daily.mergedPerDay.at(-1)?.day ?? '?'} ${daily.timezone}`,
+      `${merged} merged`,
+      `lead time median ${median === null ? 'no data' : formatDuration(median)}`
+    ]),
+    ...row(
+      'Merged per day',
+      daily.mergedPerDay.map((one) => `${one.day.slice(5)} ${one.merged}`)
+    )
+  ]
+}
+
+export function formatGameMetrics(metrics: GameMetrics & { daily?: GameMetricsSummary }): string {
   const { leadTime } = metrics
   const lines = [`Game metrics · ${windowOf(metrics)}`]
+  if (metrics.daily) {
+    lines.push(...dailyLines(metrics.daily))
+  }
   if (metrics.character) {
     const { name, level, xp } = metrics.character
     lines.push(...row('Character', [name, `level ${level.level}`, `${xp} XP`]))
@@ -179,6 +221,7 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
     const ticket = optionalText(flags, 'ticket')
     const since = sinceOf(flags)
     const until = untilOf(flags)
+    const timezone = timezoneOf(flags)
     const character = await characterOf(client, flags)
     // Why unfiltered: a claim before --since still starts the lead time of a merge inside it.
     const events = await callGameBoard<{ events: unknown[] }>(
@@ -193,13 +236,18 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
       gameBoardCaller(),
       'history'
     )
-    const metrics = computeGameMetrics(
-      {
-        events: events.result.events.map(parseGameEvent).filter((one) => one !== null),
-        history: history.result.records.map(parseGameHistoryRecord).filter((one) => one !== null)
-      },
-      { ticket, since, until, character }
+    const stores = {
+      events: events.result.events.map(parseGameEvent).filter((one) => one !== null),
+      history: history.result.records.map(parseGameHistoryRecord).filter((one) => one !== null)
+    }
+    const metrics = computeGameMetrics(stores, { ticket, since, until, character })
+    // Why only unfiltered: the days are the scene widget's own window, not the query's.
+    const filtered = [ticket, since, until, character].some((one) => one !== undefined)
+    const daily = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
+    printResult(
+      { ...history, result: daily ? { ...metrics, daily } : metrics },
+      json,
+      formatGameMetrics
     )
-    printResult({ ...history, result: metrics }, json, formatGameMetrics)
   }
 }
