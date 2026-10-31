@@ -31815,6 +31815,8 @@ export class OrcaRuntimeService {
             terminalHandle: callerHandle ?? undefined
           })
         ).open,
+      readMerges: () =>
+        this.gameBoard.merges({ worktreeId, terminalHandle: callerHandle ?? undefined }),
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
           worktreeId,

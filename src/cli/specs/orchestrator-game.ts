@@ -133,7 +133,8 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'A Claude member is switched in its own terminal and resumes the same session (`orca account switch`); any other member is stopped and started again in its own worktree on the new account, linked with --retry-of.',
       'When every other account is at or near its limit, nothing moves and the result says when the first is usable again.',
       'Agents without Orca-managed accounts cannot move; wait for their reset.',
-      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept. A member on a paired host moves only this way."
+      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept.",
+      "A Claude member on a paired host is switched in place on that host's accounts; any other member there moves only with --on."
     ],
     examples: [
       'orca game move CIN-12',

@@ -2,7 +2,7 @@ import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { readWorktreeGameSceneFile } from '../worktree-game-scene-file'
 import { resolveOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import { parseOrchestratorGameScene } from '../../shared/orchestrator-game-scene'
-import type { OrchestratorGameStateInput } from './orchestrator-game-state-builder'
+import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
 
 /** A lead's scene file as written, sent to a remote member's host (ORCA-794). */
 export type CarriedGameScene = { id: string; text: string }

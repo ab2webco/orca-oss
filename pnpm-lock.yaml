@@ -20,6 +20,9 @@ patchedDependencies:
   '@xterm/xterm@6.1.0-beta.287':
     hash: 8a2d562c08d6a1edb38002299fc7d9eac9b9940b876868c4a8edde466019da67
     path: config/patches/@xterm__xterm@6.1.0-beta.287.patch
+  electron-vite@5.0.0:
+    hash: 42373e3996bd93f486111b6d6871b42cba3b594916ea52466fa448a42f67a2e6
+    path: config/patches/electron-vite@5.0.0.patch
   node-pty@1.1.0:
     hash: 8fc49f17011b6611a5b8c00e83a6f12e14e75aada2b0ef26dc5393f8376d20e8
     path: config/patches/node-pty@1.1.0.patch
@@ -250,7 +253,7 @@ importers:
         version: 26.15.3(dmg-builder@26.15.3)
       electron-vite:
         specifier: ^5.0.0
-        version: 5.0.0(@swc/core@1.15.46)(rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4))
+        version: 5.0.0(patch_hash=42373e3996bd93f486111b6d6871b42cba3b594916ea52466fa448a42f67a2e6)(@swc/core@1.15.46)(rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4))
       emoji-picker-react:
         specifier: ^4.19.1
         version: 4.19.1(react@19.2.7)
@@ -10419,7 +10422,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron-vite@5.0.0(@swc/core@1.15.46)(rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4)):
+  electron-vite@5.0.0(patch_hash=42373e3996bd93f486111b6d6871b42cba3b594916ea52466fa448a42f67a2e6)(@swc/core@1.15.46)(rolldown-vite@7.3.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.8.4)):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-arrow-functions': 7.27.1(@babel/core@7.29.7)
