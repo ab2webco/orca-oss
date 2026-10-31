@@ -36,13 +36,22 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         observation.exact && observation.terminal
           ? await runtime.getFederatedMemberAgent(observation.terminal.handle).catch(() => null)
           : null
+      // Why optional: the handle a home passes to terminal.wake; an older home never reads it (ORCA-915).
+      const asleepHandle = observation.status === 'asleep' ? observation.asleep : null
+      const asleep = asleepHandle
+        ? await runtime.showTerminal(asleepHandle).then(
+            (shown) => ({ terminal: asleepHandle, branch: shown.branch, title: shown.title }),
+            () => null
+          )
+        : null
       return {
         dispatchId: params.dispatchId,
         runtimeEpoch: runtime.getRuntimeId(),
         attachment: exposeRemoteAttachment(attachment),
         terminal: observation.exact ? observation.terminal : null,
         observation: { status: observation.status, exactWorker: observation.exact },
-        ...(agent ? { agent } : {})
+        ...(agent ? { agent } : {}),
+        ...(asleep ? { asleep } : {})
       }
     }
   }),
@@ -195,7 +204,14 @@ export async function inspectRemoteAttachment(runtime: OrcaRuntimeService, dispa
   }
   const terminal = await runtime.showTerminal(attachment.terminal_handle).catch(() => null)
   if (!terminal) {
-    return { terminal: null, exact: false, status: 'missing' as const }
+    // Why: a restart slept the member's pane under a new handle; it is waiting, not gone (ORCA-915).
+    const asleep =
+      attachment.worktree_id && attachment.pane_key
+        ? runtime.sleepingTerminalHandleOfPane(attachment.worktree_id, attachment.pane_key)
+        : null
+    return asleep
+      ? { terminal: null, exact: false, status: 'asleep' as const, asleep }
+      : { terminal: null, exact: false, status: 'missing' as const }
   }
   const exact = db.isRemoteAttachmentProcessCurrent({
     dispatchId,

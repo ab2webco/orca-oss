@@ -17267,7 +17267,8 @@ export class OrcaRuntimeService {
       const owner = sleepingTerminalOwnerOf({
         record,
         members: await members,
-        leadOfRun: (runId) => this.coordinatorHandleOfRun(runId),
+        leadOfRun: (runId) =>
+          this.getOrchestrationDbIfAvailable()?.getRun(runId)?.coordinator_handle ?? null,
         pinnedAccount:
           this.gameMemberAccountFor(
             { paneKey: record.paneKey, agentType: record.agent, worktreeId: record.worktreeId },
@@ -17277,14 +17278,6 @@ export class OrcaRuntimeService {
       if (owner) {
         terminal.sleepingAgent = { ...terminal.sleepingAgent, owner }
       }
-    }
-  }
-
-  private coordinatorHandleOfRun(runId: string): string | null {
-    try {
-      return this.getOrchestrationDb().getRun(runId)?.coordinator_handle ?? null
-    } catch {
-      return null
     }
   }
 
@@ -18580,7 +18573,13 @@ export class OrcaRuntimeService {
     const worktreesById = await this.getResolvedWorktreeMap()
     this.assertStableReadyGraph(graphEpoch)
     const { leaf } = this.getLiveLeafForHandle(handle)
-    const summary = this.buildTerminalSummary(leaf, worktreesById)
+    // Why: a mounted slept pane must read as sleeping here too, as terminal.list shows it.
+    const sleeping = this.sleepingRecordOfLeafHandle(handle)
+    const summary = this.buildTerminalSummary(
+      leaf,
+      worktreesById,
+      sleeping ? new Map([[sleeping.paneKey, sleeping]]) : undefined
+    )
     const preview = leaf.ptyId
       ? await this.visibleSnapshotPreview(leaf.ptyId, summary.preview)
       : summary.preview
@@ -30368,8 +30367,8 @@ export class OrcaRuntimeService {
     })
   }
 
-  wakeTerminal(handle: string): Promise<RuntimeTerminalWake> {
-    return wakeSleepingTerminal(
+  async wakeTerminal(handle: string): Promise<RuntimeTerminalWake> {
+    const woken = await wakeSleepingTerminal(
       {
         sleepingRecordOf: (target) =>
           this.sleepingHandleRecords.get(target) ?? this.sleepingRecordOfLeafHandle(target),
@@ -30391,6 +30390,27 @@ export class OrcaRuntimeService {
       },
       handle
     )
+    if (woken.status === 'woken' && woken.handle && woken.paneKey) {
+      this.rebindRemoteAttachmentOfWokenPane(woken.paneKey, woken.handle)
+    }
+    return woken
+  }
+
+  /** A paired lead's member keeps its dispatch through a restart: the attachment follows the woken process. */
+  private rebindRemoteAttachmentOfWokenPane(paneKey: string, handle: string): void {
+    const db = this.getOrchestrationDbIfAvailable()
+    const attachment = db?.findActiveRemoteAttachmentForPane(paneKey)
+    const wokenPaneKey = this.getTerminalPaneKey(handle)
+    const processIncarnation = this.getTerminalProcessIncarnation(handle)
+    if (!db || !attachment || !wokenPaneKey || !processIncarnation) {
+      return
+    }
+    db.rebindRemoteAttachmentProcess({
+      dispatchId: attachment.dispatch_id,
+      paneKey: wokenPaneKey,
+      processIncarnation,
+      terminalHandle: handle
+    })
   }
 
   /** A mounted pane keeps its leaf handle while asleep; its record is then keyed by the leaf. */
@@ -31259,7 +31279,20 @@ export class OrcaRuntimeService {
     return await this.gameMemberResume.discard(project.key, args.tickets)
   }
 
-  private resumeGameMemberSession(member: GameMemberSession): Promise<string> {
+  private async resumeGameMemberSession(member: GameMemberSession): Promise<string | null> {
+    const asleep = this.sleepingHandleOfConversation(member.worktreeId, member.sessionId)
+    if (asleep) {
+      // Why in place: reopening beside a still-sleeping pane runs two agents on one conversation (ORCA-915).
+      const woken = await this.wakeTerminal(asleep).catch((error: unknown) => {
+        if (error instanceof Error && error.message === 'terminal_wake_unavailable') {
+          return null
+        }
+        throw error
+      })
+      if (woken) {
+        return woken.handle
+      }
+    }
     return this.reopenClaudeConversation({
       worktreeId: member.worktreeId ?? '',
       sessionId: member.sessionId ?? '',
@@ -31267,6 +31300,32 @@ export class OrcaRuntimeService {
       presentation: 'background',
       gameMember: true
     })
+  }
+
+  private sleepingHandleOfConversation(
+    worktreeId: string | null,
+    sessionId: string | null
+  ): string | null {
+    const record = Object.values(
+      (worktreeId &&
+        this.getWorkspaceSessionForWorktree(worktreeId)?.sleepingAgentSessionsByPaneKey) ||
+        {}
+    ).find((one) => one.worktreeId === worktreeId && one.providerSession.id === sessionId)
+    return record ? this.sleepingTerminalHandleOfRecord(record) : null
+  }
+
+  /** The handle `terminal.wake` takes for a slept pane, or null when the pane is not asleep. */
+  sleepingTerminalHandleOfPane(worktreeId: string, paneKey: string): string | null {
+    const record =
+      this.getWorkspaceSessionForWorktree(worktreeId)?.sleepingAgentSessionsByPaneKey?.[paneKey]
+    return record ? this.sleepingTerminalHandleOfRecord(record) : null
+  }
+
+  // Why the leaf first: a mounted slept pane is listed under its leaf's handle, as terminal.list shows it.
+  private sleepingTerminalHandleOfRecord(record: SleepingAgentSessionRecord): string {
+    const pane = parsePaneKey(record.paneKey)
+    const leaf = pane ? this.leaves.get(this.getLeafKey(pane.tabId, pane.leafId)) : undefined
+    return leaf ? this.issueHandle(leaf) : this.issueSleepingHandle(record)
   }
 
   // Why bounded: the CLI waits on this, and Claude refuses a conversation it cannot find within seconds.

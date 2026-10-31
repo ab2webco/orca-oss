@@ -16,8 +16,9 @@ type Deps = {
   /** The worktree the task's newest worker got, for a launch cut short before it was saved. */
   worktreeOfTask: (taskId: string) => string | null
   worktreeExists: (worktreeId: string) => Promise<boolean>
-  /** Reopens the member's own conversation and returns its terminal once the agent runs; throws when it cannot. */
-  resumeSession: (member: GameMemberSession) => Promise<string>
+  /** Reopens the member's own conversation and returns its terminal once the agent runs; null while
+   *  its woken pane is still starting; throws when it cannot. */
+  resumeSession: (member: GameMemberSession) => Promise<string | null>
   now?: () => number
 }
 
@@ -117,6 +118,14 @@ export class GameMemberResume {
     }
     try {
       const terminal = await this.deps.resumeSession(member)
+      if (terminal === null) {
+        // Why not relaunch: the woken pane already runs its conversation, so a second agent would share it.
+        return {
+          outcome: 'missing',
+          ticket,
+          reason: `its pane is waking and its agent is still starting; run \`orca game resume-members ${ticket}\` again in a minute`
+        }
+      }
       return { outcome: 'resumed', terminal, member: targetOf(member, retryOf) }
     } catch (error) {
       // Why relaunch: the worktree keeps the work even when the conversation cannot reopen.
