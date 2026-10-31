@@ -218,6 +218,21 @@ describe('remote members of a lead (ORCA-824)', () => {
     })
   })
 
+  it('flags a member its host runs on its global login (ORCA-891)', async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({
+        branch: 'b',
+        title: null,
+        liveness: 'running',
+        agent: { state: 'working', agentType: 'claude', updatedAt: 0, globalLogin: true }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member.globalLogin).toBe(true)
+    expect(member.account).toBeUndefined()
+  })
+
   it('keeps the dispatch and title reading for an older host that relays no agent (ORCA-837)', async () => {
     const [member] = await remoteGameMembersOf([{ ...source, finished: true }], {
       showOf: async () => ({ branch: 'b', title: '⠂ Claude Code', liveness: 'running' }),

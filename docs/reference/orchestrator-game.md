@@ -516,7 +516,7 @@ project Settings edits all but the two prompts, `rules` and `mcpServers`, which 
 orchestratorGame:
   orchestrator:
     autostart: true # a plain session in this project starts as the lead
-    cap: 4 # members running at once, 1 to 12; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1
+    cap: 4 # members running at once, 1 to 100; launches past it are refused. Unset: one per 4 GB of memory and 2 cores, at least 1 and at most 12. With a paired host, the ceiling over every host's cap (below)
     agent: claude # what a member runs, as `orca orchestration worker-start --agent` names it
     model: opus # optional
     effort: high # optional, used only with a model
@@ -585,13 +585,15 @@ The lead's verbs, run from the lead's terminal
   - A network failure of the launch (runtime unavailable or timed out) is retried twice, 1 s and
     3 s apart, with the same orchestration request id, so the runtime never starts a second member
     for one launch ([`orchestrator-game-launch-retry.ts`](../../src/cli/handlers/orchestrator-game-launch-retry.ts)).
-    A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends only
-    what was typed, `--account <email|id>` or the project's `accounts: auto`, and the host resolves
-    it against its own roster. An email the host does not have, or whose sign-in failed, is refused
-    there, as is `auto` with no usable account or every account at its limit (with the first
-    reset); nothing falls back to the host's global login. The result names the email the host
-    used. A host older than `orchestration.federation-member-account.v1` refuses `--account` and
-    `auto` by name. Without either, the host keeps its own selection, as before.
+    A member launched with `--on` runs on the host's own accounts (ORCA-798): the home sends the
+    typed `--account <email|id|auto>`, or `auto` unless the project sets `accounts: default`
+    (ORCA-891), with the project's list if any. The host resolves it against its own roster as a
+    local launch does (see Accounts). Only a host with no managed account for the agent, and no
+    list, runs `auto` on its global login, one member at a time (`global_login_taken`), and the
+    result says so (`globalLogin`, `globalLoginHost`). A host older than
+    `orchestration.federation-member-account.v1` refuses a typed `--account`, and with the policy
+    unset keeps its global login (`globalLoginOlderHost`); one older than
+    `orchestration.federation-member-account-allowed.v1` refuses a list's `auto` by name.
     `orchestration worker-start --on` still refuses `--claude-account` and `--codex-account`.
   - A member started with a model or an effort — from these flags or from the lead's
     `model`/`effort` — gets `ORCA_AGENT_MODEL_PINNED=1` and/or `ORCA_AGENT_EFFORT_PINNED=1` in its
@@ -610,6 +612,13 @@ The lead's verbs, run from the lead's terminal
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
   merged and its ticket is in review or done (or it has none); every other member counts toward
   the cap, even one whose turn ended.
+- **Per-host caps (ORCA-888).** With a saved environment, the lead's cap is the sum of each
+  reachable host's: this Orca's from its memory and cores (one per 4 GB and 2 cores, 1 to 12), each
+  paired host's `memberCap` from `status.get`, cached 30 s. A layer's `orchestrator.cap` only caps
+  that sum. A host that does not answer adds nothing; an older one publishes no cap, so its members
+  take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
+  carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
+  `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
@@ -850,7 +859,8 @@ of its agent with the most free quota
   says so; a second is refused until it is gone. `game fleet` shows such a member's ACCOUNT as
   `global login` (`globalLogin: true` in `game state` and `--json`; an older host sends none).
 - `default` keeps Orca's own account selection, which can be the global login. A member placed
-  with `--on` sends the host only what was typed or set to `auto`.
+  with `--on` follows the same rules on its host, from that host's roster (see `game launch`
+  above); a paired host's member never counts against this host's global login.
 
 A member is **limited** when it stopped (not `working`) and either its account has a window at 100%
 that has not reset, or its terminal shows a provider usage-limit message while its account is not
