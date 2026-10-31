@@ -11,6 +11,7 @@ import {
   type ReadLinkedStatus
 } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import { trackerWorkItemOf, type TrackerItem } from './orchestrator-game-lead-work-item'
 import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
@@ -49,8 +50,6 @@ import {
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
-  statusGroupOfName,
-  statusGroupOfPlane,
   type GameActivity,
   type GameMemberWorktree,
   type GameWorkItem,
@@ -67,8 +66,6 @@ import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-bud
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
-
-type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
 
 export type OrchestratorGameStateInput = {
   settings:
@@ -93,6 +90,8 @@ export type OrchestratorGameStateInput = {
   agents: GameAgentRow[]
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
   members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  /** Every other session on this machine; read only for a lead (ORCA-914). */
+  found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
@@ -194,28 +193,11 @@ export async function buildOrchestratorGameState(
         : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
     timezone: desktopGameTimezoneOf(resolved.config.timezone)
   }
-  let workItem: GameWorkItem | null = null
-  if (plane) {
-    workItem = {
-      provider: 'plane',
-      identifier: plane.identifier,
-      title: plane.title,
-      url: plane.url,
-      status: plane.stateName,
-      statusGroup: statusGroupOfPlane(plane.stateGroup, plane.stateName)
-    }
-  } else if (linear) {
-    workItem = {
-      provider: 'linear',
-      identifier: linear.identifier,
-      title: linear.title,
-      url: linear.url,
-      status: linear.stateName,
-      statusGroup: statusGroupOfName(linear.stateName)
-    }
-  } else if (tracker) {
-    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
-  }
+  const workItem =
+    trackerWorkItemOf(plane, linear) ??
+    (tracker
+      ? await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
+      : null)
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
   // Why `tracker`: it is already off for a member, whose band shows no project work.
@@ -263,6 +245,7 @@ export async function buildOrchestratorGameState(
   const agents = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
+    found: input.callerParentPaneKey ? [] : input.found,
     leaderPaneKey: input.leaderPaneKey,
     teamHandles: input.teamHandles,
     terminalHandleOf: input.terminalHandleOf,

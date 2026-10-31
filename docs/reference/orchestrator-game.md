@@ -319,7 +319,14 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 - `agents` — the worktree's agent rows (`working`, `waiting`, `idle`, `done`, current tool,
   leader flag, and an optional `terminalHandle` when the pane maps to an Orca terminal). The Fleet
   pane's **View** button (hotkeys `1`–`9` by tile order) runs `terminal focus` on that handle;
-  a row without one gets no button;
+  a row without one gets no button. A lead also gets every other live session on this machine,
+  whatever its agent (Claude, Codex, OpenCode…) and in any worktree or folder workspace, as a
+  member marked `found: true` and named after its worktree
+  ([selector](../../src/main/runtime/orchestrator-game-found-sessions.ts)). Other leads and
+  their live members stay out. A found session takes no wave slot and earns no rewards, and
+  `sweep`, `push` and `stop --all` leave it alone; `game stop <ticket or name>` closes it. A
+  found session running in the worktree of a member the lead saved is that member, taken back
+  under its name (ORCA-735);
 - `review` — the hosted review for the branch from any supported provider (GitHub, GitLab,
   Bitbucket, Azure DevOps, Gitea) with its aggregate CI status. `verdict` (optional) is the
   host's review decision — `approved`, `changes_requested` or `review_required` (GitHub only;
