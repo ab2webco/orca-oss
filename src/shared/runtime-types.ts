@@ -93,6 +93,8 @@ export type RuntimeStatus = {
   // Why: mobile gates its Floating Workspace entry on this; absent on older
   // hosts, false when the user disabled the feature in desktop settings.
   floatingWorkspaceEnabled?: boolean
+  // Why: a lead sums its paired hosts' member caps from this; an older host sends none (ORCA-888).
+  gameHost?: { totalMemory: number; cpuCoreCount: number; memberCap: number }
   // COMPAT(runtimeStatusMobileAliases): added 2026-05-15 for mobile builds
   // that still read these names; new desktop/CLI code uses the fields above.
   protocolVersion?: number

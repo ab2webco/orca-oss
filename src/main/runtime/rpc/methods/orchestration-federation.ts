@@ -19,7 +19,7 @@ import {
   persistFederatedSetupWaitOutcome
 } from './orchestration-federation-setup'
 import { claimFederatedSetupSlot } from './orchestration-federation-setup-admission'
-import { resolveHostMemberAccount } from './orchestration-federation-member-account'
+import { attachAccountOf, accountReceiptOf } from './orchestration-federation-global-login'
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { holdSlotForSetup } from './orchestration-worker-setup-queue'
@@ -56,14 +56,15 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
         })
       }
       const memberAccount = params.account
-        ? await resolveHostMemberAccount({
+        ? await attachAccountOf({
             runtime,
             agent,
             selector: params.account,
-            reusesTerminal: Boolean(params.terminal)
+            allowed: params.allowedAccounts,
+            reusesTerminal: Boolean(params.terminal),
+            dispatchId: params.dispatchId
           })
         : null
-      const accountPin = memberAccount?.pin ?? {}
       const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
       const gameMember = params.game ? { orchestrationGameMember: true } : {}
 
@@ -113,7 +114,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             createdWithAgent: agent as TuiAgent,
             startupAgent: agent as TuiAgent,
             ...gameMember,
-            ...accountPin,
+            ...memberAccount?.pin,
             ...(launch.preferences ? { startupLaunchPreferences: launch.preferences } : {}),
             activate: false,
             lineage: { noParent: true }
@@ -189,7 +190,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               // its CLI is `cursor-agent`); resolve through the TUI agent config.
               startupAgent: agent as TuiAgent,
               ...gameMember,
-              ...accountPin,
+              ...memberAccount?.pin,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
               title: `worker-${params.taskId}`,
               presentation: 'background'
@@ -281,7 +282,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           terminalHandle,
           setup,
           launch: launch.receipt,
-          ...(memberAccount ? { account: memberAccount.account } : {}),
+          ...accountReceiptOf(memberAccount),
           effects,
           residualResources: []
         }

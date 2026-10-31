@@ -97,7 +97,7 @@ async function localInventory(
   return {
     checked: true,
     ...inventory,
-    ...(picked ? { account: picked.account.email } : {})
+    ...(picked?.account ? { account: picked.account.email } : {})
   }
 }
 

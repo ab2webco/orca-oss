@@ -5569,6 +5569,17 @@ export class OrchestrationDb {
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
   }
 
+  /** Attachments whose member may still run here: starting, ready, or settled and not released. */
+  listHeldRemoteAttachments(): RemoteDispatchAttachmentRow[] {
+    return this.db
+      .prepare(
+        `SELECT * FROM remote_dispatch_attachments
+         WHERE terminal_handle IS NOT NULL
+           AND (state IN ('starting', 'ready') OR (state = 'succeeded' AND stage != 'released'))`
+      )
+      .all() as RemoteDispatchAttachmentRow[]
+  }
+
   findActiveRemoteAttachmentForPane(paneKey: string): RemoteDispatchAttachmentRow | undefined {
     const rows = this.db
       .prepare(
