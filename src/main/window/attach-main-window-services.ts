@@ -523,6 +523,7 @@ function registerRuntimeWindowLifecycle(
     retireSleepingAgentSessions: (target) => send('ui:retireSleepingAgentSessions', target),
     sleepWorktree: (worktreeId) => send('ui:sleepWorktree', { worktreeId }),
     resumeSleepingAgents: (worktreeId) => send('ui:resumeSleepingAgents', { worktreeId }),
+    wakeSleepingAgentPane: (paneKey) => send('ui:wakeSleepingAgentPane', { paneKey }),
     terminalFitOverrideChanged: (ptyId, mode, cols, rows) =>
       send('runtime:terminalFitOverrideChanged', { ptyId, mode, cols, rows }),
     terminalDriverChanged: (ptyId, driver) =>

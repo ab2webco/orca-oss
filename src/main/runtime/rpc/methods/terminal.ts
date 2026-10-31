@@ -1666,6 +1666,11 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     })
   }),
   defineMethod({
+    name: 'terminal.wake',
+    params: TerminalHandle,
+    handler: async (params, { runtime }) => ({ wake: await runtime.wakeTerminal(params.terminal) })
+  }),
+  defineMethod({
     name: 'terminal.closeTab',
     params: TerminalHandle,
     handler: async (params, context) => ({
