@@ -24,6 +24,12 @@ describe('mapRuntimeError', () => {
     }
   )
 
+  it('preserves a wake refused by a host with no window', () => {
+    expect(
+      mapRuntimeError('req_1', { runtimeId: 'runtime-1' }, new Error('terminal_wake_unavailable'))
+    ).toMatchObject({ ok: false, error: { code: 'terminal_wake_unavailable' } })
+  })
+
   it.each([
     'remote_update_manual_required',
     'remote_update_not_available',

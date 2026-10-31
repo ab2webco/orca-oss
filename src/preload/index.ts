@@ -4456,6 +4456,12 @@ const api = {
       ipcRenderer.on('ui:resumeSleepingAgents', listener)
       return () => ipcRenderer.removeListener('ui:resumeSleepingAgents', listener)
     },
+    onWakeSleepingAgentPane: (callback: (data: { paneKey: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { paneKey: string }) =>
+        callback(data)
+      ipcRenderer.on('ui:wakeSleepingAgentPane', listener)
+      return () => ipcRenderer.removeListener('ui:wakeSleepingAgentPane', listener)
+    },
     onTerminalZoom: (callback: (direction: 'in' | 'out' | 'reset') => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, direction: 'in' | 'out' | 'reset') =>
         callback(direction)

@@ -38,6 +38,7 @@ import type { TuiAgent } from '../../shared/types'
 import { RuntimeClientError } from '../runtime-client'
 import { resolveAccountSelectorFlags } from '../account-selector'
 import { attachAgentTerminalToTask, resolveTaskAttachRequest } from './agent-terminal-task-attach'
+import { terminalWakeHandler } from './terminal-wake'
 import {
   getBrowserWorktreeSelector,
   getOptionalWorktreeSelector,
@@ -241,6 +242,7 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
   },
   // `focus` resolves to this canonical path via CommandSpec.aliases before dispatch.
   'terminal switch': terminalFocusHandler,
+  'terminal wake': terminalWakeHandler,
   'terminal close': async ({ flags, client, cwd, json }) => {
     const method = flags.get('tab') === true ? 'terminal.closeTab' : 'terminal.close'
     const result = await client.call<{ close: RuntimeTerminalClose }>(method, {

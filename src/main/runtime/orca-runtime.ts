@@ -402,6 +402,7 @@ import {
   type RuntimeTerminalSplit,
   type RuntimeTerminalFocus,
   type RuntimeTerminalClose,
+  type RuntimeTerminalWake,
   type RuntimeTerminalListResult,
   type RuntimeTerminalOrphanAdoptionRequest,
   type RuntimeTerminalOrphanAdoptionResult,
@@ -775,6 +776,7 @@ import {
   liveProjectMemberNamesOf
 } from './orchestrator-game-member-name-reservations'
 import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
+import { wakeSleepingTerminal } from './terminal-wake'
 import { GameMemberResume } from './orchestrator-game-member-resume'
 import type {
   GameMemberResumeOutcome,
@@ -2445,6 +2447,8 @@ type RuntimeNotifier = {
   // the runtime has no in-memory sleeping records or wake authority. Optional to
   // match the many renderer-backed notifier methods only the real bridge wires.
   resumeSleepingAgents?(worktreeId: string): void
+  // Why: `terminal.wake` wakes one pane through the host renderer's own wake paths (ORCA-915).
+  wakeSleepingAgentPane?(paneKey: string): void
   terminalFitOverrideChanged(
     ptyId: string,
     mode: 'mobile-fit' | 'remote-desktop-fit' | 'desktop-fit',
@@ -30313,6 +30317,72 @@ export class OrcaRuntimeService {
         }
       }
     })
+  }
+
+  wakeTerminal(handle: string): Promise<RuntimeTerminalWake> {
+    return wakeSleepingTerminal(
+      {
+        sleepingRecordOf: (target) =>
+          this.sleepingHandleRecords.get(target) ?? this.sleepingRecordOfLeafHandle(target),
+        assertLiveHandle: (target) => {
+          if (!this.getLivePtyForHandle(target)) {
+            this.getLiveLeafForHandle(target)
+          }
+        },
+        canWake: () =>
+          Boolean(this.getAvailableAuthoritativeWindow() && this.notifier?.wakeSleepingAgentPane),
+        requestWake: (paneKey) => this.notifier?.wakeSleepingAgentPane?.(paneKey),
+        isAsleep: (record) =>
+          Boolean(
+            this.getWorkspaceSessionForWorktree(record.worktreeId)
+              ?.sleepingAgentSessionsByPaneKey?.[record.paneKey]
+          ),
+        liveHandleOf: (record) => this.liveHandleOfWokenRecord(record),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      },
+      handle
+    )
+  }
+
+  /** A mounted pane keeps its leaf handle while asleep; its record is then keyed by the leaf. */
+  private sleepingRecordOfLeafHandle(handle: string): SleepingAgentSessionRecord | null {
+    const record = this.handles.get(handle)
+    if (!record || record.runtimeId !== this.runtimeId) {
+      return null
+    }
+    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    const paneKey = tryMakePaneKey(record.tabId, record.leafId)
+    if (!leaf || leaf.ptyId || !paneKey) {
+      return null
+    }
+    return (
+      this.getWorkspaceSessionForWorktree(record.worktreeId)?.sleepingAgentSessionsByPaneKey?.[
+        paneKey
+      ] ?? null
+    )
+  }
+
+  /** The pane itself after an in-place wake, else the fresh tab that resumed its session. */
+  private async liveHandleOfWokenRecord(
+    record: SleepingAgentSessionRecord
+  ): Promise<string | null> {
+    const { terminals } = await this.listTerminals(`id:${record.worktreeId}`)
+    const running = terminals.filter(
+      (terminal) => terminal.liveness === 'running' || terminal.liveness === 'starting'
+    )
+    const inPlace = running.find(
+      (terminal) => `${terminal.tabId}:${terminal.leafId}` === record.paneKey
+    )
+    if (inPlace) {
+      return inPlace.handle
+    }
+    return (
+      running.find(
+        (terminal) =>
+          this.getExactWorkerProviderSessionIdentity(terminal.handle, 0)?.providerSession.id ===
+          record.providerSession.id
+      )?.handle ?? null
+    )
   }
 
   async closeTerminal(handle: string): Promise<RuntimeTerminalClose> {
