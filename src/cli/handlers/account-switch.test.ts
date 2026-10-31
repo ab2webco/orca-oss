@@ -567,16 +567,51 @@ describe('orca account switch', () => {
     })
   })
 
-  it('rejects --environment instead of retargeting the switch', async () => {
-    const { client, calls } = buildSwitchClient()
-    await expect(
-      ACCOUNT_HANDLERS['account switch']!(
+  describe('on a paired host (ORCA-916)', () => {
+    function remoteClient(): ReturnType<typeof buildSwitchClient> {
+      const built = buildSwitchClient()
+      ;(built.client as { isRemote?: boolean }).isRemote = true
+      return built
+    }
+
+    it("switches the named terminal on that host without this pane's proof", async () => {
+      process.env.ORCA_TERMINAL_HANDLE = 'orca-terminal-home'
+      process.env.ORCA_PANE_KEY = 'tab-home:leaf-home'
+      process.env.ORCA_AGENT_LAUNCH_TOKEN = 'token-home'
+      const { client, calls } = remoteClient()
+      await ACCOUNT_HANDLERS['account switch']!(
         switchContext(client, [
-          ['to', 'acct-2'],
-          ['environment', 'homelab']
+          ['to', 'two@example.com'],
+          ['terminal', 'orca-terminal-5'],
+          ['environment', 'imac']
         ])
       )
-    ).rejects.toMatchObject({ code: 'invalid_argument' })
-    expect(calls).toEqual([])
+      expect(calls.map((entry) => entry.method)).toEqual([
+        'accounts.snapshot',
+        'accounts.switchClaudeTerminal'
+      ])
+      expect(calls[1]?.params).toEqual({
+        terminal: 'orca-terminal-5',
+        targetAccountId: 'acct-2',
+        awaitMs: 0
+      })
+    })
+
+    it('refuses to guess the terminal there from this pane', async () => {
+      process.env.ORCA_TERMINAL_HANDLE = 'orca-terminal-home'
+      const { client, calls } = remoteClient()
+      await expect(
+        ACCOUNT_HANDLERS['account switch']!(
+          switchContext(client, [
+            ['to', 'acct-2'],
+            ['environment', 'imac']
+          ])
+        )
+      ).rejects.toMatchObject({
+        code: 'invalid_argument',
+        message: expect.stringContaining('--terminal')
+      })
+      expect(calls).toEqual([])
+    })
   })
 })

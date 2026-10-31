@@ -19,6 +19,7 @@ Accounts that use a custom endpoint do not have usage tracking.
 - Use **Switch to** in the account list, or `orca account switch --to <email|id>` from the CLI.
 - Switching is available for Claude accounts from the CLI. For Claude, the same terminal is relaunched and resumes the same conversation. If the relaunch fails, Orca Lab restores the previous account.
 - Auto-switch is not available for SSH terminals, because the account credentials live on the remote host.
+- To switch a terminal on a paired host, name it and the host: `orca account switch --to <email|id> --terminal <handle> --environment <host>`. The target is one of that host's own accounts.
 - `orca account list` shows cached quota. It never prints credentials.
 
 ## Where credentials are stored
