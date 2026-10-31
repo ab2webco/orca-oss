@@ -133,7 +133,8 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'A Claude member is switched in its own terminal and resumes the same session (`orca account switch`); any other member is stopped and started again in its own worktree on the new account, linked with --retry-of.',
       'When every other account is at or near its limit, nothing moves and the result says when the first is usable again.',
       'Agents without Orca-managed accounts cannot move; wait for their reset.',
-      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept. A member on a paired host moves only this way."
+      "--on <host> --repo <selector> starts the member anew on that paired host, on --account or the project's account policy resolved there; once it starts, the old dispatch stops and its worktree is kept.",
+      "A Claude member on a paired host is switched in place on that host's accounts; any other member there moves only with --on."
     ],
     examples: [
       'orca game move CIN-12',
@@ -180,8 +181,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>] [--timezone <zone>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'since', 'until', 'ticket', 'character', 'timezone'],
     notes: [
-      'Computed from `game events` and `game history` on the Orca host that runs the lead, so it also works for SSH and folder projects. Read-only.',
-      'Done: a merged event, or a member freed as merged or with a merged PR. Lead time: first claim to last merge, per ticket.',
+      'Computed from `game events` and `game history` on the Orca host that runs the lead, so it also works for SSH and folder projects. Read-only. Done: a merged event, or a member freed as merged or with a merged PR. Lead time: first claim to last merge, per ticket.',
       '--since keeps entries at or after it, --until entries before it. Metrics with no recorded fact print "not recorded", never 0.',
       "--character keeps that character's own tasks (its last 20) and shows its level and XP. A ticket counts as done only when its own task on it is; lead time still runs from the ticket's first claim.",
       "With no filter it also prints the last 14 days the scene's metrics widget draws: tickets merged per calendar day in --timezone (default this machine's zone; pass the game's own zone to match the widget) and that window's median lead time."

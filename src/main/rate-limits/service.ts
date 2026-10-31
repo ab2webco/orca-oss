@@ -52,6 +52,8 @@ import {
 } from '../codex-accounts/runtime-selection'
 import { ClaudeOauthRefreshCooldownStore } from './claude-oauth-refresh-cooldown'
 import type { CodexRateLimitHomeResolution } from '../codex-accounts/runtime-home-service'
+import { hasLiveDirectedCodexPtyForAccount } from '../codex/directed-codex-pty-binding'
+import { hasCodexPaneOnAccount } from '../codex/codex-pane-account-registry'
 
 export type InactiveCodexAccountInfo = {
   id: string
@@ -945,7 +947,13 @@ export class RateLimitService {
           }
         }
         const home = account.resolveHome()
-        if (home.kind === 'skip') {
+        // Why skip a live member's home: a cold app-server there can rotate its single-use refresh
+        // token under the member, which then asks to log out and sign in again (ORCA-916).
+        if (
+          home.kind === 'skip' ||
+          hasLiveDirectedCodexPtyForAccount(account.id) ||
+          hasCodexPaneOnAccount(account.id)
+        ) {
           continue
         }
         staggerNextProbe = true

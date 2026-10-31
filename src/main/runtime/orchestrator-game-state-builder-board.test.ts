@@ -63,6 +63,37 @@ describe('buildOrchestratorGameState inboxes', () => {
   })
 })
 
+describe('buildOrchestratorGameState merges', () => {
+  const merges = [
+    {
+      key: 'merged CIN-1 #4',
+      ticket: 'CIN-1',
+      provider: 'github' as const,
+      number: 4,
+      worktreeId: 'wt-1',
+      perfect: true
+    }
+  ]
+
+  it("gives the lead its members' recorded merges, a member none, and none when unreadable", async () => {
+    const lead = await buildOrchestratorGameState({ ...base, readMerges: async () => merges })
+    expect(lead.merges).toEqual(merges)
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readMerges: async () => merges
+    })
+    expect('merges' in member).toBe(false)
+    const failed = await buildOrchestratorGameState({
+      ...base,
+      readMerges: async () => {
+        throw new Error('EACCES')
+      }
+    })
+    expect('merges' in failed).toBe(false)
+  })
+})
+
 describe('buildOrchestratorGameState owner questions', () => {
   it('gives the lead the count of questions waiting on the person, a member none', async () => {
     const lead = await buildOrchestratorGameState({
