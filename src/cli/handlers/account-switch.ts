@@ -2,9 +2,12 @@ import type { HandlerContext } from '../dispatch'
 import type { RuntimeAccountsSnapshot } from '../account-format'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
-import { getRequiredStringFlag } from '../flags'
+import { getPresentStringFlag, getRequiredStringFlag } from '../flags'
 import { resolveManagedAccountSelector } from '../account-selector'
-import { resolveCallerTerminalIdentity } from '../caller-terminal-identity'
+import {
+  resolveCallerTerminalIdentity,
+  type CallerTerminalIdentity
+} from '../caller-terminal-identity'
 import { describeUnswitchableSource } from '../account-switch-source'
 import type { ClaudeTerminalAccountReport } from '../../shared/managed-account-types'
 import {
@@ -86,6 +89,21 @@ function formatClaudeTerminalSwitch(response: ClaudeTerminalSwitchResponse): str
 }
 
 /**
+ * A paired host's terminal is named, never inferred: this pane's handle and launch proof belong
+ * to the runtime it runs in, and on the host they would name or authenticate a different pane.
+ */
+function remoteTerminalIdentity(flags: Map<string, string | boolean>): CallerTerminalIdentity {
+  const terminal = getPresentStringFlag(flags, 'terminal')?.trim()
+  if (!terminal) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Name the terminal on that host with --terminal <handle>; see `orca terminal list --environment <host>`.'
+    )
+  }
+  return { terminal }
+}
+
+/**
  * Switches the caller's own terminal (or an explicitly named one) to another
  * managed Claude account. All of the work happens in the runtime that owns the
  * PTY; this only resolves identity, names the target account, and reports.
@@ -93,7 +111,9 @@ function formatClaudeTerminalSwitch(response: ClaudeTerminalSwitchResponse): str
 export async function switchClaudeTerminalAccount(ctx: HandlerContext): Promise<void> {
   const { flags, client, json } = ctx
   const selector = getRequiredStringFlag(flags, 'to')
-  const identity = await resolveCallerTerminalIdentity({ flags, client, flagName: 'terminal' })
+  const identity = client.isRemote
+    ? remoteTerminalIdentity(flags)
+    : await resolveCallerTerminalIdentity({ flags, client, flagName: 'terminal' })
   // Why the cached snapshot: resolving a name must not stall behind a forced
   // provider usage refresh, and this command changes nothing about quota.
   const snapshot = await client.call<RuntimeAccountsSnapshot>('accounts.snapshot')
