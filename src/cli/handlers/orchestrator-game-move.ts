@@ -3,6 +3,8 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { switchClaudeTerminalAccount } from './account-switch'
+import { openHostRuntimeClient } from './orchestrator-game-host-client'
+import type { RuntimeAccountsSnapshot } from '../account-format'
 import { readCallerGameState } from './orchestrator-game-launch'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import {
@@ -100,6 +102,19 @@ async function targetOf(
     }
     throw error
   }
+}
+
+/** A remote member's account as its host names it: only the email crosses hosts (ORCA-798). */
+async function onHostOf(host: Client, member: GameAgent): Promise<GameAgent> {
+  if (!member.remote || !member.account) {
+    return member
+  }
+  const { email } = member.account
+  const { result } = await host.call<RuntimeAccountsSnapshot>('accounts.snapshot')
+  const hostAccount = result[member.account.provider].accounts.find(
+    (account) => account.email.toLowerCase() === email.toLowerCase()
+  )
+  return { ...member, account: hostAccount ? { ...member.account, id: hostAccount.id } : undefined }
 }
 
 async function relaunch(args: {
@@ -211,7 +226,8 @@ export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
       printResult({ ...response, result: moved }, json, formatGameMove)
       return
     }
-    if (member.remote) {
+    // Why only a Claude member with its host's handle stays: it resumes in place there (ORCA-916).
+    if (member.remote && !(member.agentType === 'claude' && member.terminalHandle)) {
       throw new RuntimeClientError(
         'invalid_argument',
         `${ticket} runs on ${member.remote.host}; move it with --on <host> --repo <selector of the repo there>, which starts it anew on that host.`
@@ -224,7 +240,8 @@ export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
     ) {
       throw new RuntimeClientError('invalid_argument', `${ticket} already runs on ${from}.`)
     }
-    const target = await targetOf(client, state, member, selector)
+    const host = member.remote ? await openHostRuntimeClient(member.remote.host) : client
+    const target = await targetOf(host, state, await onHostOf(host, member), selector)
     if ('wait' in target) {
       printResult(
         { ...response, result: { ticket, moved: false, from, wait: target.wait } },
@@ -243,6 +260,7 @@ export const ORCHESTRATOR_GAME_MOVE_HANDLERS: Record<string, CommandHandler> = {
       // Why reuse: Orca's in-place switch stops, repoints and resumes the same Claude session, with rollback.
       await switchClaudeTerminalAccount({
         ...ctx,
+        client: host,
         flags: new Map([
           ['to', target.account.id],
           ['terminal', member.terminalHandle]
