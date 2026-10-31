@@ -200,6 +200,11 @@ import {
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+
+const gameHostProfileOfThisMachine = (): GameHostProfile => ({
+  totalMemory: totalmem(),
+  cpuCoreCount: Math.max(1, cpus().length)
+})
 import { summarizeRetiredRunMail, type RetiredRunMail } from './orchestration/run-mail-settlement'
 import type { RetiredRunMailNotice } from '../../shared/orchestration-check-output'
 import { MailPointerRepointScheduler } from './orchestration/mail-pointer-repoint-scheduler'
@@ -734,6 +739,7 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import {
   gameAgentStateOf,
   statusGroupOfJira,
+  type GameAgent,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import {
@@ -760,6 +766,8 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
+import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
@@ -3800,6 +3808,21 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
+  private readonly gamePairedHosts = new GamePairedHostReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    statusOf: async (environmentId) => {
+      const response = await this.orchestrationEnvironmentTransport!.call(
+        environmentId,
+        'status.get',
+        undefined,
+        REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+      )
+      if (response.ok === false) {
+        throw new Error(response.error.message)
+      }
+      return response.result
+    }
+  })
   private readonly gamePausedMembers = new GamePausedMembers({
     store: this.gameMemberSessions,
     contextOf: (handle) => this.getAgentStatusOrchestrationContextForHandle(handle),
@@ -5863,6 +5886,9 @@ export class OrcaRuntimeService {
       hostPlatform: process.platform,
       terminalWindowsShell: this.store?.getSettings?.().terminalWindowsShell ?? null,
       floatingWorkspaceEnabled: this.store?.getSettings?.().floatingTerminalEnabled !== false,
+      gameHost: ((profile) => ({ ...profile, memberCap: defaultGameMemberCapOf(profile) }))(
+        gameHostProfileOfThisMachine()
+      ),
       protocolVersion: RUNTIME_PROTOCOL_VERSION,
       minCompatibleMobileVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
     }
@@ -31369,6 +31395,47 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** The worktree names of this host's federated members on its global login for one provider (ORCA-891). */
+  async federatedMembersOnGlobalLogin(provider: 'claude' | 'codex'): Promise<string[]> {
+    const held = this.getOrchestrationDb().listHeldRemoteAttachments()
+    const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
+    return held.flatMap((row) => {
+      const paneKey = row.terminal_handle ? this.getTerminalPaneKey(row.terminal_handle) : null
+      const onGlobalLogin =
+        paneKey !== null &&
+        this.readGameMemberSeat(
+          { paneKey, agentType: provider, worktreeId: row.worktree_id },
+          worktreesById,
+          isGameMemberOnGlobalLogin
+        ) === true
+      return onGlobalLogin
+        ? [worktreesById.get(row.worktree_id ?? '')?.displayName ?? row.dispatch_id]
+        : []
+    })
+  }
+
+  /** This host's agents on a managed account, each with the usage limit it stopped on (ORCA-891). */
+  async gameAgentsOnAccounts(): Promise<GameAgent[]> {
+    const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
+    const rows = (this.getAgentStatusSnapshotFn?.() ?? []).filter(
+      (row) => !row.restoredUnconfirmed && !row.providerSessionOnly
+    )
+    const agents = await Promise.all(
+      rows.map(async ({ paneKey, agentType = null, state: hookState }): Promise<GameAgent[]> => {
+        const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
+        const account = this.gameMemberAccountFor({ paneKey, agentType, worktreeId }, worktreesById)
+        if (!account) {
+          return []
+        }
+        const state = gameAgentStateOf(hookState)
+        const limit = await this.gameMemberLimitFor({ paneKey, agentType, state, account })
+        const agent = { paneKey, displayName: null, agentType, state, toolName: null, account }
+        return [{ ...agent, isLeader: false, isMember: true, ...(limit && { limit }) }]
+      })
+    )
+    return agents.flat()
+  }
+
   /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */
   async getFederatedMemberAgent(handle: string): Promise<RemoteMemberAgent | null> {
     const paneKey = this.getTerminalPaneKey(handle)
@@ -31377,10 +31444,11 @@ export class OrcaRuntimeService {
       return null
     }
     const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
-    const account = this.gameMemberAccountFor(
-      { paneKey, agentType: agent.agentType, worktreeId },
-      worktreeId ? await this.getResolvedWorktreeMap().catch(() => new Map()) : new Map()
-    )
+    const member = { paneKey, agentType: agent.agentType, worktreeId }
+    const worktreesById = worktreeId
+      ? await this.getResolvedWorktreeMap().catch(() => new Map())
+      : new Map()
+    const account = this.gameMemberAccountFor(member, worktreesById)
     const limit = await this.gameMemberLimitFor({
       paneKey,
       agentType: agent.agentType,
@@ -31390,7 +31458,11 @@ export class OrcaRuntimeService {
     return {
       ...agent,
       // Why the email only: an account id means nothing on the home and must not leave this host (ORCA-798).
-      ...(account ? { account: { provider: account.provider, email: account.email } } : {}),
+      ...(account
+        ? { account: { provider: account.provider, email: account.email } }
+        : this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin)
+          ? { globalLogin: true as const }
+          : {}),
       ...(limit ? { limit } : {})
     }
   }
@@ -31495,7 +31567,8 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
-      host: { totalMemory: totalmem(), cpuCoreCount: Math.max(1, cpus().length) },
+      host: gameHostProfileOfThisMachine(),
+      readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
         ? {
             id: worktree.id,

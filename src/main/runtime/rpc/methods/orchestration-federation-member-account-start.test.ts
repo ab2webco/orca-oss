@@ -140,6 +140,20 @@ describe('remote member accounts across hosts (ORCA-798)', () => {
   const claudeStart = (taskId: string, overrides: Record<string, unknown> = {}) =>
     startRequest(taskId, { agent: 'claude', game: true, ...overrides })
 
+  const NO_ACCOUNTS = {
+    claude: { accounts: [], activeAccountId: null },
+    codex: { accounts: [], activeAccountId: null },
+    rateLimits: {
+      claude: null,
+      codex: null,
+      inactiveClaudeAccounts: [],
+      inactiveCodexAccounts: []
+    }
+  }
+  const dropCapabilities = (...dropped: string[]) => {
+    workerCapabilities = workerCapabilities.filter((one) => !dropped.includes(one))
+  }
+
   it('advertises the member-account capability on a current build', () => {
     expect(workerRuntime.getStatus().capabilities).toContain(
       ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY
@@ -245,5 +259,156 @@ describe('remote member accounts across hosts (ORCA-798)', () => {
       error: { code: 'invalid_argument' }
     })
     expect(attachParams).toHaveLength(0)
+  })
+
+  describe('with orchestrator.accounts unset (ORCA-891)', () => {
+    const unset = { remoteAccount: 'auto', remoteAccountByDefault: true }
+
+    it('lands on the freest managed account of the host', async () => {
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', account: { provider: 'claude', email: 'ops@netsat.co' } }
+      })
+      expect(JSON.stringify(response)).not.toContain('globalLogin')
+      expect(workerRuntime.createManagedWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ claudeAccountId: 'imac-ops' })
+      )
+    })
+
+    it("runs on the host's global login when it has no managed account, and says so", async () => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(NO_ACCOUNTS as never)
+
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', globalLogin: 'no_account' }
+      })
+      expect(attachParams[0]).toMatchObject({ account: 'auto' })
+      expect(workerRuntime.createManagedWorktree).toHaveBeenCalledWith(
+        expect.not.objectContaining({ claudeAccountId: expect.anything() })
+      )
+    })
+
+    it('refuses a second member while one holds the host global login', async () => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(NO_ACCOUNTS as never)
+      vi.spyOn(workerRuntime, 'federatedMembersOnGlobalLogin').mockResolvedValue(['Ana · CIN-11'])
+
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'failed', refusal: { code: 'global_login_taken' } }
+      })
+      expect(JSON.stringify(response)).toContain('Ana · CIN-11')
+      expect(workerRuntime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+
+    it('keeps a host that cannot pick an account on its global login, and says so', async () => {
+      dropCapabilities(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
+
+      const response = await homeDispatcher.dispatch(claudeStart(createHomeTask().id, unset))
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', globalLogin: 'older_host' }
+      })
+      expect(attachParams[0]).not.toHaveProperty('account')
+    })
+
+    it('still refuses accounts: auto on a host older than member accounts', async () => {
+      dropCapabilities(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({ ok: false, error: { code: 'capability_unsupported' } })
+      expect(attachParams).toHaveLength(0)
+    })
+  })
+
+  describe("with an orchestrator.accounts list, on the host's own roster (ORCA-891)", () => {
+    const ALLOWED_CAPABILITY = 'orchestration.federation-member-account-allowed.v1'
+    const listed = (...allowed: string[]) => ({
+      remoteAccount: 'auto',
+      remoteAllowedAccounts: allowed
+    })
+
+    it('advertises that it limits auto to the list', () => {
+      expect(workerRuntime.getStatus().capabilities).toContain(ALLOWED_CAPABILITY)
+    })
+
+    it('picks only from the accounts the list allows, though another is freer', async () => {
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, listed('ANA@koombea.com'))
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', account: { provider: 'claude', email: 'ana@koombea.com' } }
+      })
+      expect(attachParams[0]).toMatchObject({
+        account: 'auto',
+        allowedAccounts: ['ANA@koombea.com']
+      })
+    })
+
+    it.each([
+      ['other accounts', WORKER_ACCOUNTS],
+      ['no account', NO_ACCOUNTS]
+    ])('refuses, never the global login, on a host with %s', async (_label, roster) => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(roster as never)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, listed('cy@koombea.com'))
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'failed', refusal: { code: 'accounts_unusable' } }
+      })
+      expect(JSON.stringify(response)).toContain('cy@koombea.com')
+      expect(workerRuntime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+
+    it('refuses by name a host that would pick from all of its accounts', async () => {
+      dropCapabilities(ALLOWED_CAPABILITY)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, listed('ana@koombea.com'))
+      )
+
+      expect(response).toMatchObject({ ok: false, error: { code: 'capability_unsupported' } })
+      expect(JSON.stringify(response)).toContain(ALLOWED_CAPABILITY)
+      expect(attachParams).toHaveLength(0)
+    })
+
+    it("skips an account one of the host's own members stopped on a limit", async () => {
+      vi.spyOn(workerRuntime, 'gameAgentsOnAccounts').mockResolvedValue([
+        {
+          paneKey: 'tab:9',
+          displayName: 'CIN-9',
+          agentType: 'claude',
+          state: 'done',
+          toolName: null,
+          isLeader: false,
+          isMember: true,
+          account: { provider: 'claude', id: 'imac-ops', email: 'ops@netsat.co' },
+          limit: { resetsAt: NOW + 3_600_000 }
+        }
+      ])
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', account: { provider: 'claude', email: 'ana@koombea.com' } }
+      })
+    })
   })
 })

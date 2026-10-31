@@ -263,7 +263,9 @@ export async function remoteGameMembersOf(
                 id: `remote:${source.environmentId}:${agent.account.email}`
               }
             }
-          : {}),
+          : agent?.globalLogin
+            ? { globalLogin: true as const }
+            : {}),
         ...(lastActivityAt ? { lastActivityAt } : {}),
         ...(agent?.stateStartedAt ? { stateSince: agent.stateStartedAt } : {})
       }
