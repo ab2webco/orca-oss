@@ -494,6 +494,43 @@ describe("a host's reading of a federated member's agent (ORCA-837)", () => {
   })
 })
 
+// Why: a federated `auto` must skip an account the host's own member stopped on (ORCA-891).
+describe("a host's own agents on its managed accounts (ORCA-891)", () => {
+  it('lists each agent on an account with the limit it stopped on, and none on no account', async () => {
+    const hook = (paneKey: string) => ({
+      paneKey,
+      state: 'done' as const,
+      prompt: '',
+      agentType: 'claude',
+      connectionId: null,
+      receivedAt: 42,
+      stateStartedAt: 40
+    })
+    const runtime = new OrcaRuntimeService(null, undefined, {
+      getAgentStatusSnapshot: () => [hook('tab:1'), hook('tab:2')]
+    })
+    const account = { provider: 'claude', id: 'imac-ops', email: 'ops@netsat.co' }
+    vi.spyOn(
+      runtime as unknown as { gameMemberAccountFor: (member: { paneKey: string }) => unknown },
+      'gameMemberAccountFor'
+    ).mockImplementation(({ paneKey }) => (paneKey === 'tab:1' ? account : null))
+    vi.spyOn(
+      runtime as unknown as { gameMemberLimitFor: () => Promise<unknown> },
+      'gameMemberLimitFor'
+    ).mockResolvedValue({ resetsAt: 9 })
+
+    expect(await runtime.gameAgentsOnAccounts()).toEqual([
+      expect.objectContaining({
+        paneKey: 'tab:1',
+        isMember: true,
+        isLeader: false,
+        account,
+        limit: { resetsAt: 9 }
+      })
+    ])
+  })
+})
+
 describe('the member name pool with a member on a paired host (ORCA-794)', () => {
   it("skips the name a remote member's home task holds", async () => {
     const runtime = new OrcaRuntimeService(null)

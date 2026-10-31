@@ -137,6 +137,15 @@ host (decision O3).
   `orchestration.federation-member-account.v1`. The host resolves it in
   `orchestration-federation-member-account.ts`, refuses before any effect, and returns only the
   email. No account id crosses hosts.
+- ORCA-891: an unset `orchestrator.accounts` is sent as `auto` too, with
+  `remoteAccountByDefault`, to any host with `orchestration.federation-member-account.v1`, so a
+  host with managed accounts never starts the member on its global login. A list goes as
+  `allowedAccounts` only to a host with `orchestration.federation-member-account-allowed.v1`,
+  which picks `auto` from it and skips accounts its own agents stopped on. It runs `auto` on its
+  global login only with no managed account and no list, one federated member at a time
+  (`orchestration-federation-global-login.ts`), and reports
+  `globalLogin` on the attach receipt and on `federationShow`; one before it refuses instead. A
+  host without member accounts gets no selector and the home reports `older_host`.
 - A cross-host `game move` is a new dispatch on the other host, not an in-place switch. The current
   `game move` restart path (`src/cli/handlers/orchestrator-game-move.ts:139-149`) is **unverified**;
   child 8 reads it before changing it.

@@ -1,0 +1,13 @@
+diff --git a/dist/chunks/lib-q6ns0vZr.js b/dist/chunks/lib-q6ns0vZr.js
+index fe0d0c62c9a4159f17437d44e8d128db4bea2ae4..3510a2bf599018227378b06aed2efaab3da98df1 100644
+--- a/dist/chunks/lib-q6ns0vZr.js
++++ b/dist/chunks/lib-q6ns0vZr.js
+@@ -1763,7 +1763,7 @@ async function bundleConfigFile(fileName, isESM) {
+ const _require = createRequire(import.meta.url);
+ async function loadConfigFormBundledFile(configRoot, configFile, bundledCode, isESM) {
+     if (isESM) {
+-        const fileNameTmp = path.resolve(configRoot, `${CONFIG_FILE_NAME}.${Date.now()}.mjs`);
++        const fileNameTmp = path.resolve(configRoot, `${CONFIG_FILE_NAME}.${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+         fs.writeFileSync(fileNameTmp, bundledCode);
+         const fileUrl = pathToFileURL(fileNameTmp);
+         try {
