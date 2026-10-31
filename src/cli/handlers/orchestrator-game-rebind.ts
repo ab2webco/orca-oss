@@ -5,7 +5,7 @@ import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestr
 import { readCallerGameState } from './orchestrator-game-launch'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { dispatchOf, STOPPABLE, type GameStopWorker } from './orchestrator-game-stop'
-import { hostClientOf } from './orchestrator-game-host-client'
+import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { rebindTerminalOf } from './orchestrator-game-rebind-terminal'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
@@ -112,7 +112,7 @@ async function rebindMember(
   if (!stale) {
     return { ticket, rebound: false, refusal: 'it has no dispatch to rebind' }
   }
-  const where = stale.environmentId ? hostClientOf(stale.environmentId) : client
+  const where = stale.environmentId ? await openHostRuntimeClient(stale.environmentId) : client
   const [terminals, workers, ps] = await Promise.all([
     where.call<{ terminals: RuntimeTerminalSummary[] }>('terminal.list', {
       worktree: `id:${stale.worktreeId}`

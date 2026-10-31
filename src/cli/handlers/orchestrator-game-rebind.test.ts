@@ -6,7 +6,7 @@ const host = vi.hoisted(() => ({
   results: {} as Record<string, unknown>
 }))
 vi.mock('./orchestrator-game-host-client', () => ({
-  hostClientOf: (environmentId: string) => ({
+  openHostRuntimeClient: async (environmentId: string) => ({
     call: async (method: string, params: unknown) => {
       host.calls.push([environmentId, method, params])
       return { ok: true, result: host.results[method] }

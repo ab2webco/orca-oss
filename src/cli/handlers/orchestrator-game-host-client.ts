@@ -1,5 +1,6 @@
 import { RuntimeClient } from '../runtime-client'
 
-/** A client for one paired host's own runtime, by its environment id. */
-export const hostClientOf = (environmentId: string): RuntimeClient =>
-  new RuntimeClient(undefined, undefined, null, environmentId)
+/** A client for the paired host a remote member runs on, named as the lead launched it there. */
+export async function openHostRuntimeClient(host: string): Promise<RuntimeClient> {
+  return new RuntimeClient(undefined, undefined, null, host)
+}

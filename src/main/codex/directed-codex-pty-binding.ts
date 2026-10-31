@@ -49,9 +49,7 @@ export function hasSeededUnconfirmedDirectedCodexPtys(): boolean {
  * an asserted-but-dead session would force reattach on a cold restore, which
  * fails the spawn outright instead of opening the pane.
  */
-export function confirmSeededDirectedCodexPtyBindings(
-  aliveSessionIds: readonly string[]
-): void {
+export function confirmSeededDirectedCodexPtyBindings(aliveSessionIds: readonly string[]): void {
   const alive = new Set(aliveSessionIds)
   for (const sessionId of seededUnconfirmedDirectedCodexPtyIds) {
     if (!alive.has(sessionId)) {
@@ -100,6 +98,15 @@ export function releaseDirectedCodexPtyBinding(ptyId: string): void {
   // Why unconditional: an in-memory release that already happened must not leave
   // a disk row behind for the next launch to re-seed.
   persistence?.removeCodexDirectedPtyAccountBinding(ptyId)
+}
+
+export function hasLiveDirectedCodexPtyForAccount(accountId: string): boolean {
+  for (const owner of liveDirectedCodexPtyAccounts.values()) {
+    if (owner === accountId) {
+      return true
+    }
+  }
+  return false
 }
 
 export function getDirectedCodexPtyAccountId(ptyId: string): string | null {
