@@ -5,11 +5,13 @@ import { reward, rewardsOf, workRewardsOf, XP_BY_REWARD, type Reward } from './r
 type FleetMember = GameAgent & { worktree: GameMemberWorktree }
 
 // Why only members with a worktree: the rest work in the lead's, whose review the pane's own rewards read.
+// Why not found ones: no launch of this lead started them (ORCA-914).
 const membersOf = (state: GameState): FleetMember[] =>
   state.role === 'member'
     ? []
     : state.agents.filter(
-        (agent): agent is FleetMember => agent.isMember === true && agent.worktree !== undefined
+        (agent): agent is FleetMember =>
+          agent.isMember === true && agent.found !== true && agent.worktree !== undefined
       )
 
 const nameOf = (member: GameAgent): string => member.workItem?.identifier ?? member.displayName

@@ -156,3 +156,49 @@ describe('PR E2E scope selection', () => {
     expect(selectPrE2eScope(['tests/playwright.spec.ts']).mode).toBe('none')
   })
 })
+
+// ORCA-932: a PR push runs only what it touched; the full suite moves to the merge queue.
+describe('PR E2E scope with the full suite deferred to the merge queue', () => {
+  const deferred = { deferFullSuite: true }
+
+  it('leaves a full-suite match to the merge queue when no spec changed', () => {
+    const scope = selectPrE2eScope(['src/main/runtime/orchestration/coordinator.ts'], deferred)
+    expect(scope.mode).toBe('merge-queue')
+    expect(scope.shouldRun).toBe(false)
+    expect(scope.testFiles).toBe('')
+    expect(scope.triggeredBy).toEqual(['src/main/runtime/orchestration/coordinator.ts'])
+  })
+
+  it('still runs the changed specs of a full-suite PR on the push', () => {
+    const spec = 'tests/e2e/orchestration-worker-terminal-visibility.spec.ts'
+    const scope = selectPrE2eScope(
+      ['src/main/runtime/orchestration/coordinator.ts', spec],
+      deferred
+    )
+    expect(scope.mode).toBe('changed-specs')
+    expect(scope.shouldRun).toBe(true)
+    expect(scope.testFiles).toBe(JSON.stringify([spec]))
+  })
+
+  it('keeps the cheap lanes unchanged', () => {
+    expect(selectPrE2eScope(['docs/README.md'], deferred).mode).toBe('none')
+    expect(selectPrE2eScope(['tests/e2e/a.spec.ts'], deferred).mode).toBe('changed-specs')
+  })
+
+  it('reads the deferral from the command line', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-e2e-scope-'))
+    tempDirs.push(dir)
+    const output = join(dir, 'github-output')
+    main(['src/main/runtime/orca-runtime.ts'], {
+      output,
+      log: () => {},
+      argv: ['--defer-full-suite']
+    })
+    expect(readFileSync(output, 'utf8')).toBe('should_run=false\nmode=merge-queue\ntest_files=\n')
+  })
+
+  it('runs the full suite without the flag, as the merge queue calls it', () => {
+    const { scope } = runWithOutputFile(['src/main/runtime/orca-runtime.ts'])
+    expect(scope.mode).toBe('full')
+  })
+})

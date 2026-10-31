@@ -402,6 +402,7 @@ import {
   type RuntimeTerminalCreate,
   type RuntimeTerminalPresentation,
   type RuntimeTerminalSplit,
+  type RuntimePairedTerminalReveal,
   type RuntimeTerminalFocus,
   type RuntimeTerminalClose,
   type RuntimeTerminalListResult,
@@ -717,6 +718,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
@@ -2419,6 +2421,7 @@ type RuntimeNotifier = {
   ): void
   renameTerminal(tabId: string, title: string | null): void
   focusTerminal(tabId: string, worktreeId: string, leafId?: string | null): void
+  revealPairedTerminal?(target: { environmentId: string; handle: string }): void
   focusEditorTab?(tabId: string, worktreeId: string): void
   closeSessionTab?(tabId: string, worktreeId: string): void
   moveSessionTab?(worktreeId: string, move: RuntimeMobileSessionTabMove): void
@@ -30340,6 +30343,20 @@ export class OrcaRuntimeService {
     })
   }
 
+  /** Asks this window to open a connected server's terminal; the window reads the server itself. */
+  async revealPairedTerminal(
+    selector: string,
+    handle: string
+  ): Promise<RuntimePairedTerminalReveal> {
+    const server = this.resolveOrchestrationWorkerServer(selector)
+    const reveal = this.notifier?.revealPairedTerminal
+    if (!reveal) {
+      throw new Error('runtime_unavailable')
+    }
+    reveal({ environmentId: server.environmentId, handle })
+    return { handle, environmentId: server.environmentId, host: server.name, navigated: true }
+  }
+
   async closeTerminal(handle: string): Promise<RuntimeTerminalClose> {
     const sleepingRecord = this.sleepingHandleRecords.get(handle)
     if (sleepingRecord) {
@@ -31640,6 +31657,14 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       members,
+      found: args.paneKey
+        ? foundGameSessionsOf(summaries, {
+            leadPaneKey: args.paneKey,
+            hasTerminal: (paneKey) => this.getTerminalHandleForPaneKey(paneKey) !== null,
+            isLeadPane: (paneKey) =>
+              this._orchestrationDb?.getCurrentRunForPane?.(paneKey) !== undefined
+          })
+        : [],
       readMemberWork: (memberWorktreeId) =>
         this.gameMemberWork.read(memberWorktreeId, async () => {
           const member = worktreesById.get(memberWorktreeId)
@@ -31897,11 +31922,13 @@ export class OrcaRuntimeService {
         starting: this.workerSetupAdmission.startingTaskIds()
       }
     )
+    const { agents, unlisted } = recoveredGameMembersOf(state.agents, view.unlisted)
     return {
       ...state,
+      agents,
       pausedMembers: view.paused,
       ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
-      ...(view.unlisted.length > 0 ? { unlistedMembers: view.unlisted } : {}),
+      ...(unlisted.length > 0 ? { unlistedMembers: unlisted } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }

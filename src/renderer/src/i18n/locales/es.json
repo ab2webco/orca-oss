@@ -15376,6 +15376,14 @@
           "overridePlaceholder": "Reemplaza la respuesta del lead",
           "override": "Corregir"
         }
+      },
+      "terminal-pane": {
+        "paired-terminal-reveal": {
+          "failed": "No se pudo abrir la terminal del miembro en su host",
+          "repoMissing": "Agrega el repositorio del host a esta ventana para abrir sus terminales.",
+          "notMirrored": "Su worktree está abierto, pero la terminal aún no aparece en esta ventana.",
+          "terminalGone": "El host ya no tiene esta terminal; puede que el miembro haya terminado o se haya liberado."
+        }
       }
     },
     "i18n": {

@@ -1,6 +1,7 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { gameFleetOf, liveLinkedItemOf, settle } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import { trackerWorkItemOf } from './orchestrator-game-lead-work-item'
 import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
@@ -27,7 +28,6 @@ import {
   type GameActivity,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
-import { trackerWorkItemOf } from './orchestrator-game-tracker-item'
 import { settleGameStop } from '../../shared/orchestrator-game-stop-state'
 
 export async function buildOrchestratorGameState(
@@ -151,6 +151,7 @@ export async function buildOrchestratorGameState(
   const agents = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
+    found: input.callerParentPaneKey ? [] : input.found,
     leaderPaneKey: input.leaderPaneKey,
     teamHandles: input.teamHandles,
     terminalHandleOf: input.terminalHandleOf,

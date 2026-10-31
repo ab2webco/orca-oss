@@ -54,12 +54,16 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
   remote?: GameMemberRemote
+  /** A session no `game launch` started; it earns its lead nothing. Absent from an older Orca. */
+  found?: true
   /** When its host last saw it work or change state (ms); absent when unknown or from an older host. */
   activeAt?: number
 }
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
