@@ -1,7 +1,11 @@
 import type { EngineInterface, On } from 'claude-code'
 
+import type { GameLocale } from '../types'
+
 import { readFleetText, refresh, viewOf } from './fleet-sync'
 import { LEAD_SKILL } from './game-lead'
+import { gameLocale } from './game-strings'
+import { unmarkLeadStarted } from './lead-autostart'
 import { isLeadStarted } from './lead-started'
 
 /** The session starts after which a lead no longer sees its members; a fresh start runs `game lead`. */
@@ -24,14 +28,30 @@ export const leadBriefOf = (source: LeadBriefSource, fleet: string): string =>
       : [])
   ].join('\n')
 
-/** Whether this pane is the project's started lead, with no other live lead. */
-async function isReturningLead($: EngineInterface): Promise<boolean> {
+const NOT_LEAD_WORDS: Readonly<Record<GameLocale, (handle: string) => string>> = {
+  en: (handle) => `Not the lead: ${handle} leads this project`,
+  es: (handle) => `No es el líder: ${handle} lidera este proyecto`
+}
+
+/** What a former lead reads when it comes back while another pane leads (ORCA-728). */
+export const notLeadBriefOf = (handle: string): string =>
+  `Orca: this session is no longer the project's lead: ${handle} leads it. Do not act as the lead: stop any report watcher you armed, do not arm one, and do not launch, dispatch, release or resume members. Tell the person that ${handle} is the lead pane, then keep working here as a plain session.`
+
+/** `lead` for this pane's started lead, the other pane's handle when one leads instead. */
+async function returningLeadOf(
+  $: EngineInterface
+): Promise<{ lead: true } | { elsewhere: string } | null> {
   if (!(await isLeadStarted($))) {
-    return false
+    return null
   }
   await refresh($)
   const { state } = await viewOf($)
-  return state?.role === 'lead' && state.leadElsewhere === undefined
+  if (state?.role !== 'lead') {
+    return null
+  }
+  return state.leadElsewhere === undefined
+    ? { lead: true }
+    : { elsewhere: state.leadElsewhere.handle }
 }
 
 /** The brief for this pane's started lead; undefined for any other session or when Orca cannot answer. */
@@ -47,8 +67,19 @@ export const registerLeadBrief = (on: On): void => {
   on('classic.SessionStart', async ($, e, next) => {
     const answered = await next(e)
     const source = e.source
-    if (!isLeadBriefSource(source) || !(await isReturningLead($).catch(() => false))) {
+    if (!isLeadBriefSource(source)) {
       return answered
+    }
+    const returning = await returningLeadOf($).catch(() => null)
+    if (returning === null) {
+      return answered
+    }
+    if ('elsewhere' in returning) {
+      // Why: its transcript still says it leads, so it would re-arm a watcher and read the board.
+      await unmarkLeadStarted($).catch(() => undefined)
+      $.ui.toast(NOT_LEAD_WORDS[gameLocale()](returning.elsewhere))
+      const brief = notLeadBriefOf(returning.elsewhere)
+      return { ...answered, additionalContext: [...(answered.additionalContext ?? []), brief] }
     }
     if (source === 'resume') {
       // Why: a restart killed the lead's report watcher, and its rules say whether to resume members.
