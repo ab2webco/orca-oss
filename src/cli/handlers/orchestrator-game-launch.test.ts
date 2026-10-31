@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
 import {
@@ -703,13 +703,48 @@ describe('orca game launch', () => {
       expect.objectContaining({ remoteAccount: 'ANA@koombea.com' })
     )
 
-    for (const extra of [[], [['account', 'cy@koombea.com']]] as [string, string][][]) {
-      const refused = fakeClient(stateWith({ lead }))
-      await expect(launch(refused.client, 'CIN-12', [...remote, ...extra])).rejects.toThrow(
-        /this project allows only ana@koombea\.com.*--account/
-      )
-      expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+    const refused = fakeClient(stateWith({ lead }))
+    await expect(
+      launch(refused.client, 'CIN-12', [...remote, ['account', 'cy@koombea.com']])
+    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
+    expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+  })
+
+  it("on a paired host, hands auto the project's list for the host to pick from (ORCA-891)", async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
+    const status = {
+      'status.get': {
+        capabilities: [
+          ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+          'orchestration.federation-member-account-allowed.v1'
+        ]
+      }
     }
+    for (const extra of [[], [['account', 'auto']]] as [string, string][][]) {
+      const { client, calls } = fakeClient(stateWith({ lead }), { id: 'run_1' }, status)
+      await launch(client, 'CIN-12', [['on', 'imac'], ['repo', 'name:cineco'], ...extra])
+      const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+      expect(start).toEqual(
+        expect.objectContaining({
+          remoteAccount: 'auto',
+          remoteAllowedAccounts: ['ana@koombea.com']
+        })
+      )
+      expect(start).not.toHaveProperty('remoteAccountByDefault')
+    }
+  })
+
+  it('refuses the list before any start when this Orca cannot hand it to a host (ORCA-891)', async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
+    const { client, calls } = fakeClient(stateWith({ lead }))
+
+    await expect(
+      launch(client, 'CIN-12', [
+        ['on', 'imac'],
+        ['repo', 'name:cineco']
+      ])
+    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
+    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {
@@ -836,61 +871,5 @@ describe('orca game launch', () => {
     expect(JSON.parse(output.join('')).result).toEqual(
       expect.objectContaining({ dispatchId: 'dispatch_1', state: 'ready' })
     )
-  })
-
-  it('queues the member behind a running setup and reports it as queued, not as a failure', async () => {
-    const { client, calls } = fakeClient(stateWith(), undefined, {
-      'orchestration.workerStart': {
-        runId: 'run_1',
-        taskId: 'task_1',
-        state: 'queued',
-        setupQueue: { position: 2, waitingOn: 'Ford · CIN-9' }
-      }
-    })
-
-    await launch(client)
-
-    expect(process.exitCode).toBeUndefined()
-    expect(calls.findLast(([method]) => method === 'game.memberRecord')?.[1]).toEqual(
-      expect.objectContaining({ member: { ticket: 'CIN-12', lastState: 'queued' } })
-    )
-    const launched = JSON.parse(output.join('')).result
-    expect(launched).toEqual(
-      expect.objectContaining({
-        ticket: 'CIN-12',
-        state: 'queued',
-        setupQueue: { position: 2, waitingOn: 'Ford · CIN-9' }
-      })
-    )
-    expect(formatGameLaunch(launched)).toBe(
-      'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself\n' +
-        'ana@example.com: no reading yet, the first Claude account (5h —, 7d —)'
-    )
-  })
-
-  it('refuses a ticket already queued behind a setup, so it never gets a second member', async () => {
-    const { client, calls } = fakeClient(
-      stateWith({
-        queuedMembers: [{ ticket: 'CIN-12', name: null, position: 1, waitingOn: 'Ford · CIN-9' }]
-      })
-    )
-
-    await expect(launch(client)).rejects.toThrow(
-      'CIN-12 is queued #1, waiting on Ford · CIN-9; it starts by itself.'
-    )
-    expect(calls.map(([method]) => method)).toEqual(['game.state'])
-  })
-
-  it('says so when the connected Orca Lab cannot queue setups, and launches at once', async () => {
-    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
-    const { client, calls } = fakeClient(stateWith(), undefined, {
-      'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] }
-    })
-
-    await launch(client)
-
-    const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
-    expect(start).not.toHaveProperty('setupAdmission')
-    expect(String(stderr.mock.calls[0]?.[0])).toContain('This Orca Lab cannot queue member setups')
   })
 })

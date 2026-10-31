@@ -739,6 +739,7 @@ import { readPluginGameSceneSources } from '../plugins/plugin-game-scene-sources
 import {
   gameAgentStateOf,
   statusGroupOfJira,
+  type GameAgent,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import {
@@ -31425,6 +31426,47 @@ export class OrcaRuntimeService {
     }
   }
 
+  /** The worktree names of this host's federated members on its global login for one provider (ORCA-891). */
+  async federatedMembersOnGlobalLogin(provider: 'claude' | 'codex'): Promise<string[]> {
+    const held = this.getOrchestrationDb().listHeldRemoteAttachments()
+    const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
+    return held.flatMap((row) => {
+      const paneKey = row.terminal_handle ? this.getTerminalPaneKey(row.terminal_handle) : null
+      const onGlobalLogin =
+        paneKey !== null &&
+        this.readGameMemberSeat(
+          { paneKey, agentType: provider, worktreeId: row.worktree_id },
+          worktreesById,
+          isGameMemberOnGlobalLogin
+        ) === true
+      return onGlobalLogin
+        ? [worktreesById.get(row.worktree_id ?? '')?.displayName ?? row.dispatch_id]
+        : []
+    })
+  }
+
+  /** This host's agents on a managed account, each with the usage limit it stopped on (ORCA-891). */
+  async gameAgentsOnAccounts(): Promise<GameAgent[]> {
+    const worktreesById = await this.getResolvedWorktreeMap().catch(() => new Map())
+    const rows = (this.getAgentStatusSnapshotFn?.() ?? []).filter(
+      (row) => !row.restoredUnconfirmed && !row.providerSessionOnly
+    )
+    const agents = await Promise.all(
+      rows.map(async ({ paneKey, agentType = null, state: hookState }): Promise<GameAgent[]> => {
+        const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
+        const account = this.gameMemberAccountFor({ paneKey, agentType, worktreeId }, worktreesById)
+        if (!account) {
+          return []
+        }
+        const state = gameAgentStateOf(hookState)
+        const limit = await this.gameMemberLimitFor({ paneKey, agentType, state, account })
+        const agent = { paneKey, displayName: null, agentType, state, toolName: null, account }
+        return [{ ...agent, isLeader: false, isMember: true, ...(limit && { limit }) }]
+      })
+    )
+    return agents.flat()
+  }
+
   /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */
   async getFederatedMemberAgent(handle: string): Promise<RemoteMemberAgent | null> {
     const paneKey = this.getTerminalPaneKey(handle)
@@ -31433,10 +31475,11 @@ export class OrcaRuntimeService {
       return null
     }
     const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
-    const account = this.gameMemberAccountFor(
-      { paneKey, agentType: agent.agentType, worktreeId },
-      worktreeId ? await this.getResolvedWorktreeMap().catch(() => new Map()) : new Map()
-    )
+    const member = { paneKey, agentType: agent.agentType, worktreeId }
+    const worktreesById = worktreeId
+      ? await this.getResolvedWorktreeMap().catch(() => new Map())
+      : new Map()
+    const account = this.gameMemberAccountFor(member, worktreesById)
     const limit = await this.gameMemberLimitFor({
       paneKey,
       agentType: agent.agentType,
@@ -31446,7 +31489,11 @@ export class OrcaRuntimeService {
     return {
       ...agent,
       // Why the email only: an account id means nothing on the home and must not leave this host (ORCA-798).
-      ...(account ? { account: { provider: account.provider, email: account.email } } : {}),
+      ...(account
+        ? { account: { provider: account.provider, email: account.email } }
+        : this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin)
+          ? { globalLogin: true as const }
+          : {}),
       ...(limit ? { limit } : {})
     }
   }
