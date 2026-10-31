@@ -239,6 +239,7 @@ const agentOf = (value: unknown): GameAgent[] => {
       ...(isTerminalHandle(value.terminalHandle) ? { terminalHandle: value.terminalHandle } : {}),
       ...(activity === undefined ? {} : { activity }),
       ...(value.isMember === true ? { isMember: true } : {}),
+      ...(value.found === true ? { found: true as const } : {}),
       ...(worktree === undefined ? {} : { worktree }),
       ...(review === null ? {} : { review }),
       ...(workItem === null ? {} : { workItem }),

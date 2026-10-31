@@ -136,6 +136,12 @@ describe('fleetRewardsOf', () => {
     expect(fleetRewardsOf(leadState([], asMember), leadState([after], asMember))).toEqual([])
   })
 
+  it('earns nothing for a found session, which no game launch started (ORCA-914)', () => {
+    const before = member({ found: true })
+    const after = member({ found: true, review: review({ state: 'merged', ci: 'success' }) })
+    expect(fleetRewardsOf(leadState([before]), leadState([after]))).toEqual([])
+  })
+
   it("names the member's ticket and review in its label", () => {
     const after = member({ review: review({ state: 'merged' }) })
     const [merged] = fleetRewardsOf(leadState([member()]), leadState([after]))
