@@ -12,7 +12,6 @@ import {
   stopDiscardedTerminals
 } from './orchestrator-game-open-member-terminal'
 import {
-  formatSetupQueue,
   runtimeCapabilitiesOf,
   setupAdmissionOf,
   type GameSetupQueue
@@ -22,6 +21,15 @@ import {
   localGameFreeOf,
   type GameFleet
 } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  asleepOnHostsOf,
+  ticketOfRemoteMember,
+  wakeOnHost
+} from './orchestrator-game-resume-remote-members'
+import {
+  formatResumedMembers,
+  type GameResumedMember
+} from './orchestrator-game-resumed-member-report'
 import { gameHostLoadFor } from '../../shared/orchestrator-game-host-load'
 import type {
   GameMemberResumeOutcome,
@@ -31,17 +39,6 @@ import type {
 } from '../../shared/orchestrator-game-member-sessions'
 
 type Client = Parameters<CommandHandler>[0]['client']
-
-export type GameResumedMember = {
-  ticket: string
-  result: 'resumed' | 'relaunched' | 'submitted' | 'finished' | 'skipped' | 'unresumable' | 'failed'
-  dispatchId?: string
-  /** The open terminal Enter was pressed in, for `submitted`. */
-  terminal?: string
-  setupQueue?: GameSetupQueue
-  reason?: string
-  note?: string
-}
 
 type WorkerStarted = { dispatchId?: string; state: string; setupQueue?: GameSetupQueue }
 
@@ -155,31 +152,11 @@ const capReasonOf = (fleet: Pick<GameFleet, 'cap' | 'hosts'>, running: number): 
     : `cap: ${fleet.cap} members already run`
 }
 
-const RESULT_TEXT: Record<GameResumedMember['result'], string> = {
-  resumed: 'its conversation reopened',
-  relaunched: 'a new agent started on its task',
-  submitted: 'Enter pressed in its terminal',
-  finished: 'already finished, forgotten',
-  skipped: 'skipped',
-  unresumable: 'cannot resume',
-  failed: 'failed'
-}
-
 const unlistedReason = (one: GameUnlistedMember): string =>
   `its agent runs in ${one.branch ?? one.worktreeId}, but this lead does not list it`
 
 const worktreeGoneReason = (one: GamePausedMember): string =>
   `its worktree ${one.branch ?? 'of record'} is gone; \`orca game resume-members ${one.ticket} --discard\` frees it`
-
-export const formatResumedMembers = (result: { members: GameResumedMember[] }): string =>
-  result.members.length === 0
-    ? 'No paused members.'
-    : result.members
-        .map(
-          (one) =>
-            `${one.ticket}: ${RESULT_TEXT[one.result]}${one.terminal ? ` (${one.terminal})` : ''}${one.dispatchId ? ` (member ${one.dispatchId})` : ''}${one.setupQueue ? ` (${formatSetupQueue(one.setupQueue)})` : ''}${one.reason ? `: ${one.reason}` : ''}${one.note ? ` (${one.note})` : ''}`
-        )
-        .join('\n')
 
 export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHandler> = {
   'game resume-members': async ({ flags, client, cwd, json }) => {
@@ -230,6 +207,8 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     const unlisted = (state.unlistedMembers ?? []).filter(
       (one) => named.length === 0 || named.includes(one.ticket)
     )
+    // Why apart: they wake on the host that slept them, so they take none of this Orca's slots (ORCA-915).
+    const asleepOnHosts = asleepOnHostsOf(state.agents, named)
     const fleet = gameFleetReportOf({ ...state, pausedMembers: [] })
     const liveMembers = fleet.running
     // Why local slots: a paused member reopens on this Orca, whatever room paired hosts have (ORCA-888).
@@ -250,13 +229,14 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
             openTerminal: ticketsWith('terminal-open'),
             resume: closed.slice(0, free).map((one) => one.ticket),
             overCap: closed.slice(free).map((one) => one.ticket),
+            ...(asleepOnHosts.length > 0 ? { wake: asleepOnHosts.map(ticketOfRemoteMember) } : {}),
             ...(unlisted.length > 0 ? { unlisted } : {}),
             ...(gone.length > 0 ? { unresumable: gone.map((one) => one.ticket) } : {})
           }
         },
         json,
         (plan) =>
-          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}${plan.unlisted ? ` · running but not listed by this lead: ${plan.unlisted.map((one) => `${one.ticket} (${one.branch ?? one.worktreeId})`).join(', ')}` : ''}${gone.length > 0 ? ` · worktree gone, cannot resume: ${gone.map((one) => `${one.ticket} (${one.branch ?? '-'})`).join(', ')}; \`orca game resume-members <ticket> --discard\` frees it` : ''}`
+          `${plan.submit.length ? `Would press Enter for: ${plan.submit.join(', ')} · ` : ''}${plan.openTerminal.length ? `Would skip, terminal still open: ${plan.openTerminal.join(', ')} · ` : ''}Would resume: ${plan.resume.join(', ') || 'none'}${plan.wake ? ` · would wake on their hosts: ${plan.wake.join(', ')}` : ''}${plan.overCap.length ? ` · over the cap: ${plan.overCap.join(', ')}` : ''}${plan.unlisted ? ` · running but not listed by this lead: ${plan.unlisted.map((one) => `${one.ticket} (${one.branch ?? one.worktreeId})`).join(', ')}` : ''}${gone.length > 0 ? ` · worktree gone, cannot resume: ${gone.map((one) => `${one.ticket} (${one.branch ?? '-'})`).join(', ')}; \`orca game resume-members <ticket> --discard\` frees it` : ''}`
       )
       return
     }
@@ -317,6 +297,9 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
         process.exitCode = 1
         members.push({ ticket: member.ticket, result: 'failed', reason: errorText(error) })
       }
+    }
+    for (const agent of asleepOnHosts) {
+      members.push(await wakeOnHost(client, agent))
     }
     printResult({ ...response, result: { members } }, json, formatResumedMembers)
   }

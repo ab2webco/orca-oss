@@ -88,6 +88,8 @@ export type GameRemoteHost = {
   ticketDone?: true
   /** The host answered and the member's terminal is no longer there (ORCA-790). */
   gone?: true
+  /** A host restart slept the member's pane; resume wakes it (ORCA-915). Absent from an older host. */
+  asleep?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }
