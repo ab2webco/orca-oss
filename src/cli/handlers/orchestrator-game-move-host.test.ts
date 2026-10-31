@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RuntimeClient } from '../runtime-client'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import type { GameLaunchResult } from './orchestrator-game-launch'
+import type { GameLaunchResult } from './orchestrator-game-launch-result'
 import { moveMemberToHost } from './orchestrator-game-move-host'
 
 const NOW = Date.UTC(2026, 9, 29, 12, 0, 0)
