@@ -26,6 +26,7 @@ import type { GameMerge } from '../../shared/orchestrator-game-events'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
+import type { GameMetricsSummary } from '../../shared/orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
@@ -95,6 +96,8 @@ export type OrchestratorGameStateInput = {
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
   readGitHubBudget?: () => Promise<GameGitHubBudget | null>
+  /** The project's delivery numbers by day in `timezone`; read only for a lead. */
+  readMetrics?: (timezone: string) => Promise<GameMetricsSummary | null>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null

@@ -109,6 +109,18 @@ describe('computeGameMetrics', () => {
     expect(metrics.ticketsDone).toEqual(['ORCA-0', 'ORCA-1', 'ORCA-3', 'ORCA-4', 'ORCA-5'])
   })
 
+  it('dates each done ticket by its last merged event, else by when its member was freed', () => {
+    const metrics = computeGameMetrics({ events: EVENTS, history: HISTORY }, {})
+
+    expect(metrics.ticketsDoneAt).toEqual({
+      'ORCA-0': '2026-10-10T08:00:00.000Z',
+      'ORCA-1': '2026-10-19T12:30:00.000Z',
+      'ORCA-3': '2026-10-20T15:00:00.000Z',
+      'ORCA-4': '2026-10-20T08:00:00.000Z',
+      'ORCA-5': '2026-10-19T20:00:00.000Z'
+    })
+  })
+
   it('measures lead time from the first claim to the last merge, per ticket', () => {
     // Why a zone: on a UTC runner, reading launchedAt as local time would pass unnoticed.
     vi.stubEnv('TZ', 'America/Bogota')
