@@ -10,7 +10,7 @@ import { rebindTerminalOf } from './orchestrator-game-rebind-terminal'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import type { RuntimeTerminalSummary } from '../../shared/runtime-types'
+import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -37,6 +37,10 @@ export type GameRebindResult = {
 }
 
 const TICKET = /^[A-Z0-9][A-Z0-9_-]{0,39}$/
+// Why past the default 200: the member's worktree may sort after the most recent ones.
+const PS_LIMIT = 10_000
+// The states a retry may start from.
+const SETTLED = new Set(['failed', 'stopped', 'abandoned'])
 
 function memberOf(state: OrchestratorGameState, ticket: string): GameAgent {
   const member = state.agents.find(
@@ -109,23 +113,33 @@ async function rebindMember(
     return { ticket, rebound: false, refusal: 'it has no dispatch to rebind' }
   }
   const where = stale.environmentId ? hostClientOf(stale.environmentId) : client
-  const [terminals, workers] = await Promise.all([
+  const [terminals, workers, ps] = await Promise.all([
     where.call<{ terminals: RuntimeTerminalSummary[] }>('terminal.list', {
       worktree: `id:${stale.worktreeId}`
     }),
-    stale.environmentId
-      ? where.call<{ workers: GameStopWorker[] }>('orchestration.workerList', {})
-      : client.call<{ workers: GameStopWorker[] }>('orchestration.workerList', {})
+    where.call<{ workers: GameStopWorker[] }>('orchestration.workerList', {}),
+    // Why: only its agent rows tell an agent terminal from a plain shell, and whether it is mid-turn.
+    where.call<RuntimeWorktreePsResult>('worktree.ps', { limit: PS_LIMIT })
   ])
   const choice = rebindTerminalOf(stale, {
     terminals: terminals.result.terminals,
-    workers: workers.result.workers
+    workers: workers.result.workers,
+    agents:
+      ps.result.worktrees.find((worktree) => worktree.worktreeId === stale.worktreeId)?.agents ?? []
   })
   if (!('handle' in choice)) {
     return { ticket, rebound: false, from: stale.terminalHandle, ...choice }
   }
-  if (STOPPABLE.has(stale.workerState)) {
-    await client.call('orchestration.workerStop', { dispatch: stale.dispatchId })
+  let settled = stale.workerState
+  if (STOPPABLE.has(settled) && settled !== 'stop_unknown') {
+    const stopped = await client.call<{ state: string }>('orchestration.workerStop', {
+      dispatch: stale.dispatchId
+    })
+    settled = stopped.result.state
+  }
+  // Why: with its terminal gone no stop is proven, and abandoning closes nothing.
+  if (!SETTLED.has(settled)) {
+    await client.call('orchestration.workerAbandon', { dispatch: stale.dispatchId })
   }
   const started = await client.call<{ dispatchId: string; state: string }>(
     'orchestration.workerStart',

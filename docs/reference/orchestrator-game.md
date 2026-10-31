@@ -688,13 +688,15 @@ matches …` (ORCA-866).
 - `orca game rebind <ticket>` — binds a member to the terminal it runs in after its own was
   replaced outside Orca, for example by an account switch made on its host (CIN-1297). Its
   dispatch's capability belongs to the old terminal's pane and process, so mail from the new one is
-  refused by design. Rebind therefore stops the old dispatch and starts its task again, linked with
-  `--retry-of`, on the one live terminal in the member's worktree that no other live dispatch
-  holds, locally or on its paired host (`--on`). Any agent can be rebound. The new dispatch gives
-  that terminal its own capability, so mail and the Panel follow it and the old row leaves.
-  Nothing changes while the member's own terminal still runs, or when its worktree has no live
-  terminal or several; the result lists them. A member gone from its host points to it in
-  `game fleet` and in View.
+  refused by design. Rebind therefore settles the old dispatch and starts its task again, linked
+  with `--retry-of`, on the one live agent terminal in the member's worktree that no other live
+  dispatch holds, locally or on its paired host (`--on`). A plain shell there is not a candidate.
+  The old dispatch is stopped, or abandoned when no stop can be proven because its terminal is
+  gone; abandoning closes nothing. Any agent can be rebound. The new dispatch gives that terminal
+  its own capability, so mail and the Panel follow it and the old row leaves. Nothing changes while
+  the member's own terminal still runs, while the agent there is mid-turn (rebind it at its
+  prompt), or when its worktree has no live agent terminal or several; the result lists them. A
+  member gone from its host points to it in `game fleet` and in View.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is

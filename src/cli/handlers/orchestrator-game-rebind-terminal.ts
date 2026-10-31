@@ -3,21 +3,32 @@ import { STOPPABLE } from './orchestrator-game-stop'
 type RebindTerminal = {
   handle: string
   worktreeId: string
+  tabId: string
+  leafId: string
   liveness: string
   connected: boolean
 }
 
 type RebindWorker = { dispatchId: string; agentTerminalHandle: string | null; workerState: string }
 
+type RebindAgent = { paneKey: string; state: string }
+
 export type RebindChoice = { handle: string } | { refusal: string; handles: string[] }
 
+// Why: the start waits for the agent's prompt, and by then the old dispatch is already stopped.
+const MID_TURN = new Set(['working', 'blocked'])
+
 /**
- * The terminal a member now runs in after its own was replaced (CIN-1297): the one live terminal
- * in its worktree that no other live dispatch holds. Several, or none, is the lead's call.
+ * The terminal a member now runs in after its own was replaced (CIN-1297): the one live agent
+ * terminal in its worktree that no other live dispatch holds. Several, or none, is the lead's call.
  */
 export function rebindTerminalOf(
   member: { dispatchId: string; terminalHandle: string | null; worktreeId: string },
-  found: { terminals: readonly RebindTerminal[]; workers: readonly RebindWorker[] }
+  found: {
+    terminals: readonly RebindTerminal[]
+    workers: readonly RebindWorker[]
+    agents: readonly RebindAgent[]
+  }
 ): RebindChoice {
   const live = found.terminals.filter(
     (terminal) =>
@@ -37,11 +48,20 @@ export function rebindTerminalOf(
         : []
     )
   )
-  const handles = live.map((terminal) => terminal.handle).filter((handle) => !held.has(handle))
-  if (handles.length === 1) {
-    return { handle: handles[0]! }
+  const agentStates = new Map(found.agents.map((agent) => [agent.paneKey, agent.state]))
+  const candidates = live.flatMap((terminal) => {
+    const state = agentStates.get(`${terminal.tabId}:${terminal.leafId}`)
+    return state !== undefined && !held.has(terminal.handle)
+      ? [{ handle: terminal.handle, state }]
+      : []
+  })
+  const handles = candidates.map((candidate) => candidate.handle)
+  if (candidates.length === 1) {
+    return MID_TURN.has(candidates[0]!.state)
+      ? { refusal: 'its agent is mid-turn; rebind it at its prompt', handles }
+      : { handle: handles[0]! }
   }
   return handles.length === 0
-    ? { refusal: 'no live terminal in its worktree', handles }
-    : { refusal: 'several live terminals in its worktree', handles }
+    ? { refusal: 'no live agent terminal in its worktree', handles }
+    : { refusal: 'several live agent terminals in its worktree', handles }
 }
