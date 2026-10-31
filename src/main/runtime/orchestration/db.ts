@@ -103,7 +103,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** A dispatch's `launch.effective` selection, only when it chose a model or an effort. */
-function chosenLaunchSelectionOf(startOptions: string): Record<string, unknown> | null {
+export function chosenLaunchSelectionOf(startOptions: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(startOptions)
     const launch = isRecord(parsed) ? parsed.launch : undefined

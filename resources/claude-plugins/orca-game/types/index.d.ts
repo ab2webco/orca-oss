@@ -67,7 +67,7 @@ export type GameMemberRemote = {
   gone?: true
 }
 
-export type GameMemberLaunch = { model: string | null; effort: string | null }
+export type GameMemberLaunch = GameMemberAdvisorPick & { source?: 'session' | 'launch' }
 
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
