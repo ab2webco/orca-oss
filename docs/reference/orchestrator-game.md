@@ -619,6 +619,11 @@ The lead's verbs, run from the lead's terminal
   take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
   carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
   `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
+- **Host capacity (ORCA-841).** `game fleet`, `game state` and the Panel then give each host its
+  own line: members against its cap, cores, free memory and load, flagged `low memory` (under 4 GB
+  or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The figures
+  come from each host's `diagnostics.memory`, so an older host needs no update, and are reused for
+  15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
