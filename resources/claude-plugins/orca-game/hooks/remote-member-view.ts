@@ -7,6 +7,7 @@ type RemoteText = {
   finished: (name: string, host: string) => string
   silent: (name: string, host: string, read: string) => string
   live: (name: string, host: string, read: string) => string
+  unopened: (name: string, host: string, read: string) => string
 }
 
 // Why apart from the catalog: a remote member's terminal lives on its host, and View says so (ORCA-790).
@@ -16,30 +17,50 @@ const REMOTE_TEXT: Record<GameLocale, RemoteText> = {
     gone: (name, host) => `${name} no longer exists on ${host}: orca game rebind or stop`,
     finished: (name, host) => `${name} finished on ${host}; its terminal is closed`,
     silent: (name, host, read) => `${host} does not answer; read ${name}: ${read}`,
-    live: (name, host, read) => `${name} runs on ${host}; read it: ${read}`
+    live: (name, host, read) => `${name} runs on ${host}; read it: ${read}`,
+    unopened: (name, host, read) => `Could not open ${name} on ${host}; read it: ${read}`
   },
   es: {
     goneTag: (host) => `ya no está en ${host}`,
     gone: (name, host) => `${name} ya no existe en ${host}: orca game rebind o stop`,
     finished: (name, host) => `${name} terminó en ${host}; su terminal está cerrada`,
     silent: (name, host, read) => `${host} no responde; lee a ${name}: ${read}`,
-    live: (name, host, read) => `${name} corre en ${host}; léelo: ${read}`
+    live: (name, host, read) => `${name} corre en ${host}; léelo: ${read}`,
+    unopened: (name, host, read) => `No se pudo abrir ${name} en ${host}; léelo: ${read}`
   }
 }
 
 export const remoteGoneTagOf = (host: string): string => REMOTE_TEXT[gameLocale()].goneTag(host)
 
+type RemoteViewAgent = Pick<GameAgent, 'paneKey' | 'displayName' | 'state' | 'remote'>
+
+const nameOf = (agent: RemoteViewAgent): string => agent.displayName ?? agent.paneKey
+const readOf = (agent: RemoteViewAgent): string =>
+  `orca orchestration worker-read --dispatch ${agent.paneKey.replace(/^remote:/, '')}`
+
+/** The paired terminal View opens for a live remote member; null when it has only a notice. */
+export function remoteOpenOf(
+  agent: RemoteViewAgent & Pick<GameAgent, 'terminalHandle'>
+): { handle: string; environmentId: string } | null {
+  const remote = agent.remote
+  return remote?.stateKnown && !remote.gone && remote.environmentId && agent.terminalHandle
+    ? { handle: agent.terminalHandle, environmentId: remote.environmentId }
+    : null
+}
+
+/** What View says when this window could not open a live remote member's terminal. */
+export const remoteOpenFailedOf = (agent: RemoteViewAgent): string =>
+  REMOTE_TEXT[gameLocale()].unopened(nameOf(agent), agent.remote?.host ?? '', readOf(agent))
+
 /** What View says for a remote member, whose handle only resolves on its host; null for a local one. */
-export function remoteViewNoticeOf(
-  agent: Pick<GameAgent, 'paneKey' | 'displayName' | 'state' | 'remote'>
-): string | null {
+export function remoteViewNoticeOf(agent: RemoteViewAgent): string | null {
   const remote = agent.remote
   if (!remote) {
     return null
   }
   const text = REMOTE_TEXT[gameLocale()]
-  const name = agent.displayName ?? agent.paneKey
-  const read = `orca orchestration worker-read --dispatch ${agent.paneKey.replace(/^remote:/, '')}`
+  const name = nameOf(agent)
+  const read = readOf(agent)
   if (remote.gone) {
     return agent.state === 'done' ? text.finished(name, remote.host) : text.gone(name, remote.host)
   }

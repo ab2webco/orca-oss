@@ -16,6 +16,7 @@ import { TOGGLE_WORKSPACE_BOARD_EVENT } from '@/components/sidebar/useWorkspaceB
 import { SPLIT_TERMINAL_PANE_EVENT, CLOSE_TERMINAL_PANE_EVENT } from '@/constants/terminal'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
 import { registerRendererBackedTerminalCreate } from '@/components/terminal-pane/renderer-backed-terminal-create'
+import { revealPairedTerminal } from '@/components/terminal-pane/paired-terminal-reveal'
 import { planMobileTerminalTabMount } from '@/lib/mobile-terminal-tab-mount'
 import { resolveTerminalTabPtyOwnership } from '@/lib/terminal-tab-for-pty-id'
 import {
@@ -1907,6 +1908,12 @@ export function useIpcEvents(): void {
     unsubs.push(
       window.api.ui.onRenameTerminal(({ tabId, title }) => {
         useAppStore.getState().setTabCustomTitle(tabId, title)
+      })
+    )
+
+    unsubs.push(
+      window.api.ui.onRevealPairedTerminal((target) => {
+        void revealPairedTerminal(target)
       })
     )
 

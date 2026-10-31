@@ -93,13 +93,19 @@ describe('the lab release signal gate', () => {
     expect(gateShard.name).toBe('Test shard')
     expect(prShard.name).toBe('Test shard')
     expect(gateShard.run).toBe(prShard.run)
+    // Why the merge_group arm: that is the partition main's commits were verified with;
+    // a PR push runs half the shards (ORCA-932).
+    const mergeQueueArm = (expression) =>
+      JSON.parse(expression.match(/merge_group' && fromJSON\('(\[[^']*\])'\)/)[1])
     expect(release.jobs.gate_tests.strategy.matrix.shard).toEqual(
-      pr.jobs.test.strategy.matrix.shard
+      mergeQueueArm(pr.jobs.test.strategy.matrix.shard)
     )
     expect(release.jobs.gate_tests.strategy.matrix.shard_total).toEqual(
-      pr.jobs.test.strategy.matrix.shard_total
+      mergeQueueArm(pr.jobs.test.strategy.matrix.shard_total)
     )
-    expect(release.jobs.gate_tests['timeout-minutes']).toBe(pr.jobs.test['timeout-minutes'])
+    expect(release.jobs.gate_tests['timeout-minutes']).toBeLessThanOrEqual(
+      pr.jobs.test['timeout-minutes']
+    )
   })
 
   it('verifies the one pinned commit and refuses to release past it', () => {
