@@ -530,3 +530,160 @@ describe('GameLeads.liveLeadOf (ORCA-878)', () => {
     await expect(game.liveLeadOf('repo:a')).resolves.toBeNull()
   })
 })
+
+describe('GameLeads while a restart restores the lead (ORCA-728)', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  const LEAD_PANE = 'tab-1:leaf-1'
+  const AT = Date.UTC(2026, 9, 17, 10)
+  const STORED: GameLeadSession = {
+    sessionId: 'sess-lead',
+    agentArgs: null,
+    worktreeId: 'wt1',
+    accountId: null
+  }
+  // Two former lead sessions whose tabs the restore also brought back.
+  const FORMER: Record<string, { paneKey: string; sessionId: string }> = {
+    term_b: { paneKey: 'tab-2:leaf-1', sessionId: 'sess-b' },
+    term_c: { paneKey: 'tab-3:leaf-1', sessionId: 'sess-c' }
+  }
+
+  async function recordedLead(): Promise<string> {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-game-leads-'))
+    dirs.push(dir)
+    await new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: 'term_a', paneKey: LEAD_PANE } }),
+      isLive: () => true,
+      now: () => new Date(AT),
+      roster: new GameLeadRoster(() => dir),
+      sessionOf: async () => STORED
+    }).register({ project: 'cineco', label: 'Ana', claim: true })
+    return dir
+  }
+
+  // The relaunch: the lead's pane reconnects and starts Claude only after the former leads resume.
+  function restoring(dir: string, args: { now?: () => number; onWait?: (waits: number) => void }) {
+    const lead = {
+      handle: null as string | null,
+      state: 'starting' as 'running' | 'shell' | 'starting'
+    }
+    const resumed: string[] = []
+    let waits = 0
+    const sessionOfHandle = (handle: string): GameLeadSession | null => {
+      if (handle === 'term_new') {
+        return lead.state === 'running' ? STORED : null
+      }
+      const former = FORMER[handle]
+      return former ? { ...STORED, sessionId: former.sessionId } : null
+    }
+    const game = new GameLeads({
+      projectOf: async (caller) => ({
+        ...LEAD,
+        lead: {
+          handle: caller.terminalHandle ?? '',
+          paneKey: FORMER[caller.terminalHandle ?? '']?.paneKey ?? null
+        }
+      }),
+      isLive: (handle) => handle === lead.handle || handle in FORMER,
+      now: () => new Date(args.now?.() ?? AT),
+      wait: async () => {
+        waits += 1
+        args.onWait?.(waits)
+      },
+      roster: new GameLeadRoster(() => dir),
+      sessions: {
+        read: async () => STORED,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
+      sessionOf: async (handle) => sessionOfHandle(handle),
+      resume: async (session) => {
+        resumed.push(session.sessionId)
+        return 'term_resumed'
+      },
+      focus: async () => undefined,
+      handleOfPane: (paneKey) => (paneKey === LEAD_PANE ? lead.handle : null),
+      paneState: async (handle) => (handle === 'term_new' ? lead.state : 'running')
+    })
+    return { game, lead, resumed }
+  }
+
+  const claimOf = (game: GameLeads, terminalHandle: string) =>
+    game.register({ terminalHandle, project: 'cineco', label: 'Ana', claim: true })
+
+  it('keeps exactly one acting lead when two former lead sessions claim before the lead is back', async () => {
+    const dir = await recordedLead()
+    const world = restoring(dir, {
+      onWait: (waits) => {
+        if (waits === 1) {
+          world.lead.handle = 'term_new'
+        } else if (waits === 2) {
+          world.lead.state = 'running'
+        }
+      }
+    })
+
+    await expect(
+      Promise.all([claimOf(world.game, 'term_b'), claimOf(world.game, 'term_c')])
+    ).resolves.toEqual([
+      { registered: false, live: { handle: 'term_new' } },
+      { registered: false, live: { handle: 'term_new' } }
+    ])
+    expect(world.resumed).toEqual([])
+    expect((await world.game.list()).leads.map((one) => one.handle)).toEqual(['term_new'])
+  })
+
+  it('names the restoring lead to a former lead as soon as its pane is back', async () => {
+    const dir = await recordedLead()
+    const world = restoring(dir, {})
+
+    await expect(world.game.leadElsewhere({ terminalHandle: 'term_b' })).resolves.toBeNull()
+    world.lead.handle = 'term_new'
+    await expect(world.game.leadElsewhere({ terminalHandle: 'term_b' })).resolves.toBe('term_new')
+  })
+
+  it('lets a former lead claim once the restoring pane turns out to be a shell', async () => {
+    const dir = await recordedLead()
+    const world = restoring(dir, {
+      onWait: () => {
+        world.lead.handle = 'term_new'
+        world.lead.state = 'shell'
+      }
+    })
+
+    await expect(claimOf(world.game, 'term_b')).resolves.toEqual({
+      registered: false,
+      resumed: { handle: 'term_resumed' }
+    })
+    expect(world.resumed).toEqual(['sess-lead'])
+  })
+
+  it('stops waiting for a lead whose pane never comes back once the restore grace is over', async () => {
+    const dir = await recordedLead()
+    let now = AT
+    const world = restoring(dir, { now: () => now })
+    await world.game.list()
+    now = AT + 10 * 60_000
+
+    await expect(world.game.leadElsewhere({ terminalHandle: 'term_b' })).resolves.toBeNull()
+    await expect(claimOf(world.game, 'term_b')).resolves.toEqual({
+      registered: false,
+      resumed: { handle: 'term_resumed' }
+    })
+  })
+
+  it('gives up a bounded wait and claims as today when the lead pane stays away', async () => {
+    const dir = await recordedLead()
+    const world = restoring(dir, {})
+
+    await expect(claimOf(world.game, 'term_b')).resolves.toEqual({
+      registered: false,
+      resumed: { handle: 'term_resumed' }
+    })
+  })
+})
