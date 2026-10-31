@@ -9,8 +9,13 @@ import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orches
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import {
+  gameFleetHostLoadsOf,
+  localGameFreeOf,
+  type GameHostLoad
+} from './orchestrator-game-host-load'
 
-export { ticketInText, isFinishedMember }
+export { ticketInText, isFinishedMember, localGameFreeOf }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
 
@@ -58,6 +63,8 @@ export type GameFleet = {
   /** Members not finished and not gone from their host: each holds a ticket and a slot. */
   running: number
   free: number
+  /** Running members and free slots per host, local first; absent when the state has no per-host caps. */
+  hosts?: GameHostLoad[]
   /** Members not live since Orca or the machine restarted: `game resume-members`. */
   paused: GamePausedMember[]
   /** Members whose start waits for the setup in flight (ORCA-746). */
@@ -65,7 +72,7 @@ export type GameFleet = {
   pausedError?: string
 }
 
-export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead'> &
+export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead' | 'hosts'> &
   Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
@@ -194,12 +201,18 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
     (agent) => agent.remote?.gone && !isFinishedMember(agent)
   )
   const running = rows.length - counts.finished - gone.length + holding.length + queued.length
+  const hosts =
+    state.hosts &&
+    gameFleetHostLoadsOf(state.hosts, gameFleetMembersOf(state), holding.length + queued.length)
+  const free = Math.max(0, cap - running)
+  const hostsFree = hosts?.reduce((total, one) => total + one.free, 0) ?? free
   return {
     rows,
     counts,
     cap,
     running,
-    free: Math.max(0, cap - running),
+    free: Math.min(free, hostsFree),
+    ...(hosts ? { hosts } : {}),
     paused: state.pausedMembers ?? [],
     queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})
@@ -216,7 +229,7 @@ export type GameWavePlan = {
   skipped: { ticket: string; reason: GameWaveSkipReason }[]
 }
 
-/** Named tickets, or the To Do's in list order, up to the free slots; never past the cap. */
+/** Named tickets, or the To Do's in list order, up to this Orca's free slots; never past the cap. */
 export function gameWavePlanOf(
   state: GameFleetInput & Pick<OrchestratorGameState, 'project'>,
   requested: readonly string[]
@@ -247,7 +260,7 @@ export function gameWavePlanOf(
           ? 'queued'
           : group !== undefined && PAST_WORK.has(group)
             ? 'not in To Do'
-            : plan.launch.length >= fleet.free
+            : plan.launch.length >= localGameFreeOf(fleet)
               ? 'cap'
               : null
     if (reason) {

@@ -79,6 +79,38 @@ describe('evaluateStartupBudget', () => {
     expect(redRate(150)).toBeGreaterThan(0.99)
   })
 
+  // Run 40432819784 (ORCA-814): one populated launch stalled 1.8s in the
+  // renderer after plugins had finished; the other 31 launches were level.
+  it('does not let one stalled launch turn a level run red', () => {
+    const verdict = evaluateStartupBudget({
+      baselineMs: [
+        1331, 1315, 1307, 1319, 1305, 1293, 1311, 1302, 1325, 1331, 1301, 1297, 1312, 1316, 1311,
+        1319
+      ],
+      populatedMs: [
+        1303, 1311, 3123, 1327, 1352, 1325, 1332, 1298, 1317, 1312, 1331, 1344, 1433, 1325, 1314,
+        1330
+      ],
+      budgetMs: BUDGET_MS
+    })
+    expect(verdict.withinBudget, verdict.description).toBe(true)
+  })
+
+  it('stays green when any single launch per run stalls', () => {
+    let red = 0
+    for (let round = 0; round < 400; round += 1) {
+      const populatedMs = launches(SAMPLES, 0, 1 + round * 31 + 7919)
+      populatedMs[round % SAMPLES] += 1800
+      const verdict = evaluateStartupBudget({
+        baselineMs: launches(SAMPLES, 0, 1 + round * 31),
+        populatedMs,
+        budgetMs: BUDGET_MS
+      })
+      red += verdict.withinBudget ? 0 : 1
+    }
+    expect(red / 400).toBeLessThan(0.05)
+  })
+
   it('does not fire on noise when the plugins cost nothing', () => {
     expect(redRate(0)).toBeLessThan(0.05)
     expect(redRate(25)).toBeLessThan(0.25)

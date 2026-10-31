@@ -12,7 +12,8 @@ import {
   type GameWaveResult,
   type SweepClose
 } from './orchestrator-game-fleet-format'
-import { isLaunchUnderway, launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { isLaunchUnderway } from './orchestrator-game-launch-result'
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
@@ -23,6 +24,7 @@ import {
   gamePushPlanOf,
   gameSweepOf,
   gameWavePlanOf,
+  localGameFreeOf,
   type GameSweepEntry
 } from '../../shared/orchestrator-game-fleet-verbs'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
@@ -138,11 +140,12 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     if (openPrWarning) {
       console.error(`Warning: ${openPrWarning}`)
     }
-    const { cap, free } = gameFleetReportOf(state)
+    const fleet = gameFleetReportOf(state)
     const wave: GameWaveResult = {
       dryRun,
-      cap,
-      free,
+      cap: fleet.cap,
+      free: localGameFreeOf(fleet),
+      ...(fleet.hosts ? { hosts: fleet.hosts } : {}),
       ...gameWavePlanOf(state, tickets),
       launched: [],
       failed: []

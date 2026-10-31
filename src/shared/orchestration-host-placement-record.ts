@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   defaultGameMemberCapOf,
-  GAME_LEAD_CAP_MAX,
+  GAME_HOST_CAP_MAX,
   type GameHostProfile
 } from './orchestrator-game-lead'
 
@@ -14,7 +14,7 @@ export const HOST_PLACEMENT_ROLES = ['dev', 'e2e', 'any'] as const
 export type HostPlacementRole = (typeof HOST_PLACEMENT_ROLES)[number]
 
 const SELECTOR_MAX = 512
-const capError = `must be a whole number from 1 to ${GAME_LEAD_CAP_MAX}`
+const capError = `must be a whole number from 1 to ${GAME_HOST_CAP_MAX}`
 const selector = z.string().trim().min(1, 'must not be empty').max(SELECTOR_MAX)
 
 // Strict: pairing codes and device tokens stay in orca-environments.json, never in a placement record.
@@ -31,7 +31,7 @@ const HostPlacementRecordSchema = z.strictObject(
       .number({ error: capError })
       .int(capError)
       .min(1, capError)
-      .max(GAME_LEAD_CAP_MAX, capError)
+      .max(GAME_HOST_CAP_MAX, capError)
       .optional(),
     repos: z.record(selector, selector).default({})
   },
