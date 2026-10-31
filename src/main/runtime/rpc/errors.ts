@@ -95,6 +95,10 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'capability_unsupported',
   // Why: placement reads `data.host` to try another host (ORCA-792, ORCA-795).
   'setup_slot_busy',
+  // Why: a host refusing a member's account must reach the home as a refusal, not an unknown start (ORCA-891).
+  'accounts_limited',
+  'accounts_unusable',
+  'global_login_taken',
   'relay_quota_exceeded',
   'dispatch_capability_invalid',
   // Why: a refused remote member's message names its recovery step (ORCA-857).

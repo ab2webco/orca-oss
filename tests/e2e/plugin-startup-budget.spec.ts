@@ -158,6 +158,8 @@ test('keeps real Electron launch stable with 20 approved inert plugins', async (
     // Why annotated on green too: without the value in the run, the only way to
     // tell a real regression from a slow runner is to re-run and watch by hand.
     testInfo.annotations.push({ type: 'plugin-startup-budget', description: verdict.description })
+    // Why stdout too: the list reporter drops annotations, so the job log had no margin on green.
+    console.log(`[plugin-startup-budget] ${verdict.description}`)
     expect(verdict.withinBudget, verdict.description).toBe(true)
     expect(markerPaths.every((markerPath) => !existsSync(markerPath))).toBe(true)
   } finally {
