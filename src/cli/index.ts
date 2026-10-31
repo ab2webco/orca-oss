@@ -19,9 +19,15 @@ export { buildCurrentWorktreeSelector, normalizeWorktreeSelector } from './selec
 
 const COMMAND_PATHS = COMMAND_SPECS.flatMap((spec) => specPaths(spec))
 
+// Why flags only: an agent's self-switch runs in a shell that may export ORCA_ENVIRONMENT, and
+// must still land on its own runtime; only a typed --environment names a paired host (ORCA-916).
+function isExplicitRemoteSelectionOnly(commandPath: string[]): boolean {
+  return commandPath[0] === 'account' && commandPath[1] === 'switch'
+}
+
 function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
   return (
-    commandPath[0] === 'account' ||
+    (commandPath[0] === 'account' && !isExplicitRemoteSelectionOnly(commandPath)) ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
     commandPath[0] === 'serve' ||
@@ -91,6 +97,7 @@ export async function main(
     validateCommandAndFlags(COMMAND_SPECS, parsed)
     const RuntimeClientClass = await loadRuntimeClientClass()
     const ignoreRemoteSelection = shouldIgnoreRemoteSelection(parsed.commandPath)
+    const flagsOnly = isExplicitRemoteSelectionOnly(parsed.commandPath)
     const pairingCode = ignoreRemoteSelection ? null : parsed.flags.get('pairing-code')
     const environmentSelector = ignoreRemoteSelection ? null : parsed.flags.get('environment')
     // Why: pass `null` (not `undefined`) when remote selection is suppressed
@@ -105,10 +112,14 @@ export async function main(
         client ??= new RuntimeClientClass(
           undefined,
           undefined,
-          typeof pairingCode === 'string' ? pairingCode : ignoreRemoteSelection ? null : undefined,
+          typeof pairingCode === 'string'
+            ? pairingCode
+            : ignoreRemoteSelection || flagsOnly
+              ? null
+              : undefined,
           typeof environmentSelector === 'string'
             ? environmentSelector
-            : ignoreRemoteSelection
+            : ignoreRemoteSelection || flagsOnly
               ? null
               : undefined
         )
