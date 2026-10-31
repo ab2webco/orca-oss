@@ -12,6 +12,8 @@ export type OrchestrationWorkerServer = {
 
 export type OrchestrationEnvironmentTransport = {
   resolve(selector: string): OrchestrationWorkerServer
+  /** The saved environments; absent where none can be listed. */
+  list?(): { id: string; name: string }[]
   call(
     selector: string,
     method: string,
