@@ -688,8 +688,10 @@ matches …` (ORCA-866).
   there on `--account` or the project's account policy, resolved by that host; only once it
   starts does the old dispatch stop, without a release, so the old host keeps its worktree and the
   result names it. When that host has every account near or limited, nothing moves and the result
-  names when its first account is back. A member already on a paired host moves only this way;
-  `--account` alone is refused for it.
+  names when its first account is back. A Claude member already on a paired host is switched in
+  place there (ORCA-916): `--account` and `auto` resolve against that host's accounts, matched to
+  the member's by email, and the lead's machine needs the host saved as an environment. Any other
+  member on a paired host moves only with `--on`; `--account` alone is refused for it.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
