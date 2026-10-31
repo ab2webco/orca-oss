@@ -63,6 +63,8 @@ export type GameMemberRemote = {
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
+  /** A host restart slept its pane; Resume wakes it there (ORCA-915). */
+  asleep?: true
 }
 
 export type GameMemberLaunch = { model: string | null; effort: string | null }

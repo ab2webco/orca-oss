@@ -103,6 +103,20 @@ export const terminalFocusArgvOf = (
     : [path, 'terminal', 'focus', '--terminal', handle, '--json']
 }
 
+// Why the shape: the ticket is a CLI value, so it must never read as a flag.
+const TICKET_ID = /^[A-Za-z][A-Za-z0-9]*-\d+$/
+
+/** Wakes or reopens one paused member the way `orca game resume-members` does (ORCA-915). */
+export const resumeMembersArgvOf = (
+  cli: string | null | undefined,
+  ticket: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined || !TICKET_ID.test(ticket)
+    ? undefined
+    : [path, 'game', 'resume-members', '--tickets', ticket, '--json']
+}
+
 /** Asks Orca to open a link in the desktop's system browser, where the person is signed in. */
 export const openLinkArgvOf = (
   cli: string | null | undefined,

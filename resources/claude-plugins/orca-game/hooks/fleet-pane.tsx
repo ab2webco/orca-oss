@@ -17,7 +17,7 @@ import { memberCard } from './fleet-member-card'
 import { HUD_ROWS, hudCellsOf } from './fleet-hud'
 import { projectRowsOf } from './fleet-project'
 import { reviewSectionOf } from './fleet-review-section'
-import { viewMember } from './member-view-press'
+import { viewLabelOf, viewMember } from './member-view-press'
 import { openGameLink, viewOf } from './fleet-sync'
 import { cardLayoutOf, TILE_COLUMNS, TILE_ROWS, tileCellsOf } from './fleet-tiles'
 import { leadTitleOf } from './game-lead'
@@ -94,7 +94,7 @@ export const registerFleetPane = (on: On): void => {
         onPress={viewPressOf(agent, handle)}
       >
         <Text backgroundColor={palette.panel} color={palette.parchment} bold>
-          {` ${text.view} `}
+          {` ${viewLabelOf(agent)} `}
         </Text>
       </Button>
     )
@@ -108,7 +108,7 @@ export const registerFleetPane = (on: On): void => {
           {
             ...tapOf({
               key: `view-${agent.paneKey}`,
-              labels: [`▸ ${text.view}`],
+              labels: [`▸ ${viewLabelOf(agent)}`],
               hotkey: viewHotkeyOf(index),
               onPress: viewPressOf(agent, handle)
             }),
@@ -316,7 +316,7 @@ export const registerFleetPane = (on: On): void => {
             palette,
             columns,
             isTap,
-            viewLabel: text.view,
+            viewLabelOf,
             pressOf: viewPressOf,
             hotkeyOf: viewHotkeyOf
           })
