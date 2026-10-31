@@ -391,8 +391,8 @@ popover.
 ## Panel layout
 
 The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
-item rows), My PRs, To Do and Actions, in that order. A new Panel shows only Team and My PRs; the
-other three are widgets in the catalog that a person adds from the **Widgets** menu chip or with
+item rows), My PRs, To Do, Actions and Metrics, in that order. A new Panel shows only Team and My
+PRs; the other four are widgets in the catalog that a person adds from the **Widgets** menu chip or with
 `/orca-game:layout add <section>`, and removes the same way. In the catalog `●` marks a shown
 widget and `○` one that waits; a shown widget also gets `↑` and `↓` chips that move it. Each
 heading starts with a mark: `▾` while it is expanded, `▸` once collapsed to its heading line
@@ -405,6 +405,15 @@ a row of such chips. The Widgets chip has no hotkey: every letter and digit is a
 A widget that is not shown is not drawn: its rows, buttons, hotkeys and Team's animated tiles are
 gone until it is added, and a closed Actions widget reads no run log. Its data still arrives with
 `game state`.
+
+The Metrics widget draws the state's `metrics` (see `orca game metrics` below) with no work of its
+own per frame: a sparkline of tickets done per day with the window's total and its first and last
+day, the median lead time, then each Claude account with `●` on the active one and two meters,
+`5h` and `7d`, filled by eighths of a cell, yellow from 75% and red from 90%. Wide, an account
+is one row; on a phone it is two, and the meters narrow to two cells so neither row wraps
+([`metrics-widget.ts`](../../resources/claude-plugins/orca-game/hooks/metrics-widget.ts)). A
+member's Panel, or one on an older host, gets no `metrics` and says the numbers are in the
+lead's Panel. A version 1 layout upgrades with Metrics in the catalog, not shown.
 
 `/orca-game:layout` lists the sections with their state and takes `reset`, `add <section>`,
 `remove <section>` and `move <section> up|down` (Spanish words work too: `añadir tareas`,

@@ -16,6 +16,7 @@ import { gameStrings } from './game-strings'
 import type { BandPalette } from './scenes/scene-definition'
 import { actionLabelOf, listActionOf } from './lead-actions'
 import type { PanelSection } from './panel-layout'
+import { metricsSectionOf } from './metrics-section'
 import { tapButtonsOf } from './tap-buttons'
 import { isTapLayout } from './tap-layout'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
@@ -33,9 +34,11 @@ export type SectionMarks = {
   isCollapsed: (section: PanelSection) => boolean
 }
 
-export type ProjectSections = Partial<Record<'reviews' | 'todo' | 'actions', RenderElement>>
+export type ProjectSections = Partial<
+  Record<'reviews' | 'todo' | 'actions' | 'metrics', RenderElement>
+>
 
-/** My PRs, my To Do grouped by status, and the project's actions with each MCP one's last result. */
+/** My PRs, my To Do grouped by status, the project's actions with each MCP one's last result, and Metrics. */
 export async function projectRowsOf(
   $: EngineInterface,
   e: RenderInput,
@@ -240,6 +243,9 @@ export async function projectRowsOf(
               {!isActionsCollapsed && actions.flatMap(resultRows)}
             </Box>
           )
-        })
+        }),
+    ...(isShown('metrics')
+      ? { metrics: metricsSectionOf($, e, state, palette, columns, marks) }
+      : {})
   }
 }
