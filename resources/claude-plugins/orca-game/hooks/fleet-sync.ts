@@ -31,6 +31,7 @@ import {
   questFleet,
   questLiveConfig
 } from './quest-runtime'
+import { fleetNoteOf } from './fleet-age'
 import { earnedRewardsOf } from './fleet-rewards'
 import { RECENT_KEY, recentRewardsOf, withRecent } from './recent-rewards'
 import { awardXp, levelOf, signedXpOf, xpLedgerOf } from './rewards'
@@ -39,6 +40,10 @@ import { setContributedScenes } from './scenes/index'
 export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
 const CLI_TIMEOUT_MS = 15000
+// Why longer: a lead's state reads GitHub and paired hosts, and a cut read only keeps the old fleet.
+const STATE_TIMEOUT_MS = 45000
+// Why sooner than the poll: a failed read leaves the band drawing an old fleet.
+const RETRY_MS = 10000
 const XP_KEY = 'xp-ledger'
 
 const EMPTY: FleetState = { isLoading: false, refreshedAt: 0, state: null, note: '', xp: 0 }
@@ -55,7 +60,8 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
 async function runCli(
   $: EngineInterface,
   argv: readonly string[] | undefined,
-  extraEnv: Record<string, string> = {}
+  extraEnv: Record<string, string> = {},
+  timeoutMs = CLI_TIMEOUT_MS
 ) {
   if (argv === undefined) {
     return undefined
@@ -66,8 +72,7 @@ async function runCli(
     return undefined
   }
   const env = { ...invocation.env, ...extraEnv }
-  const init =
-    Object.keys(env).length > 0 ? { timeoutMs: CLI_TIMEOUT_MS, env } : { timeoutMs: CLI_TIMEOUT_MS }
+  const init = Object.keys(env).length > 0 ? { timeoutMs, env } : { timeoutMs }
   return await $.process.run(invocation.argv, init).catch(() => undefined)
 }
 
@@ -87,7 +92,7 @@ async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>>
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
   const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
-  const out = await runCli($, argv, await advisorEnvOf($))
+  const out = await runCli($, argv, await advisorEnvOf($), STATE_TIMEOUT_MS)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 
@@ -223,11 +228,16 @@ export async function refresh($: EngineInterface): Promise<void> {
     isLoading: false,
     refreshedAt: doneAt,
     state: next ?? s.state,
+    stateAt: next === undefined ? s.stateAt : doneAt,
+    isStale: next === undefined && s.state !== null,
     note,
     xp,
     recent
   }))
   quest.clockMs = doneAt
+  if (next === undefined && before.state !== null) {
+    $.clock.after(RETRY_MS, () => void refreshSoon($).catch(() => undefined))
+  }
   if (next !== undefined) {
     syncHdTeam(next, config.rewards)
     for (const one of teamEventsOf(before.state, next)) {
@@ -243,15 +253,23 @@ export async function refresh($: EngineInterface): Promise<void> {
   }
 }
 
+// Module state: a refresh asked for while one ran, which read the fleet before that change.
+let isRefreshOwed = false
+
 export async function refreshSoon($: EngineInterface): Promise<void> {
   if (quest.isDemo) {
     return
   }
   const state = await read($, fleet)
   if (state.isLoading && (await $.clock.now()) - state.refreshedAt < STUCK_MS) {
+    isRefreshOwed = true
     return
   }
-  void refresh($).catch(() => undefined)
+  isRefreshOwed = false
+  void refresh($)
+    .catch(() => undefined)
+    .then(() => (isRefreshOwed ? refreshSoon($) : undefined))
+    .catch(() => undefined)
 }
 
 export type FleetView = FleetState & { isDemo: boolean }
@@ -262,7 +280,7 @@ export async function viewOf($: EngineInterface): Promise<FleetView> {
     const now = await $.clock.now()
     const state =
       v.state && withLeadSubagents(v.state, runningLeadSubagents, now, await isLeadStarted($))
-    return { ...v, state, isDemo: false }
+    return { ...v, state, note: fleetNoteOf(v, now), isDemo: false }
   }
   const frame = demoNow()
   return { ...v, state: frame.state, xp: frame.xp, note: '', isLoading: false, isDemo: true }

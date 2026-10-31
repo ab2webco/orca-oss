@@ -309,7 +309,16 @@ is in that project's own `orca.yaml`.
 
 ## What the game reads: `orca game state --json`
 
-The plugin polls this every 30 seconds and after each turn. It resolves the calling pane from
+The plugin reads this when Orca pushes a fleet change, every 30 seconds and after each turn. The
+push is `orca game watch`, which the mod streams for the session: it long-polls `game.fleetWait`
+and prints `fleet <version>` when a worktree is created or removed, a member's agent changes state,
+a member's terminal goes away, the lead records, frees, resumes or discards a member, the STOP
+switch moves, or orchestration mail arrives. A burst (a launch makes a worktree, a terminal and a
+record) is one version, and the mod reads once per 300 ms burst; a change that lands while a read
+runs gets a read after it. The 30-second poll stays because PR and CI changes, members on paired
+hosts and an Orca without `game.fleetWait` push nothing. A read that fails keeps the fleet it had,
+the band says `updated <age> ago · retrying`, and the mod reads again after 10 seconds. A read has
+45 seconds before it counts as failed. It resolves the calling pane from
 `ORCA_WORKTREE_ID`, `ORCA_TERMINAL_HANDLE` and `ORCA_PANE_KEY`
 ([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)). Members also get
 `ORCA_WORKTREE_SLUG` to keep parallel test suites apart
