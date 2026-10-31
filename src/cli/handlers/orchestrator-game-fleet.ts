@@ -12,7 +12,8 @@ import {
   type GameWaveResult,
   type SweepClose
 } from './orchestrator-game-fleet-format'
-import { isLaunchUnderway, launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
+import { isLaunchUnderway } from './orchestrator-game-launch-result'
 import { gameLaunchChoiceOf, parseGameLaunchFlags } from './orchestrator-game-launch-options'
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'

@@ -1,4 +1,4 @@
-import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch'
+import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch-result'
 import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import type { GameHold } from './orchestrator-game-hold'

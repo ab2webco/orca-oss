@@ -85,12 +85,27 @@ describe('a remote member account resolved against the host roster (ORCA-798)', 
     expect(picked.pin).toEqual({ claudeAccountId: 'id-bo@koombea.com' })
   })
 
-  it('refuses auto when this host has no usable account rather than using its global login', () => {
-    expect(() => resolve([], 'auto')).toThrow(
-      expect.objectContaining({
-        code: 'invalid_argument',
-        message: expect.stringContaining('orca account add')
-      })
+  it('runs auto on the global login when this host has no managed account (ORCA-891)', () => {
+    expect(resolve([], 'auto')).toEqual({ pin: {}, account: null, globalLogin: 'claude' })
+    expect(resolve([entry('ana@koombea.com', 5)], 'auto', 'codex')).toEqual({
+      pin: {},
+      account: null,
+      globalLogin: 'codex'
+    })
+  })
+
+  it('refuses auto rather than the global login when managed accounts exist but none is usable (ORCA-891)', () => {
+    const broken = entry('ana@koombea.com', 5, {
+      auth: { accountId: 'id-ana@koombea.com', state: 'failed' } as AccountListEntry['auth']
+    })
+    expect(() => resolve([broken], 'auto')).toThrow(
+      expect.objectContaining({ code: 'accounts_unusable' })
+    )
+  })
+
+  it('still refuses a named account on a host with no managed account', () => {
+    expect(() => resolve([], 'ana@koombea.com')).toThrow(
+      expect.objectContaining({ code: 'invalid_argument' })
     )
   })
 

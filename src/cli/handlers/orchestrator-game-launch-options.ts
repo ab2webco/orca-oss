@@ -3,6 +3,7 @@ import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestra
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isAllowedGameAccount } from '../../shared/orchestrator-game-account-usage'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import { ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   GAME_PROMPT_MAX,
   GAME_WORK_PROMPT_PLACEHOLDERS,
@@ -35,8 +36,10 @@ export type GameLaunchChoice = {
   effort?: string
   /** An email, an account id, or `auto` (the flag, or orchestrator.accounts unset or auto); null with accounts: default. */
   account: string | null
-  /** What a paired host resolves: only what the flag or orchestrator.accounts named. */
+  /** What a paired host resolves: the flag, or `auto` unless orchestrator.accounts is default. */
   remoteAccount: string | null
+  /** remoteAccount is the unset policy's `auto`, so a host that cannot honor it keeps its global login. */
+  remoteAccountByDefault: boolean
   /** orchestrator.accounts as a list: the only accounts a member may run on. */
   allowedAccounts?: string[]
 }
@@ -83,15 +86,19 @@ export function parseGameLaunchFlags(flags: Map<string, string | boolean>): Game
 export const allowedAccountsText = (allowed: readonly string[]): string =>
   `this project allows only ${allowed.join(', ')} (orchestratorGame.orchestrator.accounts)`
 
-/** A paired host gets only what the project's list allows; until hosts filter `auto`, only a named one. */
+/** A paired host gets only what the project's list allows: a named one, or `auto` it picks from the list. */
 function checkRemoteAccountAllowed(choice: GameLaunchChoice, on: string): void {
   const allowed = choice.allowedAccounts
   const named = choice.remoteAccount
   // Why by email: an account id is the host's own, so the home can only match the email the list names.
-  if (allowed && (named === null || !isAllowedGameAccount({ id: named, email: named }, allowed))) {
+  if (
+    allowed &&
+    (named === null ||
+      (named !== 'auto' && !isAllowedGameAccount({ id: named, email: named }, allowed)))
+  ) {
     throw new RuntimeClientError(
       'invalid_argument',
-      `${allowedAccountsText(allowed)}; name one of them on ${on} with --account <email>, since ${on} would otherwise pick from all of its accounts.`
+      `${allowedAccountsText(allowed)}; name one of them on ${on} with --account <email>, or leave --account out for ${on} to pick from them.`
     )
   }
 }
@@ -128,13 +135,43 @@ export function gameLaunchChoiceOf(
     ...(model === undefined || effort === undefined ? {} : { effort }),
     // Why auto when unset: Orca cannot move or refresh a member on the global login (ORCA-809).
     account: typed.account ?? (lead.accounts === 'default' ? null : 'auto'),
-    remoteAccount: typed.account ?? (lead.accounts === 'auto' ? 'auto' : null),
+    // Why only typed for an agent with no accounts: the host refuses `auto` for it, as this host ignores it.
+    remoteAccount:
+      typed.account ??
+      (lead.accounts === 'default' || accountProviderOfAgent(agent) === null ? null : 'auto'),
+    remoteAccountByDefault: typed.account === undefined && lead.accounts === undefined,
     ...(Array.isArray(lead.accounts) ? { allowedAccounts: lead.accounts } : {})
   }
   if (remote) {
     checkRemoteAccountAllowed(choice, remote.on)
   }
   return choice
+}
+
+/** The worker-start fields that hand a paired host its account selector. */
+export function remoteAccountParamsOf(
+  choice: GameLaunchChoice,
+  capabilities: readonly string[]
+): { remoteAccount?: string; remoteAccountByDefault?: true; remoteAllowedAccounts?: string[] } {
+  if (choice.remoteAccount === null) {
+    return {}
+  }
+  const listed = choice.remoteAccount === 'auto' && choice.allowedAccounts
+  // Why: an older runtime drops the list, so the host would pick from all of its accounts.
+  if (
+    listed &&
+    !capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `${allowedAccountsText(listed)}; this Orca cannot hand that list to a paired host, so name one with --account <email>, or update Orca.`
+    )
+  }
+  return {
+    remoteAccount: choice.remoteAccount,
+    ...(choice.remoteAccountByDefault ? { remoteAccountByDefault: true as const } : {}),
+    ...(listed && { remoteAllowedAccounts: listed })
+  }
 }
 
 /** `--on <host>`: the paired host a member runs on, in its own worktree of that host's `repo`. */

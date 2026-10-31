@@ -20,6 +20,8 @@ export type RemoteMemberAgent = {
   limit?: GameMemberLimit
   /** The host's account the pane runs on; only its email crosses hosts (ORCA-798). */
   account?: { provider: GameAccountProvider; email: string }
+  /** No managed account: the pane runs on the host's global login (ORCA-891); absent from an older host. */
+  globalLogin?: true
 }
 
 /** The host's hook reading for a pane; null without one, or when it is only restored from disk. */
@@ -44,10 +46,8 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   if (typeof value !== 'object' || value === null) {
     return null
   }
-  const { state, agentType, updatedAt, stateStartedAt, limit, account } = value as Record<
-    string,
-    unknown
-  >
+  const { state, agentType, updatedAt, stateStartedAt, limit, account, globalLogin } =
+    value as Record<string, unknown>
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -74,7 +74,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
           }
         }
       : {}),
-    ...(relayed ? { account: relayed } : {})
+    ...(relayed ? { account: relayed } : globalLogin === true ? { globalLogin: true as const } : {})
   }
 }
 

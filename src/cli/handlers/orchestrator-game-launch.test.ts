@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatGameLaunch, ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { formatGameLaunch } from './orchestrator-game-launch-result'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
 import {
@@ -703,13 +704,48 @@ describe('orca game launch', () => {
       expect.objectContaining({ remoteAccount: 'ANA@koombea.com' })
     )
 
-    for (const extra of [[], [['account', 'cy@koombea.com']]] as [string, string][][]) {
-      const refused = fakeClient(stateWith({ lead }))
-      await expect(launch(refused.client, 'CIN-12', [...remote, ...extra])).rejects.toThrow(
-        /this project allows only ana@koombea\.com.*--account/
-      )
-      expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+    const refused = fakeClient(stateWith({ lead }))
+    await expect(
+      launch(refused.client, 'CIN-12', [...remote, ['account', 'cy@koombea.com']])
+    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
+    expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+  })
+
+  it("on a paired host, hands auto the project's list for the host to pick from (ORCA-891)", async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
+    const status = {
+      'status.get': {
+        capabilities: [
+          ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+          'orchestration.federation-member-account-allowed.v1'
+        ]
+      }
     }
+    for (const extra of [[], [['account', 'auto']]] as [string, string][][]) {
+      const { client, calls } = fakeClient(stateWith({ lead }), { id: 'run_1' }, status)
+      await launch(client, 'CIN-12', [['on', 'imac'], ['repo', 'name:cineco'], ...extra])
+      const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
+      expect(start).toEqual(
+        expect.objectContaining({
+          remoteAccount: 'auto',
+          remoteAllowedAccounts: ['ana@koombea.com']
+        })
+      )
+      expect(start).not.toHaveProperty('remoteAccountByDefault')
+    }
+  })
+
+  it('refuses the list before any start when this Orca cannot hand it to a host (ORCA-891)', async () => {
+    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
+    const { client, calls } = fakeClient(stateWith({ lead }))
+
+    await expect(
+      launch(client, 'CIN-12', [
+        ['on', 'imac'],
+        ['repo', 'name:cineco']
+      ])
+    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
+    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {
