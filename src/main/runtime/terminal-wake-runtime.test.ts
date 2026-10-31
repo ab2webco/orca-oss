@@ -153,3 +153,52 @@ describe('terminal.wake', () => {
     await expect(runtime.wakeTerminal('term_unknown')).rejects.toThrow('terminal_handle_stale')
   })
 })
+
+describe('terminal.list owner of a sleeping row', () => {
+  it.each(['mounted', 'unmounted'] as const)(
+    'names the lead, ticket and account of the %s member pane a restart left asleep',
+    async (pane) => {
+      const { runtime } = makeRuntime(true, pane)
+      const read = vi.fn(async (projectKey: string) => ({
+        ok: true as const,
+        members:
+          projectKey === `repo:${REPO_ID}`
+            ? [
+                {
+                  ticket: 'ORCA-915',
+                  name: 'Nova',
+                  runId: 'run-1',
+                  taskId: 'task-1',
+                  dispatchId: null,
+                  worktreeId: WORKTREE_ID,
+                  branch: 'fabolivark/orca-915',
+                  agent: 'claude',
+                  accountId: 'acct-1',
+                  account: 'member@example.com',
+                  sessionId: 'member-session',
+                  lastState: 'working',
+                  launchedAt: '2026-10-30T10:00:00.000Z',
+                  updatedAt: '2026-10-30T10:00:00.000Z'
+                }
+              ]
+            : []
+      }))
+      // Why a cast: the member file and the run database are private and touch disk.
+      Object.assign(runtime as object, {
+        gameMemberSessions: { read },
+        getOrchestrationDb: () => ({
+          getRun: (id: string) => (id === 'run-1' ? { coordinator_handle: 'term_lead' } : undefined)
+        })
+      })
+
+      const { terminals } = await runtime.listTerminals(`id:${WORKTREE_ID}`)
+
+      expect(
+        terminals.find((terminal) => terminal.liveness === 'sleeping')?.sleepingAgent
+      ).toMatchObject({
+        owner: { lead: 'term_lead', ticket: 'ORCA-915', account: 'member@example.com' }
+      })
+      expect(read).toHaveBeenCalledTimes(1)
+    }
+  )
+})

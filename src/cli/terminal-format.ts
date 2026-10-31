@@ -33,10 +33,19 @@ function formatTerminalLiveness(terminal: RuntimeTerminalSummary): string {
     case 'running':
       return 'running'
     case 'sleeping':
-      return `sleeping (${terminal.sleepingAgent?.agent ?? 'agent'}, wake to resume)`
+      return `sleeping (${terminal.sleepingAgent?.agent ?? 'agent'}, wake to resume)${formatSleepingOwner(terminal)}`
     case 'gone':
       return 'gone'
   }
+}
+
+function formatSleepingOwner(terminal: RuntimeTerminalSummary): string {
+  const owner = terminal.sleepingAgent?.owner
+  if (!owner) {
+    return ''
+  }
+  const lead = owner.lead ? `lead ${owner.lead}` : 'no lead'
+  return `  owner: ${owner.ticket}, ${lead}, ${owner.account ?? 'account unknown'}`
 }
 
 /** Why on the same line as liveness: `running` is true of the shell and says
