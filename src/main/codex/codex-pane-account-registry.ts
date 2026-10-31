@@ -220,6 +220,11 @@ export function forgetCodexPaneAccount(ptyId: string): void {
   recordCodexPaneAccount(ptyId, null)
 }
 
+/** Whether a recorded pane launched on this managed account; stale rows drop at reconciliation. */
+export function hasCodexPaneOnAccount(accountId: string): boolean {
+  return Object.values(readRegistry().panes).some((pane) => pane.accountId === accountId)
+}
+
 /**
  * Returns the account a PTY launched under, or null when it was never recorded.
  */
