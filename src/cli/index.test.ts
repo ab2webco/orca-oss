@@ -285,6 +285,49 @@ describe('artifact runtime routing', () => {
   })
 })
 
+describe('account runtime routing (ORCA-916)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    process.exitCode = 0
+  })
+
+  it('sends account switch to the host named by --environment', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    callMock.mockRejectedValue(new Error('stop after routing'))
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      ['account', 'switch', '--to', 'a@b.c', '--terminal', 't-1', '--environment', 'imac'],
+      '/tmp/repo'
+    )
+
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(null, 'imac')
+  })
+
+  it('keeps a self-switch local when only the environment variables name a host', async () => {
+    vi.stubEnv('ORCA_ENVIRONMENT', 'imac')
+    vi.stubEnv('ORCA_PAIRING_CODE', '')
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    callMock.mockRejectedValue(new Error('stop after routing'))
+    runtimeClientConstructorMock.mockClear()
+
+    await main(['account', 'switch', '--to', 'a@b.c'], '/tmp/repo')
+
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(null, null)
+  })
+
+  it('still refuses --environment on account list', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    callMock.mockClear()
+
+    await main(['account', 'list', '--environment', 'imac'], '/tmp/repo')
+
+    expect(process.exitCode).toBe(1)
+    expect(callMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('unknown command surfaces a suggestion', () => {
   let errorSpy: ReturnType<typeof vi.spyOn>
 

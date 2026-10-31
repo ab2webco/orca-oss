@@ -5,7 +5,7 @@ import {
   type OrchestratorGameSceneExtension
 } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_SOURCE } from '../../shared/orchestrator-game-scene-file'
-import type { OrchestratorGameStateInput } from './orchestrator-game-state-builder'
+import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
 import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 
 // `notes` are parts of a scene that still draws, left out; `warning` means it fell back to Quest.

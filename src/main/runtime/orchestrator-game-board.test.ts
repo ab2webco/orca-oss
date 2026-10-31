@@ -71,6 +71,32 @@ describe('GameBoard events', () => {
   })
 })
 
+// ORCA-887: a member freed right after its merge earns its lead through the recorded merge.
+describe('GameBoard merges', () => {
+  const merge = { provider: 'github' as const, number: 4, worktreeId: 'wt-1', perfect: true }
+
+  it('lists the merged events the host recorded with their review, oldest first, a member none', async () => {
+    const game = board((caller) => (caller.terminalHandle === 'term_member' ? MEMBER : LEAD))
+    const lead = { terminalHandle: 'term_lead', kind: 'merged' as const, ticket: 'CIN-1' }
+
+    await game.postEvent({ ...lead, key: 'merged CIN-1 #4', merge })
+    await game.postEvent({ ...lead, ticket: 'CIN-2', key: 'merged CIN-2 #5' })
+    await game.postEvent({ ...lead, kind: 'failed', key: 'failed CIN-1', merge })
+    await game.postEvent({
+      ...lead,
+      ticket: 'CIN-3',
+      key: 'merged CIN-3 #6',
+      merge: { ...merge, number: 6, perfect: false }
+    })
+
+    expect(await game.merges({ terminalHandle: 'term_lead' })).toEqual([
+      { ...merge, key: 'merged CIN-1 #4', ticket: 'CIN-1' },
+      { ...merge, number: 6, perfect: false, key: 'merged CIN-3 #6', ticket: 'CIN-3' }
+    ])
+    expect(await game.merges({ terminalHandle: 'term_member' })).toEqual([])
+  })
+})
+
 describe('GameBoard STOP', () => {
   const lead = { terminalHandle: 'term_lead' }
   const asMember = { terminalHandle: 'term_member' }
