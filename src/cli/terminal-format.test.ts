@@ -99,6 +99,49 @@ describe('formatTerminalList liveness', () => {
     expect(output).not.toContain('disconnected')
   })
 
+  it('names the member that owns a sleeping row, so a lead knows whose terminal slept', () => {
+    const asleep = {
+      handle: 'term_asleep',
+      ptyId: null,
+      worktreeId: 'wt-1',
+      worktreePath: '/repo',
+      branch: 'main',
+      tabId: 'tab-worker',
+      leafId: 'leaf-worker',
+      title: 'Worker',
+      connected: false,
+      writable: false,
+      liveness: 'sleeping' as const,
+      lastOutputAt: null,
+      preview: '',
+      sleepingAgent: {
+        agent: 'claude',
+        paneKey: 'tab-worker:leaf-worker',
+        stateAtSleep: 'working',
+        capturedAt: 1,
+        owner: { lead: 'term_lead', ticket: 'ORCA-915', account: 'member@example.com' }
+      }
+    }
+    const output = formatTerminalList({ terminals: [asleep], totalCount: 1, truncated: false })
+    expect(output).toContain(
+      'sleeping (claude, wake to resume)  owner: ORCA-915, lead term_lead, member@example.com'
+    )
+    const orphaned = formatTerminalList({
+      terminals: [
+        {
+          ...asleep,
+          sleepingAgent: {
+            ...asleep.sleepingAgent,
+            owner: { lead: null, ticket: 'ORCA-915', account: null }
+          }
+        }
+      ],
+      totalCount: 1,
+      truncated: false
+    })
+    expect(orphaned).toContain('owner: ORCA-915, no lead, account unknown')
+  })
+
   it('does not claim there are no live terminals when the list is empty', () => {
     expect(formatTerminalList({ terminals: [], totalCount: 0, truncated: false })).toBe(
       'No terminals.'

@@ -504,6 +504,15 @@ export type RuntimeTerminalSleepingAgent = {
   capturedAt: number
   /** Whether the sleeping session was interrupted mid-turn rather than idle. */
   interrupted?: boolean
+  /** The game member it belongs to; absent for a pane no member owns, and from older hosts. */
+  owner?: RuntimeTerminalSleepingOwner
+}
+
+export type RuntimeTerminalSleepingOwner = {
+  /** The lead's terminal handle, from the member's run; null once no pane leads that run. */
+  lead: string | null
+  ticket: string
+  account: string | null
 }
 
 export type RuntimeTerminalVisualTerminalNode = {
