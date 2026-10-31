@@ -3,6 +3,7 @@ import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import { RateLimitService, type InactiveCodexAccountInfo } from './service'
 import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
 import { fetchCodexRateLimits } from './codex-fetcher'
+import type * as CodexPaneAccountRegistry from '../codex/codex-pane-account-registry'
 import {
   markDirectedCodexPtySpawned,
   releaseDirectedCodexPtyBinding
@@ -24,6 +25,10 @@ vi.mock('./codex-fetcher', () => ({
   fetchCodexRateLimits: vi.fn()
 }))
 
+vi.mock('../codex/codex-pane-account-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof CodexPaneAccountRegistry>()),
+  hasCodexPaneOnAccount: vi.fn((accountId: string) => accountId === 'pinned')
+}))
 vi.mock('./gemini-usage-fetcher', () => ({
   fetchGeminiRateLimits: vi.fn()
 }))
@@ -131,6 +136,22 @@ describe('RateLimitService', () => {
     } finally {
       releaseDirectedCodexPtyBinding('pty-busy')
     }
+
+    expect(fetchCodexRateLimits).toHaveBeenCalledTimes(1)
+    expect(fetchCodexRateLimits).toHaveBeenCalledWith(
+      expect.objectContaining({ codexHomePath: '/tmp/free/home' })
+    )
+  })
+
+  it('does not start a Codex probe in the home a worktree-pinned member runs on (ORCA-916)', async () => {
+    const service = new RateLimitService()
+    service.setInactiveCodexAccountsResolver(() => [
+      { id: 'pinned', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/pinned/home' }) },
+      { id: 'free', resolveHome: () => ({ kind: 'ready', managedHomePath: '/tmp/free/home' }) }
+    ])
+    vi.mocked(fetchCodexRateLimits).mockResolvedValue(okProvider('codex', 33, Date.now()))
+
+    await service.fetchInactiveCodexAccountsOnOpen()
 
     expect(fetchCodexRateLimits).toHaveBeenCalledTimes(1)
     expect(fetchCodexRateLimits).toHaveBeenCalledWith(
