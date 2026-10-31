@@ -5,7 +5,7 @@ import { advisorCard, advisorCardViewOf } from './advisor-card'
 import { advisorPinsOf, ownAdvisorOf } from './advisor-report'
 import { advisorNow } from './advisor-state'
 import { ADVISOR_TILE_KEY } from './advisor-tile'
-import { countChipsOf } from './band-chips'
+import { countChipsOf, FLEET_CHIP_COLORS } from './band-chips'
 import { flatLine } from './flat-block'
 import { flatPaneMembers } from './flat-rows'
 import { isFlatMode } from './flat-toggle'
@@ -38,14 +38,10 @@ import { fleetAdvisorSummaryOf, memberModelLinesOf, memberModelOf } from './memb
 import { tapButtonsOf, type TapButton } from './tap-buttons'
 import { viewPickerOf } from './view-picker'
 import { isTapLayout } from './tap-layout'
+import { hostCapacityTextsOf } from './fleet-host-rows'
 
 export const PANE_ID = 'orca-game-fleet'
 const HUD_KEY = 'pane-hud'
-const FLEET_CHIP_COLORS: Readonly<Record<string, string>> = {
-  'fleet-working': 'cyan',
-  'fleet-idle': 'gray',
-  'fleet-done': 'green'
-}
 
 export async function openPane($: EngineInterface): Promise<void> {
   const title = gameStrings().text.fleet
@@ -396,6 +392,7 @@ export const registerFleetPane = (on: On): void => {
           {v.isLoading && <Text dimColor>{text.refreshing}</Text>}
           {fleetModels !== null && <Text color={palette.gold}>{fleetModels}</Text>}
         </Box>
+        {isLead && hostCapacityTextsOf($, e, state.hostCapacity ?? [], isTap)}
         {needs.map((need) => (
           <Text key={`need-${need.name}`} color="red" wrap="truncate-end">
             {` ! ${need.name}  ${need.text}`}
