@@ -16,20 +16,26 @@ export type StartupBudgetVerdict = {
   readonly description: string
 }
 
-function mean(values: readonly number[]): number {
-  return values.reduce((total, value) => total + value, 0) / values.length
+// Why trimmed: one launch stalled by the runner (run 40432819784, +1.8s) moves a
+// 16-sample mean by 113ms, while a real plugin cost shifts every launch.
+const TRIM_FRACTION = 1 / 8
+
+function trimmedMean(values: readonly number[]): number {
+  const trim = Math.floor(values.length * TRIM_FRACTION)
+  const kept = [...values].sort((a, b) => a - b).slice(trim, values.length - trim)
+  return kept.reduce((total, value) => total + value, 0) / kept.length
 }
 
-// Why the mean and not the median: with the sample counts this launch loop can
-// afford, the median of each side carries more spread than the effect it is
-// asked to resolve, so it both misses real regressions and invents fake ones.
+// Why not the median: with the sample counts this launch loop can afford, the
+// median of each side carries more spread than the effect it is asked to
+// resolve, so it both misses real regressions and invents fake ones.
 export function evaluateStartupBudget(input: StartupBudgetInput): StartupBudgetVerdict {
   const { baselineMs, populatedMs, budgetMs } = input
   if (baselineMs.length === 0 || populatedMs.length === 0) {
     throw new Error('startup budget needs at least one sample on each side')
   }
-  const baselineMeanMs = mean(baselineMs)
-  const populatedMeanMs = mean(populatedMs)
+  const baselineMeanMs = trimmedMean(baselineMs)
+  const populatedMeanMs = trimmedMean(populatedMs)
   const deltaMs = populatedMeanMs - baselineMeanMs
   return {
     withinBudget: deltaMs <= budgetMs,
@@ -37,7 +43,7 @@ export function evaluateStartupBudget(input: StartupBudgetInput): StartupBudgetV
     populatedMeanMs,
     deltaMs,
     description:
-      `${populatedMs.length} plugin launches averaged ${populatedMeanMs.toFixed(0)}ms vs ` +
+      `${populatedMs.length} plugin launches at a trimmed mean of ${populatedMeanMs.toFixed(0)}ms vs ` +
       `${baselineMs.length} baseline at ${baselineMeanMs.toFixed(0)}ms ` +
       `(delta ${deltaMs.toFixed(0)}ms, budget ${budgetMs}ms)`
   }
