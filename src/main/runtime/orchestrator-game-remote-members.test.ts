@@ -291,6 +291,22 @@ describe('remote members of a lead (ORCA-824)', () => {
     expect(member.remote).toEqual({ host: 'imac', stateKnown: true, gone: true })
   })
 
+  // Why: a host restart slept the member's pane; it waits to be woken, it is not gone (ORCA-915).
+  it('marks a member whose host slept its pane as asleep, with its worktree, not gone', async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({
+        branch: 'fabolivark/orca-915',
+        title: 'Nova · ORCA-915',
+        liveness: 'sleeping',
+        asleep: true
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, asleep: true })
+    expect(member.worktree?.branch).toBe('fabolivark/orca-915')
+  })
+
   // Why: a follow-up `worker-start --on --worktree` titled from its prompt listed the ticket twice (ORCA-854).
   it('lists two dispatches in one host worktree as one member, titled by the first', async () => {
     const reads: string[] = []

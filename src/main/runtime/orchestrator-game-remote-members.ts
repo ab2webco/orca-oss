@@ -34,6 +34,8 @@ export type RemoteGameMemberShow = {
   liveness: RuntimeTerminalLiveness
   /** The host's hook reading of the agent; absent from an older host (ORCA-837). */
   agent?: RemoteMemberAgent | null
+  /** A host restart slept its pane, which `game.memberWake` wakes (ORCA-915). */
+  asleep?: true
 }
 
 type RemoteMemberReads = {
@@ -198,6 +200,20 @@ function oneSourcePerWorktree(
   })
 }
 
+/** What a host's federationShow says of a member a restart slept (ORCA-915); null for anything else. */
+export function remoteAsleepShowOf(value: unknown): RemoteGameMemberShow | null {
+  const asleep = value as { terminal?: unknown; branch?: unknown; title?: unknown } | null
+  if (typeof asleep?.terminal !== 'string' || typeof asleep.branch !== 'string') {
+    return null
+  }
+  return {
+    branch: asleep.branch,
+    title: typeof asleep.title === 'string' ? asleep.title : null,
+    liveness: 'sleeping',
+    asleep: true
+  }
+}
+
 /** Fleet rows for remote members; a host that does not answer still lists its member, state unknown. */
 export async function remoteGameMembersOf(
   sources: readonly RemoteGameMemberSource[],
@@ -241,7 +257,8 @@ export async function remoteGameMembersOf(
           stateKnown: answer.answered,
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
-          ...(gone ? { gone: true as const } : {})
+          ...(gone ? { gone: true as const } : {}),
+          ...(show?.asleep ? { asleep: true as const } : {})
         },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch
