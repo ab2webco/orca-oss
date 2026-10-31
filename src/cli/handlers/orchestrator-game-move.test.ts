@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_MOVE_HANDLERS } from './orchestrator-game-move'
 import type { RuntimeClient } from '../runtime-client'
+import { openHostRuntimeClient } from './orchestrator-game-host-client'
+
+vi.mock('./orchestrator-game-host-client', () => ({ openHostRuntimeClient: vi.fn() }))
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0)
 const HOUR = 3_600_000
@@ -248,18 +251,47 @@ describe('orca game move', () => {
     )
   })
 
-  it('tells a remote member to move with --on instead of switching a terminal here (ORCA-798)', async () => {
+  it("switches a remote Claude member in place on its host, to that host's freest account (ORCA-916)", async () => {
     const remote = {
       ...CLAUDE_MEMBER,
+      paneKey: 'remote:ctx_a',
+      terminalHandle: 'term_on_imac',
+      account: {
+        provider: 'claude',
+        id: 'remote:env_imac:ana@example.com',
+        email: 'ana@example.com'
+      },
+      limit: { resetsAt: null, loggedOut: true },
+      remote: { host: 'imac', stateKnown: true }
+    }
+    const home = fakeClient(stateWith(remote), snapshotWith(limits(10)))
+    const host = fakeClient(stateWith(remote), snapshotWith(limits(10)))
+    ;(host.client as { isRemote?: boolean }).isRemote = true
+    vi.mocked(openHostRuntimeClient).mockResolvedValue(host.client)
+
+    await move(home.client)
+
+    expect(openHostRuntimeClient).toHaveBeenCalledWith('imac')
+    expect(home.methods()).toEqual(['game.state'])
+    expect(host.paramsOf('accounts.switchClaudeTerminal')).toEqual({
+      terminal: 'term_on_imac',
+      targetAccountId: 'acct_cy',
+      awaitMs: 0
+    })
+  })
+
+  it('tells a remote Codex member to move with --on, which starts it anew there (ORCA-798)', async () => {
+    const remote = {
+      ...CODEX_MEMBER,
       paneKey: 'remote:ctx_a',
       remote: { host: 'imac', stateKnown: true }
     }
     const { client, methods } = fakeClient(stateWith(remote), snapshotWith(limits(10)))
 
-    await expect(move(client, [['account', 'cy@example.com']])).rejects.toThrow(
+    await expect(move(client, [['account', 'di@example.com']])).rejects.toThrow(
       /CIN-5 runs on imac; move it with --on <host> --repo/
     )
-    expect(methods()).not.toContain('accounts.switchClaudeTerminal')
+    expect(methods()).not.toContain('orchestration.workerStop')
   })
 
   it('plans a move to another host with --on and --repo without touching anything (ORCA-798)', async () => {

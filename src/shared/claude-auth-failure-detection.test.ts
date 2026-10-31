@@ -14,6 +14,19 @@ describe('detectClaudeAuthFailureOutput', () => {
     expect(detectClaudeAuthFailureOutput(chunk, state, NOW)).toBe(true)
   })
 
+  it('detects the logged-out banner a dropped session prints (ORCA-916)', () => {
+    const state = createClaudeAuthFailureDetectionState()
+    const chunk = '\u001b[31m⎿  Not logged in\u001b[0m · Please run \u001b[1m/login\u001b[0m\r\n'
+    expect(detectClaudeAuthFailureOutput(chunk, state, NOW)).toBe(true)
+  })
+
+  it('ignores a quoted logged-out phrase', () => {
+    const state = createClaudeAuthFailureDetectionState()
+    expect(detectClaudeAuthFailureOutput("'Not logged in · Please run /login'\n", state, NOW)).toBe(
+      false
+    )
+  })
+
   it('detects a phrase split across two PTY chunks', () => {
     const state = createClaudeAuthFailureDetectionState()
     expect(detectClaudeAuthFailureOutput('Login expired · please run ', state, NOW)).toBe(false)
