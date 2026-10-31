@@ -1,5 +1,3 @@
-import type { GameMetrics } from '../hooks/metrics-widget'
-
 export type GameMode = 'on' | 'zen' | 'flat' | 'off'
 
 /** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
@@ -373,6 +371,18 @@ export type GameState = {
   githubLow?: { remaining: number; limit: number }
   /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */
   metrics?: GameMetrics
+}
+
+/** Percent of the 5-hour (session) and 7-day (weekly) window used; null when not reported. */
+export type GameUsePercents = Record<'sessionPercent' | 'weeklyPercent', number | null>
+
+export type GameClaudeAccountUse = GameUsePercents & { email: string; active: boolean }
+
+export type GameMetrics = {
+  /** Oldest first; `day` is `YYYY-MM-DD` in the host's zone. */
+  mergedPerDay: { day: string; merged: number }[]
+  leadTime: { medianMs: number | null; measured: number }
+  claudeAccounts: GameClaudeAccountUse[]
 }
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }

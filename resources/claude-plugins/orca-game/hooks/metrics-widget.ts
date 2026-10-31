@@ -1,3 +1,4 @@
+import type { GameClaudeAccountUse, GameMetrics } from '../types'
 import { isShape, str } from './game-state-shapes'
 import { metricsWords } from './metrics-words'
 
@@ -9,23 +10,6 @@ const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉']
 const METER_CELLS = [2, 6] as const
 const EMAIL_MIN = 12
 const HOUR_MS = 3_600_000
-
-export type GameClaudeAccountUse = {
-  email: string
-  active: boolean
-  /** Percent of the 5-hour window used; null when not reported. */
-  sessionPercent: number | null
-  /** Percent of the 7-day window used; null when not reported. */
-  weeklyPercent: number | null
-}
-
-/** The lead's delivery numbers, read by the host at most once a minute. */
-export type GameMetrics = {
-  /** Oldest first; `day` is `YYYY-MM-DD` in the host's zone. */
-  mergedPerDay: { day: string; merged: number }[]
-  leadTime: { medianMs: number | null; measured: number }
-  claudeAccounts: GameClaudeAccountUse[]
-}
 
 export type MetricsTone = 'gold' | 'dim' | 'plain' | 'warning' | 'danger'
 export type MetricsLine = { key: string; parts: { text: string; tone: MetricsTone }[] }
