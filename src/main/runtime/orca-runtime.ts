@@ -17125,7 +17125,7 @@ export class OrcaRuntimeService {
             ?.getFolderWorkspaces?.()
             .find((workspace) => workspace.id === parsedTargetWorkspace.folderWorkspaceId)
         : null
-    const targetRepo = targetWorktree ? this.store?.getRepo(targetWorktree.repoId) : null
+    const targetRepo = targetWorktree ? this.store?.getRepo?.(targetWorktree.repoId) : null
     const connectionId = folderWorkspace
       ? this.resolveFolderWorkspaceConnectionId(folderWorkspace)
       : targetRepo
