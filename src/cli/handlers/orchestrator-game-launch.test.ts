@@ -500,23 +500,24 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })
 
-  it('refuses per host: a full host names the one with room (ORCA-888)', async () => {
-    const onImac = (paneKey: string) => ({
-      paneKey,
-      state: 'working',
-      isMember: true,
-      remote: { host: 'imac', stateKnown: true }
+  // Two members fill a paired imac whose cap is 2 (ORCA-888).
+  const imacFull = (localCap: number) =>
+    stateWith({
+      agents: ['a', 'b'].map((paneKey) => ({
+        paneKey,
+        state: 'working',
+        isMember: true,
+        remote: { host: 'imac', stateKnown: true }
+      })),
+      lead: { autostart: false, cap: localCap + 2, agent: 'claude' },
+      hosts: [
+        { host: 'local', cap: localCap, status: 'ok' },
+        { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
+      ]
     })
-    const { client, calls } = fakeClient(
-      stateWith({
-        agents: [onImac('a'), onImac('b')],
-        lead: { autostart: false, cap: 6, agent: 'claude' },
-        hosts: [
-          { host: 'local', cap: 4, status: 'ok' },
-          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
-        ]
-      })
-    )
+
+  it('refuses per host: a full host names the one with room (ORCA-888)', async () => {
+    const { client, calls } = fakeClient(imacFull(4))
 
     await expect(
       launch(client, 'cin-12', [
@@ -528,22 +529,7 @@ describe('orca game launch', () => {
   })
 
   it('launches here while a paired host is full, past the old single cap', async () => {
-    const onImac = (paneKey: string) => ({
-      paneKey,
-      state: 'working',
-      isMember: true,
-      remote: { host: 'imac', stateKnown: true }
-    })
-    const { client, calls } = fakeClient(
-      stateWith({
-        agents: [onImac('a'), onImac('b')],
-        lead: { autostart: false, cap: 3, agent: 'claude' },
-        hosts: [
-          { host: 'local', cap: 1, status: 'ok' },
-          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
-        ]
-      })
-    )
+    const { client, calls } = fakeClient(imacFull(1))
 
     await launch(client)
 
