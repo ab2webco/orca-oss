@@ -13,6 +13,7 @@ import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
+import type { GameMetricsSummary } from './orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
@@ -205,6 +206,8 @@ export type OrchestratorGameState = {
   pausedMembersError?: string
   /** github.com's budget and Orca's share of it; absent when it cannot be read or from an older host. */
   githubBudget?: GameGitHubBudget
+  /** The project's delivery numbers, refreshed at most once a minute; only for the lead, absent from an older host. */
+  metrics?: GameMetricsSummary
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
 }
