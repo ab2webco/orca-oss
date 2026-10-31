@@ -49,7 +49,7 @@ const PANE_MEMBER_LINES = 40
 
 export type FlatPaneInput = Pick<FlatBandInput, 'state' | 'palette' | 'columns'> & {
   isTap: boolean
-  viewLabel: string
+  viewLabelOf: (agent: GameAgent) => string
   pressOf: (agent: GameAgent, handle: string) => () => void
   hotkeyOf: (index: number) => string | undefined
 }
@@ -58,10 +58,12 @@ export type FlatPaneInput = Pick<FlatBandInput, 'state' | 'palette' | 'columns'>
 export function flatPaneMembers(
   $: EngineInterface,
   e: RenderInput,
-  { state, palette, columns, isTap, viewLabel, pressOf, hotkeyOf }: FlatPaneInput
+  { state, palette, columns, isTap, viewLabelOf, pressOf, hotkeyOf }: FlatPaneInput
 ): RenderElement[] {
   const { Button, Text } = $.ui.resolve(e)
-  const viewCells = cellWidthOf(` ${viewLabel} `) + 1
+  // Why the widest: every line leaves the same room, so View, Resume and Reconnect line up.
+  const viewCells =
+    Math.max(...teamOrderOf(state).map((agent) => cellWidthOf(` ${viewLabelOf(agent)} `)), 0) + 1
   const lines = flatMemberLinesOf({
     state,
     scene: currentScene(),
@@ -83,7 +85,7 @@ export function flatPaneMembers(
           onPress={pressOf(one.agent, one.handle)}
         >
           <Text backgroundColor={palette.panel} color={palette.parchment} bold>
-            {` ${viewLabel} `}
+            {` ${viewLabelOf(one.agent)} `}
           </Text>
         </Button>
       )

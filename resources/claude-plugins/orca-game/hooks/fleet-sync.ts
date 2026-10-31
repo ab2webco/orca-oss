@@ -13,6 +13,7 @@ import {
   gameViewArgvOf,
   openLinkArgvOf,
   tabCreateArgvOf,
+  resumeMembersArgvOf,
   terminalFocusArgvOf
 } from './game-config'
 import { gameStateOf, parseGameState } from './game-state'
@@ -55,7 +56,8 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
 async function runCli(
   $: EngineInterface,
   argv: readonly string[] | undefined,
-  extraEnv: Record<string, string> = {}
+  extraEnv: Record<string, string> = {},
+  timeoutMs = CLI_TIMEOUT_MS
 ) {
   if (argv === undefined) {
     return undefined
@@ -66,8 +68,7 @@ async function runCli(
     return undefined
   }
   const env = { ...invocation.env, ...extraEnv }
-  const init =
-    Object.keys(env).length > 0 ? { timeoutMs: CLI_TIMEOUT_MS, env } : { timeoutMs: CLI_TIMEOUT_MS }
+  const init = Object.keys(env).length > 0 ? { timeoutMs, env } : { timeoutMs }
   return await $.process.run(invocation.argv, init).catch(() => undefined)
 }
 
@@ -125,6 +126,19 @@ export async function focusTerminal($: EngineInterface, handle: string): Promise
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
   const out = await runCli($, terminalFocusArgvOf(cli, handle))
   return out?.exitCode === 0
+}
+
+// Why longer: a member's host waits up to 30 s for its agent to start, past the usual 15 s.
+const RESUME_TIMEOUT_MS = 90_000
+
+/** Runs `game resume-members` for one ticket; undefined when the CLI could not run (ORCA-915). */
+export async function resumeMemberTicket(
+  $: EngineInterface,
+  ticket: string
+): Promise<{ ok: boolean; stdout: string } | undefined> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, resumeMembersArgvOf(cli, ticket), {}, RESUME_TIMEOUT_MS)
+  return out && { ok: out.exitCode === 0, stdout: out.stdout }
 }
 
 /** Opens a link where the project asks: the system browser, else (or when that fails) an Orca tab. */
