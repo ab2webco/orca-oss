@@ -1,7 +1,7 @@
 import type { GameAgent, GameMemberAccount, GameMemberLimit, GameMemberRemote } from '../types'
 import { cellWidthOf } from './cell-width'
 import { gameLocale, gameStrings, type GameLocale } from './game-strings'
-import { remoteGoneTagOf } from './remote-member-view'
+import { remoteAsleepTagsOf, remoteGoneTagOf } from './remote-member-view'
 
 // What a member card says about the account its agent runs on.
 
@@ -64,7 +64,8 @@ export const memberRemoteOf = (value: unknown): GameMemberRemote | undefined =>
     ? {
         host: value.host,
         stateKnown: value.stateKnown !== false,
-        ...(value.gone === true ? { gone: true as const } : {})
+        ...(value.gone === true ? { gone: true as const } : {}),
+        ...(value.asleep === true ? { asleep: true as const } : {})
       }
     : undefined
 
@@ -83,12 +84,14 @@ export const agentTagOf = (
   const answering = remote ? remote.stateKnown || remote.gone === true : false
   // Why `host ?`: a narrow card would ellipsize `imac not answering` into `imac no…`.
   const hosts = remote
-    ? remote.gone && agent.state !== 'done'
-      ? [remoteGoneTagOf(remote.host), `${remote.host} ✕`]
-      : [
-          gameStrings().text.remoteHost(remote.host, answering),
-          answering ? remote.host : `${remote.host} ?`
-        ]
+    ? remote.asleep
+      ? remoteAsleepTagsOf(remote.host)
+      : remote.gone && agent.state !== 'done'
+        ? [remoteGoneTagOf(remote.host), `${remote.host} ✕`]
+        : [
+            gameStrings().text.remoteHost(remote.host, answering),
+            answering ? remote.host : `${remote.host} ?`
+          ]
     : ['']
   const bases = [
     ...hosts.map((host) => [agent.agentType, host].filter(Boolean).join(' · ')),
