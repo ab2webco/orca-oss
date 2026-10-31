@@ -158,6 +158,46 @@ describe('orca game state', () => {
     expect(text).toContain('Inbox: 2 unread; CIN-1 1')
   })
 
+  it('lists each host with its members, cores, free memory and load in text (ORCA-841)', async () => {
+    const client = {
+      call: async () => ({
+        ok: true,
+        result: {
+          config: { mode: 'on', scene: 'quest' },
+          sources: { mode: 'default' },
+          agents: [],
+          warnings: [],
+          hostCapacity: [
+            {
+              host: 'imac',
+              running: 2,
+              cap: 6,
+              status: 'ok',
+              cpuCoreCount: 4,
+              totalMemory: 52 * 1024 ** 3,
+              availableMemory: 4.9 * 1024 ** 3,
+              loadAverage1m: 3.8
+            },
+            { host: 'm1', running: 0, status: 'unreachable' }
+          ]
+        }
+      })
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game state']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: false
+    })
+
+    const text = output.join('\n')
+    expect(text).toContain(
+      'imac  2/6 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory'
+    )
+    expect(text).toContain('m1    0 running · not answering')
+  })
+
   it('prints the lead brief built from the project lead settings', async () => {
     const client = {
       call: async () => ({
