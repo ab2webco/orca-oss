@@ -220,6 +220,20 @@ describe('command aliases dispatch to the canonical handler', () => {
     }
   })
 
+  // Why: a paired host's handle means nothing to this runtime's focus; it asks this window to open it there (ORCA-839).
+  it("opens a paired host's terminal in this window with `terminal focus --on`", async () => {
+    queueFixtures(callMock, okFixture('req', { focus: { ok: true } }))
+    await main(
+      ['terminal', 'focus', '--terminal', 'term_member', '--on', 'imac', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenCalledWith('terminal.revealPaired', {
+      terminal: 'term_member',
+      on: 'imac'
+    })
+    expect(callMock).not.toHaveBeenCalledWith('terminal.focus', expect.anything())
+  })
+
   it('serves `agent-context --json` without contacting the runtime', async () => {
     runtimeClientConstructorMock.mockClear()
     await main(['agent-context', '--json'], '/tmp/repo')

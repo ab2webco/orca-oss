@@ -60,6 +60,8 @@ export type GameAgent = {
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
@@ -369,12 +371,23 @@ export type GameState = {
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
   /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
   githubLow?: { remaining: number; limit: number }
+  /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
 }
+
+/** A host's members against its cap while it publishes one, and its machine while it answers. */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
+  | { status: 'unreachable' }
+  | ({ status: 'ok'; loadAverage1m: number | null } & Record<GameHostFigure, number>)
+)
+
+export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
 
 export type GameRole = 'lead' | 'member'
 
+/** `stateAt`: when `state` was read; `isStale`: the last read failed and kept the old one. */
 export type FleetState = {
   isLoading: boolean
   refreshedAt: number
@@ -383,11 +396,7 @@ export type FleetState = {
   xp: number
   /** The latest rewards, newest first; absent in an atom an older mod stored. */
   recent?: readonly RecentReward[]
-  /** When `state` was read; absent in an atom an older mod stored. */
-  stateAt?: number
-  /** The last read failed and `state` is the one before it. */
-  isStale?: boolean
-}
+} & Partial<{ stateAt: number; isStale: boolean }>
 
 export type RewardKind =
   | 'review-merged'

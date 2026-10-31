@@ -98,14 +98,28 @@ const TERMINAL_HANDLE = /^term_[A-Za-z0-9_-]{1,128}$/
 export const isTerminalHandle = (value: unknown): value is string =>
   typeof value === 'string' && TERMINAL_HANDLE.test(value)
 
+// Orca issues paired environment ids as UUIDs; the shape keeps one from reading as a CLI flag.
+const ENVIRONMENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+
+export const isEnvironmentId = (value: unknown): value is string =>
+  typeof value === 'string' && ENVIRONMENT_ID.test(value)
+
+/** Focuses a pane; `on` opens a paired host's terminal in this window instead. */
 export const terminalFocusArgvOf = (
   cli: string | null | undefined,
-  handle: string
+  handle: string,
+  on?: string
 ): readonly string[] | undefined => {
   const path = cliOf(cli)
-  return path === undefined || !isTerminalHandle(handle)
-    ? undefined
-    : [path, 'terminal', 'focus', '--terminal', handle, '--json']
+  if (path === undefined || !isTerminalHandle(handle)) {
+    return undefined
+  }
+  if (on === undefined) {
+    return [path, 'terminal', 'focus', '--terminal', handle, '--json']
+  }
+  return isEnvironmentId(on)
+    ? [path, 'terminal', 'focus', '--terminal', handle, '--on', on, '--json']
+    : undefined
 }
 
 /** Asks Orca to open a link in the desktop's system browser, where the person is signed in. */

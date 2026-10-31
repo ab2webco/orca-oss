@@ -125,10 +125,14 @@ export async function readFleetText($: EngineInterface): Promise<string | undefi
   return out?.exitCode === 0 && out.stdout.trim() !== '' ? out.stdout.trim() : undefined
 }
 
-/** Brings a teammate's Orca pane forward; false when Orca could not. */
-export async function focusTerminal($: EngineInterface, handle: string): Promise<boolean> {
+/** Brings a teammate's Orca pane forward, or with `on` a paired host's; false when Orca could not. */
+export async function focusTerminal(
+  $: EngineInterface,
+  handle: string,
+  on?: string
+): Promise<boolean> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
-  const out = await runCli($, terminalFocusArgvOf(cli, handle))
+  const out = await runCli($, terminalFocusArgvOf(cli, handle, on))
   return out?.exitCode === 0
 }
 
