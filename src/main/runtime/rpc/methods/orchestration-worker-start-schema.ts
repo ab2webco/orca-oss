@@ -26,6 +26,10 @@ export const WorkerStartParams = z.object({
   codexAccountId: OptionalString,
   // Why a selector, not an id: with --on the host resolves `auto` or an email against its own roster (ORCA-798).
   remoteAccount: OptionalString,
+  // Why optional: an older CLI never sends the unset policy's auto, so its absence means typed (ORCA-891).
+  remoteAccountByDefault: z.boolean().optional(),
+  // Why: orchestrator.accounts as a list, which the host's `auto` must pick from (ORCA-891).
+  remoteAllowedAccounts: z.array(z.string().min(1).max(320)).min(1).max(100).optional(),
   model: OptionalWorkerLaunchPreference,
   effort: OptionalWorkerLaunchPreference,
   retryOf: OptionalString,
