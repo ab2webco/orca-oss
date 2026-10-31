@@ -53,8 +53,19 @@ const remote = {
 const running = (handle: string, worktreeId: string) => ({
   handle,
   worktreeId,
+  tabId: `tab-${handle}`,
+  leafId: `leaf-${handle}`,
   liveness: 'running',
   connected: true
+})
+
+const ps = (worktreeId: string, agents: readonly (readonly [string, string])[]) => ({
+  worktrees: [
+    {
+      worktreeId,
+      agents: agents.map(([handle, state]) => ({ paneKey: `tab-${handle}:leaf-${handle}`, state }))
+    }
+  ]
 })
 
 function clientWith(agents: unknown[], results: Record<string, unknown> = {}) {
@@ -84,10 +95,12 @@ const rebind = (client: RuntimeClient, ticket = 'cin-1297') =>
     json: true
   })
 
-const mutations = (calls: [string, unknown][]) =>
-  calls.filter(
-    ([method]) => method === 'orchestration.workerStop' || method === 'orchestration.workerStart'
-  )
+const MUTATIONS = new Set([
+  'orchestration.workerStop',
+  'orchestration.workerAbandon',
+  'orchestration.workerStart'
+])
+const mutations = (calls: [string, unknown][]) => calls.filter(([method]) => MUTATIONS.has(method))
 
 // A member whose terminal something replaced takes a fresh dispatch on the one it runs in now (CIN-1297).
 describe('orca game rebind (ORCA-914)', () => {
@@ -108,8 +121,11 @@ describe('orca game rebind (ORCA-914)', () => {
     vi.restoreAllMocks()
   })
 
-  it('stops the stale dispatch and starts its task again on the live terminal in its worktree', async () => {
+  // Why abandon: with its terminal gone no stop is proven, and a retry needs a settled dispatch.
+  it('settles the stale dispatch and starts its task again on the live terminal in its worktree', async () => {
     const { client, calls } = clientWith([local], {
+      'orchestration.workerStop': { state: 'stop_unknown' },
+      'orchestration.workerAbandon': { state: 'abandoned' },
       'orchestration.workerList': {
         workers: [
           {
@@ -122,13 +138,17 @@ describe('orca game rebind (ORCA-914)', () => {
           }
         ]
       },
-      'terminal.list': { terminals: [running('term_new', 'wt-1297')] }
+      'terminal.list': {
+        terminals: [running('term_shell', 'wt-1297'), running('term_new', 'wt-1297')]
+      },
+      'worktree.ps': ps('wt-1297', [['term_new', 'done']])
     })
 
     await rebind(client)
 
     expect(mutations(calls)).toEqual([
       ['orchestration.workerStop', { dispatch: 'ctx_old' }],
+      ['orchestration.workerAbandon', { dispatch: 'ctx_old' }],
       [
         'orchestration.workerStart',
         expect.objectContaining({
@@ -147,7 +167,8 @@ describe('orca game rebind (ORCA-914)', () => {
   it('on a paired host, finds the live terminal there and starts the task on it with --on', async () => {
     host.results = {
       'terminal.list': { terminals: [running('term_new_r', 'repo::/home/me/cin-1297')] },
-      'orchestration.workerList': { workers: [] }
+      'orchestration.workerList': { workers: [] },
+      'worktree.ps': ps('repo::/home/me/cin-1297', [['term_new_r', 'waiting']])
     }
     const { client, calls } = clientWith([remote], {
       'orchestration.workerList': {
@@ -189,7 +210,7 @@ describe('orca game rebind (ORCA-914)', () => {
     ])
   })
 
-  it('changes nothing while its own terminal still runs, or when it cannot tell which terminal', async () => {
+  it('changes nothing while its own terminal still runs, its agent is mid-turn, or it cannot tell which terminal', async () => {
     const worker = {
       dispatchId: 'ctx_old',
       taskId: 'task_1297',
@@ -198,13 +219,21 @@ describe('orca game rebind (ORCA-914)', () => {
       workerState: 'ready',
       resource: { worktreeId: 'wt-1297' }
     }
-    for (const terminals of [
-      [running('term_old', 'wt-1297'), running('term_new', 'wt-1297')],
-      [running('term_a', 'wt-1297'), running('term_b', 'wt-1297')]
-    ]) {
+    for (const [terminals, agents] of [
+      [[running('term_old', 'wt-1297'), running('term_new', 'wt-1297')], [['term_new', 'done']]],
+      [
+        [running('term_a', 'wt-1297'), running('term_b', 'wt-1297')],
+        [
+          ['term_a', 'done'],
+          ['term_b', 'done']
+        ]
+      ],
+      [[running('term_new', 'wt-1297')], [['term_new', 'working']]]
+    ] as const) {
       const { client, calls } = clientWith([local], {
         'orchestration.workerList': { workers: [worker] },
-        'terminal.list': { terminals }
+        'terminal.list': { terminals },
+        'worktree.ps': ps('wt-1297', agents)
       })
 
       await rebind(client)
