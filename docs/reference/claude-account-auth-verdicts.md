@@ -58,7 +58,8 @@ answer, and a verdict is always a statement about a past instant.
 Three rules follow.
 
 **A pane rejection demotes the account for free.** When a pane's Claude CLI
-prints the provider's `Login expired · Please run /login` banner, the renderer
+prints the provider's `Login expired · Please run /login` banner, or the
+`Not logged in · Please run /login` a CLI prints after clearing a dead token, the renderer
 resolves which managed account that PTY runs on and records a
 `credential-rejected` verdict. The Settings roster and `orca account list` turn
 negative without the user re-opening anything and without a provider call. Only
