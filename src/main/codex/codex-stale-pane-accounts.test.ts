@@ -8,6 +8,7 @@ import {
   forgetCodexPaneAccount,
   getCodexPaneAccount,
   getCodexPtyAccountOwner,
+  hasCodexPaneOnAccount,
   hasRecordedLegacySharedCodexPane,
   hasRecordedManagedHostCodexPane,
   isCodexPaneHomeRouteProvenAwayFromSharedHome,
@@ -209,6 +210,16 @@ describe('codex pane account registry', () => {
 
     reconcileCodexPaneAccountsWithLivePtys([])
     expect(hasRecordedLegacySharedCodexPane()).toBe(false)
+  })
+
+  it('says whether a recorded pane runs on a managed account (ORCA-916)', () => {
+    recordCodexPaneAccount('pty-pinned', { selectionKey: 'host', accountId: 'acct-pinned' })
+    recordCodexPaneAccount('pty-default', { selectionKey: 'host', accountId: null })
+
+    expect(hasCodexPaneOnAccount('acct-pinned')).toBe(true)
+    expect(hasCodexPaneOnAccount('acct-free')).toBe(false)
+    forgetCodexPaneAccount('pty-pinned')
+    expect(hasCodexPaneOnAccount('acct-pinned')).toBe(false)
   })
 
   it('forgets a PTY so a reused id cannot inherit a dead pane account', () => {

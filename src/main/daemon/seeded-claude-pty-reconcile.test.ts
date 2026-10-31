@@ -478,6 +478,8 @@ describe('daemon-init: reconcileSeededClaudeLivePtys', () => {
     const DEAD_PTY = 'repo::/dead@@bbbb'
     const LIVE_ACCOUNT = 'account-live'
     const DEAD_ACCOUNT = 'account-dead'
+    const FALLBACK_PTY = 'repo::/fallback@@cccc'
+    const FALLBACK_ACCOUNT = 'account-fallback'
 
     /** Two daemon generations behind one router — the shape the null contract is
      *  about. Returns the legacy adapter so a test can decide how it answers. */
@@ -545,6 +547,43 @@ describe('daemon-init: reconcileSeededClaudeLivePtys', () => {
       expect(gate.hasLiveClaudePtysUsingAccount(DEAD_ACCOUNT)).toBe(false)
       expect(gate.hasLiveClaudePtysUsingAccount(LIVE_ACCOUNT)).toBe(true)
       gate.markClaudePtyExited(LIVE_PTY)
+    })
+
+    // ORCA-916: in degraded mode fresh terminals run on the local fallback, which no daemon
+    // lists; reading only the daemons released a live member's claim and freed its token.
+    it('keeps the claim of a session the degraded fallback hosts', async () => {
+      const mod = await importFresh()
+      const gate = await import('../claude-accounts/live-pty-gate')
+      const { reconcileLiveClaudePtyGate } =
+        await import('../claude-accounts/live-claude-pty-gate-reconciliation')
+      await mod.initDaemonPtyProvider()
+      const { DegradedDaemonPtyProvider } = await import('./degraded-daemon-pty-provider')
+      const { DaemonPtyAdapter } = await import('./daemon-pty-adapter')
+      const current = adapterInstances[0]
+      current.listProcesses.mockImplementation(async () => [{ id: LIVE_PTY }])
+      const fallback = {
+        listProcesses: vi.fn(async () => [{ id: FALLBACK_PTY }]),
+        onData: vi.fn(() => () => {}),
+        onExit: vi.fn(() => () => {})
+      }
+      mod.replaceDaemonProvider(
+        new DegradedDaemonPtyProvider({
+          current: current as unknown as InstanceType<typeof DaemonPtyAdapter>,
+          legacy: [],
+          fallback: fallback as unknown as ConstructorParameters<
+            typeof DegradedDaemonPtyProvider
+          >[0]['fallback']
+        })
+      )
+      gate.markInjectedClaudePtySpawned(LIVE_PTY, LIVE_ACCOUNT)
+      gate.markInjectedClaudePtySpawned(FALLBACK_PTY, FALLBACK_ACCOUNT)
+
+      const released = await reconcileLiveClaudePtyGate()
+
+      expect(released).toEqual([])
+      expect(gate.hasLiveClaudePtysUsingAccount(FALLBACK_ACCOUNT)).toBe(true)
+      gate.markClaudePtyExited(LIVE_PTY)
+      gate.markClaudePtyExited(FALLBACK_PTY)
     })
   })
 
