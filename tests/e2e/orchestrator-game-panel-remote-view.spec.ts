@@ -128,7 +128,8 @@ test('View on a remote member says where it is instead of failing to open it', a
         timeout: 60_000,
         message: 'the band never drew the seeded party'
       })
-      .toContain('LUM-16')
+      // Why the count: the band leaves a ghost to its +N, never on stage (ORCA-886); the Panel lists it.
+      .toContain('1 teammate')
     await orcaPage.waitForTimeout(REDRAW_MS)
     await clickTerminalText(orcaPage, 'Panel')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('View')
