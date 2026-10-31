@@ -47,20 +47,35 @@ export const FULL_SUITE_PATHS = [
 
 /**
  * @param {string[]} changedPaths
+ * @param {{ deferFullSuite?: boolean }} [options] PR pushes defer the full suite to the merge queue (ORCA-932).
  */
-export function selectPrE2eScope(changedPaths) {
+export function selectPrE2eScope(changedPaths, { deferFullSuite = false } = {}) {
   const paths = changedPaths.map((line) => line.trim()).filter((line) => line.length > 0)
   const fullSuiteMatches = paths.filter((path) =>
     FULL_SUITE_PATHS.some((pattern) => pattern.test(path))
   )
   const changedSpecs = paths.filter((path) => CHANGED_SPEC.test(path))
 
-  if (fullSuiteMatches.length > 0) {
+  if (fullSuiteMatches.length > 0 && deferFullSuite && changedSpecs.length === 0) {
+    return {
+      mode: 'merge-queue',
+      shouldRun: false,
+      testFiles: '',
+      triggeredBy: fullSuiteMatches
+    }
+  }
+
+  if (fullSuiteMatches.length > 0 && !deferFullSuite) {
     // Why the empty string and not '[]': e2e.yml keys its sharded suite on
     // `inputs.test_files == ''`. A '[]' here would instead select changed-e2e,
     // whose unquoted expansion would run the whole suite on one runner and die
     // at its 30-minute timeout.
-    return { mode: 'full', shouldRun: true, testFiles: '', triggeredBy: fullSuiteMatches }
+    return {
+      mode: 'full',
+      shouldRun: true,
+      testFiles: '',
+      triggeredBy: fullSuiteMatches
+    }
   }
 
   if (changedSpecs.length > 0) {
@@ -75,8 +90,13 @@ export function selectPrE2eScope(changedPaths) {
   return { mode: 'none', shouldRun: false, testFiles: '', triggeredBy: [] }
 }
 
-export function main(changedPaths, { output = process.env.GITHUB_OUTPUT, log = console.log } = {}) {
-  const scope = selectPrE2eScope(changedPaths)
+export function main(
+  changedPaths,
+  { output = process.env.GITHUB_OUTPUT, log = console.log, argv = process.argv.slice(2) } = {}
+) {
+  const scope = selectPrE2eScope(changedPaths, {
+    deferFullSuite: argv.includes('--defer-full-suite')
+  })
 
   if (output) {
     appendFileSync(

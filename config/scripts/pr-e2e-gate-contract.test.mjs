@@ -98,7 +98,7 @@ describe('PR E2E gate contract', () => {
     // neither is superseded by a push. Keyed to the PR number, this can only
     // cancel a run for a commit that is no longer that PR's head.
     expect(prWorkflow.jobs.e2e.concurrency).toEqual({
-      group: 'pr-e2e-${{ github.event.pull_request.number }}',
+      group: 'pr-e2e-${{ github.event.pull_request.number || github.ref }}',
       'cancel-in-progress': true
     })
     expect(e2eWorkflow.concurrency).toBeUndefined()
@@ -109,7 +109,8 @@ describe('PR E2E gate contract', () => {
     // job without adding it to the strict loop fails here instead of silently
     // leaving that job unenforced. This is what caught GIT_COMPATIBILITY and
     // SHELL_CONTRACTS being absent from an earlier hardcoded list.
-    const strictLoop = verifyStep.run.slice(0, verifyStep.run.indexOf('done'))
+    // Why up to the last `done`: the fast set and the merge-queue set are two loops (ORCA-932).
+    const strictLoop = verifyStep.run.slice(0, verifyStep.run.lastIndexOf('done'))
     for (const job of prWorkflow.jobs.verify.needs.filter((j) => !SCOPED_JOBS.includes(j))) {
       // A job name may contain a dash (verify-windows); env vars may not.
       const envVar = job.toUpperCase().replaceAll('-', '_')
@@ -203,7 +204,11 @@ describe('PR E2E gate contract', () => {
     expect(filterStep.run).toContain('set -euo pipefail')
     // Why env and not inline expressions: the SHAs reach git as values, so a
     // crafted ref cannot close the quote and run in this shell.
-    expect(filterStep.env.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
-    expect(filterStep.env.HEAD_SHA).toBe('${{ github.event.pull_request.head.sha }}')
+    expect(filterStep.env.BASE_SHA).toBe(
+      '${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}'
+    )
+    expect(filterStep.env.HEAD_SHA).toBe(
+      '${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}'
+    )
   })
 })
