@@ -3,6 +3,7 @@ import {
   GAME_EVENTS_MAX,
   appendGameEvent,
   filterGameEvents,
+  gameMergesOf,
   parseGameEvent,
   type GameEvent
 } from './orchestrator-game-events'
@@ -76,5 +77,31 @@ describe('game events', () => {
     expect(parseGameEvent({ ...good, text: 'x'.repeat(5000) })?.text).toHaveLength(600)
     expect(parseGameEvent({ ...good, key: 'pr CIN-1' })?.key).toBe('pr CIN-1')
     expect(parseGameEvent('CIN-1')).toBeNull()
+  })
+
+  it("keeps a merged event's review, and drops only a review it cannot read", () => {
+    const merge = { provider: 'gitlab', number: 7, worktreeId: 'wt-1', perfect: false }
+    const merged = { ...event('CIN-1', '2026-10-16T10:00:00.000Z', 'merged'), key: 'k', merge }
+    expect(parseGameEvent(merged)).toEqual(merged)
+    expect(parseGameEvent({ ...merged, merge: { ...merge, perfect: 'yes' } })).not.toHaveProperty(
+      'merge'
+    )
+    expect(parseGameEvent({ ...merged, merge: { ...merge, provider: 'svn' } })?.key).toBe('k')
+    expect(parseGameEvent({ ...merged, kind: 'failed' })).not.toHaveProperty('merge')
+  })
+
+  it('lists the newest merges with their review, oldest first', () => {
+    const merge = { provider: 'github' as const, number: 4, worktreeId: 'wt-1', perfect: true }
+    const at = '2026-10-16T10:00:00.000Z'
+    const events: GameEvent[] = [
+      { ...event('CIN-1', at, 'merged'), key: 'merged CIN-1 #4', merge },
+      { ...event('CIN-2', at, 'merged'), key: 'merged CIN-2 #5' },
+      { ...event('CIN-3', at, 'merged'), key: 'merged CIN-3 #6', merge: { ...merge, number: 6 } }
+    ]
+    expect(gameMergesOf(events, 5).map((one) => [one.key, one.ticket, one.number])).toEqual([
+      ['merged CIN-1 #4', 'CIN-1', 4],
+      ['merged CIN-3 #6', 'CIN-3', 6]
+    ])
+    expect(gameMergesOf(events, 1).map((one) => one.number)).toEqual([6])
   })
 })
