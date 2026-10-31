@@ -17118,10 +17118,33 @@ export class OrcaRuntimeService {
           : targetWorktreeId
             ? []
             : [...worktreesById.values()]
-    const controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+    const parsedTargetWorkspace = targetWorktreeId ? parseWorkspaceKey(targetWorktreeId) : null
+    const folderWorkspace =
+      parsedTargetWorkspace?.type === 'folder'
+        ? this.store
+            ?.getFolderWorkspaces?.()
+            .find((workspace) => workspace.id === parsedTargetWorkspace.folderWorkspaceId)
+        : null
+    const targetRepo = targetWorktree ? this.store?.getRepo(targetWorktree.repoId) : null
+    const connectionId = folderWorkspace
+      ? this.resolveFolderWorkspaceConnectionId(folderWorkspace)
+      : targetRepo
+        ? (targetRepo.connectionId ?? null)
+        : undefined
+    let controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
       resolvedWorktrees,
-      targetWorktreeId
+      targetWorktreeId,
+      undefined,
+      connectionId
     )
+    if (!controllerInventory && opts.requireFreshPtyLiveness) {
+      controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+        resolvedWorktrees,
+        targetWorktreeId,
+        undefined,
+        connectionId
+      )
+    }
     const refreshedPtyLiveness = controllerInventory
       ? new Set(controllerInventory.livePtyIds)
       : null

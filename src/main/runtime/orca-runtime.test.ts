@@ -41438,6 +41438,91 @@ describe('OrcaRuntimeService', () => {
     ).rejects.toThrow('terminal_liveness_unavailable')
   })
 
+  it('retries a transient fresh PTY inventory failure before failing closed', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const listProcesses = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('daemon inventory temporarily unavailable'))
+      .mockResolvedValueOnce([])
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null,
+      listProcesses
+    })
+
+    await expect(
+      runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, undefined, {
+        requireFreshPtyLiveness: true
+      })
+    ).resolves.toMatchObject({ terminals: [], totalCount: 0 })
+    expect(listProcesses).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not let an unrelated SSH inventory failure block local fresh PTY liveness', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const listProcesses = vi.fn(async (connectionId?: string | null) => {
+      if (connectionId !== null) {
+        throw new Error('unrelated SSH inventory unavailable')
+      }
+      return []
+    })
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null,
+      listProcesses
+    })
+
+    await expect(
+      runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, undefined, {
+        requireFreshPtyLiveness: true
+      })
+    ).resolves.toMatchObject({ terminals: [], totalCount: 0 })
+    expect(listProcesses).toHaveBeenCalledWith(null)
+  })
+
+  it('queries only the target SSH provider and still fails closed when it is unavailable', async () => {
+    const sshStore = {
+      ...store,
+      getRepo: (id: string) => {
+        const repo = store.getRepo(id)
+        return repo ? { ...repo, connectionId: 'ssh-1' } : undefined
+      }
+    }
+    const runtime = new OrcaRuntimeService(sshStore as never)
+    let targetUnavailable = false
+    const listProcesses = vi.fn(async (connectionId?: string | null) => {
+      if (connectionId !== 'ssh-1') {
+        throw new Error('unrelated provider must not be queried')
+      }
+      if (targetUnavailable) {
+        throw new Error('target SSH inventory unavailable')
+      }
+      return []
+    })
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null,
+      listProcesses
+    })
+
+    await expect(
+      runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, undefined, {
+        requireFreshPtyLiveness: true
+      })
+    ).resolves.toMatchObject({ terminals: [], totalCount: 0 })
+    targetUnavailable = true
+    await expect(
+      runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, undefined, {
+        requireFreshPtyLiveness: true
+      })
+    ).rejects.toThrow('terminal_liveness_unavailable')
+    expect(listProcesses).toHaveBeenCalledTimes(3)
+    expect(listProcesses).toHaveBeenCalledWith('ssh-1')
+  })
+
   it('rejects invalid positive limits for bounded list commands', async () => {
     const runtime = new OrcaRuntimeService(store)
 
