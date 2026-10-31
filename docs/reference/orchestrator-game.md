@@ -680,6 +680,17 @@ matches …` (ORCA-866).
   time still runs from the ticket's first claim. It adds the character's level and XP, drops XP from
   `not recorded`, and notes when older tasks are no longer kept. An unknown name is refused with the
   known ones ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
+  With no filter it also prints the scene's metrics widget window: tickets done per calendar day
+  for the last 14 days and their median lead time, in `--timezone <zone>` (default this machine's
+  zone). Each done ticket counts once, on the day of its `ticketsDoneAt` in `--json` (its last
+  merged event, else when its member was freed), so a ticket merged one evening and freed the
+  next morning is not counted on both days the way two one-day `--since`/`--until` queries would.
+- Game state's optional `metrics` (lead only, absent from an older host or for a member) carries
+  that same 14-day summary in the game's own timezone plus each managed Claude account's 5h and 7d
+  use (active first, then the busiest, at most 8, readings Orca already holds, never a refresh).
+  The host computes it at most once a minute per project and zone; the budget is 2 KB of payload
+  and 50 ms of compute on a full store, both tested against a recording of this project's real
+  stores ([`orchestrator-game-metrics-summary.ts`](../../src/shared/orchestrator-game-metrics-summary.ts)).
 - `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
   reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
   usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
@@ -941,9 +952,11 @@ member right after its PR merges, so a refresh rarely sees its review turn `merg
 with that review: provider, number, worktree and whether `perfectMerge` was `true`. Only after that
 does auto-release drop the row
 ([`orchestrator-game-merge-record.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-merge-record.ts)).
-A lead's state lists the 20 newest of these as `merges`, so the mod can reward a merge whose member
-is already gone (ORCA-906); an older host sends none. A merge recorded while its review facts could
-not be read counts as not perfect.
+A lead's state lists the 20 newest of these as `merges`. A merge that appears there between two
+refreshes earns `review-merged` and, when perfect, `perfect-merge` and the arcade offer, under the
+same ids the review's change would give, so a merge both seen and recorded earns once. An older
+host sends no `merges`, and the first list a pane reads awards nothing. A merge recorded while its
+review facts could not be read counts as not perfect.
 
 ### The scoring table: `orchestratorGame.rewardWeights`
 

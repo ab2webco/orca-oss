@@ -48,8 +48,15 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions, readGitHubBudget } =
-    input
+  const {
+    readStop,
+    readInboxes,
+    readLeadElsewhere,
+    readOpenOwnerQuestions,
+    readGitHubBudget,
+    readMetrics
+  } = input
+  const timezone = desktopGameTimezoneOf(resolved.config.timezone)
   const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
     read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
   const [
@@ -64,7 +71,8 @@ export async function buildOrchestratorGameState(
     suggested,
     openOwnerQuestions,
     githubBudget,
-    merges
+    merges,
+    metrics
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -77,7 +85,8 @@ export async function buildOrchestratorGameState(
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
     leadOnly(readOpenOwnerQuestions),
     readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
-    leadOnly(input.readMerges)
+    leadOnly(input.readMerges),
+    leadOnly(readMetrics && (() => readMetrics(timezone)))
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -88,7 +97,7 @@ export async function buildOrchestratorGameState(
       : sceneFile?.warning === undefined
         ? {}
         : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
-    timezone: desktopGameTimezoneOf(resolved.config.timezone)
+    timezone
   }
   const workItem =
     trackerWorkItemOf(plane, linear) ??
@@ -201,6 +210,7 @@ export async function buildOrchestratorGameState(
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
     ...(merges ? { merges } : {}),
+    ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

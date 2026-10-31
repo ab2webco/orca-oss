@@ -51,7 +51,7 @@ export function observedMergesOf(
   agents: readonly GameAgent[]
 ): (ObservedGameEvent & { merge: GameEventMerge })[] {
   return agents.flatMap((agent) => {
-    const ticket = agent.isMember && !agent.isLeader ? ticketOfMember(agent) : null
+    const ticket = agent.isMember && !agent.isLeader && !agent.found ? ticketOfMember(agent) : null
     const review = agent.review
     if (!ticket || !agent.worktree || review?.state !== 'merged') {
       return []
