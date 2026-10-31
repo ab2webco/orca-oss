@@ -692,8 +692,10 @@ matches …` (ORCA-866).
   there on `--account` or the project's account policy, resolved by that host; only once it
   starts does the old dispatch stop, without a release, so the old host keeps its worktree and the
   result names it. When that host has every account near or limited, nothing moves and the result
-  names when its first account is back. A member already on a paired host moves only this way;
-  `--account` alone is refused for it.
+  names when its first account is back. A Claude member already on a paired host is switched in
+  place there (ORCA-916): `--account` and `auto` resolve against that host's accounts, matched to
+  the member's by email, and the lead's machine needs the host saved as an environment. Any other
+  member on a paired host moves only with `--on`; `--account` alone is refused for it.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
@@ -921,6 +923,16 @@ counts it once. A member pane (`role: member`) earns only its own work. Toasts n
 (`+100 XP · ORCA-12 · #41 merged`), a merge floats `#41 merged!`, and `rewards: false` turns all
 of it off. The board's `claimed` event is not in `game state`, so a launch is read from the member
 appearing there instead.
+
+The merge is the exception to "nothing once it leaves" (ORCA-887). The lead and auto-release free a
+member right after its PR merges, so a refresh rarely sees its review turn `merged`. When a lead's
+`game state` reads a member's review as `merged`, the host first writes the board's `merged` event
+with that review: provider, number, worktree and whether `perfectMerge` was `true`. Only after that
+does auto-release drop the row
+([`orchestrator-game-merge-record.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-merge-record.ts)).
+A lead's state lists the 20 newest of these as `merges`, so the mod can reward a merge whose member
+is already gone (ORCA-906); an older host sends none. A merge recorded while its review facts could
+not be read counts as not perfect.
 
 ### The scoring table: `orchestratorGame.rewardWeights`
 

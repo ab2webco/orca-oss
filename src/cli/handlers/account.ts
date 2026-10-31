@@ -307,7 +307,6 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'account switch': async (ctx) => {
-    rejectRemoteSelectionFlags(ctx, 'orca account switch')
     await switchClaudeTerminalAccount(ctx)
   }
 }
