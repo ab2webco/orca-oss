@@ -108,12 +108,13 @@ describe("a lead's members across a restart, through the runtime", () => {
   })
 
   // Why (ORCA-764): a live member the lead no longer lists was neither listed nor paused.
+  // Why no terminal: one with a live terminal is found and taken back (ORCA-735).
   it('names a saved member whose worktree runs an agent this lead does not list', async () => {
     await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
       worktreeId: 'wt-lead',
       paneKey: 'tab-1:lead'
     })
-    const orphaned = { ...memberWorktree, agents: [agentRow('tab-4:member', null)] }
+    const orphaned = { ...memberWorktree, agents: [agentRow('tab-5:no-terminal', null)] }
 
     const after = await runtimeWith([leadWorktree, orphaned]).getOrchestratorGameState({
       worktreeId: 'wt-lead',
@@ -129,6 +130,28 @@ describe("a lead's members across a restart, through the runtime", () => {
         worktreeId: 'wt-member'
       }
     ])
+  })
+
+  // Why (ORCA-735): a member whose dispatch ended kept its terminal open, and the lead lost it.
+  it('takes back as its member a found session running in a saved member worktree', async () => {
+    await runtimeWith([leadWorktree, memberWorktree]).getOrchestratorGameState({
+      worktreeId: 'wt-lead',
+      paneKey: 'tab-1:lead'
+    })
+    const orphaned = { ...memberWorktree, agents: [agentRow('tab-4:member', 'tab-0:gone-lead')] }
+
+    const after = await runtimeWith([leadWorktree, orphaned]).getOrchestratorGameState({
+      worktreeId: 'wt-lead',
+      paneKey: 'tab-1:lead'
+    })
+
+    expect(after.unlistedMembers).toBeUndefined()
+    expect(after.pausedMembers).toEqual([])
+    expect(
+      after.agents
+        .filter((agent) => agent.isMember)
+        .map((agent) => [agent.paneKey, agent.displayName, agent.found ?? false])
+    ).toEqual([['tab-4:member', 'Merlin · ORCA-609 Cartelera', false]])
   })
 
   // Why (ORCA-864): live imac members showed again under "Paused since Orca restarted", each taking a slot.

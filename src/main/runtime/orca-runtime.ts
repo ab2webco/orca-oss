@@ -718,6 +718,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
@@ -31649,6 +31650,14 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       members,
+      found: args.paneKey
+        ? foundGameSessionsOf(summaries, {
+            leadPaneKey: args.paneKey,
+            hasTerminal: (paneKey) => this.getTerminalHandleForPaneKey(paneKey) !== null,
+            isLeadPane: (paneKey) =>
+              this._orchestrationDb?.getCurrentRunForPane?.(paneKey) !== undefined
+          })
+        : [],
       readMemberWork: (memberWorktreeId) =>
         this.gameMemberWork.read(memberWorktreeId, async () => {
           const member = worktreesById.get(memberWorktreeId)
@@ -31904,11 +31913,13 @@ export class OrcaRuntimeService {
         starting: this.workerSetupAdmission.startingTaskIds()
       }
     )
+    const { agents, unlisted } = recoveredGameMembersOf(state.agents, view.unlisted)
     return {
       ...state,
+      agents,
       pausedMembers: view.paused,
       ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
-      ...(view.unlisted.length > 0 ? { unlistedMembers: view.unlisted } : {}),
+      ...(unlisted.length > 0 ? { unlistedMembers: unlisted } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }
