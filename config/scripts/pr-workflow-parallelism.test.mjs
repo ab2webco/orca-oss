@@ -35,7 +35,9 @@ const realZshUsage =
 
 describe('PR workflow parallelism', () => {
   it('cancels superseded runs for the same pull request', () => {
-    expect(workflow.concurrency.group).toBe('pr-checks-${{ github.event.pull_request.number }}')
+    expect(workflow.concurrency.group).toBe(
+      'pr-checks-${{ github.event.pull_request.number || github.ref }}'
+    )
     expect(workflow.concurrency['cancel-in-progress']).toBe(true)
   })
 
@@ -51,10 +53,12 @@ describe('PR workflow parallelism', () => {
     expect(nodeMatrix).toContain("github.repository_owner == 'stablyai'")
     expect(nodeMatrix).toContain('fromJSON(\'["24", "26"]\')')
     expect(nodeMatrix).toContain('fromJSON(\'["24"]\')')
-    expect(workflow.jobs.test.strategy.matrix.shard).toEqual(
-      Array.from({ length: 16 }, (_, index) => index + 1)
+    // Why an expression: a push runs 8 shards and the merge queue 16 (ORCA-932); the
+    // per-event split is pinned in pr-workflow-merge-queue.test.mjs.
+    expect(workflow.jobs.test.strategy.matrix.shard).toContain("github.event_name == 'merge_group'")
+    expect(workflow.jobs.test.strategy.matrix.shard_total).toContain(
+      "github.event_name == 'merge_group'"
     )
-    expect(workflow.jobs.test.strategy.matrix.shard_total).toEqual([16])
     const testStep = workflow.jobs.test.steps.find((step) => step.name === 'Test shard')
     const installStep = workflow.jobs.test.steps.find(
       (step) => step.uses === './.github/actions/install-node-dependencies'

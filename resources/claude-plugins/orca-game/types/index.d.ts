@@ -54,12 +54,16 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
   remote?: GameMemberRemote
+  /** A session no `game launch` started; it earns its lead nothing. Absent from an older Orca. */
+  found?: true
   /** When its host last saw it work or change state (ms); absent when unknown or from an older host. */
   activeAt?: number
 }
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
@@ -244,14 +248,7 @@ export type Card = { icon: string; name: LocalizedName; color: string }
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
 
 /** The team band's pixel-art frame and night sky; built-in scenes leave it out and keep Quest's. */
-export type HudPalette = {
-  skyTop: number
-  skyBottom: number
-  frame: number
-  text: number
-  dim: number
-  star: number
-}
+export type HudPalette = Record<'skyTop' | 'skyBottom' | 'frame' | 'text' | 'dim' | 'star', number>
 
 /** A cast member's sprite: one to seven rows of one width (1–10); each glyph a key of its `colors`, '.' transparent. */
 export type CastFrame = readonly string[]
@@ -369,6 +366,8 @@ export type GameState = {
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
   /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
   githubLow?: { remaining: number; limit: number }
+  /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
   /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */
   metrics?: GameMetrics
 }
@@ -376,14 +375,20 @@ export type GameState = {
 /** Percent of the 5-hour (session) and 7-day (weekly) window used; null when not reported. */
 export type GameUsePercents = Record<'sessionPercent' | 'weeklyPercent', number | null>
 
-export type GameClaudeAccountUse = GameUsePercents & { email: string; active: boolean }
-
 export type GameMetrics = {
   /** Oldest first; `day` is `YYYY-MM-DD` in the host's zone. */
   mergedPerDay: { day: string; merged: number }[]
   leadTime: { medianMs: number | null; measured: number }
-  claudeAccounts: GameClaudeAccountUse[]
+  claudeAccounts: (GameUsePercents & { email: string; active: boolean })[]
 }
+
+/** A host's members against its cap while it publishes one, and its machine while it answers. */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
+  | { status: 'unreachable' }
+  | ({ status: 'ok'; loadAverage1m: number | null } & Record<GameHostFigure, number>)
+)
+
+export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
 

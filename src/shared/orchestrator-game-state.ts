@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
@@ -79,10 +80,14 @@ export type GameAgent = {
   orphaned?: true
   /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */
   remote?: GameRemoteHost
+  /** A session no `game launch` started: listed and stopped by name, never acted on in bulk (ORCA-914). */
+  found?: true
 }
 
 export type GameRemoteHost = {
   host: string
+  /** The paired environment View opens the member's terminal through (ORCA-839). */
+  environmentId?: string
   stateKnown: boolean
   /** Launched by a lead that no longer leads it; read from the home Run DB (ORCA-793). */
   earlierLead?: true
@@ -209,6 +214,8 @@ export type OrchestratorGameState = {
   githubBudget?: GameGitHubBudget
   /** The project's delivery numbers, refreshed at most once a minute; only for the lead, absent from an older host. */
   metrics?: GameMetricsSummary
+  /** This Orca and each paired host: members, cores, free memory, load; only for a lead with a saved environment (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */

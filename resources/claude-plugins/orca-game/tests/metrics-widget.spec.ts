@@ -16,7 +16,10 @@ import {
 // Why recorded: the host's summary of this project's real stores, as `orca game state` sends it.
 const recorded = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../src/shared/__fixtures__/orchestrator-game-recorded-stores.json'),
+    join(
+      __dirname,
+      '../../../../src/shared/__tests__/fixtures/orchestrator-game-recorded-stores.json'
+    ),
     'utf8'
   )
 ) as { recordedAt: string; events: unknown[]; history: unknown[] }

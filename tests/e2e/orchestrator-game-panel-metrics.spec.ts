@@ -22,7 +22,7 @@ const METRICS_LAST_ROW = 'spare@example.com'
 // Why recorded: the summary the host would send for this project's real stores on 2026-10-30.
 const recorded = JSON.parse(
   readFileSync(
-    join(__dirname, '../../src/shared/__fixtures__/orchestrator-game-recorded-stores.json'),
+    join(__dirname, '../../src/shared/__tests__/fixtures/orchestrator-game-recorded-stores.json'),
     'utf8'
   )
 ) as { recordedAt: string; events: unknown[]; history: unknown[] }

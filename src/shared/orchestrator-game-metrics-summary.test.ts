@@ -15,7 +15,10 @@ import {
 
 // Why recorded: this project's real game.events and game.history on 2026-10-30, `text` and accounts blanked.
 const recorded = JSON.parse(
-  readFileSync(join(__dirname, '__fixtures__', 'orchestrator-game-recorded-stores.json'), 'utf8')
+  readFileSync(
+    join(__dirname, '__tests__', 'fixtures', 'orchestrator-game-recorded-stores.json'),
+    'utf8'
+  )
 ) as { recordedAt: string; events: unknown[]; history: unknown[] }
 const stores = {
   events: recorded.events.map(parseGameEvent).filter((one) => one !== null),

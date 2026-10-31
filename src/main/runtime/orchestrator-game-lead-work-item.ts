@@ -6,7 +6,7 @@ import {
 
 export type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
 
-/** The worktree's ticket from its Plane read, else its Linear one; null when neither found it. */
+/** The worktree's current Plane item, else its Linear one; null leaves its linked item to decide. */
 export function trackerWorkItemOf(
   plane: (TrackerItem & { stateGroup: string }) | null,
   linear: TrackerItem | null
@@ -21,15 +21,14 @@ export function trackerWorkItemOf(
       statusGroup: statusGroupOfPlane(plane.stateGroup, plane.stateName)
     }
   }
-  if (linear) {
-    return {
-      provider: 'linear',
-      identifier: linear.identifier,
-      title: linear.title,
-      url: linear.url,
-      status: linear.stateName,
-      statusGroup: statusGroupOfName(linear.stateName)
-    }
-  }
-  return null
+  return linear
+    ? {
+        provider: 'linear',
+        identifier: linear.identifier,
+        title: linear.title,
+        url: linear.url,
+        status: linear.stateName,
+        statusGroup: statusGroupOfName(linear.stateName)
+      }
+    : null
 }

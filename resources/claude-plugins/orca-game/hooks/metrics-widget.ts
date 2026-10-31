@@ -1,6 +1,8 @@
-import type { GameClaudeAccountUse, GameMetrics } from '../types'
+import type { GameMetrics } from '../types'
 import { isShape, str } from './game-state-shapes'
 import { metricsWords } from './metrics-words'
+
+type GameClaudeAccountUse = GameMetrics['claudeAccounts'][number]
 
 // The host sends at most 14 days and 8 accounts; the caps only bound a damaged state.
 const DAYS_MAX = 31

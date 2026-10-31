@@ -31,7 +31,7 @@ import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-ad
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { PairedGameHostEntry } from './orchestrator-game-paired-hosts'
-import type { TrackerItem } from './orchestrator-game-tracker-item'
+import type { TrackerItem } from './orchestrator-game-lead-work-item'
 
 export type OrchestratorGameStateInput = {
   settings:
@@ -56,6 +56,8 @@ export type OrchestratorGameStateInput = {
   agents: GameAgentRow[]
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
   members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  /** Every other session on this machine; read only for a lead (ORCA-914). */
+  found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null

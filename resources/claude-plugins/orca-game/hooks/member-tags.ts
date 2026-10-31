@@ -1,5 +1,6 @@
 import type { GameAgent, GameMemberAccount, GameMemberLimit, GameMemberRemote } from '../types'
 import { cellWidthOf } from './cell-width'
+import { isEnvironmentId } from './game-config'
 import { gameLocale, gameStrings, type GameLocale } from './game-strings'
 import { remoteGoneTagOf } from './remote-member-view'
 
@@ -63,6 +64,7 @@ export const memberRemoteOf = (value: unknown): GameMemberRemote | undefined =>
   isShape(value) && typeof value.host === 'string' && value.host !== ''
     ? {
         host: value.host,
+        ...(isEnvironmentId(value.environmentId) ? { environmentId: value.environmentId } : {}),
         stateKnown: value.stateKnown !== false,
         ...(value.gone === true ? { gone: true as const } : {})
       }
