@@ -23,6 +23,10 @@ export type GameLeadRegistration = {
 
 // Why: an unplaced caller shares this key with every other, so one lead there is not one per project.
 const UNPLACED_PROJECT = 'no-project'
+// Why: after a restart the lead's pane reconnects after former lead tabs have resumed (ORCA-728).
+const RESTORE_GRACE_MS = 120_000
+const CLAIM_POLL_MS = 500
+const CLAIM_POLLS = 40
 
 /** The leads of this Orca host: `orca game lead` registers one, `orca game leads` lists the live ones. */
 export class GameLeads {
@@ -32,6 +36,7 @@ export class GameLeads {
   private readonly records = new Map<string, GameLeadRecord>()
   private readonly pending = new Map<string, GameLeadRecord>()
   private loaded: Promise<void> | null = null
+  private loadedAt: number | null = null
 
   constructor(
     private readonly deps: {
@@ -40,6 +45,7 @@ export class GameLeads {
       /** False once the pane is back at its shell: a lead that ran /exit, or a resume Claude refused. */
       isRunning?: (handle: string) => Promise<boolean>
       now?: () => Date
+      wait?: (ms: number) => Promise<void>
       sessions?: {
         read: (projectKey: string) => Promise<GameLeadSession | null>
         write: (projectKey: string, session: GameLeadSession) => Promise<void>
@@ -93,7 +99,8 @@ export class GameLeads {
     }
     return this.queued(project.key, async () => {
       await this.settle(project.key)
-      const live = await this.leadOf(project.key)
+      const live =
+        (await this.leadOf(project.key)) ?? (await this.afterRestore(project.key, callerPane))
       if (live && live.handle !== caller) {
         await this.deps.focus?.(live.handle).catch(() => undefined)
         return { registered: false, live: { handle: live.handle } }
@@ -141,8 +148,33 @@ export class GameLeads {
       return null
     }
     await this.settle(project.key)
-    const live = await this.leadOf(project.key)
-    return live && live.handle !== project.lead.handle ? live.handle : null
+    const restoring = this.restoringOf(project.key, project.lead.paneKey)
+    const lead =
+      (await this.leadOf(project.key))?.handle ??
+      (restoring ? this.deps.handleOfPane?.(restoring.paneKey) : null)
+    return lead && lead !== project.lead.handle ? lead : null
+  }
+
+  /** A lead kept from before the restart, not yet back in its own pane, that still leads the project. */
+  private restoringOf(projectKey: string, callerPane: string | null): GameLeadRecord | null {
+    const one = this.pending.get(projectKey)
+    const now = (this.deps.now?.() ?? new Date()).getTime()
+    return one && one.paneKey !== callerPane && now - (this.loadedAt ?? now) < RESTORE_GRACE_MS
+      ? one
+      : null
+  }
+
+  // Why bounded: a claim must answer inside the CLI's request timeout even if the pane never returns.
+  private async afterRestore(
+    projectKey: string,
+    callerPane: string | null
+  ): Promise<{ handle: string } | null> {
+    const wait = this.deps.wait ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)))
+    for (let polls = 0; polls < CLAIM_POLLS && this.restoringOf(projectKey, callerPane); polls++) {
+      await wait(CLAIM_POLL_MS)
+      await this.settle(projectKey)
+    }
+    return this.leadOf(projectKey)
   }
 
   /** The project's live lead, for a caller that is no terminal: the person's Inbox. */
@@ -197,6 +229,7 @@ export class GameLeads {
 
   private load(): Promise<void> {
     this.loaded ??= (async () => {
+      this.loadedAt = (this.deps.now?.() ?? new Date()).getTime()
       const kept = (await this.deps.roster?.read().catch(() => [])) ?? []
       for (const one of kept) {
         if (one.projectKey !== UNPLACED_PROJECT) {

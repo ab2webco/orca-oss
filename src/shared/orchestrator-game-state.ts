@@ -5,6 +5,7 @@ import type { OrchestratorGameConfig, OrchestratorGameSource } from './orchestra
 import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orchestrator-game-view'
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
+import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
 import type { GameProjectWork } from './orchestrator-game-project-work'
@@ -209,6 +210,8 @@ export type OrchestratorGameState = {
   githubBudget?: GameGitHubBudget
   /** The project's delivery numbers, refreshed at most once a minute; only for the lead, absent from an older host. */
   metrics?: GameMetricsSummary
+  /** This Orca and each paired host: members, cores, free memory, load; only for a lead with a saved environment (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
