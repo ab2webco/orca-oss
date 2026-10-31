@@ -5497,6 +5497,22 @@ export class OrchestrationDb {
     )
   }
 
+  /** Points an active attachment at its pane's woken process after a restart slept it (ORCA-915). */
+  rebindRemoteAttachmentProcess(params: {
+    dispatchId: string
+    paneKey: string
+    processIncarnation: string
+    terminalHandle: string
+  }): void {
+    this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET pane_key = ?, process_incarnation = ?, terminal_handle = ?, updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('starting', 'ready')`
+      )
+      .run(params.paneKey, params.processIncarnation, params.terminalHandle, params.dispatchId)
+  }
+
   beginRemoteAttachmentStop(dispatchId: string): RemoteDispatchAttachmentRow {
     const attachment = this.getRemoteDispatchAttachment(dispatchId)
     if (!attachment) {
