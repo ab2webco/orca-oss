@@ -19,6 +19,8 @@ T1: original source `Tests 2 failed | 1173 skipped (1175)`; changed source `Test
 
 T2: `npx playwright test tests/e2e/paired-remote-terminal-materialization-reconnect.spec.ts --config tests/playwright.config.ts --project=electron-headless --workers=1 --repeat-each=10` under one `yes` CPU process: `10 passed (1.6m)`, `10 skipped` (existing `fixme`). Log: `/tmp/orca935-e2e-10.log`.
 
+Work-unit commit: `8b2908cb981` (`fix(terminal): retry scoped fresh liveness inventory`). Parent spot check after the commit: `Tests 4 passed | 1172 skipped (1176)` from the focused runtime suite.
+
 ## Delivery
 Strategy: ask-on-risk. Forecast: approximately 100 authored changed lines across one work unit; no chain expected. Branch: `fabolivark/orca-935`.
 
