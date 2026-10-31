@@ -626,6 +626,11 @@ The lead's verbs, run from the lead's terminal
   take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
   carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
   `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
+- **Host capacity (ORCA-841).** `game fleet`, `game state` and the Panel then give each host its
+  own line: members against its cap, cores, free memory and load, flagged `low memory` (under 4 GB
+  or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The figures
+  come from each host's `diagnostics.memory`, so an older host needs no update, and are reused for
+  15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
@@ -815,6 +820,14 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
   rules, is the project's lead, and has no other live lead gets it; a fresh start reads the fleet
   through the lead skill instead. A resumed lead also runs the lead skill again: a restart killed its
   report watcher, and its rules then resume the paused members or ask first.
+- **Former leads** (ORCA-728). A restore can bring back several sessions that once ran the lead
+  rules; only the recorded lead keeps leading. For two minutes after the roster loads, a recorded
+  lead whose pane has not reconnected still leads: `leadElsewhere` names it once its pane has a
+  handle, and a `game lead` claim waits up to 20 s for it to settle before it reopens the stored
+  conversation or takes the project
+  ([`orchestrator-game-leads.ts`](../../src/main/runtime/orchestrator-game-leads.ts)). A resumed or
+  compacted former lead is unmarked, told which pane leads and to stop its report watcher, and a
+  toast names that pane.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
   of any saved member that has not finished, paused or live, even with `--force`, which only waives

@@ -1,4 +1,5 @@
-import type { GameLead, GameRole, GameState } from '../types'
+import type { GameLead, GameState } from '../types'
+import { hostCapacityOf } from './host-capacity'
 
 /** The plugin skill that loads the lead's standing rules from `orca game lead`. */
 export const LEAD_SKILL = 'orca-game:lead'
@@ -22,11 +23,12 @@ const leadOf = (value: Shape): GameLead => {
   }
 }
 
-/** The project's lead and the calling pane's role; each absent when the host sends none. */
+/** The project's lead, the calling pane's role and the lead's hosts; each absent when the host sends none. */
 export const gameLeadOf = (
   body: Shape
-): { lead?: GameLead; role?: GameRole; leadElsewhere?: { handle: string } } => ({
+): Pick<GameState, 'lead' | 'role' | 'leadElsewhere' | 'hostCapacity'> => ({
   ...(isShape(body.lead) ? { lead: leadOf(body.lead) } : {}),
+  ...hostCapacityOf(body),
   ...(body.role === 'lead' || body.role === 'member' ? { role: body.role } : {}),
   ...(isShape(body.leadElsewhere) && typeof body.leadElsewhere.handle === 'string'
     ? { leadElsewhere: { handle: body.leadElsewhere.handle } }

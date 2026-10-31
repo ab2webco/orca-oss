@@ -156,6 +156,21 @@ describe('parseGameState', () => {
     expect(parsed?.agents[1]).not.toHaveProperty('terminalHandle')
   })
 
+  // Why: View hands the id to `orca terminal focus --on`, so only an id that cannot read as a flag passes (ORCA-839).
+  it("keeps a remote member's environment id only when it is safe to pass on", () => {
+    const ids = ['3f2a9c1e-0b7d-4c55-9e1a-2b6f0d8c4a11', '--json', '', 7, 'a b']
+    const agents = ids.map((environmentId, index) => ({
+      ...STATE.agents[1],
+      paneKey: `remote:ctx_${index}`,
+      remote: { host: 'imac', stateKnown: true, environmentId }
+    }))
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => agent.remote)).toEqual([
+      { host: 'imac', stateKnown: true, environmentId: ids[0] },
+      ...ids.slice(1).map(() => ({ host: 'imac', stateKnown: true }))
+    ])
+  })
+
   it('turns an invalid review, work item or config field into null or nothing', () => {
     const parsed = parseGameState(
       JSON.stringify({
