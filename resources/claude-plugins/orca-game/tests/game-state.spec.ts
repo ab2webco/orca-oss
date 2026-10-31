@@ -130,6 +130,17 @@ describe('parseGameState', () => {
     ])
   })
 
+  it('keeps the found mark of a session no game launch started, and only a true one (ORCA-914)', () => {
+    const member = { ...STATE.agents[1], isMember: true }
+    const agents = [
+      { ...member, paneKey: 'tab:a', found: true },
+      { ...member, paneKey: 'tab:b', found: 'yes' },
+      { ...member, paneKey: 'tab:c' }
+    ]
+    const parsed = parseGameState(JSON.stringify({ ...STATE, agents }))
+    expect(parsed?.agents.map((agent) => agent.found)).toEqual([true, undefined, undefined])
+  })
+
   it('keeps a terminal handle only in the shape Orca issues', () => {
     const handles = ['term_3f2a-9c_b', '', '--json', 'term_a b', 'term_', 7, 'pty:1']
     const agents = handles.map((terminalHandle, index) => ({

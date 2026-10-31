@@ -7,9 +7,14 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  # Why: GitHub Free caps the org at 20 concurrent jobs, so a push runs the fast set and
+  # the jobs gated on merge_group run once per PR, in the merge queue (ORCA-932).
+  merge_group:
+    types:
+      - checks_requested
 
 concurrency:
-  group: pr-checks-${{ github.event.pull_request.number }}
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -58,13 +63,13 @@ jobs:
       # needs the fetch above. Why the base SHA: only this PR's commits are judged, so the two
       # AI-credited commits already in main do not make it red forever (ORCA-529).
       - name: Reject AI attribution in commit messages
-        run: pnpm run check:ai-attribution -- "${{ github.event.pull_request.base.sha }}"
+        run: pnpm run check:ai-attribution -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
 
       - name: Enforce changed-code quality
-        run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
+        run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
 
       - name: Enforce React Doctor on changed lines
-        run: pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha }}"
+        run: pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
 
       - name: Check Zustand selector fan-out budget
         run: pnpm run check:zustand-selector-fanout
@@ -84,7 +89,7 @@ jobs:
       # Why the base SHA: the gate compares case counts against the merge target, so it
       # needs the same ref the other changed-line gates use (ORCA-269).
       - name: Reject silently deleted test cases
-        run: pnpm run check:test-case-deletion -- "${{ github.event.pull_request.base.sha }}"
+        run: pnpm run check:test-case-deletion -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
 
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
@@ -111,7 +116,7 @@ jobs:
       - name: Verify no new untranslated keys
         run: pnpm run verify:localization-new-keys
         env:
-          ORCA_LOCALIZATION_GATE_BASE: ${{ github.event.pull_request.base.sha }}
+          ORCA_LOCALIZATION_GATE_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
 
       # Why: project-owned type declarations must live in .ts so tsc
       # actually checks them. TypeScript's skipLibCheck: true (inherited
@@ -149,8 +154,8 @@ jobs:
 
       - name: Reject new root-level files and folders
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
 
   typecheck:
@@ -168,6 +173,7 @@ jobs:
 
   git_compatibility:
     name: Git compatibility
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     # Why: looser than the other test jobs because this one builds Git 2.25.5
     # from source and pulls container images; healthy runs stay under 2 minutes.
@@ -221,6 +227,7 @@ jobs:
 
   shell_contracts:
     name: shell contracts
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     # Why: these specs drive real shells and PTYs, so a wedged child hangs the
     # job; healthy runs stay under 3 minutes.
@@ -300,6 +307,7 @@ jobs:
 
   cli_subprocess:
     name: cli subprocess
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     # Why its own job: the specs spawn the compiled CLI and self-skip when
     # out/cli/index.js is absent, so they need a build the sharded test job
@@ -337,7 +345,7 @@ jobs:
     # Why: a healthy shard finishes in under 5 minutes, but a wedged worker holds
     # the run for the 6h default — one shard hung 72 minutes and blocked
     # re-running any other shard (ORCA-119). Cap so a hang reports as a failure.
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -345,8 +353,9 @@ jobs:
         # the doubled matrix doubles every PR's CI cost while the product ships on
         # engines.node 24 — node 26 coverage returns with each upstream sync (ORCA-127).
         node: ${{ github.repository_owner == 'stablyai' && fromJSON('["24", "26"]') || fromJSON('["24"]') }}
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-        shard_total: [16]
+        # Why fewer on a push: a push's 16 shards were most of its ~45 jobs (ORCA-932).
+        shard: ${{ github.event_name == 'merge_group' && fromJSON('[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]') || fromJSON('[1, 2, 3, 4, 5, 6, 7, 8]') }}
+        shard_total: ${{ github.event_name == 'merge_group' && fromJSON('[16]') || fromJSON('[8]') }}
 
     steps:
       - name: Checkout
@@ -387,6 +396,7 @@ jobs:
 
   cross-version-wire:
     name: cross-version wire compatibility
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
 
     steps:
@@ -415,6 +425,7 @@ jobs:
 
   managed_hook_node18:
     name: managed hooks on Node 18
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
 
     steps:
@@ -438,6 +449,7 @@ jobs:
 
   claude_hooks_python_floor:
     name: Claude hooks on Python 3.9
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -471,6 +483,7 @@ jobs:
 
   package:
     name: package
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
 
     steps:
@@ -532,6 +545,7 @@ jobs:
 
   verify-windows:
     name: Windows platform tests
+    if: github.event_name == 'merge_group'
     runs-on: windows-2022
     timeout-minutes: 20
     permissions:
@@ -627,6 +641,7 @@ jobs:
 
   package_windows:
     name: package (windows)
+    if: github.event_name == 'merge_group'
     runs-on: windows-2022
     timeout-minutes: 30
 
@@ -731,12 +746,16 @@ jobs:
       - name: Select E2E scope
         id: filter
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
+          # Why: a push runs only its changed specs; the full suite waits for the merge queue.
+          defer=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then defer="--defer-full-suite"; fi
           git diff --name-only --diff-filter=AMCR --merge-base "$BASE_SHA" "$HEAD_SHA" \
-            | node config/scripts/select-pr-e2e-scope.mjs
+            | node config/scripts/select-pr-e2e-scope.mjs $defer
 
   e2e:
     name: e2e (${{ needs.e2e-paths.outputs.mode }})
@@ -750,7 +769,7 @@ jobs:
     # on. Keyed to the PR number so it can never reach the scheduled run or the
     # release-cut dispatch, which share e2e.yml and are not superseded by a push.
     concurrency:
-      group: pr-e2e-${{ github.event.pull_request.number }}
+      group: pr-e2e-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     uses: ./.github/workflows/e2e.yml
     with:
@@ -795,20 +814,27 @@ jobs:
           E2E_PATHS: ${{ needs['e2e-paths'].result }}
           E2E: ${{ needs.e2e.result }}
           DRAFT: ${{ github.event.pull_request.draft }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           for result in \
             "$STATIC_ANALYSIS" \
             "$ROOT_DIRECTORY_GUARD" \
             "$TYPECHECK" \
+            "$TEST"; do
+            if [ "$result" != "success" ]; then
+              exit 1
+            fi
+          done
+          # Why: a push skips the merge-queue set, and the queue run must pass it (ORCA-932).
+          for result in \
             "$GIT_COMPATIBILITY" \
             "$SHELL_CONTRACTS" \
             "$CLI_SUBPROCESS" \
-            "$TEST" \
             "$MANAGED_HOOK_NODE18" \
             "$PACKAGE" \
             "$VERIFY_WINDOWS" \
             "$PACKAGE_WINDOWS"; do
-            if [ "$result" != "success" ]; then
+            if [ "$result" != "success" ] && ! { [ "$EVENT_NAME" = "pull_request" ] && [ "$result" = "skipped" ]; }; then
               exit 1
             fi
           done
