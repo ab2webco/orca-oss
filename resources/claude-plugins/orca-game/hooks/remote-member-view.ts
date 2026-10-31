@@ -13,16 +13,14 @@ type RemoteText = {
 const REMOTE_TEXT: Record<GameLocale, RemoteText> = {
   en: {
     goneTag: (host) => `gone from ${host}`,
-    gone: (name, host) =>
-      `${name} no longer exists on ${host}; if it runs on in another terminal there: orca game rebind, else orca game stop`,
+    gone: (name, host) => `${name} no longer exists on ${host}: orca game rebind or stop`,
     finished: (name, host) => `${name} finished on ${host}; its terminal is closed`,
     silent: (name, host, read) => `${host} does not answer; read ${name}: ${read}`,
     live: (name, host, read) => `${name} runs on ${host}; read it: ${read}`
   },
   es: {
     goneTag: (host) => `ya no está en ${host}`,
-    gone: (name, host) =>
-      `${name} ya no existe en ${host}; si sigue en otra terminal allí: orca game rebind, si no orca game stop`,
+    gone: (name, host) => `${name} ya no existe en ${host}: orca game rebind o stop`,
     finished: (name, host) => `${name} terminó en ${host}; su terminal está cerrada`,
     silent: (name, host, read) => `${host} no responde; lee a ${name}: ${read}`,
     live: (name, host, read) => `${name} corre en ${host}; léelo: ${read}`
