@@ -238,6 +238,7 @@ export async function remoteGameMembersOf(
         isMember: true,
         remote: {
           host: source.hostName,
+          environmentId: source.environmentId,
           stateKnown: answer.answered,
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),

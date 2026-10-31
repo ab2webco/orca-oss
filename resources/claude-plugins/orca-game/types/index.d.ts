@@ -60,6 +60,8 @@ export type GameAgent = {
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
@@ -70,16 +72,11 @@ export type GameMemberLaunch = { model: string | null; effort: string | null }
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
 
+/** Optional text fields Jev may leave out or null. */
+export type GameOptionalTexts<K extends string> = Partial<Record<K, string | null>>
 /** Jev's optional detail from a newer report; a version 1 report carries none of it. */
-export type GameMemberAdvisorDetail = {
-  line?: string | null
-  skill?: string | null
-  tool?: string | null
-  hold?: string | null
-  confidence?: string | null
-  routedModel?: string | null
-  sessionModel?: string | null
-}
+export type GameMemberAdvisorDetail = GameOptionalTexts<'line' | 'skill' | 'tool' | 'hold'> &
+  GameOptionalTexts<'confidence' | 'routedModel' | 'sessionModel'>
 
 /** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
 export type GameMemberAdvisor = GameMemberAdvisorPick &
@@ -371,16 +368,21 @@ export type GameState = {
   githubLow?: { remaining: number; limit: number }
   /** The project's latest member merges, newest last; only for a lead, absent from an older host. */
   merges?: GameMerge[]
+  /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
 }
 
-/** A member's merge as Orca recorded it, which outlives the member's row (ORCA-887). */
-export type GameMerge = Pick<GameReview, 'provider' | 'number'> & {
-  /** The game event's key, one per merge. */
-  key: string
-  ticket: string | null
-  worktreeId: string
-  perfect: boolean
-}
+/** A member's merge as Orca recorded it, which outlives its row (ORCA-887); `key` is one per merge. */
+export type GameMerge = Pick<GameReview, 'provider' | 'number'> &
+  Record<'key' | 'worktreeId', string> & { ticket: string | null; perfect: boolean }
+
+/** A host's members against its cap while it publishes one, and its machine while it answers. */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
+  | { status: 'unreachable' }
+  | ({ status: 'ok'; loadAverage1m: number | null } & Record<GameHostFigure, number>)
+)
+
+export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
 

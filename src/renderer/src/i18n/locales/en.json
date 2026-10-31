@@ -16215,6 +16215,12 @@
           "shared": "Claude sign-in expired for this pane, which runs on the shared Claude login (no managed account pinned).",
           "reauthenticatedSince": "This pane still holds an expired Claude sign-in, but {{value0}} was re-authenticated after this pane started. Restart the pane to pick up the new sign-in.",
           "unknown": "Claude sign-in expired in this pane. Orca Lab could not tell which account it runs on."
+        },
+        "paired-terminal-reveal": {
+          "failed": "Could not open the member's terminal on its host",
+          "repoMissing": "Add the host's repository to this window to open its terminals.",
+          "notMirrored": "Its worktree is open, but the terminal has not appeared in this window.",
+          "terminalGone": "The host no longer has this terminal; the member may have finished or been released."
         }
       },
       "plugins": {

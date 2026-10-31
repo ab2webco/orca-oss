@@ -86,7 +86,7 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
         displayName: 'ORCA-805 gate',
         state: 'idle',
         terminalHandle: 'term_on_imac',
-        remote: { host: 'imac', stateKnown: true },
+        remote: { host: 'imac', environmentId: 'env_imac', stateKnown: true },
         worktree: expect.objectContaining({ branch: 'fabolivark/orca-805' })
       })
     ])
@@ -130,7 +130,7 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     expect(state.agents.filter((agent) => agent.isMember)).toEqual([
       expect.objectContaining({
         paneKey: `remote:${dispatchId}`,
-        remote: { host: 'imac', stateKnown: false }
+        remote: { host: 'imac', environmentId: 'env_imac', stateKnown: false }
       })
     ])
   })
@@ -149,6 +149,7 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     for (const state of [closed, forgotten]) {
       expect(state.agents.find((agent) => agent.isMember)?.remote).toEqual({
         host: 'imac',
+        environmentId: 'env_imac',
         stateKnown: true,
         gone: true
       })
@@ -209,7 +210,13 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
         paneKey: `remote:${started.dispatch.id}`,
         state: 'done',
         terminalHandle: 'term_5c58ff4d',
-        remote: { host: 'imac', stateKnown: true, earlierLead: true, ticketDone: true }
+        remote: {
+          host: 'imac',
+          environmentId: 'env_imac',
+          stateKnown: true,
+          earlierLead: true,
+          ticketDone: true
+        }
       })
     ])
   })
