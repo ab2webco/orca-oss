@@ -20,7 +20,7 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   tile and activity link, then the review and the work item as links. **Open** takes `i` (work
   item), `o` (review), `c` (CI), `w` (first project link) and `a` (activity) into an Orca browser
   tab. `r` refreshes, `p` pets, `q` or Esc closes. **View** (`1`–`9` by tile order) focuses
-  that teammate's Orca pane. Each section (Team, Review, My PRs, To Do, Actions) collapses from
+  that teammate's Orca pane. Each section (Team, Review, My PRs, To Do, Actions, Metrics) collapses from
   the `▾` before its heading, and `/orca-game:layout` hides, moves or resets them; the layout is
   kept per project in `$.store`.
 - **Rewards.** XP and level-ups, kept in the mod's `$.store` across sessions.
