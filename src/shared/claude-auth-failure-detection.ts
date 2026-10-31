@@ -16,7 +16,10 @@ const ANSI_SEQUENCE_RE =
   /\x1b(?:\][\s\S]*?(?:\x07|\x1b\\)|\[[0-?]*[ -/]*[@-~]|[PX^_][\s\S]*?\x1b\\|[@-_])/g
 const CONTROL_CHARACTER_RE = /[\x00-\x08\x0b-\x1f\x7f]/g
 
-const AUTH_REJECTION_BANNER_RE = /\blogin\s+expired\b.{0,80}\bplease\s+run\s+\/login\b/i
+// Why 'not logged in' too: a CLI whose refresh got invalid_grant clears its stored token and
+// prints that instead of 'Login expired' (ORCA-916).
+const AUTH_REJECTION_BANNER_RE =
+  /\b(?:login\s+expired|not\s+logged\s+in)\b.{0,80}\bplease\s+run\s+\/login\b/i
 const QUOTED_OR_LOGGED_LINE_RE =
   /^\s*(?:["'`]|(?:const|let|var)\s|\[[a-z]+\]|(?:debug|info|warn|error)\b)/i
 
