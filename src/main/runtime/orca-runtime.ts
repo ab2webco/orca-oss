@@ -400,6 +400,7 @@ import {
   type RuntimeTerminalCreate,
   type RuntimeTerminalPresentation,
   type RuntimeTerminalSplit,
+  type RuntimePairedTerminalReveal,
   type RuntimeTerminalFocus,
   type RuntimeTerminalClose,
   type RuntimeTerminalListResult,
@@ -2408,6 +2409,7 @@ type RuntimeNotifier = {
   ): void
   renameTerminal(tabId: string, title: string | null): void
   focusTerminal(tabId: string, worktreeId: string, leafId?: string | null): void
+  revealPairedTerminal?(target: { environmentId: string; handle: string }): void
   focusEditorTab?(tabId: string, worktreeId: string): void
   closeSessionTab?(tabId: string, worktreeId: string): void
   moveSessionTab?(worktreeId: string, move: RuntimeMobileSessionTabMove): void
@@ -30313,6 +30315,20 @@ export class OrcaRuntimeService {
         }
       }
     })
+  }
+
+  /** Asks this window to open a connected server's terminal; the window reads the server itself. */
+  async revealPairedTerminal(
+    selector: string,
+    handle: string
+  ): Promise<RuntimePairedTerminalReveal> {
+    const server = this.resolveOrchestrationWorkerServer(selector)
+    const reveal = this.notifier?.revealPairedTerminal
+    if (!reveal) {
+      throw new Error('runtime_unavailable')
+    }
+    reveal({ environmentId: server.environmentId, handle })
+    return { handle, environmentId: server.environmentId, host: server.name, navigated: true }
   }
 
   async closeTerminal(handle: string): Promise<RuntimeTerminalClose> {

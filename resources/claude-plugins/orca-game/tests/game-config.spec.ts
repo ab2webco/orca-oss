@@ -116,6 +116,21 @@ describe('terminalFocusArgvOf', () => {
     ])
   })
 
+  // Why: a remote member's handle only resolves on its host; --on opens it here through that pairing (ORCA-839).
+  it("opens a paired host's terminal in this window with --on", () => {
+    expect(terminalFocusArgvOf('/opt/orca/bin/orca', 'term_3f2a', 'env-imac')).toEqual([
+      '/opt/orca/bin/orca',
+      'terminal',
+      'focus',
+      '--terminal',
+      'term_3f2a',
+      '--on',
+      'env-imac',
+      '--json'
+    ])
+    expect(terminalFocusArgvOf('/opt/orca/bin/orca', 'term_3f2a', '--help')).toBeUndefined()
+  })
+
   it('runs nothing for a bare CLI or a handle Orca would not issue', () => {
     expect(terminalFocusArgvOf('orca', 'term_3f2a')).toBeUndefined()
     expect(terminalFocusArgvOf(undefined, 'term_3f2a')).toBeUndefined()
