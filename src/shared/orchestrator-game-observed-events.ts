@@ -1,5 +1,5 @@
 import { ticketOfMember } from './orchestrator-game-fleet-verbs'
-import type { GameEventKind } from './orchestrator-game-events'
+import type { GameEventKind, GameEventMerge } from './orchestrator-game-events'
 import type { GameAgent } from './orchestrator-game-state'
 
 export type ObservedGameEvent = {
@@ -10,6 +10,15 @@ export type ObservedGameEvent = {
   key: string
 }
 
+const prOf = (agent: GameAgent): string => (agent.review ? `#${agent.review.number}` : '-')
+
+const mergedEventOf = (ticket: string, agent: GameAgent): ObservedGameEvent => ({
+  kind: 'merged',
+  ticket,
+  text: `PR ${prOf(agent)} merged`,
+  key: `merged ${ticket} ${prOf(agent)}`
+})
+
 /** What `game fleet` and `game sweep` see happened to members: a merged PR, a ticket handed to QA. */
 export function observedGameEventsOf(agents: readonly GameAgent[]): ObservedGameEvent[] {
   return agents.flatMap((agent): ObservedGameEvent[] => {
@@ -17,15 +26,10 @@ export function observedGameEventsOf(agents: readonly GameAgent[]): ObservedGame
     if (!ticket) {
       return []
     }
-    const pr = agent.review ? `#${agent.review.number}` : '-'
+    const pr = prOf(agent)
     const events: ObservedGameEvent[] = []
     if (agent.review?.state === 'merged') {
-      events.push({
-        kind: 'merged',
-        ticket,
-        text: `PR ${pr} merged`,
-        key: `merged ${ticket} ${pr}`
-      })
+      events.push(mergedEventOf(ticket, agent))
     }
     if (agent.workItem?.statusGroup === 'review') {
       events.push({
@@ -36,5 +40,28 @@ export function observedGameEventsOf(agents: readonly GameAgent[]): ObservedGame
       })
     }
     return events
+  })
+}
+
+/**
+ * The merged event of each member whose review the host reads as merged, with the review its lead's
+ * rewards need: the member may be freed before the lead's next poll sees it (ORCA-887).
+ */
+export function observedMergesOf(
+  agents: readonly GameAgent[]
+): (ObservedGameEvent & { merge: GameEventMerge })[] {
+  return agents.flatMap((agent) => {
+    const ticket = agent.isMember && !agent.isLeader ? ticketOfMember(agent) : null
+    const review = agent.review
+    if (!ticket || !agent.worktree || review?.state !== 'merged') {
+      return []
+    }
+    const merge = {
+      provider: review.provider,
+      number: review.number,
+      worktreeId: agent.worktree.id,
+      perfect: review.perfectMerge === true
+    }
+    return [{ ...mergedEventOf(ticket, agent), merge }]
   })
 }

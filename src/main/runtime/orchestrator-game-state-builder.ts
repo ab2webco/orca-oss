@@ -1,35 +1,16 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
-import {
-  gameFleetOf,
-  liveLinkedItemOf,
-  settle,
-  type GameAgentRow,
-  type GameMemberAccountOf,
-  type GameMemberGlobalLoginOf,
-  type GameMemberLimitOf,
-  type GameMemberWork,
-  type ReadLinkedStatus
-} from './orchestrator-game-fleet'
+import { gameFleetOf, liveLinkedItemOf, settle } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
-import { trackerWorkItemOf, type TrackerItem } from './orchestrator-game-lead-work-item'
-import type { CarriedGameScene } from './orchestrator-game-carried-scene'
+import { trackerWorkItemOf } from './orchestrator-game-lead-work-item'
+import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   resolveOrchestratorGameConfig,
   resolveOrchestratorGameIntegrations,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
-import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
-import {
-  gameLeadOverPairedHostsOf,
-  type PairedGameHostEntry
-} from './orchestrator-game-paired-hosts'
-import {
-  builtInGameActivityRules,
-  gameActivityOf,
-  type GameActivityCall
-} from '../../shared/orchestrator-game-activity'
-import type { GameActivityMemory } from './orchestrator-game-activity-memory'
+import { gameLeadOverPairedHostsOf } from './orchestrator-game-paired-hosts'
+import { builtInGameActivityRules, gameActivityOf } from '../../shared/orchestrator-game-activity'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
 import { gameActionsOf, renderGameWorkPrompt } from '../../shared/orchestrator-game-actions'
 import { gameListActionsOf, gameStateActionsOf } from '../../shared/orchestrator-game-lead-actions'
@@ -38,102 +19,16 @@ import {
   gameLinksOf,
   projectGameLinksOf
 } from '../../shared/orchestrator-game-links'
-import {
-  orchestratorGameScenesOf,
-  type OrchestratorGameSceneSource
-} from '../../shared/orchestrator-game-scene'
+import { orchestratorGameScenesOf } from '../../shared/orchestrator-game-scene'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
-import {
-  shownOrchestratorGameModeOf,
-  type OrchestratorGameViewId
-} from '../../shared/orchestrator-game-view'
+import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
   type GameActivity,
-  type GameMemberWorktree,
-  type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
-import type {
-  GameProjectWork,
-  OrchestratorGameTodoSource
-} from '../../shared/orchestrator-game-project-work'
-import type { GlobalSettings } from '../../shared/types'
-import { settleGameStop, type GameStop } from '../../shared/orchestrator-game-stop-state'
-import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
-import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
-import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
-import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
-import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
-
-export type OrchestratorGameStateInput = {
-  settings:
-    | Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects' | 'uiLanguage'>>
-    | undefined
-  /** The OS locale behind a `system` UI language. */
-  systemLocale?: string
-  /** Orca's machine, which sets the member cap no layer sets. */
-  host?: GameHostProfile
-  /** The paired hosts and what each publishes; read only for a lead (ORCA-888). */
-  readPairedHosts?: () => Promise<PairedGameHostEntry[]>
-  worktree: {
-    id: string
-    repoId: string | null
-    /** SSH connection of the worktree's repo; its orca.yaml is read from that host. */
-    connectionId?: string | null
-    path: string
-    branch: string
-    displayName: string
-    linkedWorkItem: WorkspaceLinkedItem | null | undefined
-  } | null
-  agents: GameAgentRow[]
-  /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
-  members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
-  /** Every other session on this machine; read only for a lead (ORCA-914). */
-  found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
-  leaderPaneKey: string | null
-  /** The calling pane's own launcher; set when a lead started it through orchestration. */
-  callerParentPaneKey?: string | null
-  /** The handle of the project's live lead when it is not the caller. */
-  readLeadElsewhere?: () => Promise<string | null>
-  terminalHandleOf?: (paneKey: string) => string | null
-  /** The calling Team's terminals; when known, agents outside it are left out. */
-  teamHandles?: ReadonlySet<string> | null
-  /** A pane's recent MCP calls, newest first, held by the hook server in memory. */
-  mcpCallsOf?: (paneKey: string) => readonly GameActivityCall[]
-  /** Keeps each pane's last match once its call leaves `mcpCallsOf`'s bounded window. */
-  activityMemory?: GameActivityMemory
-  readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
-  readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
-  readLinear: () => Promise<TrackerItem | null>
-  readLinkedStatus?: ReadLinkedStatus
-  accountOf?: GameMemberAccountOf
-  globalLoginOf?: GameMemberGlobalLoginOf
-  limitOf?: GameMemberLimitOf
-  advisorOf?: (paneKey: string) => GameMemberAdvisor | null
-  launchOf?: (paneKey: string) => GameMemberLaunch | null
-  /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
-  readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
-  readScenes?: () => Promise<OrchestratorGameSceneSource[]>
-  /** The scene a member's lead draws; used only when the worktree's own file does not read. */
-  readCarriedScene?: () => Promise<CarriedGameScene | null>
-  /** The project's STOP; absent leaves `stopped` out, as from an older host. */
-  readStop?: () => Promise<GameStop | null>
-  /** The project's inboxes; read only for a lead. */
-  readInboxes?: () => Promise<GameInboxSummary[]>
-  /** Questions the lead asked the person that wait for an answer; read only for a lead. */
-  readOpenOwnerQuestions?: () => Promise<number>
-  /** The view the host's resources suggest; absent leaves `suggestedView` out. */
-  suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
-  /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
-  readGitHubBudget?: () => Promise<GameGitHubBudget | null>
-  /** My open PRs and tickets across the repo, not only this worktree's. */
-  readProjectWork?: (args: {
-    todo: OrchestratorGameTodoSource | null
-    workItem: GameWorkItem | null
-  }) => Promise<GameProjectWork>
-}
+import { settleGameStop } from '../../shared/orchestrator-game-stop-state'
 
 export async function buildOrchestratorGameState(
   input: OrchestratorGameStateInput
@@ -168,7 +63,8 @@ export async function buildOrchestratorGameState(
     leadElsewhere,
     suggested,
     openOwnerQuestions,
-    githubBudget
+    githubBudget,
+    merges
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -180,7 +76,8 @@ export async function buildOrchestratorGameState(
     readLeadElsewhere ? settle(readLeadElsewhere) : Promise.resolve(null),
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
     leadOnly(readOpenOwnerQuestions),
-    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null)
+    readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
+    leadOnly(input.readMerges)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -303,6 +200,7 @@ export async function buildOrchestratorGameState(
     ...(openOwnerQuestions === null ? {} : { openOwnerQuestions }),
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
+    ...(merges ? { merges } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }
