@@ -49,11 +49,13 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'Same pane, same tab: nothing is focused, split, or created. A verification failure rolls the terminal back to the account it started on.',
       '--to takes an email or account id from `orca account list`; custom-endpoint accounts are rejected (they use the failover path).',
       'Omitting --terminal targets the terminal this command runs in, proven by ORCA_TERMINAL_HANDLE / ORCA_PANE_KEY. There is no focused-pane fallback.',
+      '--environment <host> switches a terminal on that paired host to one of the host’s own accounts; it needs --terminal, and only the flag retargets (ORCA_ENVIRONMENT does not).',
       'The runtime accepts the operation before it stops anything, so losing this CLI process does not cancel a switch that is already underway.'
     ],
     examples: [
       'orca account switch --to other@example.com',
-      'orca account switch --to acct_123 --terminal orca-terminal-4 --json'
+      'orca account switch --to acct_123 --terminal orca-terminal-4 --json',
+      'orca account switch --to other@example.com --terminal orca-terminal-4 --environment imac'
     ]
   }
 ]
