@@ -918,6 +918,16 @@ counts it once. A member pane (`role: member`) earns only its own work. Toasts n
 of it off. The board's `claimed` event is not in `game state`, so a launch is read from the member
 appearing there instead.
 
+The merge is the exception to "nothing once it leaves" (ORCA-887). The lead and auto-release free a
+member right after its PR merges, so a refresh rarely sees its review turn `merged`. When a lead's
+`game state` reads a member's review as `merged`, the host first writes the board's `merged` event
+with that review: provider, number, worktree and whether `perfectMerge` was `true`. Only after that
+does auto-release drop the row
+([`orchestrator-game-merge-record.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-merge-record.ts)).
+A lead's state lists the 20 newest of these as `merges`, so the mod can reward a merge whose member
+is already gone (ORCA-906); an older host sends none. A merge recorded while its review facts could
+not be read counts as not perfect.
+
 ### The scoring table: `orchestratorGame.rewardWeights`
 
 Every reward comes from a fact Orca observes in two polls of `game state`, never from what an
