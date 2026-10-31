@@ -115,6 +115,9 @@ describe('rebinding a member to the terminal that replaced its own', () => {
     ).rejects.toThrow(/cannot retry/)
     const abandoned = await call('orchestration.workerAbandon', { dispatch: first.dispatchId })
     expect(abandoned.state).toBe('abandoned')
+    expect(
+      db.getDispatchContextById(first.dispatchId as string)?.capability_revoked_at
+    ).toBeTruthy()
 
     const rebound = await call('orchestration.workerStart', {
       task: task.id,
