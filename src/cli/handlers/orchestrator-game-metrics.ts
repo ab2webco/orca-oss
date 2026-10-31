@@ -124,7 +124,7 @@ function timezoneOf(flags: Map<string, string | boolean>): string {
   if (!isOrchestratorGameTimezone(zone)) {
     throw new RuntimeClientError(
       'invalid_argument',
-      `--timezone must be a zone like America/Bogota or UTC, not "${zone}".`
+      `--timezone must be a zone like America/Bogota or UTC, not ${JSON.stringify(zone)}.`
     )
   }
   return zone
