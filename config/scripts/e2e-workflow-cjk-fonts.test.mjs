@@ -10,18 +10,10 @@ const workflow = parse(readFileSync(join(projectDir, '.github/workflows/e2e.yml'
 const jobRuns = (job) =>
   (job.steps ?? []).map((step) => step.run).filter((run) => typeof run === 'string')
 
-// Spec-running jobs install through the cached apt action (ORCA-750); the build job
-// still runs apt-get inline, so both shapes are read.
-const aptPackages = (job) => [
-  ...jobRuns(job)
-    .flatMap((run) => run.match(/apt-get install[^\n]*/g) ?? [])
-    .flatMap((install) => install.split(/\s+/))
-    .filter((token) => !['apt-get', 'install', '&&', 'sudo', ''].includes(token))
-    .filter((token) => !token.startsWith('-')),
-  ...(job.steps ?? [])
+const aptPackages = (job) =>
+  (job.steps ?? [])
     .filter((step) => step.uses === './.github/actions/install-apt-packages')
     .flatMap((step) => step.with.packages.split(/\s+/))
-]
 
 describe('e2e workflow CJK font coverage', () => {
   // Why derived and not a hardcoded job list: a new spec-running lane added later

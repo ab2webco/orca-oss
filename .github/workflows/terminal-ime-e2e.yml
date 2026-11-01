@@ -22,8 +22,8 @@ jobs:
 
       - name: Install native build and IME tools
         run: >-
-          sudo apt-get update &&
-          sudo apt-get install -y
+          bash config/scripts/ci-apt.sh update &&
+          bash config/scripts/ci-apt.sh install -y
           build-essential
           dbus-x11
           dconf-gsettings-backend

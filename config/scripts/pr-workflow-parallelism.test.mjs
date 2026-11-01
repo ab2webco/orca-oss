@@ -81,9 +81,9 @@ describe('PR workflow parallelism', () => {
     // Why parsed rather than substring-matched: the step name changes as shells are
     // added, and `includes('fish')` would also match a comment or a longer package.
     const aptPackages = (step) =>
-      (step.run?.match(/apt-get install[^\n]*/)?.[0] ?? '')
+      (step.run?.match(/ci-apt\.sh install[^\n|]*/)?.[0] ?? '')
         .split(/\s+/)
-        .filter((token) => !['apt-get', 'install', 'sudo', ''].includes(token))
+        .filter((token) => !['ci-apt.sh', 'install', ''].includes(token))
         .filter((token) => !token.startsWith('-'))
     const jobsInstallingPackages = Object.entries(workflow.jobs)
       .filter(([, job]) => (job.steps ?? []).some((step) => aptPackages(step).length > 0))
