@@ -54,6 +54,7 @@ const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'terminal_tab_close_timeout',
   'terminal_tab_not_found',
   'terminal_tab_pinned',
+  'terminal_wake_unavailable',
   'no_active_terminal',
   'repo_not_found',
   'timeout',

@@ -30,7 +30,9 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
   }
   // Why: a finished member's closed terminal is how it ends; its phase says what is next (ORCA-854).
   if (remote?.gone && agent.state !== 'done') {
-    return `gone from ${remote.host}: orca game stop ${ticket ?? agent.paneKey}`
+    const name = ticket ?? agent.paneKey
+    // Why rebind first: a terminal replaced outside Orca leaves the member running there (CIN-1297).
+    return `gone from ${remote.host}: orca game rebind ${name} if it runs on in another terminal there, else orca game stop ${name}`
   }
   return remote?.earlierLead && remote.ticketDone
     ? `left by an earlier lead, ticket done: orca game stop ${ticket ?? agent.paneKey}`

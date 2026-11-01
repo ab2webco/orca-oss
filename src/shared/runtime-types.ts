@@ -771,6 +771,13 @@ export type RuntimeTerminalFocus = {
   navigated?: boolean
 }
 
+/** `waking`: the host started the wake but the pane does not run yet; `terminal list` shows it. */
+export type RuntimeTerminalWake = {
+  handle: string | null
+  status: 'awake' | 'woken' | 'waking'
+  paneKey?: string
+}
+
 /** A connected server's terminal this window was asked to open (ORCA-839). */
 export type RuntimePairedTerminalReveal = {
   handle: string

@@ -243,14 +243,7 @@ export type Card = { icon: string; name: LocalizedName; color: string }
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
 
 /** The team band's pixel-art frame and night sky; built-in scenes leave it out and keep Quest's. */
-export type HudPalette = {
-  skyTop: number
-  skyBottom: number
-  frame: number
-  text: number
-  dim: number
-  star: number
-}
+export type HudPalette = Record<'skyTop' | 'skyBottom' | 'frame' | 'text' | 'dim' | 'star', number>
 
 /** A cast member's sprite: one to seven rows of one width (1–10); each glyph a key of its `colors`, '.' transparent. */
 export type CastFrame = readonly string[]
@@ -372,6 +365,18 @@ export type GameState = {
   merges?: GameMerge[]
   /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
   hostCapacity?: GameHostCapacity[]
+  /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */
+  metrics?: GameMetrics
+}
+
+/** Percent of the 5-hour (session) and 7-day (weekly) window used; null when not reported. */
+export type GameUsePercents = Record<'sessionPercent' | 'weeklyPercent', number | null>
+
+export type GameMetrics = {
+  /** Oldest first; `day` is `YYYY-MM-DD` in the host's zone. */
+  mergedPerDay: { day: string; merged: number }[]
+  leadTime: { medianMs: number | null; measured: number }
+  claudeAccounts: (GameUsePercents & { email: string; active: boolean })[]
 }
 
 /** A member's merge as Orca recorded it, which outlives its row (ORCA-887); `key` is one per merge. */

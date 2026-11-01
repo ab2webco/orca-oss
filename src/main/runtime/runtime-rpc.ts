@@ -517,6 +517,10 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
   if (request.method === 'accounts.switchClaudeTerminal') {
     return 'wait'
   }
+  // Why: a wake waits up to 30 s for the pane to start, as long as the idle cap (ORCA-915).
+  if (request.method === 'terminal.wake') {
+    return 'wait'
+  }
   if (request.method === 'orchestration.check') {
     const params = request.params as { wait?: unknown } | undefined
     return params?.wait === true ? 'wait' : null
