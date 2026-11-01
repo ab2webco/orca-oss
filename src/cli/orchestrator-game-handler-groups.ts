@@ -32,6 +32,12 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-move.js')).ORCHESTRATOR_GAME_MOVE_HANDLERS
   },
   {
+    name: 'orchestrator-game-rebind',
+    keys: ['game rebind'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-rebind.js')).ORCHESTRATOR_GAME_REBIND_HANDLERS
+  },
+  {
     name: 'orchestrator-game-accounts',
     keys: ['game accounts'],
     load: async () =>
