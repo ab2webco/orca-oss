@@ -4,6 +4,7 @@ import { ORCA_REPOSITORY_SLUG } from '../../shared/orca-repository-url'
 import { SERVE_COMMAND_SPECS } from './serve'
 import { TERMINAL_CREATE_COMMAND_SPECS } from './terminal-create'
 import { TERMINAL_SPLIT_COMMAND_SPECS } from './terminal-split'
+import { TERMINAL_WAKE_COMMAND_SPECS } from './terminal-wake'
 import { WORKTREE_RM_COMMAND_SPECS } from './worktree-rm'
 
 export const CORE_COMMAND_SPECS: CommandSpec[] = [
@@ -293,5 +294,6 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'orca terminal rename --terminal term_abc123 --json'
     ]
   },
-  ...TERMINAL_SPLIT_COMMAND_SPECS
+  ...TERMINAL_SPLIT_COMMAND_SPECS,
+  ...TERMINAL_WAKE_COMMAND_SPECS
 ]

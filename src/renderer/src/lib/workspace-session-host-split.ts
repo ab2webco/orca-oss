@@ -135,6 +135,7 @@ export function splitWorkspaceSessionByHost(
   }
 
   const localSlice = slices[LOCAL_EXECUTION_HOST_ID] as WorkspaceSessionRecord
+  const clearedFields: (keyof WorkspaceSessionState)[] = []
 
   for (const field of Object.keys(
     WORKSPACE_SESSION_FIELD_OWNERSHIP
@@ -142,6 +143,10 @@ export function splitWorkspaceSessionByHost(
     const ownership = WORKSPACE_SESSION_FIELD_OWNERSHIP[field]
     const value = state[field]
     if (value === undefined) {
+      // Why: a patch clears a field with an own `undefined` key; dropping it kept main's stale value.
+      if (Object.hasOwn(state, field) && ownership !== 'global' && ownership !== 'hostPrivate') {
+        clearedFields.push(field)
+      }
       continue
     }
     // Why: a present-but-empty container ({} / []) must survive the round trip.
@@ -247,6 +252,11 @@ export function splitWorkspaceSessionByHost(
           ctx
         )
         break
+    }
+  }
+  for (const slice of Object.values(slices) as WorkspaceSessionRecord[]) {
+    for (const field of clearedFields) {
+      slice[field] = undefined
     }
   }
 
