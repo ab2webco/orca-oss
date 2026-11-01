@@ -1185,10 +1185,9 @@ export async function listLiveDaemonPtyIds(): Promise<string[] | null> {
   if (!adapter) {
     return null
   }
-  const adapters =
-    adapter instanceof DaemonPtyRouter || adapter instanceof DegradedDaemonPtyProvider
-      ? adapter.getAllAdapters()
-      : [adapter]
+  // Why the degraded provider whole: its fresh terminals run on the local fallback, which no
+  // daemon adapter lists, so their live Claude sessions read as dead and lose the gate (ORCA-916).
+  const adapters = adapter instanceof DaemonPtyRouter ? adapter.getAllAdapters() : [adapter]
   const inventories = await Promise.allSettled(
     adapters.map((daemonAdapter) => daemonAdapter.listProcesses())
   )

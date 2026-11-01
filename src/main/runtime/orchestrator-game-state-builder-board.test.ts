@@ -148,3 +148,53 @@ describe('buildOrchestratorGameState GitHub budget', () => {
     expect('githubBudget' in state).toBe(false)
   })
 })
+
+describe('buildOrchestratorGameState metrics', () => {
+  const metrics = {
+    computedAt: '2026-10-30T13:30:00.000Z',
+    timezone: 'America/Bogota',
+    mergedPerDay: [{ day: '2026-10-30', merged: 2 }],
+    leadTime: { medianMs: 6_726_454, measured: 24 },
+    claudeAccounts: [
+      { email: 'a@example.com', active: true, sessionPercent: 41, weeklyPercent: 12 }
+    ]
+  }
+
+  it("carries the project's metrics to the lead, read in the game's own zone", async () => {
+    const zones: string[] = []
+    const state = await buildOrchestratorGameState({
+      ...base,
+      settings: { orchestratorGame: { timezone: 'America/Bogota' } },
+      readMetrics: async (timezone) => {
+        zones.push(timezone)
+        return metrics
+      }
+    })
+    expect(state.metrics).toEqual(metrics)
+    expect(zones).toEqual(['America/Bogota'])
+  })
+
+  it('reads none for a member, whose pane polls too', async () => {
+    let reads = 0
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readMetrics: async () => {
+        reads += 1
+        return metrics
+      }
+    })
+    expect('metrics' in member).toBe(false)
+    expect(reads).toBe(0)
+  })
+
+  it('leaves them out when they cannot be read', async () => {
+    const state = await buildOrchestratorGameState({
+      ...base,
+      readMetrics: async () => {
+        throw new Error('history unreadable')
+      }
+    })
+    expect('metrics' in state).toBe(false)
+  })
+})

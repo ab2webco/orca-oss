@@ -845,6 +845,10 @@ const TerminalFocus = TerminalHandle.extend({
   source: z.string().max(256).optional()
 })
 
+const TerminalRevealPaired = TerminalHandle.extend({
+  on: requiredString('Missing --on server')
+})
+
 const TerminalListParams = z.object({
   worktree: OptionalString,
   limit: OptionalFiniteNumber,
@@ -1651,6 +1655,13 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
       }
       return { focus }
     }
+  }),
+  defineMethod({
+    name: 'terminal.revealPaired',
+    params: TerminalRevealPaired,
+    handler: async (params, { runtime }) => ({
+      focus: await runtime.revealPairedTerminal(params.on, params.terminal)
+    })
   }),
   defineMethod({
     name: 'terminal.close',

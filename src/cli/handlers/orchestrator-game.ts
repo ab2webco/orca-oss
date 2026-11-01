@@ -6,6 +6,7 @@ import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
 import { withGameMemberIdentity } from '../../shared/orchestrator-game-member-identity'
+import { formatGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
 
 type GameLeadRegistration = {
   registered?: boolean
@@ -76,7 +77,8 @@ function formatGameState(state: OrchestratorGameState): string {
       : [
           `Render: ${state.config.render} (from ${state.sources.render}), timezone ${state.config.timezone} (from ${state.sources.timezone})`
         ]),
-    `Agents: ${state.agents.length}`
+    `Agents: ${state.agents.length}`,
+    ...(state.hostCapacity ? formatGameHostCapacity(state.hostCapacity) : [])
   ]
   if (state.review) {
     lines.push(

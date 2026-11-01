@@ -225,7 +225,8 @@ const EN: GameStrings = {
       review: 'Review',
       reviews: 'My PRs',
       todo: 'To Do',
-      actions: 'Actions'
+      actions: 'Actions',
+      metrics: 'Metrics'
     },
     layoutHint:
       'Tip: press ▾ beside a Panel section to collapse it; /orca-game:layout hides, moves or resets them.',
@@ -297,10 +298,7 @@ const EN: GameStrings = {
   }
 }
 
-export const CATALOGS: Readonly<Record<GameLocale, GameCatalog>> = {
-  en: EN,
-  es: ES
-}
+export const CATALOGS: Readonly<Record<GameLocale, GameCatalog>> = { en: EN, es: ES }
 
 export const gameLocaleOf = (value: string | null | undefined): GameLocale => {
   const said = value?.trim().toLowerCase()

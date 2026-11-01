@@ -54,12 +54,16 @@ export type GameAgent = {
   launch?: GameMemberLaunch
   /** A member on a paired remote host; `stateKnown` is false while that host does not answer. */
   remote?: GameMemberRemote
+  /** A session no `game launch` started; it earns its lead nothing. Absent from an older Orca. */
+  found?: true
   /** When its host last saw it work or change state (ms); absent when unknown or from an older host. */
   activeAt?: number
 }
 
 export type GameMemberRemote = {
   host: string
+  /** The paired environment View opens the member's terminal through. */
+  environmentId?: string
   stateKnown: boolean
   /** The host answered and the member's terminal is no longer there. */
   gone?: true
@@ -70,16 +74,11 @@ export type GameMemberLaunch = { model: string | null; effort: string | null }
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
 
+/** Optional text fields Jev may leave out or null. */
+export type GameOptionalTexts<K extends string> = Partial<Record<K, string | null>>
 /** Jev's optional detail from a newer report; a version 1 report carries none of it. */
-export type GameMemberAdvisorDetail = {
-  line?: string | null
-  skill?: string | null
-  tool?: string | null
-  hold?: string | null
-  confidence?: string | null
-  routedModel?: string | null
-  sessionModel?: string | null
-}
+export type GameMemberAdvisorDetail = GameOptionalTexts<'line' | 'skill' | 'tool' | 'hold'> &
+  GameOptionalTexts<'confidence' | 'routedModel' | 'sessionModel'>
 
 /** `pinned`: Orca applied that dimension at launch; `previous`: before Jev's latest switch. */
 export type GameMemberAdvisor = GameMemberAdvisorPick &
@@ -244,14 +243,7 @@ export type Card = { icon: string; name: LocalizedName; color: string }
 export type BandPalette = { gold: string; ink: string; panel: string; parchment: string }
 
 /** The team band's pixel-art frame and night sky; built-in scenes leave it out and keep Quest's. */
-export type HudPalette = {
-  skyTop: number
-  skyBottom: number
-  frame: number
-  text: number
-  dim: number
-  star: number
-}
+export type HudPalette = Record<'skyTop' | 'skyBottom' | 'frame' | 'text' | 'dim' | 'star', number>
 
 /** A cast member's sprite: one to seven rows of one width (1–10); each glyph a key of its `colors`, '.' transparent. */
 export type CastFrame = readonly string[]
@@ -369,7 +361,35 @@ export type GameState = {
   suggestedView?: 'off' | 'flat' | 'zen' | '2d-classic' | '2d-hd'
   /** The account's lowest GitHub bucket while Orca reports the budget low; absent otherwise. */
   githubLow?: { remaining: number; limit: number }
+  /** The project's latest member merges, newest last; only for a lead, absent from an older host. */
+  merges?: GameMerge[]
+  /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
+  hostCapacity?: GameHostCapacity[]
+  /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */
+  metrics?: GameMetrics
 }
+
+/** Percent of the 5-hour (session) and 7-day (weekly) window used; null when not reported. */
+export type GameUsePercents = Record<'sessionPercent' | 'weeklyPercent', number | null>
+
+export type GameMetrics = {
+  /** Oldest first; `day` is `YYYY-MM-DD` in the host's zone. */
+  mergedPerDay: { day: string; merged: number }[]
+  leadTime: { medianMs: number | null; measured: number }
+  claudeAccounts: (GameUsePercents & { email: string; active: boolean })[]
+}
+
+/** A member's merge as Orca recorded it, which outlives its row (ORCA-887); `key` is one per merge. */
+export type GameMerge = Pick<GameReview, 'provider' | 'number'> &
+  Record<'key' | 'worktreeId', string> & { ticket: string | null; perfect: boolean }
+
+/** A host's members against its cap while it publishes one, and its machine while it answers. */
+export type GameHostCapacity = { host: string; running: number; cap?: number } & (
+  | { status: 'unreachable' }
+  | ({ status: 'ok'; loadAverage1m: number | null } & Record<GameHostFigure, number>)
+)
+
+export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
 export type GameLead = { autostart: boolean; cap: number; label?: string }
 
