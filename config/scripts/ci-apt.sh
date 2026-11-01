@@ -6,7 +6,7 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
-# Three sequential calls in the cached action finish or fail in under six minutes.
+# Real installs need time for unpacking and triggers; updates and URI resolution do not.
 uri_output=''
 for argument in "$@"; do
   if [ "$argument" = '--print-uris' ]; then
@@ -16,8 +16,14 @@ for argument in "$@"; do
   fi
 done
 
+apt_deadline=120s
+if [ "$1" = install ] && [ -z "$uri_output" ]; then
+  apt_deadline=600s
+fi
+apt_deadline=${CI_APT_TIMEOUT:-$apt_deadline}
+
 run_apt() {
-  sudo timeout --signal=TERM --kill-after=10s 45s apt-get \
+  sudo timeout --signal=TERM --kill-after=10s "$apt_deadline" apt-get \
     -o Acquire::Retries=3 \
     -o Acquire::http::Timeout=30 \
     -o Acquire::https::Timeout=30 \

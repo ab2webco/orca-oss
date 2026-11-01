@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest'
 
 const script = resolve(import.meta.dirname, 'ci-apt.sh')
 
-function runApt(result, args = ['install', '-y', 'build-essential', 'python3']) {
+function runApt(
+  result,
+  args = ['install', '-y', 'build-essential', 'python3'],
+  timeoutOverride = ''
+) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-ci-apt-'))
   const makeCommand = (name, body) =>
     writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 })
@@ -33,7 +37,8 @@ esac`
       PATH: `${dir}:${process.env.PATH}`,
       CI_APT_RESULT: result,
       CI_APT_CALL_LOG: callLog,
-      CI_APT_TIMEOUT_LOG: timeoutLog
+      CI_APT_TIMEOUT_LOG: timeoutLog,
+      CI_APT_TIMEOUT: timeoutOverride
     }
   })
   const lines = (path) => {
@@ -54,8 +59,23 @@ describe('bounded CI apt', () => {
       '-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --print-uris -y zsh fish'
     ])
     expect(result.timeouts).toEqual([
-      '--signal=TERM --kill-after=10s 45s apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --print-uris -y zsh fish'
+      '--signal=TERM --kill-after=10s 120s apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --print-uris -y zsh fish'
     ])
+  })
+
+  it('uses the short deadline for update', () => {
+    const result = runApt('success', ['update'])
+    expect(result.timeouts[0]).toContain('--kill-after=10s 120s apt-get')
+  })
+
+  it('allows enough time for a real package install', () => {
+    const result = runApt('success', ['install', '-y', 'fonts-noto-cjk'])
+    expect(result.timeouts[0]).toContain('--kill-after=10s 600s apt-get')
+  })
+
+  it('accepts an explicit deadline override', () => {
+    const result = runApt('success', ['install', '-y', 'zsh'], '75s')
+    expect(result.timeouts[0]).toContain('--kill-after=10s 75s apt-get')
   })
 
   it('retries a failed attempt once and succeeds', () => {
