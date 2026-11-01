@@ -215,6 +215,36 @@ describe('fetchWorkspaceSessionFromHosts', () => {
     )
   })
 
+  it('clears the last sleeping agent record on the host instead of dropping the clear', async () => {
+    // Why: the dropped clear left main listing a woken pane as sleeping (ORCA-915).
+    let persisted: WorkspaceSessionState = {
+      ...getDefaultWorkspaceSession(),
+      sleepingAgentSessionsByPaneKey: {
+        'tab-1:leaf-1': {
+          paneKey: 'tab-1:leaf-1',
+          worktreeId: 'repo::/wt',
+          agent: 'claude',
+          providerSession: { key: 'session_id', id: 'member-session' },
+          prompt: 'implement ORCA-915',
+          state: 'working',
+          capturedAt: 1,
+          updatedAt: 1
+        }
+      }
+    }
+    const patch = vi.fn(async (slice: Partial<WorkspaceSessionState>) => {
+      persisted = { ...persisted, ...slice }
+    })
+
+    await patchWorkspaceSessionByHost(
+      { get: vi.fn(), patch, setSync: vi.fn() },
+      { sleepingAgentSessionsByPaneKey: undefined },
+      { repos: [], worktreesByRepo: {} }
+    )
+
+    expect(persisted.sleepingAgentSessionsByPaneKey?.['tab-1:leaf-1']).toBeUndefined()
+  })
+
   it('keeps catalog-known local folder workspace patches local over stale restored owners', async () => {
     const folderKey = folderWorkspaceKey('folder-1')
     const patch = vi.fn().mockResolvedValue(undefined)

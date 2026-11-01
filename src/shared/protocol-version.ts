@@ -131,6 +131,8 @@ export const TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY = 'terminal.paired-parki
 // Why: older hosts lack the targeted settings RPCs and strip agentPrompt from
 // terminal creation, so mobile must hide Quick Commands unless both are present.
 export const TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY = 'terminal.quick-commands.v1' as const
+// Why: older hosts have no terminal.wake, so a client must say "unsupported" instead of calling it (ORCA-915).
+export const TERMINAL_WAKE_RUNTIME_CAPABILITY = 'terminal.wake.v1' as const
 // Why: older hosts strip worktree.create's clientMutationId, so mobile must only
 // replay ambiguous cutovers when the host advertises idempotent create support.
 export const WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY =
@@ -238,6 +240,7 @@ export const RUNTIME_CAPABILITIES = [
   TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY,
   TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY,
   TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY,
+  TERMINAL_WAKE_RUNTIME_CAPABILITY,
   WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,

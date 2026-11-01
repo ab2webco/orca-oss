@@ -12,6 +12,7 @@ import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { runWorktreeDelete } from '@/components/sidebar/delete-worktree-flow'
 import { runSleepWorktree } from '@/components/sidebar/sleep-worktree-flow'
 import { createBackgroundSleepingAgentWakeDispatcher } from '@/lib/wake-sleeping-agents-in-background'
+import { wakeSleepingAgentPaneInBackground } from '@/lib/wake-sleeping-agent-pane'
 import { TOGGLE_WORKSPACE_BOARD_EVENT } from '@/components/sidebar/useWorkspaceBoardPanel'
 import { SPLIT_TERMINAL_PANE_EVENT, CLOSE_TERMINAL_PANE_EVENT } from '@/constants/terminal'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
@@ -2143,6 +2144,15 @@ export function useIpcEvents(): void {
         backgroundSleepingAgentWakeDispatcher.request(worktreeId)
       })
     )
+    const unsubscribeWakeSleepingAgentPane = window.api.ui.onWakeSleepingAgentPane?.(
+      ({ paneKey }) => {
+        // Why: `terminal.wake` from the CLI or a paired client wakes one pane, as the UI does.
+        wakeSleepingAgentPaneInBackground(paneKey)
+      }
+    )
+    if (unsubscribeWakeSleepingAgentPane) {
+      unsubs.push(unsubscribeWakeSleepingAgentPane)
+    }
 
     // Hydrate initial update status then subscribe to changes
     window.api.updater.getStatus().then((status) => {
