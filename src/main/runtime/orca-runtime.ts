@@ -31548,9 +31548,12 @@ export class OrcaRuntimeService {
       const db = this.getOrchestrationDb()
       const launched = db.workerLaunchForTerminal(handle)
       const seen = this.gameMemberSeenModelFor(paneKey, handle, db)
+      // Why named: the card says whose word the model is, so a member without Jev never reads as unknown (ORCA-933).
+      const isSession = Boolean(seen?.model) || (!launched?.model && Boolean(seen?.effort))
       return gameMemberLaunchOf({
         model: seen?.model ?? launched?.model ?? null,
-        effort: seen?.effort ?? launched?.effort ?? null
+        effort: seen?.effort ?? launched?.effort ?? null,
+        source: isSession ? 'session' : 'launch'
       })
     } catch {
       return null
@@ -31677,8 +31680,16 @@ export class OrcaRuntimeService {
         : this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin)
           ? { globalLogin: true as const }
           : {}),
-      ...(limit ? { limit } : {})
+      ...(limit ? { limit } : {}),
+      ...this.gameMemberModelsFor(paneKey)
     }
+  }
+
+  // Why here: a member posts its Jev report to its own host, so a lead elsewhere sees it only relayed (ORCA-933).
+  private gameMemberModelsFor(paneKey: string): Pick<RemoteMemberAgent, 'advisor' | 'launch'> {
+    const advisor = this.gameMemberAdvisors.of(paneKey, Date.now())
+    const launch = this.gameMemberLaunchFor(paneKey)
+    return { ...(advisor ? { advisor } : {}), ...(launch ? { launch } : {}) }
   }
 
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */

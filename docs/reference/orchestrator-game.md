@@ -1113,7 +1113,11 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
   its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
   their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`
-  reports. A host that does not answer within 3 s keeps its member listed with state `unknown`
+  reports, with the tool the member runs (`toolName`), its Jev report (`advisor`) and the model its
+  own hooks named, else the one the lead launched it on (`launch.source` `session` or `launch`;
+  ORCA-933). The Panel card prints that source (`◇ session …`, `◇ launch …`) when there is no Jev
+  report, and an older host relays none of the three, so the home falls back to its own launch
+  record. A host that does not answer within 3 s keeps its member listed with state `unknown`
   and NEXT `worker-show --dispatch <id>`. The fleet holds the lead Run's live remote dispatches and
   those that finished since the current lead claimed the Run. A remote agent started any other way
   (a plain terminal on the host) has no record on the lead's machine and cannot be listed;
