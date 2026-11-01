@@ -38,7 +38,7 @@ function setup(
     dispatchStatus?: string | null
     worktrees?: string[]
     taskWorktree?: string
-    resume?: (member: GameMemberSession) => Promise<string>
+    resume?: (member: GameMemberSession) => Promise<string | null>
     now?: () => number
   } = {}
 ) {
@@ -213,6 +213,17 @@ describe('GameMemberResume.resume', () => {
       outcome: 'relaunch',
       member: target,
       note: 'Claude exited instead of reopening the conversation'
+    })
+  })
+
+  it('starts no second agent while its slept pane is still waking (ORCA-915)', async () => {
+    const { store, resume } = setup({ resume: async () => null })
+    await store.upsert('repo:a', saved('ORCA-1'))
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'missing',
+      ticket: 'ORCA-1',
+      reason:
+        'its pane is waking and its agent is still starting; run `orca game resume-members ORCA-1` again in a minute'
     })
   })
 

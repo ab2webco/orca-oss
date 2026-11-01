@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getDefaultWorkspaceSession } from '../../shared/constants'
 import type { SleepingAgentSessionRecord } from '../../shared/agent-session-resume'
+import type { GameMemberSession } from '../../shared/orchestrator-game-member-sessions'
 import type { WorkspaceSessionState } from '../../shared/types'
 import { OrcaRuntimeService } from './orca-runtime'
+import { OrchestrationDb } from './orchestration/db'
+import { inspectRemoteAttachment } from './rpc/methods/orchestration-federation-control'
 
 // Why: after a host restart a member's pane comes back asleep, and a lead on
 // another machine could only wake it by clicking it in that host's UI (ORCA-915).
@@ -43,6 +46,23 @@ const RECORD: SleepingAgentSessionRecord = {
   capturedAt: 10,
   updatedAt: 20,
   origin: 'quit'
+}
+
+const MEMBER: GameMemberSession = {
+  ticket: 'ORCA-915',
+  name: 'Nova',
+  runId: 'run-1',
+  taskId: 'task-1',
+  dispatchId: null,
+  worktreeId: WORKTREE_ID,
+  branch: 'fabolivark/orca-915',
+  agent: 'claude',
+  accountId: 'acct-1',
+  account: 'member@example.com',
+  sessionId: 'member-session',
+  lastState: 'working',
+  launchedAt: '2026-10-30T10:00:00.000Z',
+  updatedAt: '2026-10-30T10:00:00.000Z'
 }
 
 function syncMemberPane(runtime: OrcaRuntimeService, ptyId: string | null): void {
@@ -161,32 +181,12 @@ describe('terminal.list owner of a sleeping row', () => {
       const { runtime } = makeRuntime(true, pane)
       const read = vi.fn(async (projectKey: string) => ({
         ok: true as const,
-        members:
-          projectKey === `repo:${REPO_ID}`
-            ? [
-                {
-                  ticket: 'ORCA-915',
-                  name: 'Nova',
-                  runId: 'run-1',
-                  taskId: 'task-1',
-                  dispatchId: null,
-                  worktreeId: WORKTREE_ID,
-                  branch: 'fabolivark/orca-915',
-                  agent: 'claude',
-                  accountId: 'acct-1',
-                  account: 'member@example.com',
-                  sessionId: 'member-session',
-                  lastState: 'working',
-                  launchedAt: '2026-10-30T10:00:00.000Z',
-                  updatedAt: '2026-10-30T10:00:00.000Z'
-                }
-              ]
-            : []
+        members: projectKey === `repo:${REPO_ID}` ? [MEMBER] : []
       }))
       // Why a cast: the member file and the run database are private and touch disk.
       Object.assign(runtime as object, {
         gameMemberSessions: { read },
-        getOrchestrationDb: () => ({
+        getOrchestrationDbIfAvailable: () => ({
           getRun: (id: string) => (id === 'run-1' ? { coordinator_handle: 'term_lead' } : undefined)
         })
       })
@@ -199,6 +199,119 @@ describe('terminal.list owner of a sleeping row', () => {
         owner: { lead: 'term_lead', ticket: 'ORCA-915', account: 'member@example.com' }
       })
       expect(read).toHaveBeenCalledTimes(1)
+    }
+  )
+})
+
+describe('game resume of a member whose pane slept', () => {
+  const resumeOf = (runtime: OrcaRuntimeService, member: GameMemberSession): Promise<string> =>
+    (
+      runtime as unknown as { resumeGameMemberSession: (one: GameMemberSession) => Promise<string> }
+    ).resumeGameMemberSession(member)
+
+  it.each(['mounted', 'unmounted'] as const)(
+    'wakes the %s pane in place instead of opening a second agent on its conversation',
+    async (pane) => {
+      const { runtime, wakeSleepingAgentPane } = makeRuntime(true, pane)
+      const reopen = vi.fn(async () => 'term_second_agent')
+      Object.assign(runtime as object, { reopenClaudeConversation: reopen })
+
+      const terminal = await resumeOf(runtime, MEMBER)
+
+      expect(wakeSleepingAgentPane).toHaveBeenCalledExactlyOnceWith(PANE_KEY)
+      expect(reopen).not.toHaveBeenCalled()
+      const { terminals } = await runtime.listTerminals(`id:${WORKTREE_ID}`)
+      expect(terminals.find((one) => one.handle === terminal)).toMatchObject({
+        liveness: 'running',
+        leafId: LEAF_ID
+      })
+    }
+  )
+
+  it('reopens the conversation when no pane of it is asleep', async () => {
+    const { runtime, wakeSleepingAgentPane } = makeRuntime(true)
+    const reopen = vi.fn(async () => 'term_reopened')
+    Object.assign(runtime as object, { reopenClaudeConversation: reopen })
+
+    await expect(resumeOf(runtime, { ...MEMBER, sessionId: 'another-session' })).resolves.toBe(
+      'term_reopened'
+    )
+    expect(wakeSleepingAgentPane).not.toHaveBeenCalled()
+  })
+})
+
+/** A member a paired lead placed in the sleeping pane, attached before the host restarted. */
+function attachRemoteMember(runtime: OrcaRuntimeService): OrchestrationDb {
+  const db = new OrchestrationDb(':memory:')
+  runtime.setOrchestrationDb(db)
+  db.createRemoteDispatchAttachment({
+    dispatchId: 'ctx_remote',
+    taskId: 'task_remote',
+    homePeerFingerprint: 'home',
+    protocolVersion: 1,
+    runtimeEpoch: 'before-restart',
+    mutationReceipt: {
+      callerFingerprint: 'home',
+      requestId: 'req-1',
+      method: 'orchestration.workerStart',
+      payloadHash: 'hash'
+    }
+  })
+  db.prepareRemoteAttachmentAuthority({
+    dispatchId: 'ctx_remote',
+    paneKey: PANE_KEY,
+    processIncarnation: 'pty-before-restart:1',
+    worktreeId: WORKTREE_ID,
+    terminalHandle: 'term_before_restart',
+    setupState: 'ready',
+    effects: []
+  })
+  db.markRemoteAttachmentReady('ctx_remote')
+  return db
+}
+
+describe('waking a member a paired lead placed on this host', () => {
+  it.each(['mounted', 'unmounted'] as const)(
+    'rebinds its attachment to the woken %s pane, so the lead sees its member again',
+    async (pane) => {
+      const { runtime } = makeRuntime(true, pane)
+      const db = attachRemoteMember(runtime)
+
+      const woken = await runtime.wakeTerminal(await sleepingHandleOf(runtime))
+
+      const incarnation = runtime.getTerminalProcessIncarnation(woken.handle!)
+      expect(db.getRemoteDispatchAttachment('ctx_remote')?.terminal_handle).toBe(woken.handle)
+      expect(
+        db.isRemoteAttachmentProcessCurrent({
+          dispatchId: 'ctx_remote',
+          paneKey: PANE_KEY,
+          processIncarnation: incarnation
+        })
+      ).toBe(true)
+      db.close()
+    }
+  )
+})
+
+describe('federationShow of a member whose pane slept', () => {
+  it.each(['mounted', 'unmounted'] as const)(
+    'reports the %s pane asleep with its handle, not missing',
+    async (pane) => {
+      const { runtime } = makeRuntime(true, pane)
+      const db = attachRemoteMember(runtime)
+
+      const observation = await inspectRemoteAttachment(runtime, 'ctx_remote')
+
+      expect(observation).toMatchObject({
+        status: 'asleep',
+        terminal: null,
+        asleep: await sleepingHandleOf(runtime)
+      })
+      // federationShow describes the asleep member from this handle.
+      await expect(
+        runtime.showTerminal((observation as { asleep: string }).asleep)
+      ).resolves.toMatchObject({ liveness: 'sleeping', worktreeId: WORKTREE_ID })
+      db.close()
     }
   )
 })
