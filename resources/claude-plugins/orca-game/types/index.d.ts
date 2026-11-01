@@ -69,7 +69,7 @@ export type GameMemberRemote = {
   gone?: true
 }
 
-export type GameMemberLaunch = { model: string | null; effort: string | null }
+export type GameMemberLaunch = GameMemberAdvisorPick & { source?: 'session' | 'launch' }
 
 /** A model and effort as Jev names them; null where Jev set none. */
 export type GameMemberAdvisorPick = { model: string | null; effort: string | null }
@@ -395,6 +395,7 @@ export type GameLead = { autostart: boolean; cap: number; label?: string }
 
 export type GameRole = 'lead' | 'member'
 
+/** `stateAt`: when `state` was read; `isStale`: the last read failed and kept the old one. */
 export type FleetState = {
   isLoading: boolean
   refreshedAt: number
@@ -403,7 +404,7 @@ export type FleetState = {
   xp: number
   /** The latest rewards, newest first; absent in an atom an older mod stored. */
   recent?: readonly RecentReward[]
-}
+} & Partial<{ stateAt: number; isStale: boolean }>
 
 export type RewardKind =
   | 'review-merged'

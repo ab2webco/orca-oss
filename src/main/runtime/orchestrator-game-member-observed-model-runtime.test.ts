@@ -85,10 +85,18 @@ describe("a member's model from its own hooks", () => {
       model: 'claude-opus-5-5',
       effort: 'high'
     })
-    expect(await member.memberLaunch()).toEqual({ model: 'Opus 5.5', effort: 'high' })
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      source: 'session'
+    })
 
     member.hookStatuses.length = 0
-    expect(await member.memberLaunch()).toEqual({ model: 'Opus 5.5', effort: 'high' })
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      source: 'session'
+    })
   })
 
   it('wins over the model the dispatch asked for, and keeps the launch effort when hooks name none', async () => {
@@ -97,13 +105,21 @@ describe("a member's model from its own hooks", () => {
       effective: { agent: 'claude', model: 'claude-sonnet-5-5', effort: 'low' }
     })
     dbs.push(member.db)
-    expect(await member.memberLaunch()).toEqual({ model: 'Sonnet 5.5', effort: 'low' })
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Sonnet 5.5',
+      effort: 'low',
+      source: 'launch'
+    })
 
     member.hookStatuses.push({
       paneKey: 'tab-4:member',
       state: 'working',
       model: 'claude-opus-5-5'
     })
-    expect(await member.memberLaunch()).toEqual({ model: 'Opus 5.5', effort: 'low' })
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Opus 5.5',
+      effort: 'low',
+      source: 'session'
+    })
   })
 })

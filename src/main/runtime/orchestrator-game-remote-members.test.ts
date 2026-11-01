@@ -112,7 +112,8 @@ describe('remote members of a lead (ORCA-824)', () => {
     createdAt: '2026-10-27 13:00:00',
     finished: false,
     ticketDone: false,
-    earlierLead: false
+    earlierLead: false,
+    launch: null
   }
 
   it('reads state, branch and PR from the host and the review provider', async () => {
@@ -609,7 +610,8 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     createdAt: '2026-10-27 09:00:00',
     finished: true,
     ticketDone: true,
-    earlierLead: true
+    earlierLead: true,
+    launch: null
   }
 
   it("shows an earlier lead's member only while its host still runs its terminal", async () => {

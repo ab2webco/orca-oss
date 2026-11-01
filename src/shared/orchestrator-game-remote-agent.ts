@@ -5,6 +5,12 @@ import {
 } from './agent-status-types'
 import type { GameMemberLimit } from './orchestrator-game-member-limit'
 import { accountProviderOfAgent, type GameAccountProvider } from './orchestrator-game-member-agent'
+import {
+  GAME_MEMBER_ADVISOR_VERSION,
+  parseGameMemberAdvisorReport,
+  type GameMemberAdvisor
+} from './orchestrator-game-member-advisor'
+import { gameMemberLaunchOf, type GameMemberLaunch } from './orchestrator-game-member-launch'
 
 /**
  * A remote member's agent as its host's Claude/Codex hooks report it, relayed on
@@ -22,7 +28,15 @@ export type RemoteMemberAgent = {
   account?: { provider: GameAccountProvider; email: string }
   /** No managed account: the pane runs on the host's global login (ORCA-891); absent from an older host. */
   globalLogin?: true
+  /** The tool the pane's hooks say it runs; absent from an older host (ORCA-933). */
+  toolName?: string
+  /** The Jev report the member's pane posted to its host; absent without Jev or from an older host. */
+  advisor?: GameMemberAdvisor
+  /** The model its hooks named, else its launch's; absent when neither named one or from an older host. */
+  launch?: GameMemberLaunch
 }
+
+const TOOL_NAME_MAX = 64
 
 /** The host's hook reading for a pane; null without one, or when it is only restored from disk. */
 export function remoteMemberAgentOf(
@@ -37,7 +51,8 @@ export function remoteMemberAgentOf(
     state: entry.state,
     agentType: entry.agentType ?? null,
     updatedAt: entry.receivedAt,
-    ...(Number.isFinite(entry.stateStartedAt) ? { stateStartedAt: entry.stateStartedAt } : {})
+    ...(Number.isFinite(entry.stateStartedAt) ? { stateStartedAt: entry.stateStartedAt } : {}),
+    ...(entry.toolName ? { toolName: entry.toolName } : {})
   }
 }
 
@@ -48,6 +63,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   }
   const { state, agentType, updatedAt, stateStartedAt, limit, account, globalLogin } =
     value as Record<string, unknown>
+  const { toolName, advisor, launch } = value as Record<string, unknown>
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -57,6 +73,8 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   }
   const resetsAt = (limit as { resetsAt?: unknown } | undefined)?.resetsAt
   const relayed = relayedAccountOf(account)
+  const relayedAdvisor = relayedAdvisorOf(advisor)
+  const relayedLaunch = gameMemberLaunchOf(launch)
   return {
     state: state as AgentStatusState,
     agentType: typeof agentType === 'string' ? agentType : null,
@@ -74,7 +92,36 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
           }
         }
       : {}),
-    ...(relayed ? { account: relayed } : globalLogin === true ? { globalLogin: true as const } : {})
+    ...(relayed
+      ? { account: relayed }
+      : globalLogin === true
+        ? { globalLogin: true as const }
+        : {}),
+    ...(typeof toolName === 'string' && toolName !== ''
+      ? { toolName: toolName.slice(0, TOOL_NAME_MAX) }
+      : {}),
+    ...(relayedAdvisor ? { advisor: relayedAdvisor } : {}),
+    ...(relayedLaunch ? { launch: relayedLaunch } : {})
+  }
+}
+
+// Why the version: the host relays the report it holds, which carries none; the pane's parser wants one.
+function relayedAdvisorOf(value: unknown): GameMemberAdvisor | null {
+  if (typeof value !== 'object' || value === null) {
+    return null
+  }
+  const report = parseGameMemberAdvisorReport({ ...value, version: GAME_MEMBER_ADVISOR_VERSION })
+  if (!report) {
+    return null
+  }
+  const before = (value as { previous?: unknown }).previous
+  const previous =
+    typeof before === 'object' && before !== null
+      ? parseGameMemberAdvisorReport({ ...before, version: GAME_MEMBER_ADVISOR_VERSION })
+      : null
+  return {
+    ...report,
+    ...(previous ? { previous: { model: previous.model, effort: previous.effort } } : {})
   }
 }
 
