@@ -799,6 +799,7 @@ import type {
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
+import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
@@ -3977,6 +3978,7 @@ export class OrcaRuntimeService {
     this.notifier?.gameInboxChanged?.()
     this.emitClientEvent({ type: 'gameInboxChanged' })
   })
+  private readonly gameFleetChange = new GameFleetChangeSignal()
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -6260,6 +6262,7 @@ export class OrcaRuntimeService {
   }
 
   private notifyWorktreesChanged(repoId: string): void {
+    this.gameFleetChange.changed()
     this.notifier?.worktreesChanged(repoId)
     this.emitClientEvent({ type: 'worktreesChanged', repoId })
   }
@@ -11945,6 +11948,10 @@ export class OrcaRuntimeService {
     // updatedAt) — mirrors AgentStatusEntry.stateStartedAt on the desktop side.
     const stateStartedAt =
       previous && previous.payload.state === payload.state ? previous.stateStartedAt : now
+    // Why state only: a game band draws working/waiting/done, and tool pings would refresh it nonstop.
+    if (stateStartedAt === now) {
+      this.gameFleetChange.changed()
+    }
     this.latestAgentStatusByPaneKey.set(paneKey, {
       paneKey,
       ptyId,
@@ -11972,6 +11979,7 @@ export class OrcaRuntimeService {
     for (const [paneKey, snapshot] of this.latestAgentStatusByPaneKey) {
       if (snapshot.ptyId === ptyId) {
         this.latestAgentStatusByPaneKey.delete(paneKey)
+        this.gameFleetChange.changed()
       }
     }
   }
@@ -31160,6 +31168,19 @@ export class OrcaRuntimeService {
     return repoId ? `repo:${repoId}` : null
   }
 
+  /** Long-polls the fleet version; with no `since`, answers the current one at once. */
+  async waitGameFleetChange(args: { since?: number; timeoutMs: number }): Promise<GameFleetWait> {
+    if (args.since === undefined) {
+      return { version: this.gameFleetChange.version(), changed: false }
+    }
+    return await this.gameFleetChange.wait(args.since, args.timeoutMs)
+  }
+
+  /** A change made outside the runtime's own paths (the stop switch) that a band draws. */
+  noteGameFleetChanged(): void {
+    this.gameFleetChange.changed()
+  }
+
   getGameBoard(): GameBoard {
     return this.gameBoard
   }
@@ -31253,6 +31274,7 @@ export class OrcaRuntimeService {
     if (args.record.ticket) {
       await this.gamePausedMembers.forget(key, [args.record.ticket]).catch(() => undefined)
     }
+    this.gameFleetChange.changed()
     return { recorded: true, count: records.length }
   }
 
@@ -31266,6 +31288,7 @@ export class OrcaRuntimeService {
       throw new Error('Only the lead saves its members.')
     }
     await this.gamePausedMembers.record(project.key, args.member)
+    this.gameFleetChange.changed()
     return { recorded: true }
   }
 
@@ -31309,7 +31332,11 @@ export class OrcaRuntimeService {
     if (project.isMember) {
       throw new Error('Only the lead resumes its members.')
     }
-    return await this.gameMemberResume.resume(project.key, args.ticket)
+    try {
+      return await this.gameMemberResume.resume(project.key, args.ticket)
+    } finally {
+      this.gameFleetChange.changed()
+    }
   }
 
   async discardGameMembers(args: {
@@ -31321,7 +31348,11 @@ export class OrcaRuntimeService {
     if (project.isMember) {
       throw new Error('Only the lead discards its members.')
     }
-    return await this.gameMemberResume.discard(project.key, args.tickets)
+    try {
+      return await this.gameMemberResume.discard(project.key, args.tickets)
+    } finally {
+      this.gameFleetChange.changed()
+    }
   }
 
   private resumeGameMemberSession(member: GameMemberSession): Promise<string> {
@@ -36804,6 +36835,8 @@ export class OrcaRuntimeService {
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
     this.gameInboxChange.mailArrived(messageType)
+    // Why heartbeats too: a member's first one moves its phase off "starting".
+    this.gameFleetChange.changed()
     const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
     const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
     const dispatch =
