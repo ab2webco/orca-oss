@@ -1,0 +1,77 @@
+name: Packaged Plugin Seal
+
+# Why before merge too: the Lab Release gate runs this same check on the commit it ships, but a
+# change to the Claude plugin path should meet it before merge, not at release time (ORCA-663).
+# Why the merge queue and not each push: three runners, one macOS, per push jammed the org's
+# 20-job cap (ORCA-932). merge_group takes no `paths`, so the scope job applies them.
+
+on:
+  merge_group:
+    types:
+      - checks_requested
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaged-plugin-seal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: detect plugin seal scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.filter.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Match the plugin seal paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != "merge_group" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Why apart from grep: a failed diff must fail the job, not read as "no plugin change".
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          matches=$(printf '%s\n' "$changed" | grep -E \
+            -e '^src/main/claude/(orchestrator-game-|claude-plugin-dir-probe)' \
+            -e '^resources/claude-plugins/' \
+            -e '^config/electron-builder\.config\.cjs$' \
+            -e '^config/scripts/verify-packaged-claude-plugin-seal' \
+            -e '^\.github/actions/verify-packaged-plugin-seal/' \
+            -e '^\.github/workflows/packaged-plugin-seal\.yml$' || true)
+          if [ -n "$matches" ]; then
+            printf 'Seal scope:\n%s\n' "$matches"
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  seal:
+    name: packaged plugin seal (${{ matrix.os }})
+    needs: scope
+    if: needs.scope.outputs.should_run == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/verify-packaged-plugin-seal
