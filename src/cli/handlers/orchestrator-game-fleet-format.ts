@@ -7,6 +7,10 @@ import {
   formatGameGitHubBudget,
   type GameGitHubBudget
 } from '../../shared/orchestrator-game-github-budget'
+import {
+  formatGameHostCapacity,
+  type GameHostCapacity
+} from '../../shared/orchestrator-game-host-capacity'
 import type {
   GameFleet,
   GameFleetRow,
@@ -153,12 +157,19 @@ function sinceOf(at: string | null, now: number): string {
   return minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`
 }
 
-export type GameFleetWithBudget = GameFleet & { githubBudget?: GameGitHubBudget }
+export type GameFleetWithBudget = GameFleet & {
+  githubBudget?: GameGitHubBudget
+  hostCapacity?: GameHostCapacity[]
+}
 
 export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
   const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
-  const hosts = fleet.hosts ? [`Hosts: ${gameHostLoadLineOf(fleet.hosts)}`] : []
+  const hosts = fleet.hostCapacity
+    ? formatGameHostCapacity(fleet.hostCapacity)
+    : fleet.hosts
+      ? [`Hosts: ${gameHostLoadLineOf(fleet.hosts)}`]
+      : []
   const budget = fleet.githubBudget ? formatGameGitHubBudget(fleet.githubBudget, now) : []
   const top = [head, ...hosts, ...budget]
   const paused = [...formatQueued(fleet), ...formatPaused(fleet)]
@@ -178,7 +189,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.agent ?? '-',
     row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.next,
-    row.name
+    row.found ? `${row.name} (found)` : row.name
   ])
   const header = [
     'PHASE',

@@ -26,12 +26,12 @@ import type { GameMerge } from '../../shared/orchestrator-game-events'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
+import type { GameMetricsSummary } from '../../shared/orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { PairedGameHostEntry } from './orchestrator-game-paired-hosts'
-
-type TrackerItem = { identifier: string; title: string; url: string; stateName: string }
+import type { TrackerItem } from './orchestrator-game-lead-work-item'
 
 export type OrchestratorGameStateInput = {
   settings:
@@ -56,6 +56,8 @@ export type OrchestratorGameStateInput = {
   agents: GameAgentRow[]
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
   members?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  /** Every other session on this machine; read only for a lead (ORCA-914). */
+  found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
@@ -94,6 +96,8 @@ export type OrchestratorGameStateInput = {
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */
   readGitHubBudget?: () => Promise<GameGitHubBudget | null>
+  /** The project's delivery numbers by day in `timezone`; read only for a lead. */
+  readMetrics?: (timezone: string) => Promise<GameMetricsSummary | null>
   /** My open PRs and tickets across the repo, not only this worktree's. */
   readProjectWork?: (args: {
     todo: OrchestratorGameTodoSource | null
