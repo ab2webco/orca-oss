@@ -42,6 +42,7 @@ export const FULL_SUITE_PATHS = [
   // The lane itself, so a change to this gate is proved by running it.
   /^\.github\/workflows\/(pr|e2e)\.yml$/,
   /^\.github\/actions\/install-apt-packages\//,
+  /^config\/scripts\/ci-apt\.sh$/,
   /^config\/scripts\/(select-pr-e2e-scope|apt-archive-cache)\.mjs$/
 ]
 

@@ -259,18 +259,18 @@ jobs:
           # non-zero and would red this required check over something unrelated to the
           # PR. Every fish outcome is judged by the version gate below instead, so only
           # the zsh install (which has no such gate) stays fatal here.
-          sudo apt-get update || true
+          bash config/scripts/ci-apt.sh update || true
           # Why a script and not an inline loop: the retry/backoff and the
           # "source unavailable" outcome are the thing under test, and a workflow
           # step cannot be exercised without pushing a commit (ORCA-287).
           export ORCA_FISH4_SOURCE_STATUS_FILE="${RUNNER_TEMP}/fish4-source-status"
           bash config/scripts/enable-fish4-apt-source.sh || true
-          sudo apt-get update || true
+          bash config/scripts/ci-apt.sh update || true
           # Why both shells on one line: pr-workflow-parallelism.test.mjs parses only the
           # first install command in this step to prove the lane really installs them.
           # Why the zsh-only retry: the PPA's fish .deb can 503 while its index answers
           # (ORCA-737); fish falls through to the release below, zsh stays fatal.
-          sudo apt-get install -y zsh fish || sudo apt-get install -y zsh
+          bash config/scripts/ci-apt.sh install -y zsh fish || bash config/scripts/ci-apt.sh install -y zsh
           # Why a second source: the PPA can be added and still 503 its Packages index,
           # which leaves Noble's fish 3.7 (ORCA-732); this fetches the pinned fish 4 release.
           bash config/scripts/install-fish4-release.sh || true
