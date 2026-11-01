@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import SyncDatabase from '../sqlite/sync-database'
 import { OrchestrationDb } from './orchestration/db'
 import { tellGameLead } from './orchestrator-game-lead-note'
+import { GameBoard } from './orchestrator-game-board'
+import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GameStopSwitch } from './orchestrator-game-stop-switch'
 
 const LEAD_WATCH_TYPES = ['worker_done', 'escalation', 'question', 'decision_gate'] as const
 const LEAD_PANE = 'tab_lead:11111111-1111-4111-8111-111111111111'
@@ -133,5 +136,43 @@ describe('tellGameLead', () => {
 
     expect(tellGameLead(closed, notify, LEAD, { subject: 's', body: 'b', payload: {} })).toBe(false)
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  // Why (ORCA-942): the lead asked again because the Inbox answer never woke its watch.
+  it("wakes the lead's watch with exactly one escalation for an Inbox answer", async () => {
+    const db = adoptedDb()
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    const dir = mkdtempSync(join(tmpdir(), 'orca-lead-note-board-'))
+    dirs.push(dir)
+    const notify = vi.fn()
+    const game = new GameBoard({
+      store: new GameHistoryStore(() => dir),
+      stops: new GameStopSwitch(() => join(dir, 'stop')),
+      projectOf: async () => ({ key: 'repo:r1', isMember: false, memberTicket: null, lead: LEAD }),
+      inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
+      tellLead: (lead, note) => tellGameLead(db, notify, lead, note)
+    })
+    const { question } = await game.askOwner({ ticket: 'orca-1', question: 'Queue #817?' })
+
+    await expect(
+      game.answerOwner({ worktreeId: 'wt', id: question.id, text: 'Sí, encolar #817' })
+    ).resolves.toMatchObject({ delivered: true })
+    await game.ownerQuestions({ terminalHandle: 'term_lead' })
+    await game.inbox({ terminalHandle: 'term_lead' })
+
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(db.hasUnreadOutsideMemberRunMail(run.id, 'term_lead')).toBe(true)
+    const mail = leadDelivery(db, run.id, run.consumer_generation)?.messages ?? []
+    expect(mail).toHaveLength(1)
+    expect(mail[0]).toMatchObject({ from_handle: 'owner', type: 'escalation' })
+    expect(JSON.parse(mail[0]?.payload ?? '{}')).toEqual({
+      ownerQuestionId: question.id,
+      ticket: 'ORCA-1',
+      answer: 'Sí, encolar #817'
+    })
   })
 })

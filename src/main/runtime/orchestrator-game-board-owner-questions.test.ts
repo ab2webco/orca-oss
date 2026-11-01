@@ -27,7 +27,10 @@ const LEAD: GameBoardProject = {
 }
 const MEMBER: GameBoardProject = { ...LEAD, isMember: true, memberTicket: 'CIN-1' }
 
-function board(project: (caller: { terminalHandle?: string }) => GameBoardProject) {
+function board(
+  project: (caller: { terminalHandle?: string }) => GameBoardProject,
+  accepts: (lead: GameBoardLead) => boolean = () => true
+) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-owner-'))
   dirs.push(dir)
   const told: { lead: GameBoardLead; note: GameLeadNote }[] = []
@@ -38,6 +41,9 @@ function board(project: (caller: { terminalHandle?: string }) => GameBoardProjec
     projectOf: async (caller) => project(caller),
     inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
     tellLead: (lead, note) => {
+      if (!accepts(lead)) {
+        return false
+      }
       told.push({ lead, note })
       return true
     },
@@ -71,7 +77,8 @@ describe('GameBoard owner questions', () => {
     })
     await expect(game.ownerQuestions({ terminalHandle: 'term_lead' })).resolves.toEqual({
       questions: [question],
-      open: 1
+      open: 1,
+      undelivered: []
     })
   })
 
@@ -119,7 +126,8 @@ describe('GameBoard owner questions', () => {
     ])
     expect(await game.ownerQuestions({ terminalHandle: 'term_lead' })).toEqual({
       questions: [],
-      open: 0
+      open: 0,
+      undelivered: []
     })
     expect(
       (await game.ownerQuestions({ terminalHandle: 'term_lead', all: true })).questions
@@ -158,5 +166,67 @@ describe('GameBoard owner questions', () => {
     await game.ownerQuestions({ terminalHandle: 'term_lead' })
 
     expect(changed).toEqual(['repo:r1', 'repo:r1'])
+  })
+
+  // Why (ORCA-942): an answer given while no lead could take it was lost, and the lead asked again.
+  it("keeps an answer no lead received and delivers it once to the project's next lead", async () => {
+    let lead: GameBoardLead | null = null
+    const { game, told } = board(() => ({ ...LEAD, lead }))
+    const { question } = await game.askOwner(ask)
+
+    await expect(
+      game.answerOwner({ worktreeId: 'wt', id: question.id, text: 'Yes' })
+    ).resolves.toMatchObject({ delivered: false, repeated: false })
+    expect(told).toEqual([])
+
+    lead = { handle: 'term_next_lead', paneKey: 'tab:next' }
+    const listed = await game.ownerQuestions({ terminalHandle: 'term_next_lead' })
+
+    expect(listed).toMatchObject({ questions: [], open: 0 })
+    expect(listed.undelivered).toMatchObject([{ id: question.id, answer: { text: 'Yes' } }])
+    expect(told).toMatchObject([
+      { lead, note: { payload: { ownerQuestionId: question.id, answer: 'Yes' } } }
+    ])
+
+    await game.ownerQuestions({ terminalHandle: 'term_next_lead' })
+    await game.inbox({ terminalHandle: 'term_next_lead' })
+    expect(told).toHaveLength(1)
+    expect((await game.ownerQuestions({ terminalHandle: 'term_next_lead' })).undelivered).toEqual(
+      []
+    )
+  })
+
+  it("retries a note the lead's mail refused on the next read of its inbox", async () => {
+    let open = false
+    const { game, told } = board(
+      () => LEAD,
+      () => open
+    )
+    const { question } = await game.askOwner(ask)
+
+    await expect(game.answerOwner({ id: question.id, option: 1 })).resolves.toMatchObject({
+      delivered: false
+    })
+    const stored = await game.ownerQuestions({ terminalHandle: 'term_lead', all: true })
+    expect(stored.questions[0]?.answer).toMatchObject({ text: 'Yes', undelivered: true })
+
+    open = true
+    await game.inbox({ terminalHandle: 'term_lead' })
+
+    expect(told).toMatchObject([{ lead: LEAD_TERMINAL, note: { payload: { answer: 'Yes' } } }])
+    const after = await game.ownerQuestions({ terminalHandle: 'term_lead', all: true })
+    expect(after.questions[0]?.answer).toEqual({ text: 'Yes', at: '2026-10-29T10:00:00.000Z' })
+  })
+
+  it('never delivers to a member, which only reads its own ticket', async () => {
+    let caller: GameBoardProject = { ...LEAD, lead: null }
+    const { game, told } = board(() => caller)
+    const { question } = await game.askOwner(ask)
+    await game.answerOwner({ id: question.id, text: 'Yes' })
+
+    caller = MEMBER
+    await game.inbox({ terminalHandle: 'term_member' })
+
+    expect(told).toEqual([])
   })
 })
