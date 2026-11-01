@@ -790,6 +790,7 @@ import {
 } from './orchestrator-game-member-name-reservations'
 import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
 import { wakeSleepingTerminal } from './terminal-wake'
+import { sleepingTerminalOwnerOf } from './sleeping-terminal-owner'
 import { GameMemberResume } from './orchestrator-game-member-resume'
 import type {
   GameMemberResumeOutcome,
@@ -17269,6 +17270,7 @@ export class OrcaRuntimeService {
       ? terminals.filter((terminal) => requestedHandles.has(terminal.handle))
       : terminals
     const listedTerminals = matchingTerminals.slice(0, limit)
+    await this.attachSleepingTerminalOwners(listedTerminals, worktreesById, sleepingAgentsByPaneKey)
     // Why: undefined (pre-flag client) must still get layouts; only an explicit
     // `false` opts out.
     const visualLayouts =
@@ -17287,6 +17289,53 @@ export class OrcaRuntimeService {
       ),
       totalCount: matchingTerminals.length,
       truncated: matchingTerminals.length > limit
+    }
+  }
+
+  /** Names each sleeping row's game member, so a lead sees whose terminals a restart left asleep (ORCA-915). */
+  private async attachSleepingTerminalOwners(
+    terminals: RuntimeTerminalSummary[],
+    worktreesById: Map<string, ResolvedWorktree>,
+    records: Map<string, SleepingAgentSessionRecord>
+  ): Promise<void> {
+    const membersByProject = new Map<string, Promise<readonly GameMemberSession[]>>()
+    for (const terminal of terminals) {
+      const record = terminal.sleepingAgent && records.get(terminal.sleepingAgent.paneKey)
+      const repoId = worktreesById.get(terminal.worktreeId)?.repoId
+      if (!terminal.sleepingAgent || !record || !repoId) {
+        continue
+      }
+      const key = `repo:${repoId}`
+      let members = membersByProject.get(key)
+      if (!members) {
+        // Why never throw: an unreadable members file costs the row its owner, not the list.
+        members = this.gameMemberSessions.read(key).then(
+          (read) => (read.ok ? read.members : []),
+          () => []
+        )
+        membersByProject.set(key, members)
+      }
+      const owner = sleepingTerminalOwnerOf({
+        record,
+        members: await members,
+        leadOfRun: (runId) => this.coordinatorHandleOfRun(runId),
+        pinnedAccount:
+          this.gameMemberAccountFor(
+            { paneKey: record.paneKey, agentType: record.agent, worktreeId: record.worktreeId },
+            worktreesById
+          )?.email ?? null
+      })
+      if (owner) {
+        terminal.sleepingAgent = { ...terminal.sleepingAgent, owner }
+      }
+    }
+  }
+
+  private coordinatorHandleOfRun(runId: string): string | null {
+    try {
+      return this.getOrchestrationDb().getRun(runId)?.coordinator_handle ?? null
+    } catch {
+      return null
     }
   }
 
