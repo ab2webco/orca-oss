@@ -748,7 +748,15 @@ matches …` (ORCA-866).
   serves, so there is no wire change. Adoption is refused while the agent is mid-turn, so the attach
   brief never lands in a running turn (pass `--force` to adopt anyway). It is also refused when the
   agent leads a Run on its host or its terminal no longer runs. Adopting an agent that is already a
-  member reuses its dispatch. A local found agent of another repo is never adopted.
+  member reuses its dispatch. A local found agent of another repo is never adopted. An agent dropped
+  with `game drop` is brought back into the fleet first.
+- `orca game drop <name|ticket>` — takes an agent out of the lead's fleet without stopping it or
+  touching its terminal or worktree (ORCA-943). The drop is kept per project, by the agent's host
+  and worktree (a restart changes its pane key, not those), so the agent stays out of `game fleet`
+  and the Panel across refreshes and restarts, and its saved member entry is removed so a restart
+  does not resume it, until `game adopt` brings it back. A member whose dispatch still reports to
+  the lead is refused, with the dispatch named: drop it after its worker_done, or `game stop` ends
+  it. Ending a live dispatch while keeping its agent is not built yet.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is

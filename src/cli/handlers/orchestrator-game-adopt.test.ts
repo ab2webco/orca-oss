@@ -64,12 +64,13 @@ const hostReads = (state = 'done', runs: unknown[] = []) => ({
   'orchestration.runList': { runs }
 })
 
-function clientWith(agents: unknown[]) {
+function clientWith(agents: unknown[], droppedAgents?: unknown[]) {
   const calls: [string, unknown][] = []
   const all: Record<string, unknown> = {
     'game.state': {
       config: { mode: 'on' },
       agents: [LEAD, ...agents],
+      ...(droppedAgents ? { droppedAgents } : {}),
       role: 'lead',
       worktree: {
         id: 'repo1::/repo',
@@ -81,7 +82,8 @@ function clientWith(agents: unknown[]) {
     'game.stopSwitch': { stopped: null },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.taskCreate': { task: { id: 'task_adopt' } },
-    'orchestration.workerStart': { dispatchId: 'ctx_adopted', state: 'ready' }
+    'orchestration.workerStart': { dispatchId: 'ctx_adopted', state: 'ready' },
+    'game.fleetDrop': { dropped: false, count: 0 }
   }
   const client = {
     call: async (method: string, params: unknown) => {
@@ -273,6 +275,27 @@ describe('orca game adopt (ORCA-943)', () => {
 
       await expect(adopt(client, 'ORCA-907')).rejects.toThrow(/No agent named ORCA-907/)
       expect(mutations(calls)).toEqual([])
+    })
+
+    it('brings a dropped agent back into the fleet, then adopts it', async () => {
+      const { client, calls } = clientWith([], [local()])
+
+      await adopt(client, 'ORCA-907')
+
+      expect(calls.filter(([method]) => method === 'game.fleetDrop')).toEqual([
+        [
+          'game.fleetDrop',
+          expect.objectContaining({
+            agent: expect.objectContaining({
+              worktreeId: 'repo1::/wt/orca-907',
+              environmentId: null
+            }),
+            dropped: false
+          })
+        ]
+      ])
+      expect(mutations(calls)).toHaveLength(2)
+      expect(output()).toMatchObject({ adopted: true, restored: true })
     })
 
     it('says an already adopted local member is one, without a new dispatch', async () => {

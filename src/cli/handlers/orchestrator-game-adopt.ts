@@ -2,7 +2,7 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
-import { readCallerGameState } from './orchestrator-game-board-call'
+import { readCallerGameState, setGameAgentDropped } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
@@ -17,6 +17,8 @@ export type GameAdoptResult = {
   name: string
   adopted: boolean
   reused?: true
+  /** It was dropped from the fleet, and is back in it. */
+  restored?: true
   host?: string
   terminal?: string
   dispatchId?: string
@@ -54,6 +56,17 @@ export const isSameGameProject = (worktreeId: string, leadWorktreeId: string | n
   getRepoIdFromWorktreeId(worktreeId) === getRepoIdFromWorktreeId(leadWorktreeId)
 
 const MID_TURN_REFUSAL = 'its agent is mid-turn; adopt it at its prompt, or pass --force'
+
+/** A non-lead agent of this project by name: on a paired host (listed per project), or in this repo. */
+export const isOurGameAgentNamed = (
+  agent: GameAgent,
+  name: string,
+  leadWorktreeId: string | null
+): boolean =>
+  !agent.isLeader &&
+  agent.worktree !== undefined &&
+  (agent.remote !== undefined || isSameGameProject(agent.worktree.id, leadWorktreeId)) &&
+  isGameAgentNamed(agent, name)
 
 /** The found agent's terminal on its paired host, read there, or why it cannot be adopted. */
 async function hostSeatOf(
@@ -216,12 +229,21 @@ export const ORCHESTRATOR_GAME_ADOPT_HANDLERS: Record<string, CommandHandler> = 
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, `adopting ${name}`)
     const leadWorktreeId = response.result.worktree?.id ?? null
-    const result = await adoptAgent(client, response.result.agents, name, {
+    // Why first: a dropped agent stays out of the fleet until it is adopted again (ORCA-943).
+    const dropped = response.result.droppedAgents?.find((agent) =>
+      isOurGameAgentNamed(agent, name, leadWorktreeId)
+    )
+    if (dropped) {
+      await setGameAgentDropped(client, dropped, name, false)
+    }
+    const agents = dropped ? [...response.result.agents, dropped] : response.result.agents
+    const adopted = await adoptAgent(client, agents, name, {
       force: flags.get('force') === true,
       flags,
       cwd,
       leadWorktreeId
     })
+    const result = dropped ? { ...adopted, restored: true as const } : adopted
     if (!result.adopted) {
       process.exitCode = 1
     }
