@@ -22,6 +22,7 @@ import {
   persistWorkerSetupWaitOutcome
 } from './orchestration-worker-setup-gate'
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
+import { waitForAgentTuiIdle } from './agent-readiness-timeout'
 import {
   admitWorkerSetup,
   holdSlotForSetup,
@@ -216,10 +217,7 @@ async function startWorker(
     // would time the caller out on a start the runtime still completes.
     const readinessBudgetMs = params.timeoutMs ?? 60_000
     const readinessDeadline = Date.now() + readinessBudgetMs
-    const wait = await runtime.waitForTerminal(terminalHandle, {
-      condition: 'tui-idle',
-      timeoutMs: readinessBudgetMs
-    })
+    const wait = await waitForAgentTuiIdle(runtime, terminalHandle, agent, readinessBudgetMs)
     persistWorkerSetupWaitOutcome({ ...setupStage, wait })
     // Why: a wait-for-setup agent saw the setup end; its Setup tab may never exit.
     if (setupReceipt.state !== 'running') {
