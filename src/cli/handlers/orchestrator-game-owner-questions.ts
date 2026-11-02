@@ -6,7 +6,12 @@ import { callGameBoard, gameBoardCaller, optionalText } from './orchestrator-gam
 import type { GameOwnerQuestion } from '../../shared/orchestrator-game-owner-questions'
 
 type AskResult = { question: GameOwnerQuestion }
-type ListResult = { questions: GameOwnerQuestion[]; open: number }
+// Why optional: a host from before ORCA-942 does not send `undelivered`.
+type ListResult = {
+  questions: GameOwnerQuestion[]
+  open: number
+  undelivered?: GameOwnerQuestion[]
+}
 type AnswerResult = { question: GameOwnerQuestion; delivered: boolean; repeated: boolean }
 
 const WHAT = 'owner questions'
@@ -30,9 +35,33 @@ function formatQuestion(one: GameOwnerQuestion): string[] {
   ]
 }
 
-export function formatOwnerQuestions({ questions, open }: ListResult): string {
+function heldSection(list: GameOwnerQuestion[], tail: [string, string]): string[] {
+  if (list.length === 0) {
+    return []
+  }
+  const one = list.length === 1
+  return [
+    `${list.length} answer${one ? '' : 's'} ${one ? tail[0] : tail[1]}`,
+    ...list.flatMap(formatQuestion)
+  ]
+}
+
+export function formatOwnerQuestions({ questions, open, undelivered = [] }: ListResult): string {
   const head = `${open} open question${open === 1 ? '' : 's'} for the person`
-  return [head, ...questions.flatMap(formatQuestion)].join('\n')
+  const sent = undelivered.filter((one) => !one.answer?.undelivered)
+  const stuck = undelivered.filter((one) => one.answer?.undelivered)
+  return [
+    head,
+    ...questions.flatMap(formatQuestion),
+    ...heldSection(sent, [
+      'had not reached you; it is in your mail now:',
+      'had not reached you; they are in your mail now:'
+    ]),
+    ...heldSection(stuck, [
+      'could not reach your mail; act on it from here:',
+      'could not reach your mail; act on them from here:'
+    ])
+  ].join('\n')
 }
 
 function replyOf(flags: Map<string, string | boolean>): { option: number } | { text: string } {
