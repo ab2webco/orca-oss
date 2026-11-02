@@ -11,6 +11,7 @@ import type {
   LocalNetworkConnectionTestResult
 } from '../../shared/developer-permissions-types'
 import type {
+  GameInboxNotificationTarget,
   NotificationDeliveryProbeResult,
   NotificationDismissResult,
   NotificationDispatchRequest,
@@ -26,6 +27,10 @@ export type NotificationsApi = {
   getPermissionStatus: () => Promise<NotificationPermissionStatusResult>
   probeDelivery: (args?: { force?: boolean }) => Promise<NotificationDeliveryProbeResult>
   playSound: (options?: { force?: boolean; volume?: number }) => Promise<NotificationSoundResult>
+  /** The dock/launcher count of open owner questions; 0 clears it. */
+  setBadgeCount: (count: number) => Promise<void>
+  /** A clicked owner-question notification asks to open that project's Inbox. */
+  onOpenGameInbox: (callback: (target: GameInboxNotificationTarget) => void) => () => void
 }
 
 export type MacosTccPromptsApi = {

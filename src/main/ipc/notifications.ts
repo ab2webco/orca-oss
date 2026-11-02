@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, ipcMain } from 'electron'
+import { app, BrowserWindow, Notification, ipcMain } from 'electron'
 import type { Store } from '../persistence'
 import type {
   NotificationDeliveryProbeResult,
@@ -133,7 +133,8 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
       const notificationOptions = buildNotificationOptions(args)
 
       // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
-      if (runtime && args.source !== 'test') {
+      // An owner question reaches the phone from the host that keeps it, not from this computer.
+      if (runtime && args.source !== 'test' && args.source !== 'game-owner-question') {
         const dedupeKey = args.worktreeId ?? args.worktreeLabel ?? 'global'
         if (reserveNotificationCooldown(recentMobileNotifications, dedupeKey, Date.now())) {
           runtime.dispatchMobileNotification({
@@ -161,7 +162,11 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
       // Why: the Settings test button is an explicit, often-repeated user action, so it bypasses burst dedupe.
       if (args.source !== 'test') {
         // Dedupe by worktree, not source — agent-finish and terminal-bell often fire in one chunk; surface only the first.
-        const dedupeKey = args.worktreeId ?? args.worktreeLabel ?? 'global'
+        // Each owner question is its own alert, so two asked back to back both show.
+        const dedupeKey =
+          args.source === 'game-owner-question'
+            ? (args.notificationId ?? 'game-owner-question')
+            : (args.worktreeId ?? args.worktreeLabel ?? 'global')
         if (!reserveNotificationCooldown(recentDesktopNotifications, dedupeKey, Date.now())) {
           return { delivered: false, reason: 'cooldown' }
         }
@@ -184,6 +189,16 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
       })
     }
   )
+
+  ipcMain.removeHandler('notifications:setBadgeCount')
+  // Why only macOS and Linux: Electron has no taskbar count on Windows.
+  ipcMain.handle('notifications:setBadgeCount', (_event, count: unknown): void => {
+    if (process.platform !== 'darwin' && process.platform !== 'linux') {
+      return
+    }
+    const safe = typeof count === 'number' && Number.isInteger(count) && count > 0 ? count : 0
+    app.setBadgeCount(safe)
+  })
 
   registerNotificationSoundHandlers(store)
 }

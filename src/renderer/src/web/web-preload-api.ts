@@ -3228,7 +3228,10 @@ function createNotificationsApi(): NonNullable<Partial<PreloadApi>['notification
     getPermissionStatus: () =>
       Promise.resolve({ supported: false, platform: getBrowserPlatform(), requested: false }),
     probeDelivery: () => Promise.resolve({ state: 'unsupported' as const, authoritative: false }),
-    playSound: () => Promise.resolve({ played: false, reason: 'missing-path' })
+    playSound: () => Promise.resolve({ played: false, reason: 'missing-path' }),
+    // Why no-ops: a browser tab has no dock badge and no native notification to click.
+    setBadgeCount: () => Promise.resolve(),
+    onOpenGameInbox: () => () => {}
   }
 }
 

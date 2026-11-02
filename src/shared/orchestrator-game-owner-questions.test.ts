@@ -5,6 +5,7 @@ import {
   answerGameOwnerQuestion,
   openGameOwnerQuestions,
   parseGameOwnerQuestion,
+  parseGameOwnerQuestionProjects,
   type GameOwnerQuestion
 } from './orchestrator-game-owner-questions'
 
@@ -88,5 +89,28 @@ describe('openGameOwnerQuestions', () => {
   it('lists unanswered questions oldest first and skips unreadable entries', () => {
     const list = [asked('oq_1'), { id: 'oq_new', shape: 'v2' }, asked('oq_2', true), asked('oq_3')]
     expect(openGameOwnerQuestions(list).map((one) => one.id)).toEqual(['oq_1', 'oq_3'])
+  })
+})
+
+describe('parseGameOwnerQuestionProjects', () => {
+  it('keeps well-formed projects and their readable questions, drops the rest', () => {
+    expect(
+      parseGameOwnerQuestionProjects({
+        projects: [
+          {
+            repoId: 'r1',
+            repoName: 'orca',
+            worktreeId: 'r1::/w',
+            questions: [asked('oq_1'), { id: 7 }]
+          },
+          { repoId: 'r2', repoName: 'empty', worktreeId: null, questions: [] },
+          { repoId: 3, repoName: 'bad', worktreeId: null, questions: [asked('oq_2')] },
+          'junk'
+        ]
+      })
+    ).toEqual([
+      { repoId: 'r1', repoName: 'orca', worktreeId: 'r1::/w', questions: [asked('oq_1')] }
+    ])
+    expect(parseGameOwnerQuestionProjects(null)).toEqual([])
   })
 })
