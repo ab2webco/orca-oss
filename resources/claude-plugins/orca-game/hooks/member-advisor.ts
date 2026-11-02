@@ -6,6 +6,7 @@ import type {
 } from '../types'
 import { cellWidthOf, fitCells } from './cell-width'
 import { gameStrings } from './game-strings'
+import { modelSourceWordOf } from './member-model-source'
 
 // What a member card says about the model and effort Jev has that member on.
 
@@ -60,8 +61,9 @@ export const memberLaunchOf = (value: unknown): GameMemberLaunch | undefined => 
   }
   const launch = pickOf(value)
   const isText = (one: unknown) => one === undefined || one === null || typeof one === 'string'
+  const source = value.source === 'session' || value.source === 'launch' ? value.source : undefined
   return isText(value.model) && isText(value.effort) && (launch.model ?? launch.effort) !== null
-    ? launch
+    ? { ...launch, ...(source ? { source } : {}) }
     : undefined
 }
 
@@ -131,7 +133,9 @@ export const memberModelLinesOf = (agent: MemberModels, room: number): string[] 
     return memberAdvisorLinesOf(agent.advisor, room)
   }
   const launch = agent.launch === undefined ? '' : pickText(agent.launch)
-  return launch === '' ? [] : [`◇ ${launch}`]
+  const source = agent.launch?.source
+  const from = source ? `${modelSourceWordOf(source)} ` : ''
+  return launch === '' ? [] : [`◇ ${from}${launch}`]
 }
 
 /** "◆ 2 on Sonnet 5.5, 1 on Opus 5.5" for the members whose Jev or launch names a model; null for none. */

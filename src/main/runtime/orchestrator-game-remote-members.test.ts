@@ -112,7 +112,8 @@ describe('remote members of a lead (ORCA-824)', () => {
     createdAt: '2026-10-27 13:00:00',
     finished: false,
     ticketDone: false,
-    earlierLead: false
+    earlierLead: false,
+    launch: null
   }
 
   it('reads state, branch and PR from the host and the review provider', async () => {
@@ -141,7 +142,8 @@ describe('remote members of a lead (ORCA-824)', () => {
       state: 'idle',
       isMember: true,
       terminalHandle: 'term_805',
-      remote: { host: 'imac', stateKnown: true },
+      // Why the id: View opens the member's terminal through this host's pairing (ORCA-839).
+      remote: { host: 'imac', environmentId: 'env_imac', stateKnown: true },
       worktree: { branch: 'refs/heads/fabolivark/orca-805' },
       review: { number: 701, state: 'open', ci: 'success' },
       lastActivityAt: '2026-10-27T14:00:00.000Z'
@@ -254,7 +256,7 @@ describe('remote members of a lead (ORCA-824)', () => {
     expect(member).toMatchObject({
       paneKey: 'remote:ctx_805',
       isMember: true,
-      remote: { host: 'imac', stateKnown: false }
+      remote: { host: 'imac', environmentId: 'env_imac', stateKnown: false }
     })
     expect(member.review).toBeUndefined()
   })
@@ -266,7 +268,12 @@ describe('remote members of a lead (ORCA-824)', () => {
       reviewOf: async () => null
     })
 
-    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, gone: true })
+    expect(member.remote).toEqual({
+      host: 'imac',
+      environmentId: 'env_imac',
+      stateKnown: true,
+      gone: true
+    })
   })
 
   // Why: a host answers `terminal: null` once the member's terminal closed; that is not silence (ORCA-854).
@@ -278,7 +285,7 @@ describe('remote members of a lead (ORCA-824)', () => {
 
     expect(member).toMatchObject({
       state: 'done',
-      remote: { host: 'imac', stateKnown: true, gone: true }
+      remote: { host: 'imac', environmentId: 'env_imac', stateKnown: true, gone: true }
     })
   })
 
@@ -288,7 +295,12 @@ describe('remote members of a lead (ORCA-824)', () => {
       reviewOf: async () => null
     })
 
-    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, gone: true })
+    expect(member.remote).toEqual({
+      host: 'imac',
+      environmentId: 'env_imac',
+      stateKnown: true,
+      gone: true
+    })
   })
 
   // Why: a host restart slept the member's pane; it waits to be woken, it is not gone (ORCA-915).
@@ -614,7 +626,8 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     createdAt: '2026-10-27 09:00:00',
     finished: true,
     ticketDone: true,
-    earlierLead: true
+    earlierLead: true,
+    launch: null
   }
 
   it("shows an earlier lead's member only while its host still runs its terminal", async () => {
@@ -633,6 +646,7 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
         terminalHandle: 'term_5c58ff4d',
         remote: {
           host: 'imac',
+          environmentId: 'env_imac',
           stateKnown: true,
           earlierLead: true,
           ticketDone: true
@@ -652,6 +666,6 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
       }
     )
 
-    expect(member.remote).toEqual({ host: 'imac', stateKnown: false })
+    expect(member.remote).toEqual({ host: 'imac', environmentId: 'env_imac', stateKnown: false })
   })
 })

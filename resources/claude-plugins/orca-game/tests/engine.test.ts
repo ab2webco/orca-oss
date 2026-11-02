@@ -288,6 +288,37 @@ describe('fleet pane', () => {
     ])
     await pane.unmount()
   })
+
+  // Why: a remote member's handle resolves only on its host; View opens it here through the pairing (ORCA-839).
+  test("View on a live remote member opens its host's terminal in this window", async ($, on) => {
+    const remote = {
+      ...agent('ORCA-839 view', 'working', null),
+      paneKey: 'remote:ctx_839',
+      isMember: true,
+      terminalHandle: 'term_839',
+      remote: { host: 'imac', environmentId: 'env-imac', stateKnown: true }
+    }
+    const agents = [agent('lead', 'working', 'Edit', true), remote]
+    const world = worldOf({ stdout: JSON.stringify({ ...STATE, agents }) })
+    const clock = mock.clock(on)
+    engine(on, world)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const pane = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...PANE })
+    await pane.press({ key: 'view-remote:ctx_839' })
+    await clock.settle()
+    expect(world.calls).toContainEqual([
+      ORCA_CLI,
+      'terminal',
+      'focus',
+      '--terminal',
+      'term_839',
+      '--on',
+      'env-imac',
+      '--json'
+    ])
+    await pane.unmount()
+  })
 })
 
 describe('quest mode', () => {

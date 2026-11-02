@@ -388,3 +388,42 @@ describe('game.memberWake RPC', () => {
     expect(asked).toEqual([{ worktreeId: undefined, terminalHandle: 'h1', dispatchId: 'ctx_1' }])
   })
 })
+
+describe('game.fleetWait RPC', () => {
+  const dispatcherWith = (waitGameFleetChange: (args: unknown) => Promise<unknown>) =>
+    new RpcDispatcher({
+      runtime: {
+        getRuntimeId: () => 'runtime',
+        waitGameFleetChange
+      } as unknown as OrcaRuntimeService,
+      methods: ORCHESTRATOR_GAME_METHODS
+    })
+  const wait = (dispatcher: RpcDispatcher, params?: unknown) =>
+    dispatcher.dispatch({ id: 'w', authToken: 'test', method: 'game.fleetWait', params })
+
+  it('long-polls the runtime from the version the caller saw, 25 s by default', async () => {
+    const calls: unknown[] = []
+    const dispatcher = dispatcherWith(async (args) => {
+      calls.push(args)
+      return { version: 4, changed: true }
+    })
+
+    await expect(wait(dispatcher, { since: 3 })).resolves.toMatchObject({
+      ok: true,
+      result: { version: 4, changed: true }
+    })
+    await wait(dispatcher)
+    expect(calls).toEqual([
+      { since: 3, timeoutMs: 25_000 },
+      { since: undefined, timeoutMs: 25_000 }
+    ])
+  })
+
+  it('refuses a wait longer than a minute', async () => {
+    const dispatcher = dispatcherWith(async () => ({ version: 0, changed: false }))
+
+    await expect(wait(dispatcher, { since: 0, timeoutMs: 600_000 })).resolves.toMatchObject({
+      ok: false
+    })
+  })
+})

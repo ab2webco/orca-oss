@@ -342,7 +342,7 @@ describe('gameFleetReportOf', () => {
       expect.objectContaining({
         ticket: 'CIN-2',
         stateKnown: true,
-        next: 'gone from imac: orca game stop CIN-2'
+        next: 'gone from imac: orca game rebind CIN-2 if it runs on in another terminal there, else orca game stop CIN-2'
       }),
       expect.objectContaining({ ticket: 'CIN-3', state: 'done', next: 'push' })
     ])

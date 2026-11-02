@@ -4330,6 +4330,16 @@ const api = {
       ipcRenderer.on('ui:focusTerminal', listener)
       return () => ipcRenderer.removeListener('ui:focusTerminal', listener)
     },
+    onRevealPairedTerminal: (
+      callback: (data: { environmentId: string; handle: string }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { environmentId: string; handle: string }
+      ) => callback(data)
+      ipcRenderer.on('ui:revealPairedTerminal', listener)
+      return () => ipcRenderer.removeListener('ui:revealPairedTerminal', listener)
+    },
     onFocusEditorTab: (
       callback: (data: { tabId: string; worktreeId: string }) => void
     ): (() => void) => {

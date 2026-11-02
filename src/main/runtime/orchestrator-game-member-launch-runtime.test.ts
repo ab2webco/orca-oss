@@ -77,7 +77,7 @@ describe("a dispatched member's launch model through the runtime", () => {
     const lead = await runtime.getOrchestratorGameState({ paneKey: 'tab-1:lead' })
 
     expect(lead.agents.map((agent) => [agent.paneKey, agent.launch])).toEqual([
-      ['tab-4:member', { model: 'Opus 5.5', effort: 'high' }]
+      ['tab-4:member', { model: 'Opus 5.5', effort: 'high', source: 'launch' }]
     ])
   })
 })
