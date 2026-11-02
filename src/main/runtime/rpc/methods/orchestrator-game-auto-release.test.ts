@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameAgent, OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { OrchestrationDb } from '../../orchestration/db'
+import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RpcContext } from '../core'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
@@ -266,5 +267,119 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
     expect(postEvent.mock.calls[0]?.[0].text).toMatch(
       /^Not released automatically \(PR #41 merged\): kept as user_takeover\. Someone typed/
     )
+  })
+})
+
+// Why: m1 rows stayed in the fleet for merged members whose host worktree was already gone (ORCA-943).
+describe('a lead game state settles a remote member its host has nothing left of (ORCA-943)', () => {
+  let db: OrchestrationDb
+  let runtime: OrcaRuntimeService
+  let postEvent: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    db = new OrchestrationDb(':memory:')
+    runtime = new OrcaRuntimeService()
+    runtime.setOrchestrationDb(db)
+    vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+    postEvent = vi.fn().mockResolvedValue({ posted: true })
+    vi.spyOn(runtime, 'getGameBoard').mockReturnValue({ postEvent } as never)
+  })
+
+  afterEach(() => {
+    db.close()
+    vi.restoreAllMocks()
+  })
+
+  function remoteMember(reported: boolean): string {
+    const runId = db.createRun({
+      objective: 'game',
+      coordinatorHandle: 'term_coord',
+      coordinatorPaneKey: COORD_PANE
+    }).id
+    const task = db.createTask({ spec: 'ORCA-774', taskTitle: 'ORCA-774', runId })
+    const { dispatch } = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_m1', serverName: 'm1' },
+      federation: {
+        environmentId: 'env_m1',
+        environmentName: 'm1',
+        peerFingerprint: 'fp_m1',
+        protocolVersion: 1
+      }
+    })
+    db.markWorkerDispatchReady(dispatch.id)
+    if (reported) {
+      db.settleWorkerReport({
+        taskId: task.id,
+        dispatchId: dispatch.id,
+        outcome: 'succeeded',
+        result: 'done'
+      })
+    }
+    return dispatch.id
+  }
+
+  const goneRow = (dispatchId: string): GameAgent =>
+    memberOf({
+      paneKey: `remote:${dispatchId}`,
+      displayName: 'ORCA-774',
+      terminalHandle: undefined,
+      review: undefined,
+      stateSince: undefined,
+      remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true, gone: true }
+    })
+
+  async function leadReads(member: GameAgent): Promise<OrchestratorGameState> {
+    vi.spyOn(runtime, 'getOrchestratorGameState').mockResolvedValue({
+      role: 'lead',
+      agents: [lead, member]
+    } as OrchestratorGameState)
+    const method = ORCHESTRATOR_GAME_METHODS.find((one) => one.name === 'game.state')!
+    return (await method.handler(
+      method.params!.parse({ worktreeId: 'wt-lead', paneKey: COORD_PANE }),
+      { runtime }
+    )) as OrchestratorGameState
+  }
+
+  it('marks it released once its host no longer knows the dispatch, and says so once', async () => {
+    const dispatchId = remoteMember(true)
+    const call = vi
+      .spyOn(runtime, 'callOrchestrationWorkerServer')
+      .mockRejectedValue(new OrchestrationError('dispatch_not_found', 'gone'))
+
+    await leadReads(goneRow(dispatchId))
+
+    await vi.waitFor(() => expect(db.getWorkerDispatch(dispatchId)?.stage).toBe('released'))
+    await vi.waitFor(() => expect(postEvent).toHaveBeenCalledTimes(1))
+    expect(call.mock.calls.map((one) => one[1])).toEqual(['orchestration.federationShow'])
+    expect(postEvent.mock.calls[0]?.[0]).toMatchObject({
+      ticket: 'ORCA-774',
+      key: `auto-release:${dispatchId}`,
+      text: 'Released automatically: nothing of it is left on m1 after worker_done.'
+    })
+  })
+
+  it('keeps it while its host still has its worktree, or when it never sent worker_done', async () => {
+    const kept = remoteMember(true)
+    const unreported = remoteMember(false)
+    vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockImplementation(async (_env, method) =>
+      method === 'orchestration.federationShow'
+        ? {
+            attachment: {
+              effects: [{ kind: 'worktree', action: 'created', id: 'repo::/home/m1/orca-774' }]
+            },
+            observation: { status: 'gone' }
+          }
+        : { worktree: { id: 'repo::/home/m1/orca-774' } }
+    )
+
+    const state = await leadReads(goneRow(kept))
+    await leadReads(goneRow(unreported))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.agents).toHaveLength(2)
+    expect(db.getWorkerDispatch(kept)?.stage).not.toBe('released')
+    expect(db.getWorkerDispatch(unreported)?.stage).not.toBe('released')
+    expect(postEvent).not.toHaveBeenCalled()
   })
 })
