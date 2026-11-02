@@ -102,6 +102,10 @@ Connect a Plane workspace and its projects become a task source: a board with on
   <img src="docs/assets/readme/diff-note.gif" alt="A diff an agent wrote: the + button in the gutter opens Add note for the AI, the note is typed and saved under line 2, and the toolbar counts 1 AI note to send" width="960" />
 </p>
 
+<p align="center">
+  <img src="docs/assets/readme/design-mode.gif" alt="Orca's browser on a page under work: Annotate page element highlights the headline with its selector, a note for the agent is typed, and the annotation joins the list to send" width="960" />
+</p>
+
 ### Extend it with plugins
 
 A plugin is a folder with an `orca-plugin.json`. Nothing runs until you review what it asks for; then its panel, settings and worker go live, sandboxed. [Orca Sonar](docs/reference/orca-sonar.md) is one: `orca sonar find` and `orca sonar symbol` give agents an index of the repo instead of grep. The [worklog example](examples/plugins/worklog) exercises the whole API. [Plugin development →](docs/reference/plugin-development.md)
@@ -150,7 +154,7 @@ Orca Game turns a Claude Code session into the **lead** of a team. The lead does
 
 It looks like a game, a pixel-art party under the lead's prompt with XP and level-ups, because watching ten agents in ten terminals is hard. The rules underneath are the ones a good engineering team already keeps.
 
-The idea of running a Claude Code team as a game, and the original plugin it grew from, came from [Jucer Orozco](https://github.com/Jucerweb).
+The idea of running a Claude Code team as a game came from [Jucer Orozco](https://github.com/Jucerweb).
 
 <p align="center">
   <img src="docs/assets/readme/game-band-panel.gif" alt="The game band under a Claude Code lead: three members, one waiting on you; the Panel lists each member's ticket, branch, PR and CI; a merged PR and green CI award XP and a level-up" width="960" />

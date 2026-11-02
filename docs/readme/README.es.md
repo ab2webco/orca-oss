@@ -102,6 +102,10 @@ Conecta un espacio de trabajo de Plane y sus proyectos se convierten en fuente d
   <img src="../assets/readme/diff-note.gif" alt="Un diff que escribió un agente: el botón + del margen abre Add note for the AI, se escribe la nota y queda guardada bajo la línea 2, y la barra cuenta 1 nota para enviar" width="960" />
 </p>
 
+<p align="center">
+  <img src="../assets/readme/design-mode.gif" alt="El navegador de Orca sobre una página en desarrollo: Annotate page element resalta el titular con su selector, se escribe una nota para el agente y la anotación se suma a la lista para enviar" width="960" />
+</p>
+
 ### Extiéndelo con plugins
 
 Un plugin es una carpeta con un `orca-plugin.json`. Nada se ejecuta hasta que revisas lo que pide; entonces su panel, sus ajustes y su worker se activan, aislados. [Orca Sonar](../reference/orca-sonar.md) es uno: `orca sonar find` y `orca sonar symbol` dan a los agentes un índice del repo en lugar de grep. El [ejemplo worklog](../../examples/plugins/worklog) recorre toda la API. [Desarrollo de plugins →](../reference/plugin-development.md)
@@ -150,7 +154,7 @@ Orca Game convierte una sesión de Claude Code en el **líder** de un equipo. El
 
 Parece un juego, con un grupo en pixel art bajo el prompt del líder, XP y subidas de nivel, porque seguir a diez agentes en diez terminales es difícil. Las reglas de fondo son las que ya sigue un buen equipo de ingeniería.
 
-La idea de dirigir un equipo de Claude Code como un juego, y el plugin original del que nació, vienen de [Jucer Orozco](https://github.com/Jucerweb).
+La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco](https://github.com/Jucerweb).
 
 <p align="center">
   <img src="../assets/readme/game-band-panel.gif" alt="La banda del juego bajo un líder de Claude Code: tres miembros, uno esperándote; el Panel muestra el ticket, la rama, el PR y el CI de cada miembro; un PR mergeado y un CI en verde dan XP y una subida de nivel" width="960" />
