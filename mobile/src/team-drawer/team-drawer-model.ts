@@ -5,6 +5,7 @@ import type {
   GameOwnerQuestionProject
 } from '../../../src/shared/orchestrator-game-owner-questions'
 import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
+import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
 
@@ -34,6 +35,16 @@ export type TeamMetrics = {
 export type TeamLeadView = { members: TeamMemberRow[]; metrics: TeamMetrics | null }
 
 export type TeamBadge = { tone: 'question' | 'working'; count: number } | null
+
+export type TeamDrawerData = {
+  /** null: this terminal is not a live lead, or the host cannot say. */
+  view: TeamLeadView | null
+  questions: GameOwnerQuestion[]
+  /** The worktree the owner board answers through; null when the host has none for this repo. */
+  answerWorktreeId: string | null
+  badge: TeamBadge
+  answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
+}
 
 type Rec = Record<string, unknown>
 
@@ -147,4 +158,22 @@ export function leadOwnerQuestionsOf(
   return project
     ? { worktreeId: project.worktreeId, questions: project.questions }
     : { worktreeId: null, questions: [] }
+}
+
+export function teamButtonLabel(badge: TeamBadge): string {
+  if (!badge) {
+    return 'Open Team'
+  }
+  const plural = badge.count === 1 ? '' : 's'
+  return badge.tone === 'question'
+    ? `Open Team, ${badge.count} question${plural} waiting`
+    : `Open Team, ${badge.count} member${plural} working`
+}
+
+export function formatLeadTime(ms: number): string {
+  const hours = ms / 3_600_000
+  if (hours < 1) {
+    return `${Math.max(1, Math.round(ms / 60_000))} min`
+  }
+  return hours < 48 ? `${hours.toFixed(1)} h` : `${(hours / 24).toFixed(1)} d`
 }

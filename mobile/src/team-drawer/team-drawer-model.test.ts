@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatLeadTime,
   leadOwnerQuestionsOf,
+  teamButtonLabel,
   teamBadgeOf,
   teamLeadViewOf,
   type TeamMemberRow
@@ -179,5 +181,21 @@ describe('leadOwnerQuestionsOf', () => {
       questions: [question]
     })
     expect(leadOwnerQuestionsOf(projects, 'none::/x')).toEqual({ worktreeId: null, questions: [] })
+  })
+})
+
+describe('teamButtonLabel', () => {
+  it('names what the badge counts for screen readers', () => {
+    expect(teamButtonLabel(null)).toBe('Open Team')
+    expect(teamButtonLabel({ tone: 'question', count: 1 })).toBe('Open Team, 1 question waiting')
+    expect(teamButtonLabel({ tone: 'working', count: 3 })).toBe('Open Team, 3 members working')
+  })
+})
+
+describe('formatLeadTime', () => {
+  it('reads in minutes, hours or days', () => {
+    expect(formatLeadTime(5 * 60_000)).toBe('5 min')
+    expect(formatLeadTime(3.25 * 3_600_000)).toBe('3.3 h')
+    expect(formatLeadTime(72 * 3_600_000)).toBe('3.0 d')
   })
 })
