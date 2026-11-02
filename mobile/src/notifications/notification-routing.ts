@@ -11,6 +11,8 @@ export type DesktopNotificationSource =
 export type DesktopNotificationEvent = {
   source: DesktopNotificationSource
   worktreeId?: string
+  /** The lead's terminal on an owner question; absent from an older host. */
+  terminal?: string
   notificationId?: string
 }
 
@@ -18,6 +20,7 @@ export type LocalNotificationData = {
   source: DesktopNotificationSource
   hostId: string
   worktreeId?: string
+  terminal?: string
   notificationId?: string
 }
 
@@ -40,6 +43,9 @@ export function buildLocalNotificationData(
   }
   if (event.worktreeId) {
     data.worktreeId = event.worktreeId
+  }
+  if (event.terminal) {
+    data.terminal = event.terminal
   }
   if (event.notificationId) {
     data.notificationId = event.notificationId
@@ -83,10 +89,16 @@ export function getNotificationNavigationTarget(
 
   const worktreeId = readNonEmptyString(record.worktreeId)
   const credentialStatus = options.credentialStatusByHostId?.get(hostId)
-  // Why by source: an owner question spans the host's projects, so it carries no worktree.
+  const terminal = readNonEmptyString(record.terminal)
+  // Why by source: an owner question opens its lead's Team drawer, else the host-wide Inbox.
   const routeTarget: HostStackRouteTarget | null =
     record.source === 'game-owner-question'
-      ? { name: '[hostId]/inbox', params: { hostId } }
+      ? worktreeId && terminal
+        ? {
+            name: '[hostId]/session/[worktreeId]',
+            params: { hostId, worktreeId, terminal, team: 'open' }
+          }
+        : { name: '[hostId]/inbox', params: { hostId } }
       : worktreeId
         ? mobileSessionRouteTarget({ hostId, worktreeId })
         : null

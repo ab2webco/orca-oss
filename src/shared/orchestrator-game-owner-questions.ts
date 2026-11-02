@@ -213,22 +213,27 @@ const NOTIFICATION_BODY_MAX = 180
 export const gameOwnerQuestionNotificationId = (id: string): string => `game-owner-question:${id}`
 
 /** What the host pushes to a paired phone when the lead asks; the same id dismisses it once answered. */
+/** `lead`: the live lead's terminal, so a phone tap opens it with the Team drawer (ORCA-952). */
 export function gameOwnerQuestionMobileNotification(
   question: GameOwnerQuestion,
-  projectName: string | null
+  projectName: string | null,
+  lead: { worktreeId: string; terminal: string } | null = null
 ): {
   type: 'notification'
   source: 'game-owner-question'
   title: string
   body: string
   notificationId: string
+  worktreeId?: string
+  terminal?: string
 } {
   return {
     type: 'notification',
     source: 'game-owner-question',
     title: projectName ? `${projectName}: the lead asks you` : 'The lead asks you',
     body: clipped(question.question, NOTIFICATION_BODY_MAX),
-    notificationId: gameOwnerQuestionNotificationId(question.id)
+    notificationId: gameOwnerQuestionNotificationId(question.id),
+    ...(lead ? { worktreeId: lead.worktreeId, terminal: lead.terminal } : {})
   }
 }
 

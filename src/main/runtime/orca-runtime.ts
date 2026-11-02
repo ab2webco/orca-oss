@@ -3148,6 +3148,8 @@ export type MobileNotificationDispatchEvent = {
   title: string
   body: string
   worktreeId?: string
+  /** The lead's terminal handle on a `game-owner-question`; an older phone ignores it. */
+  terminal?: string
   notificationId?: string
   notificationSeq?: number
   notificationEpoch?: string
@@ -4008,13 +4010,22 @@ export class OrcaRuntimeService {
       this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
     },
     ownerQuestionSettled: (projectKey, question) => {
-      if (question.answer) {
-        this.dismissMobileNotification(gameOwnerQuestionNotificationId(question.id))
-        return
-      }
-      const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
-      const repoName = repoId ? (this.store?.getRepo(repoId)?.displayName ?? null) : null
-      this.dispatchMobileNotification(gameOwnerQuestionMobileNotification(question, repoName))
+      // Why one chain: the push waits on the lead lookup; a quick answer's dismiss must not overtake it.
+      this.ownerQuestionPushes = this.ownerQuestionPushes
+        .then(async () => {
+          if (question.answer) {
+            this.dismissMobileNotification(gameOwnerQuestionNotificationId(question.id))
+            return
+          }
+          const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
+          const repoName = repoId ? (this.store?.getRepo(repoId)?.displayName ?? null) : null
+          const lead = await this.gameOwnerQuestionLeadTerminal(projectKey)
+          this.dispatchMobileNotification(
+            gameOwnerQuestionMobileNotification(question, repoName, lead)
+          )
+        })
+        // Why: a rejected link would skip every later push and dismiss until Orca restarts.
+        .catch(() => {})
     },
     replyToMember: (lead, args) =>
       replyToMemberAsLead(
@@ -14194,6 +14205,19 @@ export class OrcaRuntimeService {
   // a stale watermark from a valid one — see MobileNotificationReplayBuffer.
   getMobileNotificationEpoch(): string {
     return this.mobileNotificationReplay.epoch
+  }
+
+  private ownerQuestionPushes: Promise<void> = Promise.resolve()
+
+  // Why never throw: a lead that cannot be placed still gets the push, routed to the Inbox.
+  private async gameOwnerQuestionLeadTerminal(
+    projectKey: string
+  ): Promise<{ worktreeId: string; terminal: string } | null> {
+    const terminal = await this.gameLeads.liveLeadOf(projectKey).catch(() => null)
+    const worktreeId = terminal
+      ? (await this.showTerminal(terminal).catch(() => null))?.worktreeId
+      : null
+    return terminal && worktreeId ? { worktreeId, terminal } : null
   }
 
   dismissMobileNotification(notificationId: string): void {
