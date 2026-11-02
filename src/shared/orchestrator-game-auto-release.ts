@@ -27,6 +27,10 @@ export function workedSinceReport(agent: GameAgent, reportedAt: number): boolean
   if (agent.review?.state === 'open' || agent.review?.state === 'draft') {
     return true
   }
+  // Why: its host answered the terminal is gone, so nothing there can work past the report (ORCA-943).
+  if (agent.remote?.gone) {
+    return false
+  }
   return agent.stateSince === undefined || agent.stateSince > reportedAt + REPORT_TURN_TAIL_MS
 }
 
