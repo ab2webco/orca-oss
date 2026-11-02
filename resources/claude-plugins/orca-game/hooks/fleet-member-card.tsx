@@ -6,15 +6,14 @@ import {
   activityTextOf,
   AGENT_COLORS,
   CI_COLORS,
-  fitWords,
   memberHeadingOf,
-  memberHeadOf,
   memberMetaOf,
   reviewTextOf,
   workItemTextOf
 } from './fleet-labels'
+import { cardChipsOf, cardHeadOf, cardMetaRowsOf } from './member-card-rows'
 import { TILE_COLUMNS } from './fleet-tiles'
-import { gameStrings, localizedNameOf } from './game-strings'
+import { localizedNameOf } from './game-strings'
 import type { CardState } from './lead-state'
 import { limitTagOf } from './member-tags'
 import { viewLabelOf } from './remote-member-view'
@@ -32,6 +31,8 @@ export type MemberCardParts = {
   /** False drops the tile column: a phone card gives its width to the ticket (ORCA-827). */
   withTile?: boolean
   view?: RenderElement
+  /** A phone card: chips stack beside View's touch chip (ORCA-949). */
+  isTap?: boolean
   advisorRows: RenderElement[]
   link: (key: string, url: string, label: string, child: RenderElement) => RenderElement
 }
@@ -50,7 +51,7 @@ export const memberDoingOf = (
     .join(' · ')
 }
 
-// A terminal has one font size, so rank is color and weight: the id bold, the title plain, the rest dim.
+// A terminal has one font size, so rank is color and weight: the id bold, the title bright, the rest dim.
 export function memberCard(
   $: EngineInterface,
   e: RenderInput,
@@ -59,28 +60,53 @@ export function memberCard(
   parts: MemberCardParts
 ): RenderElement {
   const { Box, Text } = $.ui.resolve(e)
-  const text = gameStrings().text
+  const { gold, panel, parchment } = parts.scene.band
   const color = AGENT_COLORS[parts.cardState]
   const heading = memberHeadingOf(agent)
-  const crown = parts.leadTitle === null ? '' : `♛ ${parts.leadTitle}`
-  const viewCells =
-    parts.view === undefined ? 0 : cellWidthOf(` ${viewLabelOf(agent)} `) + HOTKEY_CELLS + 1
-  const crownCells = crown === '' ? 0 : cellWidthOf(crown) + 1
-  const head = memberHeadOf(
-    heading.name,
-    text.agentStates[parts.cardState],
-    parts.room - viewCells - crownCells,
+  const head = cardHeadOf({
+    name: heading.name,
+    title: heading.title,
+    cardState: parts.cardState,
+    crown: parts.leadTitle === null ? '' : `♛ ${parts.leadTitle}`,
+    room: parts.room
+  })
+  const viewLabel = parts.isTap ? ` ▸ ${viewLabelOf(agent)} ` : ` ${viewLabelOf(agent)} `
+  const viewCells = parts.view === undefined ? 0 : cellWidthOf(viewLabel) + HOTKEY_CELLS + 1
+  const chips = cardChipsOf({
+    review: agent.review,
+    workItem: agent.workItem,
+    room: parts.isTap ? parts.room - viewCells : parts.room
+  })
+  const chipOf = (chip: (typeof chips)[number]) =>
+    chip.key === 'review' && agent.review !== undefined ? (
+      parts.link(
+        `review-${agent.paneKey}`,
+        agent.review.url,
+        reviewTextOf(agent.review),
+        <Text color={CI_COLORS[agent.review.ci]} backgroundColor={panel}>
+          {chip.text}
+        </Text>
+      )
+    ) : agent.workItem !== undefined && agent.workItem.url !== '' ? (
+      parts.link(
+        `work-item-${agent.paneKey}`,
+        agent.workItem.url,
+        workItemTextOf(agent.workItem),
+        <Text color={parchment} backgroundColor={panel}>
+          {chip.text}
+        </Text>
+      )
+    ) : (
+      <Text key={`work-item-${agent.paneKey}`} color={parchment} backgroundColor={panel}>
+        {chip.text}
+      </Text>
+    )
+  const metaRows = cardMetaRowsOf(
+    memberMetaOf(agent, parts.room),
+    memberDoingOf(agent, member, parts.scene),
     parts.room
   )
-  // Both cut to one row, the ticket before the review, since a wrapped link reads as two.
-  const review = agent.review === undefined ? '' : fitCells(reviewTextOf(agent.review), parts.room)
-  const workItem =
-    agent.workItem === undefined
-      ? ''
-      : fitCells(
-          workItemTextOf(agent.workItem),
-          parts.room - (review === '' ? 0 : cellWidthOf(review) + 1)
-        )
+  const hasChipRow = chips.length > 0 || parts.view !== undefined
   return (
     <Box
       key={`card-${agent.paneKey}`}
@@ -90,76 +116,71 @@ export function memberCard(
     >
       {parts.withTile === false ? null : (parts.tile ?? <Box width={TILE_COLUMNS} />)}
       <Box flexDirection="column" paddingX={1} flexGrow={1} flexShrink={1}>
-        {/* Why wrap: on a phone the crown and state move down whole instead of splitting mid-word. */}
-        <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-          {head.name !== '' && (
-            <Box flexShrink={0}>
-              <Text color={color} bold>
-                {head.name}
+        <Box key="card-head" flexDirection="row">
+          <Text color={color} bold>
+            {head.name}
+          </Text>
+          {parts.leadTitle !== null && <Text color={gold}>{` ♛ ${parts.leadTitle}`}</Text>}
+          {head.title !== '' && (
+            <Box marginLeft={2} flexShrink={1}>
+              <Text color={parchment} bold wrap="truncate-end">
+                {head.title}
               </Text>
             </Box>
           )}
-          {crown !== '' && (
-            <Box flexShrink={0}>
-              <Text color={parts.scene.band.gold}>{crown}</Text>
-            </Box>
-          )}
-          <Box flexShrink={0}>
-            <Text color={color}>{head.state}</Text>
-          </Box>
           <Box flexGrow={1} />
-          {parts.view}
+          {head.isAlert ? (
+            <Text color="white" backgroundColor="red" bold>
+              {head.pill}
+            </Text>
+          ) : (
+            <Text color={color} backgroundColor={panel}>
+              {head.pill}
+            </Text>
+          )}
         </Box>
-        {heading.title !== '' && (
-          <Text wrap="truncate-end">{fitWords(heading.title, parts.room)}</Text>
+        {head.titleBelow !== '' && (
+          <Text color={parchment} bold>
+            {head.titleBelow}
+          </Text>
         )}
-        <Text dimColor wrap="truncate-end">
-          {memberMetaOf(agent, parts.room)}
-        </Text>
+        {metaRows.map((row, at) => (
+          <Text key={`card-meta-${at}`} dimColor wrap="truncate-end">
+            {row}
+          </Text>
+        ))}
         {agent.limit !== undefined && (
           <Text color="red" bold wrap="truncate-end">
             {limitTagOf(agent.limit, Date.now())}
           </Text>
         )}
         {parts.advisorRows}
-        <Text wrap="truncate-end">
-          {fitCells(memberDoingOf(agent, member, parts.scene), parts.room)}
-        </Text>
-        {(review !== '' || workItem !== '') && (
-          <Box flexDirection="row" gap={1}>
-            {agent.review !== undefined &&
-              review !== '' &&
-              parts.link(
-                `review-${agent.paneKey}`,
-                agent.review.url,
-                reviewTextOf(agent.review),
-                <Text color={CI_COLORS[agent.review.ci]} underline>
-                  {review}
-                </Text>
-              )}
-            {agent.workItem !== undefined &&
-              workItem !== '' &&
-              (agent.workItem.url === '' ? (
-                <Text>{workItem}</Text>
-              ) : (
-                parts.link(
-                  `work-item-${agent.paneKey}`,
-                  agent.workItem.url,
-                  workItemTextOf(agent.workItem),
-                  <Text underline>{workItem}</Text>
-                )
-              ))}
-          </Box>
-        )}
+        {hasChipRow &&
+          (parts.isTap ? (
+            // A phone stacks the chips beside View's three-row touch chip.
+            <Box key="card-chips" flexDirection="row" marginTop={1}>
+              <Box flexDirection="column" flexGrow={1} flexShrink={1} rowGap={1}>
+                {chips.map((chip) => (
+                  <Box key={`card-chip-${chip.key}`} flexDirection="row">
+                    {chipOf(chip)}
+                  </Box>
+                ))}
+              </Box>
+              {parts.view}
+            </Box>
+          ) : (
+            <Box key="card-chips" flexDirection="row" columnGap={1} marginTop={1}>
+              {chips.map(chipOf)}
+              <Box flexGrow={1} />
+              {parts.view}
+            </Box>
+          ))}
         {agent.activity !== undefined &&
           parts.link(
             `activity-${agent.paneKey}`,
             agent.activity.url,
             agent.activity.id,
-            <Text
-              color={agent.activity.running ? 'cyan' : parts.scene.band.parchment}
-              wrap="truncate-end"
-            >
+            <Text color={agent.activity.running ? 'cyan' : parchment} wrap="truncate-end">
               {fitCells(
                 activityTextOf({
                   name: agent.activity.name,

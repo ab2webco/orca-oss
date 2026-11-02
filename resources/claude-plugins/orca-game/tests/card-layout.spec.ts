@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { cellWidthOf } from '../hooks/cell-width'
-import { memberHeadOf, memberMetaOf } from '../hooks/fleet-labels'
+import { memberMetaOf } from '../hooks/fleet-labels'
+import { cardHeadOf } from '../hooks/member-card-rows'
 import { cardLayoutOf, TILE_COLUMNS } from '../hooks/fleet-tiles'
 import { setGameLocale } from '../hooks/game-strings'
 
@@ -21,7 +22,7 @@ describe('member card layout', () => {
   it('shows the ticket and host in full on a 320 px pane', () => {
     setGameLocale('en')
     const { room } = cardLayoutOf(38)
-    const head = memberHeadOf('LUM-14', 'working', room, room)
+    const head = cardHeadOf({ name: 'LUM-14', title: '', cardState: 'working', crown: '', room })
     expect(head.name).toBe('LUM-14')
     const silent = {
       agentType: '',
