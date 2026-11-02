@@ -43,7 +43,8 @@ function clientWith(state: Record<string, unknown>, workers: unknown[] = []) {
       ...state
     },
     'orchestration.workerList': { workers },
-    'game.fleetDrop': { dropped: true, count: 1 }
+    'game.fleetDrop': { dropped: true, count: 1 },
+    'orchestration.workerDetach': { dispatchId: 'ctx_907', state: 'stopped', processAction: 'none' }
   }
   const client = {
     call: async (method: string, params: unknown) => {
@@ -121,7 +122,7 @@ describe('orca game drop (ORCA-943)', () => {
     expect(output()).toMatchObject({ dropped: true, host: 'm1' })
   })
 
-  it('refuses a member with a live dispatch, naming it', async () => {
+  it('detaches a live local member, then drops it, closing nothing', async () => {
     const { client, calls } = clientWith({ agents: [LEAD, agent({})] }, [
       {
         dispatchId: 'ctx_907',
@@ -133,11 +134,29 @@ describe('orca game drop (ORCA-943)', () => {
 
     await drop(client, 'ORCA-907')
 
+    const methods = calls.map(([method]) => method)
+    expect(calls).toContainEqual(['orchestration.workerDetach', { dispatch: 'ctx_907' }])
+    expect(methods.indexOf('orchestration.workerDetach')).toBeLessThan(
+      methods.indexOf('game.fleetDrop')
+    )
+    expect(methods).not.toContain('orchestration.workerStop')
+    expect(methods).not.toContain('terminal.close')
+    expect(output()).toMatchObject({ dropped: true, detached: 'ctx_907' })
+  })
+
+  it('refuses a live member on a paired host, naming the host', async () => {
+    const { client, calls } = clientWith({ agents: [LEAD, remoteMember] }, [
+      { dispatchId: 'ctx_915', workerState: 'ready', agentTerminalHandle: null }
+    ])
+
+    await drop(client, 'ORCA-915')
+
+    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerDetach')
     expect(drops(calls)).toEqual([])
     expect(output()).toMatchObject({
       dropped: false,
-      dispatchId: 'ctx_907',
-      refusal: expect.stringMatching(/live dispatch ctx_907/)
+      dispatchId: 'ctx_915',
+      refusal: expect.stringMatching(/on m1/)
     })
     expect(process.exitCode).toBe(1)
   })

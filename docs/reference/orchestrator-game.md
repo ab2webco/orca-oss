@@ -767,9 +767,11 @@ matches …` (ORCA-866).
   touching its terminal or worktree (ORCA-943). The drop is kept per project, by the agent's host
   and worktree (a restart changes its pane key, not those), so the agent stays out of `game fleet`
   and the Panel across refreshes and restarts, and its saved member entry is removed so a restart
-  does not resume it, until `game adopt` brings it back. A member whose dispatch still reports to
-  the lead is refused, with the dispatch named: drop it after its worker_done, or `game stop` ends
-  it. Ending a live dispatch while keeping its agent is not built yet.
+  does not resume it, until `game adopt` brings it back. A member on this machine whose dispatch
+  still reports to the lead is detached first with `orchestration.workerDetach`: the dispatch
+  settles as stopped (stage `detached`), its capability and questions close, and its terminal
+  becomes the user's, so no release or recovery closes the pane. A live member on a paired host is
+  refused, naming the host, since that host's stop closes the pane there.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
