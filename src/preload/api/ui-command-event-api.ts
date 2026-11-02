@@ -173,6 +173,9 @@ export type UiCommandEventApi = {
       scrollToBottomIfOutputSinceLastView?: boolean
     }) => void
   ) => () => void
+  onRevealPairedTerminal: (
+    callback: (data: { environmentId: string; handle: string }) => void
+  ) => () => void
   onFocusEditorTab: (callback: (data: { tabId: string; worktreeId: string }) => void) => () => void
   onCloseSessionTab: (callback: (data: { tabId: string; worktreeId: string }) => void) => () => void
   onMoveSessionTab: (

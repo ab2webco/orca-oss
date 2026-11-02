@@ -100,7 +100,9 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
       if (params.set === undefined) {
         return board.stopState(caller)
       }
-      return params.set ? board.setStop(caller) : board.clearStop(caller)
+      const result = await (params.set ? board.setStop(caller) : board.clearStop(caller))
+      runtime.noteGameFleetChanged()
+      return result
     }
   }),
   defineMethod({

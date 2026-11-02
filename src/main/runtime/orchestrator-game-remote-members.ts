@@ -6,8 +6,12 @@ import {
   gameReviewOf,
   type GameAgent
 } from '../../shared/orchestrator-game-state'
+import {
+  gameMemberLaunchOf,
+  type GameMemberLaunch
+} from '../../shared/orchestrator-game-member-launch'
 import type { RuntimeTerminalLiveness } from '../../shared/runtime-types'
-import type { OrchestrationDb } from './orchestration/db'
+import { chosenLaunchSelectionOf, type OrchestrationDb } from './orchestration/db'
 
 /** A member the lead's Run placed on a paired host with `worker-start --on`, as the home database records it. */
 export type RemoteGameMemberSource = {
@@ -25,6 +29,8 @@ export type RemoteGameMemberSource = {
   ticketDone: boolean
   /** Launched by a lead that no longer leads it (ORCA-793). */
   earlierLead: boolean
+  /** The model and effort the lead chose at `worker-start --on`; null when it chose neither (ORCA-933). */
+  launch: GameMemberLaunch | null
 }
 
 /** What the host's own federationShow reports about the member's terminal. */
@@ -51,7 +57,8 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               COALESCE(d.last_activity_at, d.last_heartbeat_at) AS lastActivityAt,
               d.created_at AS createdAt,
               d.status NOT IN ('pending', 'dispatched') AS finished,
-              COALESCE(t.status, '') = 'completed' AS ticketDone`
+              COALESCE(t.status, '') = 'completed' AS ticketDone,
+              w.start_options AS startOptions`
 
 const SOURCE_JOINS = `FROM federated_dispatches f
          JOIN dispatch_contexts d ON d.id = f.dispatch_id
@@ -69,17 +76,28 @@ const CURRENT_ERA = `(d.status IN ('pending', 'dispatched')
 // Why a cap: each earlier-lead row costs one federationShow per state read.
 const EARLIER_LEAD_LIMIT = 20
 
-type SourceRow = Omit<RemoteGameMemberSource, 'finished' | 'ticketDone' | 'earlierLead'> & {
+type SourceRow = Omit<
+  RemoteGameMemberSource,
+  'finished' | 'ticketDone' | 'earlierLead' | 'launch'
+> & {
   finished: number
   ticketDone: number
+  startOptions: string | null
 }
 
-const sourceOf = (row: SourceRow, earlierLead: boolean): RemoteGameMemberSource => ({
-  ...row,
-  finished: row.finished === 1,
-  ticketDone: row.ticketDone === 1,
-  earlierLead
-})
+const sourceOf = (
+  { startOptions, ...row }: SourceRow,
+  earlierLead: boolean
+): RemoteGameMemberSource => {
+  const chosen = startOptions ? chosenLaunchSelectionOf(startOptions) : null
+  return {
+    ...row,
+    finished: row.finished === 1,
+    ticketDone: row.ticketDone === 1,
+    earlierLead,
+    launch: chosen ? gameMemberLaunchOf({ ...chosen, source: 'launch' }) : null
+  }
+}
 
 const sqliteOf = (db: OrchestrationDb): Database.Database =>
   (db as unknown as { db: Database.Database }).db
@@ -244,16 +262,19 @@ export async function remoteGameMembersOf(
             ? TITLE_STATES[titleState]
             : 'idle'
       const lastActivityAt = latestActivityOf(source.lastActivityAt, agent?.updatedAt)
+      // Why the home's launch last: the host's hooks may have seen the member move off it.
+      const launch = agent?.launch ?? source.launch
       return {
         paneKey: `remote:${source.dispatchId}`,
         displayName: source.taskTitle ?? source.dispatchId,
         agentType: agent?.agentType ?? null,
         state,
-        toolName: null,
+        toolName: agent?.toolName ?? null,
         isLeader: false,
         isMember: true,
         remote: {
           host: source.hostName,
+          environmentId: source.environmentId,
           stateKnown: answer.answered,
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
@@ -283,6 +304,8 @@ export async function remoteGameMembersOf(
           : agent?.globalLogin
             ? { globalLogin: true as const }
             : {}),
+        ...(agent?.advisor ? { advisor: agent.advisor } : {}),
+        ...(launch ? { launch } : {}),
         ...(lastActivityAt ? { lastActivityAt } : {}),
         ...(agent?.stateStartedAt ? { stateSince: agent.stateStartedAt } : {})
       }

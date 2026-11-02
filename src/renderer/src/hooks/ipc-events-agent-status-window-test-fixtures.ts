@@ -52,6 +52,7 @@ export function buildWindowApi(args: {
         onSplitTerminal: () => () => {},
         onRenameTerminal: () => () => {},
         onFocusTerminal: () => () => {},
+        onRevealPairedTerminal: () => () => {},
         onFocusEditorTab: () => () => {},
         onCloseSessionTab: () => () => {},
         onMoveSessionTab: () => () => {},

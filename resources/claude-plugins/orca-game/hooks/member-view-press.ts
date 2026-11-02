@@ -4,6 +4,8 @@ import type { GameAgent } from '../types'
 import { focusTerminal, refresh, refreshSoon, resumeMemberTicket } from './fleet-sync'
 import { gameStrings } from './game-strings'
 import {
+  remoteOpenFailedOf,
+  remoteOpenOf,
   remoteRecoveryOf,
   remoteRecoveryTextOf,
   remoteViewNoticeOf,
@@ -32,11 +34,20 @@ async function recoverMember(
   await refreshSoon($)
 }
 
-/** View on a member: a remote one says where it runs; a local one focuses its pane or toasts why not. */
+/** View on a member: a live remote one opens through its host, others say where they are; a local one focuses its pane. */
 export function viewMember($: EngineInterface, agent: GameAgent, handle: string): void {
   const recovery = remoteRecoveryOf(agent)
   if (recovery !== null) {
     void recoverMember($, agent, recovery).catch(() => undefined)
+    return
+  }
+  const paired = remoteOpenOf(agent)
+  if (paired !== null) {
+    void focusTerminal($, paired.handle, paired.environmentId).then((isOpened) => {
+      if (!isOpened) {
+        $.ui.toast(remoteOpenFailedOf(agent))
+      }
+    })
     return
   }
   const notice = remoteViewNoticeOf(agent)

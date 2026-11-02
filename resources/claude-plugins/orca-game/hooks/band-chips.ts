@@ -31,6 +31,13 @@ export type BandChip = Chip & {
 
 export type Counts = { working: number; idle: number; done: number; waiting: number }
 
+/** The Panel's count chips on a phone; waiting takes red only while someone waits. */
+export const FLEET_CHIP_COLORS: Readonly<Record<string, string>> = {
+  'fleet-working': 'cyan',
+  'fleet-idle': 'gray',
+  'fleet-done': 'green'
+}
+
 export const MENU_ROWS = 1
 export const CHIP_ROWS = 2
 

@@ -22,7 +22,7 @@ const mergedEventOf = (ticket: string, agent: GameAgent): ObservedGameEvent => (
 /** What `game fleet` and `game sweep` see happened to members: a merged PR, a ticket handed to QA. */
 export function observedGameEventsOf(agents: readonly GameAgent[]): ObservedGameEvent[] {
   return agents.flatMap((agent): ObservedGameEvent[] => {
-    const ticket = agent.isMember && !agent.isLeader ? ticketOfMember(agent) : null
+    const ticket = agent.isMember && !agent.isLeader && !agent.found ? ticketOfMember(agent) : null
     if (!ticket) {
       return []
     }
@@ -51,7 +51,7 @@ export function observedMergesOf(
   agents: readonly GameAgent[]
 ): (ObservedGameEvent & { merge: GameEventMerge })[] {
   return agents.flatMap((agent) => {
-    const ticket = agent.isMember && !agent.isLeader ? ticketOfMember(agent) : null
+    const ticket = agent.isMember && !agent.isLeader && !agent.found ? ticketOfMember(agent) : null
     const review = agent.review
     if (!ticket || !agent.worktree || review?.state !== 'merged') {
       return []

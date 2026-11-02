@@ -97,3 +97,47 @@ describe("a remote member's relayed agent reading (ORCA-837)", () => {
     ).not.toHaveProperty('globalLogin')
   })
 })
+
+describe("a remote member's relayed activity and model (ORCA-933)", () => {
+  it("reads the tool the pane's hooks say it runs", () => {
+    expect(remoteMemberAgentOf([entry({ toolName: 'Bash' })], 'tab:817')?.toolName).toBe('Bash')
+    expect(remoteMemberAgentOf([entry()], 'tab:817')).not.toHaveProperty('toolName')
+  })
+
+  it('keeps a relayed tool, Jev report and model with its source, and drops what it cannot read', () => {
+    const relayed = (extra: Record<string, unknown>) =>
+      parseRemoteMemberAgent({ state: 'working', updatedAt: 5, ...extra })
+    expect(relayed({ toolName: 'Bash' })?.toolName).toBe('Bash')
+    expect(relayed({ toolName: 7 })).not.toHaveProperty('toolName')
+    expect(
+      relayed({
+        advisor: {
+          model: 'Opus 5.5',
+          effort: 'medium',
+          pinned: { model: true, effort: false },
+          previous: { model: 'Sonnet 5.5', effort: 'medium' }
+        }
+      })?.advisor
+    ).toEqual({
+      model: 'Opus 5.5',
+      effort: 'medium',
+      pinned: { model: true, effort: false },
+      previous: { model: 'Sonnet 5.5', effort: 'medium' }
+    })
+    expect(relayed({ advisor: { model: 3 } })).not.toHaveProperty('advisor')
+    expect(
+      relayed({ launch: { model: 'Opus 5.5', effort: 'high', source: 'session' } })?.launch
+    ).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      source: 'session'
+    })
+    expect(
+      relayed({ launch: { model: 'Opus 5.5', effort: null, source: 'guess' } })?.launch
+    ).toEqual({
+      model: 'Opus 5.5',
+      effort: null
+    })
+    expect(relayed({ launch: { model: null, effort: null } })).not.toHaveProperty('launch')
+  })
+})

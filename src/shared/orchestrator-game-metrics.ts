@@ -60,6 +60,8 @@ export type GameMetrics = {
   character: GameMetricsCharacter | null
   /** Tickets with a merged event, or freed as merged or with a merged PR, in the window. */
   ticketsDone: string[]
+  /** When each done ticket was done, as ISO: its last merged event, else its last freeing. */
+  ticketsDoneAt: Record<string, string>
   leadTime: {
     tickets: GameLeadTime[]
     /** Done tickets with no claim before their merge, or a claim outside the stores. */
@@ -251,6 +253,9 @@ export function computeGameMetrics(
     },
     character: character && characterSummaryOf(character),
     ticketsDone,
+    ticketsDoneAt: Object.fromEntries(
+      done.map(([name, { at }]) => [name, new Date(at).toISOString()])
+    ),
     leadTime: {
       tickets: leadTimes,
       unmeasured,

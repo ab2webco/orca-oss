@@ -99,4 +99,12 @@ describe('observedMergesOf', () => {
       ])
     ).toEqual([])
   })
+
+  it('records nothing for a found session, which earns its lead nothing (ORCA-914)', () => {
+    expect(
+      observedMergesOf([
+        member({ worktree, found: true, review: { ...review('merged'), perfectMerge: true } })
+      ])
+    ).toEqual([])
+  })
 })

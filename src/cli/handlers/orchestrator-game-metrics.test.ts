@@ -248,6 +248,42 @@ describe('orca game metrics', () => {
     expect(Math.max(...text.split('\n').map((line) => line.length))).toBeLessThanOrEqual(80)
   })
 
+  it('prints the last 14 days the scene widget draws, from the same summary', async () => {
+    vi.useFakeTimers({ now: Date.parse('2026-10-21T12:00:00.000Z'), toFake: ['Date'] })
+    const { client } = fakeClient()
+
+    await run(client, [['timezone', 'UTC']])
+    const daily = JSON.parse(output.join('')).result.daily
+    output = []
+    await run(client, [['timezone', 'UTC']], false)
+    vi.useRealTimers()
+
+    expect(daily.timezone).toBe('UTC')
+    expect(daily.mergedPerDay.at(-1)).toEqual({ day: '2026-10-21', merged: 0 })
+    expect(daily.mergedPerDay.find((one: { day: string }) => one.day === '2026-10-20')).toEqual({
+      day: '2026-10-20',
+      merged: 1
+    })
+    const text = output.join('\n')
+    expect(text).toContain('Last 14 days   to 2026-10-21 UTC · 2 merged · lead time median 3d 15h')
+    expect(text).toMatch(/^Merged per day 10-08 0 · /m)
+    expect(text).toMatch(/10-19 1\n {15}10-20 1 · 10-21 0$/m)
+    expect(Math.max(...text.split('\n').map((line) => line.length))).toBeLessThanOrEqual(80)
+  })
+
+  it('leaves the 14 days out of a filtered query, whose window is its own', async () => {
+    const { client } = fakeClient()
+    await run(client, [['since', '2026-10-13']])
+    expect(JSON.parse(output.join('')).result).not.toHaveProperty('daily')
+  })
+
+  it('refuses a zone the runtime does not know', async () => {
+    const { client } = fakeClient()
+    await expect(run(client, [['timezone', 'Mars/Olympus']])).rejects.toMatchObject({
+      code: 'invalid_argument'
+    })
+  })
+
   it('says when the stores no longer reach the start of the window', () => {
     const metrics = {
       ...computeGameMetrics({ events: [], history: [] }, {}),

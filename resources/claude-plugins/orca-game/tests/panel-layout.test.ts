@@ -62,7 +62,7 @@ const worldOf = (seeded?: unknown): World => ({
   toasts: []
 })
 
-const DEFAULT_ORDER = ['team', 'review', 'reviews', 'todo', 'actions']
+const DEFAULT_ORDER = ['team', 'review', 'reviews', 'todo', 'actions', 'metrics']
 
 // A version 2 layout for the project; the fields given replace the default ones.
 const fleetStore = (fleet: Record<string, unknown>) => ({
@@ -74,7 +74,22 @@ const fleetStore = (fleet: Record<string, unknown>) => ({
   }
 })
 
-const engine = (on: On, world: World, locale: string) => {
+// What the host sends the lead: three days of merges, the median lead time and one account.
+const METRICS = {
+  computedAt: '2026-10-30T18:00:00.000Z',
+  timezone: 'America/Bogota',
+  mergedPerDay: [
+    { day: '2026-10-28', merged: 0 },
+    { day: '2026-10-29', merged: 2 },
+    { day: '2026-10-30', merged: 4 }
+  ],
+  leadTime: { medianMs: 26 * 3_600_000, measured: 6 },
+  claudeAccounts: [
+    { email: 'lead@example.com', active: true, sessionPercent: 41, weeklyPercent: 92 }
+  ]
+}
+
+const engine = (on: On, world: World, locale: string, state: unknown) => {
   mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: locale })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
@@ -96,7 +111,7 @@ const engine = (on: On, world: World, locale: string) => {
   on('process.run', () => ({
     value: {
       exitCode: 0,
-      stdout: JSON.stringify(STATE),
+      stdout: JSON.stringify(state),
       stderr: '',
       isStdoutTruncated: false,
       isStderrTruncated: false
@@ -113,9 +128,9 @@ const shownOf = (one: unknown): string => {
   return isDrawn(one) && Array.isArray(one.children) ? one.children.map(shownOf).join('') : ''
 }
 
-const start = async ($: Engine, on: On, world: World, locale = 'en') => {
+const start = async ($: Engine, on: On, world: World, locale = 'en', state: unknown = STATE) => {
   const clock = mock.clock(on)
-  engine(on, world, locale)
+  engine(on, world, locale, state)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
   return clock
@@ -289,12 +304,37 @@ describe('panel layout', () => {
     await ui.press({ key: 'catalog-down-team' })
     await ui.press({ key: 'catalog-todo' })
     expect(fleetIn(world)).toEqual({
-      order: ['review', 'team', 'reviews', 'todo', 'actions'],
+      order: ['review', 'team', 'reviews', 'todo', 'actions', 'metrics'],
       collapsed: [],
       shown: ['team', 'reviews']
     })
     expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
     await ui.press({ key: 'widgets' })
+    await ui.unmount()
+  })
+
+  test('the Metrics widget draws the merges per day, the lead time and each account', async ($, on) => {
+    const world = worldOf(fleetStore({ shown: ['metrics'] }))
+    await start($, on, world, 'en', { ...STATE, metrics: METRICS })
+    const ui = await pane($)
+    expect(await headerOf(ui, 'metrics')).toBe('▾ Metrics')
+    const rows = shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))
+    expect(rows).toContain('▁▅█ 6 merged · 3 days')
+    expect(rows).toContain('lead time median 1d 2h · 6 tickets')
+    expect(rows).toContain('● lead@example.com')
+    expect(rows).toContain('92%')
+    await ui.press({ key: 'layout-toggle-metrics' })
+    expect(shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))).not.toContain('merged')
+    await ui.unmount()
+  })
+
+  test("a member's Panel, or an older host's, says where the metrics come from", async ($, on) => {
+    const world = worldOf(fleetStore({ shown: ['metrics'] }))
+    await start($, on, world)
+    const ui = await pane($)
+    expect(shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))).toContain(
+      "Metrics show in the lead's Panel"
+    )
     await ui.unmount()
   })
 
@@ -342,6 +382,7 @@ describe('/orca-game:layout', () => {
         '3. Review (review): shown',
         '4. My PRs (reviews): shown',
         '5. Actions (actions): hidden',
+        '6. Metrics (metrics): hidden',
         'Change it with /orca-game:layout reset, add <section>, remove <section> or move <section> up|down. Press ▾ or ▸ in the Panel to collapse a section.'
       ].join('\n')
     )
@@ -354,7 +395,7 @@ describe('/orca-game:layout', () => {
     await layout($, 'hide team')
     await layout($, 'move todo up')
     expect(fleetIn(world)).toEqual({
-      order: ['team', 'review', 'todo', 'reviews', 'actions'],
+      order: ['team', 'review', 'todo', 'reviews', 'actions', 'metrics'],
       collapsed: [],
       shown: ['reviews']
     })
@@ -385,7 +426,7 @@ describe('/orca-game:layout', () => {
     const world = worldOf()
     await start($, on, world)
     expect((await layout($, 'hide quests')).text).toBe(
-      'Unknown section "quests". Sections: team, review, reviews, todo, actions.'
+      'Unknown section "quests". Sections: team, review, reviews, todo, actions, metrics.'
     )
     expect((await layout($, 'move todo sideways')).text).toContain('/orca-game:layout reset')
     expect(world.writes).toEqual([])

@@ -56,7 +56,9 @@ jobs:
       # install step in pr.yml's verify job so E2E doesn't hit missing-toolchain
       # errors.
       - name: Install native build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+        uses: ./.github/actions/install-apt-packages
+        with:
+          packages: build-essential python3
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

@@ -104,6 +104,7 @@ docs/**
 !docs/reference/agent-verification-traps.md
 !docs/reference/rendered-ui-checks.md
 !docs/reference/ci-failure-classification.md
+!docs/reference/ci-merge-queue.md
 !docs/reference/claude-account-auth-verdicts.md
 !docs/reference/orca-201-sync7-handoff.md
 !docs/reference/orca-269-sync8-plan.md

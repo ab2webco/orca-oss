@@ -1,5 +1,5 @@
 /** The Panel's sections, in the order drawn before layouts. Each one is a widget a person can add or remove. */
-export const PANEL_SECTIONS = ['team', 'review', 'reviews', 'todo', 'actions'] as const
+export const PANEL_SECTIONS = ['team', 'review', 'reviews', 'todo', 'actions', 'metrics'] as const
 export type PanelSection = (typeof PANEL_SECTIONS)[number]
 
 /** What a new Panel shows; every other section waits in the catalog until a person adds it. */
@@ -33,7 +33,9 @@ const ALIASES: Readonly<Record<string, PanelSection>> = {
   revisiones: 'reviews',
   'por-hacer': 'todo',
   tareas: 'todo',
-  acciones: 'actions'
+  acciones: 'actions',
+  metricas: 'metrics',
+  métricas: 'metrics'
 }
 
 type StoredObject = Record<string, unknown>
@@ -76,13 +78,16 @@ const inOrder = (
   sections: readonly PanelSection[]
 ): PanelSection[] => order.filter((one) => sections.includes(one))
 
+// The sections a version 1 Panel had; one added since starts in the catalog.
+const VERSION_1_SECTIONS: readonly PanelSection[] = ['team', 'review', 'reviews', 'todo', 'actions']
+
 // Why: a version 1 Panel drew every section it did not hide, so the upgrade keeps exactly that.
 const upgradedFleetOf = (fleet: StoredObject): StoredObject => {
   const hidden = sectionsOf(fleet.hidden)
   return {
     order: fleet.order,
     collapsed: fleet.collapsed,
-    shown: PANEL_SECTIONS.filter((one) => !hidden.includes(one))
+    shown: VERSION_1_SECTIONS.filter((one) => !hidden.includes(one))
   }
 }
 

@@ -118,6 +118,7 @@ describe('useIpcEvents updater integration', () => {
           onSplitTerminal: () => () => {},
           onRenameTerminal: () => () => {},
           onFocusTerminal: () => () => {},
+          onRevealPairedTerminal: () => () => {},
           onFocusEditorTab: () => () => {},
           onCloseSessionTab: () => () => {},
           onMoveSessionTab: () => () => {},

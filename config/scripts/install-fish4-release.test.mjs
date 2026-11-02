@@ -125,7 +125,7 @@ describe('install-fish4-release fallback', () => {
       path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'pr.yml'),
       'utf8'
     )
-    const apt = workflow.indexOf('sudo apt-get install -y zsh fish')
+    const apt = workflow.indexOf('bash config/scripts/ci-apt.sh install -y zsh fish')
     const fallback = workflow.indexOf('bash config/scripts/install-fish4-release.sh')
     const gate = workflow.indexOf('bash config/scripts/require-fish4.sh')
     expect(apt).toBeGreaterThan(-1)
@@ -155,9 +155,18 @@ describe('pr.yml "Install zsh and fish" step', () => {
     for (const name of ['enable-fish4-apt-source.sh', 'install-fish4-release.sh']) {
       writeFileSync(path.join(scripts, name), `echo ${name} >>${JSON.stringify(calls)}\n`)
     }
-    const fake = mkdtempSync(path.join(dir, 'fake-'))
     writeFileSync(
-      path.join(fake, 'sudo'),
+      path.join(scripts, 'ci-apt.sh'),
+      readFileSync(path.resolve(import.meta.dirname, 'ci-apt.sh'))
+    )
+    const fake = mkdtempSync(path.join(dir, 'fake-'))
+    writeFileSync(path.join(fake, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
+    writeFileSync(path.join(fake, 'timeout'), '#!/usr/bin/env bash\nshift 3\nexec "$@"\n', {
+      mode: 0o755
+    })
+    writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 })
+    writeFileSync(
+      path.join(fake, 'apt-get'),
       `#!/usr/bin/env bash
 echo "$*" >>${JSON.stringify(calls)}
 case "$*" in

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
+import { appendFile, chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
@@ -10,8 +10,9 @@ import { execInTerminal, waitForActivePanePtyId } from './terminal'
 
 // The band and Panel are drawn by the orca-game mod inside a real Claude Code, so
 // specs using this need `claude` on PATH and skip without it. Game state comes from
-// a stand-in for `orca game state --json` that prints whatever the spec last wrote;
-// the API key is a dummy and the API URL points nowhere.
+// a stand-in for `orca game state --json` that prints whatever the spec last wrote, and
+// for `orca game watch` that prints what the spec pushes; the API key is a dummy and the
+// API URL points nowhere.
 const MIN_CLAUDE = [2, 1, 287]
 const DEMO_KEY = 'sk-ant-api03-readme-demo-000000000000000000000000000000000000'
 
@@ -112,6 +113,10 @@ export type GameBand = {
   setState: (state: unknown) => Promise<void>
   /** How many `game state --json` reads the mod has made so far. */
   reads: () => Promise<number>
+  /** Has `game watch` print `fleet <version>`, as Orca does on a fleet change. */
+  pushFleetChange: (version: number) => Promise<void>
+  /** Makes each `game state --json` read fail until a state is set again. */
+  failReads: () => Promise<void>
 }
 
 /** Starts Claude Code with the orca-game mod in the active terminal, reading `state`. */
@@ -125,6 +130,7 @@ export async function startGameBand(
   const configDir = join(root, 'claude-config')
   const stateFile = join(root, 'state.json')
   const readsFile = join(root, 'reads.log')
+  const pushFile = join(root, 'push.log')
   await mkdir(projectDir)
   await mkdir(configDir)
   // A fresh Claude config that skips onboarding and trusts only the demo folder.
@@ -143,6 +149,7 @@ export async function startGameBand(
   )
   await writeFile(stateFile, JSON.stringify(options.state))
   await writeFile(readsFile, '')
+  await writeFile(pushFile, '')
   const cli = join(root, 'orca-demo-cli')
   await writeFile(
     cli,
@@ -151,8 +158,20 @@ export async function startGameBand(
       "const fs = require('node:fs')",
       "const argv = process.argv.slice(2).join(' ')",
       `fs.appendFileSync(${JSON.stringify(readsFile)}, argv + '\\n')`,
-      "if (argv !== 'game state --json') process.exit(1)",
-      `process.stdout.write(fs.readFileSync(${JSON.stringify(stateFile)}, 'utf8'))`,
+      "if (argv === 'game watch') {",
+      "  process.stdout.write('ready 1\\n')",
+      '  let sent = 0',
+      '  setInterval(() => {',
+      `    const pushed = fs.readFileSync(${JSON.stringify(pushFile)}, 'utf8')`,
+      '    process.stdout.write(pushed.slice(sent))',
+      '    sent = pushed.length',
+      '  }, 50)',
+      '} else {',
+      "  if (argv !== 'game state --json') process.exit(1)",
+      `  const state = fs.readFileSync(${JSON.stringify(stateFile)}, 'utf8')`,
+      "  if (state === 'FAIL') process.exit(1)",
+      '  process.stdout.write(state)',
+      '}',
       ''
     ].join('\n')
   )
@@ -202,6 +221,8 @@ export async function startGameBand(
     setState: (state) => writeFile(stateFile, JSON.stringify(state)),
     reads: async () =>
       (await readFile(readsFile, 'utf8')).split('\n').filter((one) => one === 'game state --json')
-        .length
+        .length,
+    pushFleetChange: (version) => appendFile(pushFile, `fleet ${version}\n`),
+    failReads: () => writeFile(stateFile, 'FAIL')
   }
 }

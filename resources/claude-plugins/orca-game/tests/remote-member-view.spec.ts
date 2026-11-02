@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { setGameLocale } from '../hooks/game-strings'
-import { remoteViewNoticeOf } from '../hooks/remote-member-view'
+import { remoteOpenFailedOf, remoteOpenOf, remoteViewNoticeOf } from '../hooks/remote-member-view'
 import type { GameAgent } from '../types'
 
 afterEach(() => setGameLocale('en'))
@@ -22,9 +22,10 @@ describe('View on a remote member', () => {
     expect(remoteViewNoticeOf(member())).toBeNull()
   })
 
-  it('says a gone member no longer exists and how to free it', () => {
+  // Why this short: the toast box shows three lines, and at 320 px a longer one cut off `stop`.
+  it('says a gone member no longer exists, and how to rebind or free it (CIN-1297)', () => {
     expect(remoteViewNoticeOf(member({ host: 'imac', stateKnown: false, gone: true }))).toBe(
-      'ORCA-826 restart no longer exists on imac; free it: orca game stop'
+      'ORCA-826 restart no longer exists on imac: orca game rebind or stop'
     )
   })
 
@@ -55,7 +56,50 @@ describe('View on a remote member', () => {
   it('speaks the pane locale', () => {
     setGameLocale('es')
     expect(remoteViewNoticeOf(member({ host: 'imac', stateKnown: false, gone: true }))).toBe(
-      'ORCA-826 restart ya no existe en imac; libéralo: orca game stop'
+      'ORCA-826 restart ya no existe en imac: orca game rebind o stop'
+    )
+  })
+})
+
+// Why: the owner opens a live remote member's terminal here, through the host's pairing (ORCA-839).
+describe('Opening a live remote member', () => {
+  const live = (remote: GameAgent['remote'], terminalHandle?: string) => ({
+    ...member(),
+    paneKey: 'remote:ctx_839',
+    remote,
+    ...(terminalHandle ? { terminalHandle } : {})
+  })
+
+  it('opens the terminal of a live member on its host', () => {
+    expect(
+      remoteOpenOf(live({ host: 'imac', environmentId: 'env-imac', stateKnown: true }, 'term_839'))
+    ).toEqual({ handle: 'term_839', environmentId: 'env-imac' })
+  })
+
+  it('leaves a gone, silent, local or unaddressable member to its notice', () => {
+    expect(remoteOpenOf(live(undefined, 'term_839'))).toBeNull()
+    expect(
+      remoteOpenOf(
+        live({ host: 'imac', environmentId: 'env-imac', stateKnown: true, gone: true }, 'term_839')
+      )
+    ).toBeNull()
+    expect(
+      remoteOpenOf(live({ host: 'imac', environmentId: 'env-imac', stateKnown: false }, 'term_839'))
+    ).toBeNull()
+    expect(remoteOpenOf(live({ host: 'imac', stateKnown: true }, 'term_839'))).toBeNull()
+    expect(
+      remoteOpenOf(live({ host: 'imac', environmentId: 'env-imac', stateKnown: true }))
+    ).toBeNull()
+  })
+
+  it('says why it could not open the member and how to read it instead', () => {
+    const one = live({ host: 'imac', environmentId: 'env-imac', stateKnown: true }, 'term_839')
+    expect(remoteOpenFailedOf(one)).toBe(
+      'Could not open ORCA-826 restart on imac; read it: orca orchestration worker-read --dispatch ctx_839'
+    )
+    setGameLocale('es')
+    expect(remoteOpenFailedOf(one)).toBe(
+      'No se pudo abrir ORCA-826 restart en imac; léelo: orca orchestration worker-read --dispatch ctx_839'
     )
   })
 })

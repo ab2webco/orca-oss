@@ -1,6 +1,7 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
 import { gameFleetOf, liveLinkedItemOf, settle } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
+import { trackerWorkItemOf } from './orchestrator-game-lead-work-item'
 import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
@@ -24,10 +25,7 @@ import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
-  statusGroupOfName,
-  statusGroupOfPlane,
   type GameActivity,
-  type GameWorkItem,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import { settleGameStop } from '../../shared/orchestrator-game-stop-state'
@@ -50,8 +48,15 @@ export async function buildOrchestratorGameState(
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
   const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
   const readScenes = input.readScenes
-  const { readStop, readInboxes, readLeadElsewhere, readOpenOwnerQuestions, readGitHubBudget } =
-    input
+  const {
+    readStop,
+    readInboxes,
+    readLeadElsewhere,
+    readOpenOwnerQuestions,
+    readGitHubBudget,
+    readMetrics
+  } = input
+  const timezone = desktopGameTimezoneOf(resolved.config.timezone)
   const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
     read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
   const [
@@ -66,7 +71,8 @@ export async function buildOrchestratorGameState(
     suggested,
     openOwnerQuestions,
     githubBudget,
-    merges
+    merges,
+    metrics
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -79,7 +85,8 @@ export async function buildOrchestratorGameState(
     input.suggestedView ? settle(input.suggestedView) : Promise.resolve(null),
     leadOnly(readOpenOwnerQuestions),
     readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
-    leadOnly(input.readMerges)
+    leadOnly(input.readMerges),
+    leadOnly(readMetrics && (() => readMetrics(timezone)))
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -90,30 +97,13 @@ export async function buildOrchestratorGameState(
       : sceneFile?.warning === undefined
         ? {}
         : { scene: DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene }),
-    timezone: desktopGameTimezoneOf(resolved.config.timezone)
+    timezone
   }
-  let workItem: GameWorkItem | null = null
-  if (plane) {
-    workItem = {
-      provider: 'plane',
-      identifier: plane.identifier,
-      title: plane.title,
-      url: plane.url,
-      status: plane.stateName,
-      statusGroup: statusGroupOfPlane(plane.stateGroup, plane.stateName)
-    }
-  } else if (linear) {
-    workItem = {
-      provider: 'linear',
-      identifier: linear.identifier,
-      title: linear.title,
-      url: linear.url,
-      status: linear.stateName,
-      statusGroup: statusGroupOfName(linear.stateName)
-    }
-  } else if (tracker) {
-    workItem = await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
-  }
+  const workItem =
+    trackerWorkItemOf(plane, linear) ??
+    (tracker
+      ? await liveLinkedItemOf(input.worktree?.linkedWorkItem, input.readLinkedStatus)
+      : null)
   const gameReview = gameReviewOf(review)
   const readProjectWork = input.readProjectWork
   // Why `tracker`: it is already off for a member, whose band shows no project work.
@@ -161,6 +151,7 @@ export async function buildOrchestratorGameState(
   const agents = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
+    found: input.callerParentPaneKey ? [] : input.found,
     leaderPaneKey: input.leaderPaneKey,
     teamHandles: input.teamHandles,
     terminalHandleOf: input.terminalHandleOf,
@@ -219,6 +210,7 @@ export async function buildOrchestratorGameState(
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
     ...(merges ? { merges } : {}),
+    ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   }

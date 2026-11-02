@@ -202,6 +202,8 @@ import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
+// Why longer: the host answers after a full `ps` sweep, and only a first read waits for it.
+const GAME_HOST_CAPACITY_TIMEOUT_MS = 6_000
 
 const gameHostProfileOfThisMachine = (): GameHostProfile => ({
   totalMemory: totalmem(),
@@ -402,6 +404,7 @@ import {
   type RuntimeTerminalCreate,
   type RuntimeTerminalPresentation,
   type RuntimeTerminalSplit,
+  type RuntimePairedTerminalReveal,
   type RuntimeTerminalFocus,
   type RuntimeTerminalClose,
   type RuntimeTerminalWake,
@@ -718,6 +721,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import {
@@ -730,6 +734,12 @@ import type {
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
 import { GameReadCache } from './orchestrator-game-read-cache'
+import {
+  GAME_METRICS_REFRESH_MS,
+  gameMetricsSummaryOf,
+  type GameMetricsSummary
+} from '../../shared/orchestrator-game-metrics-summary'
+import { gameClaudeAccountsUsageOf } from '../../shared/orchestrator-game-claude-usage'
 import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
   GameProjectWorkCache,
@@ -769,6 +779,9 @@ import {
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
+import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import { collectHostMemory } from '../memory/host-memory'
 import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
 import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
@@ -788,6 +801,7 @@ import type {
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
+import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
 import { GameLeads } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
@@ -2413,6 +2427,7 @@ type RuntimeNotifier = {
   ): void
   renameTerminal(tabId: string, title: string | null): void
   focusTerminal(tabId: string, worktreeId: string, leafId?: string | null): void
+  revealPairedTerminal?(target: { environmentId: string; handle: string }): void
   focusEditorTab?(tabId: string, worktreeId: string): void
   closeSessionTab?(tabId: string, worktreeId: string): void
   moveSessionTab?(worktreeId: string, move: RuntimeMobileSessionTabMove): void
@@ -3803,6 +3818,8 @@ export class OrcaRuntimeService {
   private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
     () => (gameGitHubPollStretch() > 1 ? 300_000 : 0)
   )
+  // Why cached: the lead's band polls every few seconds and the numbers move by the minute.
+  private readonly gameMetrics = new GameReadCache<GameMetricsSummary>(GAME_METRICS_REFRESH_MS)
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
@@ -3815,6 +3832,18 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
   )
+  private readonly gameHostCapacity = new GameHostCapacityReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    readLocal: collectHostMemory,
+    // Why diagnostics.memory: every paired host already answers it, so no wire change (ORCA-841).
+    readRemote: (environmentId) =>
+      this.callOrchestrationWorkerServer(
+        environmentId,
+        'diagnostics.memory',
+        undefined,
+        GAME_HOST_CAPACITY_TIMEOUT_MS
+      )
+  })
   private readonly gamePairedHosts = new GamePairedHostReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
     statusOf: async (environmentId) => {
@@ -3951,6 +3980,7 @@ export class OrcaRuntimeService {
     this.notifier?.gameInboxChanged?.()
     this.emitClientEvent({ type: 'gameInboxChanged' })
   })
+  private readonly gameFleetChange = new GameFleetChangeSignal()
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
@@ -6234,6 +6264,7 @@ export class OrcaRuntimeService {
   }
 
   private notifyWorktreesChanged(repoId: string): void {
+    this.gameFleetChange.changed()
     this.notifier?.worktreesChanged(repoId)
     this.emitClientEvent({ type: 'worktreesChanged', repoId })
   }
@@ -11919,6 +11950,10 @@ export class OrcaRuntimeService {
     // updatedAt) — mirrors AgentStatusEntry.stateStartedAt on the desktop side.
     const stateStartedAt =
       previous && previous.payload.state === payload.state ? previous.stateStartedAt : now
+    // Why state only: a game band draws working/waiting/done, and tool pings would refresh it nonstop.
+    if (stateStartedAt === now) {
+      this.gameFleetChange.changed()
+    }
     this.latestAgentStatusByPaneKey.set(paneKey, {
       paneKey,
       ptyId,
@@ -11946,6 +11981,7 @@ export class OrcaRuntimeService {
     for (const [paneKey, snapshot] of this.latestAgentStatusByPaneKey) {
       if (snapshot.ptyId === ptyId) {
         this.latestAgentStatusByPaneKey.delete(paneKey)
+        this.gameFleetChange.changed()
       }
     }
   }
@@ -17105,10 +17141,33 @@ export class OrcaRuntimeService {
           : targetWorktreeId
             ? []
             : [...worktreesById.values()]
-    const controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+    const parsedTargetWorkspace = targetWorktreeId ? parseWorkspaceKey(targetWorktreeId) : null
+    const folderWorkspace =
+      parsedTargetWorkspace?.type === 'folder'
+        ? this.store
+            ?.getFolderWorkspaces?.()
+            .find((workspace) => workspace.id === parsedTargetWorkspace.folderWorkspaceId)
+        : null
+    const targetRepo = targetWorktree ? this.store?.getRepo?.(targetWorktree.repoId) : null
+    const connectionId = folderWorkspace
+      ? this.resolveFolderWorkspaceConnectionId(folderWorkspace)
+      : targetRepo
+        ? (targetRepo.connectionId ?? null)
+        : undefined
+    let controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
       resolvedWorktrees,
-      targetWorktreeId
+      targetWorktreeId,
+      undefined,
+      connectionId
     )
+    if (!controllerInventory && opts.requireFreshPtyLiveness) {
+      controllerInventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
+        resolvedWorktrees,
+        targetWorktreeId,
+        undefined,
+        connectionId
+      )
+    }
     const refreshedPtyLiveness = controllerInventory
       ? new Set(controllerInventory.livePtyIds)
       : null
@@ -30456,6 +30515,20 @@ export class OrcaRuntimeService {
     )
   }
 
+  /** Asks this window to open a connected server's terminal; the window reads the server itself. */
+  async revealPairedTerminal(
+    selector: string,
+    handle: string
+  ): Promise<RuntimePairedTerminalReveal> {
+    const server = this.resolveOrchestrationWorkerServer(selector)
+    const reveal = this.notifier?.revealPairedTerminal
+    if (!reveal) {
+      throw new Error('runtime_unavailable')
+    }
+    reveal({ environmentId: server.environmentId, handle })
+    return { handle, environmentId: server.environmentId, host: server.name, navigated: true }
+  }
+
   async closeTerminal(handle: string): Promise<RuntimeTerminalClose> {
     const sleepingRecord = this.sleepingHandleRecords.get(handle)
     if (sleepingRecord) {
@@ -31117,6 +31190,19 @@ export class OrcaRuntimeService {
     return repoId ? `repo:${repoId}` : null
   }
 
+  /** Long-polls the fleet version; with no `since`, answers the current one at once. */
+  async waitGameFleetChange(args: { since?: number; timeoutMs: number }): Promise<GameFleetWait> {
+    if (args.since === undefined) {
+      return { version: this.gameFleetChange.version(), changed: false }
+    }
+    return await this.gameFleetChange.wait(args.since, args.timeoutMs)
+  }
+
+  /** A change made outside the runtime's own paths (the stop switch) that a band draws. */
+  noteGameFleetChanged(): void {
+    this.gameFleetChange.changed()
+  }
+
   getGameBoard(): GameBoard {
     return this.gameBoard
   }
@@ -31210,6 +31296,7 @@ export class OrcaRuntimeService {
     if (args.record.ticket) {
       await this.gamePausedMembers.forget(key, [args.record.ticket]).catch(() => undefined)
     }
+    this.gameFleetChange.changed()
     return { recorded: true, count: records.length }
   }
 
@@ -31223,6 +31310,7 @@ export class OrcaRuntimeService {
       throw new Error('Only the lead saves its members.')
     }
     await this.gamePausedMembers.record(project.key, args.member)
+    this.gameFleetChange.changed()
     return { recorded: true }
   }
 
@@ -31266,7 +31354,11 @@ export class OrcaRuntimeService {
     if (project.isMember) {
       throw new Error('Only the lead resumes its members.')
     }
-    return await this.gameMemberResume.resume(project.key, args.ticket)
+    try {
+      return await this.gameMemberResume.resume(project.key, args.ticket)
+    } finally {
+      this.gameFleetChange.changed()
+    }
   }
 
   async discardGameMembers(args: {
@@ -31278,7 +31370,11 @@ export class OrcaRuntimeService {
     if (project.isMember) {
       throw new Error('Only the lead discards its members.')
     }
-    return await this.gameMemberResume.discard(project.key, args.tickets)
+    try {
+      return await this.gameMemberResume.discard(project.key, args.tickets)
+    } finally {
+      this.gameFleetChange.changed()
+    }
   }
 
   private async resumeGameMemberSession(member: GameMemberSession): Promise<string | null> {
@@ -31425,6 +31521,36 @@ export class OrcaRuntimeService {
     return { characters: await this.gameHistory.characters(key) }
   }
 
+  private async readGameMetrics(
+    caller: { worktreeId?: string; terminalHandle?: string },
+    timezone: string
+  ): Promise<GameMetricsSummary | null> {
+    // Why the board's project: it is the key `orca game metrics` reads game.events and game.history by.
+    const { key } = await this.gameBoardProjectOf(caller)
+    return this.gameMetrics.read(JSON.stringify([key, timezone]), async () => {
+      const [events, history] = await Promise.all([
+        this.gameHistory.events(key),
+        this.gameHistory.list(key)
+      ])
+      const summary = gameMetricsSummaryOf({ events, history }, { now: Date.now(), timezone })
+      const services = this.accountServices
+      if (!services) {
+        return summary
+      }
+      const roster = services.claudeAccounts.listAccounts()
+      return {
+        ...summary,
+        claudeAccounts: gameClaudeAccountsUsageOf(
+          {
+            accounts: roster.accounts,
+            activeAccountId: roster.activeAccountIdsByRuntime?.host ?? roster.activeAccountId
+          },
+          services.rateLimits.getState()
+        )
+      }
+    })
+  }
+
   async listGameHistory(args: {
     worktreeId?: string
     terminalHandle?: string
@@ -31514,9 +31640,12 @@ export class OrcaRuntimeService {
       const db = this.getOrchestrationDb()
       const launched = db.workerLaunchForTerminal(handle)
       const seen = this.gameMemberSeenModelFor(paneKey, handle, db)
+      // Why named: the card says whose word the model is, so a member without Jev never reads as unknown (ORCA-933).
+      const isSession = Boolean(seen?.model) || (!launched?.model && Boolean(seen?.effort))
       return gameMemberLaunchOf({
         model: seen?.model ?? launched?.model ?? null,
-        effort: seen?.effort ?? launched?.effort ?? null
+        effort: seen?.effort ?? launched?.effort ?? null,
+        source: isSession ? 'session' : 'launch'
       })
     } catch {
       return null
@@ -31643,8 +31772,16 @@ export class OrcaRuntimeService {
         : this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin)
           ? { globalLogin: true as const }
           : {}),
-      ...(limit ? { limit } : {})
+      ...(limit ? { limit } : {}),
+      ...this.gameMemberModelsFor(paneKey)
     }
+  }
+
+  // Why here: a member posts its Jev report to its own host, so a lead elsewhere sees it only relayed (ORCA-933).
+  private gameMemberModelsFor(paneKey: string): Pick<RemoteMemberAgent, 'advisor' | 'launch'> {
+    const advisor = this.gameMemberAdvisors.of(paneKey, Date.now())
+    const launch = this.gameMemberLaunchFor(paneKey)
+    return { ...(advisor ? { advisor } : {}), ...(launch ? { launch } : {}) }
   }
 
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
@@ -31744,6 +31881,9 @@ export class OrcaRuntimeService {
       ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
           ?.parentPaneKey
       : null
+    const hostReadings = callerParentPaneKey
+      ? Promise.resolve(null)
+      : this.gameHostCapacity.read().catch(() => null)
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -31762,6 +31902,14 @@ export class OrcaRuntimeService {
         : null,
       agents: summary?.agents ?? [],
       members,
+      found: args.paneKey
+        ? foundGameSessionsOf(summaries, {
+            leadPaneKey: args.paneKey,
+            hasTerminal: (paneKey) => this.getTerminalHandleForPaneKey(paneKey) !== null,
+            isLeadPane: (paneKey) =>
+              this._orchestrationDb?.getCurrentRunForPane?.(paneKey) !== undefined
+          })
+        : [],
       readMemberWork: (memberWorktreeId) =>
         this.gameMemberWork.read(memberWorktreeId, async () => {
           const member = worktreesById.get(memberWorktreeId)
@@ -31830,6 +31978,8 @@ export class OrcaRuntimeService {
           })
         ).stopped,
       readGitHubBudget: () => readGameGitHubBudget(),
+      readMetrics: (timezone) =>
+        this.readGameMetrics({ worktreeId, terminalHandle: callerHandle ?? undefined }, timezone),
       readProjectWork: async ({ todo, workItem }) => {
         const repoId = worktree?.repoId
         if (!repoId) {
@@ -31925,12 +32075,13 @@ export class OrcaRuntimeService {
       worktree,
       worktreesById
     )
-    return await this.withPausedGameMembers(withRemote, {
+    const withPaused = await this.withPausedGameMembers(withRemote, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
       liveWorktreeIds: new Set(
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
+    return withGameHostCapacity(withPaused, await hostReadings)
   }
 
   private async withRemoteGameMembers(
@@ -32055,11 +32206,13 @@ export class OrcaRuntimeService {
         starting: this.workerSetupAdmission.startingTaskIds()
       }
     )
+    const { agents, unlisted } = recoveredGameMembersOf(state.agents, view.unlisted)
     return {
       ...state,
+      agents,
       pausedMembers: view.paused,
       ...(view.queued.length > 0 ? { queuedMembers: view.queued } : {}),
-      ...(view.unlisted.length > 0 ? { unlistedMembers: view.unlisted } : {}),
+      ...(unlisted.length > 0 ? { unlistedMembers: unlisted } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
   }
@@ -36782,6 +36935,8 @@ export class OrcaRuntimeService {
   // Why: wake blocking orchestration.check --wait calls on this handle so they return the new message immediately instead of polling.
   notifyMessageArrived(handle: string, messageType?: string): void {
     this.gameInboxChange.mailArrived(messageType)
+    // Why heartbeats too: a member's first one moves its phase off "starting".
+    this.gameFleetChange.changed()
     const paneKey = handle.startsWith('term_') ? this.getTerminalPaneKey(handle) : null
     const run = paneKey ? this._orchestrationDb?.getCurrentRunForPane?.(paneKey) : undefined
     const dispatch =

@@ -309,7 +309,16 @@ is in that project's own `orca.yaml`.
 
 ## What the game reads: `orca game state --json`
 
-The plugin polls this every 30 seconds and after each turn. It resolves the calling pane from
+The plugin reads this when Orca pushes a fleet change, every 30 seconds and after each turn. The
+push is `orca game watch`, which the mod streams for the session: it long-polls `game.fleetWait`
+and prints `fleet <version>` when a worktree is created or removed, a member's agent changes state,
+a member's terminal goes away, the lead records, frees, resumes or discards a member, the STOP
+switch moves, or orchestration mail arrives. A burst (a launch makes a worktree, a terminal and a
+record) is one version, and the mod reads once per 300 ms burst; a change that lands while a read
+runs gets a read after it. The 30-second poll stays because PR and CI changes, members on paired
+hosts and an Orca without `game.fleetWait` push nothing. A read that fails keeps the fleet it had,
+the band says `updated <age> ago · retrying`, and the mod reads again after 10 seconds. A read has
+45 seconds before it counts as failed. It resolves the calling pane from
 `ORCA_WORKTREE_ID`, `ORCA_TERMINAL_HANDLE` and `ORCA_PANE_KEY`
 ([builder](../../src/main/runtime/orchestrator-game-state-builder.ts)). Members also get
 `ORCA_WORKTREE_SLUG` to keep parallel test suites apart
@@ -319,7 +328,14 @@ The plugin polls this every 30 seconds and after each turn. It resolves the call
 - `agents` — the worktree's agent rows (`working`, `waiting`, `idle`, `done`, current tool,
   leader flag, and an optional `terminalHandle` when the pane maps to an Orca terminal). The Fleet
   pane's **View** button (hotkeys `1`–`9` by tile order) runs `terminal focus` on that handle;
-  a row without one gets no button;
+  a row without one gets no button. A lead also gets every other live session on this machine,
+  whatever its agent (Claude, Codex, OpenCode…) and in any worktree or folder workspace, as a
+  member marked `found: true` and named after its worktree
+  ([selector](../../src/main/runtime/orchestrator-game-found-sessions.ts)). Other leads and
+  their live members stay out. A found session takes no wave slot and earns no rewards, and
+  `sweep`, `push` and `stop --all` leave it alone; `game stop <ticket or name>` closes it. A
+  found session running in the worktree of a member the lead saved is that member, taken back
+  under its name (ORCA-735);
 - `review` — the hosted review for the branch from any supported provider (GitHub, GitLab,
   Bitbucket, Azure DevOps, Gitea) with its aggregate CI status. `verdict` (optional) is the
   host's review decision — `approved`, `changes_requested` or `review_required` (GitHub only;
@@ -384,8 +400,8 @@ popover.
 ## Panel layout
 
 The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
-item rows), My PRs, To Do and Actions, in that order. A new Panel shows only Team and My PRs; the
-other three are widgets in the catalog that a person adds from the **Widgets** menu chip or with
+item rows), My PRs, To Do, Actions and Metrics, in that order. A new Panel shows only Team and My
+PRs; the other four are widgets in the catalog that a person adds from the **Widgets** menu chip or with
 `/orca-game:layout add <section>`, and removes the same way. In the catalog `●` marks a shown
 widget and `○` one that waits; a shown widget also gets `↑` and `↓` chips that move it. Each
 heading starts with a mark: `▾` while it is expanded, `▸` once collapsed to its heading line
@@ -398,6 +414,15 @@ a row of such chips. The Widgets chip has no hotkey: every letter and digit is a
 A widget that is not shown is not drawn: its rows, buttons, hotkeys and Team's animated tiles are
 gone until it is added, and a closed Actions widget reads no run log. Its data still arrives with
 `game state`.
+
+The Metrics widget draws the state's `metrics` (see `orca game metrics` below) with no work of its
+own per frame: a sparkline of tickets done per day with the window's total and its first and last
+day, the median lead time, then each Claude account with `●` on the active one and two meters,
+`5h` and `7d`, filled by eighths of a cell, yellow from 75% and red from 90%. Wide, an account
+is one row; on a phone it is two, and the meters narrow to two cells so neither row wraps
+([`metrics-widget.ts`](../../resources/claude-plugins/orca-game/hooks/metrics-widget.ts)). A
+member's Panel, or one on an older host, gets no `metrics` and says the numbers are in the
+lead's Panel. A version 1 layout upgrades with Metrics in the catalog, not shown.
 
 `/orca-game:layout` lists the sections with their state and takes `reset`, `add <section>`,
 `remove <section>` and `move <section> up|down` (Spanish words work too: `añadir tareas`,
@@ -619,6 +644,11 @@ The lead's verbs, run from the lead's terminal
   take this Orca's slots. `game fleet` prints `Hosts: local 3/5 · imac 4/8`, `game state --json`
   carries `hosts`, `game launch` refuses per host and names one with room, and `game wave` and
   `game resume-members` start members on this Orca only. An explicit per-host cap has no setter yet.
+- **Host capacity (ORCA-841).** `game fleet`, `game state` and the Panel then give each host its
+  own line: members against its cap, cores, free memory and load, flagged `low memory` (under 4 GB
+  or 10% free) or `busy` (load at its cores); `--json` carries them in `hostCapacity`. The figures
+  come from each host's `diagnostics.memory`, so an older host needs no update, and are reused for
+  15 s ([`orchestrator-game-host-capacity.ts`](../../src/shared/orchestrator-game-host-capacity.ts)).
 - `orca game wave [<ticket>,...] [--repo] [--dry-run]` — launches the named tickets, or the To
   Do's items still in To Do in list order, up to the free slots. It skips tickets a member holds
   and named tickets already in review, done or cancelled; one already In Progress is launched,
@@ -668,6 +698,17 @@ matches …` (ORCA-866).
   time still runs from the ticket's first claim. It adds the character's level and XP, drops XP from
   `not recorded`, and notes when older tasks are no longer kept. An unknown name is refused with the
   known ones ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
+  With no filter it also prints the scene's metrics widget window: tickets done per calendar day
+  for the last 14 days and their median lead time, in `--timezone <zone>` (default this machine's
+  zone). Each done ticket counts once, on the day of its `ticketsDoneAt` in `--json` (its last
+  merged event, else when its member was freed), so a ticket merged one evening and freed the
+  next morning is not counted on both days the way two one-day `--since`/`--until` queries would.
+- Game state's optional `metrics` (lead only, absent from an older host or for a member) carries
+  that same 14-day summary in the game's own timezone plus each managed Claude account's 5h and 7d
+  use (active first, then the busiest, at most 8, readings Orca already holds, never a refresh).
+  The host computes it at most once a minute per project and zone; the budget is 2 KB of payload
+  and 50 ms of compute on a full store, both tested against a recording of this project's real
+  stores ([`orchestrator-game-metrics-summary.ts`](../../src/shared/orchestrator-game-metrics-summary.ts)).
 - `orca game accounts [--refresh]` — every managed account per agent with its 5h and 7d use and
   reset time, its standing (`free`, `near`, `limited`, `unknown`), when a near or limited one is
   usable again, the tickets of this lead's members running on it, and whether `auto` may pick it.
@@ -687,6 +728,18 @@ matches …` (ORCA-866).
   place there (ORCA-916): `--account` and `auto` resolve against that host's accounts, matched to
   the member's by email, and the lead's machine needs the host saved as an environment. Any other
   member on a paired host moves only with `--on`; `--account` alone is refused for it.
+- `orca game rebind <ticket>` — binds a member to the terminal it runs in after its own was
+  replaced outside Orca, for example by an account switch made on its host (CIN-1297). Its
+  dispatch's capability belongs to the old terminal's pane and process, so mail from the new one is
+  refused by design. Rebind therefore settles the old dispatch and starts its task again, linked
+  with `--retry-of`, on the one live agent terminal in the member's worktree that no other live
+  dispatch holds, locally or on its paired host (`--on`). A plain shell there is not a candidate.
+  The old dispatch is stopped, or abandoned when no stop can be proven because its terminal is
+  gone; abandoning closes nothing. Any agent can be rebound. The new dispatch gives that terminal
+  its own capability, so mail and the Panel follow it and the old row leaves. Nothing changes while
+  the member's own terminal still runs, while the agent there is mid-turn (rebind it at its
+  prompt), or when its worktree has no live agent terminal or several; the result lists them. A
+  member gone from its host points to it in `game fleet` and in View.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
@@ -808,6 +861,14 @@ resumed`, so two agents never reopen in one worktree. Each Orca host keeps this 
   rules, is the project's lead, and has no other live lead gets it; a fresh start reads the fleet
   through the lead skill instead. A resumed lead also runs the lead skill again: a restart killed its
   report watcher, and its rules then resume the paused members or ask first.
+- **Former leads** (ORCA-728). A restore can bring back several sessions that once ran the lead
+  rules; only the recorded lead keeps leading. For two minutes after the roster loads, a recorded
+  lead whose pane has not reconnected still leads: `leadElsewhere` names it once its pane has a
+  handle, and a `game lead` claim waits up to 20 s for it to settle before it reopens the stored
+  conversation or takes the project
+  ([`orchestrator-game-leads.ts`](../../src/main/runtime/orchestrator-game-leads.ts)). A resumed or
+  compacted former lead is unmarked, told which pane leads and to stop its report watcher, and a
+  toast names that pane.
 - **Discard.** `--discard` frees the named members, or all of them; worktrees are never touched.
 - **Their worktrees are guarded** (ORCA-746). `orca worktree rm` (`worktree.rm`) refuses the worktree
   of any saved member that has not finished, paused or live, even with `--force`, which only waives
@@ -921,9 +982,11 @@ member right after its PR merges, so a refresh rarely sees its review turn `merg
 with that review: provider, number, worktree and whether `perfectMerge` was `true`. Only after that
 does auto-release drop the row
 ([`orchestrator-game-merge-record.ts`](../../src/main/runtime/rpc/methods/orchestrator-game-merge-record.ts)).
-A lead's state lists the 20 newest of these as `merges`, so the mod can reward a merge whose member
-is already gone (ORCA-906); an older host sends none. A merge recorded while its review facts could
-not be read counts as not perfect.
+A lead's state lists the 20 newest of these as `merges`. A merge that appears there between two
+refreshes earns `review-merged` and, when perfect, `perfect-merge` and the arcade offer, under the
+same ids the review's change would give, so a merge both seen and recorded earns once. An older
+host sends no `merges`, and the first list a pane reads awards nothing. A merge recorded while its
+review facts could not be read counts as not perfect.
 
 ### The scoring table: `orchestratorGame.rewardWeights`
 
@@ -1059,7 +1122,11 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
   its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
   their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`
-  reports. A host that does not answer within 3 s keeps its member listed with state `unknown`
+  reports, with the tool the member runs (`toolName`), its Jev report (`advisor`) and the model its
+  own hooks named, else the one the lead launched it on (`launch.source` `session` or `launch`;
+  ORCA-933). The Panel card prints that source (`◇ session …`, `◇ launch …`) when there is no Jev
+  report, and an older host relays none of the three, so the home falls back to its own launch
+  record. A host that does not answer within 3 s keeps its member listed with state `unknown`
   and NEXT `worker-show --dispatch <id>`. The fleet holds the lead Run's live remote dispatches and
   those that finished since the current lead claimed the Run. A remote agent started any other way
   (a plain terminal on the host) has no record on the lead's machine and cannot be listed;

@@ -260,9 +260,15 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     // alias rather than a duplicate spec + handler registration.
     aliases: [['terminal', 'focus']],
     summary: 'Switch to a terminal tab in the UI',
-    usage: 'orca terminal switch [--terminal <handle>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'terminal'],
-    examples: ['orca terminal switch --terminal term_abc123']
+    usage: 'orca terminal switch [--terminal <handle>] [--on <saved-environment>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'terminal', 'on'],
+    notes: [
+      "--on opens a connected Orca Lab server's terminal in this window; --terminal is then that server's handle."
+    ],
+    examples: [
+      'orca terminal switch --terminal term_abc123',
+      'orca terminal switch --terminal term_abc123 --on imac'
+    ]
   },
   {
     path: ['terminal', 'close'],

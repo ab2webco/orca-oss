@@ -99,6 +99,8 @@ export async function liveLinkedItemOf(
 export async function gameFleetOf(args: {
   agents: readonly GameAgentRow[]
   members: readonly { row: GameAgentRow; worktree: GameMemberWorktree }[]
+  /** Other sessions on this machine, which no `game launch` started (ORCA-914). */
+  found?: readonly { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
   teamHandles: ReadonlySet<string> | null | undefined
   terminalHandleOf: ((paneKey: string) => string | null) | undefined
@@ -130,13 +132,24 @@ export async function gameFleetOf(args: {
       args.agents.filter(
         (row) => !row.parentPaneKey || isMemberRow(row) || row.paneKey === leaderPaneKey
       )
+  const listed = new Set([
+    ...rows.map((row) => row.paneKey),
+    ...(leaderPaneKey ? [leaderPaneKey] : [])
+  ])
+  const launched = args.members.filter((one) => !listed.has(one.row.paneKey))
+  for (const one of launched) {
+    listed.add(one.row.paneKey)
+  }
   const sourced = [
-    ...rows.map((row) => ({ row, worktree: undefined })),
-    ...args.members.filter((one) => !rows.some((row) => row.paneKey === one.row.paneKey))
+    ...rows.map((row) => ({ row, worktree: undefined, found: false })),
+    ...launched.map((one) => ({ ...one, found: false })),
+    ...(args.found ?? [])
+      .filter((one) => !listed.has(one.row.paneKey))
+      .map((one) => ({ ...one, found: true }))
   ]
   const readMemberWork = args.readMemberWork
   return await Promise.all(
-    sourced.map(async ({ row, worktree }) => {
+    sourced.map(async ({ row, worktree, found }) => {
       const work =
         worktree && readMemberWork ? await settle(() => readMemberWork(worktree.id)) : null
       const review = work ? gameReviewOf(work.review) : null
@@ -169,7 +182,10 @@ export async function gameFleetOf(args: {
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,
+        // Why the worktree's name: outside a dispatch a row has no task title to show.
+        ...(found ? { displayName: agent.displayName ?? worktree?.displayName ?? null } : {}),
         ...(isMember ? { isMember: true } : {}),
+        ...(found ? { found: true as const } : {}),
         ...(worktree ? { worktree } : {}),
         ...(review ? { review } : {}),
         ...(workItem ? { workItem } : {}),

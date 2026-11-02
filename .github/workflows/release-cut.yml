@@ -843,7 +843,7 @@ jobs:
 
       - name: Install native build tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
+        run: bash config/scripts/ci-apt.sh update && bash config/scripts/ci-apt.sh install -y build-essential python3 xvfb
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -918,7 +918,7 @@ jobs:
 
       - name: Install native build tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
+        run: bash config/scripts/ci-apt.sh update && bash config/scripts/ci-apt.sh install -y build-essential python3 xvfb
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -1092,7 +1092,7 @@ jobs:
       # .rpm artifact. Stock Ubuntu runners do not ship it.
       - name: Install Linux computer-use provider dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool rpm
+        run: bash config/scripts/ci-apt.sh update && bash config/scripts/ci-apt.sh install -y python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool rpm
 
       # Why: telemetry's transport gate (`src/main/telemetry/client.ts:IS_OFFICIAL_BUILD`)
       # requires the build identity to be the literal string `stable` or `rc`,

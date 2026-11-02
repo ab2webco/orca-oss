@@ -1,7 +1,17 @@
 import { stripTerminalControl } from './terminal-control-stripping'
 
+/** Where a member's model came from without Jev: its own hooks (`session`) or Orca's launch choice. */
+export type GameMemberModelSource = 'session' | 'launch'
+
 /** The model and effort Orca launched a dispatched member on, as a person reads them. */
-export type GameMemberLaunch = { model: string | null; effort: string | null }
+export type GameMemberLaunch = {
+  model: string | null
+  effort: string | null
+  /** Absent from an older host, which named no source (ORCA-933). */
+  source?: GameMemberModelSource
+}
+
+const MODEL_SOURCES: readonly GameMemberModelSource[] = ['session', 'launch']
 
 const WORDS_MAX = 64
 const CLAUDE_FAMILY = /^claude-([a-z]+)((?:-\d{1,2})*)(?:-\d{8})?(?:\[[^\]]*\])?$/
@@ -41,5 +51,10 @@ export function gameMemberLaunchOf(value: unknown): GameMemberLaunch | null {
   if (model === undefined || effort === undefined || (model === null && effort === null)) {
     return null
   }
-  return { model: model === null ? null : modelLabelOf(model), effort }
+  const source = MODEL_SOURCES.find((one) => one === selection.source)
+  return {
+    model: model === null ? null : modelLabelOf(model),
+    effort,
+    ...(source ? { source } : {})
+  }
 }

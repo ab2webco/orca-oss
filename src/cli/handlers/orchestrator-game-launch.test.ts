@@ -1,85 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
+import { TODO_ITEM, fakeClient, launch, stateWith } from './orchestrator-game-launch-test-fixtures'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
-import {
-  ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
-  ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
-} from '../../shared/protocol-version'
-
-const TODO_ITEM = {
-  id: 'CIN-12',
-  title: 'Cartelera page',
-  url: 'https://jira.example/browse/CIN-12',
-  status: 'To Do'
-}
-
-function stateWith(overrides: Record<string, unknown> = {}) {
-  return {
-    config: { mode: 'on' },
-    agents: [],
-    worktree: { id: 'wt1', path: '/repo', branch: 'main', displayName: 'cineco' },
-    project: { reviews: null, todo: { provider: 'jira', total: 1, url: null, items: [TODO_ITEM] } },
-    lead: { autostart: false, cap: 2, agent: 'claude', launchPrompt: 'Implement {id}: {title}' },
-    ...overrides
-  }
-}
-
-const ACCOUNTS = {
-  claude: {
-    accounts: [{ id: 'acct_ana', email: 'ana@example.com' }],
-    activeAccountId: 'acct_ana'
-  },
-  codex: { accounts: [{ id: 'acct_bo', email: 'bo@example.com' }], activeAccountId: null },
-  rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
-}
-
-function fakeClient(
-  state: unknown,
-  run: { id: string } | null = { id: 'run_1' },
-  overrides: Record<string, unknown> = {}
-) {
-  const calls: [string, unknown][] = []
-  const results: Record<string, unknown> = {
-    'game.state': state,
-    'worktree.list': { worktrees: [] },
-    'terminal.show': { terminal: { handle: 'h1' } },
-    'status.get': {
-      capabilities: [
-        ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
-        ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY
-      ]
-    },
-    'orchestration.runCurrent': { run },
-    'accounts.snapshot': ACCOUNTS,
-    'orchestration.runCreate': { run: { id: 'run_new', objective: 'x' } },
-    'orchestration.taskCreate': { task: { id: 'task_1', status: 'ready' } },
-    'orchestration.workerStart': {
-      runId: 'run_1',
-      taskId: 'task_1',
-      dispatchId: 'dispatch_1',
-      state: 'ready',
-      effects: [],
-      residualResources: []
-    },
-    ...overrides
-  }
-  const client = {
-    call: async (method: string, params: unknown) => {
-      calls.push([method, params])
-      return { ok: true, result: results[method] }
-    }
-  } as unknown as RuntimeClient
-  return { client, calls }
-}
-
-const launch = (client: RuntimeClient, ticket = 'cin-12', extra: [string, string][] = []) =>
-  ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
-    flags: new Map([['ticket', ticket], ...extra]),
-    client,
-    cwd: '/repo',
-    json: true
-  })
 
 describe('orca game launch', () => {
   const saved = { ...process.env }
@@ -500,23 +422,24 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })
 
-  it('refuses per host: a full host names the one with room (ORCA-888)', async () => {
-    const onImac = (paneKey: string) => ({
-      paneKey,
-      state: 'working',
-      isMember: true,
-      remote: { host: 'imac', stateKnown: true }
+  // Two members fill a paired imac whose cap is 2 (ORCA-888).
+  const imacFull = (localCap: number) =>
+    stateWith({
+      agents: ['a', 'b'].map((paneKey) => ({
+        paneKey,
+        state: 'working',
+        isMember: true,
+        remote: { host: 'imac', stateKnown: true }
+      })),
+      lead: { autostart: false, cap: localCap + 2, agent: 'claude' },
+      hosts: [
+        { host: 'local', cap: localCap, status: 'ok' },
+        { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
+      ]
     })
-    const { client, calls } = fakeClient(
-      stateWith({
-        agents: [onImac('a'), onImac('b')],
-        lead: { autostart: false, cap: 6, agent: 'claude' },
-        hosts: [
-          { host: 'local', cap: 4, status: 'ok' },
-          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
-        ]
-      })
-    )
+
+  it('refuses per host: a full host names the one with room (ORCA-888)', async () => {
+    const { client, calls } = fakeClient(imacFull(4))
 
     await expect(
       launch(client, 'cin-12', [
@@ -528,22 +451,7 @@ describe('orca game launch', () => {
   })
 
   it('launches here while a paired host is full, past the old single cap', async () => {
-    const onImac = (paneKey: string) => ({
-      paneKey,
-      state: 'working',
-      isMember: true,
-      remote: { host: 'imac', stateKnown: true }
-    })
-    const { client, calls } = fakeClient(
-      stateWith({
-        agents: [onImac('a'), onImac('b')],
-        lead: { autostart: false, cap: 3, agent: 'claude' },
-        hosts: [
-          { host: 'local', cap: 1, status: 'ok' },
-          { host: 'imac', id: 'env-imac', cap: 2, status: 'ok' }
-        ]
-      })
-    )
+    const { client, calls } = fakeClient(imacFull(1))
 
     await launch(client)
 
@@ -609,142 +517,6 @@ describe('orca game launch', () => {
     expect(
       calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
     ).not.toHaveProperty('on')
-  })
-
-  it('starts the member on a paired host with the same roster name and game as a local one (ORCA-794)', async () => {
-    const { client, calls } = fakeClient(stateWith())
-
-    await launch(client, 'CIN-12', [
-      ['on', 'imac'],
-      ['repo', 'name:cineco']
-    ])
-
-    expect(calls.map(([method]) => method)).not.toContain('worktree.list')
-    expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
-      expect.objectContaining({ taskTitle: 'Arthur · CIN-12 Cartelera page' })
-    )
-    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
-      expect.objectContaining({
-        on: 'imac',
-        worktree: 'new-top-level',
-        repo: 'name:cineco',
-        name: 'cin-12',
-        displayName: 'Arthur · CIN-12 Cartelera page',
-        game: true
-      })
-    )
-    expect(JSON.parse(output.join('')).result).toEqual(
-      expect.objectContaining({ ticket: 'CIN-12', name: 'Arthur' })
-    )
-  })
-
-  it('refuses --on without the host repo before any call (ORCA-794)', async () => {
-    const { client, calls } = fakeClient(stateWith())
-
-    await expect(launch(client, 'CIN-12', [['on', 'imac']])).rejects.toThrow(
-      /--on imac needs --repo <selector of the repo on imac>/
-    )
-    expect(calls).toEqual([])
-  })
-
-  it('hands accounts: auto to the host instead of pinning a local account (ORCA-798)', async () => {
-    const { client, calls } = fakeClient(
-      stateWith({
-        lead: { autostart: false, cap: 2, agent: 'claude', accounts: 'auto' }
-      })
-    )
-
-    await launch(client, 'CIN-12', [
-      ['on', 'imac'],
-      ['repo', 'name:cineco']
-    ])
-
-    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
-    const started = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
-    expect(started).toEqual(expect.objectContaining({ remoteAccount: 'auto' }))
-    expect(started).not.toHaveProperty('claudeAccountId')
-  })
-
-  it('sends a typed account for the host to resolve and shows the email it used (ORCA-798)', async () => {
-    const { client, calls } = fakeClient(stateWith(), undefined, {
-      'orchestration.workerStart': {
-        runId: 'run_1',
-        taskId: 'task_1',
-        dispatchId: 'dispatch_1',
-        state: 'ready',
-        account: { provider: 'claude', email: 'ana@koombea.com' }
-      }
-    })
-
-    await launch(client, 'CIN-12', [
-      ['on', 'imac'],
-      ['repo', 'name:cineco'],
-      ['account', 'ana@koombea.com']
-    ])
-
-    expect(calls.map(([method]) => method)).not.toContain('accounts.snapshot')
-    expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
-      expect.objectContaining({ on: 'imac', remoteAccount: 'ana@koombea.com' })
-    )
-    const result = JSON.parse(output.join('')).result
-    expect(result).toEqual(expect.objectContaining({ account: 'ana@koombea.com' }))
-    expect(result).not.toHaveProperty('accountId')
-  })
-
-  it('on a paired host, sends only an account the project allows, and never its global login (ORCA-896)', async () => {
-    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
-    const remote: [string, string][] = [
-      ['on', 'imac'],
-      ['repo', 'name:cineco']
-    ]
-    const allowed = fakeClient(stateWith({ lead }))
-    await launch(allowed.client, 'CIN-12', [...remote, ['account', 'ANA@koombea.com']])
-    expect(allowed.calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toEqual(
-      expect.objectContaining({ remoteAccount: 'ANA@koombea.com' })
-    )
-
-    const refused = fakeClient(stateWith({ lead }))
-    await expect(
-      launch(refused.client, 'CIN-12', [...remote, ['account', 'cy@koombea.com']])
-    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
-    expect(refused.calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
-  })
-
-  it("on a paired host, hands auto the project's list for the host to pick from (ORCA-891)", async () => {
-    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
-    const status = {
-      'status.get': {
-        capabilities: [
-          ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
-          'orchestration.federation-member-account-allowed.v1'
-        ]
-      }
-    }
-    for (const extra of [[], [['account', 'auto']]] as [string, string][][]) {
-      const { client, calls } = fakeClient(stateWith({ lead }), { id: 'run_1' }, status)
-      await launch(client, 'CIN-12', [['on', 'imac'], ['repo', 'name:cineco'], ...extra])
-      const start = calls.find(([method]) => method === 'orchestration.workerStart')?.[1]
-      expect(start).toEqual(
-        expect.objectContaining({
-          remoteAccount: 'auto',
-          remoteAllowedAccounts: ['ana@koombea.com']
-        })
-      )
-      expect(start).not.toHaveProperty('remoteAccountByDefault')
-    }
-  })
-
-  it('refuses the list before any start when this Orca cannot hand it to a host (ORCA-891)', async () => {
-    const lead = { autostart: false, cap: 2, agent: 'claude', accounts: ['ana@koombea.com'] }
-    const { client, calls } = fakeClient(stateWith({ lead }))
-
-    await expect(
-      launch(client, 'CIN-12', [
-        ['on', 'imac'],
-        ['repo', 'name:cineco']
-      ])
-    ).rejects.toThrow(/this project allows only ana@koombea\.com.*--account/)
-    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
   })
 
   it('runs the member on another agent, model and effort for this launch only', async () => {

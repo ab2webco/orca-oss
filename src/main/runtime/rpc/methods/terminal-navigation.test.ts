@@ -134,3 +134,25 @@ describe('terminal split launch accounts', () => {
     })
   })
 })
+
+// Why: a remote member's handle resolves only on its host, so View asks this window to open it there (ORCA-839).
+describe("revealing a paired host's terminal", () => {
+  it('hands the host selector and handle to the runtime', async () => {
+    const focus = { handle: 'term_839', environmentId: 'env-imac', host: 'imac', navigated: true }
+    const runtime = {
+      getRuntimeId: () => 'runtime-1',
+      revealPairedTerminal: vi.fn().mockResolvedValue(focus)
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: TERMINAL_METHODS })
+
+    const response = await dispatcher.dispatch({
+      id: 'reveal-1',
+      authToken: 'token',
+      method: 'terminal.revealPaired',
+      params: { terminal: 'term_839', on: 'imac' }
+    })
+
+    expect(runtime.revealPairedTerminal).toHaveBeenCalledWith('imac', 'term_839')
+    expect(response).toMatchObject({ ok: true, result: { focus } })
+  })
+})

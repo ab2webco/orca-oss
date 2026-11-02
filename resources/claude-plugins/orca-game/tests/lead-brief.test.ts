@@ -43,7 +43,11 @@ const start = async (
     store.set(String(Reflect.get(e, 'key')), Reflect.get(e, 'value'))
     return { value: undefined }
   })
-  on('ui.toast', () => ({ value: undefined }))
+  const toasts: string[] = []
+  on('ui.toast', ($s, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
   on('command.run', ($s, e) => {
     commands.push(e.command)
@@ -66,7 +70,7 @@ const start = async (
   })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
-  return { runs, commands, clock }
+  return { runs, commands, clock, toasts, store }
 }
 
 const contextOf = (answer: unknown): string =>
@@ -122,9 +126,23 @@ describe('lead brief', () => {
     expect(contextOf(await $.classic.SessionStart({ source: 'resume' }))).toBe('')
   })
 
-  test('says nothing while another pane leads the project', async ($, on) => {
+  test('tells a resumed former lead that another pane leads, and to stop its watcher (ORCA-728)', async ($, on) => {
+    const { runs, toasts, store } = await start($, on, {
+      state: { ...STATE, leadElsewhere: { handle: 'term_other' } }
+    })
+    const context = contextOf(await $.classic.SessionStart({ source: 'resume' }))
+    expect(context).toContain('no longer')
+    expect(context).toContain('term_other')
+    expect(context).toContain('watcher')
+    expect(context).not.toContain('CIN-7')
+    expect(runs.some((argv) => argv.includes('fleet'))).toBe(false)
+    expect(toasts.some((one) => one.includes('term_other'))).toBe(true)
+    expect(store.get(STARTED)).toEqual([])
+  })
+
+  test('tells a compacted former lead the same', async ($, on) => {
     await start($, on, { state: { ...STATE, leadElsewhere: { handle: 'term_other' } } })
-    expect(contextOf(await $.classic.SessionStart({ source: 'resume' }))).toBe('')
+    expect(contextOf(await $.classic.SessionStart({ source: 'compact' }))).toContain('term_other')
   })
 
   test('says nothing to a member session', async ($, on) => {

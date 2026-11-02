@@ -40,12 +40,12 @@ const VERSION_1_STORE = {
 describe('panel layout', () => {
   it('shows Team and My PRs by default and keeps the rest in the catalog', () => {
     expect(DEFAULT_FLEET_LAYOUT).toEqual({
-      order: ['team', 'review', 'reviews', 'todo', 'actions'],
+      order: ['team', 'review', 'reviews', 'todo', 'actions', 'metrics'],
       collapsed: [],
       shown: ['team', 'reviews']
     })
     expect(fleetLayoutOf(undefined, 'repo-1')).toEqual(DEFAULT_FLEET_LAYOUT)
-    expect(catalogOf(DEFAULT_FLEET_LAYOUT)).toEqual(['review', 'todo', 'actions'])
+    expect(catalogOf(DEFAULT_FLEET_LAYOUT)).toEqual(['review', 'todo', 'actions', 'metrics'])
   })
 
   it('keys a layout by the repo of the worktree, so every worktree of a project shares it', () => {
@@ -70,7 +70,7 @@ describe('panel layout', () => {
       shown: 'team'
     })
     expect(fleetLayoutOf(value, 'repo-1')).toEqual({
-      order: ['todo', 'actions', 'team', 'review', 'reviews'],
+      order: ['todo', 'actions', 'metrics', 'team', 'review', 'reviews'],
       collapsed: ['todo'],
       shown: ['team', 'reviews']
     })
@@ -80,12 +80,12 @@ describe('panel layout', () => {
     const value = stored({ order: ['team'], collapsed: [], shown: ['team'] })
     const layout = fleetLayoutOf(value, 'repo-1')
     expect(layout.shown).toEqual(['team'])
-    expect(catalogOf(layout)).toEqual(['review', 'reviews', 'todo', 'actions'])
+    expect(catalogOf(layout)).toEqual(['review', 'reviews', 'todo', 'actions', 'metrics'])
   })
 
-  it('reads a version 1 layout and keeps every section it showed', () => {
+  it('reads a version 1 layout and keeps every section it showed, and only those', () => {
     expect(fleetLayoutOf(VERSION_1_STORE, 'repo-1')).toEqual({
-      order: ['todo', 'team', 'review', 'reviews', 'actions'],
+      order: ['todo', 'team', 'review', 'reviews', 'actions', 'metrics'],
       collapsed: ['todo'],
       shown: ['todo', 'team', 'reviews', 'actions']
     })
@@ -124,10 +124,11 @@ describe('panel layout', () => {
       'review',
       'todo',
       'reviews',
-      'actions'
+      'actions',
+      'metrics'
     ])
     expect(moveSection(DEFAULT_FLEET_LAYOUT, 'team', 'up')).toEqual(DEFAULT_FLEET_LAYOUT)
-    expect(moveSection(DEFAULT_FLEET_LAYOUT, 'actions', 'down')).toEqual(DEFAULT_FLEET_LAYOUT)
+    expect(moveSection(DEFAULT_FLEET_LAYOUT, 'metrics', 'down')).toEqual(DEFAULT_FLEET_LAYOUT)
   })
 
   it('writes one project as version 2 and keeps the other projects and keys it does not know', () => {
@@ -182,6 +183,8 @@ describe('panel layout', () => {
   it('reads a section name in English or Spanish', () => {
     expect(panelSectionOf('TODO')).toBe('todo')
     expect(panelSectionOf('equipo')).toBe('team')
+    expect(panelSectionOf('Métricas')).toBe('metrics')
+    expect(panelSectionOf('metricas')).toBe('metrics')
     expect(panelSectionOf('quests')).toBeNull()
   })
 })

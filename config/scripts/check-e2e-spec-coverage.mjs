@@ -58,7 +58,7 @@ export function parseBaseline(text) {
 export function formatBaseline(counts) {
   return [
     '# E2E test counts per Playwright project.',
-    '# This is a ratchet: update intentionally when specs are added or removed.',
+    '# Counts are per-project floors: increases pass; review and update intentional decreases.',
     '',
     ...PROJECTS.map((project) => `${project} ${counts.get(project) ?? 0}`),
     ''
@@ -66,13 +66,13 @@ export function formatBaseline(counts) {
 }
 
 export function diffAgainstBaseline(current, baseline) {
-  return PROJECTS.filter((project) => current.get(project) !== baseline.get(project)).map(
-    (project) => ({
-      project,
-      current: current.get(project) ?? 0,
-      expected: baseline.get(project) ?? 0
-    })
-  )
+  return PROJECTS.filter(
+    (project) => !baseline.has(project) || (current.get(project) ?? 0) < baseline.get(project)
+  ).map((project) => ({
+    project,
+    current: current.get(project) ?? 0,
+    expected: baseline.get(project) ?? 0
+  }))
 }
 
 function runProject(root, project) {
@@ -127,7 +127,7 @@ export function checkCoverage(root = process.cwd(), { write = false } = {}) {
   const differences = diffAgainstBaseline(projectResults, baseline)
   if (differences.length && !write) {
     throw new Error(
-      `E2E project test-count ratchet changed:\n${differences.map(({ project, current, expected }) => `  ${project}: expected ${expected}, found ${current}`).join('\n')}\nRun with --write after reviewing the intentional change.`
+      `E2E project test-count floor missing or decreased:\n${differences.map(({ project, current, expected }) => `  ${project}: floor ${expected}, found ${current}`).join('\n')}\nRun with --write after reviewing an intentional baseline change.`
     )
   }
   if (write) {

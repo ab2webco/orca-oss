@@ -1,0 +1,2466 @@
+{
+  "recordedAt": "2026-10-30T13:30:00.000Z",
+  "events": [
+    {
+      "at": "2026-10-30T13:20:48.623Z",
+      "kind": "claimed",
+      "ticket": "ORCA-888",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:19:44.250Z",
+      "kind": "claimed",
+      "ticket": "ORCA-887",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:19:29.131Z",
+      "kind": "claimed",
+      "ticket": "ORCA-889",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:18:33.601Z",
+      "kind": "claimed",
+      "ticket": "ORCA-888",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:18:33.076Z",
+      "kind": "claimed",
+      "ticket": "ORCA-887",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:18:31.456Z",
+      "kind": "claimed",
+      "ticket": "ORCA-886",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:18:10.102Z",
+      "kind": "claimed",
+      "ticket": "ORCA-774",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T13:01:11.046Z",
+      "kind": "claimed",
+      "ticket": "ORCA-885",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T12:31:23.523Z",
+      "kind": "claimed",
+      "ticket": "ORCA-822",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T12:17:09.561Z",
+      "kind": "claimed",
+      "ticket": "ORCA-884",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T12:01:38.592Z",
+      "kind": "claimed",
+      "ticket": "ORCA-803",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T11:47:04.584Z",
+      "kind": "claimed",
+      "ticket": "ORCA-809",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T10:56:09.074Z",
+      "kind": "claimed",
+      "ticket": "ORCA-883",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T10:30:21.765Z",
+      "kind": "claimed",
+      "ticket": "ORCA-881",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T10:00:16.632Z",
+      "kind": "claimed",
+      "ticket": "ORCA-880",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T09:23:54.768Z",
+      "kind": "claimed",
+      "ticket": "ORCA-872",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T09:00:15.709Z",
+      "kind": "claimed",
+      "ticket": "ORCA-859",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T07:58:13.808Z",
+      "kind": "claimed",
+      "ticket": "ORCA-879",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T06:43:49.553Z",
+      "kind": "claimed",
+      "ticket": "ORCA-801",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T06:37:41.723Z",
+      "kind": "claimed",
+      "ticket": "ORCA-867",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T06:36:02.983Z",
+      "kind": "claimed",
+      "ticket": "ORCA-832",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T06:30:48.849Z",
+      "kind": "claimed",
+      "ticket": "ORCA-858",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T05:00:44.092Z",
+      "kind": "claimed",
+      "ticket": "ORCA-874",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T04:59:54.629Z",
+      "kind": "claimed",
+      "ticket": "ORCA-863",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T02:54:43.686Z",
+      "kind": "claimed",
+      "ticket": "ORCA-878",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T01:55:24.856Z",
+      "kind": "claimed",
+      "ticket": "ORCA-866",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T01:55:01.094Z",
+      "kind": "claimed",
+      "ticket": "ORCA-876",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T01:54:08.136Z",
+      "kind": "claimed",
+      "ticket": "ORCA-877",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T00:15:13.750Z",
+      "kind": "claimed",
+      "ticket": "ORCA-875",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-30T00:14:11.765Z",
+      "kind": "claimed",
+      "ticket": "ORCA-830",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T23:56:04.104Z",
+      "kind": "claimed",
+      "ticket": "ORCA-838",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T23:09:56.848Z",
+      "kind": "claimed",
+      "ticket": "ORCA-861",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T23:08:24.279Z",
+      "kind": "claimed",
+      "ticket": "ORCA-861",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T20:26:33.534Z",
+      "kind": "claimed",
+      "ticket": "ORCA-861",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T20:18:32.573Z",
+      "kind": "claimed",
+      "ticket": "ORCA-864",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T20:17:03.837Z",
+      "kind": "claimed",
+      "ticket": "ORCA-870",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T20:16:29.559Z",
+      "kind": "claimed",
+      "ticket": "ORCA-782",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T19:52:17.830Z",
+      "kind": "claimed",
+      "ticket": "ORCA-855",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T19:48:20.519Z",
+      "kind": "claimed",
+      "ticket": "ORCA-862",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:12:22.757Z",
+      "kind": "claimed",
+      "ticket": "ORCA-857",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:11:30.445Z",
+      "kind": "claimed",
+      "ticket": "ORCA-857",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:11:26.117Z",
+      "kind": "claimed",
+      "ticket": "ORCA-855",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:10:47.367Z",
+      "kind": "claimed",
+      "ticket": "ORCA-857",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:10:47.093Z",
+      "kind": "claimed",
+      "ticket": "ORCA-855",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:10:46.784Z",
+      "kind": "claimed",
+      "ticket": "ORCA-856",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:10:46.575Z",
+      "kind": "claimed",
+      "ticket": "ORCA-798",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T18:09:52.539Z",
+      "kind": "merged",
+      "ticket": "ORCA-813",
+      "by": "lead",
+      "key": "merged ORCA-813 #738",
+      "text": ""
+    },
+    {
+      "at": "2026-10-29T04:53:52.276Z",
+      "kind": "claimed",
+      "ticket": "ORCA-813",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-28T02:19:09.414Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-28T01:26:45.622Z",
+      "kind": "merged",
+      "ticket": "ORCA-812",
+      "by": "lead",
+      "key": "merged ORCA-812 #713",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T23:39:30.536Z",
+      "kind": "claimed",
+      "ticket": "ORCA-817",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T23:39:29.965Z",
+      "kind": "claimed",
+      "ticket": "ORCA-665",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T23:39:29.576Z",
+      "kind": "claimed",
+      "ticket": "ORCA-812",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T18:30:50.615Z",
+      "kind": "claimed",
+      "ticket": "ORCA-825",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T14:13:28.119Z",
+      "kind": "claimed",
+      "ticket": "JEVADV-118",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T14:01:57.123Z",
+      "kind": "claimed",
+      "ticket": "ORCA-824",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T14:00:53.586Z",
+      "kind": "claimed",
+      "ticket": "ORCA-823",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T13:35:48.245Z",
+      "kind": "claimed",
+      "ticket": "ORCA-678",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T05:12:38.260Z",
+      "kind": "claimed",
+      "ticket": "ORCA-329",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T05:12:38.219Z",
+      "kind": "claimed",
+      "ticket": "ORCA-673",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T05:12:37.968Z",
+      "kind": "claimed",
+      "ticket": "ORCA-675",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T05:12:37.922Z",
+      "kind": "claimed",
+      "ticket": "ORCA-677",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T05:12:37.853Z",
+      "kind": "claimed",
+      "ticket": "ORCA-681",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T00:59:45.265Z",
+      "kind": "claimed",
+      "ticket": "ORCA-811",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T00:44:08.248Z",
+      "kind": "claimed",
+      "ticket": "JEVADV-117",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-27T00:31:45.585Z",
+      "kind": "claimed",
+      "ticket": "JEVADV-116",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T22:13:55.596Z",
+      "kind": "claimed",
+      "ticket": "ORCA-678",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T22:13:55.526Z",
+      "kind": "claimed",
+      "ticket": "ORCA-679",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T22:13:55.419Z",
+      "kind": "claimed",
+      "ticket": "ORCA-680",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T22:02:54.102Z",
+      "kind": "claimed",
+      "ticket": "ORCA-808",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T21:21:48.470Z",
+      "kind": "claimed",
+      "ticket": "ORCA-807",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T20:52:09.339Z",
+      "kind": "claimed",
+      "ticket": "ORCA-753",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T19:01:13.231Z",
+      "kind": "claimed",
+      "ticket": "ORCA-766",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T17:19:00.441Z",
+      "kind": "claimed",
+      "ticket": "ORCA-805",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T16:45:08.748Z",
+      "kind": "claimed",
+      "ticket": "ORCA-753",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T14:25:51.186Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T14:16:27.002Z",
+      "kind": "claimed",
+      "ticket": "ORCA-792",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T14:13:02.718Z",
+      "kind": "claimed",
+      "ticket": "ORCA-791",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T14:13:02.472Z",
+      "kind": "claimed",
+      "ticket": "ORCA-792",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T12:54:38.295Z",
+      "kind": "claimed",
+      "ticket": "ORCA-686",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T12:54:33.158Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T05:14:27.769Z",
+      "kind": "claimed",
+      "ticket": "ORCA-686",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T05:14:27.500Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T02:38:26.843Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T00:48:05.980Z",
+      "kind": "claimed",
+      "ticket": "ORCA-682",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-26T00:48:05.772Z",
+      "kind": "claimed",
+      "ticket": "ORCA-683",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T23:52:51.525Z",
+      "kind": "claimed",
+      "ticket": "ORCA-682",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T23:52:51.481Z",
+      "kind": "claimed",
+      "ticket": "ORCA-683",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T23:52:51.420Z",
+      "kind": "claimed",
+      "ticket": "ORCA-688",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T23:19:41.005Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T17:49:33.039Z",
+      "kind": "claimed",
+      "ticket": "ORCA-734",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T17:49:32.827Z",
+      "kind": "claimed",
+      "ticket": "ORCA-759",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T17:49:32.564Z",
+      "kind": "claimed",
+      "ticket": "ORCA-777",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T17:49:32.326Z",
+      "kind": "claimed",
+      "ticket": "ORCA-773",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T17:49:32.030Z",
+      "kind": "claimed",
+      "ticket": "ORCA-686",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T16:55:33.483Z",
+      "kind": "claimed",
+      "ticket": "ORCA-550",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T16:38:09.933Z",
+      "kind": "claimed",
+      "ticket": "ORCA-550",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:25:03.578Z",
+      "kind": "claimed",
+      "ticket": "ORCA-734",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:25:03.386Z",
+      "kind": "claimed",
+      "ticket": "ORCA-759",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:25:03.159Z",
+      "kind": "claimed",
+      "ticket": "ORCA-777",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:25:02.974Z",
+      "kind": "claimed",
+      "ticket": "ORCA-773",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:25:02.766Z",
+      "kind": "claimed",
+      "ticket": "ORCA-686",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T15:24:28.185Z",
+      "kind": "claimed",
+      "ticket": "ORCA-775",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T08:10:28.509Z",
+      "kind": "merged",
+      "ticket": "ORCA-776",
+      "by": "lead",
+      "key": "merged ORCA-776 #647",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T04:37:01.049Z",
+      "kind": "claimed",
+      "ticket": "ORCA-789",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-25T04:33:19.181Z",
+      "kind": "claimed",
+      "ticket": "ORCA-790",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T10:51:43.111Z",
+      "kind": "claimed",
+      "ticket": "ORCA-785",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T10:51:42.882Z",
+      "kind": "claimed",
+      "ticket": "ORCA-776",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T10:51:42.671Z",
+      "kind": "claimed",
+      "ticket": "ORCA-779",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T04:30:53.388Z",
+      "kind": "claimed",
+      "ticket": "ORCA-787",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T03:57:52.310Z",
+      "kind": "claimed",
+      "ticket": "ORCA-780",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T03:27:49.699Z",
+      "kind": "claimed",
+      "ticket": "ORCA-746",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T03:17:25.216Z",
+      "kind": "claimed",
+      "ticket": "ORCA-781",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T02:40:10.273Z",
+      "kind": "claimed",
+      "ticket": "ORCA-766",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T02:10:33.673Z",
+      "kind": "merged",
+      "ticket": "ORCA-746",
+      "by": "lead",
+      "key": "merged ORCA-746 #625",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T02:02:03.606Z",
+      "kind": "claimed",
+      "ticket": "ORCA-771",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:55:44.203Z",
+      "kind": "claimed",
+      "ticket": "ORCA-766",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:35:17.476Z",
+      "kind": "claimed",
+      "ticket": "ORCA-770",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:27:46.779Z",
+      "kind": "claimed",
+      "ticket": "ORCA-769",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:26:59.129Z",
+      "kind": "claimed",
+      "ticket": "ORCA-768",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:20:40.382Z",
+      "kind": "claimed",
+      "ticket": "ORCA-766",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:12:39.839Z",
+      "kind": "merged",
+      "ticket": "ORCA-658",
+      "by": "lead",
+      "key": "merged ORCA-658 #623",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:12:39.700Z",
+      "kind": "claimed",
+      "ticket": "ORCA-766",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-24T01:12:39.482Z",
+      "kind": "claimed",
+      "ticket": "ORCA-765",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T21:43:25.266Z",
+      "kind": "claimed",
+      "ticket": "ORCA-658",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T21:43:25.022Z",
+      "kind": "claimed",
+      "ticket": "ORCA-746",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T21:43:24.774Z",
+      "kind": "claimed",
+      "ticket": "ORCA-753",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T21:43:24.501Z",
+      "kind": "claimed",
+      "ticket": "ORCA-750",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T21:43:23.925Z",
+      "kind": "claimed",
+      "ticket": "ORCA-751",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-23T01:23:36.868Z",
+      "kind": "claimed",
+      "ticket": "ORCA-764",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T23:54:35.036Z",
+      "kind": "claimed",
+      "ticket": "ORCA-684",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T23:54:27.952Z",
+      "kind": "claimed",
+      "ticket": "ORCA-686",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T22:49:18.022Z",
+      "kind": "claimed",
+      "ticket": "ORCA-689",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T20:00:54.360Z",
+      "kind": "claimed",
+      "ticket": "ORCA-752",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T18:47:27.782Z",
+      "kind": "claimed",
+      "ticket": "ORCA-757",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T17:38:00.890Z",
+      "kind": "claimed",
+      "ticket": "ORCA-756",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T17:37:11.211Z",
+      "kind": "claimed",
+      "ticket": "ORCA-750",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T17:33:17.618Z",
+      "kind": "claimed",
+      "ticket": "ORCA-754",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T13:38:40.807Z",
+      "kind": "claimed",
+      "ticket": "JEVADV-107",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T12:49:09.882Z",
+      "kind": "claimed",
+      "ticket": "ORCA-688",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T12:41:17.764Z",
+      "kind": "claimed",
+      "ticket": "ORCA-689",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T12:40:07.396Z",
+      "kind": "claimed",
+      "ticket": "ORCA-690",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T12:38:13.647Z",
+      "kind": "claimed",
+      "ticket": "ORCA-687",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:59:45.348Z",
+      "kind": "claimed",
+      "ticket": "ORCA-746",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:29:25.974Z",
+      "kind": "claimed",
+      "ticket": "ORCA-687",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:28:02.604Z",
+      "kind": "claimed",
+      "ticket": "ORCA-688",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:26:53.734Z",
+      "kind": "claimed",
+      "ticket": "ORCA-689",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:25:35.191Z",
+      "kind": "claimed",
+      "ticket": "ORCA-690",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T05:24:30.549Z",
+      "kind": "claimed",
+      "ticket": "ORCA-742",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:53:52.337Z",
+      "kind": "claimed",
+      "ticket": "ORCA-687",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:53:40.775Z",
+      "kind": "claimed",
+      "ticket": "ORCA-688",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:53:31.536Z",
+      "kind": "claimed",
+      "ticket": "ORCA-689",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:53:23.399Z",
+      "kind": "claimed",
+      "ticket": "ORCA-690",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:37:09.799Z",
+      "kind": "merged",
+      "ticket": "ORCA-723",
+      "by": "lead",
+      "key": "merged ORCA-723 #570",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:04:36.280Z",
+      "kind": "claimed",
+      "ticket": "ORCA-723",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-22T04:00:15.299Z",
+      "kind": "claimed",
+      "ticket": "ORCA-742",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T18:46:37.617Z",
+      "kind": "merged",
+      "ticket": "ORCA-718",
+      "by": "lead",
+      "key": "merged ORCA-718 #551",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T18:41:56.865Z",
+      "kind": "claimed",
+      "ticket": "ORCA-719",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T18:41:43.321Z",
+      "kind": "claimed",
+      "ticket": "ORCA-718",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T17:38:26.160Z",
+      "kind": "claimed",
+      "ticket": "ORCA-685",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T17:38:13.449Z",
+      "kind": "claimed",
+      "ticket": "ORCA-724",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T15:26:12.679Z",
+      "kind": "claimed",
+      "ticket": "ORCA-726",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T13:12:42.639Z",
+      "kind": "claimed",
+      "ticket": "ORCA-697",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T13:05:51.857Z",
+      "kind": "claimed",
+      "ticket": "ORCA-723",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T13:05:43.314Z",
+      "kind": "claimed",
+      "ticket": "ORCA-722",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T13:01:34.083Z",
+      "kind": "claimed",
+      "ticket": "ORCA-724",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T11:27:21.763Z",
+      "kind": "claimed",
+      "ticket": "ORCA-719",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T11:06:18.701Z",
+      "kind": "claimed",
+      "ticket": "ORCA-718",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T10:46:47.984Z",
+      "kind": "claimed",
+      "ticket": "ORCA-716",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T10:43:18.733Z",
+      "kind": "claimed",
+      "ticket": "ORCA-676",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T10:25:06.453Z",
+      "kind": "claimed",
+      "ticket": "ORCA-713",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T10:18:33.653Z",
+      "kind": "claimed",
+      "ticket": "ORCA-712",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T05:12:55.094Z",
+      "kind": "claimed",
+      "ticket": "ORCA-691",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T04:35:44.383Z",
+      "kind": "claimed",
+      "ticket": "ORCA-710",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T00:59:22.954Z",
+      "kind": "claimed",
+      "ticket": "ORCA-674",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T00:31:45.415Z",
+      "kind": "claimed",
+      "ticket": "ORCA-654",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-21T00:29:00.824Z",
+      "kind": "merged",
+      "ticket": "ORCA-701",
+      "by": "lead",
+      "key": "merged ORCA-701 #533",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:57:39.906Z",
+      "kind": "claimed",
+      "ticket": "ORCA-691",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:53:57.620Z",
+      "kind": "claimed",
+      "ticket": "ORCA-701",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:52:51.718Z",
+      "kind": "claimed",
+      "ticket": "ORCA-702",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:38:29.651Z",
+      "kind": "claimed",
+      "ticket": "ORCA-691",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:37:44.293Z",
+      "kind": "claimed",
+      "ticket": "ORCA-695",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T22:37:19.167Z",
+      "kind": "claimed",
+      "ticket": "ORCA-701",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T20:04:30.090Z",
+      "kind": "claimed",
+      "ticket": "ORCA-696",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T19:53:52.267Z",
+      "kind": "claimed",
+      "ticket": "ORCA-694",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T19:53:36.710Z",
+      "kind": "claimed",
+      "ticket": "ORCA-693",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T19:53:26.392Z",
+      "kind": "claimed",
+      "ticket": "ORCA-692",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T01:41:53.837Z",
+      "kind": "claimed",
+      "ticket": "ORCA-674",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-20T00:11:40.193Z",
+      "kind": "claimed",
+      "ticket": "ORCA-612",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T23:14:19.389Z",
+      "kind": "claimed",
+      "ticket": "ORCA-607",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T23:13:56.946Z",
+      "kind": "claimed",
+      "ticket": "ORCA-612",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T21:44:03.747Z",
+      "kind": "claimed",
+      "ticket": "ORCA-663",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T19:32:44.169Z",
+      "kind": "claimed",
+      "ticket": "ORCA-663",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T19:30:34.362Z",
+      "kind": "claimed",
+      "ticket": "ORCA-663",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T19:02:35.758Z",
+      "kind": "claimed",
+      "ticket": "ORCA-662",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T18:00:53.042Z",
+      "kind": "merged",
+      "ticket": "ORCA-655",
+      "by": "lead",
+      "key": "merged ORCA-655 #522",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T17:30:39.201Z",
+      "kind": "claimed",
+      "ticket": "ORCA-660",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T17:30:24.135Z",
+      "kind": "merged",
+      "ticket": "JEVADV-106",
+      "by": "lead",
+      "key": "merged JEVADV-106 #92",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T16:09:44.682Z",
+      "kind": "claimed",
+      "ticket": "ORCA-292",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T15:24:34.587Z",
+      "kind": "claimed",
+      "ticket": "ORCA-657",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T15:22:09.236Z",
+      "kind": "claimed",
+      "ticket": "JEVADV-106",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T15:09:51.354Z",
+      "kind": "claimed",
+      "ticket": "ORCA-656",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T14:53:04.723Z",
+      "kind": "claimed",
+      "ticket": "ORCA-655",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T14:39:05.613Z",
+      "kind": "claimed",
+      "ticket": "ORCA-292",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T14:38:52.189Z",
+      "kind": "claimed",
+      "ticket": "ORCA-646",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T14:38:38.196Z",
+      "kind": "claimed",
+      "ticket": "ORCA-602",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T13:42:27.302Z",
+      "kind": "claimed",
+      "ticket": "ORCA-653",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T13:36:11.111Z",
+      "kind": "claimed",
+      "ticket": "ORCA-602",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T13:35:45.738Z",
+      "kind": "claimed",
+      "ticket": "ORCA-646",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T13:35:30.574Z",
+      "kind": "claimed",
+      "ticket": "ORCA-610",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T13:35:18.622Z",
+      "kind": "claimed",
+      "ticket": "ORCA-605",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T12:11:05.434Z",
+      "kind": "claimed",
+      "ticket": "ORCA-612",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T11:40:22.897Z",
+      "kind": "claimed",
+      "ticket": "ORCA-653",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T11:07:40.762Z",
+      "kind": "claimed",
+      "ticket": "ORCA-329",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T11:07:27.308Z",
+      "kind": "claimed",
+      "ticket": "ORCA-605",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T11:07:19.054Z",
+      "kind": "claimed",
+      "ticket": "ORCA-607",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T11:07:11.827Z",
+      "kind": "claimed",
+      "ticket": "ORCA-610",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T10:32:12.970Z",
+      "kind": "claimed",
+      "ticket": "ORCA-647",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T05:31:18.524Z",
+      "kind": "claimed",
+      "ticket": "ORCA-612",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T05:31:08.683Z",
+      "kind": "claimed",
+      "ticket": "ORCA-623",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T05:28:14.685Z",
+      "kind": "claimed",
+      "ticket": "ORCA-623",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T05:17:25.210Z",
+      "kind": "claimed",
+      "ticket": "ORCA-640",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T04:14:54.732Z",
+      "kind": "claimed",
+      "ticket": "ORCA-646",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T03:57:06.614Z",
+      "kind": "claimed",
+      "ticket": "ORCA-645",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T02:24:50.840Z",
+      "kind": "claimed",
+      "ticket": "ORCA-644",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T02:24:42.784Z",
+      "kind": "claimed",
+      "ticket": "ORCA-643",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T01:24:12.799Z",
+      "kind": "claimed",
+      "ticket": "ORCA-642",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T01:09:34.984Z",
+      "kind": "claimed",
+      "ticket": "ORCA-643",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-19T00:02:57.688Z",
+      "kind": "claimed",
+      "ticket": "ORCA-639",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T20:35:21.939Z",
+      "kind": "claimed",
+      "ticket": "ORCA-638",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T19:04:38.158Z",
+      "kind": "claimed",
+      "ticket": "ORCA-615",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T19:04:27.749Z",
+      "kind": "claimed",
+      "ticket": "ORCA-637",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T18:59:39.930Z",
+      "kind": "claimed",
+      "ticket": "ORCA-636",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T18:25:42.153Z",
+      "kind": "claimed",
+      "ticket": "ORCA-613",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T17:58:48.083Z",
+      "kind": "claimed",
+      "ticket": "ORCA-627",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T17:58:06.505Z",
+      "kind": "claimed",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T17:57:57.367Z",
+      "kind": "claimed",
+      "ticket": "ORCA-606",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T16:23:24.749Z",
+      "kind": "claimed",
+      "ticket": "ORCA-626",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T16:23:12.455Z",
+      "kind": "claimed",
+      "ticket": "ORCA-635",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T16:19:34.114Z",
+      "kind": "claimed",
+      "ticket": "ORCA-609",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T16:11:50.480Z",
+      "kind": "claimed",
+      "ticket": "ORCA-635",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T15:35:00.474Z",
+      "kind": "claimed",
+      "ticket": "ORCA-606",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T14:31:54.988Z",
+      "kind": "claimed",
+      "ticket": "ORCA-566",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T14:25:07.604Z",
+      "kind": "claimed",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T14:13:11.218Z",
+      "kind": "claimed",
+      "ticket": "ORCA-626",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T14:07:49.801Z",
+      "kind": "claimed",
+      "ticket": "ORCA-609",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T14:06:19.308Z",
+      "kind": "claimed",
+      "ticket": "ORCA-625",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T13:53:50.442Z",
+      "kind": "claimed",
+      "ticket": "ORCA-622",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T13:47:41.173Z",
+      "kind": "claimed",
+      "ticket": "ORCA-617",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T13:46:57.481Z",
+      "kind": "claimed",
+      "ticket": "ORCA-617",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T03:34:11.928Z",
+      "kind": "claimed",
+      "ticket": "ORCA-614",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T03:03:15.784Z",
+      "kind": "merged",
+      "ticket": "ORCA-602",
+      "by": "lead",
+      "key": "merged ORCA-602 #480",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:40:54.059Z",
+      "kind": "claimed",
+      "ticket": "ORCA-611",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:40:38.098Z",
+      "kind": "claimed",
+      "ticket": "ORCA-602",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:36:02.902Z",
+      "kind": "merged",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "key": "merged ORCA-608 #479",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:36:02.901Z",
+      "kind": "merged",
+      "ticket": "ORCA-606",
+      "by": "lead",
+      "key": "merged ORCA-606 #478",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:22:55.931Z",
+      "kind": "claimed",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T02:22:23.727Z",
+      "kind": "merged",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "key": "merged ORCA-608 #476",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T01:45:47.365Z",
+      "kind": "claimed",
+      "ticket": "ORCA-606",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T01:44:40.117Z",
+      "kind": "merged",
+      "ticket": "ORCA-603",
+      "by": "lead",
+      "key": "merged ORCA-603 #475",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T01:39:46.376Z",
+      "kind": "claimed",
+      "ticket": "ORCA-608",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T00:43:31.650Z",
+      "kind": "claimed",
+      "ticket": "ORCA-606",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T00:31:25.991Z",
+      "kind": "claimed",
+      "ticket": "ORCA-603",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-18T00:31:16.170Z",
+      "kind": "claimed",
+      "ticket": "ORCA-601",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T23:47:10.972Z",
+      "kind": "claimed",
+      "ticket": "ORCA-600",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T23:46:52.967Z",
+      "kind": "claimed",
+      "ticket": "ORCA-604",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T20:47:45.302Z",
+      "kind": "claimed",
+      "ticket": "ORCA-604",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T20:41:53.556Z",
+      "kind": "claimed",
+      "ticket": "ORCA-603",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T20:39:48.443Z",
+      "kind": "claimed",
+      "ticket": "ORCA-603",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T20:28:52.880Z",
+      "kind": "claimed",
+      "ticket": "ORCA-601",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T13:54:27.970Z",
+      "kind": "claimed",
+      "ticket": "ORCA-592",
+      "by": "lead",
+      "text": ""
+    },
+    {
+      "at": "2026-10-17T13:50:58.611Z",
+      "kind": "claimed",
+      "ticket": "ORCA-592",
+      "by": "lead",
+      "text": ""
+    }
+  ],
+  "history": [
+    {
+      "ticket": "ORCA-863",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-863",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-30 04:59:43",
+      "endedAt": "2026-10-30T06:30:18.114Z",
+      "outcome": "merged",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-864",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-864-auto-release",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-29 20:18:19",
+      "endedAt": "2026-10-30T05:29:29.146Z",
+      "outcome": "merged",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-857",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-857",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-29 18:12:14",
+      "endedAt": "2026-10-29T19:27:40.745Z",
+      "outcome": "merged",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-855",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-855",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-29 18:11:11",
+      "endedAt": "2026-10-29T19:27:38.830Z",
+      "outcome": "merged",
+      "pr": "#741 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-813",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-813",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-29 17:55:25",
+      "endedAt": "2026-10-29T18:10:19.931Z",
+      "outcome": "merged",
+      "pr": "#738 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "JEVADV-118",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/jevadv-118-measure-cli",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-28 03:13:00",
+      "endedAt": "2026-10-28T03:13:27.968Z",
+      "outcome": "stopped",
+      "pr": "#109 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-826",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-826",
+      "agent": null,
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-28T01:56:45.793Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-823",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-823",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-27T14:14:11.094Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-791",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-791",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-26 14:13:16",
+      "endedAt": "2026-10-26T14:16:05.861Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-792",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-792",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-26 14:12:47",
+      "endedAt": "2026-10-26T14:16:05.632Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-686",
+      "repo": null,
+      "branch": "",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-26T14:12:41.200Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-775",
+      "repo": null,
+      "branch": "",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-26T14:12:41.090Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-683",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-683",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 23:53:04",
+      "endedAt": "2026-10-26T00:47:46.870Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-682",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-682",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 23:53:31",
+      "endedAt": "2026-10-26T00:47:46.665Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-550",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-550",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-25T16:55:17.905Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-686",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-686-2",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 15:28:32",
+      "endedAt": "2026-10-25T16:37:32.522Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-773",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-773",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 15:29:04",
+      "endedAt": "2026-10-25T16:37:32.189Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-777",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-777",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 15:29:32",
+      "endedAt": "2026-10-25T16:37:32.010Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-759",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-759",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-25 15:30:35",
+      "endedAt": "2026-10-25T16:37:31.619Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-765",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-765",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-24T01:27:29.489Z",
+      "outcome": "stopped",
+      "pr": "#624 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-658",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-658-mid-turn-reattach-test",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-23 23:37:14",
+      "endedAt": "2026-10-24T01:13:06.353Z",
+      "outcome": "merged",
+      "pr": "#623 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-689",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-689-view-panel",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-22T07:43:28.586Z",
+      "outcome": "stopped",
+      "pr": "#580 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-687",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-687",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-22T07:29:49.783Z",
+      "outcome": "stopped",
+      "pr": "#578 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-690",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-690",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-22T07:16:26.183Z",
+      "outcome": "stopped",
+      "pr": "#574 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-688",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-688",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-22 05:27:53",
+      "endedAt": "2026-10-22T05:59:22.184Z",
+      "outcome": "stopped",
+      "pr": "#572 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-723",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-723",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-22 04:04:25",
+      "endedAt": "2026-10-22T04:37:33.400Z",
+      "outcome": "merged",
+      "pr": "#570 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-701",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-701",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-20 22:53:03",
+      "endedAt": "2026-10-21T00:29:20.235Z",
+      "outcome": "merged",
+      "pr": "#533 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-647",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/fix-orca-647-native",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T10:49:02.199Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-637",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/fix-orca-637-heartbeat",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-18 19:04:15",
+      "endedAt": "2026-10-19T05:38:23.892Z",
+      "outcome": "stopped",
+      "pr": "#502 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-640",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/fix-orca-640-mac",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T05:36:25.345Z",
+      "outcome": "stopped",
+      "pr": "#510 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-623",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-623",
+      "agent": "codex",
+      "account": null,
+      "launchedAt": "2026-10-19 05:28:08",
+      "endedAt": "2026-10-19T05:30:02.758Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-645",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/task-c0e349a19d10",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T04:30:07.464Z",
+      "outcome": "stopped",
+      "pr": "#509 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-643",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-643-2",
+      "agent": "codex",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T04:13:23.661Z",
+      "outcome": "stopped",
+      "pr": "#507 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-644",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-644",
+      "agent": "codex",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T03:22:19.308Z",
+      "outcome": "stopped",
+      "pr": "#508 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-642",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-642",
+      "agent": "codex",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T02:18:30.337Z",
+      "outcome": "stopped",
+      "pr": "#506 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-639",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-639",
+      "agent": "codex",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-19T01:11:53.588Z",
+      "outcome": "stopped",
+      "pr": "#505 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-615",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/worker-task-817526679734-dispatch",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T20:34:41.545Z",
+      "outcome": "stopped",
+      "pr": "#503 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-627",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/fix-orca-627-lead",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T18:58:58.078Z",
+      "outcome": "stopped",
+      "pr": "#498 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-606",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-606-chips",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T18:24:47.875Z",
+      "outcome": "stopped",
+      "pr": "#495 merged",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-626",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/feat-orca-626-settings",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T17:08:36.642Z",
+      "outcome": "stopped",
+      "pr": "#493 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-609",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-609-animate",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T16:40:19.168Z",
+      "outcome": "stopped",
+      "pr": "#491 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-635",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-635",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-18 16:11:38",
+      "endedAt": "2026-10-18T16:22:08.917Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-566",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-566-required-checks-auto-merge",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": null,
+      "endedAt": "2026-10-18T16:09:00.808Z",
+      "outcome": "stopped",
+      "pr": "#490 open",
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-617",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-617",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-18 13:46:46",
+      "endedAt": "2026-10-18T13:47:24.376Z",
+      "outcome": "stopped",
+      "pr": null,
+      "lastReport": null
+    },
+    {
+      "ticket": "ORCA-592",
+      "repo": null,
+      "branch": "refs/heads/fabolivark/orca-592",
+      "agent": "claude",
+      "account": null,
+      "launchedAt": "2026-10-17 13:50:48",
+      "endedAt": "2026-10-17T13:54:16.910Z",
+      "outcome": "limited",
+      "pr": null,
+      "lastReport": null
+    }
+  ]
+}

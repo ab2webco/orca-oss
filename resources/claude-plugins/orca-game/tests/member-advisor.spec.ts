@@ -187,3 +187,29 @@ describe('member card detail from a newer Jev report', () => {
     ])
   })
 })
+
+// Why (ORCA-933): a member without Jev must say whose word its model is, never read as "no model".
+describe("a member card names where a Jev-less member's model came from", () => {
+  it('says session for the model its hooks named and launch for the one Orca chose', () => {
+    const session = { model: 'Sonnet 5.5', effort: 'low', source: 'session' as const }
+    const launch = { model: 'Opus 5.5', effort: 'high', source: 'launch' as const }
+    expect(memberModelLinesOf({ launch: session }, 80)).toEqual(['◇ session Sonnet 5.5·low'])
+    expect(memberModelLinesOf({ launch }, 80)).toEqual(['◇ launch Opus 5.5·high'])
+    setGameLocale('es')
+    expect(memberModelLinesOf({ launch: session }, 80)).toEqual(['◇ sesión Sonnet 5.5·low'])
+    expect(memberModelLinesOf({ launch }, 80)).toEqual(['◇ lanzamiento Opus 5.5·high'])
+  })
+
+  it('keeps the source a state carries, and drops one this build cannot read', () => {
+    const launchOf = (launch: unknown) => parseGameState(stateWith({ launch }))?.agents[0]?.launch
+    expect(launchOf({ model: 'Opus 5.5', effort: null, source: 'session' })).toEqual({
+      model: 'Opus 5.5',
+      effort: null,
+      source: 'session'
+    })
+    expect(launchOf({ model: 'Opus 5.5', effort: null, source: 'guess' })).toEqual({
+      model: 'Opus 5.5',
+      effort: null
+    })
+  })
+})

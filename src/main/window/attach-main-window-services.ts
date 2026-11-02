@@ -481,6 +481,7 @@ function registerRuntimeWindowLifecycle(
     renameTerminal: (tabId, title) => send('ui:renameTerminal', { tabId, title }),
     focusTerminal: (tabId, worktreeId, leafId) =>
       send('ui:focusTerminal', { tabId, worktreeId, leafId }),
+    revealPairedTerminal: (target) => send('ui:revealPairedTerminal', target),
     focusEditorTab: (tabId, worktreeId) => send('ui:focusEditorTab', { tabId, worktreeId }),
     closeSessionTab: (tabId, worktreeId) => send('ui:closeSessionTab', { tabId, worktreeId }),
     moveSessionTab: (worktreeId: string, move: RuntimeMobileSessionTabMove) =>

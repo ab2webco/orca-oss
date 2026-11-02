@@ -20,7 +20,7 @@ describe('terminal IME e2e workflow', () => {
     const runs = workflow.jobs['linux-x11'].steps
       .map((step) => step.run)
       .filter((run) => typeof run === 'string')
-    const installRun = runs.find((run) => run.includes('apt-get install'))
+    const installRun = runs.find((run) => run.includes('ci-apt.sh install'))
 
     expect(installRun).toBeDefined()
     expect(installRun).toContain('ibus-hangul')

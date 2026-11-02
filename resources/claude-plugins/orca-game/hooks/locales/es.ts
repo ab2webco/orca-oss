@@ -81,7 +81,8 @@ export const ES: GameCatalog = {
       review: 'Revisión',
       reviews: 'Mis PRs',
       todo: 'Por hacer',
-      actions: 'Acciones'
+      actions: 'Acciones',
+      metrics: 'Métricas'
     },
     layoutHint:
       'Consejo: pulsa ▾ junto a una sección del Panel para plegarla; /orca-game:layout las oculta, mueve o restablece.',

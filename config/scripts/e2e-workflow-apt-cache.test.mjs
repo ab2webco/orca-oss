@@ -23,6 +23,14 @@ describe('e2e workflow apt installs', () => {
     expect(steps.filter((step) => /apt-get install/.test(step.run ?? ''))).toEqual([])
   })
 
+  it('uses the same bounded cached action in the build job', () => {
+    const install = workflow.jobs.build.steps.find(
+      (step) => step.name === 'Install native build tools'
+    )
+    expect(install.uses).toBe(APT_ACTION)
+    expect(install.with.packages).toBe('build-essential python3')
+  })
+
   it('installs from a restored archive dir and saves it only on a miss', () => {
     const steps = readAction().runs.steps
     const restore = steps.findIndex((step) => step.uses?.startsWith('actions/cache/restore@'))

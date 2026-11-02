@@ -5,6 +5,7 @@ import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
 
 function dispatcherWith(board: Record<string, (args: unknown) => Promise<unknown>>) {
   const calls: [string, unknown][] = []
+  let fleetChanges = 0
   const gameBoard = Object.fromEntries(
     Object.entries(board).map(([name, fn]) => [
       name,
@@ -16,12 +17,15 @@ function dispatcherWith(board: Record<string, (args: unknown) => Promise<unknown
   )
   const runtime = {
     getRuntimeId: () => 'runtime',
-    getGameBoard: () => gameBoard
+    getGameBoard: () => gameBoard,
+    noteGameFleetChanged: () => {
+      fleetChanges += 1
+    }
   } as unknown as OrcaRuntimeService
   const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_BOARD_METHODS })
   const send = (method: string, params: unknown) =>
     dispatcher.dispatch({ id: 'b', authToken: 'test', method, params })
-  return { send, calls }
+  return { send, calls, fleetChanges: () => fleetChanges }
 }
 
 describe('game board RPC', () => {
@@ -72,7 +76,7 @@ describe('game board RPC', () => {
   })
 
   it('reads, sets and clears the STOP switch of the caller project', async () => {
-    const { send, calls } = dispatcherWith({
+    const { send, calls, fleetChanges } = dispatcherWith({
       stopState: async () => ({ stopped: null }),
       setStop: async () => ({ stopped: { since: 'x', by: 'lead' }, changed: true }),
       clearStop: async () => ({ stopped: null, changed: true })
@@ -89,6 +93,8 @@ describe('game board RPC', () => {
       ['setStop', caller],
       ['clearStop', caller]
     ])
+    // Why: the band draws STOP, so setting or clearing it wakes `orca game watch`; a read does not.
+    expect(fleetChanges()).toBe(2)
   })
 
   it("reads the caller's game inbox with its filters", async () => {

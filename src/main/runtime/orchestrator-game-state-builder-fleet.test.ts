@@ -218,4 +218,108 @@ describe('buildOrchestratorGameState fleet', () => {
     expect(state.agents[1]).not.toHaveProperty('review')
     expect(state.agents[1]).not.toHaveProperty('workItem')
   })
+
+  it('adds every other session the lead did not launch as a found member, with its worktree, account and work (ORCA-914)', async () => {
+    const row = {
+      state: 'working' as const,
+      agentType: 'codex',
+      displayName: null,
+      taskTitle: null,
+      toolName: null,
+      lastActivityAt: '2026-10-30T12:00:00.000Z'
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [{ ...row, paneKey: 'tab-1:lead', agentType: 'claude' }],
+      members: [
+        {
+          row: { ...row, paneKey: 'tab-4:launched', taskTitle: 'CIN-7' },
+          worktree: { id: 'wt-cin-7', branch: 'cin-7', displayName: 'cin-7' }
+        }
+      ],
+      found: [
+        // Why: a launched member and the lead are already listed; found never lists them twice.
+        {
+          row: { ...row, paneKey: 'tab-4:launched' },
+          worktree: { id: 'wt-cin-7', branch: 'cin-7', displayName: 'cin-7' }
+        },
+        {
+          row: { ...row, paneKey: 'tab-1:lead' },
+          worktree: { id: 'wt-lead', branch: 'main', displayName: 'lead' }
+        },
+        {
+          row: { ...row, paneKey: 'tab-8:plain' },
+          worktree: { id: 'wt-914', branch: 'fabolivark/orca-914', displayName: 'orca-914' }
+        }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      terminalHandleOf: (paneKey) => (paneKey === 'tab-8:plain' ? 'term_plain' : null),
+      accountOf: (seat) =>
+        seat.worktreeId === 'wt-914'
+          ? { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }
+          : null,
+      readMemberWork: async (worktreeId) =>
+        worktreeId === 'wt-914'
+          ? {
+              review: {
+                provider: 'github',
+                number: 99,
+                title: 'Found',
+                url: 'https://github.com/o/r/pull/99',
+                state: 'open',
+                status: 'pending'
+              },
+              linkedWorkItem: null
+            }
+          : null,
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents.map((agent) => [agent.paneKey, agent.found ?? false])).toEqual([
+      ['tab-1:lead', false],
+      ['tab-4:launched', false],
+      ['tab-8:plain', true]
+    ])
+    expect(state.agents[2]).toMatchObject({
+      displayName: 'orca-914',
+      agentType: 'codex',
+      isMember: true,
+      terminalHandle: 'term_plain',
+      worktree: { id: 'wt-914', branch: 'fabolivark/orca-914' },
+      account: { email: 'bo@example.com' },
+      review: { number: 99, ci: 'pending' },
+      lastActivityAt: '2026-10-30T12:00:00.000Z'
+    })
+  })
+
+  it('reads no found sessions for a member pane, whose band lists only itself', async () => {
+    const row = {
+      state: 'done' as const,
+      agentType: 'claude',
+      displayName: null,
+      taskTitle: null,
+      toolName: null
+    }
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [{ ...row, paneKey: 'tab-4:member', parentPaneKey: 'tab-1:lead' }],
+      found: [
+        {
+          row: { ...row, paneKey: 'tab-8:plain' },
+          worktree: { id: 'wt-914', branch: 'b', displayName: 'orca-914' }
+        }
+      ],
+      leaderPaneKey: 'tab-4:member',
+      callerParentPaneKey: 'tab-1:lead',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual(['tab-4:member'])
+  })
 })

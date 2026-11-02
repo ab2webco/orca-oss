@@ -65,7 +65,7 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Install native build tools and xvfb
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb zsh
+        run: bash config/scripts/ci-apt.sh update && bash config/scripts/ci-apt.sh install -y build-essential python3 xvfb zsh
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

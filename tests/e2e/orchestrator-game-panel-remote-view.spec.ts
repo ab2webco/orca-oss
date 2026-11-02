@@ -20,7 +20,7 @@ const REDRAW_MS = 1_000
 const remoteMember = (
   ticket: string,
   dispatch: string,
-  remote: { host: string; stateKnown: boolean; gone?: true }
+  remote: { host: string; stateKnown: boolean; gone?: true; environmentId?: string }
 ) => ({
   paneKey: `remote:${dispatch}`,
   displayName: ticket,
@@ -68,8 +68,19 @@ const CASES = [
   {
     member: remoteMember('LUM-14', 'ctx_14', { host: 'imac', stateKnown: true }),
     toast: 'LUM-14 runs on imac'
+  },
+  // Why: this CLI refuses the open, so the mod must say so and how to read the member (ORCA-839).
+  {
+    member: remoteMember('LUM-13', 'ctx_13', {
+      host: 'imac',
+      stateKnown: true,
+      environmentId: 'env-imac'
+    }),
+    toast: 'Could not open LUM-13'
   }
 ]
+
+const UNOPENED = CASES.at(-1)!.member
 
 const screenText = async (page: Page) => (await screenRows(page)).join('\n')
 
@@ -118,7 +129,8 @@ test('View on a remote member says where it is instead of failing to open it', a
   await waitForSessionReady(orcaPage)
   await setWindowWidth(electronApp, orcaPage, 1440)
   const band = await startGameBand(orcaPage, testRepoPath, {
-    state: stateWith(GONE),
+    // Why live: since ORCA-886 the band leaves a ghost (gone or silent) to its +N, never by name.
+    state: stateWith(UNOPENED),
     theme: 'dark',
     locale: 'en'
   })
@@ -128,7 +140,7 @@ test('View on a remote member says where it is instead of failing to open it', a
         timeout: 60_000,
         message: 'the band never drew the seeded party'
       })
-      .toContain('LUM-16')
+      .toContain('LUM-13')
     await orcaPage.waitForTimeout(REDRAW_MS)
     await clickTerminalText(orcaPage, 'Panel')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('View')
@@ -152,7 +164,7 @@ test('View on a remote member says where it is instead of failing to open it', a
       await orcaPage.waitForTimeout(HOLD_MS)
     }
 
-    await band.setState(stateWith(GONE))
+    await band.setState(stateWith(UNOPENED))
     await clickTerminalText(orcaPage, 'Refresh')
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
@@ -163,17 +175,22 @@ test('View on a remote member says where it is instead of failing to open it', a
           window.__store!.getState().setRightSidebarOpen(false)
         })
         await orcaPage.waitForTimeout(HOLD_MS)
-        await viewAndExpectToast(orcaPage, 'LUM-16 no longer')
+        await viewAndExpectToast(orcaPage, 'Could not open LUM-13')
         await orcaPage.screenshot({
-          path: testInfo.outputPath(`remote-view-gone-${theme}-${width}.png`),
+          path: testInfo.outputPath(`remote-view-unopened-${theme}-${width}.png`),
           animations: 'disabled'
         })
         await orcaPage.waitForTimeout(HOLD_MS)
       }
     }
-    // Why: the toast must come from the mod, never from a local focus of the host's handle.
-    const reads = await readFile(join(band.root, 'reads.log'), 'utf8')
-    expect(reads).not.toContain('terminal focus')
+    // Why: only the member with a pairing opens through it; none focuses the host's handle locally.
+    const focuses = (await readFile(join(band.root, 'reads.log'), 'utf8'))
+      .split('\n')
+      .filter((line) => line.startsWith('terminal focus'))
+    expect(focuses.length).toBeGreaterThan(0)
+    expect(new Set(focuses)).toEqual(
+      new Set(['terminal focus --terminal term_ctx_13 --on env-imac --json'])
+    )
   } finally {
     await rm(band.root, { recursive: true, force: true })
   }

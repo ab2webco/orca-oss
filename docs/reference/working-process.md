@@ -23,7 +23,8 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
 7. **El merge a `main` lo hace GitHub, no el agente.** `main` exige el check `verify` de PR Checks
    (tests, y E2E cuando el PR lo dispara). El worker pushea, abre el PR y avisa con el número; el
    lead lo verifica y activa `gh pr merge <n> --auto --squash`, y GitHub lo integra sólo cuando
-   `verify` está verde. No se le pide el merge al dueño. `main-merge-guard.py` rechaza cualquier
+   `verify` está verde. Cada push corre sólo el set rápido; el resto corre una vez, en el merge
+   queue ([ci-merge-queue.md](./ci-merge-queue.md)). No se le pide el merge al dueño. `main-merge-guard.py` rechaza cualquier
    otra forma (merge directo, `--admin`, push a `main`) y admite `--auto` sólo si la ruleset de
    `main` exige `verify`: lead y workers comparten la identidad de `gh`, así que la garantía está en
    el servidor, no en quién corre el comando. Si Claude Code deja de invocar `PreToolUse`, la guarda
