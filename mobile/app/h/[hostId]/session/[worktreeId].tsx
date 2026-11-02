@@ -283,6 +283,11 @@ import { useFollowHostTerminalOpen } from '../../../../src/session/use-follow-ho
 import { leadMemberRoute, leadPaneKeyOf } from '../../../../src/session/lead-members'
 import { LeadMembersStrip } from '../../../../src/session/LeadMembersStrip'
 import { useLeadMembers } from '../../../../src/session/use-lead-members'
+import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
+import { TeamDrawer } from '../../../../src/team-drawer/TeamDrawer'
+import { TeamHeaderButton } from '../../../../src/team-drawer/TeamHeaderButton'
+import { openMobilePrUrl } from '../../../../src/components/mobile-pr-url'
+import { useNow } from '../../../../src/hooks/use-now'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
 import type { TerminalQuickCommand } from '../../../../../src/shared/terminal-quick-command-types'
 import type {
@@ -2873,12 +2878,19 @@ export default function SessionScreen() {
     sessionTabs,
     selectTab: switchSessionTab
   })
-  const leadMembers = useLeadMembers({
+  const activeLeadPaneKey = leadPaneKeyOf(
+    sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null
+  )
+  const leadMembers = useLeadMembers({ client, hostId, worktreeId, leadPaneKey: activeLeadPaneKey })
+  const team = useTeamDrawer({
     client,
-    hostId,
+    connected: connState === 'connected',
     worktreeId,
-    leadPaneKey: leadPaneKeyOf(sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null)
+    terminalHandle: activeHandle,
+    paneKey: activeLeadPaneKey
   })
+  const [teamOpen, setTeamOpen] = useState(false)
+  const teamNow = useNow(60_000, teamOpen)
 
   // Why: only store the ref; subscribe on web-ready to avoid the blank-terminal race (init queued before xterm.js loaded).
   const setTerminalWebViewRef = useCallback((handle: string, ref: TerminalWebViewHandle | null) => {
@@ -4367,6 +4379,9 @@ export default function SessionScreen() {
                 </Text>
               </Pressable>
             </View>
+            {team.view ? (
+              <TeamHeaderButton badge={team.badge} onPress={() => setTeamOpen(true)} />
+            ) : null}
             {!isFloatingWorkspaceRoute && (
               <MobileSessionHeaderIconButton
                 active={activePanel === 'files'}
@@ -5018,6 +5033,14 @@ export default function SessionScreen() {
           )}
         </View>
       </View>
+
+      <TeamDrawer
+        visible={teamOpen && team.view !== null}
+        onClose={() => setTeamOpen(false)}
+        team={team}
+        now={teamNow}
+        onOpenLink={openMobilePrUrl}
+      />
 
       <MobileSessionHeaderMoreActionsSheet
         visible={showHeaderMoreActions}
