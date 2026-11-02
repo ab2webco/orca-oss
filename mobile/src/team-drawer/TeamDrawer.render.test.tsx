@@ -1,0 +1,144 @@
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Why: lucide's circular ESM re-exports do not load under Vite's runner; icons are not under test.
+vi.mock('lucide-react-native', async () => {
+  const { createElement: h } = await import('react')
+  const Icon = () => h('span')
+  return new Proxy(
+    {},
+    {
+      get: (_target, name) => (typeof name === 'string' && name !== 'then' ? Icon : undefined),
+      has: (_target, name) => typeof name === 'string' && name !== 'then'
+    }
+  )
+})
+
+import { TeamDrawer } from './TeamDrawer'
+import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
+
+const question = {
+  id: 'q1',
+  ticket: 'ORCA-7',
+  question: 'Merge the chain now?',
+  options: ['Yes', 'No'],
+  context: null,
+  askedAt: '2026-11-02T10:00:00.000Z',
+  answer: null
+}
+
+const member = (paneKey: string, displayName: string, state: string) => ({
+  paneKey,
+  displayName,
+  agentType: 'claude',
+  state,
+  toolName: null,
+  isLeader: false,
+  isMember: true
+})
+
+function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
+  const view = teamLeadViewOf(
+    {
+      role: 'lead',
+      lead: { autostart: false, cap: 4, agent: 'claude' },
+      agents: [member('a', 'ORCA-1 idle one', 'idle'), member('b', 'ORCA-7 asker', 'working')],
+      metrics: {
+        mergedPerDay: [{ day: '2026-11-02', merged: 4 }],
+        leadTime: { medianMs: 2 * 3_600_000, measured: 4 }
+      }
+    },
+    new Set(['ORCA-7'])
+  )
+  return {
+    view,
+    questions: [question],
+    answerWorktreeId: 'repo::/main',
+    badge: null,
+    answer: vi.fn(async () => {}),
+    ...over
+  }
+}
+
+const safeArea = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 0, left: 0, right: 0, bottom: 0 }
+}
+
+const texts = (): string[] =>
+  [...document.body.querySelectorAll<HTMLElement>('div')]
+    .filter((one) => one.childElementCount === 0)
+    .map((one) => one.textContent ?? '')
+
+function button(label: string): HTMLElement {
+  const found = document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
+  if (!found) {
+    throw new Error(`no control labelled ${label}`)
+  }
+  return found
+}
+
+describe('TeamDrawer', () => {
+  let container: HTMLDivElement
+  let root: Root
+
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+  })
+
+  const show = (team: TeamDrawerData, onClose = vi.fn()) => {
+    act(() =>
+      root.render(
+        <SafeAreaProvider initialMetrics={safeArea}>
+          <TeamDrawer visible onClose={onClose} team={team} now={0} onOpenLink={() => {}} />
+        </SafeAreaProvider>
+      )
+    )
+    return onClose
+  }
+
+  it('shows open questions, then members needs-you first, then metrics', () => {
+    show(teamWith())
+    const shown = texts()
+    const at = (text: string) => shown.indexOf(text)
+    expect(at('Needs your answer (1)')).toBeGreaterThanOrEqual(0)
+    expect(at('Merge the chain now?')).toBeGreaterThan(at('Needs your answer (1)'))
+    expect(at('ORCA-7')).toBeLessThan(at('ORCA-1'))
+    expect(at('Metrics')).toBeGreaterThan(at('ORCA-1'))
+    expect(shown).toContain('2.0 h')
+  })
+
+  it('closes from the large X in the header', () => {
+    const onClose = show(teamWith())
+    const close = button('Close Team')
+    expect(getComputedStyle(close).width).toBe('44px')
+    act(() => close.click())
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends one answer through the board for a tapped option', async () => {
+    const team = teamWith()
+    show(team)
+    await act(async () => button('Answer Yes').click())
+    expect(team.answer).toHaveBeenCalledTimes(1)
+    expect(team.answer).toHaveBeenCalledWith('q1', { option: 1 })
+  })
+
+  it('omits sections an older host does not send', () => {
+    const view = teamWith().view
+    show(teamWith({ questions: [], view: view && { ...view, metrics: null } }))
+    const shown = texts()
+    expect(shown).not.toContain('Metrics')
+    expect(shown.some((one) => one.startsWith('Needs your answer'))).toBe(false)
+    expect(shown).toContain('Members (2)')
+  })
+})
