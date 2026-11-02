@@ -34,7 +34,12 @@ function createOtherRepo(): string {
   return repoPath
 }
 
-type Dispatched = { source?: string; repoLabel?: string; ownerQuestion?: string }
+type Dispatched = {
+  source?: string
+  repoLabel?: string
+  ownerQuestion?: string
+  gameInbox?: { environmentId: string | null; worktreeId: string | null }
+}
 
 // A question asked in a project the person is not looking at must still reach them (ORCA-940).
 test('another project’s question is announced, counted, answered and opens the Inbox', async ({
@@ -112,16 +117,39 @@ test('another project’s question is announced, counted, answered and opens the
     const entry = orcaPage.getByTestId('game-inbox-entry')
     await expect(entry).toContainText('2')
 
-    // What a click on the notification sends the window.
-    await electronApp.evaluate(
-      ({ BrowserWindow }, target) => {
-        BrowserWindow.getAllWindows()[0]?.webContents.send('ui:openGameInbox', target)
+    // The host names the worktree the click opens; the window must know it to switch to it.
+    const target = (await recorded()).dispatched.find(
+      (one) => one.repoLabel === otherName
+    )?.gameInbox
+    expect(target?.worktreeId).toBeTruthy()
+    const firstName = await orcaPage.evaluate(
+      async ({ repoId, firstWorktreeId }) => {
+        await window.__store?.getState().fetchWorktrees(repoId)
+        const firstRepoId = firstWorktreeId.split('::')[0]
+        return window.__store?.getState().repos.find((repo) => repo.id === firstRepoId)?.displayName
       },
-      { environmentId: null, worktreeId: otherWorktreeId }
+      { repoId: added.result.repo.id, firstWorktreeId: activeWorktreeId }
     )
+    await expect
+      .poll(() =>
+        orcaPage.evaluate(
+          (id) => Boolean(window.__store?.getState().getKnownWorktreeById(id)),
+          target?.worktreeId ?? ''
+        )
+      )
+      .toBe(true)
+
+    // What a click on the notification sends the window: it opens that project and its Inbox.
+    await electronApp.evaluate(({ BrowserWindow }, inbox) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.send('ui:openGameInbox', inbox)
+    }, target)
     const sheet = orcaPage.getByTestId('game-inbox-sheet')
     await expect(sheet).toHaveAttribute('data-state', 'open')
-    await expect(sheet.getByRole('heading', { name: otherName })).toBeVisible()
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
+      .toBe(target?.worktreeId)
+    // The project left behind is now the other one, listed under its name.
+    await expect(sheet.getByRole('heading', { name: firstName ?? '' })).toBeVisible()
     await expect(sheet.locator('[data-game-owner-question]')).toHaveCount(2)
 
     for (const width of [1440, 768, 390, 320]) {
