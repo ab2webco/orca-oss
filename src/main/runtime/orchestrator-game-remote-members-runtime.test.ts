@@ -287,12 +287,13 @@ describe("a lead's earlier-lead remote members stay in its project (ORCA-848)", 
     db: OrchestrationDb,
     runId: string,
     title: string,
-    createdByPaneKey?: string
+    createdByPaneKey?: string,
+    leadWorktreeId?: string
   ): string {
     const task = db.createTask({ spec: title, taskTitle: title, runId, createdByPaneKey })
     const started = db.createStartingWorkerDispatch({
       taskId: task.id,
-      startOptions: { on: 'env_imac', serverName: 'imac' },
+      startOptions: { on: 'env_imac', serverName: 'imac', leadWorktreeId },
       federation: {
         environmentId: 'env_imac',
         environmentName: 'imac',
@@ -352,6 +353,22 @@ describe("a lead's earlier-lead remote members stay in its project (ORCA-848)", 
     const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
 
     expect(remoteNames(state.agents)).toEqual(['ORCA-829'])
+  })
+
+  it("adopts an earlier lead's member by the worktree it launched from once its pane is closed (ORCA-943)", async () => {
+    const { runtime, db } = leadInOrca()
+    const closedPane = 'tab_closed:55555555-5555-4555-8555-555555555555'
+    const closed = db.createRun({
+      objective: 'lead closed by a restart',
+      coordinatorHandle: 'term_closed',
+      coordinatorPaneKey: closedPane
+    })
+    remoteMemberOf(db, closed.id, 'ORCA-915', closedPane, 'wt-orca-old')
+    remoteMemberOf(db, closed.id, 'CINE-40', closedPane, 'wt-cineco')
+
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    expect(remoteNames(state.agents)).toEqual(['ORCA-915'])
   })
 
   it('places a Run a newer lead unbound by the pane that created its member', async () => {
