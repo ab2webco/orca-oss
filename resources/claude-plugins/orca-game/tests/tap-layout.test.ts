@@ -6,7 +6,13 @@ import type { On } from 'claude-code'
 import { allWidgetsStore } from './all-widgets-store'
 
 import { cellWidthOf } from '../hooks/cell-width'
-import { HOTKEY_CELLS, TAP_LAYOUT_COLUMNS, TAP_MIN_CELLS, TAP_ROWS } from '../hooks/tap-layout'
+import {
+  closeChipCellsOf,
+  HOTKEY_CELLS,
+  TAP_LAYOUT_COLUMNS,
+  TAP_MIN_CELLS,
+  TAP_ROWS
+} from '../hooks/tap-layout'
 
 const agent = (name: string, isLeader: boolean, handle?: string) => ({
   paneKey: `t:${name}`,
@@ -237,12 +243,20 @@ describe('the Fleet pane on a phone', () => {
       ui,
       'pane-menu-tap',
       41,
-      ['refresh', 'flat', 'view', 'widgets', 'pet', 'quit'],
+      ['refresh', 'flat', 'view', 'widgets', 'pet'],
       // Why three: the view and Widgets chips with their hotkeys need more than two rows at 41 columns.
       3
     )
-    // Close leads: a phone shows the pane's top rows, and Close is how it leaves.
-    expect(keyOf(menu?.[0])).toBe('quit')
+    expect(keyOf(menu?.[0])).toBe('refresh')
+    // Close leads on a row of its own: a thumb-wide chip, right under the pane's ✕, apart from Refresh.
+    const closeRow = await ui.find({ type: 'Box', key: 'pane-close-row' })
+    expect(closeRow?.props).toMatchObject({ justifyContent: 'flex-end', marginTop: 1 })
+    expect(childrenOf(closeRow).map(keyOf)).toEqual(['quit'])
+    const closeLines = shownOf(await ui.find({ type: 'Button', key: 'quit' })).split('\n')
+    expect(closeLines).toHaveLength(TAP_ROWS)
+    expect(cellWidthOf(closeLines[1] ?? '')).toBe(closeChipCellsOf(41, '✕ Close'))
+    const boxKeys = (await ui.findAll({ type: 'Box' })).map((one) => one.key)
+    expect(boxKeys.indexOf('pane-close-row')).toBeLessThan(boxKeys.indexOf('pane-menu-tap'))
     await expectTapGroup(ui, 'view-tap-t:builder', 41, ['view-t:builder'], 1)
     await expectTapGroup(ui, 'view-tap-t:tester', 41, ['view-t:tester'], 1)
     await expectTapGroup(ui, 'pane-links-tap', 41, ['open-work-item', 'open-review'])

@@ -12,6 +12,31 @@ const WorkerDispatchParams = z.object({ dispatch: requiredString('Missing --disp
 
 export const ORCHESTRATION_WORKER_STOP_METHODS: RpcMethod[] = [
   defineMethod({
+    name: 'orchestration.workerDetach',
+    params: WorkerDispatchParams,
+    // Why local only: a paired host's stop closes the pane there, so it needs a host method first.
+    handler: (params, { runtime }) => {
+      const db = runtime.getOrchestrationDb()
+      const federated = db.getFederatedDispatch(params.dispatch)
+      if (federated) {
+        throw new OrchestrationError(
+          'invalid_argument',
+          `Dispatch ${params.dispatch} runs on ${federated.environment_name}; detaching a member on a paired host needs an Orca update there.`
+        )
+      }
+      const detached = db.detachWorker(params.dispatch)
+      if (detached.disposition === 'detached') {
+        runtime.notifyMessageArrived(`dispatch:${params.dispatch}`, 'status')
+      }
+      return {
+        dispatchId: params.dispatch,
+        state: detached.worker.state,
+        alreadySettled: detached.disposition === 'already_settled',
+        processAction: 'none' as const
+      }
+    }
+  }),
+  defineMethod({
     name: 'orchestration.workerStop',
     params: WorkerDispatchParams,
     handler: async (params, { runtime, orchestrationMutation }) => {

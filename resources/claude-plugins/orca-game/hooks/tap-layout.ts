@@ -13,6 +13,10 @@ const PAD = 2
 
 export const isTapLayout = (columns: number): boolean => columns < TAP_LAYOUT_COLUMNS
 
+/** Close's chip on a phone: half the pane wide for a thumb, never narrower than its label (ORCA-949). */
+export const closeChipCellsOf = (columns: number, label: string): number =>
+  Math.min(columns, Math.max(cellWidthOf(label) + PAD, Math.floor(columns / 2)))
+
 // A short label is centred in spaces up to the chip's least width.
 const paddedOf = (label: string): string => {
   const room = TAP_MIN_CELLS - PAD - cellWidthOf(label)

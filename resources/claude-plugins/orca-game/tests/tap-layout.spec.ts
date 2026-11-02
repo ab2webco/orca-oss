@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cellWidthOf } from '../hooks/cell-width'
 import { MORE_CHIP_KEY } from '../hooks/chip-rows'
 import {
+  closeChipCellsOf,
   isTapLayout,
   TAP_LAYOUT_COLUMNS,
   TAP_MIN_CELLS,
@@ -80,5 +81,14 @@ describe('tap layout', () => {
     const kept = row.filter((one) => /^a\d$/.test(one.key)).length
     expect(more?.label.trim()).toBe(`+${3 - kept}`)
     expect(more?.width).toBeGreaterThanOrEqual(TAP_MIN_CELLS)
+  })
+  it('gives Close a thumb-wide chip, half the pane, never narrower than its label nor wider than the pane', () => {
+    expect(closeChipCellsOf(41, '✕ Close')).toBe(20)
+    expect(closeChipCellsOf(36, '✕ Close')).toBe(18)
+    expect(closeChipCellsOf(12, '✕ Close')).toBe(9)
+    expect(closeChipCellsOf(8, '✕ Close')).toBe(8)
+    expect(closeChipCellsOf(40, '✕ Cerrar el panel de la flota')).toBe(
+      cellWidthOf('✕ Cerrar el panel de la flota') + 2
+    )
   })
 })
