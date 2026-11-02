@@ -12,7 +12,7 @@ export function paneMenuRowOf(
   palette: BandPalette,
   columns: number,
   items: readonly PaneMenuItem[],
-  picker: RenderElement | null
+  picker: RenderElement
 ): RenderElement {
   const { Box, Button, Text } = $.ui.resolve(e)
   const chipColors = { color: palette.parchment, backgroundColor: palette.panel }
