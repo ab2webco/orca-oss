@@ -30,6 +30,18 @@ const GameEventsParams = z
   })
   .optional()
 
+// Why the agent's worktree and host: they survive a restart, unlike its pane key (ORCA-943).
+const GameFleetDropParams = z.object({
+  ...Caller,
+  agent: z.object({
+    worktreeId: z.string().min(1).max(400),
+    environmentId: z.string().min(1).max(400).nullable(),
+    name: z.string().min(1).max(400),
+    ticket: z.string().max(40).nullable()
+  }),
+  dropped: z.boolean()
+})
+
 // Why set optional: without it the call only reads, so the mod can poll it like game.state.
 const GameStopSwitchParams = z.object({ ...Caller, set: z.boolean().optional() })
 
@@ -104,6 +116,11 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
       runtime.noteGameFleetChanged()
       return result
     }
+  }),
+  defineMethod({
+    name: 'game.fleetDrop',
+    params: GameFleetDropParams,
+    handler: async (params, { runtime }) => runtime.setGameAgentDropped(params)
   }),
   defineMethod({
     name: 'game.inbox',

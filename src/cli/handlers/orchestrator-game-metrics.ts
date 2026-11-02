@@ -15,6 +15,7 @@ import {
   gameMetricsSummaryOf,
   type GameMetricsSummary
 } from '../../shared/orchestrator-game-metrics-summary'
+import { withGameDelivery, type GameDelivery } from '../../shared/orchestrator-game-delivery'
 import {
   desktopGameTimezoneOf,
   isOrchestratorGameTimezone,
@@ -130,19 +131,31 @@ function timezoneOf(flags: Map<string, string | boolean>): string {
   return zone
 }
 
+/** Where the daily numbers come from, and when they were read. */
+const sourcePartsOf = ({ source }: GameMetricsSummary): string[] =>
+  source && source.kind !== 'game'
+    ? [
+        `${source.kind === 'github' ? 'GitHub' : 'GitLab'} ${source.repo} merged PRs`,
+        `read ${source.fetchedAt}`,
+        ...(source.partial ? ['partial'] : [])
+      ]
+    : ["Orca Game's own events", 'review provider not read']
+
 function dailyLines(daily: GameMetricsSummary): string[] {
   const merged = daily.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)
   const median = daily.leadTime.medianMs
+  const measured = daily.source?.kind === 'game' ? 'claim to merge' : 'PR open to merge'
   return [
     ...row(`Last ${daily.mergedPerDay.length} days`, [
       `to ${daily.mergedPerDay.at(-1)?.day ?? '?'} ${daily.timezone}`,
       `${merged} merged`,
-      `lead time median ${median === null ? 'no data' : formatDuration(median)}`
+      `lead time median ${median === null ? 'no data' : formatDuration(median)} (${measured})`
     ]),
     ...row(
       'Merged per day',
       daily.mergedPerDay.map((one) => `${one.day.slice(5)} ${one.merged}`)
-    )
+    ),
+    ...row('Source', sourcePartsOf(daily))
   ]
 }
 
@@ -243,7 +256,17 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
     const metrics = computeGameMetrics(stores, { ticket, since, until, character })
     // Why only unfiltered: the days are the scene widget's own window, not the query's.
     const filtered = [ticket, since, until, character].some((one) => one !== undefined)
-    const daily = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
+    const own = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
+    // Why caught: an older host has no game.delivery, and the stores still answer.
+    const delivery = own
+      ? await client
+          .call<{ delivery: GameDelivery | null }>('game.delivery', gameBoardCaller())
+          .then(
+            ({ result }) => result.delivery,
+            () => null
+          )
+      : null
+    const daily = own && delivery ? withGameDelivery(own, delivery) : own
     printResult(
       { ...history, result: daily ? { ...metrics, daily } : metrics },
       json,

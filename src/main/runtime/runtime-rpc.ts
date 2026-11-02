@@ -369,6 +369,8 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // The person's Game Inbox: read every project's open questions and answer one (ORCA-940).
   'game.ownerQuestionsAll',
   'game.ownerAnswer',
+  // The Team drawer over a lead's terminal reads the Panel's own state (ORCA-952).
+  'game.state',
   // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
   // Consent, enablement and invokeCommand stay off: those are desktop decisions.
   'plugins.list',
