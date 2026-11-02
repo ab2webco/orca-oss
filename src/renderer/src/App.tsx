@@ -61,6 +61,7 @@ import {
 } from './components/terminal-pane/use-system-prefers-dark'
 import RightSidebar from './components/right-sidebar'
 import { MobileInstallRequestDialog } from './components/MobileInstallRequestDialog'
+import { GameOwnerQuestionsWatcher } from './components/game-inbox/GameOwnerQuestionsWatcher'
 import { StarNagCard } from './components/StarNagCard'
 import { MemoryPressureWarningCard } from './components/memory-pressure/MemoryPressureWarningCard'
 import { StarNagAgentValueMomentObserver } from './components/star-nag/StarNagAgentValueMomentObserver'
@@ -2861,6 +2862,7 @@ function App(): React.JSX.Element {
       </TooltipProvider>
       <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />
       <SkillFreshnessNudge />
+      <GameOwnerQuestionsWatcher />
       <WorktreeBaseFallbackDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />

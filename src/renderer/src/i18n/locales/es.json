@@ -15341,7 +15341,8 @@
           "send": "Enviar"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Bandeja"
+          "inbox": "Bandeja",
+          "noWorktree": "Abre este proyecto en Orca para responder."
         },
         "GameInboxKindTag": {
           "question": "Pregunta",
