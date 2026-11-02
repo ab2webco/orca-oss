@@ -161,6 +161,14 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
         all: params?.all
       })
   }),
+  // Why no caller: the person's app shows every project's questions, not one worktree's.
+  defineMethod({
+    name: 'game.ownerQuestionsAll',
+    params: z.object({}).optional(),
+    handler: async (_params, { runtime }) => ({
+      projects: await runtime.listGameOwnerQuestionProjects()
+    })
+  }),
   defineMethod({
     name: 'game.ownerAnswer',
     params: GameOwnerAnswerParams,

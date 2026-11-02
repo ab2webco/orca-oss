@@ -218,4 +218,17 @@ describe('game board RPC: the person answers a member (ORCA-878)', () => {
       ]
     ])
   })
+
+  it("lists every project's open owner questions from the runtime", async () => {
+    const projects = [{ repoId: 'r1', repoName: 'orca', worktreeId: 'r1::/w', questions: [] }]
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      listGameOwnerQuestionProjects: async () => projects
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_BOARD_METHODS })
+
+    await expect(
+      dispatcher.dispatch({ id: 'b', authToken: 'test', method: 'game.ownerQuestionsAll' })
+    ).resolves.toMatchObject({ ok: true, result: { projects } })
+  })
 })

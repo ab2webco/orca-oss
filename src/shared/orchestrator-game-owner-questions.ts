@@ -76,6 +76,37 @@ export function parseGameOwnerQuestion(raw: unknown): GameOwnerQuestion | null {
   return { id, ticket, question, options, context, askedAt, answer }
 }
 
+/** One project's open questions on a host, with a worktree the Inbox answers through. */
+export type GameOwnerQuestionProject = {
+  repoId: string
+  repoName: string
+  worktreeId: string | null
+  questions: GameOwnerQuestion[]
+}
+
+/** `game.ownerQuestionsAll`'s result; a project left with no readable question is dropped. */
+export function parseGameOwnerQuestionProjects(raw: unknown): GameOwnerQuestionProject[] {
+  const projects = isRecord(raw) && Array.isArray(raw.projects) ? raw.projects : []
+  return projects.flatMap((one) => {
+    if (!isRecord(one)) {
+      return []
+    }
+    const { repoId, repoName, worktreeId } = one
+    const questions = Array.isArray(one.questions)
+      ? one.questions.flatMap((q) => parseGameOwnerQuestion(q) ?? [])
+      : []
+    if (
+      typeof repoId !== 'string' ||
+      typeof repoName !== 'string' ||
+      (worktreeId !== null && typeof worktreeId !== 'string') ||
+      questions.length === 0
+    ) {
+      return []
+    }
+    return [{ repoId, repoName, worktreeId, questions }]
+  })
+}
+
 const isOpen = (raw: unknown): boolean => parseGameOwnerQuestion(raw)?.answer === null
 
 /** `T` lets the store keep, as they were, the entries a newer build wrote. */
