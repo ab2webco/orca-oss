@@ -1,3 +1,5 @@
+import { describeWindowsProcessExitCode } from './windows-process-exit-codes'
+
 export type CrashReportStatus = 'pending' | 'sent' | 'dismissed'
 export type CrashReportSource = 'renderer' | 'child'
 
@@ -207,6 +209,15 @@ export function sanitizeCrashReportBreadcrumbs(
   return sanitized.length > 0 ? sanitized : undefined
 }
 
+function formatExitCode(report: CrashReportRecord): string {
+  if (report.exitCode === null) {
+    return 'unknown'
+  }
+  const decoded =
+    report.platform === 'win32' ? describeWindowsProcessExitCode(report.exitCode) : null
+  return decoded ? `${report.exitCode} (${decoded})` : String(report.exitCode)
+}
+
 export function formatCrashReportText(report: CrashReportRecord, notes?: string): string {
   const lines = [
     '[Crash Report]',
@@ -217,7 +228,7 @@ export function formatCrashReportText(report: CrashReportRecord, notes?: string)
     `Source: ${report.source}`,
     `Process: ${report.processType}`,
     `Reason: ${report.reason}`,
-    `Exit code: ${report.exitCode ?? 'unknown'}`,
+    `Exit code: ${formatExitCode(report)}`,
     `App version: ${report.appVersion}`,
     `Platform: ${report.platform} ${report.osRelease} ${report.arch}`,
     `Electron: ${report.electronVersion}`,

@@ -124,6 +124,33 @@ describe('crash-reporting shared helpers', () => {
     expect(text).not.toContain('\nURL:')
   })
 
+  it('decodes a Windows exit code so a Crashpad termination is readable', () => {
+    const report: CrashReportRecord = {
+      id: 'crash-win-crashpad',
+      createdAt: '2026-11-01T00:00:00.000Z',
+      status: 'pending',
+      source: 'renderer',
+      processType: 'renderer',
+      reason: 'crashed',
+      exitCode: -36861,
+      appVersion: '1.4.160-lab.110',
+      platform: 'win32',
+      osRelease: '10.0.26200',
+      arch: 'x64',
+      electronVersion: '43.1.0',
+      chromeVersion: '150.0.7871.47',
+      details: {},
+      breadcrumbs: []
+    }
+
+    expect(formatCrashReportText(report)).toContain(
+      'Exit code: -36861 (0xFFFF7003 crashpad-not-connected-to-handler)'
+    )
+    expect(formatCrashReportText({ ...report, platform: 'darwin' })).toContain(
+      'Exit code: -36861\n'
+    )
+  })
+
   it('caps formatted reports to the crash endpoint limit', () => {
     const report: CrashReportRecord = {
       id: 'crash-oversized',

@@ -110,13 +110,38 @@ function getProcessGoneMetricDetails(): CrashReportDetails {
   }
 }
 
+// Why: terminals render through WebGL; hardware vs software (SwiftShader) at crash
+// time separates a driver-side fault from a renderer one (GitHub #822).
+const GPU_FEATURE_DETAIL_KEYS = {
+  webgl: 'gpuFeatureWebgl',
+  webgl2: 'gpuFeatureWebgl2',
+  gpu_compositing: 'gpuFeatureGpuCompositing'
+} as const
+
+function getGpuFeatureStatusDetails(): CrashReportDetails {
+  try {
+    const status: Record<string, unknown> = { ...app.getGPUFeatureStatus() }
+    const details: CrashReportDetails = {}
+    for (const [feature, key] of Object.entries(GPU_FEATURE_DETAIL_KEYS)) {
+      const value = safeString(status[feature])
+      if (value) {
+        details[key] = value
+      }
+    }
+    return details
+  } catch (error) {
+    return { gpuFeatureStatusError: error instanceof Error ? error.name : typeof error }
+  }
+}
+
 export function buildProcessGoneCrashDetails(details: Record<string, unknown>): CrashReportDetails {
   const sanitizedDetails = sanitizeCrashReportDetails(details)
   // Why: low-JS-heap renderer kills can still be native/process memory pressure.
   // Capture Electron process buckets at process-gone time before recovery reloads.
   return {
     ...sanitizedDetails,
-    ...getProcessGoneMetricDetails()
+    ...getProcessGoneMetricDetails(),
+    ...getGpuFeatureStatusDetails()
   }
 }
 
