@@ -798,6 +798,7 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import type { GameOwnerQuestionProject } from '../../shared/orchestrator-game-owner-questions'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
@@ -31240,6 +31241,29 @@ export class OrcaRuntimeService {
   }
 
   // Why the lead's project for a member: a member in another repo (--repo) writes its lead's board.
+  /** Every repo's open owner questions; the main worktree, else any, is the one the Inbox answers through. */
+  async listGameOwnerQuestionProjects(): Promise<GameOwnerQuestionProject[]> {
+    const repos = this.store?.getRepos() ?? []
+    const byProject = await this.gameBoard.openOwnerQuestionsOf(
+      repos.map((repo) => `repo:${repo.id}`)
+    )
+    if (byProject.size === 0) {
+      return []
+    }
+    const worktrees = [...(await this.getResolvedWorktreeMap()).values()]
+    return repos.flatMap((repo) => {
+      const questions = byProject.get(`repo:${repo.id}`)
+      if (!questions) {
+        return []
+      }
+      const own = worktrees.filter((worktree) => worktree.repoId === repo.id)
+      const worktree = own.find((one) => one.isMainWorktree) ?? own[0]
+      return [
+        { repoId: repo.id, repoName: repo.displayName, worktreeId: worktree?.id ?? null, questions }
+      ]
+    })
+  }
+
   private async gameBoardProjectOf(args: {
     worktreeId?: string
     terminalHandle?: string
