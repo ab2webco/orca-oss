@@ -51,6 +51,8 @@ export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli
     `  Put every question for the person on record with ${run('game ask-owner --ticket <id> --question <text> --option <a> --option <b>')}`,
     '  as well as in your reply, so it is never only in your chat. Their answer reaches your watch once as',
     '  an escalation from `owner`: record it on the ticket and act on it.',
+    `  On every wake, and before asking the person again, read ${run('game owner-questions --all')}: an answer`,
+    '  there that you have not recorded on its ticket is new to you, even when no escalation reached you.',
     '- For a hard technical call, if your agent offers an advisor tool, consult it once for that decision,',
     '  never for a status update. Without one, decide by the bar above.',
     '- When Orca types "You have N orchestration messages" into your terminal, the person did not',

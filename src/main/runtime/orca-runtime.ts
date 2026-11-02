@@ -22,6 +22,7 @@ import {
   selectAgentSessionIdentity
 } from './terminal-agent-session-log-state'
 import { isServerDriveListRequest, listWindowsDrives } from './windows-drive-listing'
+import { findCodexReadyPromptIndex } from './codex-ready-prompt'
 import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
 import { parseFileUriPathParts } from '../daemon/osc7-file-uri'
 import type { AgentStatus } from '../../shared/agent-detection'
@@ -3957,7 +3958,7 @@ export class OrcaRuntimeService {
         return tellGameLead(
           this.getOrchestrationDb(),
           (handle, type) => this.notifyMessageArrived(handle, type),
-          lead.handle,
+          lead,
           note
         )
       } catch {
@@ -32120,7 +32121,9 @@ export class OrcaRuntimeService {
               this.getTerminalPaneKey(other.coordinatorHandle) !== null) ||
             (other.coordinatorPaneKey !== null &&
               this.getPtyRecordForPaneKey(other.coordinatorPaneKey)?.connected === true),
-          projectKey: projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey)
+          projectKey:
+            projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey) ??
+            this.gameProjectKeyOfWorktree(other.leadWorktreeId, worktreesById)
         })
       )
     ]
@@ -42877,16 +42880,6 @@ function findCursorReadyPromptIndex(normalized: string): number | null {
     return null
   }
   return CURSOR_BUSY_SPINNER_RE.test(normalized.slice(activeIndex)) ? null : activeIndex
-}
-
-function findCodexReadyPromptIndex(normalized: string): number | null {
-  const headerIndex = normalized.lastIndexOf('openai codex')
-  if (headerIndex === -1) {
-    return null
-  }
-  const readySegment = normalized.slice(headerIndex)
-  // Why: Codex prints permissions only in YOLO mode; the stable ready header is OpenAI Codex + model + directory.
-  return readySegment.includes('model:') && readySegment.includes('directory:') ? headerIndex : null
 }
 
 function findAntigravityReadyPromptIndex(normalized: string): number | null {

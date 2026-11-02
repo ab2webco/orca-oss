@@ -111,6 +111,35 @@ describe('orca game owner questions', () => {
     expect(text).toContain('  PR #41')
   })
 
+  // Why (ORCA-942): an answer that never reached the lead must not hide behind the open count.
+  it('lists the answers that had not reached the lead, and none from an older host', async () => {
+    const answered = { ...QUESTION, answer: { text: 'Wait', at: '2026-10-29T10:05:00.000Z' } }
+    const { client } = fakeClient({ questions: [], open: 0, undelivered: [answered] })
+
+    await run('game owner-questions', client, [], false)
+
+    expect(output.join('\n')).toBe(
+      [
+        '0 open questions for the person',
+        '1 answer had not reached you; it is in your mail now:',
+        'oq_1 CIN-1 asked 2026-10-29T10:00:00.000Z: Ship the arcade in lab.111?',
+        '  1) Yes  2) Wait',
+        '  PR #41',
+        '  answered 2026-10-29T10:05:00.000Z: Wait'
+      ].join('\n')
+    )
+
+    output = []
+    const stuck = { ...answered, answer: { ...answered.answer, undelivered: true } }
+    const held = fakeClient({ questions: [], open: 0, undelivered: [stuck, stuck] })
+    await run('game owner-questions', held.client, [], false)
+    expect(output[0]).toContain('2 answers could not reach your mail; act on them from here:')
+
+    output = []
+    await run('game owner-questions', fakeClient({ questions: [], open: 0 }).client, [], false)
+    expect(output.join('\n')).toBe('0 open questions for the person')
+  })
+
   it('answers by option number or with text, never both', async () => {
     const answered = { question: { ...QUESTION, answer: { text: 'Wait', at: 'x' } } }
     const { client, calls } = fakeClient({ ...answered, delivered: true, repeated: false })

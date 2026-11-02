@@ -1,6 +1,7 @@
 /** `orca game ask-owner`: what the lead asks the person, kept as records so none is lost in its chat. */
 
-export type GameOwnerAnswer = { text: string; at: string }
+/** `undelivered`: no lead has received it yet; absent on answers older builds kept, which were told. */
+export type GameOwnerAnswer = { text: string; at: string; undelivered?: true }
 
 export type GameOwnerQuestion = {
   id: string
@@ -48,9 +49,12 @@ function answerOf(value: unknown): GameOwnerAnswer | null | undefined {
   if (value === null) {
     return null
   }
-  return isRecord(value) && typeof value.text === 'string' && typeof value.at === 'string'
-    ? { text: value.text, at: value.at }
-    : undefined
+  if (!isRecord(value) || typeof value.text !== 'string' || typeof value.at !== 'string') {
+    return undefined
+  }
+  return value.undelivered === true
+    ? { text: value.text, at: value.at, undelivered: true }
+    : { text: value.text, at: value.at }
 }
 
 export function parseGameOwnerQuestion(raw: unknown): GameOwnerQuestion | null {
@@ -129,10 +133,38 @@ export function answerGameOwnerQuestion<T>(
   if (question.answer) {
     return { kind: question.answer.text === text ? 'repeated' : 'conflict', question }
   }
-  const answered: GameOwnerQuestion = { ...question, answer: { text, at } }
+  // Why undelivered until told: an answer no lead received must stay on record to reach the next one.
+  const answered: GameOwnerQuestion = { ...question, answer: { text, at, undelivered: true } }
   const next: (T | GameOwnerQuestion)[] = [...list]
   next[index] = answered
   return { kind: 'answered', list: next, question: answered }
+}
+
+/** Hands every answer no lead has received to `deliver`; `held` is each as it is now, `list` null when none went. */
+export function deliverGameOwnerAnswers<T>(
+  list: readonly T[],
+  deliver: (question: GameOwnerQuestion) => boolean
+): { list: (T | GameOwnerQuestion)[] | null; held: GameOwnerQuestion[] } {
+  const held: GameOwnerQuestion[] = []
+  let changed = false
+  const next = list.map((one): T | GameOwnerQuestion => {
+    const question = parseGameOwnerQuestion(one)
+    if (!question?.answer?.undelivered) {
+      return one
+    }
+    if (!deliver(question)) {
+      held.push(question)
+      return one
+    }
+    changed = true
+    const delivered = {
+      ...question,
+      answer: { text: question.answer.text, at: question.answer.at }
+    }
+    held.push(delivered)
+    return delivered
+  })
+  return { list: changed ? next : null, held }
 }
 
 export function openGameOwnerQuestions(list: readonly unknown[]): GameOwnerQuestion[] {

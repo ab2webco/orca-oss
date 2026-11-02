@@ -49,6 +49,10 @@ describe('gameLeadBriefOf', () => {
       '`orca game ask-owner --ticket <id> --question <text> --option <a> --option <b>`'
     )
     expect(brief).toContain('an escalation from `owner`')
+    // Why (ORCA-942): mail that was stored but never read must not hide an answer from the lead.
+    expect(brief).toContain(
+      'On every wake, and before asking the person again, read `orca game owner-questions --all`'
+    )
   })
 
   it('resumes the members a restart paused at once, then tells the person', () => {

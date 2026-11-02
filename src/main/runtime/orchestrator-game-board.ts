@@ -13,6 +13,10 @@ import {
   type GameInboxThreads
 } from '../../shared/orchestrator-game-inbox-threads'
 import {
+  deliverHeldOwnerAnswers,
+  ownerAnswerTellerOf
+} from './orchestrator-game-owner-answer-delivery'
+import {
   ownerMemberReplyNote,
   type OwnerMemberReply,
   type OwnerMemberReplyMode
@@ -28,10 +32,11 @@ import {
 import {
   addGameOwnerQuestion,
   answerGameOwnerQuestion,
-  gameOwnerAnswerNote,
+  deliverGameOwnerAnswers,
   gameOwnerQuestionDraftOf,
   openGameOwnerQuestions,
   parseGameOwnerQuestion,
+  type GameOwnerAnswerResult,
   type GameOwnerQuestion,
   type GameOwnerQuestionDraft,
   type GameOwnerReply
@@ -143,6 +148,7 @@ export class GameBoard {
     args: GameBoardCaller & { ticket?: string; unread?: boolean; markRead?: boolean }
   ): Promise<{ inbox: GameInbox }> {
     const project = await this.deps.projectOf(args)
+    await deliverHeldOwnerAnswers(this.deps.store, project, this.deps.tellLead)
     const key = project.isMember
       ? project.memberTicket
       : args.ticket?.trim().toUpperCase() || 'lead'
@@ -217,13 +223,15 @@ export class GameBoard {
   /** Open questions oldest first; `all` adds the answered ones kept for the audit. */
   async ownerQuestions(
     args: GameBoardCaller & { all?: boolean }
-  ): Promise<{ questions: GameOwnerQuestion[]; open: number }> {
+  ): Promise<{ questions: GameOwnerQuestion[]; open: number; undelivered: GameOwnerQuestion[] }> {
     const project = await this.deps.projectOf(args)
+    const undelivered = await deliverHeldOwnerAnswers(this.deps.store, project, this.deps.tellLead)
     const list = await this.deps.store.ownerQuestions(project.key)
     const open = openGameOwnerQuestions(list)
     return {
       questions: args.all ? list.flatMap((one) => parseGameOwnerQuestion(one) ?? []) : open,
-      open: open.length
+      open: open.length,
+      undelivered
     }
   }
 
@@ -236,10 +244,19 @@ export class GameBoard {
       throw new Error('A member cannot answer a question the lead asked the person.')
     }
     const at = this.now().toISOString()
-    const result = await this.deps.store.changeOwnerQuestions(project.key, (list) => {
-      const outcome = answerGameOwnerQuestion(list, args.id, args, at)
-      return { list: outcome.kind === 'answered' ? outcome.list : null, result: outcome }
-    })
+    const tell = ownerAnswerTellerOf(project, this.deps.tellLead)
+    const result = await this.deps.store.changeOwnerQuestions<GameOwnerAnswerResult<unknown>>(
+      project.key,
+      (list) => {
+        const outcome = answerGameOwnerQuestion(list, args.id, args, at)
+        if (outcome.kind !== 'answered') {
+          return { list: null, result: outcome }
+        }
+        const sent = deliverGameOwnerAnswers(outcome.list, tell)
+        const question = sent.held.find((one) => one.id === args.id) ?? outcome.question
+        return { list: sent.list ?? outcome.list, result: { ...outcome, question } }
+      }
+    )
     switch (result.kind) {
       case 'not_found':
         throw new Error(`No question ${args.id} in this project.`)
@@ -251,9 +268,7 @@ export class GameBoard {
         return { question: result.question, delivered: false, repeated: true }
       case 'answered': {
         this.deps.ownerQuestionsChanged?.(project.key)
-        const delivered = project.lead
-          ? this.deps.tellLead(project.lead, gameOwnerAnswerNote(result.question))
-          : false
+        const delivered = result.question.answer?.undelivered !== true
         return { question: result.question, delivered, repeated: false }
       }
     }

@@ -62,6 +62,11 @@ export async function startFederatedWorker(args: {
   const gameScene = carriesGameScene
     ? await runtime.readCallerGameScene(params.from).catch(() => null)
     : null
+  // Why: the lead's panes do not outlive a restart, its worktree does; a later lead adopts by it (ORCA-943).
+  const leadWorktreeId = await runtime
+    .showTerminal(params.from)
+    .then((terminal) => terminal.worktreeId || null)
+    .catch(() => null)
 
   const setupDecision = createsWorktree ? (params.setup ?? 'run') : 'not_applicable'
   const started = db.createStartingWorkerDispatch({
@@ -70,6 +75,7 @@ export async function startFederatedWorker(args: {
     startOptions: {
       on: server.environmentId,
       serverName: server.name,
+      leadWorktreeId,
       worktree,
       name: params.name ?? null,
       repo: params.repo ?? null,
