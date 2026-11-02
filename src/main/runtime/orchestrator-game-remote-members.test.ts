@@ -12,11 +12,16 @@ import {
 
 const LEAD_PANE = 'tab_lead:11111111-1111-4111-8111-111111111111'
 
-function startRemote(d: OrchestrationDb, runId: string, title: string): string {
+function startRemote(
+  d: OrchestrationDb,
+  runId: string,
+  title: string,
+  leadWorktreeId?: string
+): string {
   const task = d.createTask({ spec: title, taskTitle: title, runId })
   const started = d.createStartingWorkerDispatch({
     taskId: task.id,
-    startOptions: { on: 'env_imac', serverName: 'imac' },
+    startOptions: { on: 'env_imac', serverName: 'imac', leadWorktreeId },
     federation: {
       environmentId: 'env_imac',
       environmentName: 'imac',
@@ -471,9 +476,11 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
   }
   const leadOf = (run: EarlierLeadRunPanes): EarlierLeadRunLead => {
     const pane = run.coordinatorPaneKey ?? run.creatorPaneKey
+    const ofPane = pane ? (projectOfPane[pane] ?? null) : null
     return {
       live: run.coordinatorHandle !== null && liveLeads.has(run.coordinatorHandle),
-      projectKey: pane ? (projectOfPane[pane] ?? null) : null
+      projectKey:
+        ofPane ?? (run.leadWorktreeId ? `repo:${run.leadWorktreeId.split('::')[0]}` : null)
     }
   }
   const leadIn = (runId: string, projectKey: string | null = 'repo:orca') => ({
@@ -574,6 +581,23 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
         (one) => one.taskTitle
       )
     ).toEqual(['ORCA-700', 'ORCA-829'])
+  })
+
+  it('places a closed lead by the worktree it launched from, so a new lead adopts its members (ORCA-943)', () => {
+    db = new OrchestrationDb(':memory:')
+    const runs = leads(db)
+    const closed = db.createRun({
+      objective: 'lead closed by a restart',
+      coordinatorHandle: 'term_closed',
+      coordinatorPaneKey: 'tab_closed:55555555-5555-4555-8555-555555555555'
+    })
+    const ours = startRemote(db, closed.id, 'ORCA-915', 'orca::/Users/me/orca')
+    startRemote(db, closed.id, 'CINE-40', 'cineco::/Users/me/cineco')
+    startRemote(db, closed.id, 'ORCA-329')
+
+    expect(listEarlierLeadRemoteMemberSources(db, leadIn(runs.current), leadOf)).toEqual([
+      expect.objectContaining({ dispatchId: ours, taskTitle: 'ORCA-915', earlierLead: true })
+    ])
   })
 
   it("holds the titles of every Run's unreleased remote members for the name pool (ORCA-794)", () => {

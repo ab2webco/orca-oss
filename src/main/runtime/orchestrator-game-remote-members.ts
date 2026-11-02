@@ -125,6 +125,8 @@ export type EarlierLeadRunPanes = {
   coordinatorPaneKey: string | null
   /** The lead pane that created the member's task, which outlives the Run's binding. */
   creatorPaneKey: string | null
+  /** The lead's worktree at launch; places the Run once its panes are gone (ORCA-943). */
+  leadWorktreeId: string | null
 }
 
 /** A Run's lead as this Orca sees it now; `projectKey` is null when no pane places it. */
@@ -143,7 +145,9 @@ export function listEarlierLeadRemoteMemberSources(
   const rows = sqliteOf(db)
     .prepare(
       `SELECT ${SOURCE_COLUMNS}, d.run_id AS runId, r.coordinator_handle AS coordinatorHandle,
-              r.coordinator_pane_key AS coordinatorPaneKey, t.created_by_pane_key AS creatorPaneKey
+              r.coordinator_pane_key AS coordinatorPaneKey, t.created_by_pane_key AS creatorPaneKey,
+              CASE WHEN json_valid(w.start_options)
+                THEN json_extract(w.start_options, '$.leadWorktreeId') END AS leadWorktreeId
          ${SOURCE_JOINS}
         WHERE ${NOT_RELEASED}
           AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
@@ -168,6 +172,7 @@ export function listEarlierLeadRemoteMemberSources(
         coordinatorHandle: _handle,
         coordinatorPaneKey: _pane,
         creatorPaneKey: _creator,
+        leadWorktreeId: _leadWorktree,
         ...row
       }) => sourceOf(row, true)
     )
