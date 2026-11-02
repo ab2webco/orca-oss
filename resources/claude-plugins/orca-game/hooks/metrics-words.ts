@@ -4,10 +4,16 @@ import { gameLocale } from './game-strings'
 /** The Metrics widget's words. */
 export type MetricsWords = {
   merged: (total: number, days: number) => string
-  /** `duration` is null when no ticket in the window was measured. */
-  leadTime: (duration: string | null, measured: number) => string
   /** On a Panel whose state carries no metrics: a member's, or an older host's. */
   missing: string
+  mergedTitle: string
+  leadTitle: string
+  accountsTitle: string
+  perDay: string
+  peak: string
+  median: string
+  measured: (count: number) => string
+  noneMeasured: string
 }
 
 const plural = (count: number, one: string, many: string): string =>
@@ -15,20 +21,28 @@ const plural = (count: number, one: string, many: string): string =>
 
 const EN: MetricsWords = {
   merged: (total, days) => `${total} merged · ${days} days`,
-  leadTime: (duration, measured) =>
-    duration === null
-      ? 'lead time — no ticket measured'
-      : `lead time median ${duration} · ${plural(measured, 'ticket', 'tickets')}`,
-  missing: "Metrics show in the lead's Panel, from an Orca Lab that sends them."
+  missing: "Metrics show in the lead's Panel, from an Orca Lab that sends them.",
+  mergedTitle: 'Merged per day',
+  leadTitle: 'Lead time',
+  accountsTitle: 'Accounts',
+  perDay: '/day',
+  peak: 'peak',
+  median: 'median',
+  measured: (count) => `${plural(count, 'ticket', 'tickets')} measured`,
+  noneMeasured: 'no ticket measured'
 }
 
 const ES: MetricsWords = {
   merged: (total, days) => `${total} fusionados · ${days} días`,
-  leadTime: (duration, measured) =>
-    duration === null
-      ? 'mediana de entrega — ningún ticket medido'
-      : `mediana de entrega ${duration} · ${plural(measured, 'ticket', 'tickets')}`,
-  missing: 'Las métricas se ven en el Panel del lead, con un Orca Lab que las envíe.'
+  missing: 'Las métricas se ven en el Panel del lead, con un Orca Lab que las envíe.',
+  mergedTitle: 'Fusionados por día',
+  leadTitle: 'Tiempo de entrega',
+  accountsTitle: 'Cuentas',
+  perDay: '/día',
+  peak: 'pico',
+  median: 'mediana',
+  measured: (count) => plural(count, 'ticket medido', 'tickets medidos'),
+  noneMeasured: 'ningún ticket medido'
 }
 
 const WORDS: Readonly<Record<GameLocale, MetricsWords>> = { en: EN, es: ES }

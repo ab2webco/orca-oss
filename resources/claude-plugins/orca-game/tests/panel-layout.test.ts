@@ -324,13 +324,32 @@ describe('panel layout', () => {
     const ui = await pane($)
     expect(await headerOf(ui, 'metrics')).toMatch(/^▾ METRICS ─+$/)
     const rows = shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))
-    expect(rows).toContain('▁▅█ 6 merged · 3 days')
-    expect(rows).toContain('lead time median 1d 2h · 6 tickets')
+    for (const title of ['Merged per day', 'Lead time', 'Accounts']) {
+      expect(rows).toContain(title)
+    }
+    expect(rows).toContain('6 merged · 3 days')
+    expect(rows).toContain('1d 2h')
+    expect(rows).toContain('6 tickets measured')
     expect(rows).toContain('● lead@example.com')
     expect(rows).toContain('92%')
-    await ui.press({ key: 'layout-toggle-metrics' })
-    expect(shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))).not.toContain('merged')
     await ui.unmount()
+    // On a phone the cards stack, and no account row runs past a card's inner width (40 less border and padding).
+    const phone = await pane($, 40)
+    expect(await phone.find({ type: 'Box', key: 'metrics-top' })).toBeUndefined()
+    const accountRows = (await phone.findAll({ type: 'Box' })).filter((one) =>
+      /^metrics-account-\d/.test(one.key ?? '')
+    )
+    expect(accountRows.length).toBeGreaterThan(0)
+    for (const one of accountRows) {
+      expect(cellWidthOf(shownOf(one)), shownOf(one)).toBeLessThanOrEqual(36)
+    }
+    await phone.unmount()
+    const again = await pane($)
+    await again.press({ key: 'layout-toggle-metrics' })
+    expect(shownOf(await again.find({ type: 'Box', key: 'section-metrics' }))).not.toContain(
+      'merged'
+    )
+    await again.unmount()
   })
 
   test("a member's Panel, or an older host's, says where the metrics come from", async ($, on) => {
