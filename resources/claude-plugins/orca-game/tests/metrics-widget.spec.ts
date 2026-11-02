@@ -11,7 +11,8 @@ import {
   mergedAxisOf,
   mergedBarsOf,
   mergedStatsOf,
-  meterOf
+  meterOf,
+  metricsSourceOf
 } from '../hooks/metrics-widget'
 import { cellWidthOf } from '../hooks/cell-width'
 import { parseGameEvent } from '../../../../src/shared/orchestrator-game-events'
@@ -104,7 +105,8 @@ describe('the metrics widget', () => {
     expect(mergedBarsOf([0, 1, 2], 40).rows).toHaveLength(3)
     expect(leadTimeOf(metrics)).toEqual({
       value: expect.stringMatching(/^\d+[dhm]( \d+[hm])?$/),
-      measured: summary.leadTime.measured
+      measured: summary.leadTime.measured,
+      unit: 'ticket'
     })
   })
 
@@ -139,7 +141,8 @@ describe('the metrics widget', () => {
 
   it('says when no ticket was measured', () => {
     const metrics = stateWith({ ...summary, leadTime: { medianMs: null, measured: 0 } })!.metrics!
-    expect(leadTimeOf(metrics)).toEqual({ value: null, measured: 0 })
+    expect(leadTimeOf(metrics)).toEqual({ value: null, measured: 0, unit: 'ticket' })
+    expect(metricsWords().noneMeasured('ticket')).toBe('no ticket measured')
   })
 
   it('puts each account on one row when wide and two when narrow, the active one marked', () => {
@@ -185,9 +188,52 @@ describe('the metrics widget', () => {
     expect(spare?.parts.find((part) => /^░+$/.test(part.text))?.tone).toBe('track')
   })
 
+  it('says where the days come from and when they were read, the repo only when it fits', () => {
+    const fetchedAt = new Date(2026, 10, 2, 9, 5).toISOString()
+    const source = { kind: 'github', repo: 'ab2webco/orca-oss', fetchedAt }
+    const metrics = stateWith({
+      ...summary,
+      leadTime: { medianMs: 3_600_000, measured: 3 },
+      source
+    })!.metrics!
+    expect(metrics.source).toEqual(source)
+    expect(metricsSourceOf(metrics.source!, 80)).toBe('GitHub ab2webco/orca-oss · updated 09:05')
+    const lead = leadTimeOf(metrics)
+    expect([lead.value, metricsWords().measured(lead.measured, lead.unit)]).toEqual([
+      '1h 0m',
+      '3 PRs measured'
+    ])
+    expect(metricsSourceOf(metrics.source!, 28)).toBe('GitHub · updated 09:05')
+    const partial = stateWith({ ...summary, source: { ...source, partial: true } })!.metrics!
+    expect(metricsSourceOf(partial.source!, 80)).toBe(
+      'GitHub ab2webco/orca-oss · updated 09:05 · partial'
+    )
+  })
+
+  it("names the game's own events when the provider was not read", () => {
+    const metrics = stateWith(summary)!.metrics!
+    expect(metrics.source?.kind).toBe('game')
+    expect(metricsSourceOf(metrics.source!, 80)).toMatch(/^Orca Game events · updated /)
+    expect(leadTimeOf(metrics).unit).toBe('ticket')
+  })
+
+  it('carries no source for an older host, and drops a source it cannot read', () => {
+    const { source: _source, ...older } = summary
+    const metrics = stateWith(older)!.metrics!
+    expect(metrics.source).toBeUndefined()
+    expect(leadTimeOf(metrics).unit).toBe('ticket')
+    expect(
+      stateWith({ ...summary, source: { kind: 'svn', fetchedAt: summary.computedAt } })!.metrics!
+        .source
+    ).toBeUndefined()
+    expect(
+      stateWith({ ...summary, source: { kind: 'github', fetchedAt: 'soon' } })!.metrics!.source
+    ).toBeUndefined()
+  })
+
   it('speaks Spanish', () => {
     setGameLocale('es')
     expect(metricsWords().mergedTitle).toBe('Fusionados por día')
-    expect(metricsWords().measured(1)).toBe('1 ticket medido')
+    expect(metricsWords().measured(1, 'ticket')).toBe('1 ticket medido')
   })
 })

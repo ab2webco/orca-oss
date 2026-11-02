@@ -1,7 +1,9 @@
 import type { GameMetrics } from '../types'
-import { isShape, str } from './game-state-shapes'
+import { isShape, oneOf, str } from './game-state-shapes'
+import { metricsWords } from './metrics-words'
 
 type GameClaudeAccountUse = GameMetrics['claudeAccounts'][number]
+type GameMetricsSource = NonNullable<GameMetrics['source']>
 
 // The host sends at most 14 days and 8 accounts; the caps only bound a damaged state.
 const DAYS_MAX = 31
@@ -42,6 +44,23 @@ const accountOf = (value: unknown): GameClaudeAccountUse[] => {
     : []
 }
 
+const sourceOf = (value: unknown): { source?: GameMetricsSource } => {
+  const one = isShape(value) ? value : {}
+  const kind = oneOf(one.kind, ['github', 'gitlab', 'game'] as const)
+  const fetchedAt = str(one.fetchedAt)
+  const repo = str(one.repo)
+  return kind && fetchedAt && !Number.isNaN(Date.parse(fetchedAt))
+    ? {
+        source: {
+          kind,
+          fetchedAt,
+          ...(repo && { repo }),
+          ...(one.partial === true && { partial: true })
+        }
+      }
+    : {}
+}
+
 /** The lead's delivery numbers from `orca game state` (ORCA-774); absent from an older host or a member. */
 export const gameMetricsOf = (value: unknown): { metrics?: GameMetrics } => {
   if (!isShape(value) || !Array.isArray(value.mergedPerDay)) {
@@ -71,7 +90,8 @@ export const gameMetricsOf = (value: unknown): { metrics?: GameMetrics } => {
       },
       claudeAccounts: Array.isArray(value.claudeAccounts)
         ? value.claudeAccounts.flatMap(accountOf).slice(0, ACCOUNTS_MAX)
-        : []
+        : [],
+      ...sourceOf(value.source)
     }
   }
 }
@@ -100,6 +120,17 @@ const meterPartsOf = (percent: number, cells: number): MetricsLine['parts'] => {
     ...(filled === '' ? [] : [{ text: filled, tone: 'gold' as const }]),
     ...(filled === meter ? [] : [{ text: meter.slice(filled.length), tone: 'track' as const }])
   ]
+}
+
+/** Where the days come from and when they were read (local `HH:MM`); the repo only when it fits. */
+export const metricsSourceOf = (
+  { kind, repo, fetchedAt, partial }: GameMetricsSource,
+  columns: number
+): string => {
+  const say = (shown?: string) =>
+    metricsWords().source(kind, shown, new Date(fetchedAt).toTimeString().slice(0, 5), partial)
+  const full = say(repo)
+  return full.length <= columns ? full : say()
 }
 
 const toneOf = (percent: number | null): MetricsTone =>
@@ -167,9 +198,13 @@ export function mergedStatsOf(days: GameMetrics['mergedPerDay']): {
   }
 }
 
-export const leadTimeOf = (metrics: GameMetrics): { value: string | null; measured: number } => ({
+/** Tickets from the game's own events, PRs once the host read the review provider. */
+export const leadTimeOf = (
+  metrics: GameMetrics
+): { value: string | null; measured: number; unit: 'ticket' | 'PR' } => ({
   value: metrics.leadTime.medianMs === null ? null : durationOf(metrics.leadTime.medianMs),
-  measured: metrics.leadTime.measured
+  measured: metrics.leadTime.measured,
+  unit: (metrics.source?.kind ?? 'game') === 'game' ? 'ticket' : 'PR'
 })
 
 /** Each account on one row when its email fits beside both meters, else its email above them. */

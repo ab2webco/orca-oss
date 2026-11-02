@@ -10,6 +10,7 @@ import {
   mergedAxisOf,
   mergedBarsOf,
   mergedStatsOf,
+  metricsSourceOf,
   type MetricsTone
 } from './metrics-widget'
 import { metricsWords } from './metrics-words'
@@ -86,6 +87,7 @@ export function metricsSectionOf(
       barRoom
     )
     const axis = mergedAxisOf(days, bars.width)
+    const source = metrics.source === undefined ? '' : metricsSourceOf(metrics.source, barRoom)
     const merged = card(
       'metrics-merged',
       words.mergedTitle,
@@ -106,17 +108,25 @@ export function metricsSectionOf(
           <Text color={palette.parchment}>{words.merged(stats.total, days.length)}</Text>
           {figure('metrics-per-day', stats.perDay, words.perDay)}
           {figure('metrics-peak', String(stats.peak), words.peak)}
-        </Box>
+        </Box>,
+        ...(source === ''
+          ? []
+          : [
+              <Text key="metrics-source" dimColor wrap="truncate-end">
+                {source}
+              </Text>
+            ])
       ],
       isSide
-        ? Math.min(barRoom, Math.max(bars.width, cellWidthOf(statsText))) + CARD_CHROME_CELLS
+        ? Math.min(barRoom, Math.max(bars.width, cellWidthOf(statsText), cellWidthOf(source))) +
+            CARD_CHROME_CELLS
         : undefined
     )
     const lead = leadTimeOf(metrics)
     const leadCard = card('metrics-lead', words.leadTitle, [
       lead.value === null ? (
         <Text key="metrics-lead-none" dimColor>
-          {words.noneMeasured}
+          {words.noneMeasured(lead.unit)}
         </Text>
       ) : (
         <Text key="metrics-lead-value">
@@ -127,7 +137,7 @@ export function metricsSectionOf(
         </Text>
       ),
       <Text key="metrics-lead-measured" dimColor>
-        {words.measured(lead.measured)}
+        {words.measured(lead.measured, lead.unit)}
       </Text>
     ])
     const accounts = metrics.claudeAccounts
