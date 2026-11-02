@@ -38,6 +38,7 @@ import { tapButtonsOf, type TapButton } from './tap-buttons'
 import { cellWidthOf } from './cell-width'
 import { viewPickerOf } from './view-picker'
 import { isTapLayout } from './tap-layout'
+import { paneMenuRowOf } from './pane-menu-row'
 import { hostCapacityTextsOf } from './fleet-host-rows'
 
 export const PANE_ID = 'orca-game-fleet'
@@ -80,11 +81,6 @@ export const registerFleetPane = (on: On): void => {
       color: palette.parchment,
       backgroundColor: palette.panel
     })
-    const menu = (key: string, hotkey: string | undefined, label: string, onPress: () => void) => (
-      <Button key={key} plain hotkey={hotkey} onPress={onPress}>
-        <Text backgroundColor={palette.panel} color={palette.parchment} bold>{` ${label} `}</Text>
-      </Button>
-    )
     // Digits follow tile order; r p q are the menu's, i o c w a g t the links'; actions take the rest.
     const viewPressOf = (agent: GameAgent, handle: string) => () => viewMember($, agent, handle)
     const viewHotkeyOf = (index: number) => (index < 9 ? String(index + 1) : undefined)
@@ -122,28 +118,7 @@ export const registerFleetPane = (on: On): void => {
     const isFlat = isFlatMode()
     const menuItems = paneMenuItemsOf($, scene, isFlat, close)
     const picker = await viewPickerOf($, e, palette, columns)
-    const menuRow = (
-      <Box flexDirection="column">
-        {isTap ? (
-          tapButtonsOf(
-            $,
-            e,
-            'pane-menu-tap',
-            // Close leads on a phone: it is how the pane leaves, and the top rows are what shows.
-            [...menuItems.slice(-1), ...menuItems.slice(0, -1)].map((one) => ({
-              ...tapOf(one),
-              bold: true
-            })),
-            columns
-          )
-        ) : (
-          <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-            {menuItems.map((one) => menu(one.key, one.hotkey, one.labels[0], one.onPress))}
-          </Box>
-        )}
-        {picker}
-      </Box>
-    )
+    const menuRow = paneMenuRowOf($, e, palette, columns, menuItems, picker)
     const isLead = v.state?.role === 'lead'
     const cardMembers = (v.state?.agents ?? [])
       .filter((agent) => agent.isMember === true)
