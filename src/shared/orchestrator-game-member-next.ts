@@ -28,6 +28,10 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
   if (remote?.stateKnown === false) {
     return silentHostNextOf(remote.host, agent.paneKey)
   }
+  // Why: a found agent has no dispatch, so lead mail cannot reach it until it is adopted (ORCA-943).
+  if (remote && agent.found) {
+    return `found on ${remote.host}: orca game adopt ${ticket ?? agent.displayName ?? agent.paneKey} so lead mail reaches it`
+  }
   // Why: a finished member's closed terminal is how it ends; its phase says what is next (ORCA-854).
   if (remote?.gone && agent.state !== 'done') {
     const name = ticket ?? agent.paneKey

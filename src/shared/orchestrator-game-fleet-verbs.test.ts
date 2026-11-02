@@ -348,6 +348,29 @@ describe('gameFleetReportOf', () => {
     ])
   })
 
+  // Why: a found remote agent is listed, but no mail reaches it until the lead adopts it (ORCA-943).
+  it('asks to adopt an agent found on a paired host', () => {
+    const rows = gameFleetReportOf({
+      lead: DEFAULT_GAME_LEAD,
+      agents: [
+        member({
+          paneKey: 'remote-found:env_m1:tab-915:leaf-915',
+          displayName: 'orca-915',
+          state: 'idle',
+          found: true,
+          remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true }
+        })
+      ]
+    }).rows
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        ticket: 'ORCA-915',
+        next: 'found on m1: orca game adopt ORCA-915 so lead mail reaches it'
+      })
+    ])
+  })
+
   it("flags an earlier lead's remote member whose ticket is done and counts it once as finished (ORCA-793)", () => {
     const fleet = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,
