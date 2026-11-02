@@ -27,6 +27,7 @@ export const notificationIsSupportedMock = vi.fn(() => true)
 export const getAllWindowsMock = vi.fn(() => [])
 export const getTrustedUIRendererWindowMock: NotificationSpy = vi.fn()
 export const shellOpenExternalMock: NotificationSpy = vi.fn()
+export const appSetBadgeCountMock: NotificationSpy = vi.fn(() => true)
 export const setTrayAttentionMock: NotificationSpy = vi.fn()
 export const readAuthorizationStatusMock = vi.fn(
   (): Promise<'authorized' | 'denied' | 'not-determined' | 'unknown' | null> =>
@@ -46,7 +47,8 @@ export function createElectronModuleMock(): Record<string, unknown> {
       getAllWindows: getAllWindowsMock
     },
     app: {
-      focus: vi.fn()
+      focus: vi.fn(),
+      setBadgeCount: appSetBadgeCountMock
     },
     shell: {
       openExternal: shellOpenExternalMock
@@ -87,6 +89,7 @@ export function resetNotificationDispatchMocks(): void {
   getTrustedUIRendererWindowMock.mockReset()
   getTrustedUIRendererWindowMock.mockReturnValue(null)
   shellOpenExternalMock.mockClear()
+  appSetBadgeCountMock.mockClear()
   setTrayAttentionMock.mockClear()
 }
 
@@ -109,6 +112,13 @@ export function getDismissHandler(): (event: unknown, args: unknown) => unknown 
   return findRegisteredHandler('notifications:dismiss') as (
     event: unknown,
     args: unknown
+  ) => unknown
+}
+
+export function getSetBadgeCountHandler(): (event: unknown, count: unknown) => unknown {
+  return findRegisteredHandler('notifications:setBadgeCount') as (
+    event: unknown,
+    count: unknown
   ) => unknown
 }
 
