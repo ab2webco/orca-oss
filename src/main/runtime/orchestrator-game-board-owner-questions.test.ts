@@ -35,6 +35,7 @@ function board(
   dirs.push(dir)
   const told: { lead: GameBoardLead; note: GameLeadNote }[] = []
   const changed: string[] = []
+  const events: string[] = []
   const game = new GameBoard({
     store: new GameHistoryStore(() => dir),
     stops: new GameStopSwitch(() => join(dir, 'stop')),
@@ -48,9 +49,11 @@ function board(
       return true
     },
     ownerQuestionsChanged: (projectKey) => changed.push(projectKey),
+    ownerQuestionSettled: (projectKey, question) =>
+      events.push(`${question.answer ? 'answered' : 'asked'} ${projectKey} ${question.id}`),
     now: () => new Date(Date.UTC(2026, 9, 29, 10, 0, 0))
   })
-  return { game, told, changed }
+  return { game, told, changed, events }
 }
 
 const ask = {
@@ -245,5 +248,14 @@ describe('GameBoard owner questions', () => {
       ['repo:r1', [first.id]],
       ['repo:r2', [other.id]]
     ])
+  })
+
+  it('tells the host once when a question is asked and once when it is answered', async () => {
+    const { game, events } = board(() => LEAD)
+    const { question } = await game.askOwner(ask)
+    await game.answerOwner({ id: question.id, text: 'Yes' })
+    await game.answerOwner({ id: question.id, text: 'Yes' })
+
+    expect(events).toEqual([`asked repo:r1 ${question.id}`, `answered repo:r1 ${question.id}`])
   })
 })

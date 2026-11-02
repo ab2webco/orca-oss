@@ -208,6 +208,30 @@ export function openGameOwnerQuestions(list: readonly unknown[]): GameOwnerQuest
 const clipped = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text
 
+const NOTIFICATION_BODY_MAX = 180
+
+export const gameOwnerQuestionNotificationId = (id: string): string => `game-owner-question:${id}`
+
+/** What the host pushes to a paired phone when the lead asks; the same id dismisses it once answered. */
+export function gameOwnerQuestionMobileNotification(
+  question: GameOwnerQuestion,
+  projectName: string | null
+): {
+  type: 'notification'
+  source: 'game-owner-question'
+  title: string
+  body: string
+  notificationId: string
+} {
+  return {
+    type: 'notification',
+    source: 'game-owner-question',
+    title: projectName ? `${projectName}: the lead asks you` : 'The lead asks you',
+    body: clipped(question.question, NOTIFICATION_BODY_MAX),
+    notificationId: gameOwnerQuestionNotificationId(question.id)
+  }
+}
+
 /** Throws the reason a draft cannot be kept. */
 export function gameOwnerQuestionDraftOf(
   draft: GameOwnerQuestionDraft
