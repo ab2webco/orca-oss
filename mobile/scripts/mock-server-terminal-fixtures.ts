@@ -1,3 +1,9 @@
+import {
+  isShowcaseScenario,
+  showcaseTerminalHandle,
+  showcaseTerminalTitle
+} from './mock-server-showcase-scenario'
+
 export const FAKE_SCROLLBACK = [
   '$ claude "refactor the auth module to use JWT tokens"',
   '',
@@ -22,6 +28,18 @@ export const STREAMING_CHUNKS = [
 
 export function createMockTerminals(worktreeId?: string) {
   const resolvedWorktreeId = worktreeId ?? 'repo-1::/tmp/orca-mobile-repro/orca'
+  if (isShowcaseScenario) {
+    const handle = showcaseTerminalHandle(resolvedWorktreeId)
+    return [
+      {
+        handle,
+        worktreeId: resolvedWorktreeId,
+        title: showcaseTerminalTitle(handle),
+        isActive: true,
+        hasRunningProcess: true
+      }
+    ]
+  }
   return [
     {
       handle: 'term-1',

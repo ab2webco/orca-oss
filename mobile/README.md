@@ -185,6 +185,9 @@ Connect from the app using endpoint `ws://localhost:6768` and token `mock-device
 
 - `MOCK_NATIVE_CHAT=1` — serve the native-chat scenario (one live agent tab, empty transcript, image upload) instead of the default terminal fixtures.
 - `MOCK_SERVER_KEY_FILE` — persist the server keypair across restarts so a paired device keeps its public-key pin. A missing or invalid file is re-keyed with a warning, which forces a re-pair.
+- `MOCK_SCENARIO=showcase` — invented demo data for the README recordings: three `acme`/`field` projects, a lead with five members (tickets, PRs, CI, metrics), owner questions across projects, and agent terminals that echo what you type. `curl -X POST localhost:<PORT>/mock/owner-question` adds a question and sends the owner-question notification. Every name, ticket and URL in it is made up; keep it that way.
+- `MOCK_PAIRING_ENDPOINT` — the endpoint written into the printed `Pairing URL` (default `ws://127.0.0.1:<PORT>`; the Android emulator needs `ws://10.0.2.2:<PORT>`). Open that URL on the device (`xcrun simctl openurl` / `adb shell am start -d`) to pair without a QR code.
+- `MOCK_CHUNK_INTERVAL_MS` — pace of the scripted terminal output (default 500).
 
 ### Scenario control files
 

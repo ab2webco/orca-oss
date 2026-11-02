@@ -1,5 +1,19 @@
 import { getRepoIdFromWorktreeId } from '../../src/shared/worktree/id'
+import type {
+  GameOwnerQuestion,
+  GameOwnerQuestionProject
+} from '../../src/shared/orchestrator-game-owner-questions'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
+import {
+  createShowcaseQuestionProjects,
+  isShowcaseScenario,
+  LEAD_WORKTREE_ID,
+  SHOWCASE_MEMBERS,
+  SHOWCASE_METRICS_MERGED,
+  showcaseIncomingQuestion
+} from './mock-server-showcase-scenario'
+import { showcaseAnswerChunks } from './mock-server-showcase-terminal'
+import { queueTerminalOutput } from './mock-server-terminal-stream'
 
 // Every terminal is the lead of a project with five members, so the Team drawer (ORCA-952) has data.
 const member = (paneKey: string, name: string, state: string, extra: Record<string, unknown>) => ({
@@ -32,7 +46,7 @@ const review = (number: number, ci: string, state = 'open') => ({
   ci
 })
 
-const MEMBERS = [
+const DEFAULT_MEMBERS = [
   member('tab-9:a', 'Cipher Wren', 'idle', {
     workItem: workItem('ORCA-950', 'Metrics undercount merged per day', 'In Review'),
     review: review(845, 'success', 'merged')
@@ -55,7 +69,7 @@ const MEMBERS = [
   })
 ]
 
-let questions = [
+const DEFAULT_QUESTIONS: GameOwnerQuestion[] = [
   {
     id: 'q1',
     ticket: 'ORCA-946',
@@ -76,24 +90,88 @@ let questions = [
   }
 ]
 
-function leadState(): unknown {
+// Showcase projects are fixed; the default one follows whichever worktree is active.
+let showcaseProjects = isShowcaseScenario ? createShowcaseQuestionProjects() : []
+let defaultQuestions = DEFAULT_QUESTIONS
+
+function questionProjects(activeWorktreeId: string): GameOwnerQuestionProject[] {
+  if (isShowcaseScenario) {
+    return showcaseProjects.filter((project) => project.questions.length > 0)
+  }
+  const repoId = getRepoIdFromWorktreeId(activeWorktreeId)
+  return defaultQuestions.length
+    ? [{ repoId, repoName: 'orca-oss', worktreeId: activeWorktreeId, questions: defaultQuestions }]
+    : []
+}
+
+function openQuestionCount(): number {
+  return isShowcaseScenario
+    ? (showcaseProjects.find((one) => one.worktreeId === LEAD_WORKTREE_ID)?.questions.length ?? 0)
+    : defaultQuestions.length
+}
+
+function leadState(worktreeId: unknown): unknown {
+  if (isShowcaseScenario && worktreeId !== LEAD_WORKTREE_ID) {
+    // A root pane with no lead config: the phone shows no Team button over it.
+    return { role: 'lead', agents: [] }
+  }
   return {
     role: 'lead',
     lead: { autostart: false, cap: 5, agent: 'claude', label: 'Lead' },
-    agents: MEMBERS,
-    openOwnerQuestions: questions.length,
+    agents: isShowcaseScenario ? SHOWCASE_MEMBERS : DEFAULT_MEMBERS,
+    openOwnerQuestions: openQuestionCount(),
     metrics: {
       computedAt: new Date().toISOString(),
       timezone: 'America/Bogota',
-      mergedPerDay: [
-        { day: '2026-10-30', merged: 5 },
-        { day: '2026-10-31', merged: 7 },
-        { day: '2026-11-01', merged: 3 },
-        { day: '2026-11-02', merged: 4 }
-      ],
-      leadTime: { medianMs: 5.5 * 3_600_000, measured: 19 }
+      mergedPerDay: isShowcaseScenario
+        ? SHOWCASE_METRICS_MERGED
+        : [
+            { day: '2026-10-30', merged: 5 },
+            { day: '2026-10-31', merged: 7 },
+            { day: '2026-11-01', merged: 3 },
+            { day: '2026-11-02', merged: 4 }
+          ],
+      leadTime: isShowcaseScenario
+        ? { medianMs: 3.2 * 3_600_000, measured: 29 }
+        : { medianMs: 5.5 * 3_600_000, measured: 19 }
     }
   }
+}
+
+function answerShowcaseQuestion(id: string, params: Record<string, unknown>): void {
+  for (const project of showcaseProjects) {
+    const found = project.questions.find((one) => one.id === id)
+    if (!found) {
+      continue
+    }
+    // The option is 1-based, as the host's owner board reads it.
+    const answer =
+      typeof params.option === 'number'
+        ? found.options[params.option - 1]
+        : String(params.text ?? '')
+    if (project.worktreeId === LEAD_WORKTREE_ID && answer) {
+      queueTerminalOutput('term-lead', showcaseAnswerChunks(found.ticket, answer))
+    }
+  }
+  showcaseProjects = showcaseProjects.map((project) => ({
+    ...project,
+    questions: project.questions.filter((one) => one.id !== id)
+  }))
+}
+
+/** Adds a fresh question to the showcase lead's project; null outside the showcase. */
+export function addShowcaseOwnerQuestion(): {
+  question: GameOwnerQuestion
+  worktreeId: string
+  repoName: string
+} | null {
+  const project = showcaseProjects.find((one) => one.worktreeId === LEAD_WORKTREE_ID)
+  if (!isShowcaseScenario || !project) {
+    return null
+  }
+  const question = showcaseIncomingQuestion()
+  project.questions = [question, ...project.questions]
+  return { question, worktreeId: LEAD_WORKTREE_ID, repoName: project.repoName }
 }
 
 export function handleMockGameTeamRequest(
@@ -103,21 +181,20 @@ export function handleMockGameTeamRequest(
   activeWorktreeId: () => string | undefined
 ): boolean {
   if (request.method === 'game.state') {
-    respond(success(request.id, leadState()))
+    respond(success(request.id, leadState(request.params?.worktreeId)))
     return true
   }
   if (request.method === 'game.ownerQuestionsAll') {
-    const worktreeId = activeWorktreeId() ?? 'mock'
-    const repoId = getRepoIdFromWorktreeId(worktreeId)
-    respond(
-      success(request.id, {
-        projects: questions.length ? [{ repoId, repoName: 'orca-oss', worktreeId, questions }] : []
-      })
-    )
+    respond(success(request.id, { projects: questionProjects(activeWorktreeId() ?? 'mock') }))
     return true
   }
   if (request.method === 'game.ownerAnswer') {
-    questions = questions.filter((one) => one.id !== request.params?.id)
+    const id = request.params?.id
+    if (isShowcaseScenario) {
+      answerShowcaseQuestion(String(id), request.params ?? {})
+    } else {
+      defaultQuestions = defaultQuestions.filter((one) => one.id !== id)
+    }
     respond(success(request.id, { answered: true }))
     return true
   }

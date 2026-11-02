@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import type { RuntimeMobileSessionTabsResult } from '../../src/shared/runtime-types'
 import type { RpcRequest, RpcResponse } from './mock-server-rpc-handlers'
+import {
+  isShowcaseScenario,
+  showcaseTerminalHandle,
+  showcaseTerminalTitle
+} from './mock-server-showcase-scenario'
 
 // Why: the client's snapshot-acceptance gate keys on the publisher epoch, so it
 // must stay stable for the process and change on restart like a real publisher —
@@ -19,6 +24,7 @@ const SURFACE_TAB_ID = `${PARENT_TAB_ID}::${LEAF_ID}`
  *  `session.tabs.list` contract so mock-server repros of tab, split-pane, and
  *  pane-attribution bugs aren't shape-incomplete. */
 function createMockSessionTabs(worktreeId: string): RuntimeMobileSessionTabsResult {
+  const terminal = isShowcaseScenario ? showcaseTerminalHandle(worktreeId) : 'term-1'
   return {
     worktree: worktreeId,
     publicationEpoch: PUBLICATION_EPOCH,
@@ -39,11 +45,11 @@ function createMockSessionTabs(worktreeId: string): RuntimeMobileSessionTabsResu
       {
         type: 'terminal',
         id: SURFACE_TAB_ID,
-        title: 'zsh',
+        title: isShowcaseScenario ? showcaseTerminalTitle(terminal) : 'zsh',
         parentTabId: PARENT_TAB_ID,
         leafId: LEAF_ID,
         status: 'ready',
-        terminal: 'term-1',
+        terminal,
         isActive: true
       }
     ]
