@@ -35,12 +35,14 @@ const agentRow = (paneKey: string, parentPaneKey: string | null) => ({
 
 const leadWorktree = {
   worktreeId: 'wt-lead',
+  repoId: 'repo-1',
   branch: 'main',
   displayName: 'lead',
   agents: [agentRow('tab-1:lead', null)]
 }
 const memberWorktree = {
   worktreeId: 'wt-member',
+  repoId: 'repo-1',
   branch: 'fabolivark/orca-609',
   displayName: 'orca-609',
   agents: [agentRow('tab-4:member', 'tab-1:lead')]
