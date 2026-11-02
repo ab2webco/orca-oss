@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { SidebarGameInboxEntry } from './SidebarGameInboxEntry'
+import { useGameInboxAppState } from './game-inbox-app-state'
 
 const question = (id: string, text: string) => ({
   id,
@@ -16,16 +17,19 @@ const question = (id: string, text: string) => ({
 })
 
 let open: ReturnType<typeof question>[] = []
-const call = vi.fn(async (args: { method: string; params?: unknown }) => ({
+const answerRuntime = async (args: { method: string; params?: unknown }) => ({
   id: 'r',
   ok: true,
   result: args.method === 'game.ownerQuestions' ? { questions: open } : {},
   _meta: { runtimeId: 'rt' }
-}))
+})
+const call = vi.fn(answerRuntime)
 
 beforeEach(() => {
   open = []
   call.mockClear()
+  // Why: a test that swaps the runtime's answers must not leak them into the next.
+  call.mockImplementation(answerRuntime)
   useAppStore.setState({ activeWorktreeId: 'repo::wt', activeWorkspaceExecutionHostId: null })
   Object.defineProperty(window, 'api', {
     configurable: true,
@@ -36,6 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   useAppStore.setState(useAppStore.getInitialState(), true)
+  useGameInboxAppState.setState({ hosts: [], open: false })
   Reflect.deleteProperty(window, 'api')
 })
 
@@ -86,5 +91,37 @@ describe('SidebarGameInboxEntry with a team (ORCA-878)', () => {
 
     const entry = await view.findByRole('button', { name: /Inbox/ })
     expect(entry.textContent).toBe('Inbox')
+  })
+})
+
+describe('SidebarGameInboxEntry across projects (ORCA-940)', () => {
+  it("counts another project's questions and lists them under its name", async () => {
+    open = [question('oq_1', 'Ship it?')]
+    useGameInboxAppState.setState({
+      hosts: [
+        {
+          environmentId: null,
+          status: 'ok',
+          projects: [
+            { repoId: 'repo', repoName: 'active', worktreeId: 'repo::wt', questions: [open[0]] },
+            {
+              repoId: 'other',
+              repoName: 'billing-api',
+              worktreeId: 'other::/w',
+              questions: [question('oq_9', 'Rotate the key?')]
+            }
+          ]
+        }
+      ]
+    })
+    const view = render(<SidebarGameInboxEntry />)
+
+    const entry = await view.findByRole('button', { name: /Inbox/ })
+    await waitFor(() => expect(entry.textContent).toContain('2'))
+    act(() => fireEvent.click(entry))
+
+    expect(await view.findByText('Ship it?')).toBeTruthy()
+    expect(view.getByText('billing-api')).toBeTruthy()
+    expect(view.getByText('Rotate the key?')).toBeTruthy()
   })
 })

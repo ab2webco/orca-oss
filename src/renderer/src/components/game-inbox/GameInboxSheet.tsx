@@ -20,6 +20,18 @@ import { GameInboxThreadsView } from './GameInboxThreadsView'
 import { GameMemberOverride, GameMemberReplyForm } from './GameMemberReplyForm'
 import type { GameMemberReply } from './game-inbox-threads-client'
 
+/** Another project's open questions, answered through that project's worktree. */
+export type GameInboxQuestionGroup = {
+  key: string
+  title: string
+  /** The paired host's name; null on this computer. */
+  host: string | null
+  questions: GameOwnerQuestion[]
+  onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
+}
+
+const NO_GROUPS: GameInboxQuestionGroup[] = []
+
 function TabCount({ count }: { count: number }): React.JSX.Element | null {
   return count > 0 ? (
     <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
@@ -37,6 +49,7 @@ export function GameInboxSheet({
   onOpenChange,
   questions,
   onAnswer,
+  otherGroups = NO_GROUPS,
   threads,
   onReply
 }: {
@@ -44,9 +57,12 @@ export function GameInboxSheet({
   onOpenChange: (open: boolean) => void
   questions: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
+  otherGroups?: GameInboxQuestionGroup[]
   threads: GameInboxThreads
   onReply: (reply: GameMemberReply) => Promise<void>
 }): React.JSX.Element {
+  const forYouCount =
+    questions.length + otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -71,7 +87,7 @@ export function GameInboxSheet({
             <TabsList className="w-full">
               <TabsTrigger value="for-you" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.forYou', 'For you')}
-                <TabCount count={questions.length} />
+                <TabCount count={forYouCount} />
               </TabsTrigger>
               <TabsTrigger value="waiting" className={TAB}>
                 {translate('auto.components.game-inbox.GameInboxSheet.waiting', 'Waiting')}
@@ -86,7 +102,7 @@ export function GameInboxSheet({
             </TabsList>
           </div>
           <TabsContent value="for-you" className={`${LIST_PANEL} space-y-3`}>
-            {questions.length === 0 ? (
+            {forYouCount === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {translate(
                   'auto.components.game-inbox.GameInboxSheet.empty',
@@ -102,6 +118,25 @@ export function GameInboxSheet({
                 />
               ))
             )}
+            {otherGroups.map((group) => (
+              <section
+                key={group.key}
+                className="space-y-3 pt-2"
+                data-game-inbox-project={group.key}
+              >
+                <h3 className="flex min-w-0 items-baseline gap-2 text-xs font-medium text-muted-foreground">
+                  <span className="truncate text-foreground">{group.title}</span>
+                  {group.host ? <span className="truncate">{group.host}</span> : null}
+                </h3>
+                {group.questions.map((question) => (
+                  <GameOwnerQuestionCard
+                    key={question.id}
+                    question={question}
+                    onAnswer={(reply) => group.onAnswer(question.id, reply)}
+                  />
+                ))}
+              </section>
+            ))}
           </TabsContent>
           <TabsContent value="waiting" className={LIST_PANEL}>
             <GameInboxWaitingList
