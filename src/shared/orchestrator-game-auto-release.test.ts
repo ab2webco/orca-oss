@@ -105,6 +105,30 @@ describe('gameAutoReleaseCandidatesOf (ORCA-864)', () => {
     })
   })
 
+  // Why: with its host terminal gone nothing runs there, so no turn can follow the report (ORCA-943).
+  it('picks a remote member whose host terminal is gone once its ticket is Done', () => {
+    const gone = member({
+      paneKey: 'remote:ctx_774',
+      displayName: 'ORCA-774',
+      review: undefined,
+      stateSince: undefined,
+      terminalHandle: undefined,
+      remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true, gone: true },
+      workItem: {
+        provider: 'plane',
+        identifier: 'ORCA-774',
+        title: 'x',
+        url: 'u',
+        status: 'Done',
+        statusGroup: 'done'
+      }
+    })
+    expect(gameAutoReleaseCandidatesOf([gone], reported).map((one) => one.why)).toEqual([
+      'ticket ORCA-774 Done'
+    ])
+    expect(gameAutoReleaseCandidatesOf([{ ...gone, workItem: undefined }], reported)).toEqual([])
+  })
+
   it('never picks the lead', () => {
     expect(gameAutoReleaseCandidatesOf([member({ isLeader: true })], reported)).toEqual([])
   })

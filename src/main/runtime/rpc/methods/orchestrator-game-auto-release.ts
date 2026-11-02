@@ -5,18 +5,23 @@ import {
   type GameMemberReport
 } from '../../../../shared/orchestrator-game-auto-release'
 import { GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
+import { ticketOfMember } from '../../../../shared/orchestrator-game-fleet-verbs'
 import type { GameAgent, OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { OrchestrationDb } from '../../orchestration/db'
 import { WORKER_RELEASABLE_STATES } from '../../orchestration/worker-terminal-ownership'
 import type { WorkerReleaseReceipt } from './orchestration-worker-release-completion'
 import { releaseWorker } from './orchestration-worker-release'
+import { isFederatedMemberGoneOnHost } from './orchestration-federated-worker-gone'
 
 type LeadCaller = { worktreeId?: string; terminalHandle?: string }
 type Attempt = 'releasing' | 'released' | 'kept'
 
 // Why once per dispatch: a member release keeps (a human typed in it) stays listed, with its line, until the lead acts.
 const attemptsByRuntime = new WeakMap<OrcaRuntimeService, Map<string, Attempt>>()
+// Why throttled: each check costs the host a federationShow, and a state read comes every few seconds.
+const GONE_CHECK_INTERVAL_MS = 5 * 60_000
+const goneChecksByRuntime = new WeakMap<OrcaRuntimeService, Map<string, number>>()
 /**
  * Releases, in the background, each member whose work landed after its worker_done, and returns
  * the lead's state without them, so its row and slot go at once (ORCA-864).
@@ -44,6 +49,7 @@ export function withGameAutoRelease(
       void release(runtime, attempts, candidate, caller)
     }
   }
+  settleGoneRemoteMembers(runtime, db, state.agents, candidates, caller)
   const leaving = new Set(
     candidates
       .filter((candidate) => attempts.get(candidate.dispatchId) !== 'kept')
@@ -87,6 +93,59 @@ function reportOf(db: OrchestrationDb): (agent: GameAgent) => GameMemberReport |
 // Why: SQLite's datetime('now') has no T and no zone; it is UTC.
 const utcMsOf = (at: string | null): number =>
   at ? Date.parse(at.includes('T') ? at : `${at.replace(' ', 'T')}Z`) : Number.NaN
+
+/**
+ * A remote member that sent worker_done and whose host terminal is gone leaves once its host proves
+ * nothing of it remains; only the home row is settled, so nothing on the host is touched (ORCA-943).
+ */
+function settleGoneRemoteMembers(
+  runtime: OrcaRuntimeService,
+  db: OrchestrationDb,
+  agents: readonly GameAgent[],
+  landed: readonly GameAutoReleaseCandidate[],
+  caller: LeadCaller
+): void {
+  const checks = goneChecksByRuntime.get(runtime) ?? new Map<string, number>()
+  goneChecksByRuntime.set(runtime, checks)
+  const now = Date.now()
+  const report = reportOf(db)
+  for (const agent of agents) {
+    const dispatchId = remoteDispatchIdOf(agent)
+    const remote = agent.remote
+    const environmentId = remote?.environmentId
+    if (
+      !dispatchId ||
+      !remote?.gone ||
+      !environmentId ||
+      landed.some((one) => one.dispatchId === dispatchId) ||
+      now - (checks.get(dispatchId) ?? -Infinity) < GONE_CHECK_INTERVAL_MS ||
+      !report(agent)
+    ) {
+      continue
+    }
+    checks.set(dispatchId, now)
+    void (async () => {
+      const gone = await isFederatedMemberGoneOnHost(runtime, environmentId, dispatchId).catch(
+        () => false
+      )
+      if (!gone) {
+        return
+      }
+      db.markFederatedWorkerReleased(dispatchId)
+      runtime.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
+      await runtime
+        .getGameBoard()
+        .postEvent({
+          ...caller,
+          kind: 'stopped',
+          ticket: ticketOfMember(agent) ?? undefined,
+          text: `Released automatically: nothing of it is left on ${remote.host} after worker_done.`,
+          key: `auto-release:${dispatchId}`
+        })
+        .catch(() => undefined)
+    })()
+  }
+}
 
 async function release(
   runtime: OrcaRuntimeService,
