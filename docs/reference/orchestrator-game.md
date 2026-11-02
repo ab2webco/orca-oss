@@ -416,8 +416,10 @@ gone until it is added, and a closed Actions widget reads no run log. Its data s
 `game state`.
 
 The Metrics widget draws the state's `metrics` (see `orca game metrics` below) with no work of its
-own per frame: a sparkline of tickets done per day with the window's total and its first and last
-day, the median lead time, then each Claude account with `●` on the active one and two meters,
+own per frame: a sparkline of PRs merged per day with the window's total and its first and last
+day, the median lead time, a dim line naming its source and when it was read
+(`GitHub ab2webco/orca-oss · updated 09:05`, the repo dropped when it does not fit; `Orca Game
+events` when the review provider could not be read), then each Claude account with `●` on the active one and two meters,
 `5h` and `7d`, filled by eighths of a cell, yellow from 75% and red from 90%. Wide, an account
 is one row; on a phone it is two, and the meters narrow to two cells so neither row wraps
 ([`metrics-widget.ts`](../../resources/claude-plugins/orca-game/hooks/metrics-widget.ts)). A
@@ -698,14 +700,25 @@ matches …` (ORCA-866).
   time still runs from the ticket's first claim. It adds the character's level and XP, drops XP from
   `not recorded`, and notes when older tasks are no longer kept. An unknown name is refused with the
   known ones ([`orchestrator-game-metrics.ts`](../../src/shared/orchestrator-game-metrics.ts)).
-  With no filter it also prints the scene's metrics widget window: tickets done per calendar day
-  for the last 14 days and their median lead time, in `--timezone <zone>` (default this machine's
-  zone). Each done ticket counts once, on the day of its `ticketsDoneAt` in `--json` (its last
-  merged event, else when its member was freed), so a ticket merged one evening and freed the
-  next morning is not counted on both days the way two one-day `--since`/`--until` queries would.
+  With no filter it also prints the scene's metrics widget window for the last 14 days, in
+  `--timezone <zone>` (default this machine's zone), and its `Source`. The days come from the
+  review provider through `game.delivery` (ORCA-950): the repo's PRs merged per calendar day and
+  their median time from PR open to merge, as GitHub search (`is:pr is:merged merged:>=…` on the
+  `origin` repo the Panel's My PRs links, never a fork's upstream) or GitLab's merged MRs report
+  them. Merges through the merge queue or `gh`, several PRs per ticket and PRs no member opened all
+  count, which the game's own stores missed. A host older than this, a folder workspace, a repo on
+  neither provider, or a failed read falls back to the game's stores: each done ticket counts
+  once, on the day of its `ticketsDoneAt` in `--json` (its last merged event, else when its member
+  was freed), lead time from claim to merge, and `Source` says the provider was not read.
 - Game state's optional `metrics` (lead only, absent from an older host or for a member) carries
-  that same 14-day summary in the game's own timezone plus each managed Claude account's 5h and 7d
+  that same 14-day summary in the game's own timezone, its optional `source` (`kind` github,
+  gitlab or game, `repo`, `fetchedAt`, `partial` when the provider had more than 10 pages of 100),
+  plus each managed Claude account's 5h and 7d
   use (active first, then the busiest, at most 8, readings Orca already holds, never a refresh).
+  The provider read covers 15 days so one read serves any zone, is cached per repo for 5 minutes
+  (25 while the GitHub budget is low), uses the search bucket (30 a minute, not core or GraphQL),
+  stops when that bucket is spent, and holds the state at most 4 s on a cold read
+  ([`orchestrator-game-delivery.ts`](../../src/shared/orchestrator-game-delivery.ts)).
   The host computes it at most once a minute per project and zone; the budget is 2 KB of payload
   and 50 ms of compute on a full store, both tested against a recording of this project's real
   stores ([`orchestrator-game-metrics-summary.ts`](../../src/shared/orchestrator-game-metrics-summary.ts)).

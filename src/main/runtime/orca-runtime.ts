@@ -741,6 +741,14 @@ import {
   gameMetricsSummaryOf,
   type GameMetricsSummary
 } from '../../shared/orchestrator-game-metrics-summary'
+import {
+  GAME_DELIVERY_REFRESH_MS,
+  gameDeliverySinceOf,
+  withGameDelivery,
+  type GameDelivery
+} from '../../shared/orchestrator-game-delivery'
+import { listMergedPullRequestsSince } from '../github/merged-pull-requests'
+import { listMergedMergeRequestsSince } from '../gitlab/merged-merge-requests'
 import { gameClaudeAccountsUsageOf } from '../../shared/orchestrator-game-claude-usage'
 import { gameGitHubPollStretch, readGameGitHubBudget } from './orchestrator-game-github-budget'
 import {
@@ -3834,6 +3842,9 @@ export class OrcaRuntimeService {
   )
   // Why cached: the lead's band polls every few seconds and the numbers move by the minute.
   private readonly gameMetrics = new GameReadCache<GameMetricsSummary>(GAME_METRICS_REFRESH_MS)
+  private readonly gameDelivery = new GameReadCache<GameDelivery>(
+    () => GAME_DELIVERY_REFRESH_MS * gameGitHubPollStretch()
+  )
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
@@ -31592,7 +31603,10 @@ export class OrcaRuntimeService {
         this.gameHistory.events(key),
         this.gameHistory.list(key)
       ])
-      const summary = gameMetricsSummaryOf({ events, history }, { now: Date.now(), timezone })
+      const own = gameMetricsSummaryOf({ events, history }, { now: Date.now(), timezone })
+      // Why bounded: a cold provider read must not hold the lead's state; the next refresh uses it.
+      const delivery = await withTimeout(this.readGameDeliveryOf(key), 4_000, null)
+      const summary = delivery ? withGameDelivery(own, delivery) : own
       const services = this.accountServices
       if (!services) {
         return summary
@@ -31608,6 +31622,37 @@ export class OrcaRuntimeService {
           services.rateLimits.getState()
         )
       }
+    })
+  }
+
+  /** The project's merged reviews from its provider, for `orca game metrics` (ORCA-950). */
+  async getGameDelivery(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<{ delivery: GameDelivery | null }> {
+    const { key } = await this.gameBoardProjectOf(args)
+    return { delivery: await this.readGameDeliveryOf(key) }
+  }
+
+  // Why per repo, not zone: one read covers the widget's window in any zone.
+  private async readGameDeliveryOf(projectKey: string): Promise<GameDelivery | null> {
+    const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : ''
+    // Why: a folder workspace has no remote, so its numbers stay the game's own.
+    if (!repoId || (this.store?.getRepo(repoId)?.kind ?? 'folder') === 'folder') {
+      return null
+    }
+    return this.gameDelivery.read(repoId, async () => {
+      const repo = await this.resolveRepoSelector(`id:${repoId}`)
+      const now = Date.now()
+      const read = {
+        repoPath: repo.path,
+        since: gameDeliverySinceOf(now),
+        now,
+        preference: repo.issueSourcePreference,
+        connectionId: repo.connectionId ?? null,
+        localGitOptions: this.getLocalGitExecutionOptionArgs(repo)[0] ?? {}
+      }
+      return (await listMergedPullRequestsSince(read)) ?? (await listMergedMergeRequestsSince(read))
     })
   }
 
