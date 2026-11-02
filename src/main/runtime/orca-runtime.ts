@@ -3955,7 +3955,7 @@ export class OrcaRuntimeService {
         return tellGameLead(
           this.getOrchestrationDb(),
           (handle, type) => this.notifyMessageArrived(handle, type),
-          lead.handle,
+          lead,
           note
         )
       } catch {
