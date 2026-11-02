@@ -315,7 +315,12 @@ describe('remote members of a lead (ORCA-824)', () => {
       reviewOf: async () => null
     })
 
-    expect(member.remote).toEqual({ host: 'imac', stateKnown: true, asleep: true })
+    expect(member.remote).toEqual({
+      host: 'imac',
+      environmentId: 'env_imac',
+      stateKnown: true,
+      asleep: true
+    })
     expect(member.worktree?.branch).toBe('fabolivark/orca-915')
   })
 
