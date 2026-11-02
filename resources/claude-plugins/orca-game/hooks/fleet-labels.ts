@@ -202,18 +202,6 @@ export const branchLabelOf = (branch: string, room: number): string => {
   return tail === '' ? fitCells(whole, room) : `${BRANCH_MARK}…${tail}`
 }
 
-/** A card's first row: the state is never cut, the name gives way to it. */
-// Why lineRoom: a state that wraps to its own row still breaks mid-word when it outgrows the whole line.
-export const memberHeadOf = (
-  name: string,
-  state: string,
-  room: number,
-  lineRoom = Infinity
-): { name: string; state: string } => ({
-  name: fitCells(name, room - cellWidthOf(state) - 1),
-  state: cellWidthOf(state) > lineRoom ? fitCells(state, lineRoom) : state
-})
-
 const META_GAP = ' · '
 // Why 8: a branch keeps at least `⎇ …/604` beside the agent tag.
 const BRANCH_MIN_CELLS = 8

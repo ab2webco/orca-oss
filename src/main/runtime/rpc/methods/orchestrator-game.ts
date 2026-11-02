@@ -234,6 +234,15 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       })
   }),
   defineMethod({
+    name: 'game.delivery',
+    params: GameCallerParams,
+    handler: async (params, { runtime }) =>
+      runtime.getGameDelivery({
+        worktreeId: params?.worktreeId,
+        terminalHandle: params?.terminalHandle
+      })
+  }),
+  defineMethod({
     name: 'game.history',
     params: GameHistoryParams,
     handler: async (params, { runtime }) =>

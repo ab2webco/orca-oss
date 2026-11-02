@@ -21,7 +21,9 @@ const HANDLES: Record<string, string> = {
   'tab-1:lead': 'term_lead',
   'tab-2:plain': 'term_plain',
   'tab-3:codex': 'term_codex',
-  'tab-4:member': 'term_member'
+  'tab-4:member': 'term_member',
+  'tab-10:cineco': 'term_cineco',
+  'tab-11:folder': 'term_folder'
 }
 
 function runtimeWith() {
@@ -30,27 +32,45 @@ function runtimeWith() {
     worktrees: [
       {
         worktreeId: 'wt-lead',
+        repoId: 'repo-orca',
         branch: 'main',
         displayName: 'lead',
         agents: [agentRow('tab-1:lead', null)]
       },
       {
         worktreeId: 'wt-member',
+        repoId: 'repo-orca',
         branch: 'cin-1',
         displayName: 'CIN-1',
         agents: [agentRow('tab-4:member', 'tab-1:lead')]
       },
       {
         worktreeId: 'wt-914',
+        repoId: 'repo-orca',
         branch: 'refs/heads/fabolivark/orca-914',
         displayName: 'orca-914',
         agents: [agentRow('tab-2:plain', null)]
       },
       {
         worktreeId: 'wt-x',
+        repoId: 'repo-orca',
         branch: 'feat/x',
         displayName: 'x',
         agents: [agentRow('tab-3:codex', null, 'codex')]
+      },
+      {
+        worktreeId: 'wt-cin-1390',
+        repoId: 'repo-cineco',
+        branch: 'cin-1390',
+        displayName: 'Daisy',
+        agents: [agentRow('tab-10:cineco', null)]
+      },
+      {
+        worktreeId: 'folder:orchestrator',
+        repoId: 'folder-workspace:cineco',
+        branch: '',
+        displayName: 'main',
+        agents: [agentRow('tab-11:folder', null)]
       }
     ]
   } as never)
@@ -66,7 +86,9 @@ function runtimeWith() {
 
 describe("a lead's game state lists this machine's sessions it did not launch (ORCA-914)", () => {
   it('adds each live session of any agent as a found member, after the launched ones', async () => {
-    const lead = await runtimeWith().getOrchestratorGameState({ paneKey: 'tab-1:lead' })
+    const lead = await runtimeWith().getOrchestratorGameState({
+      paneKey: 'tab-1:lead'
+    })
 
     expect(
       lead.agents.map((agent) => [
@@ -88,8 +110,19 @@ describe("a lead's game state lists this machine's sessions it did not launch (O
     })
   })
 
+  it("leaves out live sessions in another project's repo or folder group (ORCA-948)", async () => {
+    const lead = await runtimeWith().getOrchestratorGameState({
+      paneKey: 'tab-1:lead'
+    })
+
+    expect(lead.agents.map((agent) => agent.paneKey)).not.toContain('tab-10:cineco')
+    expect(lead.agents.map((agent) => agent.paneKey)).not.toContain('tab-11:folder')
+  })
+
   it('lists none to a member pane', async () => {
-    const member = await runtimeWith().getOrchestratorGameState({ paneKey: 'tab-4:member' })
+    const member = await runtimeWith().getOrchestratorGameState({
+      paneKey: 'tab-4:member'
+    })
 
     expect(member.agents.some((agent) => agent.found)).toBe(false)
   })

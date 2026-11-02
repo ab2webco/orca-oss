@@ -58,28 +58,25 @@ export function reviewSectionOf(
         </Text>
       </Box>
     )
-  // Collapsed, the review keeps its CI color so a red CI still shows on the one line.
+  // Collapsed, the heading keeps the review's CI color so a red CI still shows on the one line.
   const reviewSummary =
     state.review !== null ? (
-      <Text>
-        {`${text.reviewHeading} `}
-        <Text color={CI_COLORS[state.review.ci]}>{reviewTextOf(state.review)}</Text>
-      </Text>
+      <Text color={CI_COLORS[state.review.ci]}>{reviewTextOf(state.review)}</Text>
     ) : state.workItem !== null ? (
-      <Text>{`${text.workItemHeading} ${workItemTextOf(state.workItem)}`}</Text>
+      <Text>{workItemTextOf(state.workItem)}</Text>
     ) : null
   if (reviewSummary === null) {
     return {}
   }
+  const isCiRed = state.review?.ci === 'failure'
   const review = (
     <Box key="section-review" flexDirection="column">
-      <Box key="layout-header-review" flexDirection="row">
-        {marks.markOf('review')}
-        {isCollapsed ? reviewSummary : (reviewRow ?? workItemRow)}
-      </Box>
-      {!isCollapsed && reviewRow !== null && workItemRow !== null && (
-        <Box paddingLeft={2}>{workItemRow}</Box>
-      )}
+      {marks.headingOf('review', text.reviewHeading, {
+        isAlert: isCiRed,
+        ...(isCollapsed ? { suffix: reviewSummary } : {})
+      })}
+      {!isCollapsed && reviewRow}
+      {!isCollapsed && workItemRow}
     </Box>
   )
   return { review }

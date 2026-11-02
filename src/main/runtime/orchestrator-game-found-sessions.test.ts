@@ -13,8 +13,14 @@ const row = (paneKey: string, overrides: Record<string, unknown> = {}) => ({
   ...overrides
 })
 
-const summary = (worktreeId: string, branch: string, agents: ReturnType<typeof row>[]) => ({
+const summary = (
+  worktreeId: string,
+  branch: string,
+  agents: ReturnType<typeof row>[],
+  repoId = 'repo-orca'
+) => ({
   worktreeId,
+  repoId,
   branch,
   displayName: worktreeId,
   agents
@@ -37,6 +43,7 @@ const pick = (
 ) =>
   foundGameSessionsOf(summaries, {
     leadPaneKey: 'tab-1:lead',
+    repoId: 'repo-orca',
     hasTerminal: (paneKey) => live.has(paneKey),
     isLeadPane
   }).map((one) => [one.row.paneKey, one.worktree.id, one.worktree.branch])
@@ -78,6 +85,23 @@ describe('foundGameSessionsOf', () => {
         (paneKey) => paneKey === 'tab-5:other-lead'
       )
     ).toEqual([])
+  })
+
+  it("leaves out sessions in another project's repo or folder group on the same host (ORCA-948)", () => {
+    expect(
+      pick([
+        summary('wt-lead', 'main', [row('tab-1:lead')]),
+        summary('wt-914', 'orca-914', [row('tab-2:plain')]),
+        summary('wt-cin', 'cin-1390', [row('tab-3:codex')], 'repo-cineco'),
+        summary('folder:notes', '', [row('tab-9:folder')], 'folder-workspace:other'),
+        summary(
+          'wt-orphan',
+          'cin-7',
+          [row('tab-7:orphan', { parentPaneKey: 'tab-0:gone' })],
+          'repo-cineco'
+        )
+      ])
+    ).toEqual([['tab-2:plain', 'wt-914', 'orca-914']])
   })
 
   it('takes a member whose lead is gone, since nothing else lists it', () => {

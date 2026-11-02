@@ -28,9 +28,19 @@ const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
   neutral: 'white'
 }
 
-/** Draws a section's ▾/▸ mark and says whether the person collapsed it. */
+/** Draws a section's ▾/▸ mark and heading row, and says whether the person collapsed it. */
 export type SectionMarks = {
   markOf: (section: PanelSection) => RenderElement
+  headingOf: (
+    section: PanelSection,
+    text: string,
+    options?: {
+      wrap?: (title: RenderElement) => RenderElement
+      isAlert?: boolean
+      // Drawn in place of the rule, as a collapsed section's one-line summary.
+      suffix?: RenderElement
+    }
+  ) => RenderElement
   isCollapsed: (section: PanelSection) => boolean
 }
 
@@ -100,33 +110,28 @@ export async function projectRowsOf(
     const isCollapsed = marks.isCollapsed(section)
     return (
       <Box key={key} flexDirection="column">
-        <Box key={`layout-header-${section}`} flexDirection="row">
-          {marks.markOf(section)}
-          <Box flexDirection="row" gap={1}>
-            {action !== undefined ? (
-              <Button
-                key={`${key}-action`}
-                plain
-                onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
-              >
-                <Text bold underline>
-                  {heading}
-                </Text>
-              </Button>
-            ) : list.url === null ? (
-              <Text bold>{heading}</Text>
-            ) : (
-              gameLinkOf(
-                $,
-                e,
-                { key: `${key}-link`, url: list.url, worktreeId, label: heading },
-                <Text bold underline>
-                  {heading}
-                </Text>
-              )
-            )}
-          </Box>
-        </Box>
+        {marks.headingOf(section, heading, {
+          wrap:
+            action !== undefined
+              ? (title) => (
+                  <Button
+                    key={`${key}-action`}
+                    plain
+                    onPress={() => void runAction($, action, isDemo).catch(() => undefined)}
+                  >
+                    {title}
+                  </Button>
+                )
+              : list.url === null
+                ? undefined
+                : (title) =>
+                    gameLinkOf(
+                      $,
+                      e,
+                      { key: `${key}-link`, url: list.url ?? '', worktreeId, label: heading },
+                      title
+                    )
+        })}
         {!isCollapsed &&
           sections.flatMap((group, at) => [
             ...(group.heading === null
@@ -186,7 +191,6 @@ export async function projectRowsOf(
   const hotkeys = actionHotkeysOf(actions)
   const actionsRow = isTapLayout(columns) ? (
     <Box key="project-actions" flexDirection="column">
-      <Text dimColor>{text.actionsHeading}</Text>
       {tapButtonsOf(
         $,
         e,
@@ -208,7 +212,6 @@ export async function projectRowsOf(
     </Box>
   ) : (
     <Box key="project-actions" flexDirection="row" columnGap={1} flexWrap="wrap">
-      <Text dimColor>{text.actionsHeading}</Text>
       {actions.map((action) => actionButton(action, hotkeys.get(action.id)))}
     </Box>
   )
@@ -232,14 +235,8 @@ export async function projectRowsOf(
       : {
           actions: (
             <Box key="project-actions-section" flexDirection="column">
-              <Box key="layout-header-actions" flexDirection="row">
-                {marks.markOf('actions')}
-                {isActionsCollapsed ? (
-                  <Text dimColor>{`${text.actionsHeading} ${actions.length}`}</Text>
-                ) : (
-                  actionsRow
-                )}
-              </Box>
+              {marks.headingOf('actions', `${text.actionsHeading} ${actions.length}`)}
+              {!isActionsCollapsed && actionsRow}
               {!isActionsCollapsed && actions.flatMap(resultRows)}
             </Box>
           )

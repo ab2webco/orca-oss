@@ -379,6 +379,8 @@ export type GameMetrics = {
   mergedPerDay: { day: string; merged: number }[]
   leadTime: { medianMs: number | null; measured: number }
   claudeAccounts: (GameUsePercents & { email: string; active: boolean })[]
+  /** Where the days come from (ORCA-950); `game` is Orca Game's own events. */
+  source?: { kind: 'github' | 'gitlab' | 'game'; repo?: string; fetchedAt: string; partial?: true }
 }
 
 /** A member's merge as Orca recorded it, which outlives its row (ORCA-887); `key` is one per merge. */
