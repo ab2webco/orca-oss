@@ -34,6 +34,16 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
     }
   }
 
+  if (args.source === 'game-owner-question') {
+    const project = normalizeNotificationText(args.repoLabel, NOTIFICATION_TITLE_CONTEXT_MAX_LENGTH)
+    return {
+      title: project ? `${project}: the lead asks you` : 'The lead asks you',
+      body:
+        normalizeNotificationText(args.ownerQuestion, NOTIFICATION_BODY_PREVIEW_MAX_LENGTH) ??
+        'Open the Inbox to answer.'
+    }
+  }
+
   if (args.source === 'test') {
     return {
       title: 'Orca Lab notifications are on',

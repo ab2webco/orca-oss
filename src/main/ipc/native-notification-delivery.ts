@@ -70,8 +70,32 @@ export function deliverNativeNotification(
   }
   notification.on('failed', failedHandler)
 
+  const inbox = args.gameInbox
+  if (inbox) {
+    clickHandler = () => {
+      release()
+      const win = getTrustedUIRendererWindow()
+      if (!win || win.isDestroyed()) {
+        return
+      }
+      if (process.platform === 'darwin') {
+        app.focus({ steal: true })
+      }
+      if (win.isMinimized()) {
+        win.restore()
+      }
+      win.show()
+      win.focus()
+      win.webContents.send('ui:openGameInbox', {
+        environmentId: inbox.environmentId,
+        worktreeId: inbox.worktreeId
+      })
+    }
+    notification.on('click', clickHandler)
+  }
+
   // Why: worktreeId is formatted "repoId::worktreePath"; without the separator we can't extract a repoId, so skip the click-to-navigate binding.
-  if (args.worktreeId && args.worktreeId.includes('::')) {
+  if (!inbox && args.worktreeId && args.worktreeId.includes('::')) {
     const repoId = getRepoIdFromWorktreeId(args.worktreeId)
     clickHandler = () => {
       release()
