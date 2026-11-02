@@ -20,7 +20,8 @@ function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
     metrics.latestDay
       ? { label: `Merged ${metrics.latestDay.day}`, value: metrics.latestDay.merged }
       : null,
-    { label: `Merged in ${metrics.windowDays} d`, value: metrics.mergedInWindow },
+    // Why the no-break space: a narrow tile wrapped the "d" alone onto its own line.
+    { label: `Merged in ${metrics.windowDays} d`, value: metrics.mergedInWindow },
     metrics.leadTimeMedianMs === null
       ? null
       : { label: 'Median lead time', value: formatLeadTime(metrics.leadTimeMedianMs) }

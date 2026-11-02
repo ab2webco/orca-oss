@@ -117,6 +117,12 @@ describe('TeamDrawer', () => {
     expect(shown).toContain('2.0 h')
   })
 
+  // Why: at 375 pt the tile wrapped "Merged in 4 d" with the "d" alone on its own line.
+  it('keeps the window unit on the line of its number', () => {
+    show(teamWith())
+    expect(texts().filter((one) => one.startsWith('Merged in'))).toEqual(['Merged in 1 d'])
+  })
+
   it('closes from the large X in the header', () => {
     const onClose = show(teamWith())
     const close = button('Close Team')
