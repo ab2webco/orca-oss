@@ -10,6 +10,7 @@ export type NotificationEvent = {
   title: string
   body: string
   worktreeId?: string
+  terminal?: string
   notificationId?: string
   // Desktop-assigned seq for reconnect catch-up (#8129); optional since older runtimes may omit it.
   notificationSeq?: number

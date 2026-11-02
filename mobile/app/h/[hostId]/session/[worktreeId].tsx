@@ -731,7 +731,8 @@ export default function SessionScreen() {
     created,
     warning: createdWarning,
     terminal: routeTerminal,
-    tab: routeTab
+    tab: routeTab,
+    team: routeTeam
   } = useLocalSearchParams<{
     hostId: string
     worktreeId: string
@@ -740,6 +741,7 @@ export default function SessionScreen() {
     warning?: string
     terminal?: string
     tab?: string
+    team?: string
   }>()
   const isFolderWorkspaceRoute = worktreeId.startsWith('folder:') // Synthetic ids have no repo scope.
   // Why: the floating sentinel has no repo/worktree, so repo-backed surfaces hide.
@@ -2890,6 +2892,14 @@ export default function SessionScreen() {
     paneKey: activeLeadPaneKey
   })
   const [teamOpen, setTeamOpen] = useState(false)
+  const teamReady = team.view !== null
+  // Why wait for the view: an owner-question tap lands here before the lead's tab and state load.
+  useEffect(() => {
+    if (routeTeam === 'open' && teamReady) {
+      setTeamOpen(true)
+      router.setParams({ team: undefined })
+    }
+  }, [routeTeam, router, teamReady])
   const teamNow = useNow(60_000, teamOpen)
 
   // Why: only store the ref; subscribe on web-ready to avoid the blank-terminal race (init queued before xterm.js loaded).

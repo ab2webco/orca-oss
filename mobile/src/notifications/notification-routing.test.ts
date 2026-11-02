@@ -60,6 +60,38 @@ describe('notification routing', () => {
     })
   })
 
+  it("opens the lead's terminal with the Team drawer when the host names the lead", () => {
+    expect(
+      getNotificationNavigationTarget({
+        source: 'game-owner-question',
+        hostId: 'host-1',
+        worktreeId: 'repo::/lead',
+        terminal: 'term_lead',
+        notificationId: 'game-owner-question:q1'
+      })
+    ).toEqual({
+      hostId: 'host-1',
+      routeTarget: {
+        name: '[hostId]/session/[worktreeId]',
+        params: { hostId: 'host-1', worktreeId: 'repo::/lead', terminal: 'term_lead', team: 'open' }
+      }
+    })
+  })
+
+  it('keeps the lead terminal in locally scheduled notification data', () => {
+    expect(
+      buildLocalNotificationData(
+        { source: 'game-owner-question', worktreeId: 'repo::/lead', terminal: 'term_lead' },
+        'host-1'
+      )
+    ).toEqual({
+      source: 'game-owner-question',
+      hostId: 'host-1',
+      worktreeId: 'repo::/lead',
+      terminal: 'term_lead'
+    })
+  })
+
   it('keeps the owner question source in locally scheduled notification data', () => {
     expect(
       buildLocalNotificationData(

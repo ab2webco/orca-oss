@@ -131,4 +131,12 @@ describe('gameOwnerQuestionMobileNotification', () => {
       gameOwnerQuestionMobileNotification({ ...asked('oq_2'), question: 'x'.repeat(400) }, null)
     ).toMatchObject({ title: 'The lead asks you', body: `${'x'.repeat(179)}…` })
   })
+
+  it("names the live lead's terminal so a tap opens its Team drawer, and nothing without one", () => {
+    const lead = { worktreeId: 'repo::/lead', terminal: 'term_lead' }
+    expect(gameOwnerQuestionMobileNotification(asked('oq_1'), 'orca-oss', lead)).toMatchObject(lead)
+    expect(gameOwnerQuestionMobileNotification(asked('oq_1'), 'orca-oss')).not.toHaveProperty(
+      'terminal'
+    )
+  })
 })
