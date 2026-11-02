@@ -208,6 +208,8 @@ export type OrchestratorGameState = {
   pausedMembers?: GamePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
   queuedMembers?: GameQueuedMember[]
+  /** Agents the lead dropped from its fleet, which `orca game adopt` brings back; only for the lead, when any (ORCA-943). */
+  droppedAgents?: GameAgent[]
   /** Saved members whose worktree runs an agent this lead does not list; only for the lead, when any. */
   unlistedMembers?: GameUnlistedMember[]
   /** Why the saved members could not be read or saved; absent when they could. */
