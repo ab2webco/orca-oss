@@ -227,6 +227,20 @@ export class GameBoard {
     }
   }
 
+  /** Each project's open questions, keeping only projects that have any. */
+  async openOwnerQuestionsOf(
+    projectKeys: readonly string[]
+  ): Promise<Map<string, GameOwnerQuestion[]>> {
+    const byProject = new Map<string, GameOwnerQuestion[]>()
+    for (const key of projectKeys) {
+      const open = openGameOwnerQuestions(await this.deps.store.ownerQuestions(key))
+      if (open.length > 0) {
+        byProject.set(key, open)
+      }
+    }
+    return byProject
+  }
+
   /** The lead hears the answer once, as an escalation its mail watch already passes. */
   async answerOwner(
     args: GameBoardCaller & GameOwnerReply & { id: string }

@@ -159,4 +159,21 @@ describe('GameBoard owner questions', () => {
 
     expect(changed).toEqual(['repo:r1', 'repo:r1'])
   })
+
+  it('lists the open questions of each project that has any, oldest first', async () => {
+    let key = 'repo:r1'
+    const { game } = board(() => ({ ...LEAD, key }))
+    const first = (await game.askOwner(ask)).question
+    const answered = (await game.askOwner({ ...ask, question: 'Answered?' })).question
+    await game.answerOwner({ id: answered.id, text: 'Yes' })
+    key = 'repo:r2'
+    const other = (await game.askOwner({ ...ask, question: 'Other project?' })).question
+
+    const byProject = await game.openOwnerQuestionsOf(['repo:r1', 'repo:r2', 'repo:r3'])
+
+    expect([...byProject.entries()].map(([k, list]) => [k, list.map((q) => q.id)])).toEqual([
+      ['repo:r1', [first.id]],
+      ['repo:r2', [other.id]]
+    ])
+  })
 })

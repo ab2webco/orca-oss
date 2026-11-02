@@ -2562,6 +2562,18 @@ const api = {
     dismiss: (ids: string[]): Promise<NotificationDismissResult> =>
       ipcRenderer.invoke('notifications:dismiss', ids),
     openSystemSettings: (): Promise<void> => ipcRenderer.invoke('notifications:openSystemSettings'),
+    setBadgeCount: (count: number): Promise<void> =>
+      ipcRenderer.invoke('notifications:setBadgeCount', count),
+    onOpenGameInbox: (
+      callback: (target: { environmentId: string | null; worktreeId: string | null }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        target: { environmentId: string | null; worktreeId: string | null }
+      ) => callback(target)
+      ipcRenderer.on('ui:openGameInbox', listener)
+      return () => ipcRenderer.removeListener('ui:openGameInbox', listener)
+    },
     getPermissionStatus: (): Promise<NotificationPermissionStatusResult> =>
       ipcRenderer.invoke('notifications:getPermissionStatus'),
     probeDelivery: (args?: { force?: boolean }): Promise<NotificationDeliveryProbeResult> =>

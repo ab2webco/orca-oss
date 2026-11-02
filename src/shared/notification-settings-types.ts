@@ -21,7 +21,17 @@ export type NotificationSettings = {
   customSoundVolume: number
 }
 
-export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'test'
+export type NotificationEventSource =
+  | 'agent-task-complete'
+  | 'terminal-bell'
+  | 'test'
+  | 'game-owner-question'
+
+/** Where a clicked owner-question notification opens the Inbox; environmentId null is this computer. */
+export type GameInboxNotificationTarget = {
+  environmentId: string | null
+  worktreeId: string | null
+}
 
 export type NotificationDispatchRequest = {
   source: NotificationEventSource
@@ -43,6 +53,9 @@ export type NotificationDispatchRequest = {
   agentToolInput?: string
   agentLastAssistantMessage?: string
   agentInterrupted?: boolean
+  /** What the lead asked, for source `game-owner-question`. */
+  ownerQuestion?: string
+  gameInbox?: GameInboxNotificationTarget
 }
 
 export type NotificationDispatchResult = {
