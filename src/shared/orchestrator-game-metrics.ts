@@ -107,7 +107,7 @@ function parseUtc(value: string | null): number {
   return Date.parse(ZONELESS.test(value) ? `${value.replace(' ', 'T')}Z` : value)
 }
 
-function median(values: readonly number[]): number | null {
+export function median(values: readonly number[]): number | null {
   if (values.length === 0) {
     return null
   }

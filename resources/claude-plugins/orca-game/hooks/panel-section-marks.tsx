@@ -1,6 +1,8 @@
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
+import { cellWidthOf } from './cell-width'
 import { gameStrings } from './game-strings'
+import { headingPartsOf } from './panel-heading'
 import type { SceneDefinition } from './scenes/index'
 import { tapButtonsOf } from './tap-buttons'
 import type { SectionMarks } from './fleet-project'
@@ -13,23 +15,58 @@ function togglePressOf($: EngineInterface, project: string, section: PanelSectio
     void changeFleetLayout($, project, (now) => toggleSection(now, section)).catch(() => undefined)
 }
 
-/** The ▾/▸ mark before each section heading; pressing it folds the section. */
+const MARK_CELLS = 2
+
+/** The ▾/▸ mark before each section heading, pressed to fold it, and the heading row every section shares. */
 export function sectionMarksOf(
   $: EngineInterface,
   e: RenderInput,
   project: string,
-  layout: FleetLayout
+  layout: FleetLayout,
+  palette: SceneDefinition['band'],
+  columns: number
 ): SectionMarks {
-  const { Button, Text } = $.ui.resolve(e)
+  const { Box, Button, Text } = $.ui.resolve(e)
   const isCollapsed = (section: PanelSection) => layout.collapsed.includes(section)
+  // Why a separate mark: the To Do and My PRs headings already open their list or run an action.
+  const markOf = (section: PanelSection) => (
+    <Button key={`layout-toggle-${section}`} plain onPress={togglePressOf($, project, section)}>
+      <Text dimColor>{`${isCollapsed(section) ? '▸' : '▾'} `}</Text>
+    </Button>
+  )
   return {
     isCollapsed,
-    // Why a separate mark: the To Do and My PRs headings already open their list or run an action.
-    markOf: (section) => (
-      <Button key={`layout-toggle-${section}`} plain onPress={togglePressOf($, project, section)}>
-        <Text dimColor>{`${isCollapsed(section) ? '▸' : '▾'} `}</Text>
-      </Button>
-    )
+    markOf,
+    headingOf: (section, text, options = {}) => {
+      const { name, count } = headingPartsOf(text)
+      const title = name.toLocaleUpperCase()
+      const chip = count === undefined ? '' : ` ${count} `
+      const used = MARK_CELLS + cellWidthOf(title) + (chip === '' ? 0 : 1 + cellWidthOf(chip))
+      const rule = '─'.repeat(Math.max(0, columns - used - 1))
+      const titleText = (
+        <Text
+          bold
+          underline={options.wrap !== undefined}
+          color={options.isAlert ? 'red' : palette.gold}
+        >
+          {title}
+        </Text>
+      )
+      return (
+        <Box key={`layout-header-${section}`} flexDirection="row">
+          {markOf(section)}
+          {options.wrap === undefined ? titleText : options.wrap(titleText)}
+          {chip !== '' && <Text> </Text>}
+          {chip !== '' && (
+            <Text bold color={palette.parchment} backgroundColor={palette.panel}>
+              {chip}
+            </Text>
+          )}
+          {options.suffix !== undefined && <Text> </Text>}
+          {options.suffix ?? (rule !== '' && <Text color={palette.panel}>{` ${rule}`}</Text>)}
+        </Box>
+      )
+    }
   }
 }
 

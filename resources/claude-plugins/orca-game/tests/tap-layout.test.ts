@@ -260,7 +260,7 @@ describe('the Fleet pane on a phone', () => {
       .map(shownOf)
       .reduce((all, one) => (one.length > all.length ? one : all), '')
     expect(drawn.indexOf('✕ Close')).toBeGreaterThan(-1)
-    expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('2 working'))
+    expect(drawn.indexOf('✕ Close')).toBeLessThan(drawn.indexOf('● 2'))
     await ui.unmount()
   })
 
@@ -276,7 +276,13 @@ describe('the Fleet pane on a phone', () => {
       const chips = rows[0] ?? []
       const labels = chips.map(shownOf)
       // A drawn Text keeps no key: each chip is its full label or the band's mark for it.
-      const expected = [/^⚑/, /^(2 working|• 2)$/, /^(0 idle|z 0)$/, /^(0 waiting on you|! 0)$/]
+      const expected = [
+        /^⚑/,
+        /^● 2( working)?$/,
+        /^○ 0( idle)?$/,
+        /^✓ 0( done)?$/,
+        /^▲ 0( waiting on you)?$/
+      ]
       expect(labels).toHaveLength(expected.length)
       labels.forEach((label, at) => expect(label.trim()).toMatch(expected[at] ?? /^$/))
       for (const label of labels) {

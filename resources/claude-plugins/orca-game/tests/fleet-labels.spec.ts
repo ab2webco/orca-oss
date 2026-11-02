@@ -5,7 +5,6 @@ import {
   branchLabelOf,
   fitWords,
   memberHeadingOf,
-  memberHeadOf,
   memberMetaOf,
   needPartsOf,
   reviewTextOf,
@@ -135,24 +134,6 @@ describe('member card labels', () => {
       '⎇ …ead-subagents'
     )
     expect(branchLabelOf('main', 40)).toBe('⎇ main')
-  })
-
-  it('never splits the state: the name gives way first', () => {
-    expect(memberHeadOf('ORCA-601', 'trabajando', 30)).toEqual({
-      name: 'ORCA-601',
-      state: 'trabajando'
-    })
-    expect(memberHeadOf('ORCA-601', 'trabajando', 16)).toEqual({
-      name: 'ORCA…',
-      state: 'trabajando'
-    })
-    expect(memberHeadOf('ORCA-601', 'trabajando', 4).state).toBe('trabajando')
-  })
-
-  it('cuts a state wider than the whole card line instead of letting it break mid-word', () => {
-    expect(memberHeadOf('claude', 'orchestrating', 1, 11).state).toBe('orchestrat…')
-    expect(memberHeadOf('claude', 'orquestando', 1, 11).state).toBe('orquestando')
-    expect(memberHeadOf('claude', 'orchestrating', 1, 40).state).toBe('orchestrating')
   })
 
   it('puts the agent, its account and the branch on one dim line that fits', () => {

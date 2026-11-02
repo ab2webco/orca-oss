@@ -2,7 +2,9 @@ import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../../shared/runtime-rpc-envelope'
 import type { GameEventKind } from '../../shared/orchestrator-game-events'
-import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import { gameDropTargetOf } from '../../shared/orchestrator-game-dropped-agents'
+import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -89,4 +91,21 @@ export async function forgetGameMember(client: Client, ticket: string): Promise<
   await client
     .call('game.memberDiscard', { ...gameBoardCaller(), tickets: [ticket] })
     .catch(() => undefined)
+}
+
+/** Takes an agent out of the lead's fleet, or back in; one with no worktree is never dropped (ORCA-943). */
+export async function setGameAgentDropped(
+  client: Client,
+  agent: GameAgent,
+  name: string,
+  dropped: boolean
+): Promise<void> {
+  const target = gameDropTargetOf(agent)
+  if (target) {
+    const params = {
+      ...gameBoardCaller(),
+      agent: { ...target, name, ticket: ticketOfMember(agent) }
+    }
+    await callGameBoard(client, 'game.fleetDrop', { ...params, dropped }, 'fleet drops')
+  }
 }
