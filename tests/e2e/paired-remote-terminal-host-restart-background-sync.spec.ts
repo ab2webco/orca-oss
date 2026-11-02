@@ -18,6 +18,13 @@ import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-
 import { settlePairedCleanupCall } from './helpers/paired-cleanup-call-budget'
 import { waitForTabParked } from './helpers/terminal-hidden-parking'
 import {
+  attachFailureEvidence,
+  capturePageWarnings,
+  captureProcessOutput,
+  createFailureEvidenceLog,
+  type FailureEvidenceLog
+} from './helpers/failure-evidence-log'
+import {
   collectUnresponsiveRendererEvidence,
   evaluateWithinRendererBudget
 } from './helpers/unresponsive-renderer-evidence'
@@ -273,7 +280,11 @@ async function readPtyConnectDiagnostics(page: Page): Promise<string> {
     .catch(() => 'unavailable')
 }
 
-async function waitForPaneConnected(page: Page, webTabId: string): Promise<void> {
+async function waitForPaneConnected(
+  page: Page,
+  webTabId: string,
+  evidence: FailureEvidenceLog
+): Promise<void> {
   // Why: "never connected" alone cannot name the stuck path; keep every distinct state the poll saw.
   const observed: string[] = []
   try {
@@ -292,6 +303,7 @@ async function waitForPaneConnected(page: Page, webTabId: string): Promise<void>
           }, webTabId)
           if (observed.at(-1) !== state) {
             observed.push(state)
+            evidence.append(`pane-recovery ${webTabId}`, state)
           }
           return state.split('/')[0]
         },
@@ -389,6 +401,8 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
   const session = createRestartSession(testInfo, {
     ORCA_DAEMON_STREAM_BACKLOG_FILE: backlogPath
   })
+  // Why: ORCA-946/ORCA-564 fail rarely and only in CI, where host logs and client warnings were never kept.
+  const evidence = createFailureEvidenceLog({ homeDirs: [os.homedir(), session.userDataDir] })
   let firstHost: ElectronApplication | null = null
   let secondHost: ElectronApplication | null = null
   let client: PairedElectronClient | null = null
@@ -396,6 +410,7 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
   try {
     const first = await session.launch()
     firstHost = first.app
+    captureProcessOutput(evidence, 'host-1 process', first.app)
     const worktreeId = await attachRepoAndOpenTerminal(first.page, repoPath)
     const daemonPid = readDaemonPid(session.userDataDir)
     client = await launchPairedElectronClient(
@@ -403,6 +418,7 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
       testInfo,
       'host-restart-background-sync'
     )
+    capturePageWarnings(evidence, 'client renderer', client.page)
     await expect
       .poll(
         () =>
@@ -442,11 +458,15 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
       .toBe(true)
 
     const alternateHostWorktreeId = await moveHostAwayFromWorktree(first.page, worktreeId)
+    evidence.append('test phases', 'closing host-1')
     await session.close(firstHost)
     firstHost = null
+    evidence.append('test phases', 'host-1 closed; relaunching')
     const foregroundEventStartMs = Date.now()
     const second = await session.launch()
     secondHost = second.app
+    captureProcessOutput(evidence, 'host-2 process', second.app)
+    evidence.append('test phases', 'host-2 launched')
     await second.page.waitForFunction(
       (expectedId) =>
         window.__store?.getState().workspaceSessionReady === true &&
@@ -469,7 +489,7 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
       )
       .toBe(true)
 
-    await waitForPaneConnected(client.page, target.webTabId)
+    await waitForPaneConnected(client.page, target.webTabId, evidence)
     await expect
       .poll(
         () =>
@@ -490,8 +510,11 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
     terminals.push(reconnectControl)
     expect(reconnectControl.ptyId).not.toBe(target.ptyId)
     await openClientTab(client, worktreeId, reconnectControl.webTabId)
-    await waitForPaneConnected(client.page, reconnectControl.webTabId)
+    await waitForPaneConnected(client.page, reconnectControl.webTabId, evidence)
     await expectTerminalInteractive(client, reconnectControl, 'y')
+  } catch (error) {
+    await attachFailureEvidence(evidence, testInfo, 'host-restart-failure-evidence.txt')
+    throw error
   } finally {
     if (client) {
       for (const terminal of terminals) {
