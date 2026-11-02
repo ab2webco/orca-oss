@@ -51,7 +51,7 @@ describe('notification route coordination', () => {
       harness.navigation,
       { push, replace: vi.fn() },
       target!.hostId,
-      target!.sessionTarget!
+      target!.routeTarget!
     )
 
     expect(push).toHaveBeenCalledWith(hostStackHostRoute('host/one'))
@@ -93,12 +93,12 @@ describe('notification route coordination', () => {
       type: 'REPLACE',
       target: '/h',
       source: 'host-index',
-      payload: target!.sessionTarget
+      payload: target!.routeTarget
     })
   })
 
   it('leaves a host-only notification as a shallow push with nothing to coordinate', () => {
-    expect(getNotificationNavigationTarget({ hostId: 'host-1' })?.sessionTarget).toBeNull()
+    expect(getNotificationNavigationTarget({ hostId: 'host-1' })?.routeTarget).toBeNull()
   })
 
   it('routes notification taps through the coordinated transition, not a bare push', () => {

@@ -2,7 +2,11 @@ import type { HostStackRouteTarget } from '../navigation/host-stack-navigation'
 import { mobileSessionRouteTarget } from '../session/mobile-session-route'
 import type { HostCredentialStatus } from '../transport/types'
 
-export type DesktopNotificationSource = 'agent-task-complete' | 'terminal-bell' | 'test'
+export type DesktopNotificationSource =
+  | 'agent-task-complete'
+  | 'terminal-bell'
+  | 'game-owner-question'
+  | 'test'
 
 export type DesktopNotificationEvent = {
   source: DesktopNotificationSource
@@ -43,11 +47,11 @@ export function buildLocalNotificationData(
   return data
 }
 
-/** Where a tap should land. `sessionTarget` is null for a host-only notification, whose
+/** Where a tap should land. `routeTarget` is null for a host-only notification, whose
  *  `/h/<id>` push is shallow enough to need no host-stack coordination. */
 export type NotificationNavigationTarget = Readonly<{
   hostId: string
-  sessionTarget: HostStackRouteTarget | null
+  routeTarget: HostStackRouteTarget | null
   credentialRecovery?: 'retry' | 're-pair'
 }>
 
@@ -79,9 +83,16 @@ export function getNotificationNavigationTarget(
 
   const worktreeId = readNonEmptyString(record.worktreeId)
   const credentialStatus = options.credentialStatusByHostId?.get(hostId)
+  // Why by source: an owner question spans the host's projects, so it carries no worktree.
+  const routeTarget: HostStackRouteTarget | null =
+    record.source === 'game-owner-question'
+      ? { name: '[hostId]/inbox', params: { hostId } }
+      : worktreeId
+        ? mobileSessionRouteTarget({ hostId, worktreeId })
+        : null
   return {
     hostId,
-    sessionTarget: worktreeId ? mobileSessionRouteTarget({ hostId, worktreeId }) : null,
+    routeTarget,
     ...(credentialStatus === 'missing'
       ? { credentialRecovery: 're-pair' as const }
       : credentialStatus === 'temporarily-unavailable'

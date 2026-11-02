@@ -18,8 +18,8 @@ export function useOpenNotificationRoute(): (target: NotificationNavigationTarge
         router.push(recoveryRoute)
         return
       }
-      if (target.sessionTarget) {
-        openHostStackRoute(target.hostId, target.sessionTarget)
+      if (target.routeTarget) {
+        openHostStackRoute(target.hostId, target.routeTarget)
         return
       }
       router.push(hostStackHostRoute(target.hostId))
