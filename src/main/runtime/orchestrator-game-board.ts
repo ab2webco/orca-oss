@@ -98,6 +98,8 @@ export class GameBoard {
       tellLead: (lead: GameBoardLead, note: GameLeadNote) => boolean
       /** Lets an open Inbox refresh instead of polling. */
       ownerQuestionsChanged?: (projectKey: string) => void
+      /** Asked (no answer) pushes it to a paired phone; answered clears that push. */
+      ownerQuestionSettled?: (projectKey: string, question: GameOwnerQuestion) => void
       /** Sends the person's words to a member through the lead's run; throws why it could not. */
       replyToMember?: (lead: GameBoardLead, args: { id: string; text: string }) => OwnerMemberReply
       now?: () => Date
@@ -217,6 +219,7 @@ export class GameBoard {
       result: null
     }))
     this.deps.ownerQuestionsChanged?.(project.key)
+    this.deps.ownerQuestionSettled?.(project.key, question)
     return { question }
   }
 
@@ -239,14 +242,13 @@ export class GameBoard {
   async openOwnerQuestionsOf(
     projectKeys: readonly string[]
   ): Promise<Map<string, GameOwnerQuestion[]>> {
-    const byProject = new Map<string, GameOwnerQuestion[]>()
-    for (const key of projectKeys) {
-      const open = openGameOwnerQuestions(await this.deps.store.ownerQuestions(key))
-      if (open.length > 0) {
-        byProject.set(key, open)
-      }
-    }
-    return byProject
+    const lists = await Promise.all(
+      projectKeys.map(async (key) => {
+        const open = openGameOwnerQuestions(await this.deps.store.ownerQuestions(key))
+        return [key, open] as const
+      })
+    )
+    return new Map(lists.filter(([, open]) => open.length > 0))
   }
 
   /** The lead hears the answer once, as an escalation its mail watch already passes. */
@@ -282,6 +284,7 @@ export class GameBoard {
         return { question: result.question, delivered: false, repeated: true }
       case 'answered': {
         this.deps.ownerQuestionsChanged?.(project.key)
+        this.deps.ownerQuestionSettled?.(project.key, result.question)
         const delivered = result.question.answer?.undelivered !== true
         return { question: result.question, delivered, repeated: false }
       }

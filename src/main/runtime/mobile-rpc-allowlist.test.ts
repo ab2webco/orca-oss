@@ -177,6 +177,15 @@ describe('mobile RPC allowlist', () => {
     ])
   })
 
+  it('allows exactly the owner-question Inbox methods of the game board on the phone', () => {
+    // Why exact: members, the STOP switch and the lead's own board stay desktop decisions.
+    const gameMethods = [...mobileRpcAllowlist()]
+      .filter((method) => method.startsWith('game.'))
+      .sort()
+
+    expect(gameMethods).toEqual(['game.ownerAnswer', 'game.ownerQuestionsAll'])
+  })
+
   it('opens one Plane work item to the phone as its own advertised capability', () => {
     // Why its own capability: the phone asks plane.listWorkItems to omit
     // `description`, so the detail has to read it somewhere. A host that

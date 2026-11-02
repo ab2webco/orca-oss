@@ -366,6 +366,9 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // One work item, gated by MOBILE_PLANE_WORK_ITEM_DESCRIPTION_RUNTIME_CAPABILITY: the
   // list no longer carries `description`, so the detail reads it here on open (ORCA-464).
   'plane.getWorkItem',
+  // The person's Game Inbox: read every project's open questions and answer one (ORCA-940).
+  'game.ownerQuestionsAll',
+  'game.ownerAnswer',
   // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
   // Consent, enablement and invokeCommand stay off: those are desktop decisions.
   'plugins.list',

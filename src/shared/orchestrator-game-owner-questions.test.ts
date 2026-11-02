@@ -6,6 +6,8 @@ import {
   openGameOwnerQuestions,
   parseGameOwnerQuestion,
   parseGameOwnerQuestionProjects,
+  gameOwnerQuestionNotificationId,
+  gameOwnerQuestionMobileNotification,
   type GameOwnerQuestion
 } from './orchestrator-game-owner-questions'
 
@@ -112,5 +114,21 @@ describe('parseGameOwnerQuestionProjects', () => {
       { repoId: 'r1', repoName: 'orca', worktreeId: 'r1::/w', questions: [asked('oq_1')] }
     ])
     expect(parseGameOwnerQuestionProjects(null)).toEqual([])
+  })
+})
+
+describe('gameOwnerQuestionMobileNotification', () => {
+  it('names the project and carries the question, keyed so an answer can dismiss it', () => {
+    expect(gameOwnerQuestionMobileNotification(asked('oq_1'), 'orca-oss')).toEqual({
+      type: 'notification',
+      source: 'game-owner-question',
+      title: 'orca-oss: the lead asks you',
+      body: 'Question oq_1?',
+      notificationId: 'game-owner-question:oq_1'
+    })
+    expect(gameOwnerQuestionNotificationId('oq_1')).toBe('game-owner-question:oq_1')
+    expect(
+      gameOwnerQuestionMobileNotification({ ...asked('oq_2'), question: 'x'.repeat(400) }, null)
+    ).toMatchObject({ title: 'The lead asks you', body: `${'x'.repeat(179)}…` })
   })
 })

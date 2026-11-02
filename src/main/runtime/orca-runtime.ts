@@ -801,7 +801,11 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
-import type { GameOwnerQuestionProject } from '../../shared/orchestrator-game-owner-questions'
+import {
+  gameOwnerQuestionMobileNotification,
+  gameOwnerQuestionNotificationId,
+  type GameOwnerQuestionProject
+} from '../../shared/orchestrator-game-owner-questions'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
@@ -3124,7 +3128,7 @@ type ResolvedWorktreeInFlight = {
 // events after it — idempotent, no duplicate local pushes.
 export type MobileNotificationDispatchEvent = {
   type: 'notification'
-  source: 'agent-task-complete' | 'terminal-bell' | 'test' | 'plugin'
+  source: 'agent-task-complete' | 'terminal-bell' | 'test' | 'plugin' | 'game-owner-question'
   title: string
   body: string
   worktreeId?: string
@@ -3969,6 +3973,15 @@ export class OrcaRuntimeService {
     ownerQuestionsChanged: () => {
       this.notifier?.gameOwnerQuestionsChanged?.()
       this.emitClientEvent({ type: 'gameOwnerQuestionsChanged' })
+    },
+    ownerQuestionSettled: (projectKey, question) => {
+      if (question.answer) {
+        this.dismissMobileNotification(gameOwnerQuestionNotificationId(question.id))
+        return
+      }
+      const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
+      const repoName = repoId ? (this.store?.getRepo(repoId)?.displayName ?? null) : null
+      this.dispatchMobileNotification(gameOwnerQuestionMobileNotification(question, repoName))
     },
     replyToMember: (lead, args) =>
       replyToMemberAsLead(
