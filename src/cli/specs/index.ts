@@ -25,6 +25,7 @@ import { ORCHESTRATOR_GAME_COMMAND_SPECS } from './orchestrator-game'
 import { ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS } from './orchestrator-game-board'
 import { ORCHESTRATOR_GAME_WATCH_COMMAND_SPECS } from './orchestrator-game-watch'
 import { ORCHESTRATOR_GAME_REBIND_COMMAND_SPECS } from './orchestrator-game-rebind'
+import { ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS } from './orchestrator-game-adopt'
 import { WORKTREE_PROCESSES_COMMAND_SPECS } from './worktree-processes'
 
 export const COMMAND_SPECS: CommandSpec[] = [
@@ -36,6 +37,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_WATCH_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_REBIND_COMMAND_SPECS,
+  ...ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS,
   ...ACCOUNT_COMMAND_SPECS,
   ...PROJECT_COMMAND_SPECS,
   ...FILE_COMMAND_SPECS,
