@@ -82,7 +82,6 @@ test('the Panel shows one fleet across the local machine and two paired hosts', 
         message: 'the band never drew the seeded party'
       })
       .toContain('Orla')
-    await showcaseFrame(orcaPage, testInfo, '01-band.png')
 
     await clickOnceRedrawn(orcaPage, 'Panel')
     // Why /i: the hd render draws section headings in capitals.
@@ -91,13 +90,13 @@ test('the Panel shows one fleet across the local machine and two paired hosts', 
     expect(panel).toMatch(/⌂ studio 2\/6 running · 12 cores/)
     expect(panel).toMatch(/⌂ linux-box 1\/4 running · 8 cores/)
     expect(panel).toContain('on studio')
-    await showcaseFrame(orcaPage, testInfo, '02-hosts.png')
+    await showcaseFrame(orcaPage, testInfo, '01-hosts.png')
 
     // A remote member's CI goes green and another remote PR merges: XP counts the same as local.
     await band.setState(state(2))
     await clickOnceRedrawn(orcaPage, 'Refresh')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('merged')
-    await showcaseFrame(orcaPage, testInfo, '03-remote-xp.png')
+    await showcaseFrame(orcaPage, testInfo, '02-remote-xp.png')
   } finally {
     await rm(band.root, { recursive: true, force: true })
   }
