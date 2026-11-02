@@ -194,9 +194,11 @@ import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   liveRemoteMemberTitlesOf,
+  remoteAsleepShowOf,
   remoteGameMembersOf,
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
+import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
@@ -32139,13 +32141,52 @@ export class OrcaRuntimeService {
             return { terminal: null }
           }
           throw error
-        })) as { terminal: RemoteGameMemberShow | null; agent?: unknown }
-        return shown.terminal && { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
+        })) as { terminal: RemoteGameMemberShow | null; agent?: unknown; asleep?: unknown }
+        if (!shown.terminal) {
+          return remoteAsleepShowOf(shown.asleep)
+        }
+        return { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
       },
       reviewOf: async (branch) =>
         repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null
     })
     return { ...state, agents: [...state.agents, ...remote] }
+  }
+
+  async wakeGameMember(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    dispatchId: string
+  }): Promise<RuntimeTerminalWake> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember) {
+      throw new Error('Only the lead wakes its members.')
+    }
+    return await this.wakeRemoteGameMember(args.dispatchId)
+  }
+
+  /** Wakes a member its paired host slept on restart, and keeps its handle for View (ORCA-915). */
+  async wakeRemoteGameMember(dispatchId: string): Promise<RuntimeTerminalWake> {
+    const db = this.getOrchestrationDb()
+    const federated = db.getFederatedDispatch(dispatchId)
+    if (!federated) {
+      throw new Error(`No member on a paired host runs dispatch ${dispatchId}.`)
+    }
+    const wake = await wakeRemoteMemberOnHost({
+      dispatchId,
+      host: federated.environment_name,
+      call: (method, params, timeoutMs) =>
+        this.callOrchestrationWorkerServer(federated.environment_id, method, params, timeoutMs)
+    })
+    if (wake.handle && federated.remote_runtime_epoch && federated.remote_worktree_id) {
+      db.updateFederatedDispatchResources({
+        dispatchId,
+        remoteRuntimeEpoch: federated.remote_runtime_epoch,
+        worktreeId: federated.remote_worktree_id,
+        terminalHandle: wake.handle
+      })
+    }
+    return wake
   }
 
   // Why only a lead pane: it is the one whose members are saved, and the one that resumes them.

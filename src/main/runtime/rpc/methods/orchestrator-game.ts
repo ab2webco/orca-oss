@@ -82,6 +82,12 @@ const GameMemberResumeParams = z.object({
   ticket: TicketParam
 })
 
+const GameMemberWakeParams = z.object({
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional(),
+  dispatchId: z.string().min(1).max(200)
+})
+
 const GameMemberDiscardParams = z.object({
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional(),
@@ -187,6 +193,17 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         terminalHandle: params.terminalHandle,
         ticket: params.ticket
       })
+  }),
+  defineMethod({
+    name: 'game.memberWake',
+    params: GameMemberWakeParams,
+    handler: async (params, { runtime }) => ({
+      wake: await runtime.wakeGameMember({
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle,
+        dispatchId: params.dispatchId
+      })
+    })
   }),
   defineMethod({
     name: 'game.memberDiscard',
