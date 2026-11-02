@@ -17,6 +17,7 @@ import { TILE_COLUMNS } from './fleet-tiles'
 import { gameStrings, localizedNameOf } from './game-strings'
 import type { CardState } from './lead-state'
 import { limitTagOf } from './member-tags'
+import { viewLabelOf } from './remote-member-view'
 import type { PartyMember } from './party'
 import { activityOf } from './quest-policy'
 import type { SceneDefinition } from './scenes/scene-definition'
@@ -62,7 +63,8 @@ export function memberCard(
   const color = AGENT_COLORS[parts.cardState]
   const heading = memberHeadingOf(agent)
   const crown = parts.leadTitle === null ? '' : `♛ ${parts.leadTitle}`
-  const viewCells = parts.view === undefined ? 0 : cellWidthOf(` ${text.view} `) + HOTKEY_CELLS + 1
+  const viewCells =
+    parts.view === undefined ? 0 : cellWidthOf(` ${viewLabelOf(agent)} `) + HOTKEY_CELLS + 1
   const crownCells = crown === '' ? 0 : cellWidthOf(crown) + 1
   const head = memberHeadOf(
     heading.name,
