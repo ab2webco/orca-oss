@@ -100,7 +100,7 @@ export const registerFleetPane = (on: On): void => {
         </Text>
       </Button>
     )
-    // On a phone View leaves the card's narrow text column for a chip under it.
+    // On a phone View is a touch chip inside the card, beside the review and ticket chips.
     const tapView = (agent: GameAgent, handle: string, index: number) =>
       tapButtonsOf(
         $,
@@ -319,15 +319,15 @@ export const registerFleetPane = (on: On): void => {
               tile: art.get(`tile-${member.key}`),
               withTile: cardLayout.withTile,
               view:
-                agent.terminalHandle === undefined || isTap
+                agent.terminalHandle === undefined
                   ? undefined
-                  : view(agent, agent.terminalHandle, index),
+                  : isTap
+                    ? tapView(agent, agent.terminalHandle, index)
+                    : view(agent, agent.terminalHandle, index),
+              isTap,
               advisorRows: advisorRowsOf(agent),
               link
-            }),
-            ...(agent.terminalHandle === undefined || !isTap
-              ? []
-              : [tapView(agent, agent.terminalHandle, index)])
+            })
           ])
     const team = (
       <Box key="section-team" flexDirection="column">
