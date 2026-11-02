@@ -36,7 +36,11 @@ export function createFailureEvidenceLog(options: {
   const sources = new Map<string, SourceLines>()
   return {
     append(source, text) {
-      const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '')
+      const lines = text
+        // oxlint-disable-next-line no-control-regex -- strips ANSI color codes from forwarded process output
+        .replace(/\u001b\[[0-9;]*m/g, '')
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== '')
       if (lines.length === 0) {
         return
       }

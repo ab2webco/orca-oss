@@ -64,6 +64,14 @@ describe('createFailureEvidenceLog', () => {
     )
   })
 
+  it('strips terminal color codes from captured output', () => {
+    const log = createFailureEvidenceLog({ homeDirs: [], now: () => 0 })
+
+    log.append('host-1', '\u001b[90m    at reconcile\u001b[39m')
+
+    expect(log.render()).toBe(['## host-1', '[+0ms]     at reconcile', ''].join('\n'))
+  })
+
   it('renders nothing when no source wrote anything', () => {
     const log = createFailureEvidenceLog({ homeDirs: [] })
 
