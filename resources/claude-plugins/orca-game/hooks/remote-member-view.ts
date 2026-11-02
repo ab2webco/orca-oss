@@ -94,7 +94,11 @@ export function remoteOpenOf(
   agent: RemoteViewAgent & Pick<GameAgent, 'terminalHandle'>
 ): { handle: string; environmentId: string } | null {
   const remote = agent.remote
-  return remote?.stateKnown && !remote.gone && remote.environmentId && agent.terminalHandle
+  return remote?.stateKnown &&
+    !remote.gone &&
+    !remote.asleep &&
+    remote.environmentId &&
+    agent.terminalHandle
     ? { handle: agent.terminalHandle, environmentId: remote.environmentId }
     : null
 }

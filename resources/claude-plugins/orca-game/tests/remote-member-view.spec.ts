@@ -92,6 +92,18 @@ describe('Opening a live remote member', () => {
     ).toBeNull()
   })
 
+  // Why: an asleep pane has no terminal to show; its card offers Resume instead (ORCA-915).
+  it('leaves an asleep member to Resume', () => {
+    expect(
+      remoteOpenOf(
+        live(
+          { host: 'imac', environmentId: 'env-imac', stateKnown: true, asleep: true },
+          'term_839'
+        )
+      )
+    ).toBeNull()
+  })
+
   it('says why it could not open the member and how to read it instead', () => {
     const one = live({ host: 'imac', environmentId: 'env-imac', stateKnown: true }, 'term_839')
     expect(remoteOpenFailedOf(one)).toBe(
