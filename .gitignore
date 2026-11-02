@@ -120,6 +120,7 @@ docs/**
 !docs/reference/renderer-recovery-reload.md
 !docs/reference/upstream-pr-adoption.md
 !docs/reference/upstream-runtime-dependencies.md
+!docs/reference/own-identity-and-services-decisions.md
 !docs/reference/remote-wire-compatibility.md
 !docs/reference/remote-host-placement.md
 !docs/reference/timing-budget-assertions.md
