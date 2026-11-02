@@ -47,10 +47,7 @@ export function metricsSectionOf(
     )
   return (
     <Box key="section-metrics" flexDirection="column">
-      <Box key="layout-header-metrics" flexDirection="row">
-        {marks.markOf('metrics')}
-        <Text bold>{gameStrings().text.layoutSections.metrics}</Text>
-      </Box>
+      {marks.headingOf('metrics', gameStrings().text.layoutSections.metrics)}
       {!marks.isCollapsed('metrics') && rows}
     </Box>
   )

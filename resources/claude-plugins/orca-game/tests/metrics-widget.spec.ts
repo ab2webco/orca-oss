@@ -131,6 +131,49 @@ describe('the metrics widget', () => {
     expect(spare?.parts.find((part) => part.text.includes('96%'))?.tone).toBe('danger')
   })
 
+  it('says where the days come from and when they were read, the repo only when it fits', () => {
+    const fetchedAt = new Date(2026, 10, 2, 9, 5).toISOString()
+    const source = { kind: 'github', repo: 'ab2webco/orca-oss', fetchedAt }
+    const metrics = stateWith({
+      ...summary,
+      leadTime: { medianMs: 3_600_000, measured: 3 },
+      source
+    })!.metrics!
+    expect(metrics.source).toEqual(source)
+    const wide = textOf(metricsLinesOf(metrics, 80))
+    expect(wide).toContain('GitHub ab2webco/orca-oss · updated 09:05')
+    expect(wide).toContain('lead time median 1h 0m · 3 PRs')
+    expect(textOf(metricsLinesOf(metrics, 28))).toContain('GitHub · updated 09:05')
+    const partial = stateWith({ ...summary, source: { ...source, partial: true } })!.metrics!
+    expect(textOf(metricsLinesOf(partial, 80))).toContain(
+      'GitHub ab2webco/orca-oss · updated 09:05 · partial'
+    )
+  })
+
+  it("names the game's own events when the provider was not read", () => {
+    const metrics = stateWith(summary)!.metrics!
+    expect(metrics.source?.kind).toBe('game')
+    expect(
+      textOf(metricsLinesOf(metrics, 80)).some((one) =>
+        one.startsWith('Orca Game events · updated ')
+      )
+    ).toBe(true)
+  })
+
+  it('draws no source line for an older host, and drops a source it cannot read', () => {
+    const { source: _source, ...older } = summary
+    expect(metricsLinesOf(stateWith(older)!.metrics!, 80).map((one) => one.key)).not.toContain(
+      'source'
+    )
+    expect(
+      stateWith({ ...summary, source: { kind: 'svn', fetchedAt: summary.computedAt } })!.metrics!
+        .source
+    ).toBeUndefined()
+    expect(
+      stateWith({ ...summary, source: { kind: 'github', fetchedAt: 'soon' } })!.metrics!.source
+    ).toBeUndefined()
+  })
+
   it('speaks Spanish', () => {
     setGameLocale('es')
     const [days, , lead] = textOf(metricsLinesOf(stateWith(summary)!.metrics!, 80))
