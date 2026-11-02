@@ -1025,6 +1025,10 @@ const CLAUDE_STARTUP_DIALOGS = JSON.parse(
 const CLAUDE_FIRST_RUN = JSON.parse(
   readFileSync(new URL('./__fixtures__/claude-first-run-2.1.314.json', import.meta.url), 'utf8')
 ) as { themePicker: string; themePickerAfterResize: string; loginMethodPicker: string }
+// Why: real Codex 0.166.0 bytes up to its first idle report; it no longer prints model/directory lines.
+const CODEX_READY_0_166_0 = JSON.parse(
+  readFileSync(new URL('./__fixtures__/codex-ready-0.166.0.json', import.meta.url), 'utf8')
+) as { readyScreen: string }
 const TEST_WORKTREE_ID = `${TEST_REPO_ID}::${TEST_WORKTREE_PATH}`
 
 /**
@@ -16689,6 +16693,37 @@ describe('OrcaRuntimeService', () => {
       condition: 'tui-idle',
       status: 'running'
     })
+  })
+
+  // Why (ORCA-936): game launch --agent codex timed out on this screen; nothing else marks it idle.
+  it('resolves tui-idle from the Codex 0.166.0 ready screen', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData('pty-bg', CODEX_READY_0_166_0.readyScreen, Date.now())
+
+    await expect(
+      runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({ handle, condition: 'tui-idle', status: 'running' })
+  })
+
+  it('treats the Codex 0.166.0 ready screen as a running agent for dispatch --inject', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
+    runtime.onPtyData('pty-bg', CODEX_READY_0_166_0.readyScreen, Date.now())
+
+    await expect(runtime.isTerminalRunningAgent(handle)).resolves.toBe(true)
   })
 
   it('resolves tui-idle from an Antigravity ready prompt preview', async () => {
