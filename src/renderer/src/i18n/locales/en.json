@@ -16290,7 +16290,8 @@
           "send": "Send"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Inbox"
+          "inbox": "Inbox",
+          "noWorktree": "Open this project in Orca to answer."
         },
         "GameInboxKindTag": {
           "question": "Question",
