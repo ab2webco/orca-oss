@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { cellWidthOf } from '../hooks/cell-width'
 import { SCENE_TICK_MS } from '../hooks/scene'
 
 const ORCA_CLI = '/opt/orca/bin/orca'
@@ -180,7 +181,7 @@ describe('panel layout', () => {
     const world = worldOf()
     await start($, on, world)
     const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toBe('▾ Team 3')
+    expect(await headerOf(ui, 'team')).toMatch(/^▾ TEAM  3  ─+$/)
     expect((await cardsOf(ui)).length).toBe(3)
     expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
     expect(await ui.find({ type: 'Box', key: 'project-todo' })).toBeUndefined()
@@ -193,16 +194,16 @@ describe('panel layout', () => {
     await start($, on, world)
     const ui = await pane($)
     await ui.press({ key: 'layout-toggle-todo' })
-    expect(await headerOf(ui, 'todo')).toBe('▸ To Do 12')
+    expect(await headerOf(ui, 'todo')).toMatch(/^▸ TO DO  12  ─+$/)
     expect(shownOf(await ui.find({ type: 'Box', key: 'project-todo' }))).not.toContain('ORCA-1')
     expect(world.writes).toEqual([
       [LAYOUT_KEY, fleetStore({ collapsed: ['todo'], shown: ['team', 'reviews', 'todo'] })]
     ])
     await ui.press({ key: 'layout-toggle-team' })
-    expect(await headerOf(ui, 'team')).toBe('▸ Team 3')
+    expect(await headerOf(ui, 'team')).toMatch(/^▸ TEAM  3  ─+$/)
     expect(await cardsOf(ui)).toEqual([])
     await ui.press({ key: 'layout-toggle-todo' })
-    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
     await ui.unmount()
   })
 
@@ -212,7 +213,7 @@ describe('panel layout', () => {
     )
     await start($, on, world)
     const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toBe('▸ Team 3')
+    expect(await headerOf(ui, 'team')).toMatch(/^▸ TEAM  3  ─+$/)
     expect(await cardsOf(ui)).toEqual([])
     expect(await ui.find({ type: 'Box', key: 'layout-header-review' })).toBeUndefined()
     const keys = (await ui.findAll({ type: 'Box' }))
@@ -226,12 +227,16 @@ describe('panel layout', () => {
     const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
     await start($, on, world)
     const ui = await pane($, 40)
+    // Every heading's rule ends at the pane's edge, so headings line up at any width.
+    for (const section of ['team', 'todo']) {
+      expect(cellWidthOf(await headerOf(ui, section)), section).toBe(40)
+    }
     const chip = await ui.find({ type: 'Button', key: 'layout-tap-todo' })
     expect(shownOf(chip)).toContain('▾ To Do')
     // A tap chip is three rows tall: its label sits between two padding rows.
     expect(shownOf(chip).split('\n')).toHaveLength(3)
     await ui.press({ key: 'layout-tap-todo' })
-    expect(await headerOf(ui, 'todo')).toBe('▸ To Do 12')
+    expect(await headerOf(ui, 'todo')).toMatch(/^▸ TO DO  12  ─+$/)
     expect(shownOf(await ui.find({ type: 'Button', key: 'layout-tap-todo' }))).toContain('▸ To Do')
     await ui.unmount()
   })
@@ -240,7 +245,7 @@ describe('panel layout', () => {
     const world = worldOf(fleetStore({ collapsed: ['review'], shown: ['review'] }))
     await start($, on, world)
     const ui = await pane($)
-    expect(await headerOf(ui, 'review')).toBe('▸ Review #42 open · CI failing')
+    expect(await headerOf(ui, 'review')).toBe('▸ REVIEW #42 open · CI failing')
     await ui.unmount()
   })
 
@@ -249,7 +254,7 @@ describe('panel layout', () => {
     const world = worldOf(newer)
     await start($, on, world)
     const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toBe('▾ Team 3')
+    expect(await headerOf(ui, 'team')).toMatch(/^▾ TEAM  3  ─+$/)
     await ui.press({ key: 'layout-toggle-team' })
     expect(world.writes).toEqual([])
     expect(world.toasts.at(-1)).toContain('newer')
@@ -271,7 +276,7 @@ describe('panel layout', () => {
     })
     await start($, on, world)
     const ui = await pane($)
-    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
     expect(await ui.find({ type: 'Box', key: 'layout-header-review' })).toBeUndefined()
     expect(world.writes).toEqual([])
     await ui.unmount()
@@ -283,7 +288,7 @@ describe('panel layout', () => {
     const ui = await pane($)
     await ui.press({ key: 'widgets' })
     await ui.press({ key: 'catalog-todo' })
-    expect(await headerOf(ui, 'todo')).toBe('▾ To Do 12')
+    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
     expect(fleetIn(world)).toEqual({
       order: DEFAULT_ORDER,
       collapsed: [],
@@ -292,7 +297,7 @@ describe('panel layout', () => {
     await ui.press({ key: 'widgets' })
     await ui.unmount()
     const reopened = await pane($)
-    expect(await headerOf(reopened, 'todo')).toBe('▾ To Do 12')
+    expect(await headerOf(reopened, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
     await reopened.unmount()
   })
 
@@ -317,7 +322,7 @@ describe('panel layout', () => {
     const world = worldOf(fleetStore({ shown: ['metrics'] }))
     await start($, on, world, 'en', { ...STATE, metrics: METRICS })
     const ui = await pane($)
-    expect(await headerOf(ui, 'metrics')).toBe('▾ Metrics')
+    expect(await headerOf(ui, 'metrics')).toMatch(/^▾ METRICS ─+$/)
     const rows = shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))
     expect(rows).toContain('▁▅█ 6 merged · 3 days')
     expect(rows).toContain('lead time median 1d 2h · 6 tickets')
