@@ -116,6 +116,23 @@ describe('owner question push to the paired phone, through the runtime', () => {
     ])
   })
 
+  it('keeps pushing after one push throws', async () => {
+    const { board, dispatched, pushes, settled } = runtimeWithPhone('repo:push-4')
+    dispatched.mockImplementationOnce(() => {
+      throw new Error('relay_down')
+    })
+
+    await board.askOwner({ worktreeId: 'w', question: 'First?' })
+    await settled()
+    await board.askOwner({ worktreeId: 'w', question: 'Second?' })
+    await settled()
+
+    expect(pushes().map(([event]) => event.type === 'notification' && event.body)).toEqual([
+      'First?',
+      'Second?'
+    ])
+  })
+
   it("places the lead by its live handle's worktree, and gives up quietly when it cannot", async () => {
     const runtime = new OrcaRuntimeService(null)
     const internals = runtime as unknown as {

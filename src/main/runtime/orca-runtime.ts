@@ -4011,18 +4011,21 @@ export class OrcaRuntimeService {
     },
     ownerQuestionSettled: (projectKey, question) => {
       // Why one chain: the push waits on the lead lookup; a quick answer's dismiss must not overtake it.
-      this.ownerQuestionPushes = this.ownerQuestionPushes.then(async () => {
-        if (question.answer) {
-          this.dismissMobileNotification(gameOwnerQuestionNotificationId(question.id))
-          return
-        }
-        const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
-        const repoName = repoId ? (this.store?.getRepo(repoId)?.displayName ?? null) : null
-        const lead = await this.gameOwnerQuestionLeadTerminal(projectKey)
-        this.dispatchMobileNotification(
-          gameOwnerQuestionMobileNotification(question, repoName, lead)
-        )
-      })
+      this.ownerQuestionPushes = this.ownerQuestionPushes
+        .then(async () => {
+          if (question.answer) {
+            this.dismissMobileNotification(gameOwnerQuestionNotificationId(question.id))
+            return
+          }
+          const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
+          const repoName = repoId ? (this.store?.getRepo(repoId)?.displayName ?? null) : null
+          const lead = await this.gameOwnerQuestionLeadTerminal(projectKey)
+          this.dispatchMobileNotification(
+            gameOwnerQuestionMobileNotification(question, repoName, lead)
+          )
+        })
+        // Why: a rejected link would skip every later push and dismiss until Orca restarts.
+        .catch(() => {})
     },
     replyToMember: (lead, args) =>
       replyToMemberAsLead(
