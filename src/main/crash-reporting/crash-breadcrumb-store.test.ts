@@ -62,6 +62,63 @@ describe('crash breadcrumb store', () => {
     ).toEqual(['surface-1', 'surface-2', 'surface-3', 'surface-4'])
   })
 
+  it('keeps the last WebGL context loss after an atlas-reset storm fills the ring', () => {
+    recordCrashBreadcrumb('terminal_webgl_diagnostic', { kind: 'webgl-context-loss', paneId: 1 })
+    recordCrashBreadcrumb('terminal_webgl_diagnostic', { kind: 'webgl-context-loss', paneId: 2 })
+    for (let index = 0; index < 40; index += 1) {
+      recordCrashBreadcrumb('terminal_webgl_diagnostic', { kind: 'webgl-atlas-reset', index })
+    }
+
+    const contextLosses = getCrashBreadcrumbSnapshot().filter(
+      (breadcrumb) => breadcrumb.data?.kind === 'webgl-context-loss'
+    )
+
+    expect(contextLosses.map((breadcrumb) => breadcrumb.data?.paneId)).toEqual([2])
+  })
+
+  it('keeps a coalesced WebGL context-loss burst with its repeat count', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-01T12:00:00.000Z'))
+    for (let paneId = 1; paneId <= 3; paneId += 1) {
+      recordCoalescedCrashBreadcrumb({
+        name: 'terminal_webgl_diagnostic',
+        data: { kind: 'webgl-context-loss', paneId },
+        coalesceKey: 'terminal_webgl_diagnostic:webgl-context-loss',
+        minIntervalMs: 30_000
+      })
+    }
+    for (let index = 0; index < 40; index += 1) {
+      recordCrashBreadcrumb('renderer_error', { index })
+    }
+
+    const contextLoss = getCrashBreadcrumbSnapshot().find(
+      (breadcrumb) => breadcrumb.data?.kind === 'webgl-context-loss'
+    )
+
+    expect(contextLoss?.data).toEqual({
+      kind: 'webgl-context-loss',
+      paneId: 3,
+      suppressedSinceLast: 2
+    })
+  })
+
+  it('does not let high-water profiles evict the retained WebGL context loss', () => {
+    recordCrashBreadcrumb('terminal_webgl_diagnostic', { kind: 'webgl-context-loss', paneId: 7 })
+    for (let index = 0; index < 5; index += 1) {
+      recordCrashBreadcrumb('renderer_memory_highwater', {
+        rendererSurface: `surface-${index}`,
+        thresholdPct: 80
+      })
+    }
+
+    const snapshot = getCrashBreadcrumbSnapshot()
+
+    expect(snapshot.some((breadcrumb) => breadcrumb.data?.paneId === 7)).toBe(true)
+    expect(
+      snapshot.filter((breadcrumb) => breadcrumb.name === 'renderer_memory_highwater')
+    ).toHaveLength(4)
+  })
+
   it('redacts sensitive breadcrumb fields before they can be snapshotted', () => {
     recordCrashBreadcrumb('workspace_opened', {
       path: '/Users/alice/project',
