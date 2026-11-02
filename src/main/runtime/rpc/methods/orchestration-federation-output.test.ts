@@ -174,6 +174,22 @@ describe('orchestration federated worker output', () => {
     return homeDb.getDispatchContext(task.id)!.id
   }
 
+  it("records the lead's worktree so a later lead can place the member (ORCA-943)", async () => {
+    vi.spyOn(homeRuntime, 'showTerminal').mockImplementation(async (handle) => {
+      if (handle !== 'term_coord') {
+        throw new Error(`unexpected terminal ${handle}`)
+      }
+      return { handle, worktreeId: 'orca::/Users/me/orca' } as never
+    })
+
+    const dispatchId = await startRemoteWorker()
+
+    expect(JSON.parse(homeDb.getWorkerDispatch(dispatchId)!.start_options)).toMatchObject({
+      on: 'environment_windows',
+      leadWorktreeId: 'orca::/Users/me/orca'
+    })
+  })
+
   it('routes show and read by Dispatch without repeating the worker server', async () => {
     const dispatchId = await startRemoteWorker()
 

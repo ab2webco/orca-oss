@@ -32059,7 +32059,9 @@ export class OrcaRuntimeService {
               this.getTerminalPaneKey(other.coordinatorHandle) !== null) ||
             (other.coordinatorPaneKey !== null &&
               this.getPtyRecordForPaneKey(other.coordinatorPaneKey)?.connected === true),
-          projectKey: projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey)
+          projectKey:
+            projectOfPane(other.coordinatorPaneKey ?? other.creatorPaneKey) ??
+            this.gameProjectKeyOfWorktree(other.leadWorktreeId, worktreesById)
         })
       )
     ]
