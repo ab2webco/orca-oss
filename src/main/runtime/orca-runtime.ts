@@ -780,6 +780,8 @@ import {
 } from './orchestrator-game-lesson-store'
 import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-engram'
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
+import { GameDroppedAgentStore } from './orchestrator-game-dropped-agent-store'
+import { splitDroppedGameAgents } from '../../shared/orchestrator-game-dropped-agents'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
 import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
 import {
@@ -3843,6 +3845,9 @@ export class OrcaRuntimeService {
   })
   private readonly gameMemberSessions = new GameMemberSessionStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-members')
+  )
+  private readonly gameDroppedAgents = new GameDroppedAgentStore(() =>
+    join(app.getPath('userData'), 'orchestrator-game-dropped')
   )
   private readonly gameHostCapacity = new GameHostCapacityReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
@@ -32139,7 +32144,50 @@ export class OrcaRuntimeService {
         summaries.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
       )
     })
-    return withGameHostCapacity(withPaused, await hostReadings)
+    const visible = await this.withoutDroppedGameAgents(
+      withPaused,
+      args.paneKey ? worktree?.repoId : undefined
+    )
+    return withGameHostCapacity(visible, await hostReadings)
+  }
+
+  // Why last: an agent the lead dropped stays out however it was listed, found or member (ORCA-943).
+  private async withoutDroppedGameAgents(
+    state: OrchestratorGameState,
+    repoId: string | undefined
+  ): Promise<OrchestratorGameState> {
+    if (state.role !== 'lead' || !repoId) {
+      return state
+    }
+    const split = splitDroppedGameAgents(
+      state.agents,
+      await this.gameDroppedAgents.read(`repo:${repoId}`)
+    )
+    return {
+      ...state,
+      agents: split.agents,
+      ...(split.dropped.length > 0 ? { droppedAgents: split.dropped } : {})
+    }
+  }
+
+  /** `orca game drop` and `orca game adopt`: the agent leaves or rejoins the lead's fleet, never killed. */
+  async setGameAgentDropped(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    agent: { worktreeId: string; environmentId: string | null; name: string; ticket: string | null }
+    dropped: boolean
+  }): Promise<{ dropped: boolean; count: number }> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember || project.key === 'no-project') {
+      throw new Error('Only the lead adds or drops agents in its fleet.')
+    }
+    const list = await this.gameDroppedAgents.set(project.key, args.agent, args.dropped)
+    // Why: a dropped member must not come back as paused or be resumed after a restart.
+    if (args.dropped && args.agent.ticket) {
+      await this.gameMemberSessions.remove(project.key, [args.agent.ticket]).catch(() => undefined)
+    }
+    this.noteGameFleetChanged()
+    return { dropped: args.dropped, count: list.length }
   }
 
   private async withRemoteGameMembers(
