@@ -2,20 +2,25 @@ import type { GameAgent, GameMemberWorktree } from '../../shared/orchestrator-ga
 import type { GameUnlistedMember } from '../../shared/orchestrator-game-member-sessions'
 import type { RuntimeWorktreeAgentRow, RuntimeWorktreePsSummary } from '../../shared/runtime-types'
 
-type FoundSummary = Pick<RuntimeWorktreePsSummary, 'worktreeId' | 'branch' | 'displayName'> & {
+type FoundSummary = Pick<
+  RuntimeWorktreePsSummary,
+  'worktreeId' | 'repoId' | 'branch' | 'displayName'
+> & {
   agents: readonly (Pick<RuntimeWorktreeAgentRow, 'paneKey' | 'parentPaneKey'> & {
     restoredUnconfirmed?: boolean
   })[]
 }
 
 /**
- * This machine's live sessions no lead lists: every agent, in any worktree or folder workspace,
- * that is not the lead, not a lead itself, and not a live lead's member (ORCA-914).
+ * This machine's live sessions no lead lists: every agent in a worktree or folder workspace of
+ * the lead's repo that is not the lead, not a lead itself, and not a live lead's member (ORCA-914).
  */
 export function foundGameSessionsOf<S extends FoundSummary>(
   summaries: readonly S[],
   lead: {
     leadPaneKey: string
+    /** The lead's repo, or folder group; sessions of any other project are never found (ORCA-948). */
+    repoId: string | null
     hasTerminal: (paneKey: string) => boolean
     /** A pane with a Run of its own leads, even before it launched anyone. */
     isLeadPane: (paneKey: string) => boolean
@@ -25,25 +30,27 @@ export function foundGameSessionsOf<S extends FoundSummary>(
   const present = new Set(rows.map((row) => row.paneKey))
   const parents = new Set(rows.flatMap((row) => (row.parentPaneKey ? [row.parentPaneKey] : [])))
   return summaries.flatMap((one) =>
-    one.agents
-      .filter(
-        (row) =>
-          row.paneKey !== lead.leadPaneKey &&
-          // Why: a hydrated row may be a session closed days ago; only a live terminal proves it runs.
-          !row.restoredUnconfirmed &&
-          lead.hasTerminal(row.paneKey) &&
-          !parents.has(row.paneKey) &&
-          !lead.isLeadPane(row.paneKey) &&
-          (!row.parentPaneKey || !present.has(row.parentPaneKey))
-      )
-      .map((row) => ({
-        row,
-        worktree: {
-          id: one.worktreeId,
-          branch: one.branch.replace(/^refs\/heads\//, ''),
-          displayName: one.displayName
-        }
-      }))
+    one.repoId !== lead.repoId
+      ? []
+      : one.agents
+          .filter(
+            (row) =>
+              row.paneKey !== lead.leadPaneKey &&
+              // Why: a hydrated row may be a session closed days ago; only a live terminal proves it runs.
+              !row.restoredUnconfirmed &&
+              lead.hasTerminal(row.paneKey) &&
+              !parents.has(row.paneKey) &&
+              !lead.isLeadPane(row.paneKey) &&
+              (!row.parentPaneKey || !present.has(row.parentPaneKey))
+          )
+          .map((row) => ({
+            row,
+            worktree: {
+              id: one.worktreeId,
+              branch: one.branch.replace(/^refs\/heads\//, ''),
+              displayName: one.displayName
+            }
+          }))
   )
 }
 
