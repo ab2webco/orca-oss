@@ -44,55 +44,61 @@ export function TeamDrawer({ visible, onClose, team, now, onOpenLink }: Props) {
   const { view, questions } = team
   return (
     <RightDrawer visible={visible} onClose={onClose}>
-      <View style={styles.header}>
-        <Text style={styles.heading}>Team</Text>
-        <Pressable
-          style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close Team"
-        >
-          <X size={22} color={colors.textPrimary} />
-        </Pressable>
-      </View>
-      {questions.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, styles.danger]}>
-            {`Needs your answer (${questions.length})`}
-          </Text>
-          {questions.map((question) => (
-            <GameInboxQuestionCard
-              key={question.id}
-              question={question}
-              worktreeId={team.answerWorktreeId}
-              now={now}
-              onAnswer={(reply) => team.answer(question.id, reply)}
-              onOpenLink={onOpenLink}
-            />
-          ))}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.heading}>Team</Text>
+          <Pressable
+            style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close Team"
+          >
+            <X size={22} color={colors.textPrimary} />
+          </Pressable>
         </View>
-      ) : null}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{`Members (${view?.members.length ?? 0})`}</Text>
-        {view && view.members.length > 0 ? (
-          view.members.map((member) => (
-            <TeamMemberCard key={member.key} member={member} onOpenLink={onOpenLink} />
-          ))
-        ) : (
-          <Text style={styles.empty}>No members running.</Text>
-        )}
-      </View>
-      {view?.metrics ? (
+        {questions.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.danger]}>
+              {`Needs your answer (${questions.length})`}
+            </Text>
+            {questions.map((question) => (
+              <GameInboxQuestionCard
+                key={question.id}
+                question={question}
+                worktreeId={team.answerWorktreeId}
+                now={now}
+                onAnswer={(reply) => team.answer(question.id, reply)}
+                onOpenLink={onOpenLink}
+              />
+            ))}
+          </View>
+        ) : null}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Metrics</Text>
-          <MetricsSummary metrics={view.metrics} />
+          <Text style={styles.sectionTitle}>{`Members (${view?.members.length ?? 0})`}</Text>
+          {view && view.members.length > 0 ? (
+            view.members.map((member) => (
+              <TeamMemberCard key={member.key} member={member} onOpenLink={onOpenLink} />
+            ))
+          ) : (
+            <Text style={styles.empty}>No members running.</Text>
+          )}
         </View>
-      ) : null}
+        {view?.metrics ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Metrics</Text>
+            <MetricsSummary metrics={view.metrics} />
+          </View>
+        ) : null}
+      </View>
     </RightDrawer>
   )
 }
 
 const styles = StyleSheet.create({
+  // Why: RightDrawer's paddingRight is only the safe-area inset, 0 on most phones.
+  content: {
+    paddingRight: spacing.md
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
