@@ -9,6 +9,7 @@ import {
 } from '../../src/shared/terminal-quick-commands'
 import type { TerminalQuickCommand } from '../../src/shared/terminal-quick-command-types'
 import { handleMockFilePreviewRequest } from './mock-server-file-preview-data'
+import { handleMockGameTeamRequest } from './mock-server-game-team'
 import { handleMockGitRequest } from './mock-server-git-state'
 import { handleMockAccountRequest } from './mock-server-account-rpc'
 import { handleMockNativeChatRequest } from './mock-server-native-chat-scenario'
@@ -130,6 +131,7 @@ export function handleRequest(
     handleMockAccountRequest(request, respond, success, error) ||
     handleMockNativeChatRequest(request, respond, success, error, ws) ||
     handleMockSessionTabsRequest(request, respond, success, terminalListWorktreeId) ||
+    handleMockGameTeamRequest(request, respond, success, () => terminalListWorktreeId(undefined)) ||
     handleMockTerminalRequest(request, respond, success, ws, terminalListWorktreeId)
   ) {
     return
