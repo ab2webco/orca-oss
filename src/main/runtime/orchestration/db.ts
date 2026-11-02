@@ -6380,6 +6380,66 @@ export class OrchestrationDb {
     }
   }
 
+  /**
+   * Ends a live local dispatch and keeps its agent: the worker settles as stopped/detached and its
+   * terminal becomes the user's, so no release or recovery closes it (ORCA-943).
+   */
+  detachWorker(
+    dispatchId: string
+  ):
+    | { disposition: 'detached'; worker: WorkerDispatchRow }
+    | { disposition: 'already_settled'; worker: WorkerDispatchRow } {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const worker = this.getWorkerDispatch(dispatchId)
+      const dispatch = this.getDispatchContextById(dispatchId)
+      if (!worker || !dispatch) {
+        throw new OrchestrationError('dispatch_not_found', `Dispatch ${dispatchId} was not found.`)
+      }
+      if (WORKER_SETTLED_STATES.includes(worker.state)) {
+        this.db.exec('COMMIT')
+        return { disposition: 'already_settled', worker }
+      }
+      if (!['ready', 'start_unknown'].includes(worker.state)) {
+        throw new OrchestrationError(
+          'dispatch_inactive',
+          `Dispatch ${dispatchId} cannot detach from ${worker.state}.`
+        )
+      }
+      this.db
+        .prepare(
+          `UPDATE worker_dispatches
+           SET state = 'stopped', stage = 'detached', updated_at = datetime('now')
+           WHERE dispatch_id = ?`
+        )
+        .run(dispatchId)
+      this.db
+        .prepare(
+          `UPDATE dispatch_contexts
+           SET status = 'failed', completed_at = datetime('now'), last_failure = 'detached',
+               capability_revoked_at = COALESCE(capability_revoked_at, datetime('now'))
+           WHERE id = ? AND status IN ('pending', 'dispatched')`
+        )
+        .run(dispatchId)
+      this.db.prepare("UPDATE tasks SET status = 'blocked' WHERE id = ?").run(dispatch.task_id)
+      this.db
+        .prepare(
+          `UPDATE worker_terminal_resources
+           SET ownership_state = 'user_owned', release_state = 'retained',
+               retained_reason = 'user_takeover', updated_at = datetime('now')
+           WHERE owner_dispatch_id = ? AND ownership_state = 'owned'
+             AND release_state IN ('not_requested', 'retained', 'requested')`
+        )
+        .run(dispatchId)
+      this.closeQuestionsForDispatch(dispatchId)
+      this.db.exec('COMMIT')
+      return { disposition: 'detached', worker: this.getWorkerDispatch(dispatchId)! }
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   reconcileFederatedWorkerStop(dispatchId: string): WorkerDispatchRow {
     this.db.exec('BEGIN IMMEDIATE')
     try {
