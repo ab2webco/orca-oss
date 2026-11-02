@@ -131,25 +131,20 @@ function timezoneOf(flags: Map<string, string | boolean>): string {
   return zone
 }
 
-const PROVIDER_NAMES = { github: 'GitHub', gitlab: 'GitLab' } as const
-
 /** Where the daily numbers come from, and when they were read. */
-export function sourcePartsOf(source: GameMetricsSummary['source']): string[] {
-  if (!source || source.kind === 'game') {
-    return ["Orca Game's own events", 'review provider not read']
-  }
-  return [
-    `${PROVIDER_NAMES[source.kind]}${source.repo ? ` ${source.repo}` : ''} merged PRs`,
-    `read ${source.fetchedAt}`,
-    ...(source.partial ? ['more merges than one read holds'] : [])
-  ]
-}
+const sourcePartsOf = ({ source }: GameMetricsSummary): string[] =>
+  source && source.kind !== 'game'
+    ? [
+        `${source.kind === 'github' ? 'GitHub' : 'GitLab'} ${source.repo} merged PRs`,
+        `read ${source.fetchedAt}`,
+        ...(source.partial ? ['partial'] : [])
+      ]
+    : ["Orca Game's own events", 'review provider not read']
 
 function dailyLines(daily: GameMetricsSummary): string[] {
   const merged = daily.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)
   const median = daily.leadTime.medianMs
-  const measured =
-    daily.source && daily.source.kind !== 'game' ? 'PR open to merge' : 'claim to merge'
+  const measured = daily.source?.kind === 'game' ? 'claim to merge' : 'PR open to merge'
   return [
     ...row(`Last ${daily.mergedPerDay.length} days`, [
       `to ${daily.mergedPerDay.at(-1)?.day ?? '?'} ${daily.timezone}`,
@@ -160,26 +155,8 @@ function dailyLines(daily: GameMetricsSummary): string[] {
       'Merged per day',
       daily.mergedPerDay.map((one) => `${one.day.slice(5)} ${one.merged}`)
     ),
-    ...row('Source', sourcePartsOf(daily.source))
+    ...row('Source', sourcePartsOf(daily))
   ]
-}
-
-/** The host's provider read; null from an older host, which keeps no such read. */
-async function deliveryOf(
-  client: Parameters<CommandHandler>[0]['client']
-): Promise<GameDelivery | null> {
-  try {
-    const { result } = await client.call<{ delivery: GameDelivery | null }>(
-      'game.delivery',
-      gameBoardCaller()
-    )
-    return result.delivery
-  } catch (error) {
-    if (error instanceof RuntimeClientError && error.code === 'method_not_found') {
-      return null
-    }
-    throw error
-  }
 }
 
 export function formatGameMetrics(metrics: GameMetrics & { daily?: GameMetricsSummary }): string {
@@ -280,7 +257,15 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
     // Why only unfiltered: the days are the scene widget's own window, not the query's.
     const filtered = [ticket, since, until, character].some((one) => one !== undefined)
     const own = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
-    const delivery = own ? await deliveryOf(client) : null
+    // Why caught: an older host has no game.delivery, and the stores still answer.
+    const delivery = own
+      ? await client
+          .call<{ delivery: GameDelivery | null }>('game.delivery', gameBoardCaller())
+          .then(
+            ({ result }) => result.delivery,
+            () => null
+          )
+      : null
     const daily = own && delivery ? withGameDelivery(own, delivery) : own
     printResult(
       { ...history, result: daily ? { ...metrics, daily } : metrics },

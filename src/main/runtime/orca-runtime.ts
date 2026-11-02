@@ -205,7 +205,6 @@ import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
 // Why longer: the host answers after a full `ps` sweep, and only a first read waits for it.
 const GAME_HOST_CAPACITY_TIMEOUT_MS = 6_000
-const GAME_DELIVERY_STATE_WAIT_MS = 4_000
 const GAME_REMOTE_SESSIONS_LIMIT = 200
 
 const gameHostProfileOfThisMachine = (): GameHostProfile => ({
@@ -31601,11 +31600,7 @@ export class OrcaRuntimeService {
       ])
       const own = gameMetricsSummaryOf({ events, history }, { now: Date.now(), timezone })
       // Why bounded: a cold provider read must not hold the lead's state; the next refresh uses it.
-      const delivery = await withTimeout(
-        this.readGameDeliveryOf(key),
-        GAME_DELIVERY_STATE_WAIT_MS,
-        null
-      )
+      const delivery = await withTimeout(this.readGameDeliveryOf(key), 4_000, null)
       const summary = delivery ? withGameDelivery(own, delivery) : own
       const services = this.accountServices
       if (!services) {
@@ -31634,13 +31629,12 @@ export class OrcaRuntimeService {
     return { delivery: await this.readGameDeliveryOf(key) }
   }
 
-  // Why the repo, not the zone: one read covers the widget's window in any zone.
-  private readGameDeliveryOf(projectKey: string): Promise<GameDelivery | null> {
-    const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : null
-    const stored = repoId ? this.store?.getRepo(repoId) : undefined
+  // Why per repo, not zone: one read covers the widget's window in any zone.
+  private async readGameDeliveryOf(projectKey: string): Promise<GameDelivery | null> {
+    const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : ''
     // Why: a folder workspace has no remote, so its numbers stay the game's own.
-    if (!repoId || !stored || stored.kind === 'folder') {
-      return Promise.resolve(null)
+    if (!repoId || (this.store?.getRepo(repoId)?.kind ?? 'folder') === 'folder') {
+      return null
     }
     return this.gameDelivery.read(repoId, async () => {
       const repo = await this.resolveRepoSelector(`id:${repoId}`)

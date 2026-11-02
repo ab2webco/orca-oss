@@ -703,8 +703,8 @@ matches …` (ORCA-866).
   With no filter it also prints the scene's metrics widget window for the last 14 days, in
   `--timezone <zone>` (default this machine's zone), and its `Source`. The days come from the
   review provider through `game.delivery` (ORCA-950): the repo's PRs merged per calendar day and
-  their median time from PR open to merge, as GitHub search (`is:pr is:merged merged:>=…`, the PR
-  repo Orca lists, so a fork's upstream unless pinned to origin) or GitLab's merged MRs report
+  their median time from PR open to merge, as GitHub search (`is:pr is:merged merged:>=…` on the
+  `origin` repo the Panel's My PRs links, never a fork's upstream) or GitLab's merged MRs report
   them. Merges through the merge queue or `gh`, several PRs per ticket and PRs no member opened all
   count, which the game's own stores missed. A host older than this, a folder workspace, a repo on
   neither provider, or a failed read falls back to the game's stores: each done ticket counts

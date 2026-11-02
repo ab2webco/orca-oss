@@ -12,13 +12,11 @@ export const GAME_METRICS_COMPUTE_BUDGET_MS = 50
 
 export type GameMetricsDay = { day: string; merged: number }
 
-/** Where `mergedPerDay` and `leadTime` come from; absent from an older host (ORCA-950). */
+/** Where `mergedPerDay` and `leadTime` come from (ORCA-950); `game` is Orca Game's own events. */
 export type GameMetricsSource = {
-  /** `game`: Orca Game's own events, when the review provider could not be read. */
   kind: 'github' | 'gitlab' | 'game'
   repo?: string
   fetchedAt: string
-  /** The provider had more merges than the pages read. */
   partial?: true
 }
 

@@ -8,8 +8,7 @@ import {
   GAME_DELIVERY_PAGE_SIZE,
   gameDeliveryOf,
   gameDeliverySinceOf,
-  gameMergedReviewsOfGitHubSearch,
-  gameMergedReviewsOfGitLab,
+  gameMergedReviewsOf,
   withGameDelivery
 } from './orchestrator-game-delivery'
 import {
@@ -50,16 +49,13 @@ const own = gameMetricsSummaryOf(
 )
 
 const recordedDelivery = () =>
-  gameDeliveryOf({
-    provider: 'github',
-    repo: github.repo,
-    since: github.since,
-    now,
-    readPage: async (page) => {
+  gameDeliveryOf(
+    { provider: 'github', repo: github.repo, since: github.since, now },
+    async (page) => {
       const body = github.pages[page - 1] ?? { total_count: 0, items: [] }
-      return { reviews: gameMergedReviewsOfGitHubSearch(body.items), total: body.total_count }
+      return { items: body.items, total: body.total_count }
     }
-  })
+  )
 
 describe('withGameDelivery on a recorded GitHub response', () => {
   it('reads every merged PR the search reported', async () => {
@@ -132,21 +128,16 @@ describe('gameDeliveryOf', () => {
   const full = (page: number) =>
     Array.from({ length: GAME_DELIVERY_PAGE_SIZE }, (_, index) => ({
       number: page * 1000 + index,
-      openedAt: '2026-11-01T00:00:00Z',
-      mergedAt: '2026-11-01T01:00:00Z'
+      created_at: '2026-11-01T00:00:00Z',
+      pull_request: { merged_at: '2026-11-01T01:00:00Z' }
     }))
+  const base = { provider: 'github' as const, repo: 'o/r', since: '2026-10-01T00:00:00Z', now }
 
   it('stops at the page cap and says the read is partial', async () => {
     let reads = 0
-    const delivery = await gameDeliveryOf({
-      provider: 'github',
-      repo: 'o/r',
-      since: '2026-10-01T00:00:00Z',
-      now,
-      readPage: async (page) => {
-        reads += 1
-        return { reviews: full(page), total: 5000 }
-      }
+    const delivery = await gameDeliveryOf(base, async (page) => {
+      reads += 1
+      return { items: full(page), total: 5000 }
     })
     expect(reads).toBe(GAME_DELIVERY_PAGES_MAX)
     expect(delivery.complete).toBe(false)
@@ -155,50 +146,48 @@ describe('gameDeliveryOf', () => {
 
   it('stops once the total is read, without asking for an empty page', async () => {
     let reads = 0
-    const delivery = await gameDeliveryOf({
-      provider: 'github',
-      repo: 'o/r',
-      since: '2026-10-01T00:00:00Z',
-      now,
-      readPage: async (page) => {
-        reads += 1
-        return { reviews: full(page), total: GAME_DELIVERY_PAGE_SIZE }
-      }
+    const delivery = await gameDeliveryOf(base, async (page) => {
+      reads += 1
+      return { items: full(page), total: GAME_DELIVERY_PAGE_SIZE }
     })
     expect(reads).toBe(1)
     expect(delivery.complete).toBe(true)
   })
 
   it('drops a GitLab MR merged before the window that an update brought along', async () => {
-    const delivery = await gameDeliveryOf({
-      provider: 'gitlab',
-      repo: 'group/project',
-      since: '2026-10-20T00:00:00Z',
-      now,
-      readPage: async () => ({
-        reviews: gameMergedReviewsOfGitLab([
+    const gitlab = { provider: 'gitlab' as const, repo: 'group/project', now }
+    const delivery = await gameDeliveryOf(
+      { ...gitlab, since: '2026-10-20T00:00:00Z' },
+      async () => ({
+        items: [
           { iid: 7, created_at: '2026-10-21T00:00:00Z', merged_at: '2026-10-22T00:00:00Z' },
           { iid: 3, created_at: '2026-09-01T00:00:00Z', merged_at: '2026-09-02T00:00:00Z' },
           { iid: 9, created_at: '2026-10-21T00:00:00Z', merged_at: null }
-        ]),
+        ],
         total: 3
       })
-    })
+    )
     expect(delivery.reviews).toEqual([
       { number: 7, openedAt: '2026-10-21T00:00:00Z', mergedAt: '2026-10-22T00:00:00Z' }
     ])
   })
 })
 
-describe('gameMergedReviewsOfGitHubSearch', () => {
+describe('gameMergedReviewsOf', () => {
   it('skips an item with no merge time or number', () => {
     expect(
-      gameMergedReviewsOfGitHubSearch([
-        { number: 1, created_at: '2026-11-01T00:00:00Z', pull_request: { merged_at: null } },
-        { number: 2, created_at: '2026-11-01T00:00:00Z' },
-        { created_at: '2026-11-01T00:00:00Z', pull_request: { merged_at: '2026-11-01T01:00:00Z' } },
-        null
-      ])
+      gameMergedReviewsOf(
+        [
+          { number: 1, created_at: '2026-11-01T00:00:00Z', pull_request: { merged_at: null } },
+          { number: 2, created_at: '2026-11-01T00:00:00Z' },
+          {
+            created_at: '2026-11-01T00:00:00Z',
+            pull_request: { merged_at: '2026-11-01T01:00:00Z' }
+          },
+          null
+        ],
+        'github'
+      )
     ).toEqual([])
   })
 })

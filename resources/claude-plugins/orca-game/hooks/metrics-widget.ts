@@ -1,5 +1,5 @@
 import type { GameMetrics } from '../types'
-import { isShape, str } from './game-state-shapes'
+import { isShape, oneOf, str } from './game-state-shapes'
 import { metricsWords } from './metrics-words'
 
 type GameClaudeAccountUse = GameMetrics['claudeAccounts'][number]
@@ -34,22 +34,18 @@ const accountOf = (value: unknown): GameClaudeAccountUse[] => {
     : []
 }
 
-const SOURCE_KINDS: readonly GameMetricsSource['kind'][] = ['github', 'gitlab', 'game']
-
 const sourceOf = (value: unknown): { source?: GameMetricsSource } => {
-  const fetchedAt = isShape(value) ? str(value.fetchedAt) : undefined
-  if (!isShape(value) || fetchedAt === undefined || Number.isNaN(Date.parse(fetchedAt))) {
-    return {}
-  }
-  const kind = SOURCE_KINDS.find((one) => one === value.kind)
-  const repo = str(value.repo)
-  return kind
+  const one = isShape(value) ? value : {}
+  const kind = oneOf(one.kind, ['github', 'gitlab', 'game'] as const)
+  const fetchedAt = str(one.fetchedAt)
+  const repo = str(one.repo)
+  return kind && fetchedAt && !Number.isNaN(Date.parse(fetchedAt))
     ? {
         source: {
           kind,
           fetchedAt,
-          ...(repo === undefined ? {} : { repo }),
-          ...(value.partial === true ? { partial: true as const } : {})
+          ...(repo && { repo }),
+          ...(one.partial === true && { partial: true })
         }
       }
     : {}
@@ -115,19 +111,15 @@ const durationOf = (ms: number): string => {
       : `${minutes}m`
 }
 
-const clockOf = (at: string): string => {
-  const date = new Date(at)
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-/** Where the days come from and when they were read; the repo only when it fits. */
-const sourceLineOf = (source: GameMetricsSource, columns: number): MetricsLine => {
-  const words = metricsWords()
-  const time = clockOf(source.fetchedAt)
-  const full = words.source(source.kind, source.repo ?? null, time, source.partial === true)
-  const text =
-    full.length <= columns ? full : words.source(source.kind, null, time, source.partial === true)
-  return { key: 'source', parts: [{ text, tone: 'dim' }] }
+/** Where the days come from and when they were read (local `HH:MM`); the repo only when it fits. */
+const sourceLineOf = (
+  { kind, repo, fetchedAt, partial }: GameMetricsSource,
+  columns: number
+): MetricsLine => {
+  const say = (shown?: string) =>
+    metricsWords().source(kind, shown, new Date(fetchedAt).toTimeString().slice(0, 5), partial)
+  const full = say(repo)
+  return { key: 'source', parts: [{ text: full.length <= columns ? full : say(), tone: 'dim' }] }
 }
 
 const toneOf = (percent: number | null): MetricsTone =>
@@ -200,7 +192,7 @@ export function metricsLinesOf(metrics: GameMetrics, columns: number): MetricsLi
           text: words.leadTime(
             median === null ? null : durationOf(median),
             metrics.leadTime.measured,
-            metrics.source !== undefined && metrics.source.kind !== 'game'
+            (metrics.source?.kind ?? 'game') === 'game' ? 'ticket' : 'PR'
           ),
           tone: 'plain'
         }
