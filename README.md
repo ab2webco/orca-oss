@@ -22,7 +22,7 @@
 <h3 align="center"><a href="https://github.com/ab2webco/orca-oss/releases/latest"><ins>Download Orca Lab</ins></a></h3>
 
 <p align="center">
-  <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four agents grouped as Needs You, Working and Done, filtered by bucket" width="960" />
+  <img src="docs/assets/readme/multi-host-fleet.gif" alt="The lead's Panel: members on this machine and on two paired hosts, each host with its running/cap, cores, free memory and load; a remote member's CI turns green and another remote PR merges, paying XP and a level-up" width="960" />
 </p>
 
 <p align="center">
@@ -68,6 +68,10 @@ Plane holds the work, GitHub holds the code, and the lead turns one into the oth
 
 The agent grid puts every live agent of every project on one screen, grouped by what it needs from you: **Needs You**, **Working**, **Done** and **Idle**. Each cell is the agent's own terminal.
 
+<p align="center">
+  <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four agents grouped as Needs You, Working and Done, filtered by bucket" width="960" />
+</p>
+
 - **One worktree per agent.** Every task gets its own git worktree, so agents never edit the same checkout; folders work as workspaces too. [Worktrees →](docs/user/model/worktrees.md)
 - **Terminals that outlive the window.** Tabs and split panes run in a background daemon, so a restart reconnects them with their recent output. [Terminal →](docs/user/terminal.md)
 - **SSH worktrees and headless hosts.** Run worktrees on a remote machine over SSH, or run the whole runtime without a window with `orca serve`. [SSH →](docs/user/ssh.md) · [Headless Linux →](docs/reference/headless-linux-server.md)
@@ -93,6 +97,14 @@ Connect a Plane workspace and its projects become a task source: a board with on
 
 - **Annotate an AI diff.** Leave notes in the diff gutter and send them straight to the agent's terminal. [Annotate →](docs/user/review/annotate-ai-diff.md)
 - **Built-in browser with design mode.** Preview the page an agent changed, pick an element, and send a question or change request with its selector, styles and HTML. [Design mode →](docs/user/browser/design-mode.md)
+
+<p align="center">
+  <img src="docs/assets/readme/diff-note.gif" alt="A diff an agent wrote: the + button in the gutter opens Add note for the AI, the note is typed and saved under line 2, and the toolbar counts 1 AI note to send" width="960" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/readme/design-mode.gif" alt="Orca's browser on a page under work: Annotate page element highlights the headline with its selector, a note for the agent is typed, and the annotation joins the list to send" width="960" />
+</p>
 
 ### Extend it with plugins
 
@@ -142,6 +154,8 @@ Orca Game turns a Claude Code session into the **lead** of a team. The lead does
 
 It looks like a game, a pixel-art party under the lead's prompt with XP and level-ups, because watching ten agents in ten terminals is hard. The rules underneath are the ones a good engineering team already keeps.
 
+The idea of running a Claude Code team as a game came from [Jucer Orozco](https://github.com/Jucerweb).
+
 <p align="center">
   <img src="docs/assets/readme/game-band-panel.gif" alt="The game band under a Claude Code lead: three members, one waiting on you; the Panel lists each member's ticket, branch, PR and CI; a merged PR and green CI award XP and a level-up" width="960" />
 </p>
@@ -166,6 +180,24 @@ It looks like a game, a pixel-art party under the lead's prompt with XP and leve
 - **Questions go somewhere real.** Members ask the lead, or stop on a decision gate; the lead answers what it can and records the answer on the ticket. What only you can decide (releases, spending, hard-to-reverse actions, product direction) becomes an owner question with options, kept in an Inbox on desktop and phone, never buried in chat.
 - **The Panel shows the truth.** One card per member with its ticket, branch, PR, CI and state, plus your open PRs, the To Do, and metrics: merges per day, lead time, and which accounts are working.
 - **Recovery is built in.** `game resume-members` brings back members a restart paused; `game adopt` takes an agent the fleet found running into the team, `game drop` lets one go without stopping it; `game lead --fresh` rotates to a new lead when the old conversation is too long.
+
+A wave fills the free slots from the To Do, one member per ticket; green CI and a merge pay XP:
+
+<p align="center">
+  <img src="docs/assets/readme/lead-wave.gif" alt="The lead's Panel with a To Do of 4; after a wave LUM-14 and LUM-15 are launched as members (+10 XP each) and the To Do drops to 2; then LUM-12's CI turns green and its PR merges, paying XP and a level-up" width="960" />
+</p>
+
+A question only you can answer lands in Orca's Inbox, and your answer goes back to the lead:
+
+<p align="center">
+  <img src="docs/assets/readme/owner-inbox.gif" alt="Orca Lab desktop: the Inbox entry shows 2; the Inbox lists the lead's two questions with option buttons; one is answered with Ship in 2.3 and the count drops to 1" width="960" />
+</p>
+
+The Panel also keeps your open PRs and the team's numbers:
+
+<p align="center">
+  <img src="docs/assets/readme/panel-metrics.gif" alt="The lead's Panel: My PRs with CI green, CI running and changes requested; then the Metrics widget with merges per day over 14 days, median lead time and each Claude account's session and weekly use" width="960" />
+</p>
 
 Settings → Agents picks how it looks, and what it costs your machine: **Off**, **Flat** (plain text), **Zen**, **2D classic** or **2D hd**. Scenes are themeable. [Orca Game reference →](docs/reference/orchestrator-game.md)
 

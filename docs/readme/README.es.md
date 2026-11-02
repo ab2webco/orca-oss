@@ -22,7 +22,7 @@
 <h3 align="center"><a href="https://github.com/ab2webco/orca-oss/releases/latest"><ins>Descargar Orca Lab</ins></a></h3>
 
 <p align="center">
-  <img src="../assets/readme/agent-grid.gif" alt="La cuadrícula de agentes de Orca Lab: cuatro agentes agrupados en Needs You, Working y Done, filtrados por grupo" width="960" />
+  <img src="../assets/readme/multi-host-fleet.gif" alt="El Panel del líder: miembros en esta máquina y en dos hosts vinculados, cada host con sus miembros en marcha y su tope, núcleos, memoria libre y carga; el CI de un miembro remoto se pone en verde y otro PR remoto se mergea, lo que da XP y una subida de nivel" width="960" />
 </p>
 
 <p align="center">
@@ -68,6 +68,10 @@ Plane guarda el trabajo, GitHub guarda el código, y el líder convierte uno en 
 
 La cuadrícula de agentes reúne en una pantalla a todos los agentes activos de todos los proyectos, agrupados por lo que necesitan de ti: **Needs You**, **Working**, **Done** e **Idle**. Cada celda es la terminal del propio agente.
 
+<p align="center">
+  <img src="../assets/readme/agent-grid.gif" alt="La cuadrícula de agentes de Orca Lab: cuatro agentes agrupados en Needs You, Working y Done, filtrados por grupo" width="960" />
+</p>
+
 - **Un worktree por agente.** Cada tarea tiene su propio worktree de git, así que los agentes nunca editan la misma copia; las carpetas también sirven como espacios de trabajo. [Worktrees →](../user/model/worktrees.md)
 - **Terminales que sobreviven a la ventana.** Las pestañas y los paneles divididos corren en un proceso en segundo plano, así que tras reiniciar se reconectan con su salida reciente. [Terminal →](../user/terminal.md)
 - **Worktrees por SSH y hosts sin pantalla.** Ejecuta worktrees en una máquina remota por SSH, o todo el runtime sin ventana con `orca serve`. [SSH →](../user/ssh.md) · [Linux sin pantalla →](../reference/headless-linux-server.md)
@@ -93,6 +97,14 @@ Conecta un espacio de trabajo de Plane y sus proyectos se convierten en fuente d
 
 - **Anota un diff hecho por IA.** Deja notas en el margen del diff y envíalas directo a la terminal del agente. [Anotar →](../user/review/annotate-ai-diff.md)
 - **Navegador integrado con modo diseño.** Previsualiza la página que cambió un agente, elige un elemento y envía una pregunta o un cambio con su selector, estilos y HTML. [Modo diseño →](../user/browser/design-mode.md)
+
+<p align="center">
+  <img src="../assets/readme/diff-note.gif" alt="Un diff que escribió un agente: el botón + del margen abre Add note for the AI, se escribe la nota y queda guardada bajo la línea 2, y la barra cuenta 1 nota para enviar" width="960" />
+</p>
+
+<p align="center">
+  <img src="../assets/readme/design-mode.gif" alt="El navegador de Orca sobre una página en desarrollo: Annotate page element resalta el titular con su selector, se escribe una nota para el agente y la anotación se suma a la lista para enviar" width="960" />
+</p>
 
 ### Extiéndelo con plugins
 
@@ -142,6 +154,8 @@ Orca Game convierte una sesión de Claude Code en el **líder** de un equipo. El
 
 Parece un juego, con un grupo en pixel art bajo el prompt del líder, XP y subidas de nivel, porque seguir a diez agentes en diez terminales es difícil. Las reglas de fondo son las que ya sigue un buen equipo de ingeniería.
 
+La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco](https://github.com/Jucerweb).
+
 <p align="center">
   <img src="../assets/readme/game-band-panel.gif" alt="La banda del juego bajo un líder de Claude Code: tres miembros, uno esperándote; el Panel muestra el ticket, la rama, el PR y el CI de cada miembro; un PR mergeado y un CI en verde dan XP y una subida de nivel" width="960" />
 </p>
@@ -166,6 +180,24 @@ Parece un juego, con un grupo en pixel art bajo el prompt del líder, XP y subid
 - **Las preguntas van a un lugar real.** Los miembros preguntan al líder, o se detienen en un decision gate; el líder responde lo que puede y registra la respuesta en el ticket. Lo que solo tú puedes decidir (releases, gastos, acciones difíciles de revertir, dirección del producto) se vuelve una pregunta para ti con opciones, guardada en una bandeja en el escritorio y en el teléfono, nunca perdida en el chat.
 - **El Panel muestra la verdad.** Una tarjeta por miembro con su ticket, rama, PR, CI y estado, más tus PR abiertos, el To Do y las métricas: merges por día, lead time y qué cuentas están trabajando.
 - **La recuperación viene incluida.** `game resume-members` trae de vuelta a los miembros que un reinicio pausó; `game adopt` suma al equipo un agente que la flota encontró en marcha y `game drop` lo deja ir sin detenerlo; `game lead --fresh` rota a un líder nuevo cuando la conversación anterior es demasiado larga.
+
+Una ola llena los cupos libres desde el To Do, un miembro por ticket; el CI en verde y el merge dan XP:
+
+<p align="center">
+  <img src="../assets/readme/lead-wave.gif" alt="El Panel del líder con un To Do de 4; tras una ola, LUM-14 y LUM-15 arrancan como miembros (+10 XP cada uno) y el To Do baja a 2; luego el CI de LUM-12 se pone en verde y su PR se mergea, lo que da XP y una subida de nivel" width="960" />
+</p>
+
+Una pregunta que solo tú puedes responder llega a la bandeja de Orca, y tu respuesta vuelve al líder:
+
+<p align="center">
+  <img src="../assets/readme/owner-inbox.gif" alt="Orca Lab de escritorio: la entrada Inbox marca 2; la bandeja lista las dos preguntas del líder con botones de opción; una se responde con Ship in 2.3 y el contador baja a 1" width="960" />
+</p>
+
+El Panel también muestra tus PR abiertos y los números del equipo:
+
+<p align="center">
+  <img src="../assets/readme/panel-metrics.gif" alt="El Panel del líder: My PRs con CI en verde, CI en curso y cambios pedidos; luego el widget Metrics con los merges por día de 14 días, el lead time mediano y el uso de sesión y semanal de cada cuenta de Claude" width="960" />
+</p>
 
 Settings → Agents elige cómo se ve y cuánto le cuesta a tu máquina: **Off**, **Flat** (texto plano), **Zen**, **2D classic** o **2D hd**. Las escenas se pueden personalizar. [Referencia de Orca Game →](../reference/orchestrator-game.md)
 
