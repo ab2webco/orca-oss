@@ -18,6 +18,7 @@ import { actionLabelOf, listActionOf } from './lead-actions'
 import type { PanelSection } from './panel-layout'
 import { metricsSectionOf } from './metrics-section'
 import { tapButtonsOf } from './tap-buttons'
+import { listTableOf, type ListTable } from './project-list-table'
 import { isTapLayout } from './tap-layout'
 import { todoDrawnCountOf, todoSectionsOf } from './todo-sections'
 
@@ -25,7 +26,7 @@ const TONE_COLORS: Readonly<Record<GameLinkTone, string>> = {
   danger: 'red',
   pending: 'yellow',
   success: 'green',
-  neutral: 'white'
+  neutral: 'gray'
 }
 
 /** Draws a section's ▾/▸ mark and heading row, and says whether the person collapsed it. */
@@ -64,40 +65,42 @@ export async function projectRowsOf(
   const text = gameStrings().text
   // Why: a closed Actions widget reads no run log.
   const runs: ActionRuns = isShown('actions') ? await actionRunsOf($) : {}
-  const itemRow = (key: string, one: GameProjectItem) => (
-    <Box key={`${key}-${one.id}`} flexDirection="row" gap={1}>
-      {one.prompt !== undefined && (
-        <Button
-          key={`work-${one.id}`}
-          plain
-          onPress={() => void workOn($, one, isDemo).catch(() => undefined)}
-        >
-          <Text color={palette.gold} bold>
-            ▶
-          </Text>
-        </Button>
-      )}
-      {/* Why no shrink: only the title gives way, so an id or status never wraps mid-word. */}
-      <Box flexShrink={0}>
-        {gameLinkOf(
-          $,
-          e,
-          { key: `${key}-link-${one.id}`, url: one.url, worktreeId, label: one.id },
-          <Text color={TONE_COLORS[one.tone ?? 'neutral']} underline>
-            {one.id}
-          </Text>
+  const itemRow = (key: string, one: GameProjectItem, table: ListTable) => {
+    const row = table.rows.find((drawn) => drawn.id === one.id)
+    return (
+      <Box key={`${key}-${one.id}`} flexDirection="row" columnGap={1}>
+        {one.prompt !== undefined && (
+          <Button
+            key={`work-${one.id}`}
+            plain
+            onPress={() => void workOn($, one, isDemo).catch(() => undefined)}
+          >
+            <Text color={palette.gold} bold>
+              ▶
+            </Text>
+          </Button>
         )}
-      </Box>
-      {one.status !== undefined && (
-        <Box flexShrink={0}>
-          <Text dimColor>{one.status}</Text>
+        <Box width={table.idCells} flexShrink={0}>
+          {gameLinkOf(
+            $,
+            e,
+            { key: `${key}-link-${one.id}`, url: one.url, worktreeId, label: one.id },
+            <Text color={palette.parchment} bold underline>
+              {one.id}
+            </Text>
+          )}
         </Box>
-      )}
-      <Box flexShrink={1} minWidth={0}>
-        <Text wrap="truncate-end">{one.title}</Text>
+        {table.statusCells > 0 && (
+          <Box width={table.statusCells} flexShrink={0}>
+            <Text color={TONE_COLORS[one.tone ?? 'neutral']}>{row?.status ?? ''}</Text>
+          </Box>
+        )}
+        <Text color={palette.parchment} wrap="truncate-end">
+          {row?.title ?? one.title}
+        </Text>
       </Box>
-    </Box>
-  )
+    )
+  }
   // A heading that opens the list, then the items, under a heading per status when they have one.
   const listRows = (
     section: 'reviews' | 'todo',
@@ -107,6 +110,11 @@ export async function projectRowsOf(
   ) => {
     const key = `project-${section}`
     const sections = todoSectionsOf(list)
+    // One table across the status groups, so their columns line up.
+    const table = listTableOf(
+      sections.flatMap((group) => group.items),
+      columns
+    )
     const isCollapsed = marks.isCollapsed(section)
     return (
       <Box key={key} flexDirection="column">
@@ -141,7 +149,7 @@ export async function projectRowsOf(
                     {`${text.todoHeadings[group.heading]}${group.count === undefined ? '' : ` ${group.count}`}`}
                   </Text>
                 ]),
-            ...group.items.map((one) => itemRow(key, one))
+            ...group.items.map((one) => itemRow(key, one, table))
           ])}
         {!isCollapsed && list.total > todoDrawnCountOf(sections) && (
           <Text dimColor>{text.moreAllies(list.total - todoDrawnCountOf(sections))}</Text>

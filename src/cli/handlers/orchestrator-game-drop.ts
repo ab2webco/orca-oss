@@ -15,6 +15,8 @@ export type GameDropResult = {
   already?: true
   host?: string
   dispatchId?: string
+  /** The live dispatch it ended; the agent and its pane keep running (ORCA-943). */
+  detached?: string
   refusal?: string
 }
 
@@ -47,7 +49,7 @@ export const formatGameDrop = (result: GameDropResult): string =>
     ? `${result.name} not dropped: ${result.refusal}`
     : result.already
       ? `${result.name} is already out of the fleet; orca game adopt ${result.name} brings it back`
-      : `${result.name} dropped from the fleet${result.host ? ` (on ${result.host})` : ''}; its agent and worktree are untouched, and orca game adopt ${result.name} brings it back`
+      : `${result.name} dropped from the fleet${result.host ? ` (on ${result.host})` : ''}${result.detached ? `, its dispatch ${result.detached} ended` : ''}; its agent and worktree are untouched, and orca game adopt ${result.name} brings it back`
 
 export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
   'game drop': async ({ flags, client, json }) => {
@@ -82,16 +84,20 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
     }
     const host = agent.remote?.host
     const live = await liveDispatchOf(client, agent)
-    if (live) {
+    // Why: a paired host's stop closes the pane there; detaching there needs a host method first.
+    if (live && host) {
       return print({
         name,
         dropped: false,
-        ...(host ? { host } : {}),
+        host,
         dispatchId: live,
-        refusal: `it has a live dispatch ${live}; drop it after its worker_done, or \`orca game stop\` ends it`
+        refusal: `its dispatch ${live} on ${host} is live, and a member on a paired host cannot be detached yet; drop it after its worker_done, or \`orca game stop\` ends it`
       })
     }
+    if (live) {
+      await client.call('orchestration.workerDetach', { dispatch: live })
+    }
     await setGameAgentDropped(client, agent, name, true)
-    print({ name, dropped: true, ...(host ? { host } : {}) })
+    print({ name, dropped: true, ...(host ? { host } : {}), ...(live ? { detached: live } : {}) })
   }
 }
