@@ -753,15 +753,15 @@ matches …` (ORCA-866).
   the member's own terminal still runs, while the agent there is mid-turn (rebind it at its
   prompt), or when its worktree has no live agent terminal or several; the result lists them. A
   member gone from its host points to it in `game fleet` and in View.
-- `orca game adopt <name|ticket> [--force]` — makes an agent `game fleet` lists as found on a
-  paired host (an agent of this project's repo no lead lists, ORCA-943) a member. It runs a new
-  task on the agent's own host terminal with `worker-start --on <host> --worktree id:<wt>
---terminal <handle>`, so lead mail reaches the agent and its status, questions and worker_done
-  reach the current lead. That path is one every paired host already serves, so there is no wire
-  change. Adoption is refused while the agent is mid-turn, so the attach brief never lands in a
-  running turn (pass `--force` to adopt anyway). It is also refused when the agent leads a Run on
-  its host or its terminal no longer runs. Adopting an agent that is already a member reuses its
-  dispatch.
+- `orca game adopt <name|ticket> [--force]` — makes an agent `game fleet` lists as found (an agent
+  of this project's repo no lead lists, ORCA-943), on this machine or on a paired host, a member. It
+  runs a new task on the agent's own terminal with `worker-start --worktree id:<wt> --terminal
+  <handle>`, plus `--on <host>` for a paired host, so lead mail reaches the agent and its status,
+  questions and worker_done reach the current lead. That path is one every paired host already
+  serves, so there is no wire change. Adoption is refused while the agent is mid-turn, so the attach
+  brief never lands in a running turn (pass `--force` to adopt anyway). It is also refused when the
+  agent leads a Run on its host or its terminal no longer runs. Adopting an agent that is already a
+  member reuses its dispatch. A local found agent of another repo is never adopted.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is

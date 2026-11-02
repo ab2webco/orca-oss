@@ -32005,6 +32005,11 @@ export class OrcaRuntimeService {
       found: args.paneKey
         ? foundGameSessionsOf(summaries, {
             leadPaneKey: args.paneKey,
+            repoId:
+              summaries.find((one) => one.agents.some((row) => row.paneKey === args.paneKey))
+                ?.repoId ??
+              worktree?.repoId ??
+              null,
             hasTerminal: (paneKey) => this.getTerminalHandleForPaneKey(paneKey) !== null,
             isLeadPane: (paneKey) =>
               this._orchestrationDb?.getCurrentRunForPane?.(paneKey) !== undefined

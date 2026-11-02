@@ -38,7 +38,11 @@ const found = {
   isMember: true,
   found: true,
   remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true },
-  worktree: { id: 'wt-915', branch: 'fabolivark/orca-915', displayName: 'orca-915' }
+  worktree: {
+    id: 'wt-915',
+    branch: 'fabolivark/orca-915',
+    displayName: 'orca-915'
+  }
 }
 
 const hostReads = (state = 'done', runs: unknown[] = []) => ({
@@ -54,14 +58,26 @@ const hostReads = (state = 'done', runs: unknown[] = []) => ({
       }
     ]
   },
-  'worktree.ps': { worktrees: [{ worktreeId: 'wt-915', agents: [{ paneKey: HOST_PANE, state }] }] },
+  'worktree.ps': {
+    worktrees: [{ worktreeId: 'wt-915', agents: [{ paneKey: HOST_PANE, state }] }]
+  },
   'orchestration.runList': { runs }
 })
 
 function clientWith(agents: unknown[]) {
   const calls: [string, unknown][] = []
   const all: Record<string, unknown> = {
-    'game.state': { config: { mode: 'on' }, agents: [LEAD, ...agents], role: 'lead' },
+    'game.state': {
+      config: { mode: 'on' },
+      agents: [LEAD, ...agents],
+      role: 'lead',
+      worktree: {
+        id: 'repo1::/repo',
+        path: '/repo',
+        branch: 'main',
+        displayName: 'repo'
+      }
+    },
     'game.stopSwitch': { stopped: null },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.taskCreate': { task: { id: 'task_adopt' } },
@@ -121,7 +137,10 @@ describe('orca game adopt (ORCA-943)', () => {
     expect(mutations(calls)).toEqual([
       [
         'orchestration.taskCreate',
-        expect.objectContaining({ taskTitle: 'ORCA-915', callerTerminalHandle: 'term_lead' })
+        expect.objectContaining({
+          taskTitle: 'ORCA-915',
+          callerTerminalHandle: 'term_lead'
+        })
       ],
       [
         'orchestration.workerStart',
@@ -154,7 +173,11 @@ describe('orca game adopt (ORCA-943)', () => {
     await adopt(client)
 
     expect(mutations(calls)).toEqual([])
-    expect(output()).toMatchObject({ adopted: true, reused: true, dispatchId: 'ctx_adopted' })
+    expect(output()).toMatchObject({
+      adopted: true,
+      reused: true,
+      dispatchId: 'ctx_adopted'
+    })
   })
 
   it('refuses while the agent is mid-turn, and adopts it with --force', async () => {
@@ -164,7 +187,10 @@ describe('orca game adopt (ORCA-943)', () => {
     await adopt(first.client)
 
     expect(mutations(first.calls)).toEqual([])
-    expect(output()).toMatchObject({ adopted: false, refusal: expect.stringMatching(/mid-turn/) })
+    expect(output()).toMatchObject({
+      adopted: false,
+      refusal: expect.stringMatching(/mid-turn/)
+    })
     expect(process.exitCode).toBe(1)
 
     const forced = clientWith([found])
@@ -186,7 +212,76 @@ describe('orca game adopt (ORCA-943)', () => {
     const { client } = clientWith([found])
 
     await expect(adopt(client, 'CINE-40')).rejects.toThrow(
-      /No agent named CINE-40 runs on this project's paired hosts/
+      /No agent named CINE-40 runs on this machine or this project's paired hosts/
     )
+  })
+
+  describe('a found agent on this machine', () => {
+    const local = (repo = 'repo1', state = 'idle') => ({
+      paneKey: 'tab-7:leaf-7',
+      displayName: 'orca-907',
+      agentType: 'claude',
+      state,
+      toolName: null,
+      isLeader: false,
+      isMember: true,
+      found: true,
+      terminalHandle: 'term_local_7',
+      worktree: {
+        id: `${repo}::/wt/orca-907`,
+        branch: 'fabolivark/orca-907',
+        displayName: 'orca-907'
+      }
+    })
+
+    it('starts a dispatch on its own local terminal, with no host', async () => {
+      const { client, calls } = clientWith([local()])
+
+      await adopt(client, 'ORCA-907')
+
+      expect(mutations(calls)).toEqual([
+        ['orchestration.taskCreate', expect.objectContaining({ taskTitle: 'ORCA-907' })],
+        [
+          'orchestration.workerStart',
+          expect.objectContaining({
+            task: 'task_adopt',
+            worktree: 'id:repo1::/wt/orca-907',
+            terminal: 'term_local_7',
+            from: 'term_lead'
+          })
+        ]
+      ])
+      expect(mutations(calls)[1][1]).not.toHaveProperty('on')
+      expect(host.calls).toEqual([])
+      expect(output()).toMatchObject({
+        adopted: true,
+        terminal: 'term_local_7'
+      })
+    })
+
+    it('refuses it while mid-turn unless --force', async () => {
+      const { client, calls } = clientWith([local('repo1', 'working')])
+
+      await adopt(client, 'ORCA-907')
+
+      expect(mutations(calls)).toEqual([])
+      expect(output().refusal).toMatch(/mid-turn/)
+    })
+
+    it("never adopts another project's local agent", async () => {
+      const { client, calls } = clientWith([local('repo2')])
+
+      await expect(adopt(client, 'ORCA-907')).rejects.toThrow(/No agent named ORCA-907/)
+      expect(mutations(calls)).toEqual([])
+    })
+
+    it('says an already adopted local member is one, without a new dispatch', async () => {
+      const { client, calls } = clientWith([{ ...local(), found: undefined }])
+
+      await adopt(client, 'ORCA-907')
+
+      expect(mutations(calls)).toEqual([])
+      expect(output()).toMatchObject({ adopted: true, reused: true })
+    })
   })
 })

@@ -8,6 +8,7 @@ import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
+import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
 
 type Client = Parameters<CommandHandler>[0]['client']
@@ -29,7 +30,7 @@ const PS_LIMIT = 10_000
 // Why: the attach brief must never land in a running turn.
 const MID_TURN = new Set(['working', 'blocked', 'waiting'])
 
-const named = (agent: GameAgent, name: string): boolean =>
+export const isGameAgentNamed = (agent: GameAgent, name: string): boolean =>
   ticketOfMember(agent) === name.toUpperCase() ||
   agent.displayName?.toLowerCase() === name.toLowerCase()
 
@@ -45,36 +46,27 @@ function hostPaneOf(agent: GameAgent): string | null {
     : null
 }
 
-/** Gives an agent found on a paired host a dispatch on its own terminal, so mail reaches it both ways. */
-async function adoptAgent(
-  client: Client,
-  agents: readonly GameAgent[],
+type Seat = { terminal: string; environmentId?: string; host?: string }
+
+// Why the repo id: a local found row may be any project's; only this project's is ever adopted.
+export const isSameGameProject = (worktreeId: string, leadWorktreeId: string | null): boolean =>
+  leadWorktreeId !== null &&
+  getRepoIdFromWorktreeId(worktreeId) === getRepoIdFromWorktreeId(leadWorktreeId)
+
+const MID_TURN_REFUSAL = 'its agent is mid-turn; adopt it at its prompt, or pass --force'
+
+/** The found agent's terminal on its paired host, read there, or why it cannot be adopted. */
+async function hostSeatOf(
+  found: {
+    hostPane: string
+    environmentId: string
+    host: string
+    worktreeId: string
+  },
   name: string,
-  args: { force: boolean; flags: Map<string, string | boolean>; cwd: string }
-): Promise<GameAdoptResult> {
-  const adopted = agents.find(
-    (agent) => agent.isMember && agent.remote && remoteDispatchIdOf(agent) && named(agent, name)
-  )
-  if (adopted) {
-    return {
-      name,
-      adopted: true,
-      reused: true,
-      host: adopted.remote?.host,
-      dispatchId: remoteDispatchIdOf(adopted)!
-    }
-  }
-  const found = agents.find((agent) => agent.found && hostPaneOf(agent) && named(agent, name))
-  const hostPane = found ? hostPaneOf(found) : null
-  const environmentId = found?.remote?.environmentId
-  const worktreeId = found?.worktree?.id
-  if (!found || !hostPane || !environmentId || !worktreeId) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `No agent named ${name} runs on this project's paired hosts; see \`orca game fleet\`. Another project's agents are never listed, so never adopted.`
-    )
-  }
-  const host = found.remote?.host ?? environmentId
+  force: boolean
+): Promise<Seat | GameAdoptResult> {
+  const { hostPane, environmentId, host, worktreeId } = found
   const where = await openHostRuntimeClient(environmentId)
   const [terminals, ps, runs] = await Promise.all([
     where.call<{ terminals: RuntimeTerminalSummary[] }>('terminal.list', {
@@ -83,7 +75,12 @@ async function adoptAgent(
     where.call<RuntimeWorktreePsResult>('worktree.ps', { limit: PS_LIMIT }),
     where.call<{ runs: { coordinator_pane_key: string | null }[] }>('orchestration.runList', {})
   ])
-  const refuse = (refusal: string): GameAdoptResult => ({ name, adopted: false, host, refusal })
+  const refuse = (refusal: string): GameAdoptResult => ({
+    name,
+    adopted: false,
+    host,
+    refusal
+  })
   if (
     runs.result.runs.some(
       (run) => run.coordinator_pane_key && samePane(run.coordinator_pane_key, hostPane)
@@ -103,8 +100,74 @@ async function adoptAgent(
   const agentState = ps.result.worktrees
     .find((one) => one.worktreeId === worktreeId)
     ?.agents.find((row) => samePane(row.paneKey, hostPane))?.state
-  if (!args.force && agentState && MID_TURN.has(agentState)) {
-    return refuse('its agent is mid-turn; adopt it at its prompt, or pass --force')
+  if (!force && agentState && MID_TURN.has(agentState)) {
+    return refuse(MID_TURN_REFUSAL)
+  }
+  return { terminal: terminal.handle, environmentId, host }
+}
+
+/** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
+async function adoptAgent(
+  client: Client,
+  agents: readonly GameAgent[],
+  name: string,
+  args: {
+    force: boolean
+    flags: Map<string, string | boolean>
+    cwd: string
+    leadWorktreeId: string | null
+  }
+): Promise<GameAdoptResult> {
+  const adopted = agents.find(
+    (agent) =>
+      agent.isMember && agent.remote && remoteDispatchIdOf(agent) && isGameAgentNamed(agent, name)
+  )
+  if (adopted) {
+    return {
+      name,
+      adopted: true,
+      reused: true,
+      host: adopted.remote?.host,
+      dispatchId: remoteDispatchIdOf(adopted)!
+    }
+  }
+  const ours = (agent: GameAgent): boolean =>
+    !agent.remote &&
+    agent.worktree !== undefined &&
+    isSameGameProject(agent.worktree.id, args.leadWorktreeId) &&
+    isGameAgentNamed(agent, name)
+  if (agents.some((agent) => agent.isMember && !agent.found && !agent.isLeader && ours(agent))) {
+    return { name, adopted: true, reused: true }
+  }
+  const local = agents.find((agent) => agent.found && agent.terminalHandle && ours(agent))
+  const found =
+    local ??
+    agents.find((agent) => agent.found && hostPaneOf(agent) && isGameAgentNamed(agent, name))
+  const worktreeId = found?.worktree?.id
+  const hostPane = found ? hostPaneOf(found) : null
+  const environmentId = found?.remote?.environmentId
+  if (!found || !worktreeId || (!local && (!hostPane || !environmentId))) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `No agent named ${name} runs on this machine or this project's paired hosts; see \`orca game fleet\`. Another project's agents are never listed, so never adopted.`
+    )
+  }
+  const seat: Seat | GameAdoptResult = local?.terminalHandle
+    ? !args.force && MID_TURN.has(local.state)
+      ? { name, adopted: false, refusal: MID_TURN_REFUSAL }
+      : { terminal: local.terminalHandle }
+    : await hostSeatOf(
+        {
+          hostPane: hostPane!,
+          environmentId: environmentId!,
+          host: found.remote?.host ?? environmentId!,
+          worktreeId
+        },
+        name,
+        args.force
+      )
+  if ('adopted' in seat) {
+    return seat
   }
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const title = ticketOfMember(found) ?? found.displayName ?? name
@@ -113,14 +176,14 @@ async function adoptAgent(
     taskTitle: title,
     callerTerminalHandle: from
   })
-  // Why worker-start --on with --terminal: the path every paired host already serves, so no wire change.
+  // Why worker-start (--on for a host) with --terminal: the path every paired host already serves, so no wire change.
   const started = await client.call<{ dispatchId: string; state: string }>(
     'orchestration.workerStart',
     {
       task: task.result.task.id,
-      on: environmentId,
+      ...(seat.environmentId ? { on: seat.environmentId } : {}),
       worktree: `id:${worktreeId}`,
-      terminal: terminal.handle,
+      terminal: seat.terminal,
       displayName: title,
       from,
       devMode: isDevCliInvocation()
@@ -129,8 +192,8 @@ async function adoptAgent(
   return {
     name,
     adopted: started.result.state === 'ready',
-    host,
-    terminal: terminal.handle,
+    ...(seat.host ? { host: seat.host } : {}),
+    terminal: seat.terminal,
     dispatchId: started.result.dispatchId,
     state: started.result.state
   }
@@ -140,8 +203,8 @@ export const formatGameAdopt = (result: GameAdoptResult): string =>
   result.refusal
     ? `${result.name} not adopted: ${result.refusal}`
     : result.reused
-      ? `${result.name} is already a member on ${result.host ?? 'its host'}: dispatch ${result.dispatchId}`
-      : `${result.name} adopted on ${result.host} (${result.terminal}): dispatch ${result.dispatchId} [${result.state}]`
+      ? `${result.name} is already a member on ${result.host ?? 'this machine'}${result.dispatchId ? `: dispatch ${result.dispatchId}` : ''}`
+      : `${result.name} adopted on ${result.host ?? 'this machine'} (${result.terminal}): dispatch ${result.dispatchId} [${result.state}]`
 
 export const ORCHESTRATOR_GAME_ADOPT_HANDLERS: Record<string, CommandHandler> = {
   'game adopt': async ({ flags, client, cwd, json }) => {
@@ -152,10 +215,12 @@ export const ORCHESTRATOR_GAME_ADOPT_HANDLERS: Record<string, CommandHandler> = 
     }
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, `adopting ${name}`)
+    const leadWorktreeId = response.result.worktree?.id ?? null
     const result = await adoptAgent(client, response.result.agents, name, {
       force: flags.get('force') === true,
       flags,
-      cwd
+      cwd,
+      leadWorktreeId
     })
     if (!result.adopted) {
       process.exitCode = 1
