@@ -11,13 +11,15 @@ type MetricFixture = {
   memory: { workingSetSize: number }
 }
 
-const { appMetricsMock } = vi.hoisted(() => ({
-  appMetricsMock: vi.fn<() => MetricFixture[]>(() => [])
+const { appMetricsMock, gpuFeatureStatusMock } = vi.hoisted(() => ({
+  appMetricsMock: vi.fn<() => MetricFixture[]>(() => []),
+  gpuFeatureStatusMock: vi.fn<() => Record<string, string>>(() => ({}))
 }))
 
 vi.mock('electron', () => ({
   app: {
-    getAppMetrics: appMetricsMock
+    getAppMetrics: appMetricsMock,
+    getGPUFeatureStatus: gpuFeatureStatusMock
   }
 }))
 
@@ -61,6 +63,32 @@ describe('process gone diagnostics', () => {
       processMetricsCount: 2,
       processMetricsRendererWorkingSetMB: 400,
       processMetricsLargestPid: 22
+    })
+  })
+
+  it('records whether WebGL ran on hardware when the process died', () => {
+    gpuFeatureStatusMock.mockReturnValue({
+      webgl: 'enabled',
+      webgl2: 'enabled',
+      gpu_compositing: 'enabled',
+      rasterization: 'enabled'
+    })
+
+    expect(buildProcessGoneCrashDetails({ processType: 'renderer' })).toMatchObject({
+      gpuFeatureWebgl: 'enabled',
+      gpuFeatureWebgl2: 'enabled',
+      gpuFeatureGpuCompositing: 'enabled'
+    })
+  })
+
+  it('names a GPU status read failure instead of dropping the crash details', () => {
+    gpuFeatureStatusMock.mockImplementation(() => {
+      throw new TypeError('GPU info unavailable')
+    })
+
+    expect(buildProcessGoneCrashDetails({ processType: 'renderer' })).toMatchObject({
+      processType: 'renderer',
+      gpuFeatureStatusError: 'TypeError'
     })
   })
 

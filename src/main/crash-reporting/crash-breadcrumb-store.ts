@@ -4,10 +4,18 @@ import {
   type CrashReportBreadcrumbData,
   type CrashReportBreadcrumb
 } from '../../shared/crash-reporting'
+import { TERMINAL_WEBGL_DIAGNOSTIC_BREADCRUMB } from '../../shared/terminal-webgl-diagnostics'
 
 const MAX_BREADCRUMBS = 30
-// Why: retain two thresholds for each renderer surface without growing the ring.
-const MAX_RETAINED_BREADCRUMBS = 4
+// Why: per-category caps so one category can never evict another's evidence.
+// High-water: two thresholds for each renderer surface. WebGL context loss: the
+// last one, which a per-reveal atlas-reset storm would otherwise push out of the
+// ring before a renderer crash (GitHub #822).
+const RETAINED_BREADCRUMB_CAPS = {
+  'memory-highwater': 4,
+  'webgl-context-loss': 1
+} as const
+type RetainedBreadcrumbCategory = keyof typeof RETAINED_BREADCRUMB_CAPS
 // Why: coalesceKey embeds an open-string agentType (length-trimmed only, never
 // enum-checked), so the key space is unbounded over a long multi-agent/SSH session.
 // Bound the coalesce map the same way ProcessGoneDedupe bounds its key map.
@@ -36,13 +44,47 @@ let breadcrumbs: CrashReportBreadcrumb[] = []
 let retainedBreadcrumbs = new Map<string, CrashReportBreadcrumb>()
 let coalescedBreadcrumbs = new Map<string, CoalescedBreadcrumbState>()
 
-function retainedBreadcrumbKey(breadcrumb: CrashReportBreadcrumb): string | null {
-  if (breadcrumb.name !== 'renderer_memory_highwater') {
-    return null
+function retainedBreadcrumbCategory(
+  breadcrumb: CrashReportBreadcrumb
+): RetainedBreadcrumbCategory | null {
+  if (breadcrumb.name === 'renderer_memory_highwater') {
+    return 'memory-highwater'
+  }
+  if (
+    breadcrumb.name === TERMINAL_WEBGL_DIAGNOSTIC_BREADCRUMB &&
+    breadcrumb.data?.kind === 'webgl-context-loss'
+  ) {
+    return 'webgl-context-loss'
+  }
+  return null
+}
+
+function retainedBreadcrumbKey(
+  breadcrumb: CrashReportBreadcrumb,
+  category: RetainedBreadcrumbCategory
+): string {
+  if (category === 'webgl-context-loss') {
+    return category
   }
   const surface = breadcrumb.data?.rendererSurface
   const threshold = breadcrumb.data?.thresholdPct
-  return `${breadcrumb.name}:${String(surface)}:${String(threshold)}`
+  return `${category}:${String(surface)}:${String(threshold)}`
+}
+
+function retainBreadcrumb(
+  breadcrumb: CrashReportBreadcrumb,
+  category: RetainedBreadcrumbCategory
+): void {
+  const key = retainedBreadcrumbKey(breadcrumb, category)
+  retainedBreadcrumbs.delete(key)
+  retainedBreadcrumbs.set(key, breadcrumb)
+  const sameCategoryKeys = [...retainedBreadcrumbs.keys()].filter(
+    (retainedKey) => retainedKey === category || retainedKey.startsWith(`${category}:`)
+  )
+  const overflow = sameCategoryKeys.length - RETAINED_BREADCRUMB_CAPS[category]
+  for (const oldestKey of sameCategoryKeys.slice(0, Math.max(0, overflow))) {
+    retainedBreadcrumbs.delete(oldestKey)
+  }
 }
 
 /** Returns the stored breadcrumb so coalescing can refresh the entry it owns. */
@@ -61,17 +103,9 @@ export function recordCrashBreadcrumb(
   if (!breadcrumb) {
     return
   }
-  const retainedKey = retainedBreadcrumbKey(breadcrumb)
-  if (retainedKey) {
-    retainedBreadcrumbs.delete(retainedKey)
-    retainedBreadcrumbs.set(retainedKey, breadcrumb)
-    while (retainedBreadcrumbs.size > MAX_RETAINED_BREADCRUMBS) {
-      const oldestKey = retainedBreadcrumbs.keys().next()
-      if (oldestKey.done) {
-        break
-      }
-      retainedBreadcrumbs.delete(oldestKey.value)
-    }
+  const retainedCategory = retainedBreadcrumbCategory(breadcrumb)
+  if (retainedCategory) {
+    retainBreadcrumb(breadcrumb, retainedCategory)
     return breadcrumb
   }
   breadcrumbs.push(breadcrumb)
