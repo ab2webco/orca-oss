@@ -518,7 +518,7 @@ function longPollClassOf(request: RpcRequest): LongPollClass | null {
     return 'wait'
   }
   // Why: a wake waits up to 30 s for the pane to start, as long as the idle cap (ORCA-915).
-  if (request.method === 'terminal.wake') {
+  if (request.method === 'terminal.wake' || request.method === 'game.memberWake') {
     return 'wait'
   }
   if (request.method === 'orchestration.check') {

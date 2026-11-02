@@ -26,7 +26,8 @@ afterEach(async () => {
 async function startRuntimeHoldingAWake(): Promise<{ endpoint: string; authToken: string }> {
   const userDataPath = mkdtempSync(join(tmpdir(), 'orca-wake-keepalive-'))
   const runtime = new OrcaRuntimeService()
-  Object.assign(runtime, { wakeTerminal: () => new Promise(() => {}) })
+  const held = (): Promise<never> => new Promise(() => {})
+  Object.assign(runtime, { wakeTerminal: held, wakeGameMember: held })
   const server = new OrcaRuntimeRpcServer({
     runtime,
     userDataPath,
@@ -74,14 +75,13 @@ async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<vo
 }
 
 describe('a held terminal wake over the real runtime socket', () => {
-  it('writes keepalive frames while the pane is still starting', async () => {
+  it.each([
+    ['terminal.wake', { terminal: 'term_asleep' }],
+    ['game.memberWake', { dispatchId: 'ctx_remote' }]
+  ])('%s writes keepalive frames while the pane is still starting', async (method, params) => {
     const target = await startRuntimeHoldingAWake()
 
-    const frames = collectFrames(target, {
-      id: 'req-wake-1',
-      method: 'terminal.wake',
-      params: { terminal: 'term_asleep' }
-    })
+    const frames = collectFrames(target, { id: 'req-wake-1', method, params })
 
     await waitFor(() => frames().filter((line) => line.includes('_keepalive')).length >= 2)
     expect(frames().every((line) => line.includes('_keepalive'))).toBe(true)

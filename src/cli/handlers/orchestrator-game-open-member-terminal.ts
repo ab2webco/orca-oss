@@ -1,6 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { stopOne, type GameStopEntry, type GameStopWorker } from './orchestrator-game-stop'
-import type { GameResumedMember } from './orchestrator-game-resume-members'
+import type { GameResumedMember } from './orchestrator-game-resumed-member-report'
 import type { RuntimeTerminalSend } from '../../shared/runtime-types'
 import type { GamePausedMember } from '../../shared/orchestrator-game-member-sessions'
 

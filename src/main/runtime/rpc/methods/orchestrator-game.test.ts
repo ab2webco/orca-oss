@@ -366,6 +366,29 @@ describe('game.setView RPC', () => {
   })
 })
 
+describe('game.memberWake RPC', () => {
+  it('passes the caller and the dispatch of the member to wake on its host (ORCA-915)', async () => {
+    const asked: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      wakeGameMember: async (args: unknown) => {
+        asked.push(args)
+        return { handle: 'term_woken', status: 'woken' }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'w', authToken: 'test', method: 'game.memberWake', params })
+
+    await expect(send({ terminalHandle: 'h1', dispatchId: 'ctx_1' })).resolves.toMatchObject({
+      ok: true,
+      result: { wake: { handle: 'term_woken', status: 'woken' } }
+    })
+    await expect(send({ terminalHandle: 'h1' })).resolves.toMatchObject({ ok: false })
+    expect(asked).toEqual([{ worktreeId: undefined, terminalHandle: 'h1', dispatchId: 'ctx_1' }])
+  })
+})
+
 describe('game.fleetWait RPC', () => {
   const dispatcherWith = (waitGameFleetChange: (args: unknown) => Promise<unknown>) =>
     new RpcDispatcher({
