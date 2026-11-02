@@ -202,6 +202,7 @@ import {
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
 // Why longer: the host answers after a full `ps` sweep, and only a first read waits for it.
 const GAME_HOST_CAPACITY_TIMEOUT_MS = 6_000
+const GAME_REMOTE_SESSIONS_LIMIT = 200
 
 const gameHostProfileOfThisMachine = (): GameHostProfile => ({
   totalMemory: totalmem(),
@@ -778,6 +779,11 @@ import { EngramLessonMirror, engramRequestOf } from './orchestrator-game-lesson-
 import { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
 import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
+import {
+  RemoteHostSessionsReader,
+  remoteFoundSessionsOf,
+  remoteWorktreeKeyOf
+} from './orchestrator-game-remote-found'
 import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
 import { collectHostMemory } from '../memory/host-memory'
 import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
@@ -3841,6 +3847,17 @@ export class OrcaRuntimeService {
         undefined,
         GAME_HOST_CAPACITY_TIMEOUT_MS
       )
+  })
+  // Why worktree.ps: every paired host already answers it, so no wire change (ORCA-943).
+  private readonly gameRemoteSessions = new RemoteHostSessionsReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    readPs: async (environmentId) =>
+      (await this.callOrchestrationWorkerServer(
+        environmentId,
+        'worktree.ps',
+        { limit: GAME_REMOTE_SESSIONS_LIMIT },
+        GAME_HOST_CAPACITY_TIMEOUT_MS
+      )) as { worktrees?: RuntimeWorktreePsSummary[] }
   })
   private readonly gamePairedHosts = new GamePairedHostReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
@@ -32008,11 +32025,9 @@ export class OrcaRuntimeService {
         return null
       }
     })
-    const withRemote = await this.withRemoteGameMembers(
-      state,
-      args.paneKey,
-      worktree,
-      worktreesById
+    const withRemote = await this.withRemoteFoundSessions(
+      await this.withRemoteGameMembers(state, args.paneKey, worktree, worktreesById),
+      worktree
     )
     const withPaused = await this.withPausedGameMembers(withRemote, {
       repoId: args.paneKey ? worktree?.repoId : undefined,
@@ -32089,6 +32104,32 @@ export class OrcaRuntimeService {
         repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null
     })
     return { ...state, agents: [...state.agents, ...remote] }
+  }
+
+  private gameRepoNameOf(repoId: string): string | null {
+    return this.store?.getRepo(repoId)?.displayName ?? null
+  }
+
+  /** The project's agents on paired hosts that no lead lists, so a new lead sees them at once (ORCA-943). */
+  private async withRemoteFoundSessions(
+    state: OrchestratorGameState,
+    worktree: ResolvedWorktree | null
+  ): Promise<OrchestratorGameState> {
+    // Why the repo's name: a host keys its own clone by its own id, and the clone keeps the name.
+    const repoName = worktree?.repoId ? this.gameRepoNameOf(worktree.repoId) : null
+    if (state.role !== 'lead' || !repoName) {
+      return state
+    }
+    const hosts = await this.gameRemoteSessions.read().catch(() => [])
+    const listed = new Set(
+      state.agents.flatMap((agent) =>
+        agent.remote?.environmentId && agent.worktree
+          ? [remoteWorktreeKeyOf(agent.remote.environmentId, agent.worktree.id)]
+          : []
+      )
+    )
+    const found = remoteFoundSessionsOf(hosts, { repoName, listed })
+    return found.length === 0 ? state : { ...state, agents: [...state.agents, ...found] }
   }
 
   // Why only a lead pane: it is the one whose members are saved, and the one that resumes them.
