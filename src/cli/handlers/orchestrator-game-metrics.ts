@@ -15,6 +15,7 @@ import {
   gameMetricsSummaryOf,
   type GameMetricsSummary
 } from '../../shared/orchestrator-game-metrics-summary'
+import { withGameDelivery, type GameDelivery } from '../../shared/orchestrator-game-delivery'
 import {
   desktopGameTimezoneOf,
   isOrchestratorGameTimezone,
@@ -130,20 +131,55 @@ function timezoneOf(flags: Map<string, string | boolean>): string {
   return zone
 }
 
+const PROVIDER_NAMES = { github: 'GitHub', gitlab: 'GitLab' } as const
+
+/** Where the daily numbers come from, and when they were read. */
+export function sourcePartsOf(source: GameMetricsSummary['source']): string[] {
+  if (!source || source.kind === 'game') {
+    return ["Orca Game's own events", 'review provider not read']
+  }
+  return [
+    `${PROVIDER_NAMES[source.kind]}${source.repo ? ` ${source.repo}` : ''} merged PRs`,
+    `read ${source.fetchedAt}`,
+    ...(source.partial ? ['more merges than one read holds'] : [])
+  ]
+}
+
 function dailyLines(daily: GameMetricsSummary): string[] {
   const merged = daily.mergedPerDay.reduce((sum, one) => sum + one.merged, 0)
   const median = daily.leadTime.medianMs
+  const measured =
+    daily.source && daily.source.kind !== 'game' ? 'PR open to merge' : 'claim to merge'
   return [
     ...row(`Last ${daily.mergedPerDay.length} days`, [
       `to ${daily.mergedPerDay.at(-1)?.day ?? '?'} ${daily.timezone}`,
       `${merged} merged`,
-      `lead time median ${median === null ? 'no data' : formatDuration(median)}`
+      `lead time median ${median === null ? 'no data' : formatDuration(median)} (${measured})`
     ]),
     ...row(
       'Merged per day',
       daily.mergedPerDay.map((one) => `${one.day.slice(5)} ${one.merged}`)
-    )
+    ),
+    ...row('Source', sourcePartsOf(daily.source))
   ]
+}
+
+/** The host's provider read; null from an older host, which keeps no such read. */
+async function deliveryOf(
+  client: Parameters<CommandHandler>[0]['client']
+): Promise<GameDelivery | null> {
+  try {
+    const { result } = await client.call<{ delivery: GameDelivery | null }>(
+      'game.delivery',
+      gameBoardCaller()
+    )
+    return result.delivery
+  } catch (error) {
+    if (error instanceof RuntimeClientError && error.code === 'method_not_found') {
+      return null
+    }
+    throw error
+  }
 }
 
 export function formatGameMetrics(metrics: GameMetrics & { daily?: GameMetricsSummary }): string {
@@ -243,7 +279,9 @@ export const ORCHESTRATOR_GAME_METRICS_HANDLERS: Record<string, CommandHandler> 
     const metrics = computeGameMetrics(stores, { ticket, since, until, character })
     // Why only unfiltered: the days are the scene widget's own window, not the query's.
     const filtered = [ticket, since, until, character].some((one) => one !== undefined)
-    const daily = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
+    const own = filtered ? null : gameMetricsSummaryOf(stores, { now: Date.now(), timezone })
+    const delivery = own ? await deliveryOf(client) : null
+    const daily = own && delivery ? withGameDelivery(own, delivery) : own
     printResult(
       { ...history, result: daily ? { ...metrics, daily } : metrics },
       json,

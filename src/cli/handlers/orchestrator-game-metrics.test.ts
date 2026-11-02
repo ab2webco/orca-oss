@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatGameMetrics, ORCHESTRATOR_GAME_METRICS_HANDLERS } from './orchestrator-game-metrics'
 import { computeGameMetrics } from '../../shared/orchestrator-game-metrics'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import type { GameDelivery } from '../../shared/orchestrator-game-delivery'
 
 const EVENTS = [
   { at: '2026-10-20T15:00:00.000Z', kind: 'merged', ticket: 'CIN-3', text: null, by: 'orca' },
@@ -68,12 +69,20 @@ const CHARACTERS = [
   }
 ]
 
-function fakeClient(fail = false, characters: unknown[] | 'unknown' = CHARACTERS) {
+function fakeClient(
+  fail = false,
+  characters: unknown[] | 'unknown' = CHARACTERS,
+  delivery: GameDelivery | null | 'unknown' = null
+) {
   const calls: [string, unknown][] = []
   const client = {
     call: async (method: string, params: unknown) => {
       calls.push([method, params])
-      if (fail || (method === 'game.characters' && characters === 'unknown')) {
+      if (
+        fail ||
+        (method === 'game.characters' && characters === 'unknown') ||
+        (method === 'game.delivery' && delivery === 'unknown')
+      ) {
         throw new RuntimeClientError('method_not_found', `Unknown method: ${method}`)
       }
       const result =
@@ -81,7 +90,9 @@ function fakeClient(fail = false, characters: unknown[] | 'unknown' = CHARACTERS
           ? { events: EVENTS }
           : method === 'game.characters'
             ? { characters }
-            : { records: RECORDS }
+            : method === 'game.delivery'
+              ? { delivery }
+              : { records: RECORDS }
       return { id: '1', ok: true, result, _meta: { runtimeId: 'rt' } }
     }
   } as unknown as RuntimeClient
@@ -265,10 +276,63 @@ describe('orca game metrics', () => {
       merged: 1
     })
     const text = output.join('\n')
-    expect(text).toContain('Last 14 days   to 2026-10-21 UTC · 2 merged · lead time median 3d 15h')
+    expect(text).toContain('Last 14 days   to 2026-10-21 UTC · 2 merged')
+    expect(text).toContain('lead time median 3d 15h (claim to merge)')
     expect(text).toMatch(/^Merged per day 10-08 0 · /m)
     expect(text).toMatch(/10-19 1\n {15}10-20 1 · 10-21 0$/m)
+    expect(text).toContain("Source         Orca Game's own events · review provider not read")
     expect(Math.max(...text.split('\n').map((line) => line.length))).toBeLessThanOrEqual(80)
+  })
+
+  it("counts the 14 days from the provider's merged PRs when the host has read them", async () => {
+    vi.useFakeTimers({ now: Date.parse('2026-10-21T12:00:00.000Z'), toFake: ['Date'] })
+    const delivery: GameDelivery = {
+      provider: 'github',
+      repo: 'ab2webco/orca-oss',
+      fetchedAt: '2026-10-21T11:58:00.000Z',
+      since: '2026-10-06T12:00:00.000Z',
+      complete: true,
+      reviews: [
+        { number: 1, openedAt: '2026-10-20T08:00:00Z', mergedAt: '2026-10-20T09:00:00Z' },
+        { number: 2, openedAt: '2026-10-20T08:00:00Z', mergedAt: '2026-10-20T11:00:00Z' },
+        { number: 3, openedAt: '2026-10-21T08:00:00Z', mergedAt: '2026-10-21T10:00:00Z' }
+      ]
+    }
+    const { client, calls } = fakeClient(false, CHARACTERS, delivery)
+
+    await run(client, [['timezone', 'UTC']])
+    const daily = JSON.parse(output.join('')).result.daily
+    output = []
+    await run(client, [['timezone', 'UTC']], false)
+    vi.useRealTimers()
+
+    expect(calls).toContainEqual([
+      'game.delivery',
+      { worktreeId: 'wt1', terminalHandle: 'term_lead' }
+    ])
+    expect(daily.mergedPerDay.slice(-2)).toEqual([
+      { day: '2026-10-20', merged: 2 },
+      { day: '2026-10-21', merged: 1 }
+    ])
+    expect(daily.leadTime).toEqual({ medianMs: 2 * 3_600_000, measured: 3 })
+    expect(daily.source).toEqual({
+      kind: 'github',
+      repo: 'ab2webco/orca-oss',
+      fetchedAt: '2026-10-21T11:58:00.000Z'
+    })
+    const text = output.join('\n')
+    expect(text).toContain('to 2026-10-21 UTC · 3 merged')
+    expect(text).toContain('lead time median 2h 00m (PR open to merge)')
+    expect(text).toContain(
+      'Source         GitHub ab2webco/orca-oss merged PRs\n               read 2026-10-21T11:58:00.000Z'
+    )
+    expect(Math.max(...text.split('\n').map((line) => line.length))).toBeLessThanOrEqual(80)
+  })
+
+  it("keeps the game's own days on an Orca that cannot read the provider yet", async () => {
+    const { client } = fakeClient(false, CHARACTERS, 'unknown')
+    await run(client, [['timezone', 'UTC']])
+    expect(JSON.parse(output.join('')).result.daily.source.kind).toBe('game')
   })
 
   it('leaves the 14 days out of a filtered query, whose window is its own', async () => {

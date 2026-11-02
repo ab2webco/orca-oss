@@ -12,6 +12,16 @@ export const GAME_METRICS_COMPUTE_BUDGET_MS = 50
 
 export type GameMetricsDay = { day: string; merged: number }
 
+/** Where `mergedPerDay` and `leadTime` come from; absent from an older host (ORCA-950). */
+export type GameMetricsSource = {
+  /** `game`: Orca Game's own events, when the review provider could not be read. */
+  kind: 'github' | 'gitlab' | 'game'
+  repo?: string
+  fetchedAt: string
+  /** The provider had more merges than the pages read. */
+  partial?: true
+}
+
 export type GameMetricsSummary = {
   computedAt: string
   /** The zone `day` is a calendar day of. */
@@ -20,6 +30,7 @@ export type GameMetricsSummary = {
   mergedPerDay: GameMetricsDay[]
   /** Over the whole `mergedPerDay` window. */
   leadTime: { medianMs: number | null; measured: number }
+  source?: GameMetricsSource
   /** The managed Claude accounts' use; absent when the host has no account services. */
   claudeAccounts?: GameClaudeAccountUsage[]
 }
@@ -59,6 +70,12 @@ const offsetOf = (at: number, timezone: string): number => {
 
 const dayKeyOf = (utcDate: number): string => new Date(utcDate).toISOString().slice(0, 10)
 
+/** The `YYYY-MM-DD` calendar day `at` falls on in `timezone`. */
+export function gameDayKeyOf(at: number, timezone: string): string {
+  const wall = wallClockOf(at, timezone)
+  return dayKeyOf(Date.UTC(wall.year, wall.month - 1, wall.day))
+}
+
 function midnightOf(day: string, timezone: string): number {
   const guess = Date.parse(`${day}T00:00:00.000Z`)
   // Why twice: the first offset is the one at UTC midnight, which can sit across a DST change.
@@ -92,15 +109,16 @@ export function gameMetricsSummaryOf(
   // Why one query bucketed: a ticket freed one day and merged the next is done once, on its last.
   const merged = new Map<string, number>()
   for (const at of Object.values(ticketsDoneAt)) {
-    const wall = wallClockOf(Date.parse(at), timezone)
-    const day = dayKeyOf(Date.UTC(wall.year, wall.month - 1, wall.day))
+    const day = gameDayKeyOf(Date.parse(at), timezone)
     merged.set(day, (merged.get(day) ?? 0) + 1)
   }
   const mergedPerDay = dayKeys.map((day) => ({ day, merged: merged.get(day) ?? 0 }))
+  const computedAt = new Date(now).toISOString()
   return {
-    computedAt: new Date(now).toISOString(),
+    computedAt,
     timezone,
     mergedPerDay,
-    leadTime: { medianMs: leadTime.medianMs, measured: leadTime.tickets.length }
+    leadTime: { medianMs: leadTime.medianMs, measured: leadTime.tickets.length },
+    source: { kind: 'game', fetchedAt: computedAt }
   }
 }

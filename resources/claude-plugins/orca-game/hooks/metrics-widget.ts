@@ -3,6 +3,7 @@ import { isShape, str } from './game-state-shapes'
 import { metricsWords } from './metrics-words'
 
 type GameClaudeAccountUse = GameMetrics['claudeAccounts'][number]
+type GameMetricsSource = NonNullable<GameMetrics['source']>
 
 // The host sends at most 14 days and 8 accounts; the caps only bound a damaged state.
 const DAYS_MAX = 31
@@ -31,6 +32,27 @@ const accountOf = (value: unknown): GameClaudeAccountUse[] => {
         }
       ]
     : []
+}
+
+const SOURCE_KINDS: readonly GameMetricsSource['kind'][] = ['github', 'gitlab', 'game']
+
+const sourceOf = (value: unknown): { source?: GameMetricsSource } => {
+  const fetchedAt = isShape(value) ? str(value.fetchedAt) : undefined
+  if (!isShape(value) || fetchedAt === undefined || Number.isNaN(Date.parse(fetchedAt))) {
+    return {}
+  }
+  const kind = SOURCE_KINDS.find((one) => one === value.kind)
+  const repo = str(value.repo)
+  return kind
+    ? {
+        source: {
+          kind,
+          fetchedAt,
+          ...(repo === undefined ? {} : { repo }),
+          ...(value.partial === true ? { partial: true as const } : {})
+        }
+      }
+    : {}
 }
 
 /** The lead's delivery numbers from `orca game state` (ORCA-774); absent from an older host or a member. */
@@ -62,7 +84,8 @@ export const gameMetricsOf = (value: unknown): { metrics?: GameMetrics } => {
       },
       claudeAccounts: Array.isArray(value.claudeAccounts)
         ? value.claudeAccounts.flatMap(accountOf).slice(0, ACCOUNTS_MAX)
-        : []
+        : [],
+      ...sourceOf(value.source)
     }
   }
 }
@@ -90,6 +113,21 @@ const durationOf = (ms: number): string => {
     : hours > 0
       ? `${hours}h ${minutes}m`
       : `${minutes}m`
+}
+
+const clockOf = (at: string): string => {
+  const date = new Date(at)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** Where the days come from and when they were read; the repo only when it fits. */
+const sourceLineOf = (source: GameMetricsSource, columns: number): MetricsLine => {
+  const words = metricsWords()
+  const time = clockOf(source.fetchedAt)
+  const full = words.source(source.kind, source.repo ?? null, time, source.partial === true)
+  const text =
+    full.length <= columns ? full : words.source(source.kind, null, time, source.partial === true)
+  return { key: 'source', parts: [{ text, tone: 'dim' }] }
 }
 
 const toneOf = (percent: number | null): MetricsTone =>
@@ -161,12 +199,14 @@ export function metricsLinesOf(metrics: GameMetrics, columns: number): MetricsLi
         {
           text: words.leadTime(
             median === null ? null : durationOf(median),
-            metrics.leadTime.measured
+            metrics.leadTime.measured,
+            metrics.source !== undefined && metrics.source.kind !== 'game'
           ),
           tone: 'plain'
         }
       ]
     },
+    ...(metrics.source ? [sourceLineOf(metrics.source, columns)] : []),
     ...accounts.flatMap((account, at): MetricsLine[] => {
       const mark = { text: `${account.active ? '●' : '○'} `, tone: 'gold' as const }
       if (isWide) {
