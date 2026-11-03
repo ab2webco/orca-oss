@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
+import { quoteWithBackslashEscapes } from '../../../../shared/backslash-escaped-quote'
 
 export type NativeChatResolvedTarget = {
   ptyId: string
@@ -29,6 +30,5 @@ export function nativeChatComposerTargetIsRemote(ptyId: string | null): boolean 
 }
 
 export function formatNativeChatFileReference(filePath: string): string {
-  const escaped = filePath.replace(/"/g, '\\"')
-  return /\s/.test(filePath) ? `@"${escaped}"` : `@${filePath}`
+  return /\s/.test(filePath) ? `@${quoteWithBackslashEscapes(filePath)}` : `@${filePath}`
 }
