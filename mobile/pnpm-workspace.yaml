@@ -1,5 +1,34 @@
 allowBuilds:
   esbuild: true
 
+# Keep every override here: a pnpm.overrides block in package.json replaces this one whole.
 overrides:
   xcode>uuid: 11.1.1
+  # GHSA-2v37-7h3g-55p8, GHSA-28wg-ghj8-5hjv (ORCA-323); moved from package.json pnpm.overrides
+  nanoid: ^3.3.18
+  # GHSA-4w3w-2rp5-g8jm, GHSA-w2rr-34g9-rvrj, GHSA-27p8-2357-5qqv and 5 more xmldom advisories
+  '@xmldom/xmldom@^0.8': 0.8.15
+  # GHSA-3px3-54cx-rmw9, GHSA-g53g-w8rj-fmg7, GHSA-6mj3-qw4j-hgrw, GHSA-vr34-hp96-76pp and 7 more
+  '@xmldom/xmldom@^0.9': 0.9.12
+  # GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7
+  brace-expansion@^1: 1.1.20
+  # GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7
+  brace-expansion@^5: 5.0.11
+  # GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx
+  browserslist@^4: 4.28.7
+  # GHSA-vc2v-76pw-4v95
+  compression@^1: 1.8.2
+  # GHSA-cg2g-xh64-v4q7 (critical), GHSA-mrv2-3pqr-j5jr; mermaid's copy, not covered by #888
+  dompurify@^3: 3.4.17
+  # GHSA-2883-xcg3-v3hh
+  js-yaml@^3: 3.15.2
+  # GHSA-2883-xcg3-v3hh
+  js-yaml@^4: 4.3.2
+  # GHSA-5x38-2vff-x55p, GHSA-7wch-p9px-956x, GHSA-86w9-cpqp-85rv and 3 more node-forge advisories
+  node-forge@^1: 1.4.1
+  # GHSA-pqg4-j6r4-53mv (critical)
+  shell-quote@^1: 1.11.0
+  # GHSA-68fv-2mgg-jv7q
+  source-map-js@^1: 1.2.2
+  # GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr (critical)
+  tinypool@^2: 2.1.2
