@@ -24,7 +24,7 @@ import { colors, spacing } from '../theme/mobile-theme'
 // Why: mount-before-commit logic is anchor-agnostic, so the X-axis drawer reuses
 // the exact same gate as BottomDrawer rather than duplicating it.
 import { resolveBottomDrawerMounted } from './bottom-drawer-mount-state'
-import { resolveRightDrawerPanelWidth } from './right-drawer-panel-width'
+import { resolveRightDrawerPanelWidth, rightDrawerSpansWindow } from './right-drawer-panel-width'
 import { useResponsiveLayout } from '../layout/responsive-layout'
 
 const DISMISS_THRESHOLD = 80
@@ -41,9 +41,11 @@ type Props = {
   children: ReactNode
   zIndex?: number
   widthPx?: number
+  /** Cover the whole window on a phone instead of leaving a backdrop gutter. */
+  fillPhone?: boolean
 }
 
-export function RightDrawer({ visible, onClose, children, zIndex, widthPx }: Props) {
+export function RightDrawer({ visible, onClose, children, zIndex, widthPx, fillPhone }: Props) {
   const [mounted, setMounted] = useState(visible)
   const resolvedMounted = resolveBottomDrawerMounted(visible, mounted)
 
@@ -66,6 +68,7 @@ export function RightDrawer({ visible, onClose, children, zIndex, widthPx }: Pro
       onHidden={() => setMounted(false)}
       zIndex={zIndex}
       widthPx={widthPx}
+      fillPhone={fillPhone}
     >
       {children}
     </MountedRightDrawer>
@@ -82,7 +85,8 @@ function MountedRightDrawer({
   onHidden,
   children,
   zIndex = 1000,
-  widthPx
+  widthPx,
+  fillPhone
 }: MountedRightDrawerProps) {
   const translateX = useSharedValue(0)
   const progress = useSharedValue(0)
@@ -90,7 +94,8 @@ function MountedRightDrawer({
   const { width: screenWidth } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const { isWideLayout } = useResponsiveLayout()
-  const panelWidth = resolveRightDrawerPanelWidth(screenWidth, isWideLayout, widthPx)
+  const panelWidth = resolveRightDrawerPanelWidth(screenWidth, isWideLayout, widthPx, fillPhone)
+  const spansWindow = rightDrawerSpansWindow(panelWidth, screenWidth)
 
   useEffect(() => {
     if (visible) {
@@ -191,6 +196,7 @@ function MountedRightDrawer({
                   paddingBottom: insets.bottom + spacing.lg,
                   paddingRight: insets.right
                 },
+                spansWindow && styles.drawerFull,
                 drawerStyle
               ]}
             >
@@ -247,5 +253,10 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 8 }
     })
+  },
+  drawerFull: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderLeftWidth: 0
   }
 })

@@ -18,7 +18,7 @@ type Props = {
 function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
   const tiles = [
     metrics.latestDay
-      ? { label: `Merged ${metrics.latestDay.day}`, value: metrics.latestDay.merged }
+      ? { label: `Merged on ${metrics.latestDay.day}`, value: metrics.latestDay.merged }
       : null,
     // Why the no-break space: a narrow tile wrapped the "d" alone onto its own line.
     { label: `Merged in ${metrics.windowDays} d`, value: metrics.mergedInWindow },
@@ -29,11 +29,11 @@ function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
   return (
     <View style={styles.metrics}>
       {tiles.map((tile) => (
-        <View key={tile.label} style={styles.tile}>
-          <Text style={styles.tileValue}>{String(tile.value)}</Text>
-          <Text style={styles.tileLabel} numberOfLines={2}>
+        <View key={tile.label} style={styles.metricRow}>
+          <Text style={styles.metricLabel} numberOfLines={1}>
             {tile.label}
           </Text>
+          <Text style={styles.metricValue}>{String(tile.value)}</Text>
         </View>
       ))}
     </View>
@@ -44,7 +44,7 @@ function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
 export function TeamDrawer({ visible, onClose, team, now, onOpenLink }: Props) {
   const { view, questions } = team
   return (
-    <RightDrawer visible={visible} onClose={onClose}>
+    <RightDrawer visible={visible} onClose={onClose} fillPhone>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.heading}>Team</Text>
@@ -138,25 +138,30 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.bodySize
   },
+  // Why rows: side-by-side tiles at 320 pt split the date label and orphaned the third tile.
   metrics: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm
-  },
-  tile: {
-    flexGrow: 1,
-    flexBasis: 90,
-    padding: spacing.md,
+    flexDirection: 'column',
     borderRadius: radii.card,
-    backgroundColor: colors.bgPanel
+    backgroundColor: colors.bgPanel,
+    paddingHorizontal: spacing.md
   },
-  tileValue: {
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    minHeight: MIN_TOUCH_TARGET,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle
+  },
+  metricLabel: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: typography.bodySize
+  },
+  metricValue: {
     color: colors.textPrimary,
-    fontSize: typography.titleSize,
+    fontSize: typography.bodySize,
     fontWeight: '700'
-  },
-  tileLabel: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize
   }
 })
