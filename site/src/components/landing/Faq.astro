@@ -1,0 +1,109 @@
+---
+import { agents, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'FAQ',
+    title: 'Questions developers ask first',
+    items: [
+      ['Is Orca Lab free?', 'Yes. Orca Lab is free and open source under the MIT License, and every release is built from the public repository.'],
+      ['How does it relate to Orca?', 'Orca Lab is Ab2Web’s build of Orca by stablyai. It adds the Orca Game lead and members, members on paired hosts, the Plane board, the owner-question Inbox on desktop and phone, diff notes, design mode, plugins and more.'],
+      ['Which agents and subscriptions do I need?', `None in particular. Orca Lab launches the agent CLIs you already use (${agents.length} today, from Claude Code and Codex to Gemini, Cursor and Copilot) on the accounts you already pay for.`],
+      ['What runs the lead?', 'The lead is a Claude Code session. Members can run any agent Orca knows, chosen per launch with `--agent`.'],
+      ['Does my code leave my machine?', 'Agents run on your machine, on hosts you pair, or over SSH on servers you configure. Builds from this repository send no telemetry.'],
+      ['Does it work with SSH, WSL and plain folders?', 'Yes. Worktrees can live on a remote machine over SSH or inside WSL on Windows, and a plain folder works as a workspace too.']
+    ]
+  },
+  es: {
+    eyebrow: 'Preguntas',
+    title: 'Lo primero que preguntan los devs',
+    items: [
+      ['¿Orca Lab es gratis?', 'Sí. Orca Lab es libre y de código abierto bajo la licencia MIT, y cada release se compila desde el repositorio público.'],
+      ['¿Qué relación tiene con Orca?', 'Orca Lab es la versión de Ab2Web de Orca, de stablyai. Suma el líder y los miembros de Orca Game, miembros en hosts emparejados, el board de Plane, el Inbox de preguntas en escritorio y teléfono, notas en el diff, design mode, plugins y más.'],
+      ['¿Qué agentes y suscripciones necesito?', `Ninguno en particular. Orca Lab lanza las CLIs de agentes que ya usas (${agents.length} hoy, de Claude Code y Codex a Gemini, Cursor y Copilot) con las cuentas que ya pagas.`],
+      ['¿Qué corre al líder?', 'El líder es una sesión de Claude Code. Los miembros pueden correr cualquier agente que Orca conozca, elegido en cada lanzamiento con `--agent`.'],
+      ['¿Mi código sale de mi máquina?', 'Los agentes corren en tu máquina, en hosts que emparejas o por SSH en servidores que configuras. Las builds de este repositorio no envían telemetría.'],
+      ['¿Funciona con SSH, WSL y carpetas sueltas?', 'Sí. Los worktrees pueden vivir en una máquina remota por SSH o dentro de WSL en Windows, y una carpeta suelta también sirve como espacio de trabajo.']
+    ]
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section faq" id="faq">
+  <div class="wrap grid">
+    <div class="reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+    </div>
+    <div class="list reveal">
+      {
+        copy.items.map(([q, a], index) => (
+          <details open={index === 0}>
+            <summary>{q}</summary>
+            <p set:html={code(a)} />
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+    gap: 48px;
+  }
+  details {
+    border-bottom: 1px solid var(--border);
+  }
+  details:first-child {
+    border-top: 1px solid var(--border);
+  }
+  summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 0;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::after {
+    content: '+';
+    font: 400 22px/1 var(--font-mono);
+    color: var(--fg-muted);
+    transition: transform 200ms ease;
+  }
+  details[open] summary::after {
+    transform: rotate(45deg);
+  }
+  details p {
+    margin: -6px 0 20px;
+    color: var(--fg-muted);
+    max-width: 64ch;
+  }
+  :global(.faq code) {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--muted);
+    font-size: 0.9em;
+  }
+  @media (max-width: 899px) {
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+  }
+</style>

@@ -1,0 +1,128 @@
+---
+import type { Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+// Settings → Experimental (ExperimentalPane.tsx). Off by default; may change or go away.
+const copy = {
+  en: {
+    eyebrow: 'Experimental',
+    title: 'In the lab',
+    lede: 'Behind a switch in Settings → Experimental. Off by default, and they may change before they graduate.',
+    items: [
+      ['Agent Dashboard', 'A kanban board for monitoring agents across worktrees, in the window or popped out.'],
+      ['Agents View', 'A threaded sidebar feed of agent completions and blocking states.'],
+      ['Chat UI', 'A chat view you can switch to from supported agent terminal panes.'],
+      ['Agent sleep', 'Stops idle background agent terminals and resumes supported sessions when you open them.'],
+      ['Terminal attention', 'Keeps a pane highlighted after a bell or an agent finishing.'],
+      ['Per-workspace environments', 'Repo-owned, on-demand environments with setup controls and run targets.'],
+      ['Pet', 'A small animated companion in the corner. It does nothing useful.']
+    ]
+  },
+  es: {
+    eyebrow: 'Experimental',
+    title: 'En el laboratorio',
+    lede: 'Detrás de un interruptor en Settings → Experimental. Apagadas por defecto, y pueden cambiar antes de graduarse.',
+    items: [
+      ['Agent Dashboard', 'Un tablero kanban para seguir agentes entre worktrees, en la ventana o aparte.'],
+      ['Agents View', 'Un feed en la barra lateral con lo que terminan y lo que bloquea a los agentes.'],
+      ['Chat UI', 'Una vista de chat a la que cambias desde las terminales de agentes soportados.'],
+      ['Agent sleep', 'Detiene terminales de agentes inactivas en segundo plano y retoma las sesiones soportadas al abrirlas.'],
+      ['Terminal attention', 'Mantiene resaltado un panel tras una campana o cuando un agente termina.'],
+      ['Entornos por espacio de trabajo', 'Entornos bajo demanda definidos en el repo, con controles de setup y destinos de ejecución.'],
+      ['Pet', 'Una mascota animada en la esquina. No hace nada útil.']
+    ]
+  }
+}[lang]
+---
+
+<section class="section experimental" id="experimental">
+  <div class="wrap">
+    <div class="box card reveal">
+      <div class="intro">
+        <span class="eyebrow">{copy.eyebrow}</span>
+        <h2 class="h2">{copy.title}</h2>
+        <p class="lede">{copy.lede}</p>
+      </div>
+      <ul>
+        {
+          copy.items.map(([title, body]) => (
+            <li>
+              <span class="tag mono">{copy.eyebrow}</span>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .box {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
+    gap: 40px;
+    padding: 40px;
+    background:
+      repeating-linear-gradient(
+        135deg,
+        transparent 0 14px,
+        color-mix(in srgb, var(--working) 4%, transparent) 14px 15px
+      ),
+      var(--card);
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--working) 35%, var(--border));
+  }
+  .eyebrow {
+    color: var(--working);
+  }
+  ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li {
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+  }
+  .tag {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--working);
+  }
+  h3 {
+    margin: 4px 0 0;
+    font-size: 15px;
+  }
+  li p {
+    margin: 4px 0 0;
+    font-size: 13.5px;
+    color: var(--fg-muted);
+  }
+  @media (max-width: 1023px) {
+    .box {
+      grid-template-columns: 1fr;
+      gap: 24px;
+      padding: 28px;
+    }
+  }
+  @media (max-width: 559px) {
+    .box {
+      padding: 20px;
+    }
+    ul {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

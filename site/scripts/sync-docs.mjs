@@ -30,11 +30,8 @@ const REFERENCE_ROUTES = {
 // GIFs the landing shows; copied rather than imported so Vite never reaches outside site/.
 export const LANDING_MEDIA = [
   'mobile-inbox-ios.gif',
-  'mobile-team-ios.gif',
-  'mobile-terminal-android.gif',
-  'mobile-answer-android.gif',
-  'agent-grid.gif',
-  'plane-board.gif'
+  'mobile-team-android.gif',
+  'mobile-terminal-ios.gif'
 ]
 
 function listMarkdown(dir) {
@@ -92,11 +89,12 @@ function syncDocs() {
 }
 
 function syncAssets() {
+  rmSync(path.join(SITE_DIR, 'public/media'), { recursive: true, force: true })
   copyInto('resources/build/icon.png', 'src/assets/icon.png')
   copyInto('resources/build/icon.png', 'public/icon.png')
   copyInto(
     'src/renderer/src/assets/fonts/Geist-Variable.woff2',
-    'public/fonts/Geist-Variable.woff2'
+    'src/assets/fonts/Geist-Variable.woff2'
   )
   for (const gif of LANDING_MEDIA) {
     copyInto(`docs/assets/readme/${gif}`, `public/media/readme/${gif}`)

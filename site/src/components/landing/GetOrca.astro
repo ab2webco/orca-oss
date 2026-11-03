@@ -1,0 +1,207 @@
+---
+import {
+  ANDROID_RELEASES_URL,
+  desktopDownloads,
+  docsHref,
+  type Lang,
+  RELEASES_URL
+} from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Get Orca Lab',
+    title: 'Start your first team in five minutes.',
+    lede: 'Install the desktop app, register the orca command, open a repo, and let the lead take the first wave from your To Do.',
+    all: 'All releases',
+    install: 'Install guide',
+    phone: 'Phone',
+    ios: 'iOS · TestFlight',
+    iosNote: 'Builds ship through TestFlight.',
+    android: 'Android · APK',
+    androidNote: 'From the mobile-android releases.',
+    server: 'Headless',
+    serverNote: '`orca serve` on Linux, paired as a host.',
+    serverLink: 'Server guide'
+  },
+  es: {
+    eyebrow: 'Consigue Orca Lab',
+    title: 'Arma tu primer equipo en cinco minutos.',
+    lede: 'Instala la app de escritorio, registra el comando orca, abre un repo y deja que el líder tome la primera ola de tu To Do.',
+    all: 'Todas las releases',
+    install: 'Guía de instalación',
+    phone: 'Teléfono',
+    ios: 'iOS · TestFlight',
+    iosNote: 'Las builds se distribuyen por TestFlight.',
+    android: 'Android · APK',
+    androidNote: 'Desde las releases mobile-android.',
+    server: 'Sin pantalla',
+    serverNote: '`orca serve` en Linux, emparejado como host.',
+    serverLink: 'Guía de servidor'
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section get" id="get">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+      <p class="lede">{copy.lede}</p>
+    </div>
+    <ul class="downloads reveal">
+      {
+        desktopDownloads.map((d) => (
+          <li>
+            <a class="dl card" href={d.href}>
+              <span class="os">{d.os}</span>
+              <span class="detail">{d.detail}</span>
+              <span class="file mono">{d.file} ↓</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    <ul class="extras reveal">
+      <li class="card">
+        <span class="label mono">{copy.phone}</span>
+        <strong>{copy.ios}</strong>
+        <p>{copy.iosNote}</p>
+      </li>
+      <li class="card">
+        <span class="label mono">{copy.phone}</span>
+        <a href={ANDROID_RELEASES_URL}><strong>{copy.android} ↗</strong></a>
+        <p>{copy.androidNote}</p>
+      </li>
+      <li class="card">
+        <span class="label mono">{copy.server}</span>
+        <a href={docsHref(lang, 'remote/headless-linux-server')}><strong>{copy.serverLink} →</strong></a>
+        <p set:html={code(copy.serverNote)} />
+      </li>
+    </ul>
+    <p class="links">
+      <a class="btn btn-ghost" href={RELEASES_URL}>{copy.all} ↗</a>
+      <a class="btn btn-ghost" href={docsHref(lang, 'install')}>{copy.install} →</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .get {
+    overflow: hidden;
+  }
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(40% 60% at 15% 100%, var(--glow-a), transparent 70%),
+      radial-gradient(40% 60% at 85% 100%, var(--glow-b), transparent 70%);
+    pointer-events: none;
+  }
+  .wrap {
+    position: relative;
+  }
+  .head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .downloads {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    list-style: none;
+    margin: 48px 0 0;
+    padding: 0;
+  }
+  .dl {
+    display: grid;
+    gap: 4px;
+    height: 100%;
+    padding: 22px;
+    text-decoration: none;
+    transition:
+      transform 160ms ease,
+      border-color 160ms ease;
+  }
+  .dl:hover {
+    transform: translateY(-2px);
+    border-color: var(--brand);
+  }
+  .os {
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  .detail {
+    color: var(--fg-muted);
+    font-size: 14px;
+  }
+  .file {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--brand);
+    overflow-wrap: anywhere;
+  }
+  .extras {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+  }
+  .extras li {
+    display: grid;
+    gap: 4px;
+    padding: 18px 22px;
+  }
+  .extras a {
+    text-decoration: none;
+  }
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  .extras p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  :global(.get .extras code) {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--muted);
+    font-size: 0.9em;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 32px 0 0;
+  }
+  @media (max-width: 1023px) {
+    .downloads {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .extras {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 479px) {
+    .downloads {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

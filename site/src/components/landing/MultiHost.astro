@@ -1,0 +1,212 @@
+---
+import { docsHref, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Agentic, on every machine',
+    title: 'The laptop you stopped using can run two members tonight.',
+    lede: 'Every Orca you pair becomes a host the lead can place members on. A strong workstation takes the heavy tickets, an old iMac adds its own accounts, and your main machine stays responsive.',
+    hosts: [
+      { name: 'local', run: 3, cap: 5, spec: '10 cores · 12 GB free', flag: '' },
+      { name: 'old-imac', run: 4, cap: 8, spec: '4 cores · 40 GB free', flag: '' },
+      { name: 'build-box', run: 2, cap: 12, spec: '32 cores · orca serve', flag: 'busy' }
+    ],
+    comments: ['# pair a host: the desktop app, or orca serve on headless Linux', '# place a member on it', '# every host against its cap, cores, memory and load'],
+    points: [
+      ['Caps that add up', 'Each host’s cap comes from its own memory and cores; the lead’s cap is the sum. A launch past a host’s cap is refused and names a host with room.'],
+      ['Each host brings its accounts', 'A remote member picks a Claude or Codex account from that host’s roster, so a machine adds quota, not only CPU.'],
+      ['One fleet, both ways', 'Remote members show up in the Panel with ticket, PR and CI, report with the same typed messages, and open their terminal through the host.'],
+      ['Private by default', 'Pair over Tailscale or your LAN; after a restart `game resume-members` wakes what it put to sleep.']
+    ],
+    more: 'Headless Linux server guide'
+  },
+  es: {
+    eyebrow: 'Agéntico, en cada máquina',
+    title: 'La laptop que dejaste de usar puede correr dos miembros esta noche.',
+    lede: 'Cada Orca que emparejas se vuelve un host donde el líder puede poner miembros. Una estación potente toma los tickets pesados, un iMac viejo suma sus propias cuentas y tu máquina principal sigue fluida.',
+    hosts: [
+      { name: 'local', run: 3, cap: 5, spec: '10 núcleos · 12 GB libres', flag: '' },
+      { name: 'old-imac', run: 4, cap: 8, spec: '4 núcleos · 40 GB libres', flag: '' },
+      { name: 'build-box', run: 2, cap: 12, spec: '32 núcleos · orca serve', flag: 'busy' }
+    ],
+    comments: ['# empareja un host: la app de escritorio, u orca serve en Linux sin pantalla', '# pon un miembro ahí', '# cada host frente a su tope, núcleos, memoria y carga'],
+    points: [
+      ['Topes que se suman', 'El tope de cada host sale de su memoria y sus núcleos; el del líder es la suma. Un lanzamiento por encima del tope se rechaza y sugiere un host con espacio.'],
+      ['Cada host trae sus cuentas', 'Un miembro remoto elige una cuenta de Claude o Codex del host, así una máquina suma cuota, no solo CPU.'],
+      ['Una sola flota', 'Los miembros remotos aparecen en el Panel con ticket, PR y CI, reportan con los mismos mensajes tipados y abren su terminal a través del host.'],
+      ['Privado por defecto', 'Empareja por Tailscale o tu red local; tras un reinicio, `game resume-members` despierta lo que puso a dormir.']
+    ],
+    more: 'Guía de servidor Linux sin pantalla'
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section multihost" id="multi-host">
+  <div class="wrap grid">
+    <div class="copy reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+      <p class="lede">{copy.lede}</p>
+      <ul class="points">
+        {
+          copy.points.map(([title, body]) => (
+            <li>
+              <h3>{title}</h3>
+              <p set:html={code(body)} />
+            </li>
+          ))
+        }
+      </ul>
+      <a class="more" href={docsHref(lang, 'remote/headless-linux-server')}>{copy.more} →</a>
+    </div>
+    <div class="visual reveal">
+      <div class="hosts">
+        {
+          copy.hosts.map((host) => (
+            <div class="host card">
+              <div class="row">
+                <span class="name mono">{host.name}</span>
+                {host.flag && <span class="flag mono">{host.flag}</span>}
+                <span class="ratio mono">
+                  {host.run}/{host.cap}
+                </span>
+              </div>
+              <div class="slots" aria-hidden="true">
+                {Array.from({ length: host.cap }, (_, i) => (
+                  <i class={i < host.run ? 'on' : ''} />
+                ))}
+              </div>
+              <p class="spec">{host.spec}</p>
+            </div>
+          ))
+        }
+      </div>
+      <pre class="term"><code><span class="c">{copy.comments[0]}</span>
+<span class="p">$</span> orca environment add --name build-box --pairing-code orca://pair?code=…
+<span class="c">{copy.comments[1]}</span>
+<span class="p">$</span> orca game launch ACME-219 --on build-box
+<span class="c">{copy.comments[2]}</span>
+<span class="p">$</span> orca game fleet</code></pre>
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 56px;
+    align-items: center;
+  }
+  .points {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 24px;
+    list-style: none;
+    margin: 32px 0 0;
+    padding: 0;
+  }
+  .points h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+  .points p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  :global(.multihost .points code) {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--muted);
+  }
+  .more {
+    display: inline-block;
+    margin-top: 24px;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 560;
+  }
+  .hosts {
+    display: grid;
+    gap: 12px;
+  }
+  .host {
+    padding: 16px 18px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .name {
+    font-weight: 600;
+  }
+  .flag {
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--working);
+    background: color-mix(in srgb, var(--working) 14%, transparent);
+  }
+  .ratio {
+    margin-left: auto;
+    color: var(--fg-muted);
+    font-size: 13px;
+  }
+  .slots {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 5px;
+    margin-top: 12px;
+  }
+  .slots i {
+    height: 8px;
+    border-radius: 3px;
+    background: var(--muted);
+  }
+  .slots i.on {
+    background: linear-gradient(90deg, var(--brand), var(--ai));
+  }
+  .spec {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  .term {
+    margin: 16px 0 0;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: #0a0a0a;
+    color: #e5e5e5;
+    font: 12.5px/1.7 var(--font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .term .c {
+    color: #8a8a8a;
+  }
+  .term .p {
+    color: #60a5fa;
+  }
+  @media (max-width: 1023px) {
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+  }
+  @media (max-width: 559px) {
+    .points {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

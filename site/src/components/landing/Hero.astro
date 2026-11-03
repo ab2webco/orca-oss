@@ -1,0 +1,168 @@
+---
+import { docsHref, type Lang, REPO_URL } from '../../data/product'
+import LeadPanelDemo from './LeadPanelDemo.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    badge: 'Free and open source · MIT',
+    titleA: 'Your coding agents,',
+    titleB: 'run like a team.',
+    lede: 'Orca Lab is the desktop IDE where a lead agent turns your To Do into one member per ticket, each in its own worktree, on any machine you own. CI turns green, PRs merge, XP lands. You only answer what only you can decide, from your desk or your phone.',
+    download: 'Download Orca Lab',
+    docs: 'Read the docs',
+    star: 'Star on GitHub',
+    platforms: 'macOS · Windows · Linux · iOS · Android'
+  },
+  es: {
+    badge: 'Libre y de código abierto · MIT',
+    titleA: 'Tus agentes de código,',
+    titleB: 'trabajando como un equipo.',
+    lede: 'Orca Lab es el IDE de escritorio donde un agente líder convierte tu To Do en un miembro por ticket, cada uno en su propio worktree y en cualquier máquina que tengas. El CI pasa a verde, los PR se fusionan y llega la XP. Tú solo respondes lo que solo tú puedes decidir, desde el escritorio o desde el teléfono.',
+    download: 'Descargar Orca Lab',
+    docs: 'Leer la documentación',
+    star: 'Estrella en GitHub',
+    platforms: 'macOS · Windows · Linux · iOS · Android'
+  }
+}[lang]
+---
+
+<section class="hero">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="intro">
+      <span class="badge"><span class="pulse"></span>{copy.badge}</span>
+      <h1>
+        <span>{copy.titleA}</span>
+        <span class="gradient-text">{copy.titleB}</span>
+      </h1>
+      <p class="lede">{copy.lede}</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#get">
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"
+            ><path
+              d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"></path></svg
+          >
+          {copy.download}
+        </a>
+        <a class="btn btn-ghost" href={docsHref(lang, '')}>{copy.docs}</a>
+        <a class="btn btn-ghost star" href={REPO_URL}>★ {copy.star}</a>
+      </div>
+      <p class="platforms mono">{copy.platforms}</p>
+    </div>
+    <div class="stage">
+      <LeadPanelDemo lang={lang} />
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    padding: 72px 0 40px;
+    overflow: hidden;
+  }
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 50% at 20% 10%, var(--glow-a), transparent 70%),
+      radial-gradient(50% 45% at 85% 25%, var(--glow-b), transparent 70%),
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 44px 44px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 44px 44px;
+    mask-image: linear-gradient(180deg, #000 55%, transparent);
+    -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  }
+  .wrap {
+    position: relative;
+  }
+  .intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    border-radius: 99px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--card) 70%, transparent);
+    font-size: 13px;
+    color: var(--fg-soft);
+  }
+  .pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--done);
+    box-shadow: 0 0 0 0 var(--done);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  h1 {
+    display: flex;
+    flex-direction: column;
+    margin: 22px 0 0;
+    font-size: clamp(40px, 7.4vw, 84px);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    font-weight: 700;
+  }
+  .lede {
+    margin: 24px auto 0;
+    max-width: 680px;
+    font-size: clamp(16px, 1.7vw, 19px);
+    color: var(--fg-muted);
+    text-wrap: pretty;
+  }
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 32px;
+  }
+  .platforms {
+    margin: 18px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--fg-muted);
+  }
+  .stage {
+    max-width: 1060px;
+    margin: 56px auto 0;
+  }
+  @media (max-width: 559px) {
+    .hero {
+      padding-top: 48px;
+    }
+    .ctas .btn {
+      width: 100%;
+    }
+    .star {
+      display: none;
+    }
+    .stage {
+      margin-top: 40px;
+    }
+  }
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--done) 60%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 10px transparent;
+    }
+  }
+</style>

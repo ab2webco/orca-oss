@@ -1,0 +1,201 @@
+---
+import { agents, docsHref, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Bring your own agent',
+    title: `${agents.length} coding agents. Your subscriptions. One screen.`,
+    lede: 'Orca Lab launches and tracks the agent CLIs you already pay for. Run Claude Code next to Codex next to Gemini, each in its own worktree, and see at a glance which one needs you.',
+    points: [
+      ['Switch accounts mid-session', 'Several Claude and Codex accounts; switch a running terminal and the conversation resumes.'],
+      ['Usage next to every agent', 'Rate-limit usage and quota resets, per account, before you hit the wall.'],
+      ['Resume any past session', 'Browse earlier agent sessions, local or over SSH, and pick one back up.']
+    ],
+    more: 'Supported agents'
+  },
+  es: {
+    eyebrow: 'Trae tu propio agente',
+    title: `${agents.length} agentes de código. Tus suscripciones. Una pantalla.`,
+    lede: 'Orca Lab lanza y sigue las CLIs de agentes que ya pagas. Corre Claude Code junto a Codex y Gemini, cada uno en su worktree, y ve de un vistazo cuál te necesita.',
+    points: [
+      ['Cambia de cuenta sin cortar la sesión', 'Varias cuentas de Claude y Codex; cambia una terminal en marcha y la conversación continúa.'],
+      ['Uso junto a cada agente', 'Uso de rate limit y reinicios de cuota por cuenta, antes de chocar con el límite.'],
+      ['Retoma cualquier sesión', 'Explora sesiones anteriores de los agentes, locales o por SSH, y continúa una.']
+    ],
+    more: 'Agentes soportados'
+  }
+}[lang]
+
+const rows = [0, 1, 2].map((r) => agents.filter((_, i) => i % 3 === r))
+---
+
+<section class="section agents" id="agents">
+  <div class="wrap head reveal">
+    <span class="eyebrow">{copy.eyebrow}</span>
+    <h2 class="h2">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+  </div>
+  <div class="marquee reveal" role="list" aria-label={copy.eyebrow}>
+    {
+      rows.map((row, index) => (
+        <div class={`track track-${index}`}>
+          <div class="lane">
+            {row.map((name) => (
+              <span class="agent" role="listitem">
+                <span class="glyph" aria-hidden="true">
+                  {name.charAt(0)}
+                </span>
+                {name}
+              </span>
+            ))}
+          </div>
+          <div class="lane clone" aria-hidden="true">
+            {row.map((name) => (
+              <span class="agent">
+                <span class="glyph">{name.charAt(0)}</span>
+                <span data-clone>{name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+  <div class="wrap">
+    <ul class="points reveal">
+      {
+        copy.points.map(([title, body]) => (
+          <li class="card">
+            <h3>{title}</h3>
+            <p>{body}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <a class="more" href={docsHref(lang, 'agents/supported')}>{copy.more} →</a>
+  </div>
+</section>
+
+<style>
+  .head {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .marquee {
+    display: grid;
+    gap: 12px;
+    margin-top: 48px;
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+  .track {
+    display: flex;
+    width: max-content;
+    animation: slide 60s linear infinite;
+  }
+  .track-1 {
+    animation-direction: reverse;
+    animation-duration: 70s;
+  }
+  .track-2 {
+    animation-duration: 54s;
+  }
+  .lane {
+    display: flex;
+    gap: 12px;
+    padding-right: 12px;
+  }
+  .agent {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-weight: 560;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .glyph {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    font: 700 13px/1 var(--font-mono);
+    color: var(--fg);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 35%, var(--muted)), var(--muted));
+  }
+  .track-1 .glyph {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ai) 35%, var(--muted)), var(--muted));
+  }
+  .track-2 .glyph {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--done) 30%, var(--muted)), var(--muted));
+  }
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    list-style: none;
+    margin: 48px 0 0;
+    padding: 0;
+  }
+  .points li {
+    padding: 22px;
+  }
+  .points h3 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+  }
+  .points p {
+    margin: 8px 0 0;
+    color: var(--fg-muted);
+    font-size: 14.5px;
+  }
+  .more {
+    display: inline-block;
+    margin-top: 20px;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 560;
+  }
+  @media (max-width: 899px) {
+    .points {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track {
+      animation: none;
+      width: auto;
+      justify-content: center;
+    }
+    .lane {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .clone {
+      display: none;
+    }
+    .marquee {
+      mask-image: none;
+      -webkit-mask-image: none;
+      padding: 0 16px;
+    }
+  }
+  @keyframes slide {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+</style>

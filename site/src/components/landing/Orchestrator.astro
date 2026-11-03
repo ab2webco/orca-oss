@@ -1,0 +1,277 @@
+---
+import { docsHref, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'The orchestrator · Orca Game',
+    title: 'A lead that runs your board. Members that ship it.',
+    lede: 'Orca Game turns a Claude Code session into the lead of a team. It does not write the code itself: it launches one member per ticket, each in its own worktree and branch, waits for their reports, answers their questions, and asks you only what only you can decide.',
+    flow: [
+      ['To Do', 'Tickets from Plane, Jira, Linear, GitHub or GitLab, in board order.'],
+      ['Wave', '`orca game wave` fills every free slot, one member per ticket.'],
+      ['Members', 'Each works in its own worktree and branch, on any paired host.'],
+      ['Verified', 'Typed reports; CI green and review state come from the tracker and CI, not from the agent.'],
+      ['Merge', 'PR merges pay XP; the merged worktree and branch are cleaned up.']
+    ],
+    xpTitle: 'XP only from verified signals',
+    xpNote: 'A member earns nothing for saying it is done. Weights are yours to change in orca.yaml.',
+    xp: [
+      ['Member claims a ticket', 10],
+      ['Its PR’s CI turns green', 20],
+      ['Ticket moves to review', 50],
+      ['Ticket reaches Done', 70],
+      ['PR merges', 100],
+      ['Merged PR is perfect', 100]
+    ],
+    rules: [
+      ['Your rules, not just ours', 'Orca’s standing rules come first; your project appends its own in orca.yaml: strict TDD, conventional commits, merge-queue only.'],
+      ['Typed reports', 'A member finishes with a worker_done envelope that states how each claim was verified. A malformed report is rejected.'],
+      ['Finish before starting', 'The lead drives each member to a merge before it launches another ticket, so half-done work does not pile up.'],
+      ['Questions go somewhere real', 'Releases, spending, product calls: they become owner questions with options, in an Inbox on desktop and phone.'],
+      ['The Panel shows the truth', 'One card per member with ticket, branch, PR, CI and state, plus your open PRs, the To Do and team metrics.'],
+      ['Recovery is built in', '`game resume-members` after a restart, `game adopt` and `game drop` for strays, `game lead --fresh` for a long conversation.']
+    ],
+    views: 'Pick how it looks, and what it costs your machine: Off, Flat, Zen, 2D classic or 2D hd. Scenes are themeable.',
+    credit: 'The idea of running a Claude Code team as a game came from Jucer Orozco.',
+    more: 'Orca Game reference'
+  },
+  es: {
+    eyebrow: 'El orquestador · Orca Game',
+    title: 'Un líder que maneja tu board. Miembros que lo entregan.',
+    lede: 'Orca Game convierte una sesión de Claude Code en el líder de un equipo. No escribe el código: lanza un miembro por ticket, cada uno en su propio worktree y rama, espera sus reportes, responde sus preguntas y solo te pregunta a ti lo que solo tú puedes decidir.',
+    flow: [
+      ['To Do', 'Tickets de Plane, Jira, Linear, GitHub o GitLab, en el orden del board.'],
+      ['Ola', '`orca game wave` llena cada espacio libre, un miembro por ticket.'],
+      ['Miembros', 'Cada uno trabaja en su worktree y su rama, en cualquier host emparejado.'],
+      ['Verificado', 'Reportes tipados; el CI en verde y el estado de revisión salen del tracker y del CI, no del agente.'],
+      ['Merge', 'Cada PR fusionado suma XP; el worktree y la rama fusionados se limpian.']
+    ],
+    xpTitle: 'XP solo por señales verificadas',
+    xpNote: 'Un miembro no gana nada por decir que terminó. Los pesos los cambias tú en orca.yaml.',
+    xp: [
+      ['Un miembro toma un ticket', 10],
+      ['El CI de su PR pasa a verde', 20],
+      ['El ticket pasa a revisión', 50],
+      ['El ticket llega a Done', 70],
+      ['El PR se fusiona', 100],
+      ['El PR fusionado queda perfecto', 100]
+    ],
+    rules: [
+      ['Tus reglas, no solo las nuestras', 'Primero van las reglas de Orca; tu proyecto suma las suyas en orca.yaml: TDD estricto, conventional commits, merge solo por la cola.'],
+      ['Reportes tipados', 'Un miembro termina con un sobre worker_done que dice cómo se verificó cada afirmación. Un reporte mal formado se rechaza.'],
+      ['Termina antes de empezar', 'El líder lleva cada miembro hasta el merge antes de lanzar otro ticket, así el trabajo a medias no se acumula.'],
+      ['Las preguntas llegan a un lugar real', 'Releases, gastos, decisiones de producto: se vuelven preguntas para ti con opciones, en un Inbox en escritorio y teléfono.'],
+      ['El Panel muestra la verdad', 'Una tarjeta por miembro con ticket, rama, PR, CI y estado, más tus PR abiertos, el To Do y las métricas del equipo.'],
+      ['La recuperación viene incluida', '`game resume-members` tras un reinicio, `game adopt` y `game drop` para agentes sueltos, `game lead --fresh` para una conversación larga.']
+    ],
+    views: 'Elige cómo se ve y cuánto le cuesta a tu máquina: Off, Flat, Zen, 2D classic o 2D hd. Las escenas se pueden personalizar.',
+    credit: 'La idea de llevar un equipo de Claude Code como un juego vino de Jucer Orozco.',
+    more: 'Referencia de Orca Game'
+  }
+}[lang]
+
+const code = (text: string) =>
+  text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section orchestrator" id="orchestrator">
+  <div class="aura" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+      <p class="lede">{copy.lede}</p>
+    </div>
+
+    <ol class="flow reveal">
+      {
+        copy.flow.map(([title, body], index) => (
+          <li class="step">
+            <span class="num mono">{String(index + 1).padStart(2, '0')}</span>
+            <h3>{title}</h3>
+            <p set:html={code(body)} />
+          </li>
+        ))
+      }
+    </ol>
+
+    <div class="split">
+      <div class="card xp reveal">
+        <h3>{copy.xpTitle}</h3>
+        <p class="note">{copy.xpNote}</p>
+        <table>
+          <tbody>
+            {
+              copy.xp.map(([signal, points]) => (
+                <tr>
+                  <td>{signal}</td>
+                  <td class="mono pts">+{points} XP</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <ul class="rules reveal">
+        {
+          copy.rules.map(([title, body]) => (
+            <li class="card">
+              <h3>{title}</h3>
+              <p set:html={code(body)} />
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <p class="views reveal">{copy.views} <span class="credit">{copy.credit}</span></p>
+    <a class="more" href={docsHref(lang, 'orchestrator/orca-game')}>{copy.more} →</a>
+  </div>
+</section>
+
+<style>
+  .orchestrator {
+    overflow: hidden;
+  }
+  .aura {
+    position: absolute;
+    inset: 10% -20% auto;
+    height: 600px;
+    background: radial-gradient(50% 50% at 50% 50%, var(--glow-b), transparent 70%);
+    pointer-events: none;
+  }
+  .wrap {
+    position: relative;
+  }
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    list-style: none;
+    margin: 56px 0 0;
+    padding: 0;
+    counter-reset: step;
+  }
+  .step {
+    position: relative;
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 30px;
+    right: -13px;
+    width: 14px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--brand), var(--ai));
+  }
+  .num {
+    font-size: 12px;
+    color: var(--brand);
+  }
+  .step h3 {
+    margin: 8px 0 0;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .step p,
+  .rules p {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  :global(.orchestrator code) {
+    font-size: 0.88em;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--muted);
+    color: var(--fg-soft);
+  }
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .xp {
+    padding: 24px;
+  }
+  .xp h3,
+  .rules h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .note {
+    margin: 6px 0 14px;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  td {
+    padding: 9px 0;
+    border-top: 1px solid var(--border);
+  }
+  .pts {
+    text-align: right;
+    color: var(--success);
+    white-space: nowrap;
+    padding-left: 12px;
+  }
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .rules li {
+    padding: 20px;
+  }
+  .views {
+    margin: 28px 0 0;
+    color: var(--fg-muted);
+    font-size: 15px;
+  }
+  .credit {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+  .more {
+    display: inline-block;
+    margin-top: 16px;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 560;
+  }
+  @media (max-width: 1023px) {
+    .flow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .step::after {
+      display: none;
+    }
+    .split {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 559px) {
+    .flow,
+    .rules {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

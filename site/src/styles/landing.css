@@ -1,0 +1,306 @@
+/*
+ * Landing tokens. Neutrals, radius and type come from the app
+ * (src/renderer/src/assets/main.css); accents are the app's agent-state and
+ * chart colours (AgentStateDot.tsx, --chart-*, --ai-action-accent, --agent-question).
+ */
+:root {
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:
+    'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+  --radius: 0.625rem;
+
+  --bg: #0a0a0a;
+  --bg-raised: #111111;
+  --card: #171717;
+  --muted: #262626;
+  --fg: #fafafa;
+  --fg-soft: #d4d4d4;
+  --fg-muted: #a1a1a1;
+  --border: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.14);
+
+  --brand: #60a5fa;
+  --brand-strong: #3b82f6;
+  --ai: #a78bfa;
+  --question: #f97316;
+  --question-text: #fdba74;
+  --working: #eab308;
+  --done: #10b981;
+  --success: #86efac;
+  --danger: #ef4444;
+  --idle: #737373;
+
+  --glow-a: rgb(59 130 246 / 0.22);
+  --glow-b: rgb(167 139 250 / 0.18);
+  --grid-line: rgb(255 255 255 / 0.035);
+  --shadow: 0 30px 80px -30px rgb(0 0 0 / 0.8), 0 0 0 1px var(--border);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-raised: #fafafa;
+  --card: #ffffff;
+  --muted: #f5f5f5;
+  --fg: #0a0a0a;
+  --fg-soft: #262626;
+  --fg-muted: #5c5c5c;
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+
+  --brand: #2563eb;
+  --brand-strong: #1d4ed8;
+  --ai: #7c3aed;
+  --question: #ea580c;
+  --question-text: #c2410c;
+  --working: #a16207;
+  --done: #047857;
+  --success: #15803d;
+  --danger: #dc2626;
+  --idle: #737373;
+
+  --glow-a: rgb(59 130 246 / 0.14);
+  --glow-b: rgb(139 92 246 / 0.12);
+  --grid-line: rgb(0 0 0 / 0.045);
+  --shadow: 0 30px 70px -35px rgb(15 23 42 / 0.35), 0 0 0 1px var(--border);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+code,
+kbd,
+.mono {
+  font-family: var(--font-mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .wrap {
+    padding: 0 32px;
+  }
+}
+
+.section {
+  position: relative;
+  padding: 96px 0;
+}
+
+@media (max-width: 767px) {
+  .section {
+    padding: 64px 0;
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+
+.eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.h2 {
+  margin: 14px 0 0;
+  font-size: clamp(30px, 4.6vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 18px 0 0;
+  max-width: 62ch;
+  font-size: clamp(16px, 1.6vw, 18px);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+.gradient-text {
+  background: linear-gradient(100deg, var(--brand) 0%, var(--ai) 55%, var(--question) 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card {
+  position: relative;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fg) 3%, var(--card)), var(--card));
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.6);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-weight: 560;
+  font-size: 15px;
+  text-decoration: none;
+  border: 1px solid var(--border-strong);
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--fg-muted);
+}
+
+.btn-primary {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.btn-primary:hover {
+  border-color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 88%, var(--brand));
+}
+
+.btn-ghost {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  font-size: 13px;
+  color: var(--fg-soft);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--idle);
+}
+
+.dot[data-state='working'] {
+  background: var(--working);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--working) 60%, transparent);
+}
+
+.dot[data-state='question'] {
+  background: var(--question);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--question) 60%, transparent);
+}
+
+.dot[data-state='done'] {
+  background: var(--done);
+}
+
+.section :is(p, li, td) code {
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 700ms ease,
+    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.reveal.is-visible,
+.no-js .reveal {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

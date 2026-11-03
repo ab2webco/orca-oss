@@ -1,0 +1,51 @@
+---
+import type { Lang } from '../../data/product'
+import LandingLayout from '../../layouts/LandingLayout.astro'
+import AgentWall from './AgentWall.astro'
+import CliShowcase from './CliShowcase.astro'
+import Experimental from './Experimental.astro'
+import Faq from './Faq.astro'
+import FeatureBento from './FeatureBento.astro'
+import GetOrca from './GetOrca.astro'
+import Hero from './Hero.astro'
+import Integrations from './Integrations.astro'
+import MobileShowcase from './MobileShowcase.astro'
+import MultiHost from './MultiHost.astro'
+import Orchestrator from './Orchestrator.astro'
+import SiteFooter from './SiteFooter.astro'
+import SiteHeader from './SiteHeader.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const meta = {
+  en: {
+    title: 'Orca Lab · Run a team of coding agents',
+    description:
+      'The desktop IDE where a lead agent turns your To Do into one member per ticket, each in its own worktree, on every machine you own. Free and open source.'
+  },
+  es: {
+    title: 'Orca Lab · Lleva un equipo de agentes de código',
+    description:
+      'El IDE de escritorio donde un agente líder convierte tu To Do en un miembro por ticket, cada uno en su worktree, en cada máquina que tengas. Libre y de código abierto.'
+  }
+}[lang]
+---
+
+<LandingLayout lang={lang} title={meta.title} description={meta.description}>
+  <SiteHeader slot="header" lang={lang} />
+  <Hero lang={lang} />
+  <Orchestrator lang={lang} />
+  <MultiHost lang={lang} />
+  <AgentWall lang={lang} />
+  <Integrations lang={lang} />
+  <FeatureBento lang={lang} />
+  <CliShowcase lang={lang} />
+  <MobileShowcase lang={lang} />
+  <Experimental lang={lang} />
+  <Faq lang={lang} />
+  <GetOrca lang={lang} />
+  <SiteFooter slot="footer" lang={lang} />
+</LandingLayout>

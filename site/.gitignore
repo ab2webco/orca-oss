@@ -6,5 +6,5 @@ dist/
 src/content/docs/docs/
 public/media/
 public/icon.png
-public/fonts/
+src/assets/fonts/
 src/assets/icon.png

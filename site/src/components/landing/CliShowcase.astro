@@ -1,0 +1,138 @@
+---
+import { docsHref, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'The orca CLI',
+    title: 'Everything you click, your agents can script.',
+    lede: 'Worktrees, terminals, accounts, tickets, the game, the browser and multi-agent orchestration: task graphs with dependencies, decision gates and blocking questions between agents.',
+    panes: [
+      ['orchestration', ['# a task that waits on another', 'orca orchestration task-create --spec "Move billing to v2" --deps \'["task_api"]\'', '# stop on a decision only a human makes', 'orca orchestration gate-create --task task_billing --question "Drop v1 now?"']],
+      ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "Ship in 2.3?" --option Yes --option Hold', 'orca game metrics']],
+      ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
+    ],
+    more: 'CLI guide'
+  },
+  es: {
+    eyebrow: 'La CLI orca',
+    title: 'Todo lo que tú haces con clics, tus agentes lo pueden scriptear.',
+    lede: 'Worktrees, terminales, cuentas, tickets, el juego, el navegador y la orquestación entre agentes: grafos de tareas con dependencias, puertas de decisión y preguntas bloqueantes entre agentes.',
+    panes: [
+      ['orchestration', ['# una tarea que espera a otra', 'orca orchestration task-create --spec "Mover billing a v2" --deps \'["task_api"]\'', '# detenerse en una decisión que toma una persona', 'orca orchestration gate-create --task task_billing --question "¿Quitar v1 ya?"']],
+      ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "¿Publicar en 2.3?" --option Sí --option Esperar', 'orca game metrics']],
+      ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
+    ],
+    more: 'Guía de la CLI'
+  }
+}[lang]
+---
+
+<section class="section cli" id="cli">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+      <p class="lede">{copy.lede}</p>
+    </div>
+    <div class="panes">
+      {
+        copy.panes.map(([name, lines]) => (
+          <div class="pane reveal">
+            <div class="bar">
+              <span class="lights" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span class="mono">{name}</span>
+            </div>
+            <div class="code mono">
+              {(lines as string[]).map((line) =>
+                line.startsWith('#') ? (
+                  <span class="c">{line}</span>
+                ) : (
+                  <span class="cmd">
+                    <span class="p">$ </span>
+                    {line}
+                  </span>
+                )
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <a class="more" href={docsHref(lang, 'cli/overview')}>{copy.more} →</a>
+  </div>
+</section>
+
+<style>
+  .panes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 48px;
+  }
+  .pane {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: #0a0a0a;
+    color: #e5e5e5;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+    font-size: 12px;
+    color: #a1a1a1;
+  }
+  .lights {
+    display: inline-flex;
+    gap: 5px;
+  }
+  .lights i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #262626;
+  }
+  .code {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .code > span {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .c {
+    color: #8a8a8a;
+  }
+  .p {
+    color: #60a5fa;
+  }
+  .more {
+    display: inline-block;
+    margin-top: 20px;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 560;
+  }
+  @media (max-width: 1023px) {
+    .panes {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,166 @@
+---
+import { ANDROID_RELEASES_URL, docsHref, type Lang, withBase } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Mobile · iOS and Android',
+    title: 'Your agents, in your pocket.',
+    lede: 'Pair once with a QR code. The phone then reaches your desktop directly, or through an end-to-end encrypted relay, and a lead’s question finds you wherever you are.',
+    phones: [
+      ['mobile-inbox-ios.gif', 'Owner-question Inbox', 'Answer the lead’s decision with one tap; the answer goes back to the lead.'],
+      ['mobile-team-android.gif', 'Team drawer', 'Open questions, a card per member with ticket, state, PR and CI, merges per day and lead time.'],
+      ['mobile-terminal-ios.gif', 'Live terminals', 'Watch any agent’s terminal stream and type into it.']
+    ],
+    alt: 'Recording of the Orca Lab phone app with invented demo data',
+    ios: 'iOS via TestFlight',
+    android: 'Android APK',
+    more: 'Mobile guide'
+  },
+  es: {
+    eyebrow: 'Móvil · iOS y Android',
+    title: 'Tus agentes, en tu bolsillo.',
+    lede: 'Empareja una vez con un código QR. Desde ahí el teléfono llega a tu escritorio directo, o por un relay cifrado de extremo a extremo, y la pregunta de un líder te encuentra donde estés.',
+    phones: [
+      ['mobile-inbox-ios.gif', 'Inbox de preguntas', 'Responde la decisión del líder con un toque; la respuesta vuelve al líder.'],
+      ['mobile-team-android.gif', 'Panel del equipo', 'Preguntas abiertas, una tarjeta por miembro con ticket, estado, PR y CI, merges por día y lead time.'],
+      ['mobile-terminal-ios.gif', 'Terminales en vivo', 'Mira la terminal de cualquier agente en tiempo real y escribe en ella.']
+    ],
+    alt: 'Grabación de la app de Orca Lab para teléfono con datos de demostración inventados',
+    ios: 'iOS por TestFlight',
+    android: 'APK de Android',
+    more: 'Guía de la app móvil'
+  }
+}[lang]
+---
+
+<section class="section mobile" id="mobile">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">{copy.eyebrow}</span>
+      <h2 class="h2">{copy.title}</h2>
+      <p class="lede">{copy.lede}</p>
+      <p class="stores">
+        <span class="chip">{copy.ios}</span>
+        <a class="chip" href={ANDROID_RELEASES_URL}>{copy.android} ↗</a>
+      </p>
+    </div>
+    <ul class="phones">
+      {
+        copy.phones.map(([file, title, body]) => (
+          <li class="reveal">
+            <div class="device">
+              <img
+                src={withBase(`media/readme/${file}`)}
+                alt={`${copy.alt}: ${title}`}
+                width="360"
+                height="782"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <h3>{title}</h3>
+            <p>{body}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <a class="more" href={docsHref(lang, 'mobile')}>{copy.more} →</a>
+  </div>
+</section>
+
+<style>
+  .mobile {
+    overflow: hidden;
+  }
+  .glow {
+    position: absolute;
+    left: 50%;
+    top: 30%;
+    width: 900px;
+    height: 600px;
+    transform: translateX(-50%);
+    background: radial-gradient(50% 50% at 50% 50%, var(--glow-a), transparent 70%);
+    pointer-events: none;
+  }
+  .wrap {
+    position: relative;
+  }
+  .head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .stores {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px 0 0;
+  }
+  .stores a {
+    text-decoration: none;
+  }
+  .phones {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+    list-style: none;
+    margin: 56px 0 0;
+    padding: 0;
+  }
+  .phones li {
+    text-align: center;
+  }
+  .device {
+    max-width: 260px;
+    margin: 0 auto;
+    padding: 8px;
+    border-radius: 40px;
+    background: linear-gradient(160deg, #3a3a3a, #111);
+    box-shadow:
+      0 40px 80px -30px rgb(0 0 0 / 0.7),
+      inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  }
+  .device img {
+    width: 100%;
+    height: auto;
+    border-radius: 32px;
+    background: #111;
+  }
+  .phones li:nth-child(2) .device {
+    transform: translateY(-24px);
+  }
+  h3 {
+    margin: 22px 0 0;
+    font-size: 17px;
+  }
+  .phones p {
+    margin: 6px auto 0;
+    max-width: 34ch;
+    font-size: 14.5px;
+    color: var(--fg-muted);
+  }
+  .more {
+    display: inline-block;
+    margin-top: 32px;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 560;
+  }
+  @media (max-width: 899px) {
+    .phones {
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+    .phones li:nth-child(2) .device {
+      transform: none;
+    }
+  }
+</style>

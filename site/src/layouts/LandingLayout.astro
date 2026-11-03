@@ -1,0 +1,95 @@
+---
+import '../styles/fonts.css'
+import '../styles/landing.css'
+import { type Lang, withBase } from '../data/product'
+
+type Props = {
+  lang: Lang
+  title: string
+  description: string
+}
+
+const { lang, title, description } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site)
+const alternateEn = new URL(withBase(''), Astro.site)
+const alternateEs = new URL(withBase('es/'), Astro.site)
+const ogImage = new URL(withBase('icon.png'), Astro.site)
+---
+
+<!doctype html>
+<html lang={lang} class="no-js" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={alternateEn} />
+    <link rel="alternate" hreflang="es" href={alternateEs} />
+    <link rel="icon" type="image/png" href={withBase('icon.png')} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <script is:inline>
+      // Same key and attribute as Starlight's theme picker, so the docs and the landing agree.
+      document.documentElement.classList.remove('no-js')
+      try {
+        const stored = localStorage.getItem('starlight-theme')
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark'
+        document.documentElement.dataset.theme = theme
+      } catch {
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">{lang === 'es' ? 'Saltar al contenido' : 'Skip to content'}</a>
+    <slot name="header" />
+    <main id="main">
+      <slot />
+    </main>
+    <slot name="footer" />
+    <script>
+      const targets = document.querySelectorAll<HTMLElement>('.reveal')
+      if (!('IntersectionObserver' in window)) {
+        targets.forEach((el) => el.classList.add('is-visible'))
+      } else {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible')
+                observer.unobserve(entry.target)
+              }
+            }
+          },
+          { rootMargin: '0px 0px -8% 0px' }
+        )
+        targets.forEach((el) => observer.observe(el))
+      }
+    </script>
+    <style>
+      .skip {
+        position: absolute;
+        left: 16px;
+        top: -60px;
+        z-index: 100;
+        padding: 8px 14px;
+        border-radius: 8px;
+        background: var(--fg);
+        color: var(--bg);
+      }
+      .skip:focus {
+        top: 12px;
+      }
+    </style>
+  </body>
+</html>

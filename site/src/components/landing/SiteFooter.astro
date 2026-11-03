@@ -1,0 +1,139 @@
+---
+import { docsHref, homeHref, type Lang, REPO_URL, withBase } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    tagline: 'Run a team of coding agents, each in its own worktree, on every machine you own.',
+    product: 'Product',
+    docs: 'Docs',
+    project: 'Project',
+    links: [
+      [docsHref(lang, 'install'), 'Install'],
+      [docsHref(lang, 'orchestrator/orca-game'), 'Orca Game'],
+      [docsHref(lang, 'cli/overview'), 'CLI'],
+      [docsHref(lang, 'extend/plugins'), 'Plugins']
+    ],
+    project_links: [
+      [REPO_URL, 'GitHub'],
+      [`${REPO_URL}/releases`, 'Release notes'],
+      [docsHref(lang, 'telemetry'), 'Privacy']
+    ],
+    legal: 'MIT License · Built on Orca by stablyai · Demo data on this page is invented.',
+    lang: 'Español'
+  },
+  es: {
+    tagline: 'Lleva un equipo de agentes de código, cada uno en su worktree, en cada máquina que tengas.',
+    product: 'Producto',
+    docs: 'Docs',
+    project: 'Proyecto',
+    links: [
+      [docsHref(lang, 'install'), 'Instalación'],
+      [docsHref(lang, 'orchestrator/orca-game'), 'Orca Game'],
+      [docsHref(lang, 'cli/overview'), 'CLI'],
+      [docsHref(lang, 'extend/plugins'), 'Plugins']
+    ],
+    project_links: [
+      [REPO_URL, 'GitHub'],
+      [`${REPO_URL}/releases`, 'Notas de versión'],
+      [docsHref(lang, 'telemetry'), 'Privacidad']
+    ],
+    legal: 'Licencia MIT · Basado en Orca de stablyai · Los datos de demostración de esta página son inventados.',
+    lang: 'English'
+  }
+}[lang]
+---
+
+<footer class="site-footer">
+  <div class="wrap grid">
+    <div class="brand">
+      <a href={homeHref(lang)} class="logo">
+        <img src={withBase('icon.png')} alt="" width="32" height="32" loading="lazy" />
+        <span>Orca Lab</span>
+      </a>
+      <p>{copy.tagline}</p>
+      <a class="lang" href={homeHref(lang === 'es' ? 'en' : 'es')}>{copy.lang}</a>
+    </div>
+    <nav aria-label={copy.product}>
+      <h2>{copy.docs}</h2>
+      {copy.links.map(([href, label]) => <a href={href}>{label}</a>)}
+    </nav>
+    <nav aria-label={copy.project}>
+      <h2>{copy.project}</h2>
+      {copy.project_links.map(([href, label]) => <a href={href}>{label}</a>)}
+    </nav>
+  </div>
+  <p class="wrap legal">{copy.legal}</p>
+</footer>
+
+<style>
+  .site-footer {
+    padding: 64px 0 40px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-raised);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 32px;
+  }
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 650;
+    text-decoration: none;
+  }
+  .logo img {
+    border-radius: 8px;
+  }
+  .brand p {
+    margin: 12px 0 0;
+    max-width: 44ch;
+    color: var(--fg-muted);
+    font-size: 14.5px;
+  }
+  .lang {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--brand);
+  }
+  nav {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+  h2 {
+    margin: 0 0 4px;
+    font: 600 12px/1 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  nav a {
+    font-size: 14.5px;
+    color: var(--fg-soft);
+    text-decoration: none;
+  }
+  nav a:hover {
+    color: var(--fg);
+  }
+  .legal {
+    margin-top: 40px;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  @media (max-width: 767px) {
+    .grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .brand {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

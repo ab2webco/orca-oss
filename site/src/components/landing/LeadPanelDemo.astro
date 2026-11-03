@@ -1,0 +1,103 @@
+---
+import '../../styles/lead-demo.css'
+import type { Lang } from '../../data/product'
+import { showcaseFrame } from '../../scripts/lead-demo/data'
+import { type DemoCopy, renderPanel } from '../../scripts/lead-demo/render'
+
+type Props = {
+  lang: Lang
+}
+
+const sources = { jira: 'Jira', plane: 'Plane', linear: 'Linear', github: 'GitHub' } as const
+
+const copies: Record<Lang, DemoCopy> = {
+  en: {
+    window: 'lead · acme/web',
+    level: 'Lv',
+    todo: 'To Do',
+    members: 'Members',
+    waveCmd: 'orca game wave',
+    promptIdle: 'waiting on member reports',
+    state: { working: 'Working', question: 'Needs you', done: 'Done' },
+    ci: { none: 'no PR yet', running: 'CI running', green: 'CI green' },
+    merged: 'Merged',
+    levelUp: 'Level up',
+    log: {
+      claimed: 'claimed',
+      ciGreen: 'CI green on',
+      merged: 'PR merged for',
+      done: 'Done:',
+      asked: 'owner question from',
+      answered: 'answer sent to'
+    },
+    phoneTitle: 'Owner question',
+    phoneFrom: 'lead · ACME-206',
+    question: 'Ship the new search limits in 2.3, or hold for 2.4?',
+    options: ['Ship in 2.3', 'Hold for 2.4'],
+    answered: 'Answered from your phone',
+    titles: {
+      'ACME-204': 'Retry failed card payments at checkout',
+      'ACME-206': 'Rate-limit the public search API',
+      'ACME-212': 'Dark mode for invoice PDFs',
+      '#482': 'Flaky Safari login test',
+      'ACME-219': 'Export reports as CSV',
+      'ACME-221': 'Audit log for admin actions'
+    },
+    sources
+  },
+  es: {
+    window: 'líder · acme/web',
+    level: 'Nv',
+    todo: 'To Do',
+    members: 'Miembros',
+    waveCmd: 'orca game wave',
+    promptIdle: 'esperando reportes de los miembros',
+    state: { working: 'Trabajando', question: 'Te necesita', done: 'Done' },
+    ci: { none: 'sin PR aún', running: 'CI corriendo', green: 'CI en verde' },
+    merged: 'Fusionado',
+    levelUp: 'Subes de nivel',
+    log: {
+      claimed: 'tomó',
+      ciGreen: 'CI en verde en',
+      merged: 'PR fusionado de',
+      done: 'Done:',
+      asked: 'pregunta al dueño de',
+      answered: 'respuesta enviada a'
+    },
+    phoneTitle: 'Pregunta para ti',
+    phoneFrom: 'líder · ACME-206',
+    question: '¿Publicamos los nuevos límites de búsqueda en 2.3 o esperamos a 2.4?',
+    options: ['Publicar en 2.3', 'Esperar a 2.4'],
+    answered: 'Respondido desde tu teléfono',
+    titles: {
+      'ACME-204': 'Reintentar pagos con tarjeta fallidos',
+      'ACME-206': 'Limitar peticiones a la API de búsqueda',
+      'ACME-212': 'Modo oscuro para facturas en PDF',
+      '#482': 'Test de login inestable en Safari',
+      'ACME-219': 'Exportar informes en CSV',
+      'ACME-221': 'Registro de auditoría de admins'
+    },
+    sources
+  }
+}
+
+const { lang } = Astro.props
+const copy = copies[lang]
+const label =
+  lang === 'es'
+    ? 'Demostración animada con datos inventados: el Panel de un líder lanza miembros desde un To Do, el CI pasa a verde, un PR se fusiona y suma XP, y una pregunta para el dueño se responde desde el teléfono.'
+    : 'Animated demo with invented data: a lead’s Panel launches members from a To Do, CI turns green, a PR merges and pays XP, and an owner question is answered from the phone.'
+---
+
+<figure class="demo-frame">
+  <div class="demo" role="img" aria-label={label} data-lead-demo data-copy={JSON.stringify(copy)}>
+    <Fragment set:html={renderPanel(showcaseFrame(), copy)} />
+  </div>
+  <figcaption class="demo-note mono">
+    {lang === 'es' ? 'Datos de demostración inventados' : 'Invented demo data'} · example.com
+  </figcaption>
+</figure>
+
+<script>
+  import '../../scripts/lead-demo/client'
+</script>
