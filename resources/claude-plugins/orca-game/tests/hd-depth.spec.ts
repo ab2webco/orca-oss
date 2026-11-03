@@ -99,4 +99,26 @@ describe('hd depth on every built-in look', () => {
       expect([label, hasDetail]).toEqual([label, true])
     }
   })
+
+  // Why: a sunset rim as light as the orange sky behind it vanished, and Quest's dusk read as main's.
+  it('rims every rolling range well clear of its sky, at dusk too', () => {
+    for (const { label, look } of LOOKS.filter((one) => one.look.scenery === 'meadow')) {
+      const frame = frameAt(look)
+      let edges = 0
+      let clear = 0
+      for (let x = 0; x < WIDTH; x += 1) {
+        for (let y = 1; y < frame.ground; y += 1) {
+          const rim = hdFarPixel(frame, x, y)
+          if (rim === undefined || hdFarPixel(frame, x, y - 1) !== undefined) {
+            continue
+          }
+          edges += 1
+          const sky = lightnessOf(hdSkyBaseOf(frame, x, y))
+          clear += Math.abs(lightnessOf(rim) - sky) >= 14 ? 1 : 0
+          break
+        }
+      }
+      expect([label, clear / edges > 0.8]).toEqual([label, true])
+    }
+  })
 })

@@ -1,4 +1,10 @@
-import { lightnessOf, luminanceOf, luminanceOfLightness, withLuminance } from './hd-lightness'
+import {
+  lightnessOf,
+  lightnessOfLuminance,
+  luminanceOf,
+  luminanceOfLightness,
+  withLuminance
+} from './hd-lightness'
 
 // Far and mid scenery keep at least LAYER_FLOOR of lightness (CIE L*) from the sky row behind them.
 
@@ -79,4 +85,20 @@ export const accentApartFromSky = (color: number, contrast: LayerContrast, y: nu
       ? 1
       : -1
   return pushed(color, own, contrast, y, side)
+}
+
+/** A ridge's rim kept `gap` of lightness off its sky row: lighter where there is room, else darker. */
+export const rimApartFromSky = (
+  color: number,
+  contrast: LayerContrast,
+  y: number,
+  gap: number
+): number => {
+  const sky = lightnessOfLuminance(contrast.sky[y] ?? 0)
+  const own = lightnessOf(color)
+  if (Math.abs(own - sky) >= gap) {
+    return color
+  }
+  const target = sky + gap <= 96 ? sky + gap : sky - gap
+  return withLuminance(color, luminanceOfLightness(Math.max(0, target)))
 }

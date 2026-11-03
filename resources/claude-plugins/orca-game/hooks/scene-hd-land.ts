@@ -3,6 +3,7 @@ import {
   accentApartFromSky,
   apartFromSky,
   layerContrastOf,
+  rimApartFromSky,
   type LayerContrast
 } from './hd-layer-contrast'
 import { lightnessOf, luminanceOf, luminanceOfLightness, withLuminance } from './hd-lightness'
@@ -25,6 +26,8 @@ const GROUND_ROWS = 3
 const MAX_KEPT = 4
 const WINDOW_TICKS = 40
 const GLINT_TICKS = 8
+// Lightness a rolling range's rim keeps off the sky behind it.
+const RIM_GAP = 16
 // The backdrop skips the material's deepest step: shade, the colour and a highlight are enough.
 const BACKDROP_STEP = 1
 // The hills' own colour leans to the near tone and darkens with each row down.
@@ -246,9 +249,14 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
     look.scenery !== 'peaks'
   ) {
     // Why the key light, not the look's snow: a dusk palette's snow is as dim as its rock.
-    const rim = keyLightOf(frame)
+    // Why brighter and stronger in the country: rolling hills have no snow cap, and a sunset rim
+    // as light as the sky behind it vanishes.
+    const isMeadow = look.scenery === 'meadow'
+    const rim = isMeadow ? mix(look.sun, 0xffffff, 0.7) : keyLightOf(frame)
     // Why the range's flat colour: its grain under a rim breaks the edge into specks.
-    return accent(mix(litOf(frame, look.far), litOf(frame, rim), isLitSide ? 0.6 : 0.4))
+    const reach = (isLitSide ? 0.6 : 0.4) + (isMeadow ? 0.25 : 0)
+    const lit = mix(litOf(frame, look.far), litOf(frame, rim), reach)
+    return isMeadow ? rimApartFromSky(lit, frame.far, y, RIM_GAP) : accent(lit)
   }
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
