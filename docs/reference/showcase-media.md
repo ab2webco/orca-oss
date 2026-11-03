@@ -40,6 +40,22 @@ Without `ORCA_SHOWCASE_CLIPS=1` the specs run as ordinary regression tests and r
   `~/lumen-app`), a configured permission mode and `hasSeenAutoDefaultNudge`, so neither the auto-mode
   notice nor its offer is drawn.
 
+## Phone clips
+
+The `mobile-<scene>-<ios|android>` clips are recorded from a release build on the iOS simulator and
+the Android emulator, paired with the mobile mock (`MOCK_SCENARIO=showcase npx tsx
+scripts/mock-server.ts` in `mobile/`; `POST /mock/owner-question` sends the notification). Name each
+recording `mobile-<scene>-<platform>.showcase.webm` or `.mp4` and export it with the same script; a
+portrait clip gets a 360 px GIF.
+
+- Android: record with `adb emu screenrecord start --fps 60 <file>.webm`. `adb shell screenrecord`
+  writes only changed frames and drops the last ones when stopped. Run `cmd uimode night yes` first,
+  or opening the app from a notification flashes the light notification card full screen.
+- iOS: `xcrun simctl io <udid> recordVideo` also writes only changed frames, so end the take on a
+  screenshot of the settled screen, and drive it with `axe batch` (one session for every tap). Under
+  load each `axe` call costs seconds; cut the still waits, never the motion.
+- Open each terminal once before the take: a cold terminal draws blank for a second.
+
 ## Before shipping a clip
 
 Watch it frame by frame (`ffmpeg -i clip.mp4 -vf fps=2,scale=1440:-1 frames/%03d.png`), and check

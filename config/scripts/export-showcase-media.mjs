@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 // Turns the raw clips the showcase specs record (ORCA_SHOWCASE_CLIPS=1, `<name>.showcase.mp4` under
 // test-results/) into what ships: a full-resolution MP4 and WebM plus a poster PNG for the site in
-// docs/assets/media/, and a lightweight GIF for the README in docs/assets/readme/.
+// docs/assets/media/, and a lightweight GIF for the README in docs/assets/readme/. Phone recordings
+// (`mobile-<scene>-<ios|android>.showcase.webm|mp4`, see docs/reference/showcase-media.md) export the same way.
 //
 //   node config/scripts/export-showcase-media.mjs [--only lead-wave,agent-grid] [--from <dir>]
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
-const SUFFIX = '.showcase.mp4'
+const SUFFIXES = ['.showcase.mp4', '.showcase.webm']
 const MEDIA_DIR = join('docs', 'assets', 'media')
 const GIF_DIR = join('docs', 'assets', 'readme')
 const GIF_WIDTH = 1200
+const PHONE_GIF_WIDTH = 360
 const GIF_FPS = 12
 
 function arg(name) {
@@ -25,11 +27,32 @@ function findClips(dir) {
     const path = join(dir, entry)
     if (statSync(path).isDirectory()) {
       found.push(...findClips(path))
-    } else if (entry.endsWith(SUFFIX)) {
+    } else if (SUFFIXES.some((suffix) => entry.endsWith(suffix))) {
       found.push(path)
     }
   }
   return found
+}
+
+const clipName = (clip) => basename(clip).replace(/\.showcase\.\w+$/, '')
+
+function isPortrait(clip) {
+  const [width, height] = execFileSync('ffprobe', [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'stream=width,height',
+    '-of',
+    'csv=p=0',
+    clip
+  ])
+    .toString()
+    .trim()
+    .split(',')
+    .map(Number)
+  return height > width
 }
 
 const ffmpeg = (args) =>
@@ -41,21 +64,24 @@ if (!existsSync(root)) {
   console.error(`no ${root}/: record the clips first with ORCA_SHOWCASE_CLIPS=1`)
   process.exit(1)
 }
-const clips = findClips(root).filter((clip) => !only || only.includes(basename(clip, SUFFIX)))
+const clips = findClips(root).filter((clip) => !only || only.includes(clipName(clip)))
 if (clips.length === 0) {
-  console.error(`no *${SUFFIX} under ${root}/`)
+  console.error(`no *${SUFFIXES.join(' or *')} under ${root}/`)
   process.exit(1)
 }
 mkdirSync(MEDIA_DIR, { recursive: true })
 mkdirSync(GIF_DIR, { recursive: true })
 
 for (const clip of clips) {
-  const name = basename(clip, SUFFIX)
+  const name = clipName(clip)
   const media = (ext) => join(MEDIA_DIR, `${name}.${ext}`)
+  // Why fps=60: simulator recordings have a variable frame rate; the site expects a steady 60.
+  const cfr = ['-vf', 'fps=60']
   // Why yuv420p and faststart: Safari and GitHub's player need both to start without a full download.
   ffmpeg([
     '-i',
     clip,
+    ...cfr,
     '-c:v',
     'libx264',
     '-preset',
@@ -72,6 +98,7 @@ for (const clip of clips) {
   ffmpeg([
     '-i',
     clip,
+    ...cfr,
     '-c:v',
     'libvpx-vp9',
     '-crf',
@@ -94,7 +121,7 @@ for (const clip of clips) {
     '-i',
     clip,
     '-filter_complex',
-    `fps=${GIF_FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,split[a][b];` +
+    `fps=${GIF_FPS},scale=${isPortrait(clip) ? PHONE_GIF_WIDTH : GIF_WIDTH}:-1:flags=lanczos,split[a][b];` +
       '[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle',
     gif
   ])
