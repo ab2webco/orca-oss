@@ -1,0 +1,7 @@
+# Why: site/ is its own pnpm project with its own lockfile, like mobile/, so the
+# root workspace (packages: []) never pulls Astro into the desktop app's graph.
+packages: []
+
+allowBuilds:
+  esbuild: true
+  sharp: true

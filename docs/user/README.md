@@ -6,6 +6,7 @@ tracker.
 
 ## Topics
 
+- [Install](install.md): desktop builds for macOS, Windows and Linux, the CLI, and headless hosts.
 - [Worktrees](model/worktrees.md): one isolated git worktree per task, and how to switch between them.
 - [Quick open](model/quick-open.md): find files, and jump to worktrees, chats and actions.
 - [Terminal](terminal.md): tabs, splits and what survives a restart.
@@ -18,6 +19,7 @@ tracker.
 - [File viewers](editing/viewers.md): images, PDFs, Markdown and other file types.
 - [Browser and Design Mode](browser/design-mode.md): preview pages and send element feedback to an agent.
 - [CLI](cli/overview.md): script Orca Lab from a terminal with the `orca` command.
+- [Mobile](mobile.md): pair the phone app, answer the lead, watch terminals.
 - [Telemetry and privacy](telemetry.md): what data Orca Lab sends, and how to turn it off.
 
 Release notes are published on the [GitHub releases page](https://github.com/ab2webco/orca-oss/releases).
