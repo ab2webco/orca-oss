@@ -168,6 +168,41 @@ describe('oversized-pr-review-guard', () => {
     expect(result.reason).toContain('Cortar la tajada')
   })
 
+  // ORCA-981: auto-merge + merge queue only land it with `verify` green, so the lead's queue
+  // command gets the size as a note instead of a stop.
+  const prOf776 = [{ path: 'src/main/feature.ts', additions: 776 }]
+  it.each([
+    'gh pr merge 885 --auto --squash',
+    'gh pr merge 885 --squash --auto --match-head-commit 4bb78c3099',
+    'gh pr merge 885 --auto --squash --match-head-commit=4bb78c3099'
+  ])('allows the lead queue command over the threshold with a size note: %s', (command) => {
+    const result = runGuard(command, { number: '885', files: prOf776 })
+    expect(result.denied).toBe(false)
+    expect(result.note).toContain('#885')
+    expect(result.note).toContain('776')
+    expect(result.note).toContain('más chica')
+  })
+
+  it.each([
+    'gh pr merge 885 --auto --squash --delete-branch',
+    'gh pr merge 885 --auto --merge',
+    'gh pr merge 885 --auto --squash --admin',
+    'gh pr merge 885 --squash'
+  ])('still denies every other oversized merge form: %s', (command) => {
+    const result = runGuard(command, { number: '885', files: prOf776 })
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('suma 776 líneas propias')
+  })
+
+  it('keeps failing closed on the queue command when the pr or repo cannot be resolved', () => {
+    expect(runGuard('gh pr merge --auto --squash', { number: null }).reason).toContain(
+      'no se pudo resolver el número'
+    )
+    expect(
+      runGuard('gh pr merge 885 --auto --squash', { files: prOf776 }, makeDir('')).reason
+    ).toContain('no se pudo resolver el repositorio')
+  })
+
   it('denies when the body only claims a review instead of naming a lineage', () => {
     const result = runGuard('gh pr merge 12 --squash  # corrí las 4 lentes, todo verde', {
       number: '12',

@@ -15,6 +15,12 @@ No es un gate infalsificable: el token de escape se puede escribir sin haber cor
 igual que `no-ticket:`. Lo único infalsificable vive del lado del servidor (ver ORCA-370).
 Lo que esto compra es que saltárselo sea un acto deliberado que deja dicho contra qué
 lineage, en vez de una deriva de cuatro rondas que nadie nombra.
+
+Why la cola del lead sólo avisa: decisión del dueño, 2026-11-03 (ORCA-981) — "que se mergee
+si ya está todo en verde". `gh pr merge <n> --auto --squash` es el único merge que permite
+`main-merge-guard.py`, y GitHub lo aterriza sólo con `verify` verde sobre el resultado. Negarlo
+por tamaño dejaba cada PR de más de 400 líneas (#871, #883-#885) esperando a que el dueño lo
+encolara a mano. Ahí la guarda informa el tamaño; toda otra forma de merge sigue negada.
 """
 
 # Why: macOS ships python3 3.9 at /usr/bin; `str | None` crashes there at import, the hook
@@ -89,6 +95,7 @@ MERGE_VALUE_FLAGS = {
     "--subject",
     "--match-head-commit",
 }
+QUEUE_FLAGS = {"--auto", "--squash"}
 PR_URL = re.compile(r"^https?://[^/]+/(?P<repo>[^/]+/[^/]+)/pull/(?P<number>\d+)")
 REPO_SLUG = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
@@ -235,6 +242,26 @@ def parse_merge_args(args: list[str]) -> tuple[str | None, str | None]:
     return selector, repo
 
 
+def is_queue_command(args: list[str]) -> bool:
+    """`<n> --auto --squash` with an optional `--match-head-commit`, as main-merge-guard admits."""
+    flags: set[str] = set()
+    selectors: list[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--match-head-commit" and index + 1 < len(args):
+            index += 2
+            continue
+        if arg.startswith("--match-head-commit="):
+            pass
+        elif arg.startswith("-"):
+            flags.add(arg)
+        else:
+            selectors.append(arg)
+        index += 1
+    return flags == QUEUE_FLAGS and len(selectors) == 1 and selectors[0].isdigit()
+
+
 def repo_slug(value: str) -> str | None:
     """owner/repo from `owner/repo`, `HOST/owner/repo` or a repo URL, or None."""
     tail = value.strip().rstrip("/").removesuffix(".git").split("/")
@@ -350,6 +377,13 @@ def check_call(call: MergeCall, ack: re.Match[str] | None) -> str | None:
         return (
             f"review: PR #{number} con {added} líneas propias (sin tests) mergeado contra el "
             f"lineage {ack.group(1)}."
+        )
+
+    if is_queue_command(call.args):
+        return (
+            f"review: PR #{number} encolado con {added} líneas propias (sin tests), por encima "
+            f"de {THRESHOLD}; el merge queue lo aterriza sólo con `verify` verde. La próxima "
+            "tajada, más chica."
         )
 
     deny(
