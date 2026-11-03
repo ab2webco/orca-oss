@@ -1,1 +1,13 @@
-/* filled below */
+/* Docs: the landing's terminal type for headings and code; colours come from scene-palette.ts. */
+:root {
+  --sl-font-mono:
+    'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4),
+h1#_top,
+.site-title {
+  font-family: var(--sl-font-mono);
+  letter-spacing: -0.01em;
+}

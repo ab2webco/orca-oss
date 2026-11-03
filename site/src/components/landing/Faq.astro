@@ -36,18 +36,16 @@ const copy = {
 const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
 ---
 
-<section class="section faq" id="faq">
-  <div class="wrap grid">
-    <div class="reveal">
-      <span class="eyebrow">{copy.eyebrow}</span>
-      <h2 class="h2">{copy.title}</h2>
-    </div>
-    <div class="list reveal">
+<section class="section" id="faq" aria-labelledby="faq-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="faq-title">{copy.title}</h2>
+    <div class="list">
       {
-        copy.items.map(([q, a], index) => (
-          <details open={index === 0}>
-            <summary>{q}</summary>
-            <p set:html={code(a)} />
+        copy.items.map(([question, answer]) => (
+          <details>
+            <summary>{question}</summary>
+            <p set:html={code(answer)} />
           </details>
         ))
       }
@@ -56,54 +54,32 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
 </section>
 
 <style>
-  .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
-    gap: 48px;
+  .list {
+    margin-top: 20px;
+    border-top: 1px solid var(--line);
   }
   details {
-    border-bottom: 1px solid var(--border);
-  }
-  details:first-child {
-    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
   }
   summary {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 20px 0;
-    font-size: 17px;
-    font-weight: 600;
+    padding: 12px 0;
     cursor: pointer;
+    font-weight: 700;
     list-style: none;
   }
   summary::-webkit-details-marker {
     display: none;
   }
-  summary::after {
-    content: '+';
-    font: 400 22px/1 var(--font-mono);
-    color: var(--fg-muted);
-    transition: transform 200ms ease;
+  summary::before {
+    content: '▸ ';
+    color: var(--gold);
   }
-  details[open] summary::after {
-    transform: rotate(45deg);
+  details[open] summary::before {
+    content: '▾ ';
   }
   details p {
-    margin: -6px 0 20px;
-    color: var(--fg-muted);
-    max-width: 64ch;
-  }
-  :global(.faq code) {
-    padding: 1px 6px;
-    border-radius: 5px;
-    background: var(--muted);
-    font-size: 0.9em;
-  }
-  @media (max-width: 899px) {
-    .grid {
-      grid-template-columns: 1fr;
-      gap: 24px;
-    }
+    margin: 0 0 14px 2ch;
+    max-width: 72ch;
+    color: var(--muted);
   }
 </style>

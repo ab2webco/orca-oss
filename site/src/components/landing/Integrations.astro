@@ -1,5 +1,6 @@
 ---
 import { docsHref, type Lang, reviewProviders, taskProviders } from '../../data/product'
+import Recording from './Recording.astro'
 
 type Props = {
   lang: Lang
@@ -33,122 +34,50 @@ const copy = {
 
 const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
 const groups = [
-  { title: copy.tasks, note: copy.tasksNote, items: taskProviders.map((p) => p.label), tone: 'brand' },
-  { title: copy.review, note: copy.reviewNote, items: reviewProviders, tone: 'ai' }
+  { title: copy.tasks, note: copy.tasksNote, items: taskProviders.map((p) => p.label) },
+  { title: copy.review, note: copy.reviewNote, items: reviewProviders }
 ]
 ---
 
-<section class="section integrations" id="integrations">
+<section class="section" id="integrations" aria-labelledby="integrations-title">
   <div class="wrap">
-    <div class="head reveal">
-      <span class="eyebrow">{copy.eyebrow}</span>
-      <h2 class="h2">{copy.title}</h2>
-      <p class="lede">{copy.lede}</p>
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="integrations-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <div class="split">
+      <div>
+        {
+          groups.map((group) => (
+            <div class="group">
+              <h3>{group.title}</h3>
+              <p class="muted">{group.note}</p>
+              <p class="names">{group.items.join(' · ')}</p>
+            </div>
+          ))
+        }
+        <p class="muted" set:html={code(copy.cli)} />
+        <ul class="links">
+          <li><a href={docsHref(lang, 'review/linear')}>{copy.more}</a></li>
+        </ul>
+      </div>
+      <Recording lang={lang} file="plane-board.gif" />
     </div>
-    <div class="groups">
-      {
-        groups.map((group) => (
-          <div class={`card group tone-${group.tone} reveal`}>
-            <h3>{group.title}</h3>
-            <p class="note">{group.note}</p>
-            <ul>
-              {group.items.map((name) => (
-                <li>
-                  <span class="mark mono" aria-hidden="true">
-                    {name
-                      .split(' ')
-                      .map((w) => w.charAt(0))
-                      .join('')}
-                  </span>
-                  {name}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))
-      }
-    </div>
-    <p class="cli reveal" set:html={code(copy.cli)} />
-    <a class="more" href={docsHref(lang, 'review/linear')}>{copy.more} →</a>
   </div>
 </section>
 
 <style>
-  .groups {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 48px;
+  .group + .group {
+    margin-top: 24px;
   }
-  .group {
-    padding: 26px;
-  }
-  .group h3 {
+  h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
   }
-  .note {
-    margin: 6px 0 20px;
-    color: var(--fg-muted);
-    font-size: 14.5px;
+  .group p {
+    margin: 4px 0 0;
   }
-  ul {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    font-weight: 560;
-  }
-  .mark {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    font-size: 12px;
+  .names {
     font-weight: 700;
-    flex: none;
-  }
-  .tone-brand .mark {
-    color: var(--brand);
-    background: color-mix(in srgb, var(--brand) 14%, transparent);
-  }
-  .tone-ai .mark {
-    color: var(--ai);
-    background: color-mix(in srgb, var(--ai) 14%, transparent);
-  }
-  .cli {
-    margin: 24px 0 0;
-    color: var(--fg-muted);
-  }
-  :global(.integrations .cli code) {
-    padding: 1px 6px;
-    border-radius: 5px;
-    background: var(--muted);
-    color: var(--fg-soft);
-    font-size: 0.9em;
-  }
-  .more {
-    display: inline-block;
-    margin-top: 12px;
-    color: var(--brand);
-    text-decoration: none;
-    font-weight: 560;
-  }
-  @media (max-width: 899px) {
-    .groups {
-      grid-template-columns: 1fr;
-    }
+    color: var(--gold);
   }
 </style>

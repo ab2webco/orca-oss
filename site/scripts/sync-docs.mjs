@@ -13,6 +13,7 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BASE, REPO_URL } from '../site.config.mjs'
+import { RECORDINGS } from '../src/data/recordings.mjs'
 import { transformDoc } from './docs-transform.mjs'
 
 const SITE_DIR = fileURLToPath(new URL('../', import.meta.url))
@@ -26,13 +27,6 @@ const REFERENCE_ROUTES = {
   'docs/reference/plugin-development.md': 'docs/extend/plugins',
   'docs/reference/orca-sonar.md': 'docs/extend/orca-sonar'
 }
-
-// GIFs the landing shows; copied rather than imported so Vite never reaches outside site/.
-export const LANDING_MEDIA = [
-  'mobile-inbox-ios.gif',
-  'mobile-team-android.gif',
-  'mobile-terminal-ios.gif'
-]
 
 function listMarkdown(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -96,7 +90,8 @@ function syncAssets() {
     'src/renderer/src/assets/fonts/Geist-Variable.woff2',
     'src/assets/fonts/Geist-Variable.woff2'
   )
-  for (const gif of LANDING_MEDIA) {
+  // Copied rather than imported so Vite never reaches outside site/.
+  for (const gif of Object.keys(RECORDINGS)) {
     copyInto(`docs/assets/readme/${gif}`, `public/media/readme/${gif}`)
   }
 }

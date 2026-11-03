@@ -1,5 +1,6 @@
 ---
 import { docsHref, type Lang } from '../../data/product'
+import Recording from './Recording.astro'
 
 type Props = {
   lang: Lang
@@ -36,6 +37,8 @@ const copy = {
       ['The Panel shows the truth', 'One card per member with ticket, branch, PR, CI and state, plus your open PRs, the To Do and team metrics.'],
       ['Recovery is built in', '`game resume-members` after a restart, `game adopt` and `game drop` for strays, `game lead --fresh` for a long conversation.']
     ],
+    needsTitle: 'Who needs you, at a glance',
+    needsBody: 'The band above the lead’s prompt shows every teammate and flags the one waiting on you. Its question lands in the Inbox with the options the lead offered; your answer goes back to the lead.',
     views: 'Pick how it looks, and what it costs your machine: Off, Flat, Zen, 2D classic or 2D hd. Scenes are themeable.',
     credit: 'The idea of running a Claude Code team as a game came from Jucer Orozco.',
     more: 'Orca Game reference'
@@ -69,6 +72,8 @@ const copy = {
       ['El Panel muestra la verdad', 'Una tarjeta por miembro con ticket, rama, PR, CI y estado, más tus PR abiertos, el To Do y las métricas del equipo.'],
       ['La recuperación viene incluida', '`game resume-members` tras un reinicio, `game adopt` y `game drop` para agentes sueltos, `game lead --fresh` para una conversación larga.']
     ],
+    needsTitle: 'Quién te necesita, de un vistazo',
+    needsBody: 'La banda sobre el prompt del líder muestra a cada compañero y marca al que te espera. Su pregunta llega al Inbox con las opciones que ofreció el líder; tu respuesta vuelve al líder.',
     views: 'Elige cómo se ve y cuánto le cuesta a tu máquina: Off, Flat, Zen, 2D classic o 2D hd. Las escenas se pueden personalizar.',
     credit: 'La idea de llevar un equipo de Claude Code como un juego vino de Jucer Orozco.',
     more: 'Referencia de Orca Game'
@@ -79,199 +84,109 @@ const code = (text: string) =>
   text.replace(/`([^`]+)`/g, '<code>$1</code>')
 ---
 
-<section class="section orchestrator" id="orchestrator">
-  <div class="aura" aria-hidden="true"></div>
+<section class="section" id="orchestrator" aria-labelledby="orchestrator-title">
   <div class="wrap">
-    <div class="head reveal">
-      <span class="eyebrow">{copy.eyebrow}</span>
-      <h2 class="h2">{copy.title}</h2>
-      <p class="lede">{copy.lede}</p>
-    </div>
-
-    <ol class="flow reveal">
-      {
-        copy.flow.map(([title, body], index) => (
-          <li class="step">
-            <span class="num mono">{String(index + 1).padStart(2, '0')}</span>
-            <h3>{title}</h3>
-            <p set:html={code(body)} />
-          </li>
-        ))
-      }
-    </ol>
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="orchestrator-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
 
     <div class="split">
-      <div class="card xp reveal">
-        <h3>{copy.xpTitle}</h3>
-        <p class="note">{copy.xpNote}</p>
-        <table>
+      <div>
+        <ol class="flow">
+          {
+            copy.flow.map(([title, text], index) => (
+              <li>
+                <b>
+                  {index + 1}. {title}
+                </b>{' '}
+                <span set:html={code(text)} />
+              </li>
+            ))
+          }
+        </ol>
+        <h3 class="h3">{copy.xpTitle}</h3>
+        <table class="xp">
           <tbody>
             {
-              copy.xp.map(([signal, points]) => (
+              copy.xp.map(([label, points]) => (
                 <tr>
-                  <td>{signal}</td>
-                  <td class="mono pts">+{points} XP</td>
+                  <td>{label}</td>
+                  <td class="pts">+{points} XP</td>
                 </tr>
               ))
             }
           </tbody>
         </table>
+        <p class="muted note">{copy.xpNote}</p>
       </div>
-      <ul class="rules reveal">
+      <Recording lang={lang} file="lead-wave.gif" />
+    </div>
+
+    <div class="split flip">
+      <ul class="dash">
         {
-          copy.rules.map(([title, body]) => (
-            <li class="card">
-              <h3>{title}</h3>
-              <p set:html={code(body)} />
+          copy.rules.map(([title, text]) => (
+            <li>
+              <b>{title}.</b> <span set:html={code(text)} />
             </li>
           ))
         }
       </ul>
+      <Recording lang={lang} file="panel-metrics.gif" />
     </div>
 
-    <p class="views reveal">{copy.views} <span class="credit">{copy.credit}</span></p>
-    <a class="more" href={docsHref(lang, 'orchestrator/orca-game')}>{copy.more} →</a>
+    <h3 class="h3">{copy.needsTitle}</h3>
+    <div class="split">
+      <p class="lede">{copy.needsBody}</p>
+      <Recording lang={lang} file="owner-inbox.gif" />
+    </div>
+
+    <p class="lede">{copy.views}</p>
+    <p class="muted note">{copy.credit}</p>
+    <ul class="links">
+      <li><a href={docsHref(lang, 'orchestrator/orca-game')}>{copy.more}</a></li>
+    </ul>
   </div>
 </section>
 
 <style>
-  .orchestrator {
-    overflow: hidden;
-  }
-  .aura {
-    position: absolute;
-    inset: 10% -20% auto;
-    height: 600px;
-    background: radial-gradient(50% 50% at 50% 50%, var(--glow-b), transparent 70%);
-    pointer-events: none;
-  }
-  .wrap {
-    position: relative;
-  }
   .flow {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
-    list-style: none;
-    margin: 56px 0 0;
+    margin: 0;
     padding: 0;
-    counter-reset: step;
+    list-style: none;
   }
-  .step {
-    position: relative;
-    padding: 18px;
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: var(--card);
+  .flow li + li {
+    margin-top: 10px;
   }
-  .step:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    top: 30px;
-    right: -13px;
-    width: 14px;
-    height: 2px;
-    background: linear-gradient(90deg, var(--brand), var(--ai));
+  .flow b {
+    color: var(--gold);
   }
-  .num {
-    font-size: 12px;
-    color: var(--brand);
+  .flow span {
+    color: var(--muted);
   }
-  .step h3 {
-    margin: 8px 0 0;
-    font-size: 17px;
-    letter-spacing: -0.01em;
-  }
-  .step p,
-  .rules p {
-    margin: 6px 0 0;
-    font-size: 14px;
-    color: var(--fg-muted);
-  }
-  :global(.orchestrator code) {
-    font-size: 0.88em;
-    padding: 1px 5px;
-    border-radius: 5px;
-    background: var(--muted);
-    color: var(--fg-soft);
-  }
-  .split {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
-    gap: 16px;
-    margin-top: 16px;
+  .h3 {
+    margin: 32px 0 0;
+    font-size: 16px;
+    font-weight: 700;
   }
   .xp {
-    padding: 24px;
-  }
-  .xp h3,
-  .rules h3 {
-    margin: 0;
-    font-size: 16px;
-  }
-  .note {
-    margin: 6px 0 14px;
-    font-size: 14px;
-    color: var(--fg-muted);
-  }
-  table {
     width: 100%;
+    margin-top: 10px;
     border-collapse: collapse;
     font-size: 14px;
   }
-  td {
-    padding: 9px 0;
-    border-top: 1px solid var(--border);
+  .xp td {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--line);
   }
-  .pts {
+  .xp .pts {
     text-align: right;
-    color: var(--success);
     white-space: nowrap;
-    padding-left: 12px;
+    color: var(--gold);
+    font-weight: 700;
   }
-  .rules {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .rules li {
-    padding: 20px;
-  }
-  .views {
-    margin: 28px 0 0;
-    color: var(--fg-muted);
-    font-size: 15px;
-  }
-  .credit {
-    display: block;
-    margin-top: 4px;
+  .note {
+    margin: 10px 0 0;
     font-size: 13px;
-  }
-  .more {
-    display: inline-block;
-    margin-top: 16px;
-    color: var(--brand);
-    text-decoration: none;
-    font-weight: 560;
-  }
-  @media (max-width: 1023px) {
-    .flow {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .step::after {
-      display: none;
-    }
-    .split {
-      grid-template-columns: 1fr;
-    }
-  }
-  @media (max-width: 559px) {
-    .flow,
-    .rules {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

@@ -1,70 +1,18 @@
 /*
- * Landing tokens. Neutrals, radius and type come from the app
- * (src/renderer/src/assets/main.css); accents are the app's agent-state and
- * chart colours (AgentStateDot.tsx, --chart-*, --ai-action-accent, --agent-question).
+ * Landing: terminal typography on the Orca Game scene palette. Colours are the --scene-* tokens
+ * LandingLayout writes from src/data/scene-palette.ts; the mono stack is the app's (main.css).
  */
 :root {
-  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono:
     'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
     monospace;
-  --radius: 0.625rem;
-
-  --bg: #0a0a0a;
-  --bg-raised: #111111;
-  --card: #171717;
-  --muted: #262626;
-  --fg: #fafafa;
-  --fg-soft: #d4d4d4;
-  --fg-muted: #a1a1a1;
-  --border: rgb(255 255 255 / 0.08);
-  --border-strong: rgb(255 255 255 / 0.14);
-
-  --brand: #60a5fa;
-  --brand-strong: #3b82f6;
-  --ai: #a78bfa;
-  --question: #f97316;
-  --question-text: #fdba74;
-  --working: #eab308;
-  --done: #10b981;
-  --success: #86efac;
-  --danger: #ef4444;
-  --idle: #737373;
-
-  --glow-a: rgb(59 130 246 / 0.22);
-  --glow-b: rgb(167 139 250 / 0.18);
-  --grid-line: rgb(255 255 255 / 0.035);
-  --shadow: 0 30px 80px -30px rgb(0 0 0 / 0.8), 0 0 0 1px var(--border);
-  color-scheme: dark;
-}
-
-:root[data-theme='light'] {
-  --bg: #ffffff;
-  --bg-raised: #fafafa;
-  --card: #ffffff;
-  --muted: #f5f5f5;
-  --fg: #0a0a0a;
-  --fg-soft: #262626;
-  --fg-muted: #5c5c5c;
-  --border: #e5e5e5;
-  --border-strong: #d4d4d4;
-
-  --brand: #2563eb;
-  --brand-strong: #1d4ed8;
-  --ai: #7c3aed;
-  --question: #ea580c;
-  --question-text: #c2410c;
-  --working: #a16207;
-  --done: #047857;
-  --success: #15803d;
-  --danger: #dc2626;
-  --idle: #737373;
-
-  --glow-a: rgb(59 130 246 / 0.14);
-  --glow-b: rgb(139 92 246 / 0.12);
-  --grid-line: rgb(0 0 0 / 0.045);
-  --shadow: 0 30px 70px -35px rgb(15 23 42 / 0.35), 0 0 0 1px var(--border);
-  color-scheme: light;
+  --bg: var(--scene-bg);
+  --surface: var(--scene-surface);
+  --line: var(--scene-line);
+  --fg: var(--scene-fg);
+  --muted: var(--scene-muted);
+  --link: var(--scene-link);
+  --gold: var(--scene-gold);
 }
 
 *,
@@ -74,7 +22,6 @@
 }
 
 html {
-  scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -82,37 +29,41 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: 15px;
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
   overflow-x: clip;
 }
 
 a {
-  color: inherit;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-img {
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+img,
+canvas {
   max-width: 100%;
   display: block;
 }
 
-code,
-kbd,
-.mono {
-  font-family: var(--font-mono);
+code {
+  font-family: inherit;
+  color: var(--gold);
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
 }
 
 .wrap {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 0 16px;
 }
@@ -124,142 +75,156 @@ kbd,
 }
 
 .section {
-  position: relative;
-  padding: 96px 0;
+  padding: 72px 0 0;
 }
 
 @media (max-width: 767px) {
   .section {
-    padding: 64px 0;
+    padding-top: 56px;
   }
 }
 
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.08em;
+/* The Panel's section heading: `▾ TEAM`, gold on the band's ink. */
+.heading {
+  display: inline-block;
+  margin: 0;
+  padding: 0 6px;
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--brand);
-}
-
-.eyebrow::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 12px currentColor;
 }
 
 .h2 {
-  margin: 14px 0 0;
-  font-size: clamp(30px, 4.6vw, 52px);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  font-weight: 650;
+  margin: 16px 0 0;
+  font-size: clamp(22px, 3.2vw, 32px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
 .lede {
-  margin: 18px 0 0;
-  max-width: 62ch;
-  font-size: clamp(16px, 1.6vw, 18px);
-  color: var(--fg-muted);
+  margin: 12px 0 0;
+  max-width: 72ch;
+  color: var(--muted);
   text-wrap: pretty;
 }
 
-.gradient-text {
-  background: linear-gradient(100deg, var(--brand) 0%, var(--ai) 55%, var(--question) 110%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.muted {
+  color: var(--muted);
 }
 
-.card {
-  position: relative;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--fg) 3%, var(--card)), var(--card));
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.6);
+/* Terminal-style links: underlined, with the key hint the Panel puts before an action. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 999px;
-  font-weight: 560;
-  font-size: 15px;
+.links a {
+  font-weight: 700;
+}
+
+.links a::before {
+  content: '→ ';
+  color: var(--muted);
   text-decoration: none;
-  border: 1px solid var(--border-strong);
-  transition:
-    transform 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease;
+  display: inline-block;
+  margin-right: 0.4ch;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--fg-muted);
+/* A plain list with the shell's dash. */
+.dash {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.btn-primary {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
+.dash li {
+  position: relative;
+  padding-left: 2ch;
+  margin-top: 8px;
 }
 
-.btn-primary:hover {
-  border-color: var(--fg);
-  background: color-mix(in srgb, var(--fg) 88%, var(--brand));
+.dash li::before {
+  content: '-';
+  position: absolute;
+  left: 0;
+  color: var(--muted);
 }
 
-.btn-ghost {
-  background: color-mix(in srgb, var(--fg) 4%, transparent);
+.dash b {
+  color: var(--fg);
 }
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--fg) 3%, transparent);
-  font-size: 13px;
-  color: var(--fg-soft);
-  white-space: nowrap;
+.dash span {
+  color: var(--muted);
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--idle);
+.box {
+  border: 1px solid var(--line);
+  background: var(--surface);
 }
 
-.dot[data-state='working'] {
-  background: var(--working);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--working) 60%, transparent);
+.prompt {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre;
 }
 
-.dot[data-state='question'] {
-  background: var(--question);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--question) 60%, transparent);
+.prompt .c {
+  color: var(--muted);
 }
 
-.dot[data-state='done'] {
-  background: var(--done);
+.prompt .p {
+  color: var(--link);
+  user-select: none;
 }
 
-.section :is(p, li, td) code {
-  white-space: nowrap;
+/* Two columns from 900px: text and the recording that proves it. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 28px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 40px;
+  }
+
+  /* Why: the recording keeps the wide column on either side. */
+  .split.flip {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+
+  .split.flip > :first-child {
+    order: 2;
+  }
+}
+
+.state-working {
+  color: var(--scene-working);
+}
+
+.state-waiting {
+  color: var(--scene-waiting);
+}
+
+.state-done {
+  color: var(--scene-done);
 }
 
 .sr-only {
@@ -269,38 +234,4 @@ kbd,
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-.reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 700ms ease,
-    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-.reveal.is-visible,
-.no-js .reveal {
-  opacity: 1;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
 }

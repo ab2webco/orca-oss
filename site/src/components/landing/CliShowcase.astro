@@ -30,109 +30,57 @@ const copy = {
     more: 'Guía de la CLI'
   }
 }[lang]
+
+const escape = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// Why a string: whitespace inside <pre> is the output, so the template's indentation must stay out.
+const terminalOf = (lines: string[]) =>
+  lines
+    .map((line) =>
+      line.startsWith('#')
+        ? `<span class="c">${escape(line)}</span>`
+        : `<span class="p">$ </span>${escape(line)}`
+    )
+    .join('\n')
 ---
 
-<section class="section cli" id="cli">
+<section class="section" id="cli" aria-labelledby="cli-title">
   <div class="wrap">
-    <div class="head reveal">
-      <span class="eyebrow">{copy.eyebrow}</span>
-      <h2 class="h2">{copy.title}</h2>
-      <p class="lede">{copy.lede}</p>
-    </div>
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="cli-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
     <div class="panes">
       {
         copy.panes.map(([name, lines]) => (
-          <div class="pane reveal">
-            <div class="bar">
-              <span class="lights" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              <span class="mono">{name}</span>
-            </div>
-            <div class="code mono">
-              {(lines as string[]).map((line) =>
-                line.startsWith('#') ? (
-                  <span class="c">{line}</span>
-                ) : (
-                  <span class="cmd">
-                    <span class="p">$ </span>
-                    {line}
-                  </span>
-                )
-              )}
-            </div>
-          </div>
+          <figure class="box">
+            <figcaption>{name}</figcaption>
+            <pre class="prompt" set:html={terminalOf(lines as string[])} />
+          </figure>
         ))
       }
     </div>
-    <a class="more" href={docsHref(lang, 'cli/overview')}>{copy.more} →</a>
+    <ul class="links">
+      <li><a href={docsHref(lang, 'cli/overview')}>{copy.more}</a></li>
+    </ul>
   </div>
 </section>
 
 <style>
   .panes {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-    margin-top: 48px;
+    margin-top: 28px;
   }
-  .pane {
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: #0a0a0a;
-    color: #e5e5e5;
-    overflow: hidden;
-    box-shadow: var(--shadow);
-  }
-  .bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-bottom: 1px solid rgb(255 255 255 / 0.08);
-    font-size: 12px;
-    color: #a1a1a1;
-  }
-  .lights {
-    display: inline-flex;
-    gap: 5px;
-  }
-  .lights i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #262626;
-  }
-  .code {
-    display: grid;
-    gap: 6px;
+  figure {
     margin: 0;
-    padding: 16px;
-    font-size: 12.5px;
-    line-height: 1.55;
+    min-width: 0;
   }
-  .code > span {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  .c {
-    color: #8a8a8a;
-  }
-  .p {
-    color: #60a5fa;
-  }
-  .more {
-    display: inline-block;
-    margin-top: 20px;
-    color: var(--brand);
-    text-decoration: none;
-    font-weight: 560;
-  }
-  @media (max-width: 1023px) {
-    .panes {
-      grid-template-columns: 1fr;
-    }
+  figcaption {
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
   }
 </style>

@@ -1,0 +1,135 @@
+---
+import type { Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+// The names Settings → Agents → Scene gives the built-in scenes.
+const SCENES = [
+  ['quest', 'Quest'],
+  ['vigilante', 'Night Watch'],
+  ['jrpg', 'Crystal Saga'],
+  ['tamer', 'Beast Tamer']
+] as const
+const copy = {
+  en: {
+    label: 'Orca Game’s /quest demo, drawn live by the game’s 2D hd renderer',
+    playing: '/quest demo',
+    scene: 'scene'
+  },
+  es: {
+    label: 'La /quest demo de Orca Game, dibujada en vivo por el renderer 2D hd del juego',
+    playing: '/quest demo',
+    scene: 'escena'
+  }
+}[lang]
+---
+
+<div class="band" data-quest-band data-scene="quest">
+  <canvas role="img" aria-label={copy.label}></canvas>
+  <div class="wrap strip">
+    <p class="now">
+      <span class="tag">{copy.playing}</span>
+      <span data-band-caption aria-live="off"></span>
+    </p>
+    <p class="scenes">
+      <span class="muted">{copy.scene}:</span>
+      {
+        SCENES.map(([id, name]) => (
+          <button type="button" data-scene-pick={id} aria-pressed={String(id === 'quest')}>
+            {name}
+          </button>
+        ))
+      }
+    </p>
+  </div>
+</div>
+
+<script>
+  import { mountQuestBand } from '../../scripts/quest-band'
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-quest-band]')) {
+    mountQuestBand(root)
+  }
+</script>
+
+<style>
+  .band {
+    border-bottom: 1px solid var(--line);
+  }
+  canvas {
+    width: 100%;
+    max-width: none;
+    /* 28 scene pixels tall (14 hd rows); quest-band.ts reads the pixel size back from this. */
+    height: calc(28 * 4px);
+    image-rendering: pixelated;
+    background: var(--scene-bg);
+    border-top: 2px solid var(--scene-gold);
+    border-bottom: 2px solid var(--scene-gold);
+    box-sizing: content-box;
+  }
+  @media (min-width: 765px) {
+    canvas {
+      height: calc(28 * 5px);
+    }
+  }
+  @media (min-width: 935px) {
+    canvas {
+      height: calc(28 * 6px);
+    }
+  }
+  @media (min-width: 1275px) {
+    canvas {
+      height: calc(28 * 8px);
+    }
+  }
+  .strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 24px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 13px;
+  }
+  .strip p {
+    margin: 0;
+    min-width: 0;
+  }
+  .now {
+    display: flex;
+    gap: 1ch;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .tag {
+    color: var(--gold);
+    font-weight: 700;
+  }
+  .scenes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.5ch;
+  }
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--link);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  button[aria-pressed='true'] {
+    color: var(--fg);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  button[aria-pressed='true']::before {
+    content: '▸';
+  }
+</style>

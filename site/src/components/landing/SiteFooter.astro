@@ -9,7 +9,6 @@ const { lang } = Astro.props
 const copy = {
   en: {
     tagline: 'Run a team of coding agents, each in its own worktree, on every machine you own.',
-    product: 'Product',
     docs: 'Docs',
     project: 'Project',
     links: [
@@ -23,12 +22,11 @@ const copy = {
       [`${REPO_URL}/releases`, 'Release notes'],
       [docsHref(lang, 'telemetry'), 'Privacy']
     ],
-    legal: 'MIT License · Built on Orca by stablyai · Demo data on this page is invented.',
+    legal: 'MIT License · Built on Orca by stablyai · The recordings and the /quest demo use demo projects, not real customers.',
     lang: 'Español'
   },
   es: {
     tagline: 'Lleva un equipo de agentes de código, cada uno en su worktree, en cada máquina que tengas.',
-    product: 'Producto',
     docs: 'Docs',
     project: 'Proyecto',
     links: [
@@ -42,98 +40,64 @@ const copy = {
       [`${REPO_URL}/releases`, 'Notas de versión'],
       [docsHref(lang, 'telemetry'), 'Privacidad']
     ],
-    legal: 'Licencia MIT · Basado en Orca de stablyai · Los datos de demostración de esta página son inventados.',
+    legal: 'Licencia MIT · Basado en Orca de stablyai · Las grabaciones y la /quest demo usan proyectos de demostración, no clientes reales.',
     lang: 'English'
   }
 }[lang]
 ---
 
 <footer class="site-footer">
-  <div class="wrap grid">
-    <div class="brand">
-      <a href={homeHref(lang)} class="logo">
-        <img src={withBase('icon.png')} alt="" width="32" height="32" loading="lazy" />
-        <span>Orca Lab</span>
+  <div class="wrap">
+    <p class="tagline">
+      <a class="brand" href={homeHref(lang)}>
+        <img src={withBase('icon.png')} alt="" width="20" height="20" loading="lazy" />Orca Lab
       </a>
-      <p>{copy.tagline}</p>
-      <a class="lang" href={homeHref(lang === 'es' ? 'en' : 'es')}>{copy.lang}</a>
-    </div>
-    <nav aria-label={copy.product}>
-      <h2>{copy.docs}</h2>
+      <span class="muted">{copy.tagline}</span>
+    </p>
+    <nav aria-label={copy.docs}>
+      <span class="muted">{copy.docs}:</span>
       {copy.links.map(([href, label]) => <a href={href}>{label}</a>)}
     </nav>
     <nav aria-label={copy.project}>
-      <h2>{copy.project}</h2>
+      <span class="muted">{copy.project}:</span>
       {copy.project_links.map(([href, label]) => <a href={href}>{label}</a>)}
+      <a href={homeHref(lang === 'es' ? 'en' : 'es')}>{copy.lang}</a>
     </nav>
+    <p class="legal muted">{copy.legal}</p>
   </div>
-  <p class="wrap legal">{copy.legal}</p>
 </footer>
 
 <style>
   .site-footer {
-    padding: 64px 0 40px;
-    border-top: 1px solid var(--border);
-    background: var(--bg-raised);
+    padding: 32px 0 40px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 32px;
+  p,
+  nav {
+    margin: 0;
   }
-  .logo {
-    display: inline-flex;
+  .tagline {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    font-weight: 650;
-    text-decoration: none;
-  }
-  .logo img {
-    border-radius: 8px;
-  }
-  .brand p {
-    margin: 12px 0 0;
-    max-width: 44ch;
-    color: var(--fg-muted);
-    font-size: 14.5px;
-  }
-  .lang {
-    display: inline-block;
-    margin-top: 12px;
-    font-size: 14px;
-    color: var(--brand);
+    gap: 4px 2ch;
   }
   nav {
-    display: grid;
-    align-content: start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 2ch;
+    margin-top: 10px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
     gap: 8px;
-  }
-  h2 {
-    margin: 0 0 4px;
-    font: 600 12px/1 var(--font-mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--fg-muted);
-  }
-  nav a {
-    font-size: 14.5px;
-    color: var(--fg-soft);
+    color: var(--fg);
+    font-weight: 700;
     text-decoration: none;
   }
-  nav a:hover {
-    color: var(--fg);
-  }
   .legal {
-    margin-top: 40px;
-    font-size: 13px;
-    color: var(--fg-muted);
-  }
-  @media (max-width: 767px) {
-    .grid {
-      grid-template-columns: 1fr 1fr;
-    }
-    .brand {
-      grid-column: 1 / -1;
-    }
+    margin-top: 18px;
   }
 </style>

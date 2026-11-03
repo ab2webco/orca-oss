@@ -39,90 +39,19 @@ const copy = {
 }[lang]
 ---
 
-<section class="section experimental" id="experimental">
+<section class="section" id="experimental" aria-labelledby="experimental-title">
   <div class="wrap">
-    <div class="box card reveal">
-      <div class="intro">
-        <span class="eyebrow">{copy.eyebrow}</span>
-        <h2 class="h2">{copy.title}</h2>
-        <p class="lede">{copy.lede}</p>
-      </div>
-      <ul>
-        {
-          copy.items.map(([title, body]) => (
-            <li>
-              <span class="tag mono">{copy.eyebrow}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="experimental-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <ul class="dash">
+      {
+        copy.items.map(([title, text]) => (
+          <li>
+            <b>{title}.</b> <span>{text}</span>
+          </li>
+        ))
+      }
+    </ul>
   </div>
 </section>
-
-<style>
-  .box {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
-    gap: 40px;
-    padding: 40px;
-    background:
-      repeating-linear-gradient(
-        135deg,
-        transparent 0 14px,
-        color-mix(in srgb, var(--working) 4%, transparent) 14px 15px
-      ),
-      var(--card);
-    border-style: dashed;
-    border-color: color-mix(in srgb, var(--working) 35%, var(--border));
-  }
-  .eyebrow {
-    color: var(--working);
-  }
-  ul {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  li {
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-  }
-  .tag {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--working);
-  }
-  h3 {
-    margin: 4px 0 0;
-    font-size: 15px;
-  }
-  li p {
-    margin: 4px 0 0;
-    font-size: 13.5px;
-    color: var(--fg-muted);
-  }
-  @media (max-width: 1023px) {
-    .box {
-      grid-template-columns: 1fr;
-      gap: 24px;
-      padding: 28px;
-    }
-  }
-  @media (max-width: 559px) {
-    .box {
-      padding: 20px;
-    }
-    ul {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>

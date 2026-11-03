@@ -1,7 +1,7 @@
 ---
-import '../styles/fonts.css'
 import '../styles/landing.css'
 import { type Lang, withBase } from '../data/product'
+import { scenePaletteCss } from '../data/scene-palette'
 
 type Props = {
   lang: Lang
@@ -32,7 +32,7 @@ const ogImage = new URL(withBase('icon.png'), Astro.site)
     <meta property="og:description" content={description} />
     <meta property="og:image" content={ogImage} />
     <meta name="twitter:card" content="summary" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <style set:html={scenePaletteCss}></style>
     <script is:inline>
       // Same key and attribute as Starlight's theme picker, so the docs and the landing agree.
       document.documentElement.classList.remove('no-js')
@@ -57,25 +57,6 @@ const ogImage = new URL(withBase('icon.png'), Astro.site)
       <slot />
     </main>
     <slot name="footer" />
-    <script>
-      const targets = document.querySelectorAll<HTMLElement>('.reveal')
-      if (!('IntersectionObserver' in window)) {
-        targets.forEach((el) => el.classList.add('is-visible'))
-      } else {
-        const observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible')
-                observer.unobserve(entry.target)
-              }
-            }
-          },
-          { rootMargin: '0px 0px -8% 0px' }
-        )
-        targets.forEach((el) => observer.observe(el))
-      }
-    </script>
     <style>
       .skip {
         position: absolute;
@@ -83,8 +64,7 @@ const ogImage = new URL(withBase('icon.png'), Astro.site)
         top: -60px;
         z-index: 100;
         padding: 8px 14px;
-        border-radius: 8px;
-        background: var(--fg);
+        background: var(--gold);
         color: var(--bg);
       }
       .skip:focus {

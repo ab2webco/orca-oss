@@ -1,0 +1,50 @@
+---
+import { type Lang, withBase } from '../../data/product'
+import { RECORDINGS } from '../../data/recordings.mjs'
+
+type Props = {
+  lang: Lang
+  file: keyof typeof RECORDINGS
+  /** Phone recordings sit narrower than desktop ones. */
+  isPhone?: boolean
+  /** Above the fold: load with the page. */
+  isEager?: boolean
+}
+
+const { lang, file, isPhone = false, isEager = false } = Astro.props
+const recording = RECORDINGS[file]
+---
+
+<figure class:list={['recording', { phone: isPhone }]}>
+  <img
+    src={withBase(`media/readme/${file}`)}
+    alt={recording[lang]}
+    width={recording.width}
+    height={recording.height}
+    loading={isEager ? 'eager' : 'lazy'}
+    decoding="async"
+  />
+  <figcaption>{recording[lang]}</figcaption>
+</figure>
+
+<style>
+  .recording {
+    margin: 0;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .recording img {
+    width: 100%;
+    height: auto;
+  }
+  .recording.phone {
+    max-width: 280px;
+  }
+  figcaption {
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+</style>
