@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { statSyncMock } from './pty-ipc-mock-registry'
+import { spawnMock, statSyncMock } from './pty-ipc-mock-registry'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { TerminalSessionOwnerUnverifiedError } from '../daemon/daemon-errors'
 import { makePaneKey } from '../../shared/stable-pane-id'
@@ -499,5 +499,103 @@ describe('registerPtyHandlers', () => {
     expect(store.setWorkspaceSession).not.toHaveBeenCalled()
     expect(store.flushOrThrow).not.toHaveBeenCalled()
     expect(session.tabsByWorktree[worktreeId]).toHaveLength(1)
+  })
+
+  it('lets the host window attach to a pane a paired client launched on the local provider', async () => {
+    type RuntimeSpawnController = {
+      spawn(args: {
+        cols: number
+        rows: number
+        worktreeId: string
+        tabId: string
+        leafId: string
+        persistHostSessionBinding: true
+      }): Promise<{ id: string; incarnationId?: string }>
+    }
+    const proc = {
+      onData: vi.fn(),
+      onExit: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      process: 'bash',
+      pid: 4242
+    }
+    spawnMock.mockReturnValue(proc)
+    const worktreeId = 'repo-1::/tmp/remote-launched-member'
+    const tabId = 'tab-remote-launched-member'
+    const leafId = '98989898-9898-4898-8898-989898989898'
+    let controller: RuntimeSpawnController | null = null
+    let launchedPtyId: string | null = null
+    const runtime = {
+      setPtyController: vi.fn((value) => {
+        controller = value
+      }),
+      resolveTerminalPane: vi.fn(() => {
+        if (!launchedPtyId) {
+          throw new Error('terminal_not_found')
+        }
+        return {
+          handle: 'term_remote_member',
+          tabId,
+          leafId,
+          ptyId: launchedPtyId,
+          connected: true
+        }
+      }),
+      createPreAllocatedTerminalHandle: vi.fn(() => 'term_remote_member'),
+      preAllocateHandleForPty: vi.fn(() => 'term_remote_member'),
+      registerPreAllocatedHandleForPty: vi.fn(),
+      beginPtyRegistration: vi.fn(),
+      cancelPendingPtyRegistration: vi.fn(),
+      assertPtyRegistrationAllowed: vi.fn(),
+      registerPty: vi.fn(),
+      noteTerminalSpawnCommand: vi.fn(),
+      seedHeadlessTerminal: vi.fn(),
+      onPtySpawned: vi.fn(),
+      onPtyExit: vi.fn(),
+      onPtyData: vi.fn()
+    }
+    const store = {
+      getWorktreeMeta: vi.fn(() => undefined),
+      persistPtyBinding: vi.fn(() => true)
+    }
+    registerPtyHandlers(
+      mainWindow as never,
+      runtime as never,
+      undefined,
+      undefined,
+      undefined,
+      store as never
+    )
+
+    // The paired client's `game launch --on <host>` spawns through the host runtime.
+    const launched = await (controller as unknown as RuntimeSpawnController).spawn({
+      cols: 120,
+      rows: 40,
+      worktreeId,
+      tabId,
+      leafId,
+      persistHostSessionBinding: true
+    })
+    launchedPtyId = launched.id
+    spawnMock.mockClear()
+
+    const opened = await handlers.get('pty:spawn')!(null, {
+      cols: 80,
+      rows: 24,
+      worktreeId,
+      tabId,
+      leafId
+    })
+
+    expect(opened).toMatchObject({
+      id: launched.id,
+      incarnationId: launched.incarnationId,
+      isReattach: true
+    })
+    expect(spawnMock).not.toHaveBeenCalled()
+    expect(runtime.onPtyExit).not.toHaveBeenCalled()
+    clearProviderPtyState(launched.id)
   })
 })
