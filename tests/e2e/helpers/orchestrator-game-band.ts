@@ -130,6 +130,8 @@ export async function startGameBand(
     scene?: string
     /** For recorded clips: `~/lumen-app` instead of a temp path, no auto-mode notice, and this API. */
     showcase?: { apiUrl?: string }
+    /** The zone hd's day and night follow; UTC when left out. */
+    timezone?: string
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -209,7 +211,7 @@ export async function startGameBand(
     ORCA_GAME_HUD: '1',
     ORCA_GAME_REWARDS: '1',
     ORCA_GAME_RENDER: 'hd',
-    ORCA_GAME_TIMEZONE: 'UTC',
+    ORCA_GAME_TIMEZONE: options.timezone ?? 'UTC',
     ORCA_GAME_LOCALE: options.locale
   }
   const play = join(projectDir, 'play')
