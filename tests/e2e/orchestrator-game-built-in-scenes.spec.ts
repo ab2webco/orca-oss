@@ -1,16 +1,21 @@
-import { rm } from 'node:fs/promises'
+import { createServer, type ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { getTerminalContent } from './helpers/terminal'
 import { claudeVersionOk, clickTerminalText, startGameBand } from './helpers/orchestrator-game-band'
 
-// Each built-in scene in the band and the Panel with invented members, at every width and theme,
-// plus a short clip; the pet chip proves the scene drew its ORCA-968 cast, not the v1 one.
-const WIDTHS = [1440, 768, 390, 320] as const
+// Each built-in scene in the band, the Panel and the hd scene of a lead's turn, with invented
+// members, plus clips of what moves: the walk, a pet, Jev's advisor and the demo's every phase.
+// ORCA_E2E_ORCA_GAME_DIR loads another build of the mod (a "before" for the same captures).
+const WIDTH = 1440
 const HEIGHT = 900
 const HOLD_MS = 1_200
-const CLIP_FRAMES = 24
-const CLIP_EVERY_MS = 250
+// Why one step per 4 s: an advisor gesture plays about that long, so each is seen whole.
+const JEV_STEP_MS = 4_000
+const TURN_PROMPT = 'Walk the scene'
 
 // Why noon: at night every world's palette sinks toward the same dark blue.
 const noonZone = (): string => {
@@ -101,6 +106,69 @@ const gameState = (scene: string, cast: readonly string[]) => ({
   locale: 'en'
 })
 
+/** An API that takes every request and never answers, so a turn stays on its spinner, unbannered. */
+async function heldApi(): Promise<{ url: string; close: () => void }> {
+  const held = new Set<ServerResponse>()
+  const server = createServer((request, response) => {
+    request.resume()
+    held.add(response)
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => {
+      held.forEach((response) => response.destroy())
+      server.closeAllConnections()
+      server.close()
+    }
+  }
+}
+
+// Jev's advisor value, one new decision, CI run or block per step: the advisor's every pose but
+// the hand up, which only Jev's gate on a real tool call plays.
+const JEV_REGISTER = `
+const ADVISOR = { plugin: 'orca-jev-mod-skills', key: 'advisor' }
+const BASE = { version: 1, locale: 'en', line: 'jev · e2e', model: 'Opus 5.5', effort: 'high', subagents: [], ci: [], notices: [] }
+const agent = (id, why, model, verdict) => ({ id, title: 'Task ' + id, model, effort: 'medium', why, verdict })
+const stepOf = (n) => {
+  const id = 'e2e-' + n
+  switch (n % 6) {
+    case 0: return { ...BASE, subagents: [agent(id, 'lowered', 'Haiku 5.5', 'Haiku is enough')] }
+    case 1: return { ...BASE, ci: [{ id, status: 'watching', text: 'CI running' }] }
+    case 2: return { ...BASE, ci: [{ id, status: 'success', text: 'CI green' }] }
+    case 3: return { ...BASE, subagents: [agent(id, 'explicit', 'Opus 5.5', 'as asked')] }
+    case 4: return { ...BASE, ci: [{ id, status: 'failure', text: 'CI red' }] }
+    default: return { ...BASE, notices: [{ id, level: 'block', text: 'Needs a person' }] }
+  }
+}
+export const register = (on) => {
+  on('session.start', async ($, e, next) => {
+    const started = await next(e)
+    let n = 0
+    await $.state.set(ADVISOR, BASE).catch(() => undefined)
+    $.clock.every(${JEV_STEP_MS}, () => {
+      void $.state.set(ADVISOR, stepOf(n)).catch(() => undefined)
+      n += 1
+    })
+    return started
+  })
+}
+`
+
+async function jevStub(root: string): Promise<string> {
+  const dir = join(root, 'jev-stub')
+  await mkdir(join(dir, '.claude-plugin'), { recursive: true })
+  await mkdir(join(dir, 'hooks'), { recursive: true })
+  await writeFile(
+    join(dir, '.claude-plugin', 'plugin.json'),
+    JSON.stringify({ name: 'orca-jev-mod-skills', version: '0.0.0', description: 'E2E Jev' })
+  )
+  await writeFile(join(dir, 'hooks', 'hooks.json'), JSON.stringify({ modules: ['./register.ts'] }))
+  await writeFile(join(dir, 'hooks', 'register.ts'), JEV_REGISTER)
+  return dir
+}
+
 for (const scene of SCENES) {
   for (const theme of ['dark', 'light'] as const) {
     test(`${scene.id} draws its current cast in the band and Panel (${theme})`, async ({
@@ -109,76 +177,94 @@ for (const scene of SCENES) {
       testRepoPath
     }, testInfo) => {
       test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
-      test.setTimeout(240_000)
+      test.setTimeout(300_000)
       await waitForSessionReady(orcaPage)
       await electronApp.evaluate(
         ({ BrowserWindow }, size) => {
           BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
         },
-        { width: WIDTHS[0], height: HEIGHT }
+        { width: WIDTH, height: HEIGHT }
       )
+      await orcaPage.setViewportSize({ width: WIDTH, height: HEIGHT })
+      const api = await heldApi()
+      const stubRoot = testInfo.outputPath('stub')
       const band = await startGameBand(orcaPage, testRepoPath, {
         state: gameState(scene.id, scene.cast),
         theme,
         locale: 'en',
         scene: scene.id,
-        timezone: noonZone()
+        timezone: noonZone(),
+        showcase: { apiUrl: api.url },
+        pluginDir: process.env.ORCA_E2E_ORCA_GAME_DIR || undefined,
+        extraPluginDirs: [await jevStub(stubRoot)]
       })
       const shown = () => getTerminalContent(orcaPage, 20_000)
       const shot = async (name: string): Promise<void> => {
         await orcaPage.waitForTimeout(HOLD_MS)
         await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
       }
+      const clip = async (name: string, frames: number, everyMs: number): Promise<void> => {
+        if (theme !== 'dark') {
+          return
+        }
+        for (let frame = 0; frame < frames; frame += 1) {
+          await orcaPage.waitForTimeout(everyMs)
+          const file = `clip-${name}-${String(frame).padStart(3, '0')}.png`
+          await orcaPage.screenshot({ path: testInfo.outputPath(file) })
+        }
+      }
+      // A turn draws the hd scene under the spinner; the held API keeps it there.
+      const startTurn = async (): Promise<void> => {
+        await orcaPage.keyboard.type(TURN_PROMPT)
+        await orcaPage.keyboard.press('Enter')
+        await orcaPage.waitForTimeout(3_000)
+      }
+      // Why the backspaces: Claude puts an interrupted prompt back in the input.
+      const interrupt = async (): Promise<void> => {
+        await orcaPage.keyboard.press('Escape')
+        await orcaPage.waitForTimeout(HOLD_MS)
+        for (let i = 0; i < TURN_PROMPT.length + 2; i += 1) {
+          await orcaPage.keyboard.press('Backspace')
+        }
+      }
       try {
         await expect
           .poll(shown, { timeout: 60_000, message: 'the band never drew the seeded party' })
           .toContain('Panel')
         const petChip = (await shown()).includes(`Pet ${scene.pet}`)
-        for (const width of WIDTHS) {
-          await orcaPage.setViewportSize({ width, height: HEIGHT })
-          await shot(`${scene.id}-band-${width}-${theme}.png`)
-        }
-        await orcaPage.setViewportSize({ width: WIDTHS[0], height: HEIGHT })
-        await orcaPage.waitForTimeout(HOLD_MS)
+        await shot(`${scene.id}-band-${theme}.png`)
         await clickTerminalText(orcaPage, 'Panel')
         await expect.poll(shown, { timeout: 20_000 }).toContain('LUM-14')
-        for (const width of WIDTHS) {
-          await orcaPage.setViewportSize({ width, height: HEIGHT })
-          await shot(`${scene.id}-panel-${width}-${theme}.png`)
-        }
-        await orcaPage.setViewportSize({ width: WIDTHS[0], height: HEIGHT })
-        await orcaPage.waitForTimeout(HOLD_MS)
-        await clickTerminalText(orcaPage, 'Close')
-        // Pet plays the scene's own pet, then the scripted demo walks every phase of the scene.
+        await shot(`${scene.id}-panel-${theme}.png`)
+        // Why its key: Jev's card pushes the Panel's Close chip below the fold.
+        await orcaPage.keyboard.press('q')
+        await expect.poll(shown, { timeout: 20_000 }).not.toContain('FLEET')
+        await startTurn()
+        await shot(`${scene.id}-scene-${theme}.png`)
+        await clip('walk', 48, 250)
         await clickTerminalText(orcaPage, petChip ? `Pet ${scene.pet}` : 'Pet')
-        await shot(`${scene.id}-pet-1440-${theme}.png`)
+        await clip('pet', 16, 200)
+        await interrupt()
+        // The scripted demo walks every phase: red CI, the merge's finale, the rest by the fire.
         await orcaPage.keyboard.type('/orca-game:demo')
         await orcaPage.keyboard.press('Enter')
         await expect.poll(shown, { timeout: 20_000 }).toContain('DEMO')
-        await shot(`${scene.id}-demo-1440-${theme}.png`)
-        // A turn draws the hd scene under the spinner; the API points nowhere, so it keeps retrying.
-        await orcaPage.keyboard.type('Walk the scene')
-        await orcaPage.keyboard.press('Enter')
-        await orcaPage.waitForTimeout(3_000)
-        if (theme === 'dark') {
-          for (let frame = 0; frame < CLIP_FRAMES; frame += 1) {
-            await orcaPage.waitForTimeout(CLIP_EVERY_MS)
-            const name = `clip-${String(frame).padStart(2, '0')}.png`
-            await orcaPage.screenshot({ path: testInfo.outputPath(name) })
-          }
-        }
-        for (const width of WIDTHS) {
-          await orcaPage.setViewportSize({ width, height: HEIGHT })
-          await shot(`${scene.id}-scene-${width}-${theme}.png`)
-        }
-        // Checked last so a run against older scenes still leaves its captures behind.
+        await startTurn()
+        await shot(`${scene.id}-demo-${theme}.png`)
+        await clip('demo', 110, 400)
+        await interrupt()
+        await clickTerminalText(orcaPage, 'Panel')
+        await clip('panel', 24, 300)
+        // Checked last so a run against an older mod still leaves its captures behind.
         expect(petChip, `the band offers no "Pet ${scene.pet}"`).toBe(true)
       } finally {
-        // Why: a turn left retrying outlives the app; stop it and leave Claude before teardown.
-        await orcaPage.keyboard.press('Escape').catch(() => undefined)
+        // Why: a held turn outlives the app; stop it and leave Claude before teardown.
+        await interrupt().catch(() => undefined)
         await orcaPage.keyboard.type('/exit\n').catch(() => undefined)
         await orcaPage.waitForTimeout(1_000)
+        api.close()
         await rm(band.root, { recursive: true, force: true })
+        await rm(stubRoot, { recursive: true, force: true })
       }
     })
   }

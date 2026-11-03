@@ -132,6 +132,10 @@ export async function startGameBand(
     showcase?: { apiUrl?: string }
     /** The zone hd's day and night follow; UTC when left out. */
     timezone?: string
+    /** The orca-game mod to load; this checkout's when left out. */
+    pluginDir?: string
+    /** More mods loaded beside it. */
+    extraPluginDirs?: readonly string[]
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -194,7 +198,11 @@ export async function startGameBand(
     ].join('\n')
   )
   await chmod(cli, 0o755)
-  const pluginDir = join(process.cwd(), 'resources', 'claude-plugins', 'orca-game')
+  const pluginDir =
+    options.pluginDir ?? join(process.cwd(), 'resources', 'claude-plugins', 'orca-game')
+  const pluginDirs = [pluginDir, ...(options.extraPluginDirs ?? [])]
+    .map((dir) => `--plugin-dir '${dir}'`)
+    .join(' ')
   const env = {
     CLAUDE_CONFIG_DIR: configDir,
     ANTHROPIC_API_KEY: DEMO_KEY,
@@ -219,7 +227,7 @@ export async function startGameBand(
     play,
     `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN\n${Object.entries(env)
       .map(([key, value]) => `export ${key}='${value}'`)
-      .join('\n')}\nexec claude --plugin-dir '${pluginDir}'\n`
+      .join('\n')}\nexec claude ${pluginDirs}\n`
   )
   await chmod(play, 0o755)
 
