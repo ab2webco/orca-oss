@@ -3,6 +3,9 @@ name: Linux Wayland GPU Sandbox
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: wayland terminal input

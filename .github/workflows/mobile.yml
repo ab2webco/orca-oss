@@ -13,6 +13,9 @@ on:
       # these shared fixtures; desktop-side fixture edits must re-run this suite.
       - 'src/shared/terminal-file-link-conformance.ts'
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     # Why: PR Checks' `verify` is the context main requires; a second check with

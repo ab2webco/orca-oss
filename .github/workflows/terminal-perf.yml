@@ -48,6 +48,9 @@ on:
     # terminal throughput regressions are caught before users report typing lag.
     - cron: '30 8 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   terminal-perf:
     name: terminal scale perf
