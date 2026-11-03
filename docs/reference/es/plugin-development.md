@@ -879,7 +879,7 @@ Cada fase (`working`, `docs`, `build`, `verify`, `pr`, `handoff`) debe estar pre
 - `cast`, opcional, le da a la escena un `pet` (al que Pet le da corazones, y que sigue al héroe) y el
   `advisor` de Jev (que, si no, es el árbitro), cada uno con frames de sprite de 1 a 7 filas por 1 a 10 glifos. Un
   miembro inválido se deja fuera con una advertencia y la escena se sigue dibujando; las reglas y los gestos
-  del advisor están en [El elenco](./orchestrator-game.md#the-cast-a-pet-and-jevs-advisor).
+  del advisor están en [El elenco](./orchestrator-game.md#el-elenco-una-mascota-y-el-advisor-de-jev).
 - `themes`, opcional, contiene de 1 a 8 variantes de paleta, cada una con un `name`, un `weight` de 0 a 1 y un
   `look` con cualquiera de los colores del look; el color propio de cada fase se acerca al del tema
   en la proporción `weight`. El mod muestra uno al día, por turnos con los looks simples, en la zona horaria del proyecto
@@ -888,7 +888,7 @@ Cada fase (`working`, `docs`, `build`, `verify`, `pr`, `handoff`) debe estar pre
   `themes` lo ignora y dibuja los looks simples.
 - `roster`, opcional, lista los nombres que toman los miembros; una entrada puede darle a su nombre un look propio (una
   paleta `variant` y un accesorio, o `costumes`). Consulta
-  [Personajes](./orchestrator-game.md#characters-a-look-per-roster-name).
+  [Personajes](./orchestrator-game.md#personajes-un-look-por-nombre-del-roster).
 - Las claves desconocidas se ignoran, así que una escena escrita para un Orca más nuevo sigue cargando.
 
 Orca lee los archivos de los plugins activados y consentidos en cada llamada a `orca game state` y envía las

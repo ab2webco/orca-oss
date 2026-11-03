@@ -28,9 +28,6 @@ const routes = buildRoutes()
 const VOSEO =
   /(?<!\p{L})(?:podés|tenés|querés|sabés|hacés|ponés|corrés|elegís|abrís|usá|abrí|hacé|poné|mirá|fijate|elegí|corré|creá|leé|tocá|probá|configurá|instalá|ejecutá|seleccioná|pegá|escribí|vos)(?!\p{L})/iu
 
-// Translations land one PR at a time; flip to true once every page has one (ORCA-974).
-const EVERY_PAGE_TRANSLATED = false
-
 function listMarkdown(dir) {
   return existsSync(dir)
     ? readdirSync(dir, { recursive: true }).filter((name) => name.endsWith('.md'))
@@ -43,17 +40,10 @@ describe('docs translations', () => {
       existsSync(path.join(REPO_DIR, translationPath(repoPath, locale)))
     )
 
-    it(`every docs page has a current ${locale} translation`, (t) => {
-      const statuses = [...routes.keys()].map((repoPath) => translationStatus(repoPath, locale))
-      const missing = statuses.filter((status) => status.state === 'missing')
-      if (!EVERY_PAGE_TRANSLATED && missing.length > 0) {
-        t.diagnostic(`not yet translated: ${missing.map((status) => status.target).join(', ')}`)
-      }
-      const problems = statuses
-        .filter(
-          (status) =>
-            status.state !== 'current' && (EVERY_PAGE_TRANSLATED || status.state !== 'missing')
-        )
+    it(`every docs page has a current ${locale} translation`, () => {
+      const problems = [...routes.keys()]
+        .map((repoPath) => translationStatus(repoPath, locale))
+        .filter((status) => status.state !== 'current')
         .map(
           (status) =>
             `${status.state}: ${status.target}${status.reason ? ` (${status.reason})` : ''}`
@@ -164,12 +154,9 @@ describe('built docs in every language', () => {
   const pages = [...routes.values()].map((route) => `${route}/index.html`)
 
   for (const locale of LOCALES) {
-    it(`builds every translated ${locale} page as its own text, not the English fallback`, () => {
+    it(`builds every ${locale} page as its own text, not the English fallback`, () => {
       const fallback = []
-      const translatedPages = [...routes]
-        .filter(([repoPath]) => existsSync(path.join(REPO_DIR, translationPath(repoPath, locale))))
-        .map(([, route]) => `${route}/index.html`)
-      for (const page of EVERY_PAGE_TRANSLATED ? pages : translatedPages) {
+      for (const page of pages) {
         const html = readBuilt(`${locale}/${page}`)
         if (
           !html.includes(`<html lang="${locale}"`) ||
