@@ -7,6 +7,7 @@ import { TILE_COLUMNS, TILE_ROWS, tileGridOf } from '../hooks/fleet-tiles'
 import { levelOf } from '../hooks/rewards'
 import { sceneOf } from '../hooks/scenes/index'
 import { digest, glyphs } from './grid-digest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 
 const QUEST = sceneOf('quest')
 
@@ -18,9 +19,9 @@ const party = [
 
 describe('tiles', () => {
   it('draw the same frames as the original quest art at a fixed tick', () => {
-    expect(digest(tileGridOf(QUEST, 'verify', 'working', 9))).toBe('3b2ada5f')
-    expect(digest(tileGridOf(QUEST, 'build', 'working', 9, 'hurt'))).toBe('c4e6c47c')
-    expect(digest(tileGridOf(QUEST, 'pr', 'idle', 9, 'cheer'))).toBe('38b8038a')
+    expect(digest(tileGridOf(PLAIN_QUEST, 'verify', 'working', 9))).toBe('3b2ada5f')
+    expect(digest(tileGridOf(PLAIN_QUEST, 'build', 'working', 9, 'hurt'))).toBe('c4e6c47c')
+    expect(digest(tileGridOf(PLAIN_QUEST, 'pr', 'idle', 9, 'cheer'))).toBe('38b8038a')
     expect(tileGridOf(QUEST, 'verify', 'working', 9)).toHaveLength(TILE_COLUMNS * TILE_ROWS)
   })
 

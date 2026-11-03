@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const FACE = 0xf0c9a0
@@ -42,10 +42,10 @@ export const JRPG_SCENE: SceneDefinition = {
       snow: 0xbff0ff,
       near: 0x3f7a5a,
       ground: 0x5a4a3a,
-      plant: 0x7fe0ff,
-      plantKind: 'crystal',
+      plant: 0x2f7a4a,
+      plantKind: 'tree',
       cloud: 0xf0f6ff,
-      scenery: 'crystals'
+      scenery: 'meadow'
     },
     docs: {
       skyTop: 0x4a2a7a,
@@ -70,10 +70,10 @@ export const JRPG_SCENE: SceneDefinition = {
       snow: 0xa0ffd0,
       near: 0x2a5a3a,
       ground: 0x3a3a2a,
-      plant: 0x6fffb0,
-      plantKind: 'crystal',
+      plant: 0x1f5a3a,
+      plantKind: 'tree',
       cloud: 0xd0f0e0,
-      scenery: 'crystals'
+      scenery: 'meadow'
     },
     verify: {
       skyTop: 0x3a0a14,
@@ -87,7 +87,7 @@ export const JRPG_SCENE: SceneDefinition = {
       plant: 0xff5a6a,
       plantKind: 'crystal',
       cloud: 0x8a2a30,
-      scenery: 'crystals'
+      scenery: 'peaks'
     },
     pr: {
       skyTop: 0x2a3a7a,
@@ -101,7 +101,7 @@ export const JRPG_SCENE: SceneDefinition = {
       plant: 0xffd08a,
       plantKind: 'crystal',
       cloud: 0xffc8a0,
-      scenery: 'crystals'
+      scenery: 'peaks'
     },
     handoff: {
       skyTop: 0x060a24,
@@ -195,18 +195,48 @@ export const JRPG_SCENE: SceneDefinition = {
   },
   // Why ★: PR #32 framed it with ♪, which is outside the characters a Raster is known to draw.
   finale: { en: '★ VICTORY ★', es: '★ ¡VICTORIA! ★' },
+  hud: {
+    skyTop: 0x0d1650,
+    skyBottom: 0x1b2a8a,
+    frame: 0xe8ecff,
+    text: 0xffffff,
+    dim: 0x9aa4d8,
+    star: 0x9fe0ff
+  },
+  themes: [
+    {
+      name: { en: 'Ember', es: 'Brasa' },
+      weight: 0.35,
+      look: { skyBottom: 0xffb080, far: 0x6a2a3a, near: 0x8a3a2a, plant: 0xff8a3a }
+    },
+    {
+      name: { en: 'Moonlit', es: 'Lunar' },
+      weight: 0.35,
+      look: { skyTop: 0x101a48, skyBottom: 0x4a5aa0, far: 0x2a3470, cloud: 0x6a78b0 }
+    }
+  ],
   // Jev's advisor: a hooded oracle whose orb flickers while it reads the signs.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: ['Aerin', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // A slime that bounced into the party and stayed.
+    pet: {
+      name: { en: 'Slime', es: 'Limo' },
+      frames: [
+        ['..H..', '.BBB.', 'BEBEB', 'BBBBB'],
+        ['.....', '.BHB.', 'BEBEB', 'BBBBB']
+      ],
+      happy: ['.H.H.', '.BBB.', 'BEBEB', 'BBRBB'],
+      colors: { B: 0x4fa8f0, H: 0xe8f6ff, E: EYES, R: 0xff6a8a }
+    },
     advisor: {
       name: { en: 'Oracle', es: 'Oráculo' },
       frames: [
         ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'OBBBBBB.', '.BBBBBB.', '.BB..BB.'],
         ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'QBBBBBB.', '.BBBBBB.', '.BB..BB.']
       ],
-      gestures: {
+      gestures: advisorGestures({
         stopped: [
           '...BB...',
           '..BBBB..',
@@ -215,8 +245,11 @@ export const JRPG_SCENE: SceneDefinition = {
           'BBBBBBB.',
           '.BBBBBB.',
           '.BB..BB.'
-        ]
-      },
+        ],
+        reach: ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', 'SBBBBBB.', '.BBBBBB.', '.BB..BB.'],
+        cheer: ['Q..BB...', 'S.BBBB..', 'BBBSEB..', '.BBSSB..', '.BBBBBB.', '.BBBBBB.', '.BB..BB.'],
+        think: ['...BB...', '..BBBB..', '.BBSEB..', '.BBSSB..', '.OSBBBB.', '.BBBBBB.', '.BB..BB.']
+      }),
       colors: { B: NAVY, S: FACE, E: EYES, O: 0x9fe0ff, Q: 0xe8ecff }
     }
   }

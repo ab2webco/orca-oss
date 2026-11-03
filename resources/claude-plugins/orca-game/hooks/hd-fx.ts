@@ -2,7 +2,7 @@ import { hash, mix } from './pixel-canvas'
 
 // Effects over a finished hd frame: particles and reaction flashes.
 
-export type ParticleKind = 'dust' | 'fireflies' | 'snow' | 'embers' | 'glitter'
+export type ParticleKind = 'dust' | 'fireflies' | 'snow' | 'embers' | 'glitter' | 'petals'
 
 export const particleKindOf = (
   sceneId: string,
@@ -17,6 +17,9 @@ export const particleKindOf = (
   }
   if (sceneId === 'jrpg') {
     return 'glitter'
+  }
+  if (sceneId === 'tamer' && night <= 0.5) {
+    return 'petals'
   }
   return night > 0.5 ? 'fireflies' : 'dust'
 }
@@ -55,6 +58,15 @@ const particleOf = (
           ((seed >>> 8) % Math.max(1, Math.floor(ground / 2))) +
           Math.round(Math.cos((tick + i * 3) / 6)),
         color: (tick + i * 3) % 12 < 6 ? 0xd9ff6a : 0x7a9a3a
+      }
+    // Blossoms drifting down and sideways on the breeze, pink and white in turn.
+    case 'petals':
+      return {
+        x:
+          ((seed % columns) + Math.floor(tick / 3) + Math.round(Math.sin((tick + i * 9) / 5))) %
+          columns,
+        y: (Math.floor(tick / 3) + (seed >>> 8)) % Math.max(1, ground),
+        color: i % 2 === 0 ? 0xffb8d8 : 0xfff4f8
       }
     case 'glitter':
       return (tick + i * 5) % 14 > 2

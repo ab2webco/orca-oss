@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const WHITE = 0xf4f4f4
@@ -61,8 +61,8 @@ export const VIGILANTE_SCENE: SceneDefinition = {
       snow: 0xe8b04a,
       near: 0x16131f,
       ground: 0x0f0d16,
-      plant: 0x3a3048,
-      plantKind: 'antenna',
+      plant: 0x2a3a30,
+      plantKind: 'tree',
       cloud: 0x3a3352,
       scenery: 'skyline'
     },
@@ -119,7 +119,7 @@ export const VIGILANTE_SCENE: SceneDefinition = {
       near: 0x1c2030,
       ground: 0x14161f,
       plant: 0x3a4058,
-      plantKind: 'antenna',
+      plantKind: 'none',
       cloud: 0xd8a080,
       scenery: 'skyline'
     }
@@ -203,26 +203,47 @@ export const VIGILANTE_SCENE: SceneDefinition = {
     colors: { R: 0x8a2a3a, M: 0x1a1a1a, W: WHITE, S: HERO_SKIN, P: 0x2a2a2a }
   },
   finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' },
+  hud: {
+    skyTop: 0x05070f,
+    skyBottom: 0x1a1d2e,
+    frame: 0x8a93a8,
+    text: 0xe6e8ee,
+    dim: 0x5d6475,
+    star: 0xf5f3c8
+  },
+  themes: [
+    {
+      name: { en: 'Neon', es: 'Neón' },
+      weight: 0.3,
+      look: { skyBottom: 0x8a2a8a, sun: 0xff5ad0, far: 0x3a1a5a, cloud: 0x6a2a7a }
+    },
+    {
+      name: { en: 'Fog', es: 'Niebla' },
+      weight: 0.4,
+      look: { skyBottom: 0x8a94a8, far: 0x5a6478, near: 0x4a5060, cloud: 0xb0b8c8 }
+    }
+  ],
   // Jev's advisor: the commissioner, grey mustache and trench coat, by the signal.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: ['Nightjar', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // An alley cat that follows the hero across the rooftops.
+    pet: {
+      name: { en: 'Alley Cat', es: 'Gato callejero' },
+      frames: [
+        ['T...K.K', 'T...KKK', '.KKKKYK', '.K..K..'],
+        ['T...K.K', 'T...KKK', '.KKKKYK', 'K..K...']
+      ],
+      happy: ['.T..K.K', 'T...KKK', '.KKKKHK', '.K..K..'],
+      colors: { K: 0x4a4a5a, T: 0x4a4a5a, Y: 0xffd84a, H: 0xc8c8d0 }
+    },
     advisor: {
       name: { en: 'Commissioner', es: 'Comisionado' },
       frames: [
         ['..HHHH..', '.HSSSSH.', '.SGSGS..', '..MMMS..', '.CCWWCC.', 'SCCRWCCS', '.CC..CC.']
       ],
-      gestures: {
-        escalated: [
-          '..HHHH..',
-          '.HSSSSH.',
-          '.SGSGS..',
-          '..MMMS..',
-          'SCCWWCC.',
-          '.CCRWCCS',
-          '.CC..CC.'
-        ],
+      gestures: advisorGestures({
         stopped: [
           '..HHHH..',
           '.HSSSSH.',
@@ -231,8 +252,11 @@ export const VIGILANTE_SCENE: SceneDefinition = {
           'CCCWWCC.',
           '.CCRWCCS',
           '.CC..CC.'
-        ]
-      },
+        ],
+        reach: ['..HHHH..', '.HSSSSH.', '.SGSGS..', '..MMMS..', 'SCCWWCC.', '.CCRWCCS', '.CC..CC.'],
+        cheer: ['..HHHH.S', '.HSSSSHC', '.SGSGS.C', '..MMMSC.', '.CCWWCC.', 'SCCRWCC.', '.CC..CC.'],
+        think: ['..HHHH..', '.HSSSSH.', '.SGSGS..', '.SMMMS..', '.CCWWCC.', '.CCRWCCS', '.CC..CC.']
+      }),
       colors: {
         H: 0xc9ccd4,
         S: HERO_SKIN,

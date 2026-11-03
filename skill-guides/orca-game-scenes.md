@@ -28,9 +28,9 @@ Run every step; skipping validation is the usual way scenes ship broken.
 
 1. **Start from the template**, never from a blank file. It is the built-in Quest with every
    required block filled in, its team-band palette (`hud`) and its advisor (a wizard), plus an
-   example of each optional block Quest lacks: a `foe` (a goblin), a `finale` and a `cast.pet`
-   (a fox), and a `roster` of ten of Quest's characters. Replace them all; none of them is meant
-   to stay:
+   example of each optional block in place of Quest's own: a `foe` (a goblin), a `finale`, a
+   `cast.pet` (a fox), a palette theme, and a `roster` of ten of Quest's characters. Replace them
+   all; none of them is meant to stay:
 
    ```text
    orca game scene new .orca/scenes/<name>.json

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { TILE_COLUMNS, TILE_ROWS, tileGridOf } from '../hooks/fleet-tiles'
-import { hudGridOf } from '../hooks/fleet-hud'
+import { hudGridOf, QUEST_HUD } from '../hooks/fleet-hud'
 import { GAME_LOCALES, isRasterText, localizedNameOf, setGameLocale } from '../hooks/game-strings'
 import { ACTIONS } from '../hooks/quest-policy'
 import { SCENE_ROWS, sceneGridOf } from '../hooks/scene'
@@ -9,6 +9,7 @@ import { SCENES, sceneOf, type SceneDefinition, type ScenePhase } from '../hooks
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { castOf } from '../hooks/scenes/cast-shape'
 import { REFEREE } from '../hooks/advisor-art'
+import { ADVISOR_GESTURES } from '../hooks/scenes/scene-definition'
 import { ORCHESTRATOR_GAME_BUILT_IN_SCENES } from '../../../../src/shared/orchestrator-game-config'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 import { digest, glyphs } from './grid-digest'
@@ -17,6 +18,7 @@ afterEach(() => setGameLocale('en'))
 
 const PHASES: readonly ScenePhase[] = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 const PORTED = ['vigilante', 'jrpg', 'tamer'] as const
+const ALL = ['quest', ...PORTED] as const
 const scene = (id: string): SceneDefinition => sceneOf(id)
 const englishNames = (one: SceneDefinition): string[] =>
   [...PHASES.map((phase) => one.cards[phase].name), one.teller.name].map((name) =>
@@ -83,7 +85,7 @@ describe('built-in scenes', () => {
     }
   })
 
-  it.each(PORTED)('%s passes both validators unchanged, foe and finale included', (id) => {
+  it.each(ALL)('%s passes both validators unchanged, foe and finale included', (id) => {
     const served = JSON.parse(JSON.stringify(scene(id))) as Record<string, unknown>
     const orca = parseOrchestratorGameScene(JSON.stringify(sceneFileOf(scene(id))), id)
     expect(orca.ok).toBe(true)
@@ -93,7 +95,7 @@ describe('built-in scenes', () => {
     expect(scene(id).finale).toBeDefined()
   })
 
-  it.each(PORTED)('%s keeps its finale to width-1 characters in every language', (id) => {
+  it.each(ALL)('%s keeps its finale to width-1 characters in every language', (id) => {
     const finale = scene(id).finale
     for (const locale of GAME_LOCALES) {
       expect(finale !== undefined && isRasterText(localizedNameOf(finale, locale))).toBe(true)
@@ -128,14 +130,17 @@ describe('built-in scenes draw', () => {
     }
   })
 
-  it('paints each world its own way while quest keeps its frame', () => {
-    const frames = Object.keys(SCENES).map((id) =>
-      digest(sceneGridOf(scene(id), 'build', 60, 7, 'Editing quest.tsx', 0))
-    )
-    expect(frames[0]).toBe('f3652aeb')
+  it('paints each world its own way', () => {
+    const frames = ALL.map((id) => digest(sceneGridOf(scene(id), 'build', 60, 7, 'Editing.ts', 0)))
     expect(new Set(frames).size).toBe(4)
-    const nights = PORTED.map((id) => digest(sceneGridOf(scene(id), 'handoff', 60, 7, '', 0)))
-    expect(new Set(nights).size).toBe(3)
+    const nights = ALL.map((id) => digest(sceneGridOf(scene(id), 'handoff', 60, 7, '', 0)))
+    expect(new Set(nights).size).toBe(4)
+  })
+
+  it.each(ALL)('%s changes its far scenery or props between phases', (id) => {
+    const looks = PHASES.map((phase) => scene(id).looks[phase])
+    const layers = new Set(looks.map((look) => `${look.scenery ?? 'peaks'}/${look.plantKind}`))
+    expect(layers.size).toBeGreaterThan(2)
   })
 
   it('a merge plays the finale in the launch language; nothing else does', () => {
@@ -146,6 +151,7 @@ describe('built-in scenes draw', () => {
     expect(merge('tamer', 'merge')).toContain('CAUGHT!')
     expect(merge('vigilante', 'push')).not.toContain('CASE CLOSED')
     expect(merge('vigilante')).not.toContain('CASE CLOSED')
+    expect(merge('quest', 'merge')).toContain('QUEST COMPLETE')
     expect(merge('quest', 'merge')).not.toMatch(/CLOSED|VICTORY|CAUGHT/)
     const resting = glyphs(
       sceneGridOf(scene('vigilante'), 'pr', 80, 3, '', 0, undefined, true, 'merge')
@@ -155,8 +161,8 @@ describe('built-in scenes draw', () => {
     expect(merge('vigilante', 'merge')).toContain('CASO CERRADO')
   })
 
-  it('a red CI brings the foe into the tile and into the HUD; quest stays as it was', () => {
-    for (const id of PORTED) {
+  it('a red CI brings the foe into the tile and into the HUD', () => {
+    for (const id of ALL) {
       const hurt = tileGridOf(scene(id), 'build', 'working', 3, 'hurt')
       expect(hurt).toHaveLength(TILE_COLUMNS * TILE_ROWS)
       expect(digest(hurt)).not.toBe(digest(tileGridOf(scene(id), 'build', 'working', 3)))
@@ -170,20 +176,57 @@ describe('built-in scenes draw', () => {
     // Tick 9: the foe's turn, between the hurt flashes that recolor the sprite.
     const frames = [0, 9].map((tick) => shows(hudGridOf(scene('tamer'), member, 60, tick)))
     expect(frames).toEqual([false, true])
-    expect(digest(tileGridOf(scene('quest'), 'build', 'working', 9, 'hurt'))).toBe('c4e6c47c')
   })
 })
 
 describe('built-in casts', () => {
   const advisors = Object.values(SCENES).map((one) => one.cast?.advisor)
 
-  it('dress Jev’s advisor for each world, each its own sprite, and pet no one but Clawd', () => {
+  it('dress Jev’s advisor for each world, each its own sprite', () => {
     expect(
       Object.values(SCENES).map((one) => localizedNameOf(one.cast?.advisor?.name ?? '', 'en'))
     ).toEqual(['Wizard', 'Commissioner', 'Oracle', 'Professor'])
     expect(new Set(advisors.map((one) => JSON.stringify(one?.frames))).size).toBe(4)
     expect(advisors).not.toContainEqual(REFEREE)
-    expect(Object.values(SCENES).every((one) => one.cast?.pet === undefined)).toBe(true)
+  })
+
+  it('give each world a pet of its own, named in every language', () => {
+    const pets = Object.values(SCENES).map((one) => one.cast?.pet)
+    expect(pets.map((one) => localizedNameOf(one?.name ?? '', 'en'))).toEqual([
+      'Hound',
+      'Alley Cat',
+      'Slime',
+      'Puffball'
+    ])
+    expect(new Set(pets.map((one) => JSON.stringify(one?.frames))).size).toBe(4)
+    for (const pet of pets) {
+      expect(GAME_LOCALES.every((locale) => localizedNameOf(pet?.name ?? '', locale) !== '')).toBe(
+        true
+      )
+    }
+  })
+
+  it('act out every gesture Jev decides with a body of its own, the size of the idle one', () => {
+    for (const advisor of advisors) {
+      const idle = advisor?.frames[0] ?? []
+      const gestures = advisor?.gestures ?? {}
+      expect(Object.keys(gestures).sort()).toEqual([...ADVISOR_GESTURES].sort())
+      for (const body of Object.values(gestures)) {
+        expect(body.map((row) => row.length)).toEqual(idle.map((row) => row.length))
+      }
+      expect(new Set(Object.values(gestures).map((body) => body.join('|'))).size).toBe(4)
+    }
+  })
+
+  it('frame the Panel in each world’s own palette, and theme every world', () => {
+    const huds = Object.values(SCENES).map((one) => JSON.stringify(one.hud ?? QUEST_HUD))
+    expect(new Set(huds).size).toBe(4)
+    for (const one of Object.values(SCENES)) {
+      expect(one.themes?.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(one.themes?.map((theme) => localizedNameOf(theme.name, 'es'))).size).toBe(
+        one.themes?.length
+      )
+    }
   })
 
   it('name each advisor in every language, as the game re-reads a scene', () => {

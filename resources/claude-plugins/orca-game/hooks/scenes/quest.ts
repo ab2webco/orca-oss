@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const CLAUDE = 0xd77757
 const EYES = 0x1a1a1a
@@ -40,7 +40,8 @@ export const QUEST_SCENE: SceneDefinition = {
       ground: 0x6b4f35,
       plant: 0x2f6b3a,
       plantKind: 'tree',
-      cloud: 0xf4f7fb
+      cloud: 0xf4f7fb,
+      scenery: 'meadow'
     },
     docs: {
       skyTop: 0x2b3a67,
@@ -51,9 +52,10 @@ export const QUEST_SCENE: SceneDefinition = {
       snow: 0xe9dcf2,
       near: 0x3f5f4a,
       ground: 0x4a3a2c,
-      plant: 0x2c4a36,
-      plantKind: 'tree',
-      cloud: 0xf7c9b0
+      plant: 0x8a6ad0,
+      plantKind: 'crystal',
+      cloud: 0xf7c9b0,
+      scenery: 'crystals'
     },
     build: {
       skyTop: 0x3b8fd6,
@@ -92,7 +94,8 @@ export const QUEST_SCENE: SceneDefinition = {
       ground: 0x2a1c26,
       plant: 0x1c1420,
       plantKind: 'tree',
-      cloud: 0xff9f86
+      cloud: 0xff9f86,
+      scenery: 'meadow'
     },
     handoff: {
       skyTop: 0x0b1030,
@@ -178,18 +181,47 @@ export const QUEST_SCENE: SceneDefinition = {
     color: '#8f9bb3'
   },
   band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' },
+  // A red dragon breathing fire at a teammate whose CI is red.
+  foe: {
+    rows: ['.H.....H..', '.RRRRRRR..', 'RRYRRRYRR.', '.RRRRRRRWF', 'RRBBBBBRR.', '.RBBBBBR..'],
+    legs: ['.R.R.R.R..', 'R.R.R.R.R.'],
+    colors: { H: 0xe8e0c8, R: 0xb0302a, Y: 0xffd84a, W: 0xffffff, F: 0xffa030, B: 0xe8a060 }
+  },
+  finale: { en: '◆ QUEST COMPLETE', es: '◆ MISIÓN CUMPLIDA' },
+  themes: [
+    {
+      name: { en: 'Autumn', es: 'Otoño' },
+      weight: 0.4,
+      look: { near: 0xb8742f, plant: 0xc0602a, ground: 0x7a4a2a, cloud: 0xf8e0c0 }
+    },
+    {
+      name: { en: 'Frost', es: 'Escarcha' },
+      weight: 0.35,
+      look: { skyBottom: 0xdfeefa, snow: 0xffffff, near: 0x9ab8c8, plant: 0x4a7a8a }
+    }
+  ],
   // Jev's advisor: a wizard whose staff glows while it waits.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: [{ en: 'Arthur', es: 'Arturo' }, ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // The squire's hound, trotting behind the hero.
+    pet: {
+      name: { en: 'Hound', es: 'Sabueso' },
+      frames: [
+        ['.....BB', 'T...BEB', '.BBBBBN', '.B..B..'],
+        ['.....BB', 'T...BEB', '.BBBBBN', 'B..B...']
+      ],
+      happy: ['T....BB', '.T..BEB', '.BBBBBN', '.B..BR.'],
+      colors: { B: 0xb07a40, T: 0xb07a40, E: EYES, N: EYES, R: 0xff6a8a }
+    },
     advisor: {
       name: { en: 'Wizard', es: 'Mago' },
       frames: [
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.G', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT']
       ],
-      gestures: {
+      gestures: advisorGestures({
         stopped: [
           '...PP...',
           '..PPYP..',
@@ -198,8 +230,11 @@ export const QUEST_SCENE: SceneDefinition = {
           'WWWWWRRT',
           '.RWWRRRT',
           '.RRRRRRT'
-        ]
-      },
+        ],
+        reach: ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', 'SWWWWRRT', '.RWWRRRT', '.RRRRRRT'],
+        cheer: ['...PP..G', '..PPYP.T', '.PPPPPPT', '..SESSST', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
+        think: ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WSWWRRT', '.RWWRRRT', '.RRRRRRT']
+      }),
       colors: {
         P: 0x3e2a78,
         Y: 0xffd84a,

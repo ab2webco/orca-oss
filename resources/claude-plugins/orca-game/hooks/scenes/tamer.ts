@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const FACE = 0xf0c9a0
@@ -66,10 +66,10 @@ export const TAMER_SCENE: SceneDefinition = {
       snow: 0xffe0b0,
       near: 0x8a8a3a,
       ground: 0x7a4a2a,
-      plant: 0xff5a3a,
-      plantKind: 'flower',
+      plant: 0x6a8a3a,
+      plantKind: 'cactus',
       cloud: 0xffe8c0,
-      scenery: 'meadow'
+      scenery: 'peaks'
     },
     verify: {
       skyTop: 0x3a4a8a,
@@ -80,10 +80,10 @@ export const TAMER_SCENE: SceneDefinition = {
       snow: 0xf0f0ff,
       near: 0x4a7a6a,
       ground: 0x5a5a4a,
-      plant: 0xf2e04a,
-      plantKind: 'flower',
+      plant: 0x5a5a6a,
+      plantKind: 'antenna',
       cloud: 0xd0d8f0,
-      scenery: 'meadow'
+      scenery: 'peaks'
     },
     pr: {
       skyTop: 0x2a7ac0,
@@ -109,9 +109,9 @@ export const TAMER_SCENE: SceneDefinition = {
       near: 0x2a3a4a,
       ground: 0x1a1a24,
       plant: 0xf5e6a8,
-      plantKind: 'flower',
+      plantKind: 'crystal',
       cloud: 0x4a3a80,
-      scenery: 'meadow'
+      scenery: 'crystals'
     }
   },
   // Z is each creature's evolution color in PR #32; kept so the art stays as drawn there.
@@ -191,17 +191,47 @@ export const TAMER_SCENE: SceneDefinition = {
     colors: { A: 0x8a8f99, M: 0x7a3fb0, R: 0xff3b3b, X: 0x2a1c40 }
   },
   finale: { en: '◓ CAUGHT!', es: '◓ ¡ATRAPADO!' },
+  hud: {
+    skyTop: 0x1a3a6a,
+    skyBottom: 0x2f6fb0,
+    frame: 0xf2d35a,
+    text: 0xffffff,
+    dim: 0x9ac0e0,
+    star: 0xfff4a0
+  },
+  themes: [
+    {
+      name: { en: 'Spring', es: 'Primavera' },
+      weight: 0.35,
+      look: { near: 0x7ad06a, plant: 0xff9ac8, cloud: 0xfff0f8 }
+    },
+    {
+      name: { en: 'Dusk', es: 'Ocaso' },
+      weight: 0.35,
+      look: { skyTop: 0x5a3a8a, skyBottom: 0xffa080, far: 0x7a5a8a, cloud: 0xffc0a0 }
+    }
+  ],
   // Jev's advisor: the professor in a lab coat, who knows every creature's level.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: ['Pip', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // The tamer's first partner, too small to battle, never far behind.
+    pet: {
+      name: { en: 'Puffball', es: 'Bolita' },
+      frames: [
+        ['.P..P.', 'PPPPPP', 'PKPPKP', '.PPPP.'],
+        ['.P..P.', 'PPPPPP', 'PKPPKP', 'P.PP.P']
+      ],
+      happy: ['.P..P.', 'PPPPPP', 'PHPPHP', '.PRRP.'],
+      colors: { P: 0xffd27a, K: EYES, H: 0x8a5a2a, R: 0xff8aa0 }
+    },
     advisor: {
       name: { en: 'Professor', es: 'Profesor' },
       frames: [
         ['..HHHH..', '.HSSSS..', '.SESSS..', '..SSS...', '.WWWWWW.', 'SWWBWWWS', '..K..K..']
       ],
-      gestures: {
+      gestures: advisorGestures({
         stopped: [
           '..HHHH..',
           '.HSSSS..',
@@ -210,8 +240,11 @@ export const TAMER_SCENE: SceneDefinition = {
           'WWWWWWW.',
           '.WWBWWWS',
           '..K..K..'
-        ]
-      },
+        ],
+        reach: ['..HHHH..', '.HSSSS..', '.SESSS..', '..SSS...', 'SWWWWWW.', '.WWBWWWS', '..K..K..'],
+        cheer: ['..HHHH.S', '.HSSSS.W', '.SESSS.W', '..SSSWW.', '.WWWWWW.', 'SWWBWWW.', '..K..K..'],
+        think: ['..HHHH..', '.HSSSS..', '.SESSS..', '.SSSS...', '.WWWWWW.', '.WWBWWWS', '..K..K..']
+      }),
       colors: { H: 0x8a8a8a, S: FACE, E: EYES, W: 0xf4f4f4, B: 0x3a7bd6, K: 0x5a3a20 }
     }
   }

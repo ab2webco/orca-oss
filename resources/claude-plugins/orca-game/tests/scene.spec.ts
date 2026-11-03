@@ -13,6 +13,7 @@ import {
   snoreOf
 } from '../hooks/scene'
 import { digest, glyphs } from './grid-digest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 
 const QUEST = sceneOf('quest')
 
@@ -113,7 +114,9 @@ describe('scene', () => {
   })
 
   it('draws the same frame as the original quest art at a fixed tick', () => {
-    expect(digest(sceneGridOf(QUEST, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe('f3652aeb')
+    expect(digest(sceneGridOf(PLAIN_QUEST, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe(
+      'f3652aeb'
+    )
   })
 
   it('a finished character sits still with a snore instead of walking', () => {

@@ -34,7 +34,9 @@ describe('light and particles', () => {
     expect(particleKindOf('quest', 1, false)).toBe('fireflies')
     expect(particleKindOf('quest', 0, false)).toBe('dust')
     expect(particleKindOf('tamer', 0, true)).toBe('embers')
-    for (const kind of ['dust', 'fireflies', 'snow', 'embers', 'glitter'] as const) {
+    expect(particleKindOf('tamer', 0, false)).toBe('petals')
+    expect(particleKindOf('tamer', 1, false)).toBe('fireflies')
+    for (const kind of ['dust', 'fireflies', 'snow', 'embers', 'glitter', 'petals'] as const) {
       const buf = new Uint32Array(60 * 20)
       particlesInto(buf, 60, 20, 17, 7, kind, 20)
       expect(buf.length).toBe(1200)

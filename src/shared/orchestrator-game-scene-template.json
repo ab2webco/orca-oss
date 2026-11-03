@@ -11,7 +11,8 @@
       "ground": "#6b4f35",
       "plant": "#2f6b3a",
       "plantKind": "tree",
-      "cloud": "#f4f7fb"
+      "cloud": "#f4f7fb",
+      "scenery": "meadow"
     },
     "docs": {
       "skyTop": "#2b3a67",
@@ -22,9 +23,10 @@
       "snow": "#e9dcf2",
       "near": "#3f5f4a",
       "ground": "#4a3a2c",
-      "plant": "#2c4a36",
-      "plantKind": "tree",
-      "cloud": "#f7c9b0"
+      "plant": "#8a6ad0",
+      "plantKind": "crystal",
+      "cloud": "#f7c9b0",
+      "scenery": "crystals"
     },
     "build": {
       "skyTop": "#3b8fd6",
@@ -63,7 +65,8 @@
       "ground": "#2a1c26",
       "plant": "#1c1420",
       "plantKind": "tree",
-      "cloud": "#ff9f86"
+      "cloud": "#ff9f86",
+      "scenery": "meadow"
     },
     "handoff": {
       "skyTop": "#0b1030",

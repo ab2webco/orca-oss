@@ -70,10 +70,11 @@ describe('hd land materials on every built-in scene', () => {
   })
 
   it('lights the far flank that faces the sun brighter than the one turned away', () => {
-    const look = SCENES.quest?.looks.working
-    if (look === undefined) {
+    const working = SCENES.quest?.looks.working
+    if (working === undefined) {
       throw new Error('quest scene missing')
     }
+    const look = { ...working, scenery: 'peaks' as const }
     // Why right of the sun: there the lit flank rises to the right, which a fixed light gets wrong.
     const frame = hdFrameOf({
       look,
