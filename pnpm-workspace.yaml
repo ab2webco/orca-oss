@@ -6,8 +6,8 @@ packages: []
 
 # Keep every override here: a pnpm.overrides block in package.json replaces this one whole.
 overrides:
-  # Pins monaco-editor's bundled copy to the app's dompurify; moved from package.json pnpm.overrides.
-  monaco-editor>dompurify: 3.4.13
+  # GHSA-cg2g-xh64-v4q7 (critical), GHSA-mrv2-3pqr-j5jr; matches the app's dompurify after #888.
+  monaco-editor>dompurify: 3.4.17
   # GHSA-22jm-h49p-29qw, GHSA-46jr-4wx8-v453, GHSA-6qxp-vccf-f47h, GHSA-f897-62hf-6gxq
   '@modelcontextprotocol/sdk@^1': 1.32.0
   # GHSA-4w3w-2rp5-g8jm, GHSA-w2rr-34g9-rvrj, GHSA-27p8-2357-5qqv and 5 more xmldom advisories
