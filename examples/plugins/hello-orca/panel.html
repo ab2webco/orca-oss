@@ -51,14 +51,15 @@
     <script>
       'use strict'
       var seq = 0
-      var pending = {}
+      // A Map, not an object: a requestId like '__proto__' must not reach Object.prototype.
+      var pending = new Map()
       var statusEl = document.getElementById('status')
       var termsEl = document.getElementById('terms')
 
       function call(action, params) {
         return new Promise(function (resolve) {
           var requestId = 'req-' + ++seq
-          pending[requestId] = resolve
+          pending.set(requestId, resolve)
           // The panel frame is an opaque origin, so '*' is the only usable
           // targetOrigin; the host verifies the sending window instead.
           window.parent.postMessage(
@@ -71,9 +72,9 @@
       window.addEventListener('message', function (event) {
         var data = event.data
         if (!data || data.type !== 'orca-panel-action-result') return
-        var resolve = pending[data.requestId]
+        var resolve = pending.get(data.requestId)
         if (!resolve) return
-        delete pending[data.requestId]
+        pending.delete(data.requestId)
         resolve(data)
       })
 
