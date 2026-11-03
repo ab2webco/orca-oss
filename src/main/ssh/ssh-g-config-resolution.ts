@@ -103,6 +103,28 @@ export function resolveWithSshG(host: string): Promise<SshResolvedConfig | null>
   })
 }
 
+// ssh -G joins the list with spaces unquoted; a word that cannot start a path continues the previous one.
+const PATH_START = /^(none$|~|\/|\\|[A-Za-z]:[\\/]|%|__PROGRAMDATA__)/
+
+function splitKnownHostsFileList(value: string): string[] {
+  const files: string[] = []
+  for (const word of value.split(' ')) {
+    if (files.length === 0 || PATH_START.test(word)) {
+      files.push(word)
+    } else {
+      files[files.length - 1] += ` ${word}`
+    }
+  }
+  return files.filter(Boolean)
+}
+
+/** Windows OpenSSH's default GlobalKnownHostsFile is `__PROGRAMDATA__\ssh/ssh_known_hosts`. */
+function expandProgramData(file: string): string {
+  return file.startsWith('__PROGRAMDATA__')
+    ? `${process.env.PROGRAMDATA ?? 'C:\\ProgramData'}${file.slice('__PROGRAMDATA__'.length)}`
+    : file
+}
+
 export function parseSshGOutput(stdout: string): SshResolvedConfig {
   const map = new Map<string, string>()
   const identityFiles: string[] = []
@@ -119,9 +141,9 @@ export function parseSshGOutput(stdout: string): SshResolvedConfig {
       identityFiles.push(resolveSshConfigHomePath(value))
     } else if (key === 'userknownhostsfile' || key === 'globalknownhostsfile') {
       // `none` opts one list out; the other list still applies.
-      for (const file of value.split(/\s+/)) {
-        if (file && file !== 'none') {
-          knownHostsFiles.push(resolveSshConfigHomePath(file))
+      for (const file of splitKnownHostsFileList(value)) {
+        if (file !== 'none') {
+          knownHostsFiles.push(resolveSshConfigHomePath(expandProgramData(file)))
         }
       }
     } else {
