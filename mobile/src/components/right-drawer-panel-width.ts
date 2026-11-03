@@ -9,7 +9,8 @@ export const NARROW_BACKDROP_GUTTER = 48
 export function resolveRightDrawerPanelWidth(
   windowWidth: number,
   isWideLayout: boolean,
-  widthPx: number | undefined
+  widthPx: number | undefined,
+  fillPhone = false
 ): number {
   if (widthPx != null) {
     // Clamp to [0, windowWidth] so a negative explicit width can't yield a negative panel.
@@ -18,5 +19,10 @@ export function resolveRightDrawerPanelWidth(
   if (isWideLayout) {
     return Math.min(WIDE_PANEL_MAX_WIDTH, windowWidth)
   }
-  return Math.max(windowWidth - NARROW_BACKDROP_GUTTER, 0)
+  return fillPhone ? windowWidth : Math.max(windowWidth - NARROW_BACKDROP_GUTTER, 0)
+}
+
+// Why: a full-window panel has no backdrop beside it, so its rounded edge would frame nothing.
+export function rightDrawerSpansWindow(panelWidth: number, windowWidth: number): boolean {
+  return panelWidth >= windowWidth
 }

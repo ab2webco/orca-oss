@@ -147,4 +147,25 @@ describe('TeamDrawer', () => {
     expect(shown.some((one) => one.startsWith('Needs your answer'))).toBe(false)
     expect(shown).toContain('Members (2)')
   })
+
+  // Why: a 48 px strip of the lead's terminal peeked beside the drawer on a phone.
+  it('fills the phone width with square edges', () => {
+    show(teamWith())
+    const panel = [...document.body.querySelectorAll<HTMLElement>('div')].find(
+      (one) => getComputedStyle(one).width === '390px'
+    )
+    expect(panel).toBeDefined()
+    expect(getComputedStyle(panel!).borderTopLeftRadius).toBe('0px')
+  })
+
+  // Why: at 320 pt the tiles broke "2026-11-02" across lines and left one tile alone.
+  it('lists metrics as full-width rows with whole labels', () => {
+    show(teamWith())
+    const label = [...document.body.querySelectorAll<HTMLElement>('div')].find(
+      (one) => one.childElementCount === 0 && one.textContent === 'Merged on 2026-11-02'
+    )
+    expect(label).toBeDefined()
+    const list = label!.parentElement!.parentElement!
+    expect(getComputedStyle(list).flexDirection).toBe('column')
+  })
 })
