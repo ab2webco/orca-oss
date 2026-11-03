@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient, RpcResponse } from '../transport/rpc-client'
-import { readLeadGameState } from './team-drawer-rpc'
+import { readLeadGameState, readLeadInboxThreads } from './team-drawer-rpc'
 
 const caller = { worktreeId: 'repo::/lead', terminalHandle: 'term_1', paneKey: 'tab-1:leaf' }
 
@@ -43,5 +43,31 @@ describe('readLeadGameState', () => {
   it('throws any other failure so the last Team stays on screen', async () => {
     const { client } = clientReplying(failure('internal_error'))
     await expect(readLeadGameState(client, caller)).rejects.toThrow('internal_error')
+  })
+})
+
+describe('readLeadInboxThreads', () => {
+  const lead = { worktreeId: 'repo::/lead', terminalHandle: 'term_1' }
+
+  it("reads the lead's own Inbox threads and drops a malformed row", async () => {
+    const { client, sendRequest } = clientReplying({
+      id: 'x',
+      ok: true,
+      result: { threads: [{ ticket: 3 }], waiting: [], answered: [] },
+      _meta: { runtimeId: 'rt' }
+    } as RpcResponse)
+
+    await expect(readLeadInboxThreads(client, lead)).resolves.toEqual({
+      status: 'ok',
+      threads: { threads: [], waiting: [], answered: [] }
+    })
+    expect(sendRequest).toHaveBeenCalledWith('game.inboxThreads', lead)
+  })
+
+  it('treats a host whose phone allowlist predates the Inbox tab as unavailable', async () => {
+    for (const code of ['forbidden', 'method_not_found']) {
+      const { client } = clientReplying(failure(code))
+      await expect(readLeadInboxThreads(client, lead)).resolves.toEqual({ status: 'unavailable' })
+    }
   })
 })
