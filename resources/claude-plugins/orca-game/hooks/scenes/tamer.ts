@@ -8,7 +8,8 @@ const shiny = (
   name: string,
   color: number,
   ...accessory: [Parameters<typeof sceneCharacter>[2], number]
-) => sceneCharacter(name, { C: color, G: color, R: color, T: color, A: color }, ...accessory)
+) =>
+  sceneCharacter(name, { C: color, G: color, R: color, T: color, A: color, U: color }, ...accessory)
 
 const CHARACTERS = [
   shiny('Mochi', 0xf8b8d0, 'bow', 0xe0405a),
@@ -142,9 +143,9 @@ export const TAMER_SCENE: SceneDefinition = {
       colors: { A: 0x3a8fd6, W: 0xffffff, K: EYES, Z: 0x9fe0ff }
     },
     handoff: {
-      rows: ['....S.....', '...SSS....', 'W.SSSSS.W.', 'WWSWKSSWW.', '.WSSSSSW..', '..SSSSS...'],
-      legs: ['...S.S....', '..S...S...'],
-      colors: { S: 0xf5e6a8, W: 0xffffff, K: EYES, Z: 0xffd84a }
+      rows: ['....U.....', '...UUU....', 'W.UUUUU.W.', 'WWUWKUUWW.', '.WUUUUUW..', '..UUUUU...'],
+      legs: ['...U.U....', '..U...U...'],
+      colors: { U: 0xf5e6a8, W: 0xffffff, K: EYES, Z: 0xffd84a }
     }
   },
   cards: {

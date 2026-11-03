@@ -240,6 +240,22 @@ describe('built-in casts', () => {
     }
   })
 
+  it('recolor a body glyph of every phase costume, so no member looks like another in any phase', () => {
+    for (const one of Object.values(SCENES)) {
+      for (const [phase, costume] of Object.entries(one.costumes)) {
+        const drawn = new Set([...costume.rows, ...costume.legs].join(''))
+        for (const character of one.characters ?? []) {
+          const colors = character.variant?.colors ?? {}
+          const recolored = Object.keys(colors).some(
+            (glyph) => drawn.has(glyph) && colors[glyph] !== costume.colors[glyph]
+          )
+          const name = localizedNameOf(character.name, 'en')
+          expect([one.id, phase, name, recolored]).toEqual([one.id, phase, name, true])
+        }
+      }
+    }
+  })
+
   it('crown only the lead: no roster character wears a crown or the lead’s gold', () => {
     for (const one of Object.values(SCENES)) {
       for (const character of one.characters ?? []) {
