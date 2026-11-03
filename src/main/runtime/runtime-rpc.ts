@@ -371,6 +371,8 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'game.ownerAnswer',
   // The Team drawer over a lead's terminal reads the Panel's own state (ORCA-952).
   'game.state',
+  // The Team drawer's Inbox tab reads the lead's threads; it never marks them read (ORCA-961).
+  'game.inboxThreads',
   // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
   // Consent, enablement and invokeCommand stay off: those are desktop decisions.
   'plugins.list',
