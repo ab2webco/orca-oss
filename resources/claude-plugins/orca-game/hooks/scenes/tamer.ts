@@ -135,7 +135,7 @@ export const TAMER_SCENE: SceneDefinition = {
     verify: {
       rows: ['....V.....', '...VT.....', '..TTTTT...', '.TWKTWKT..', '.TTTTTTT.V', '..TTTTT...'],
       legs: ['..T...T...', '.T.....T..'],
-      colors: { V: 0xf2d35a, T: 0x7fd3c8, W: 0xffffff, K: EYES, Z: 0xf2d35a }
+      colors: { V: 0xff9a3a, T: 0x7fd3c8, W: 0xffffff, K: EYES, Z: 0xf2d35a }
     },
     pr: {
       rows: ['..........', '....A.....', '..AAAAA...', '.AWKAAAAA.', '.AAAAAAA.A', '..AAAAA..A'],

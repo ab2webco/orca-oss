@@ -67,7 +67,7 @@ describe('scene registry', () => {
     }
     expect(localizedNameOf(QUEST.cards.working.name, 'es')).toBe('Escudero')
     expect(localizedNameOf(QUEST.teller.name, 'es')).toBe('Narrador')
-    expect(localizedNameOf(QUEST.cards.handoff.name, 'en')).toBe('King')
+    expect(localizedNameOf(QUEST.cards.handoff.name, 'en')).toBe('Champion')
   })
 
   it('every costume fits the scene rows and names a color for each glyph', () => {

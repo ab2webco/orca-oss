@@ -144,13 +144,14 @@
       }
     },
     "handoff": {
-      "rows": [".Y.Y.Y.Y..", ".YYYYYYY..", ".YJYYYJY..", ".OEOOOEO..", "RNNNNNNNR.", ".RRRRRRR.."],
+      "rows": ["..........", ".LYYYYYL..", "LYYYYYYYL.", ".OEOOOEO..", "RNNMNNNNR.", ".RRRRRRR.."],
       "legs": [".O.O.O.O..", "O.O.O.O.O."],
       "colors": {
         "O": "#d77757",
         "E": "#1a1a1a",
-        "Y": "#f5c518",
-        "J": "#d8283a",
+        "L": "#5fae4a",
+        "Y": "#7a4a2a",
+        "M": "#c8d4e8",
         "R": "#a3202a",
         "N": "#f4f1ea"
       }
@@ -198,12 +199,12 @@
       "color": "#3fae6f"
     },
     "handoff": {
-      "icon": "♛",
+      "icon": "❦",
       "name": {
-        "en": "King",
-        "es": "Rey"
+        "en": "Champion",
+        "es": "Campeón"
       },
-      "color": "#e0b020"
+      "color": "#6fbf5a"
     }
   },
   "teller": {

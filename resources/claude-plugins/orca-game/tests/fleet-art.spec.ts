@@ -70,15 +70,16 @@ describe('hud', () => {
     expect(xpTextOf(levelOf(130))).toBe('Lv 2 □□□□□ 30/200 XP')
   })
 
+  // Why re-pinned for ORCA-968: the done member's King, crowned, is now the Champion's laurel.
   it('draws the same HUD frame as the original quest art, and pins the level bar over it', () => {
     const acting = [
       { ...party[0], action: 'read' },
       { ...party[1], action: 'push' },
       party[2]
     ] as const
-    expect(digest(hudGridOf(QUEST, acting, 90, 4))).toBe('9e35f468')
-    expect(digest(hudGridOf(QUEST, acting, 90, 0, { isDemo: true }))).toBe('56cd3324')
-    expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('8c4630ff')
+    expect(digest(hudGridOf(QUEST, acting, 90, 4))).toBe('e9bd53c4')
+    expect(digest(hudGridOf(QUEST, acting, 90, 0, { isDemo: true }))).toBe('58912fd4')
+    expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('592598e3')
   })
 
   // Why: Orca Lab dropped ja/ko/zh (ORCA-596), so an older Orca's ja launch draws English art.

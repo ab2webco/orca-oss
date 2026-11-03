@@ -2,7 +2,8 @@ import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-d
 
 const EYES = 0x1a1a1a
 const FACE = 0xf0c9a0
-const MERC_HAIR = 0xf2d35a
+// Why silver: gold spikes on a ten-pixel head read as the lead's crown.
+const MERC_HAIR = 0xc9cfdb
 const NAVY = 0x2f3a6b
 const STEEL = 0xd0d6de
 

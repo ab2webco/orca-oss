@@ -194,7 +194,7 @@ export const needsOf = (state: GameState): Need[] => {
   ]
 }
 
-// The lead wears the costume most of its party wears, and the King once all of it is done.
+// The lead wears the costume most of its party wears, and the Champion once all of it is done.
 export const fleetPhaseOf = (
   members: readonly Pick<PartyMember, 'phase' | 'isDone'>[]
 ): FlowPhase | undefined => {

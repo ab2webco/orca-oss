@@ -10,6 +10,8 @@ import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { castOf } from '../hooks/scenes/cast-shape'
 import { REFEREE } from '../hooks/advisor-art'
 import { LEAD_GOLD } from '../hooks/hd-party'
+import { characterCostumeOf } from '../hooks/character-look'
+import { ORCHESTRATOR_GAME_SCENE_TEMPLATE } from '../../../../src/shared/orchestrator-game-scene-authoring'
 import { ADVISOR_GESTURES } from '../hooks/scenes/scene-definition'
 import { ORCHESTRATOR_GAME_BUILT_IN_SCENES } from '../../../../src/shared/orchestrator-game-config'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
@@ -254,6 +256,46 @@ describe('built-in casts', () => {
         }
       }
     }
+  })
+
+  // Why gold on the head: at ten pixels wide that is what reads as a crown, and only the lead wears one.
+  it('crown only the lead: no member sprite wears gold on its head, in any scene, phase or seat', () => {
+    const isCrownGold = (color: number | undefined): boolean => {
+      if (color === undefined) {
+        return false
+      }
+      const [r, g, b] = [(color >> 16) & 255, (color >> 8) & 255, color & 255]
+      const max = Math.max(r, g, b)
+      const span = max - Math.min(r, g, b)
+      const hue =
+        span === 0
+          ? 0
+          : max === r
+            ? (60 * (g - b)) / span
+            : max === g
+              ? 120 + (60 * (b - r)) / span
+              : 240
+      return hue >= 35 && hue <= 60 && span / max >= 0.5 && max >= 140
+    }
+    const template = sceneDefinitionOf(
+      JSON.parse(ORCHESTRATOR_GAME_SCENE_TEMPLATE),
+      'file:new.json'
+    )
+    const crowned: string[] = []
+    for (const one of [...Object.values(SCENES), ...(template === undefined ? [] : [template])]) {
+      const seats = [undefined, ...(one.roster ?? []).map((name) => localizedNameOf(name, 'en'))]
+      for (const seat of seats) {
+        for (const phase of PHASES) {
+          const costume = characterCostumeOf(one, seat, phase)
+          const head = costume.rows.filter((row) => /[^.]/.test(row)).slice(0, 2)
+          const gold = [...head.join('')].filter((glyph) => isCrownGold(costume.colors[glyph]))
+          if (gold.length > 1) {
+            crowned.push(`${one.id} ${seat ?? 'hero'} ${phase}`)
+          }
+        }
+      }
+    }
+    expect(crowned).toEqual([])
   })
 
   it('crown only the lead: no roster character wears a crown or the lead’s gold', () => {

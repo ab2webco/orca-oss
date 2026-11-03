@@ -25,7 +25,7 @@ const CHARACTERS = [
   knight('Elaine', 0xe07070, 'bow', 0x5fb8ff)
 ]
 
-// Squire, Sage, Blacksmith, Knight, Herald and King walking a parallax landscape.
+// Squire, Sage, Blacksmith, Knight, Herald and Champion walking a parallax landscape.
 export const QUEST_SCENE: SceneDefinition = {
   id: 'quest',
   looks: {
@@ -137,10 +137,11 @@ export const QUEST_SCENE: SceneDefinition = {
       legs: ['.O.O.O.O..', 'O.O.O.O.O.'],
       colors: { ...SKIN, F: 0xffffff, C: 0x2e7d4f, G: 0xd4a017, P: 0xf1e2b8 }
     },
+    // A laurel, not a crown: the crown is the lead's alone.
     handoff: {
-      rows: ['.Y.Y.Y.Y..', '.YYYYYYY..', '.YJYYYJY..', '.OEOOOEO..', 'RNNNNNNNR.', '.RRRRRRR..'],
+      rows: ['..........', '.LYYYYYL..', 'LYYYYYYYL.', '.OEOOOEO..', 'RNNMNNNNR.', '.RRRRRRR..'],
       legs: ['.O.O.O.O..', 'O.O.O.O.O.'],
-      colors: { ...SKIN, Y: 0xf5c518, J: 0xd8283a, R: 0xa3202a, N: 0xf4f1ea }
+      colors: { ...SKIN, L: 0x5fae4a, Y: 0x7a4a2a, M: 0xc8d4e8, R: 0xa3202a, N: 0xf4f1ea }
     }
   },
   cards: {
@@ -170,9 +171,9 @@ export const QUEST_SCENE: SceneDefinition = {
       color: '#3fae6f'
     },
     handoff: {
-      icon: '♛',
-      name: { en: 'King', es: 'Rey' },
-      color: '#e0b020'
+      icon: '❦',
+      name: { en: 'Champion', es: 'Campeón' },
+      color: '#6fbf5a'
     }
   },
   teller: {
