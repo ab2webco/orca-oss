@@ -170,6 +170,7 @@ describe('LocalPtyProvider', () => {
       expect(second).toEqual({
         id: 'serve-session-1',
         pid: 12345,
+        incarnationId: first.incarnationId,
         isReattach: true
       })
       expect(mockProc.resize).toHaveBeenCalledWith(120, 40)
@@ -214,7 +215,12 @@ describe('LocalPtyProvider', () => {
         attachOnly: true
       })
 
-      expect(result).toMatchObject({ id: first.id, isReattach: true })
+      expect(result).toMatchObject({
+        id: first.id,
+        incarnationId: first.incarnationId,
+        isReattach: true
+      })
+      expect(first.incarnationId).toEqual(expect.any(String))
       expect(spawnMock).not.toHaveBeenCalled()
     })
 

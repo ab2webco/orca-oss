@@ -428,6 +428,8 @@ function reattachLocalPty(id: string, cols: number, rows: number): PtySpawnResul
   return {
     id,
     pid: existing.pid,
+    // Why: stable-pane adoption rejects a reattach whose incarnation it cannot match (ORCA-988).
+    ...(ptyIncarnations.has(id) ? { incarnationId: ptyIncarnations.get(id) } : {}),
     ...(ptyWslDistroById.has(id) ? { wslDistro: ptyWslDistroById.get(id) ?? null } : {}),
     isReattach: true
   }
