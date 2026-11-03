@@ -112,12 +112,11 @@ function pressableByLabel(root: ReactTestInstance, label: string): ReactTestInst
 }
 
 function isInsideScroll(node: ReactTestInstance): boolean {
-  for (let cur: ReactTestInstance | null = node.parent; cur; cur = cur.parent) {
-    if (cur.type === 'ScrollView') {
-      return true
-    }
+  const parent = node.parent
+  if (!parent) {
+    return false
   }
-  return false
+  return parent.type === 'ScrollView' || isInsideScroll(parent)
 }
 
 describe('TerminalAccessoryBar', () => {
