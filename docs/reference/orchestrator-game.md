@@ -1613,16 +1613,16 @@ never code. The only engine is `runner` (one key to jump), and the built-in runn
 checks a file with the rules in `src/shared/orchestrator-game-arcade-file.ts`, lists every problem
 as `path: message` and exits 1 while any remain.
 
-| Key          | What it sets                                                                     |
-| ------------ | -------------------------------------------------------------------------------- |
-| `engine`     | `runner`                                                                         |
-| `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                           |
-| `fps`        | Frame cap, a whole number from 5 to 15                                           |
-| `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`    |
-| `difficulty` | `{ minGap, maxGap }`, columns of ground between obstacles (8 to 120)             |
-| `jump`       | `{ rows, ms }`: height 2 to 8 rows, time in the air 200 to 2000 ms               |
-| `obstacles`  | 1 to 8, each `{ "from": "scene" }` or a sprite `{ rows, colors }`, with `weight` |
-| `theme`      | Optional. Look colors (`skyTop`, `ground`, …) drawn over the active scene's      |
+| Key          | What it sets                                                                         |
+| ------------ | ------------------------------------------------------------------------------------ |
+| `engine`     | `runner`                                                                             |
+| `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                               |
+| `fps`        | Frame cap, a whole number from 5 to 15                                               |
+| `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`        |
+| `difficulty` | `{ minGap, maxGap }`, columns of ground between obstacles (8 to 120)                 |
+| `jump`       | `{ rows, ms }`: height 2 to 8 rows, time in the air at `speed.start`, 200 to 2000 ms |
+| `obstacles`  | 1 to 8, each `{ "from": "scene" }` or a sprite `{ rows, colors }`, with `weight`     |
+| `theme`      | Optional. Look colors (`skyTop`, `ground`, …) drawn over the active scene's          |
 
 - `{ "from": "scene" }` is the active scene's ground decoration (`plantKind`), so a custom scene
   restyles the game with no extra work. A scene whose `plantKind` is `none` has none, so the list
@@ -1639,11 +1639,21 @@ The mod plays its own copy of the built-in runner
 holds it equal to the JSON Orca validates. A run is drawn as an hd band of the active scene, 12 rows
 tall: its sky, clouds, far range, hills and ground behind, the scene's working costume as the hero and
 its own decoration (`plantKind`) as obstacles, cut to at most 4 pixels by 5 columns and outlined like a
-character so a timed jump clears one even at `speed.max`. The scene's scattered plants and pond are left
-out of the backdrop, since anything on the ground line reads as something to jump.
+character. The scene's scattered plants and pond are left out of the backdrop, since anything on the
+ground line reads as something to jump.
 
 - One key, `j`: it starts a run, jumps, resumes a paused run and starts again after a crash. `q` (or
-  Esc) closes the pane.
+  Esc) closes the pane. A press takes off at once, not on the next frame.
+- The jump stretches with the speed: `jump.ms` is its time in the air at `speed.start`, and a faster
+  run stays up for less time but covers more columns, so every obstacle leaves at least 150 ms to time
+  the press from the start speed to the max (`tests/arcade-runner-fair.spec.ts` sweeps every press
+  moment). A second press in the air jumps once more, up to a quarter of the peak higher; a press in the last
+  120 ms before touchdown takes off again on landing instead.
+- Every 20 s is a level: the speed steps up by `rampPerMinute` for that time until `speed.max`, the
+  name of the level shows for a moment, the gaps close in and obstacles start coming in pairs and
+  threes a bounce apart. Coins lie along some jumps and, from level 2, high in a gap where only the air
+  jump reaches; coins taken in a row make a combo worth more each. The top line shows the session's
+  best and the level on the left, the combo and score on the right. Nothing is kept past the session.
 - The run ticks on its own timer at `fps`, never above 15, and only while it moves: none before the
   first press, none once the pane is hidden or loses the keyboard (it pauses), none after a crash.
 - At 160 columns a frame costs about 1 ms, so a run in play takes under 2% of a core.

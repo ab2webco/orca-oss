@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { runnerOf, runnerStartOf, type RunnerState } from '../hooks/arcade-runner'
 import { ARCADE_RUNNER } from '../hooks/arcade-runner-data'
+import { RUNNER_CEILING, runnerPeakOf } from '../hooks/arcade-runner-jump'
 import {
   ARCADE_ROWS,
   ARCADE_SHAPE_MAX_COLUMNS,
@@ -85,9 +86,53 @@ describe('a runner frame', () => {
   it('lifts the hero off the ground while it jumps', () => {
     const start = runnerStartOf(runnerOf(ARCADE_RUNNER, []), 1)
     const ground = gridFor(undefined, start)
-    const air = gridFor(undefined, { ...start, jumpMs: ARCADE_RUNNER.jump.ms / 2 })
+    const air = gridFor(undefined, { ...start, air: { from: 6, rise: 0, gravity: 1, ms: 0 } })
     const lastRow = (grid: number[][]) => grid.slice(-85 * 3, -85 * 3 + 14).map((c) => c.join())
     expect(lastRow(air)).not.toEqual(lastRow(ground))
+  })
+
+  it('keeps the hero under the top line at the height of an air jump', () => {
+    const start = runnerStartOf(runnerOf(ARCADE_RUNNER, []), 1)
+    const ceiling = runnerPeakOf(ARCADE_RUNNER) * RUNNER_CEILING
+    const ground = gridFor(undefined, start)
+    const high = gridFor(undefined, {
+      ...start,
+      air: { from: ceiling, rise: 0, gravity: 1, ms: 0 }
+    })
+    const topRow = (grid: number[][]) => grid.slice(0, 85).map((c) => c.join())
+    expect(topRow(high)).toEqual(topRow(ground))
+    expect(high.slice(85, 85 * 4)).not.toEqual(ground.slice(85, 85 * 4))
+  })
+
+  it('draws a coin in its own column at its height', () => {
+    const start = runnerStartOf(runnerOf(ARCADE_RUNNER, []), 1)
+    const clear = gridFor(undefined, start)
+    const shown = gridFor(undefined, { ...start, coins: [{ x: 40, h: 12 }] })
+    const changed = new Set<number>()
+    clear.forEach((cell, i) => {
+      if (cell.join() !== shown[i]!.join()) {
+        changed.add(i % 85)
+      }
+    })
+    expect([...changed]).toEqual([40])
+  })
+
+  it('shows the best and level at the left of the top row, and a combo by the score', () => {
+    const scene = sceneOf('quest')
+    const runner = runnerOf(ARCADE_RUNNER, [])
+    const state = { ...runnerStartOf(runner, 1), score: 77, combo: 3 }
+    const grid = arcadeGridOf({
+      scene,
+      runner,
+      state,
+      columns: 43,
+      rows: ROWS,
+      tick: 0,
+      hud: 'best 9 · lv 2'
+    })
+    const top = glyphs(grid.slice(0, 43))
+    expect(top.startsWith(' best 9 · lv 2') || top.startsWith('best 9 · lv 2')).toBe(true)
+    expect(top).toContain('x3 77')
   })
 
   it('shows the score in the top row and a caption when one is given', () => {

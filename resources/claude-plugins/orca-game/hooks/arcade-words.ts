@@ -19,6 +19,11 @@ export type ArcadeWords = {
   play: string
   pass: string
   over: (score: number) => string
+  /** A run that ended above the best before it. */
+  best: (score: number) => string
+  level: (level: number) => string
+  /** The top line's left end: the best so far and the level. */
+  hud: (best: number, level: number) => string
 }
 
 const EN: ArcadeWords = {
@@ -38,7 +43,10 @@ const EN: ArcadeWords = {
   offerReach: 'ctrl+x tab, then j',
   play: 'play',
   pass: 'pass',
-  over: (score) => `Game over · ${score} · j to run again`
+  over: (score) => `Game over · ${score} · j to run again`,
+  best: (score) => `New best · ${score} · j to run again`,
+  level: (level) => `Level ${level} · faster`,
+  hud: (best, level) => (best > 0 ? `best ${best} · lv ${level}` : `lv ${level}`)
 }
 
 const ES: ArcadeWords = {
@@ -58,7 +66,10 @@ const ES: ArcadeWords = {
   offerReach: 'ctrl+x tab y luego j',
   play: 'jugar',
   pass: 'pasar',
-  over: (score) => `Fin · ${score} · j para otra`
+  over: (score) => `Fin · ${score} · j para otra`,
+  best: (score) => `Nuevo récord · ${score} · j para otra`,
+  level: (level) => `Nivel ${level} · más rápido`,
+  hud: (best, level) => (best > 0 ? `récord ${best} · nv ${level}` : `nv ${level}`)
 }
 
 const WORDS: Readonly<Record<GameLocale, ArcadeWords>> = { en: EN, es: ES }

@@ -28,9 +28,9 @@ export const ARCADE_RUNNER: ArcadeRunner = {
   engine: 'runner',
   name: { en: 'Endless run', es: 'Carrera sin fin' },
   fps: 12,
-  speed: { start: 12, max: 28, rampPerMinute: 6 },
+  speed: { start: 18, max: 30, rampPerMinute: 6 },
   difficulty: { minGap: 22, maxGap: 48 },
-  jump: { rows: 4, ms: 650 },
+  jump: { rows: 4, ms: 900 },
   obstacles: [
     { from: 'scene', weight: 1 },
     {

@@ -1,4 +1,5 @@
 import { runnerStartOf, runnerStepOf, type Runner, type RunnerState } from './arcade-runner'
+import { RUNNER_LEVEL_MS } from './arcade-runner-course'
 import { ARCADE_FPS_MAX } from './arcade-runner-data'
 import { arcadeWords } from './arcade-words'
 
@@ -15,9 +16,17 @@ export type ArcadeScreen = 'ready' | 'running' | 'paused' | 'held' | 'over'
 
 // How often a held run checks whether the user answered.
 export const ARCADE_HOLD_POLL_MS = 1000
+const LEVEL_SHOWN_MS = 1500
 
-/** The line over the sky on each screen but a run in play: what the one key does now. */
-export const arcadeCaptionOf = (screen: ArcadeScreen, score: number): string | undefined => {
+/** The run a caption speaks of: its level, how long it has run, and the best before it. */
+export type ArcadeRun = { level: number; ms: number; best: number }
+
+/** The line over the sky: what the one key does now, or a new level for a moment while running. */
+export const arcadeCaptionOf = (
+  screen: ArcadeScreen,
+  score: number,
+  run?: ArcadeRun
+): string | undefined => {
   const words = arcadeWords()
   switch (screen) {
     case 'ready':
@@ -27,9 +36,13 @@ export const arcadeCaptionOf = (screen: ArcadeScreen, score: number): string | u
     case 'held':
       return words.held
     case 'over':
-      return words.over(score)
+      return run !== undefined && score > run.best ? words.best(score) : words.over(score)
     case 'running':
-      return undefined
+      return run !== undefined &&
+        run.level > 1 &&
+        run.ms - (run.level - 1) * RUNNER_LEVEL_MS < LEVEL_SHOWN_MS
+        ? words.level(run.level)
+        : undefined
   }
 }
 
@@ -42,18 +55,22 @@ export type ArcadeLoop = {
 export const arcadeLoopOf = (args: {
   runner: Runner
   seed: number
+  /** The best score of earlier games this session. */
+  best?: number
   clock: ArcadeClock
   /** Whether the game's pane is shown and holds the keyboard. */
   isActive: () => Promise<boolean>
   /** Whether an agent waits on the user: the run freezes and goes on by itself once answered. */
   isHeld: () => boolean
-  draw: (state: RunnerState, screen: ArcadeScreen) => void
+  /** `best` is the highest score of the runs before this one. */
+  draw: (state: RunnerState, screen: ArcadeScreen, best: number) => void
 }): ArcadeLoop => {
   const { runner, clock } = args
   // Why clamp here too: a game file read past its validator must still not outrun a terminal Raster.
   const periodMs = 1000 / Math.min(runner.game.fps, ARCADE_FPS_MAX)
   let state = runnerStartOf(runner, args.seed)
   let runs = 0
+  let best = args.best ?? 0
   let timer: { cancel: () => void } | undefined
   let watch: { cancel: () => void } | undefined
   let last: number | undefined
@@ -78,13 +95,13 @@ export const arcadeLoopOf = (args: {
     try {
       if (!(await args.isActive())) {
         halt()
-        args.draw(state, 'paused')
+        args.draw(state, 'paused', best)
         return
       }
       if (args.isHeld()) {
         halt()
         isJump = false
-        args.draw(state, 'held')
+        args.draw(state, 'held', best)
         watch = clock.every(ARCADE_HOLD_POLL_MS, () => {
           if (!args.isHeld()) {
             watch?.cancel()
@@ -101,12 +118,12 @@ export const arcadeLoopOf = (args: {
       if (state.isOver) {
         halt()
       }
-      args.draw(state, state.isOver ? 'over' : 'running')
+      args.draw(state, state.isOver ? 'over' : 'running', best)
     } finally {
       isTicking = false
     }
   }
-  args.draw(state, 'ready')
+  args.draw(state, 'ready', best)
   return {
     press: () => {
       if (watch !== undefined) {
@@ -114,9 +131,12 @@ export const arcadeLoopOf = (args: {
       }
       if (timer !== undefined) {
         isJump = true
+        // Why now: waiting for the next frame takes off up to a frame late.
+        void tick()
         return
       }
       if (state.isOver) {
+        best = Math.max(best, state.score)
         runs += 1
         state = runnerStartOf(runner, args.seed + runs)
       }

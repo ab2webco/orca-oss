@@ -20,7 +20,7 @@ import { quest } from './quest-state'
 import type { SceneDefinition } from './scenes/index'
 
 // The runner in a pane of its own, opened as the demo's practice run or as an offer to play one:
-// nothing it scores is kept.
+// nothing it scores is kept past the session, which only remembers its best.
 
 export const ARCADE_PANE = 'orca-game-arcade'
 export const ARCADE_JUMP_KEY = 'j'
@@ -41,6 +41,7 @@ type View = {
   screen: ArcadeScreen
   columns: number
   tick: number
+  best: number
   /** Set while the run is only offered: the seconds left to answer. */
   offer?: { left: number; isHeld: boolean }
 }
@@ -55,6 +56,7 @@ type Arcade = {
 
 // Why module memory and not $.state or $.store: a practice run ends with its pane and leaves nothing.
 let arcade: Arcade | undefined
+let sessionBest = 0
 
 const cellsNow = ({ scene, runner, view }: Arcade): string =>
   cellsOf(
@@ -67,8 +69,13 @@ const cellsNow = ({ scene, runner, view }: Arcade): string =>
       tick: view.tick,
       caption:
         view.offer === undefined
-          ? arcadeCaptionOf(view.screen, view.state.score)
-          : arcadeWords().unlocked
+          ? arcadeCaptionOf(view.screen, view.state.score, {
+              level: view.state.level,
+              ms: view.state.ms,
+              best: view.best
+            })
+          : arcadeWords().unlocked,
+      hud: arcadeWords().hud(view.best, view.state.level)
     })
   )
 
@@ -122,10 +129,17 @@ export async function openArcade($: EngineInterface, isOffer = false): Promise<v
   const scene = currentScene()
   const runner = runnerOf(ARCADE_RUNNER, arcadeShapesOf(ARCADE_RUNNER, scene.looks.working))
   const seed = await $.clock.now().catch(() => 0)
-  const view: View = { state: runnerStartOf(runner, seed), screen: 'ready', columns: 0, tick: 0 }
+  const view: View = {
+    state: runnerStartOf(runner, seed),
+    screen: 'ready',
+    columns: 0,
+    tick: 0,
+    best: sessionBest
+  }
   const loop = arcadeLoopOf({
     runner,
     seed,
+    best: sessionBest,
     clock: { now: () => $.clock.now(), every: (ms, fn) => $.clock.every(ms, fn) },
     isActive: async () => {
       const panes = await $.ui.panes().catch(() => [])
@@ -137,9 +151,11 @@ export async function openArcade($: EngineInterface, isOffer = false): Promise<v
       return pane !== undefined && pane.isShown && pane.isFocused
     },
     isHeld,
-    draw: (state, screen) => {
+    draw: (state, screen, best) => {
       view.state = state
       view.screen = screen
+      view.best = best
+      sessionBest = Math.max(sessionBest, best, screen === 'over' ? state.score : 0)
       view.tick += 1
       if (arcade?.view === view && view.columns > 0) {
         void blitArcade($, arcade)
