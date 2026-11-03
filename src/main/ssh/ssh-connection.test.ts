@@ -7,8 +7,12 @@ import {
 } from './ssh-connection-test-harness'
 import { createCallbacks, createTarget } from './ssh-connection-test-fixtures'
 import { SshConnection } from './ssh-connection'
+import { hostKeyBlob } from './ssh-host-key-test-keys'
 
 vi.mock('ssh2', async () => (await import('./ssh-connection-test-harness')).createSsh2Module())
+vi.mock('./ssh-host-key-trust-sources', async () =>
+  (await import('./ssh-host-key-trust-sources-mock')).createHostKeyTrustSourcesModule()
+)
 vi.mock('./system-ssh-binary', async () =>
   (await import('./ssh-connection-test-harness')).createSystemSshBinaryModule()
 )
@@ -59,21 +63,21 @@ describe('SshConnection', () => {
   it('ignores a late host fingerprint from an obsolete connect generation', async () => {
     const conn = new SshConnection(createTarget(), createCallbacks())
     await conn.connect()
-    const firstVerifier = (
-      clientInstances[0].lastConnectConfig as { hostVerifier?: (key: Buffer) => boolean }
-    ).hostVerifier
+    type Verifier = (key: Buffer, verify: (ok: boolean) => void) => unknown
+    const firstVerifier = (clientInstances[0].lastConnectConfig as { hostVerifier?: Verifier })
+      .hostVerifier
 
     const privateConn = conn as unknown as { attemptConnect: () => Promise<void> }
     await privateConn.attemptConnect()
-    const secondVerifier = (
-      clientInstances[1].lastConnectConfig as { hostVerifier?: (key: Buffer) => boolean }
-    ).hostVerifier
+    const secondVerifier = (clientInstances[1].lastConnectConfig as { hostVerifier?: Verifier })
+      .hostVerifier
     expect(firstVerifier).toBeTypeOf('function')
     expect(secondVerifier).toBeTypeOf('function')
 
-    secondVerifier?.(Buffer.from('newer-ssh-host-key'))
+    secondVerifier?.(hostKeyBlob('ssh-ed25519', 2), () => {})
     const currentFingerprint = conn.getHostKeyFingerprint()
-    firstVerifier?.(Buffer.from('obsolete-ssh-host-key'))
+    expect(currentFingerprint).toMatch(/^SHA256:/)
+    firstVerifier?.(hostKeyBlob('ssh-ed25519', 3), () => {})
 
     expect(conn.getHostKeyFingerprint()).toBe(currentFingerprint)
   })

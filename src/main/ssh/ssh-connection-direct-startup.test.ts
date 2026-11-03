@@ -21,6 +21,9 @@ import { resolveWithSshG, type SshResolvedConfig } from './ssh-config-parser'
 import type { SshTarget } from '../../shared/ssh-types'
 
 vi.mock('ssh2', async () => (await import('./ssh-connection-test-harness')).createSsh2Module())
+vi.mock('./ssh-host-key-trust-sources', async () =>
+  (await import('./ssh-host-key-trust-sources-mock')).createHostKeyTrustSourcesModule()
+)
 vi.mock('./system-ssh-binary', async () =>
   (await import('./ssh-connection-test-harness')).createSystemSshBinaryModule()
 )

@@ -23,6 +23,10 @@ export type SshResolvedConfig = {
   controlMaster: string
   controlPath?: string
   controlPersist: string
+  /** User then global known_hosts files; empty when ssh -G did not report them. */
+  knownHostsFiles?: string[]
+  strictHostKeyChecking?: string
+  hostKeyAlias?: string
 }
 
 const SSH_G_TIMEOUT_MS = 5000
@@ -102,6 +106,7 @@ export function resolveWithSshG(host: string): Promise<SshResolvedConfig | null>
 export function parseSshGOutput(stdout: string): SshResolvedConfig {
   const map = new Map<string, string>()
   const identityFiles: string[] = []
+  const knownHostsFiles: string[] = []
 
   for (const line of stdout.split('\n')) {
     const spaceIdx = line.indexOf(' ')
@@ -112,12 +117,19 @@ export function parseSshGOutput(stdout: string): SshResolvedConfig {
     const value = line.substring(spaceIdx + 1).trim()
     if (key === 'identityfile') {
       identityFiles.push(resolveSshConfigHomePath(value))
+    } else if (key === 'userknownhostsfile' || key === 'globalknownhostsfile') {
+      // `none` opts one list out; the other list still applies.
+      for (const file of value.split(/\s+/)) {
+        if (file && file !== 'none') {
+          knownHostsFiles.push(resolveSshConfigHomePath(file))
+        }
+      }
     } else {
       map.set(key, value)
     }
   }
 
-  return buildSshResolvedConfig(map, identityFiles)
+  return { ...buildSshResolvedConfig(map, identityFiles), knownHostsFiles }
 }
 
 function buildSshResolvedConfig(
@@ -152,6 +164,8 @@ function buildSshResolvedConfig(
     proxyJump,
     controlMaster: map.get('controlmaster') ?? 'no',
     controlPath,
-    controlPersist: map.get('controlpersist') ?? 'no'
+    controlPersist: map.get('controlpersist') ?? 'no',
+    strictHostKeyChecking: map.get('stricthostkeychecking'),
+    hostKeyAlias: map.get('hostkeyalias') || undefined
   }
 }

@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- Why: SSH connection lifecycle, credential retries, reconnect policy, and transport fallback are intentionally co-located so state transitions stay auditable in one file. */
 import * as net from 'node:net'
-import { createHash } from 'node:crypto'
 import { Client as SshClient } from 'ssh2'
 import type { ChildProcess } from 'node:child_process'
 import type { ClientChannel, ConnectConfig, SFTPWrapper } from 'ssh2'
@@ -48,6 +47,8 @@ import {
   isTransientReconnectError
 } from './ssh-reconnect-error-classification'
 import { SshReconnectLadder } from './ssh-reconnect-ladder'
+import { installSsh2HostKeyVerification } from './ssh2-host-key-verification'
+import { isHostKeyVerificationError } from './ssh-host-key-verifier'
 import { getPassphrasePrivateKeyPath } from './ssh-private-key-authentication'
 import {
   requiresSystemSshForSecurityKey,
@@ -127,6 +128,7 @@ export class SshConnection {
   private systemCommandChannels = new Set<ClientChannel>()
   private systemOperationAbortController = new AbortController()
   private systemSshResolvedConfig: SshResolvedConfig | null = null
+  private ssh2ResolvedConfig: SshResolvedConfig | null = null
   private systemSshControlMasterDisabledForSession = false
   private systemSshGssapiOnlyForSession = false
   private useSystemSshTransport = false
@@ -692,6 +694,7 @@ export class SshConnection {
     this.systemSshGssapiOnlyForSession = false
     this.useSystemSshTransport = false
 
+    this.ssh2ResolvedConfig = resolved
     const config = buildConnectConfig(this.target, resolved)
 
     // Why: ssh2 doesn't support ProxyCommand/ProxyJump natively; spawn the resolved proxy and pipe its stdin/stdout as config.sock.
@@ -712,7 +715,8 @@ export class SshConnection {
     try {
       await this.doSsh2Connect(config, connectGeneration)
     } catch (err) {
-      if (!(err instanceof Error)) {
+      // A refused host key must not reach credential prompts or a fallback that skips our check.
+      if (!(err instanceof Error) || isHostKeyVerificationError(err)) {
         this.proxyProcess?.kill()
         this.proxyProcess = null
         throw err
@@ -758,7 +762,7 @@ export class SshConnection {
             await this.doSsh2Connect(keyConfig, connectGeneration)
             return
           } catch (keyErr) {
-            if (!(keyErr instanceof Error)) {
+            if (!(keyErr instanceof Error) || isHostKeyVerificationError(keyErr)) {
               this.proxyProcess?.kill()
               this.proxyProcess = null
               throw keyErr
@@ -1174,20 +1178,24 @@ export class SshConnection {
     config.sock = p.sock
   }
 
-  private doSsh2Connect(config: ConnectConfig, connectGeneration: number): Promise<void> {
+  private async doSsh2Connect(config: ConnectConfig, connectGeneration: number): Promise<void> {
+    const isCurrentAttempt = (): boolean =>
+      !this.disposed && connectGeneration === this.connectGeneration
+    const hostKeyVerdict = await installSsh2HostKeyVerification(config, {
+      target: this.target,
+      resolved: this.ssh2ResolvedConfig,
+      isCurrentAttempt,
+      // Why: the relay uses the accepted server key to isolate shared-home install locks.
+      onAcceptedFingerprint: (fingerprint) => {
+        this.hostKeyFingerprint = fingerprint
+      }
+    })
+    if (!isCurrentAttempt()) {
+      throw this.createCancelledConnectAttemptError()
+    }
     return new Promise<void>((resolve, reject) => {
       const client = new SshClient()
       let settled = false
-
-      // Why: the relay uses the negotiated server key to isolate shared-home
-      // install locks without comparing PIDs from an unrelated SSH host.
-      config.hostVerifier = (key: Buffer): boolean => {
-        if (!this.disposed && connectGeneration === this.connectGeneration) {
-          const digest = createHash('sha256').update(key).digest('base64').replace(/=+$/, '')
-          this.hostKeyFingerprint = `SHA256:${digest}`
-        }
-        return true
-      }
 
       const cleanupStartupListeners = (): void => {
         client.off('ready', onReady)
@@ -1239,7 +1247,7 @@ export class SshConnection {
         cleanupStartupListeners()
         settled = true
         client.destroy()
-        reject(err)
+        reject(hostKeyVerdict.rejection ?? err)
       }
 
       client.on('ready', onReady)

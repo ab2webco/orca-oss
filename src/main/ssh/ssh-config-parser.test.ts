@@ -555,6 +555,26 @@ describe('parseSshGOutput', () => {
     ])
   })
 
+  it('reads the host key policy and known_hosts files', () => {
+    const result = parseSshGOutput(
+      [
+        'hostname example.com',
+        'stricthostkeychecking true',
+        'hostkeyalias bastion-alias',
+        'userknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2',
+        'globalknownhostsfile /etc/ssh/ssh_known_hosts none'
+      ].join('\n')
+    )
+    expect(result.strictHostKeyChecking).toBe('true')
+    expect(result.hostKeyAlias).toBe('bastion-alias')
+    expect(result.knownHostsFiles).toEqual([
+      testHomePath('.ssh', 'known_hosts'),
+      testHomePath('.ssh', 'known_hosts2'),
+      '/etc/ssh/ssh_known_hosts'
+    ])
+    expect(parseSshGOutput('hostname example.com').knownHostsFiles).toEqual([])
+  })
+
   it('parses forwardagent yes', () => {
     const output = 'hostname example.com\nforwardagent yes\nport 22'
     const result = parseSshGOutput(output)

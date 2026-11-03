@@ -7,6 +7,8 @@ import type { MockSystemCommandChannel, MockSystemSshProcess } from './ssh-conne
 import type { SshResolvedConfig } from './ssh-config-parser'
 import type { SystemSshBuildArgsOptions } from './system-ssh-args'
 import type { SshTarget } from '../../shared/ssh-types'
+import { hostKeyBlob } from './ssh-host-key-test-keys'
+import { resetHostKeyTrustSourcesMocks } from './ssh-host-key-trust-sources-mock'
 
 export type MockSshClient = {
   setNoDelay: ReturnType<typeof vi.fn>
@@ -59,7 +61,8 @@ export const ssh2Mock = {
   connectSequence: [] as ('ready' | Error)[],
   execBehavior: 'callback' as 'callback' | 'pending',
   sftpBehavior: 'callback' as 'callback' | 'pending',
-  notifyClientCreated: undefined as (() => void) | undefined
+  notifyClientCreated: undefined as (() => void) | undefined,
+  hostKey: hostKeyBlob('ssh-ed25519', 1)
 }
 
 export const findSystemSshMock = vi.fn<() => string | null>()
@@ -136,10 +139,21 @@ export function createSsh2Module(): Ssh2ModuleMock {
     connect(config?: unknown) {
       connectAttempts += 1
       this.lastConnectConfig = config
-      const hostVerifier = (config as { hostVerifier?: (key: Buffer) => boolean } | undefined)
-        ?.hostVerifier
-      hostVerifier?.(Buffer.from('mock-ssh-host-key'))
+      type Verifier = (key: Buffer, verify: (ok: boolean) => void) => unknown
+      const hostVerifier = (config as { hostVerifier?: Verifier } | undefined)?.hostVerifier
+      // Mirrors ssh2: an undefined return defers to the callback; a denial fails the handshake.
+      let permitted: boolean | undefined
+      const returned = hostVerifier?.(ssh2Mock.hostKey, (ok) => {
+        permitted = ok
+      })
+      if (returned !== undefined) {
+        permitted = Boolean(returned)
+      }
       setTimeout(() => {
+        if (permitted === false) {
+          emitSshEvent('error', new Error('Host denied (verification failed)'))
+          return
+        }
         const next = ssh2Mock.connectSequence.shift()
         if (next instanceof Error) {
           emitSshEvent('error', next)
@@ -263,5 +277,7 @@ export function resetSshConnectionMocks(): void {
   resolveWithSshGMock.mockResolvedValue(null)
   findSystemSshMock.mockReset()
   findSystemSshMock.mockReturnValue(null)
+  ssh2Mock.hostKey = hostKeyBlob('ssh-ed25519', 1)
+  resetHostKeyTrustSourcesMocks()
   vi.unstubAllEnvs()
 }

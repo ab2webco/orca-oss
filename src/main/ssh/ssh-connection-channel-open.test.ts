@@ -11,6 +11,9 @@ import { createCallbacks, createTarget } from './ssh-connection-test-fixtures'
 import { SshConnection } from './ssh-connection'
 
 vi.mock('ssh2', async () => (await import('./ssh-connection-test-harness')).createSsh2Module())
+vi.mock('./ssh-host-key-trust-sources', async () =>
+  (await import('./ssh-host-key-trust-sources-mock')).createHostKeyTrustSourcesModule()
+)
 vi.mock('./system-ssh-binary', async () =>
   (await import('./ssh-connection-test-harness')).createSystemSshBinaryModule()
 )
