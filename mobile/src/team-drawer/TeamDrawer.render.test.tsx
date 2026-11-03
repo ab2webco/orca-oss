@@ -181,6 +181,16 @@ describe('TeamDrawer', () => {
     expect(shown).toContain('Yes, rebase first.')
   })
 
+  it("shows each ticket's thread collapsed, and its messages on a tap", () => {
+    show(teamWith())
+    expect(texts()).toContain('Threads (1)')
+    expect(texts()).not.toContain('Rebase on main?')
+
+    act(() => button('Open the ORCA-1 thread, 2 messages').click())
+    expect(texts()).toContain('Rebase on main?')
+    expect(texts()).toContain('ORCA-1 → lead')
+  })
+
   it('opens on the Team tab when no question waits', () => {
     show(teamWith({ questions: [] }))
     expect(button('Team').getAttribute('aria-selected')).toBe('true')

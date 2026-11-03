@@ -9,6 +9,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { TeamDrawerData } from './team-drawer-model'
 import { inboxMetaStyles as metaStyles, timeAgoOf } from './team-inbox-meta'
+import { TeamInboxThreadRow } from './TeamInboxThreadRow'
 
 type Props = { team: TeamDrawerData; now: number; onOpenLink: (url: string) => void }
 
@@ -117,6 +118,15 @@ export function TeamInboxTab({ team, now, onOpenLink }: Props) {
               ))
             ) : (
               <Text style={styles.empty}>Nothing waits on the lead.</Text>
+            )}
+          </Section>
+          <Section title={`Threads (${inbox.threads.threads.length})`}>
+            {inbox.threads.threads.length > 0 ? (
+              inbox.threads.threads.map((thread) => (
+                <TeamInboxThreadRow key={thread.ticket} thread={thread} now={now} />
+              ))
+            ) : (
+              <Text style={styles.empty}>No member has written yet.</Text>
             )}
           </Section>
           {inbox.threads.answered.length > 0 ? (
