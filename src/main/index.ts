@@ -1158,6 +1158,8 @@ function startTerminalRuntimeStartupServices(): WindowsDesktopStartupServices {
         `[daemon] STARTUP FAILED — falling back to local PTYs; terminals will not persist across quit. Reason: ${reason}`
       )
       track('daemon_start_failed', classifyError(error))
+      // Why: packaged builds keep no stdout, so only the trace file records the fallback (ORCA-990).
+      recordDurableCrashBreadcrumb('daemon_start_failed_local_fallback', undefined, reason)
     },
     onAgentHookServerError: (error) => {
       // Why: hook callbacks are sidebar enrichment only; Orca must still boot if the loopback receiver fails.

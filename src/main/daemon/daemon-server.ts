@@ -342,6 +342,12 @@ export class DaemonServer {
       publishedOwnership = true
       writeFileSync(this.tokenPath, this.token, { mode: 0o600 })
     } catch (error) {
+      // Why: the daemon's stderr dies with it, so without this the log shows a startup and nothing (ORCA-990).
+      this.log.log('endpoint-ownership-publish-failed', {
+        stage: publishedOwnership ? 'token' : 'pid-record',
+        code: (error as NodeJS.ErrnoException)?.code ?? null,
+        message: (error as Error)?.message ?? String(error)
+      })
       // Roll back only a record we wrote; anything else at that path belongs to another daemon.
       if (publishedOwnership && this.pidPath && this.launchNonce) {
         unlinkOwnedDaemonPidFile(this.pidPath, process.pid, this.launchNonce)
