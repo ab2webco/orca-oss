@@ -18,7 +18,8 @@ export type {
   SceneCharacter,
   SceneDefinition,
   ScenePet,
-  ScenePhase
+  ScenePhase,
+  SceneTheme
 } from './scene-definition'
 
 export const DEFAULT_SCENE_ID = 'quest'
