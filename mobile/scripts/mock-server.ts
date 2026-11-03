@@ -2,7 +2,11 @@
 // Why: standalone mock WebSocket server for developing the mobile app without
 // a running Orca desktop instance. Responds to the same RPC methods the real
 // runtime exposes, with realistic fake data. Supports E2EE handshake.
+import { createServer } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../src/shared/pairing'
+import { addShowcaseOwnerQuestion } from './mock-server-game-team'
+import { broadcastMockNotification } from './mock-server-notifications'
 import { deriveSharedKey, e2eeDecrypt, e2eeEncrypt, type E2EEState } from './mock-server-encryption'
 import { loadOrCreateMockServerKeyPair } from './mock-server-key-pair'
 import {
@@ -22,7 +26,30 @@ const AUTH_TOKEN = 'mock-device-token'
 const serverKeyPair = loadOrCreateMockServerKeyPair(process.env.MOCK_SERVER_KEY_FILE)
 const serverPublicKeyB64 = Buffer.from(serverKeyPair.publicKey).toString('base64')
 
-const wss = new WebSocketServer({ port: PORT })
+// Why an HTTP route on the same port: a recording script fires the owner-question
+// notification on cue (`curl -X POST localhost:6768/mock/owner-question`).
+const httpServer = createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/mock/owner-question') {
+    const added = addShowcaseOwnerQuestion()
+    if (!added) {
+      res.writeHead(404).end('owner-question trigger needs MOCK_SCENARIO=showcase\n')
+      return
+    }
+    const delivered = broadcastMockNotification({
+      source: 'game-owner-question',
+      title: `${added.repoName}: the lead asks you`,
+      body: added.question.question,
+      worktreeId: added.worktreeId,
+      terminal: 'term-lead'
+    })
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(`${JSON.stringify({ id: added.question.id, delivered })}\n`)
+    return
+  }
+  res.writeHead(404).end()
+})
+const wss = new WebSocketServer({ server: httpServer })
+httpServer.listen(PORT)
 
 // Why: each connection goes through an E2EE handshake before any RPC traffic.
 // The first message must be e2ee_hello (plaintext), then all subsequent
@@ -136,3 +163,11 @@ console.log(
   `[mock] Scenario: ${mockScenarioSummary.repoCount} repos, ${mockScenarioSummary.worktreeCount} worktrees, ${mockScenarioSummary.rpcDelayMs}ms default RPC delay`
 )
 console.log(`[mock] E2EE enabled — clients must send e2ee_hello before RPC`)
+// MOCK_PAIRING_ENDPOINT: the address the phone dials, e.g. ws://10.0.2.2:6768 from the Android emulator.
+const pairingUrl = encodePairingOffer({
+  v: PAIRING_OFFER_VERSION,
+  endpoint: process.env.MOCK_PAIRING_ENDPOINT || `ws://127.0.0.1:${PORT}`,
+  deviceToken: AUTH_TOKEN,
+  publicKeyB64: serverPublicKeyB64
+})
+console.log(`[mock] Pairing URL: ${pairingUrl}`)

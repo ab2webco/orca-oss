@@ -5,41 +5,93 @@ import {
   FAKE_SCROLLBACK,
   STREAMING_CHUNKS
 } from './mock-server-terminal-fixtures'
+import { isShowcaseScenario } from './mock-server-showcase-scenario'
+import { showcaseTerminalScript } from './mock-server-showcase-terminal'
 
-// Why: the client resubscribes on every viewport change; without cancellation
-// each resubscribe would stack another interval streaming under a dead request.
-type TerminalStream = { interval: ReturnType<typeof setInterval> | null }
-const terminalStreams = new WeakMap<WebSocket, Map<string, TerminalStream>>()
+// One output timeline per terminal, like a PTY: a resubscribe (the client does one on every
+// viewport change) gets everything written so far as scrollback, then the live tail.
+type TerminalTimeline = {
+  written: string
+  queue: string[]
+  interval: ReturnType<typeof setInterval> | null
+  subscribers: Set<Subscriber>
+}
+type Subscriber = { ws: WebSocket; emit: (chunk: string) => void }
+const timelines = new Map<string, TerminalTimeline>()
+const subscriptions = new WeakMap<WebSocket, Map<string, Subscriber>>()
+const CHUNK_INTERVAL_MS = Number(process.env.MOCK_CHUNK_INTERVAL_MS) || 500
 
-function clearTerminalStream(ws: WebSocket, terminal: string): void {
-  const perTerminal = terminalStreams.get(ws)
-  const stream = perTerminal?.get(terminal)
-  if (stream) {
-    stopTerminalStreamInterval(stream)
-    perTerminal?.delete(terminal)
+const toCrlf = (text: string) => text.replace(/\r?\n/g, '\r\n')
+
+function timelineOf(terminal: string): TerminalTimeline {
+  let timeline = timelines.get(terminal)
+  if (!timeline) {
+    const script = isShowcaseScenario
+      ? showcaseTerminalScript(terminal)
+      : { scrollback: FAKE_SCROLLBACK, chunks: STREAMING_CHUNKS }
+    timeline = {
+      written: toCrlf(script.scrollback),
+      queue: [...script.chunks],
+      interval: null,
+      subscribers: new Set()
+    }
+    timelines.set(terminal, timeline)
+    drainQueue(timeline)
+  }
+  return timeline
+}
+
+function write(timeline: TerminalTimeline, chunk: string): void {
+  timeline.written += chunk
+  for (const subscriber of timeline.subscribers) {
+    // A closed socket never unsubscribes, so it is pruned here.
+    if (subscriber.ws.readyState !== subscriber.ws.OPEN) {
+      timeline.subscribers.delete(subscriber)
+      continue
+    }
+    subscriber.emit(chunk)
   }
 }
 
-function beginTerminalStream(ws: WebSocket, terminal: string): TerminalStream {
-  clearTerminalStream(ws, terminal)
-  let perTerminal = terminalStreams.get(ws)
-  if (!perTerminal) {
-    perTerminal = new Map()
-    terminalStreams.set(ws, perTerminal)
+function drainQueue(timeline: TerminalTimeline): void {
+  if (timeline.interval !== null) {
+    return
   }
-  const stream = { interval: null }
-  perTerminal.set(terminal, stream)
-  return stream
+  timeline.interval = setInterval(() => {
+    const chunk = timeline.queue.shift()
+    if (chunk === undefined) {
+      // Why: no `end` event - a live terminal stream stays open, and `end`
+      // makes the client tear the subscription down and blank the pane.
+      clearInterval(timeline.interval!)
+      timeline.interval = null
+      return
+    }
+    write(timeline, toCrlf(chunk))
+  }, CHUNK_INTERVAL_MS)
 }
 
-function isCurrentTerminalStream(ws: WebSocket, terminal: string, stream: TerminalStream): boolean {
-  return terminalStreams.get(ws)?.get(terminal) === stream && ws.readyState === ws.OPEN
+function unsubscribe(ws: WebSocket, terminal: string): void {
+  const subscriber = subscriptions.get(ws)?.get(terminal)
+  if (subscriber) {
+    timelines.get(terminal)?.subscribers.delete(subscriber)
+    subscriptions.get(ws)?.delete(terminal)
+  }
 }
 
-function stopTerminalStreamInterval(stream: TerminalStream): void {
-  if (stream.interval !== null) {
-    clearInterval(stream.interval)
-    stream.interval = null
+/** Paced output on `terminal`, as if its agent printed it. */
+export function queueTerminalOutput(terminal: string, chunks: readonly string[]): void {
+  const timeline = timelineOf(terminal)
+  timeline.queue.push(...chunks)
+  drainQueue(timeline)
+}
+
+function echoTerminalInput(terminal: string, text: string, enter: boolean): void {
+  const echo = text.replace(/\r/g, '').replace(/\x7f/g, '\b \b')
+  if (echo) {
+    write(timelineOf(terminal), echo)
+  }
+  if (enter || text.includes('\r')) {
+    queueTerminalOutput(terminal, ['\n', ...showcaseTerminalScript(terminal).reply])
   }
 }
 
@@ -69,8 +121,19 @@ export function handleMockTerminalRequest(
 
     case 'terminal.subscribe': {
       const terminal = String(request.params?.terminal ?? 'term-1')
-      const stream = beginTerminalStream(ws, terminal)
-      const isCurrent = () => isCurrentTerminalStream(ws, terminal, stream)
+      unsubscribe(ws, terminal)
+      const timeline = timelineOf(terminal)
+      let perSocket = subscriptions.get(ws)
+      if (!perSocket) {
+        perSocket = new Map()
+        subscriptions.set(ws, perSocket)
+      }
+      // Why the gate: a delayed frame (MOCK_RPC_DELAY_*) must not land after a resubscribe or unsubscribe.
+      const isCurrent = () => perSocket.get(terminal) === subscriber && ws.readyState === ws.OPEN
+      const subscriber: Subscriber = {
+        ws,
+        emit: (chunk) => respond(success(request.id, { type: 'data', chunk }, true), isCurrent)
+      }
       // Why: the client resubscribes until scrollback echoes its viewport dims;
       // the legacy `lines` shape left the session screen in that loop forever.
       const viewport = request.params?.viewport as { cols?: number; rows?: number } | undefined
@@ -86,43 +149,34 @@ export function handleMockTerminalRequest(
           type: 'scrollback',
           cols: viewport?.cols ?? 80,
           rows: viewport?.rows ?? 24,
-          serialized: FAKE_SCROLLBACK.replace(/\n/g, '\r\n') + tuiPreamble,
+          serialized: timeline.written + tuiPreamble,
           truncated: false
         }),
         isCurrent
       )
-
-      let chunkIndex = 0
-      stream.interval = setInterval(() => {
-        if (!isCurrent()) {
-          stopTerminalStreamInterval(stream)
-          return
-        }
-        if (chunkIndex >= STREAMING_CHUNKS.length) {
-          // Why: no `end` event - a live terminal stream stays open, and `end`
-          // makes the client tear the subscription down and blank the pane.
-          stopTerminalStreamInterval(stream)
-          return
-        }
-        respond(
-          success(request.id, { type: 'data', chunk: STREAMING_CHUNKS[chunkIndex] }, true),
-          isCurrent
-        )
-        chunkIndex++
-      }, 500)
+      perSocket.set(terminal, subscriber)
+      timeline.subscribers.add(subscriber)
       return true
     }
 
-    case 'terminal.send':
+    case 'terminal.send': {
       // Input-routing repros (#8818) assert on the exact bytes reaching the host.
       console.log(
         `[SEND] terminal=${String(request.params?.terminal)} text=${JSON.stringify(request.params?.text)}`
       )
+      if (isShowcaseScenario) {
+        echoTerminalInput(
+          String(request.params?.terminal),
+          String(request.params?.text ?? ''),
+          request.params?.enter === true
+        )
+      }
       respond(success(request.id, { send: { handle: 'term-1', ok: true } }))
       return true
+    }
 
     case 'terminal.unsubscribe':
-      clearTerminalStream(ws, String(request.params?.terminal ?? 'term-1'))
+      unsubscribe(ws, String(request.params?.terminal ?? 'term-1'))
       respond(success(request.id, { unsubscribed: true }))
       return true
 

@@ -13,7 +13,13 @@ import { handleMockGameTeamRequest } from './mock-server-game-team'
 import { handleMockGitRequest } from './mock-server-git-state'
 import { handleMockAccountRequest } from './mock-server-account-rpc'
 import { handleMockNativeChatRequest } from './mock-server-native-chat-scenario'
+import { handleMockNotificationRequest } from './mock-server-notifications'
 import { handleMockSessionTabsRequest } from './mock-server-session-tabs-fixture'
+import {
+  createShowcaseWorktrees,
+  isShowcaseScenario,
+  SHOWCASE_REPOS
+} from './mock-server-showcase-scenario'
 import { handleMockTerminalRequest } from './mock-server-terminal-stream'
 import { createMockRepos, createMockWorktrees, readScenarioNumber } from './mobile-lag-scenario'
 
@@ -21,8 +27,10 @@ const MOCK_REPO_COUNT = readScenarioNumber('MOCK_REPO_COUNT', 2)
 const MOCK_WORKTREE_COUNT = readScenarioNumber('MOCK_WORKTREE_COUNT', 2)
 const MOCK_RPC_DELAY_MS = readScenarioNumber('MOCK_RPC_DELAY_MS', 0)
 
-const FAKE_REPOS = createMockRepos(MOCK_REPO_COUNT)
-let fakeWorktrees = createMockWorktrees(FAKE_REPOS, MOCK_WORKTREE_COUNT)
+const FAKE_REPOS = isShowcaseScenario ? SHOWCASE_REPOS : createMockRepos(MOCK_REPO_COUNT)
+let fakeWorktrees = isShowcaseScenario
+  ? createShowcaseWorktrees()
+  : createMockWorktrees(FAKE_REPOS, MOCK_WORKTREE_COUNT)
 
 // Mutable quick-command list so the mobile Quick Commands sheet can add/edit/
 // delete against the mock the same way it does a paired desktop.
@@ -131,6 +139,7 @@ export function handleRequest(
     handleMockAccountRequest(request, respond, success, error) ||
     handleMockNativeChatRequest(request, respond, success, error, ws) ||
     handleMockSessionTabsRequest(request, respond, success, terminalListWorktreeId) ||
+    handleMockNotificationRequest(request, respond, success, ws) ||
     handleMockGameTeamRequest(request, respond, success, () => terminalListWorktreeId(undefined)) ||
     handleMockTerminalRequest(request, respond, success, ws, terminalListWorktreeId)
   ) {
