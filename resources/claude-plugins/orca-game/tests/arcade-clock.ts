@@ -1,5 +1,12 @@
 import type { ArcadeClock } from '../hooks/arcade-loop'
 
+// Why several turns: a tick awaits the pane's focus and the clock before it draws.
+const settle = async () => {
+  for (let turn = 0; turn < 10; turn += 1) {
+    await Promise.resolve()
+  }
+}
+
 // A clock the test advances by hand: every timer fires on its own period, in time order.
 export const fakeClock = () => {
   let now = 0
@@ -22,12 +29,9 @@ export const fakeClock = () => {
       now = due.next
       due.next += due.ms
       due.fn()
-      // Why several turns: a tick awaits the pane's focus and the clock before it draws.
-      for (let turn = 0; turn < 10; turn += 1) {
-        await Promise.resolve()
-      }
+      await settle()
     }
     now = end
   }
-  return { clock, advance, timers }
+  return { clock, advance, settle, timers }
 }

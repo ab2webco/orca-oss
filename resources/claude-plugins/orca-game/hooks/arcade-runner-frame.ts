@@ -32,11 +32,12 @@ import type { Costume, Look, SceneDefinition } from './scenes/index'
 /** A scene decoration is cut to this so a timed jump clears it at max speed (see HERO_HITBOX). */
 export const ARCADE_SHAPE_MAX_HEIGHT = 4
 export const ARCADE_SHAPE_MAX_COLUMNS = 5
-/** Room for the hero's peak under the score: 3 ground pixels, a 9-pixel hero and an 8-pixel jump. */
-export const ARCADE_ROWS = 12
+/** Room under the top line for 3 ground pixels, a 9-pixel hero and an air jump's 15-pixel climb. */
+export const ARCADE_ROWS = 14
 const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PLANT_MAX_HEIGHT = 16
 const SHADOW = 0.38
+const COIN = [0xffe08a, 0xe0a526] as const
 
 export type ArcadeShape = RunnerShape & {
   /** The colour `h` pixels above the ground in the shape's `column`, unlit. */
@@ -139,6 +140,8 @@ export type ArcadeFrameInput = {
   light?: Daylight
   /** A line over the sky (paused, game over), centred. */
   caption?: string
+  /** The top line's left end: the best so far and the level. */
+  hud?: string
 }
 
 const textInto = (grid: number[][], columns: number, row: number, left: number, text: string) => {
@@ -188,6 +191,16 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
           ]
     })
   ]
+  // Why a map: a frame asks for every pixel and a run keeps only a handful of coins ahead.
+  const coins = new Map<number, number[]>()
+  for (const coin of state.coins) {
+    const x = Math.round(coin.x - state.distance)
+    coins.set(x, [...(coins.get(x) ?? []), ground - coin.h])
+  }
+  const coinAt = (x: number, y: number): number | undefined => {
+    const bottom = coins.get(x)?.find((one) => y === one || y === one - 1)
+    return bottom === undefined ? undefined : COIN[y === bottom ? 1 : 0]
+  }
   const backdropAt = (x: number, y: number): number => {
     if (y < ground) {
       return hdBakedLandOf(land, frame, x, y) ?? hdSkyPixel(frame, x, y)
@@ -204,6 +217,10 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
       if (color !== undefined) {
         return landInLight(color, figureLight)
       }
+    }
+    const coin = coinAt(x, y)
+    if (coin !== undefined) {
+      return coin
     }
     const behind = backdropAt(x, y)
     if (y > ground) {
@@ -222,8 +239,11 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
       grid.push([UPPER_HALF, at(x, row * 2), at(x, Math.min(pixels - 1, row * 2 + 1))])
     }
   }
-  const score = String(state.score)
+  const score = state.combo > 1 ? `x${state.combo} ${state.score}` : String(state.score)
   textInto(grid, columns, 0, columns - score.length - 1, score)
+  if (input.hud !== undefined) {
+    textInto(grid, columns, 0, 1, input.hud)
+  }
   if (input.caption !== undefined) {
     textInto(grid, columns, 1, Math.floor((columns - input.caption.length) / 2), input.caption)
   }

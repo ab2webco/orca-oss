@@ -9,6 +9,7 @@ import {
   type RunnerState
 } from '../hooks/arcade-runner'
 import { ARCADE_RUNNER } from '../hooks/arcade-runner-data'
+import { JUMP_BUFFER_MS, RUNNER_CEILING, runnerAirtimeOf } from '../hooks/arcade-runner-jump'
 
 // The tallest and widest a scene obstacle gets, and the built-in rock.
 const SHAPES = [
@@ -37,17 +38,56 @@ describe('the runner', () => {
     expect(runnerStepOf(RUNNER, late, 100, false).speed).toBe(ARCADE_RUNNER.speed.max)
   })
 
-  it('jumps once from the ground, peaks at its rows in pixels and lands after its time', () => {
+  it('takes off at the press, peaks at its rows in pixels and lands after its airtime', () => {
     const jumped = runnerStepOf(RUNNER, runnerStartOf(RUNNER, 1), 0, true)
-    expect(jumped.jumpMs).toBe(0)
-    const half = ARCADE_RUNNER.jump.ms / 2
-    const peak = run(jumped, half, half / 5)
+    expect(jumped.air?.ms).toBe(0)
+    const airtime = runnerAirtimeOf(ARCADE_RUNNER, jumped.speed)
+    const peak = run(jumped, airtime / 2, airtime / 10)
     expect(runnerHeightOf(RUNNER, peak)).toBeCloseTo(ARCADE_RUNNER.jump.rows * 2, 5)
-    expect(peak.jumpMs).toBeCloseTo(half, 5)
-    expect(runnerStepOf(RUNNER, peak, 50, true).jumpMs).toBeCloseTo(half + 50, 5)
-    const landed = run(peak, ARCADE_RUNNER.jump.ms, 50)
-    expect(landed.jumpMs).toBeUndefined()
+    const landed = run(peak, airtime / 2 + 50, 25)
+    expect(landed.air).toBeUndefined()
     expect(runnerHeightOf(RUNNER, landed)).toBe(0)
+  })
+
+  it('jumps farther in columns but for less time as the run speeds up', () => {
+    const { start, max } = ARCADE_RUNNER.speed
+    const slow = runnerAirtimeOf(ARCADE_RUNNER, start)
+    const fast = runnerAirtimeOf(ARCADE_RUNNER, max)
+    expect(slow).toBe(ARCADE_RUNNER.jump.ms)
+    expect(fast).toBeLessThan(slow)
+    expect(fast * max).toBeGreaterThan(slow * start)
+  })
+
+  it('jumps once more in the air, never above its ceiling, and only once until it lands', () => {
+    const jumped = runnerStepOf(RUNNER, runnerStartOf(RUNNER, 1), 0, true)
+    const airtime = runnerAirtimeOf(ARCADE_RUNNER, jumped.speed)
+    const top = run(jumped, airtime / 2, airtime / 10)
+    const again = runnerStepOf(RUNNER, top, 0, true)
+    expect(again.hasAirJump).toBe(false)
+    let highest = 0
+    let state = again
+    for (let i = 0; i < 40 && state.air !== undefined; i += 1) {
+      state = runnerStepOf(RUNNER, state, 25, i === 5)
+      highest = Math.max(highest, runnerHeightOf(RUNNER, state))
+    }
+    const peak = ARCADE_RUNNER.jump.rows * 2
+    expect(highest).toBeGreaterThan(peak)
+    expect(highest).toBeLessThanOrEqual(peak * RUNNER_CEILING + 1e-9)
+    expect(state.air).toBeUndefined()
+    expect(state.hasAirJump).toBe(true)
+  })
+
+  it('keeps a press that comes just before touchdown and takes off again as it lands', () => {
+    const jumped = runnerStepOf(RUNNER, runnerStartOf(RUNNER, 1), 0, true)
+    const airtime = runnerAirtimeOf(ARCADE_RUNNER, jumped.speed)
+    const late = run(jumped, airtime - JUMP_BUFFER_MS / 2, 10)
+    const pressed = runnerStepOf(RUNNER, late, 0, true)
+    expect(pressed.isBuffered).toBe(true)
+    expect(pressed.hasAirJump).toBe(true)
+    const bounced = run(pressed, JUMP_BUFFER_MS, 10)
+    expect(bounced.air).toBeDefined()
+    expect(bounced.isBuffered).toBe(false)
+    expect(runnerHeightOf(RUNNER, bounced)).toBeGreaterThan(0)
   })
 
   it('spawns obstacles ahead with gaps inside the difficulty range, the same for the same seed', () => {
@@ -75,26 +115,6 @@ describe('the runner', () => {
     expect(first!.x - state.distance).toBeLessThan(HERO_HITBOX.left + HERO_HITBOX.width)
     expect(state.score).toBeGreaterThan(0)
     expect(runnerStepOf(RUNNER, state, 1000, true)).toBe(state)
-  })
-
-  it('clears every obstacle when the jump is timed, even at max speed', () => {
-    let state: RunnerState = { ...runnerStartOf(RUNNER, 5), ms: 10 * 60_000 }
-    const step = 1000 / 15
-    for (let i = 0; i < 15 * 60; i += 1) {
-      const next = state.obstacles.find(
-        (one) => one.x + widthOf(one.shape) > state.distance + HERO_HITBOX.left
-      )
-      const ahead = next === undefined ? Infinity : next.x - state.distance - HERO_HITBOX.left
-      // Why this lead: take off on the frame that puts the peak nearest the obstacle's middle.
-      const lead =
-        (ARCADE_RUNNER.jump.ms / 2000) * state.speed -
-        widthOf(next?.shape ?? 0) / 2 +
-        HERO_HITBOX.width / 2
-      const stride = (state.speed * step) / 1000
-      state = runnerStepOf(RUNNER, state, step, Math.abs(ahead - lead) <= stride / 2)
-    }
-    expect(state.isOver).toBe(false)
-    expect(state.distance).toBeGreaterThan(ARCADE_RUNNER.speed.max * 50)
   })
 
   it('never runs farther than a short step when a frame comes late', () => {

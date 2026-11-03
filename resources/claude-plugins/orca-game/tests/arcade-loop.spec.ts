@@ -6,17 +6,17 @@ import { ARCADE_FPS_MAX, ARCADE_RUNNER } from '../hooks/arcade-runner-data'
 import { fakeClock } from './arcade-clock'
 
 const loopFor = (fps: number, isFocused = () => true, isHeld = () => false) => {
-  const { clock, advance, timers } = fakeClock()
-  const frames: { state: RunnerState; screen: ArcadeScreen }[] = []
+  const { clock, advance, settle, timers } = fakeClock()
+  const frames: { state: RunnerState; screen: ArcadeScreen; best: number }[] = []
   const loop = arcadeLoopOf({
     runner: runnerOf({ ...ARCADE_RUNNER, fps }, [{ heights: [4, 4, 4, 4, 4], weight: 1 }]),
     seed: 1,
     clock,
     isActive: async () => isFocused(),
     isHeld,
-    draw: (state, screen) => frames.push({ state, screen })
+    draw: (state, screen, best) => frames.push({ state, screen, best })
   })
-  return { loop, advance, timers, frames }
+  return { loop, advance, settle, timers, frames }
 }
 
 describe('the arcade loop', () => {
@@ -57,19 +57,34 @@ describe('the arcade loop', () => {
     expect(frames.at(-1)).toBe(paused)
     isFocused = true
     loop.press()
-    expect(paused.state.jumpMs).toBeUndefined()
+    expect(paused.state.air).toBeUndefined()
     await advance(100)
     expect(frames.at(-1)!.screen).toBe('running')
     expect(frames.at(-1)!.state.distance - paused.state.distance).toBeLessThan(2)
   })
 
-  it('jumps on a press while running', async () => {
-    const { loop, advance, frames } = loopFor(12)
+  it('takes off the moment the key comes, not at the next frame', async () => {
+    const { loop, advance, settle, frames } = loopFor(12)
     loop.press()
     await advance(200)
+    const before = frames.length
+    loop.press()
+    await settle()
+    expect(frames.length).toBe(before + 1)
+    expect(frames.at(-1)!.state.air).toBeDefined()
+  })
+
+  it('keeps the best score of the runs so far, and a new run starts from it', async () => {
+    const { loop, advance, frames } = loopFor(12)
+    expect(frames[0]!.best).toBe(0)
+    loop.press()
+    await advance(60_000)
+    const over = frames.at(-1)!
+    expect(over.screen).toBe('over')
+    expect(over.best).toBe(0)
     loop.press()
     await advance(100)
-    expect(frames.at(-1)!.state.jumpMs).toBeDefined()
+    expect(frames.at(-1)!.best).toBe(over.state.score)
   })
 
   it('stops its timer when the run ends, and a press starts a new run', async () => {
@@ -101,7 +116,7 @@ describe('the arcade loop', () => {
     loop.press()
     await advance(5000)
     expect(frames.at(-1)).toBe(held)
-    expect(held.state.jumpMs).toBeUndefined()
+    expect(held.state.air).toBeUndefined()
     isHeld = false
     await advance(1100)
     expect(frames.at(-1)!.screen).toBe('running')
