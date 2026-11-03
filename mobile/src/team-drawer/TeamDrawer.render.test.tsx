@@ -241,7 +241,7 @@ describe('TeamDrawer', () => {
 
   // Why: at 320 pt the tiles broke "2026-11-02" across lines and left one tile alone.
   it('lists metrics as full-width rows with whole labels', () => {
-    show(teamWith())
+    show(teamWith({ questions: [] }))
     const label = [...document.body.querySelectorAll<HTMLElement>('div')].find(
       (one) => one.childElementCount === 0 && one.textContent === 'Merged on 2026-11-02'
     )
