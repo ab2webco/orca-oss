@@ -177,13 +177,18 @@ describe('mobile RPC allowlist', () => {
     ])
   })
 
-  it("allows exactly the Inbox's owner-question methods and the Team drawer's state read on the phone", () => {
+  it("allows exactly the Inbox's owner-question methods and the Team drawer's reads on the phone", () => {
     // Why exact: member actions, the STOP switch and the lead's own board stay desktop decisions.
     const gameMethods = [...mobileRpcAllowlist()]
       .filter((method) => method.startsWith('game.'))
       .sort()
 
-    expect(gameMethods).toEqual(['game.ownerAnswer', 'game.ownerQuestionsAll', 'game.state'])
+    expect(gameMethods).toEqual([
+      'game.inboxThreads',
+      'game.ownerAnswer',
+      'game.ownerQuestionsAll',
+      'game.state'
+    ])
   })
 
   it('opens one Plane work item to the phone as its own advertised capability', () => {
