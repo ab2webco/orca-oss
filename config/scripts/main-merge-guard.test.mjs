@@ -264,7 +264,12 @@ describe.skipIf(process.platform === 'win32')('main merge guard', () => {
       'gh pr merge 73 --squash --auto',
       'gh pr merge --auto --squash 73',
       'gh pr merge 73 --auto --squash --match-head-commit 0123abc',
-      'gh pr merge 73 --auto --squash --match-head-commit=0123abc'
+      'gh pr merge 73 --auto --squash --match-head-commit=0123abc',
+      // ORCA-987: a redirect is the shell's, not gh's.
+      'gh pr merge 73 --auto --squash 2>&1',
+      'gh pr merge 73 --auto --squash >/tmp/merge.log 2>&1',
+      'gh pr merge 73 --auto --squash &>/dev/null',
+      'gh pr merge --auto --squash 73 >&2'
     ])('allows `%s`', (command) => {
       expect(runGuard(command, gated).denied).toBe(false)
     })
@@ -280,7 +285,9 @@ describe.skipIf(process.platform === 'win32')('main merge guard', () => {
       ['gh pr merge feature --auto --squash', 'branch selector'],
       ['gh pr merge 73 --auto --squash --delete-branch', 'branch deletion closes stacked PRs'],
       ['gh pr merge 73 --auto --squash --repo other/repo', 'another repository'],
-      ['gh pr merge 73 --auto --squash && gh pr merge 74', 'plain merge chained after']
+      ['gh pr merge 73 --auto --squash && gh pr merge 74', 'plain merge chained after'],
+      ['gh pr merge 73 --auto --squash --admin 2>&1', 'admin override with a redirect'],
+      ['gh pr merge 73 --squash >/tmp/merge.log 2>&1', 'plain merge with a redirect']
     ])('refuses `%s` (%s)', (command) => {
       expect(runGuard(command, gated).denied).toBe(true)
     })

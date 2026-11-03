@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from command_text import strip_heredocs  # noqa: E402
+from command_text import strip_heredocs, strip_redirections  # noqa: E402
 
 # Only a prefilter: the decision is made on the parsed command, never on this match.
 PR_MERGE_HINT = re.compile(r"\bpr\s+merge\b")
@@ -413,7 +413,7 @@ def main() -> None:
         sys.exit(0)
 
     try:
-        tokens = command_tokens(command)
+        tokens = command_tokens(strip_redirections(command))
     except ValueError:
         # Why fail closed: un comando ilegible que nombra un merge no se asume inocente.
         deny(

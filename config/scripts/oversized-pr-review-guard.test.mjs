@@ -194,6 +194,29 @@ describe('oversized-pr-review-guard', () => {
     expect(result.reason).toContain('suma 776 líneas propias')
   })
 
+  // ORCA-987: a redirect is the shell's, not gh's; `2>&1` used to read as two more selectors.
+  it.each([
+    'gh pr merge 885 --auto --squash 2>&1',
+    'gh pr merge 885 --auto --squash 2>/dev/null',
+    'gh pr merge 885 --auto --squash >/tmp/merge.log 2>&1',
+    'gh pr merge 885 --auto --squash &> merge.log',
+    'gh pr merge 885 --auto --squash 2>&1 | tail -5',
+    'gh pr merge --auto --squash 885 >&2'
+  ])('allows the lead queue command with a redirect: %s', (command) => {
+    const result = runGuard(command, { number: '885', files: prOf776 })
+    expect(result.denied).toBe(false)
+    expect(result.note).toContain('#885')
+  })
+
+  it.each([
+    'gh pr merge 885 --auto --squash --admin 2>&1',
+    'gh pr merge 885 --squash >/tmp/merge.log 2>&1'
+  ])('still denies an oversized non-queue merge with a redirect: %s', (command) => {
+    const result = runGuard(command, { number: '885', files: prOf776 })
+    expect(result.denied).toBe(true)
+    expect(result.reason).toContain('suma 776 líneas propias')
+  })
+
   it('keeps failing closed on the queue command when the pr or repo cannot be resolved', () => {
     expect(runGuard('gh pr merge --auto --squash', { number: null }).reason).toContain(
       'no se pudo resolver el número'
