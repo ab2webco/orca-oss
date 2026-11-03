@@ -950,6 +950,13 @@ function refreshActiveRelaySessions(): void {
   }
 }
 
+// Why: `owner` marks Orca-internal targets, and on-demand VMs skip host key pinning; the renderer never sets it.
+function withoutOwner<T extends { owner?: unknown }>(target: T): Omit<T, 'owner'> {
+  const copy = { ...target }
+  delete copy.owner
+  return copy
+}
+
 export function registerSshHandlers(
   store: Store,
   getMainWindow: () => BrowserWindow | null,
@@ -1023,7 +1030,7 @@ export function registerSshHandlers(
   })
 
   ipcMain.handle('ssh:addTarget', (_event, args: { target: Omit<SshTarget, 'id'> }) => {
-    const target = sshStore!.addTarget(args.target)
+    const target = sshStore!.addTarget(withoutOwner(args.target))
     // Why: re-adding a removed host can re-adopt orphaned workspaces; refresh the renderer's repo list so they move back onto the live host.
     const repoReadoptions = takeRepoReadoptions()
     return { target, repoReadoptions }
@@ -1032,7 +1039,7 @@ export function registerSshHandlers(
   ipcMain.handle(
     'ssh:updateTarget',
     (_event, args: { id: string; updates: Partial<Omit<SshTarget, 'id'>> }) => {
-      return sshStore!.updateTarget(args.id, args.updates)
+      return sshStore!.updateTarget(args.id, withoutOwner(args.updates))
     }
   )
 

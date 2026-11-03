@@ -103,6 +103,18 @@ describe('SSH IPC handlers', () => {
     expect(mockSshStore.lastRepoReadoptions).toEqual([])
   })
 
+  it('drops a renderer-supplied owner so a target cannot opt out of host key pinning', async () => {
+    const owner = { type: 'on-demand-runtime', runtimeId: 'vm-1' }
+    const target = { label: 'Server', host: 'evil.example.com', port: 22, username: 'deploy' }
+    mockSshStore.addTarget.mockReturnValue({ ...target, id: 'ssh-new' })
+
+    await handlers.get('ssh:addTarget')!(null, { target: { ...target, owner } })
+    await handlers.get('ssh:updateTarget')!(null, { id: 'ssh-1', updates: { port: 2222, owner } })
+
+    expect(mockSshStore.addTarget).toHaveBeenCalledWith(target)
+    expect(mockSshStore.updateTarget).toHaveBeenCalledWith('ssh-1', { port: 2222 })
+  })
+
   it('ssh:removeTarget calls store.removeTarget', async () => {
     await handlers.get('ssh:removeTarget')!(null, { id: 'ssh-1' })
     expect(mockSshStore.removeTarget).toHaveBeenCalledWith('ssh-1')

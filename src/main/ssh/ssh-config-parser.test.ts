@@ -555,6 +555,45 @@ describe('parseSshGOutput', () => {
     ])
   })
 
+  it('reads the host key policy and known_hosts files', () => {
+    const result = parseSshGOutput(
+      [
+        'hostname example.com',
+        'stricthostkeychecking true',
+        'hostkeyalias bastion-alias',
+        'userknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2',
+        'globalknownhostsfile /etc/ssh/ssh_known_hosts none'
+      ].join('\n')
+    )
+    expect(result.strictHostKeyChecking).toBe('true')
+    expect(result.hostKeyAlias).toBe('bastion-alias')
+    expect(result.knownHostsFiles).toEqual([
+      testHomePath('.ssh', 'known_hosts'),
+      testHomePath('.ssh', 'known_hosts2'),
+      '/etc/ssh/ssh_known_hosts'
+    ])
+    expect(parseSshGOutput('hostname example.com').knownHostsFiles).toEqual([])
+  })
+
+  it('keeps spaces inside a known_hosts path and expands __PROGRAMDATA__', () => {
+    vi.stubEnv('PROGRAMDATA', 'D:\\ProgramData')
+    try {
+      const result = parseSshGOutput(
+        [
+          'userknownhostsfile C:\\Users\\John Smith/.ssh/known_hosts /home/a  b/.ssh/known_hosts2',
+          'globalknownhostsfile __PROGRAMDATA__\\ssh/ssh_known_hosts'
+        ].join('\n')
+      )
+      expect(result.knownHostsFiles).toEqual([
+        'C:\\Users\\John Smith/.ssh/known_hosts',
+        '/home/a  b/.ssh/known_hosts2',
+        'D:\\ProgramData\\ssh/ssh_known_hosts'
+      ])
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('parses forwardagent yes', () => {
     const output = 'hostname example.com\nforwardagent yes\nport 22'
     const result = parseSshGOutput(output)
