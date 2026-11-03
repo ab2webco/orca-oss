@@ -1,0 +1,138 @@
+---
+import { docsHref, homeHref, type Lang, REPO_URL, withBase } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    nav: [
+      ['#orchestrator', 'Orchestrator'],
+      ['#desktop', 'Desktop'],
+      ['#agents', 'Agents'],
+      ['#integrations', 'Integrations'],
+      ['#mobile', 'Mobile']
+    ],
+    docs: 'Docs',
+    download: 'Download',
+    otherLang: 'ES',
+    otherLangLabel: 'Leer en español',
+    theme: 'Toggle light and dark theme',
+    light: 'light',
+    dark: 'dark'
+  },
+  es: {
+    nav: [
+      ['#orchestrator', 'Orquestador'],
+      ['#desktop', 'Escritorio'],
+      ['#agents', 'Agentes'],
+      ['#integrations', 'Integraciones'],
+      ['#mobile', 'Móvil']
+    ],
+    docs: 'Docs',
+    download: 'Descargar',
+    otherLang: 'EN',
+    otherLangLabel: 'Read in English',
+    theme: 'Cambiar entre tema claro y oscuro',
+    light: 'claro',
+    dark: 'oscuro'
+  }
+}[lang]
+const other: Lang = lang === 'es' ? 'en' : 'es'
+---
+
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href={homeHref(lang)}>
+      <img src={withBase('icon.png')} alt="" width="22" height="22" />
+      <span>orca-lab</span>
+    </a>
+    <nav class="nav" aria-label={lang === 'es' ? 'Secciones' : 'Sections'}>
+      {copy.nav.map(([href, label]) => <a href={href}>{label}</a>)}
+    </nav>
+    <div class="actions">
+      <a href={docsHref(lang, '')}>{copy.docs}</a>
+      <a href="#get">{copy.download}</a>
+      <a href={REPO_URL}>GitHub</a>
+      <a href={homeHref(other)} hreflang={other} aria-label={copy.otherLangLabel}>{copy.otherLang}</a>
+      <button type="button" data-theme-toggle aria-label={copy.theme}>
+        <span class="to-light">{copy.light}</span><span class="to-dark">{copy.dark}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+    const root = document.documentElement
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light'
+    root.dataset.theme = next
+    try {
+      localStorage.setItem('starlight-theme', next)
+    } catch {
+      // Private mode: the toggle still works for this page view.
+    }
+  })
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 8px 24px;
+    min-height: 48px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg);
+    font-weight: 700;
+    text-decoration: none;
+    flex: none;
+  }
+  .nav,
+  .actions {
+    display: flex;
+    gap: 2ch;
+    white-space: nowrap;
+  }
+  .actions {
+    margin-left: auto;
+  }
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--link);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  :root[data-theme='light'] .to-light,
+  :root:not([data-theme='light']) .to-dark {
+    display: none;
+  }
+  @media (max-width: 1023px) {
+    .nav {
+      display: none;
+    }
+  }
+  @media (max-width: 559px) {
+    .actions a[href='#get'],
+    .actions a[href^='https://github'] {
+      display: none;
+    }
+  }
+</style>

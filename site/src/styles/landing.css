@@ -1,0 +1,237 @@
+/*
+ * Landing: terminal typography on the Orca Game scene palette. Colours are the --scene-* tokens
+ * LandingLayout writes from src/data/scene-palette.ts; the mono stack is the app's (main.css).
+ */
+:root {
+  --font-mono:
+    'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+  --bg: var(--scene-bg);
+  --surface: var(--scene-surface);
+  --line: var(--scene-line);
+  --fg: var(--scene-fg);
+  --muted: var(--scene-muted);
+  --link: var(--scene-link);
+  --gold: var(--scene-gold);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: clip;
+}
+
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+img,
+canvas {
+  max-width: 100%;
+  display: block;
+}
+
+code {
+  font-family: inherit;
+  color: var(--gold);
+}
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .wrap {
+    padding: 0 32px;
+  }
+}
+
+.section {
+  padding: 72px 0 0;
+}
+
+@media (max-width: 767px) {
+  .section {
+    padding-top: 56px;
+  }
+}
+
+/* The Panel's section heading: `▾ TEAM`, gold on the band's ink. */
+.heading {
+  display: inline-block;
+  margin: 0;
+  padding: 0 6px;
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.h2 {
+  margin: 16px 0 0;
+  font-size: clamp(22px, 3.2vw, 32px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 12px 0 0;
+  max-width: 72ch;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Terminal-style links: underlined, with the key hint the Panel puts before an action. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.links a {
+  font-weight: 700;
+}
+
+.links a::before {
+  content: '→ ';
+  color: var(--muted);
+  text-decoration: none;
+  display: inline-block;
+  margin-right: 0.4ch;
+}
+
+/* A plain list with the shell's dash. */
+.dash {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash li {
+  position: relative;
+  padding-left: 2ch;
+  margin-top: 8px;
+}
+
+.dash li::before {
+  content: '-';
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+}
+
+.dash b {
+  color: var(--fg);
+}
+
+.dash span {
+  color: var(--muted);
+}
+
+.box {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.prompt {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.prompt .c {
+  color: var(--muted);
+}
+
+.prompt .p {
+  color: var(--link);
+  user-select: none;
+}
+
+/* Two columns from 900px: text and the recording that proves it. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 28px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 40px;
+  }
+
+  /* Why: the recording keeps the wide column on either side. */
+  .split.flip {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+
+  .split.flip > :first-child {
+    order: 2;
+  }
+}
+
+.state-working {
+  color: var(--scene-working);
+}
+
+.state-waiting {
+  color: var(--scene-waiting);
+}
+
+.state-done {
+  color: var(--scene-done);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

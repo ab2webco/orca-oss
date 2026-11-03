@@ -1,0 +1,85 @@
+---
+import { agents, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'FAQ',
+    title: 'Questions developers ask first',
+    items: [
+      ['Is Orca Lab free?', 'Yes. Orca Lab is free and open source under the MIT License, and every release is built from the public repository.'],
+      ['How does it relate to Orca?', 'Orca Lab is Ab2Web’s build of Orca by stablyai. It adds the Orca Game lead and members, members on paired hosts, the Plane board, the owner-question Inbox on desktop and phone, diff notes, design mode, plugins and more.'],
+      ['Which agents and subscriptions do I need?', `None in particular. Orca Lab launches the agent CLIs you already use (${agents.length} today, from Claude Code and Codex to Gemini, Cursor and Copilot) on the accounts you already pay for.`],
+      ['What runs the lead?', 'The lead is a Claude Code session. Members can run any agent Orca knows, chosen per launch with `--agent`.'],
+      ['Does my code leave my machine?', 'Agents run on your machine, on hosts you pair, or over SSH on servers you configure. Builds from this repository send no telemetry.'],
+      ['Does it work with SSH, WSL and plain folders?', 'Yes. Worktrees can live on a remote machine over SSH or inside WSL on Windows, and a plain folder works as a workspace too.']
+    ]
+  },
+  es: {
+    eyebrow: 'Preguntas',
+    title: 'Lo primero que preguntan los devs',
+    items: [
+      ['¿Orca Lab es gratis?', 'Sí. Orca Lab es libre y de código abierto bajo la licencia MIT, y cada release se compila desde el repositorio público.'],
+      ['¿Qué relación tiene con Orca?', 'Orca Lab es la versión de Ab2Web de Orca, de stablyai. Suma el líder y los miembros de Orca Game, miembros en hosts emparejados, el board de Plane, el Inbox de preguntas en escritorio y teléfono, notas en el diff, design mode, plugins y más.'],
+      ['¿Qué agentes y suscripciones necesito?', `Ninguno en particular. Orca Lab lanza las CLIs de agentes que ya usas (${agents.length} hoy, de Claude Code y Codex a Gemini, Cursor y Copilot) con las cuentas que ya pagas.`],
+      ['¿Qué corre al líder?', 'El líder es una sesión de Claude Code. Los miembros pueden correr cualquier agente que Orca conozca, elegido en cada lanzamiento con `--agent`.'],
+      ['¿Mi código sale de mi máquina?', 'Los agentes corren en tu máquina, en hosts que emparejas o por SSH en servidores que configuras. Las builds de este repositorio no envían telemetría.'],
+      ['¿Funciona con SSH, WSL y carpetas sueltas?', 'Sí. Los worktrees pueden vivir en una máquina remota por SSH o dentro de WSL en Windows, y una carpeta suelta también sirve como espacio de trabajo.']
+    ]
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section" id="faq" aria-labelledby="faq-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="faq-title">{copy.title}</h2>
+    <div class="list">
+      {
+        copy.items.map(([question, answer]) => (
+          <details>
+            <summary>{question}</summary>
+            <p set:html={code(answer)} />
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .list {
+    margin-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  details {
+    border-bottom: 1px solid var(--line);
+  }
+  summary {
+    padding: 12px 0;
+    cursor: pointer;
+    font-weight: 700;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::before {
+    content: '▸ ';
+    color: var(--gold);
+  }
+  details[open] summary::before {
+    content: '▾ ';
+  }
+  details p {
+    margin: 0 0 14px 2ch;
+    max-width: 72ch;
+    color: var(--muted);
+  }
+</style>

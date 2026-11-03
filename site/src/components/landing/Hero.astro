@@ -1,0 +1,83 @@
+---
+import { docsHref, type Lang, REPO_URL } from '../../data/product'
+import QuestBand from './QuestBand.astro'
+import Recording from './Recording.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    title: 'Run a team of coding agents from your To Do.',
+    lede: 'Orca Lab is a desktop IDE where a lead agent takes your tickets, launches one member per ticket in its own worktree, on any machine you own, and asks you only what only you can decide. Free and open source, MIT.',
+    download: 'Download',
+    docs: 'Read the docs',
+    source: 'Source on GitHub',
+    platforms: 'macOS · Windows · Linux · iOS · Android'
+  },
+  es: {
+    title: 'Lleva un equipo de agentes de código desde tu To Do.',
+    lede: 'Orca Lab es un IDE de escritorio donde un agente líder toma tus tickets, lanza un miembro por ticket en su propio worktree, en cualquier máquina que tengas, y solo te pregunta lo que solo tú puedes decidir. Libre y de código abierto, MIT.',
+    download: 'Descargar',
+    docs: 'Leer la documentación',
+    source: 'Código en GitHub',
+    platforms: 'macOS · Windows · Linux · iOS · Android'
+  }
+}[lang]
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <QuestBand lang={lang} />
+  <div class="wrap copy">
+    <div>
+    <p class="prompt-line"><span class="p">$</span> orca game lead</p>
+    <h1 id="hero-title">{copy.title}</h1>
+    <p class="lede">{copy.lede}</p>
+    <ul class="links">
+      <li><a href="#get">{copy.download}</a></li>
+      <li><a href={docsHref(lang, '')}>{copy.docs}</a></li>
+      <li><a href={REPO_URL}>{copy.source}</a></li>
+    </ul>
+    <p class="platforms muted">{copy.platforms}</p>
+    </div>
+    <Recording lang={lang} file="game-band-panel.gif" isEager />
+  </div>
+</section>
+
+<style>
+  .copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    align-items: center;
+    padding-top: 40px;
+  }
+  @media (min-width: 1024px) {
+    .copy {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 48px;
+    }
+  }
+  .prompt-line {
+    margin: 0;
+    color: var(--muted);
+  }
+  .prompt-line .p {
+    color: var(--link);
+  }
+  h1 {
+    margin: 10px 0 0;
+    max-width: 24ch;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .platforms {
+    margin: 16px 0 0;
+    font-size: 13px;
+  }
+</style>

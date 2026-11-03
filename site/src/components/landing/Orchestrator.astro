@@ -1,0 +1,192 @@
+---
+import { docsHref, type Lang } from '../../data/product'
+import Recording from './Recording.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'The orchestrator · Orca Game',
+    title: 'A lead that runs your board. Members that ship it.',
+    lede: 'Orca Game turns a Claude Code session into the lead of a team. It does not write the code itself: it launches one member per ticket, each in its own worktree and branch, waits for their reports, answers their questions, and asks you only what only you can decide.',
+    flow: [
+      ['To Do', 'Tickets from Plane, Jira, Linear, GitHub or GitLab, in board order.'],
+      ['Wave', '`orca game wave` fills every free slot, one member per ticket.'],
+      ['Members', 'Each works in its own worktree and branch, on any paired host.'],
+      ['Verified', 'Typed reports; CI green and review state come from the tracker and CI, not from the agent.'],
+      ['Merge', 'PR merges pay XP; the merged worktree and branch are cleaned up.']
+    ],
+    xpTitle: 'XP only from verified signals',
+    xpNote: 'A member earns nothing for saying it is done. Weights are yours to change in orca.yaml.',
+    xp: [
+      ['Member claims a ticket', 10],
+      ['Its PR’s CI turns green', 20],
+      ['Ticket moves to review', 50],
+      ['Ticket reaches Done', 70],
+      ['PR merges', 100],
+      ['Merged PR is perfect', 100]
+    ],
+    rules: [
+      ['Your rules, not just ours', 'Orca’s standing rules come first; your project appends its own in orca.yaml: strict TDD, conventional commits, merge-queue only.'],
+      ['Typed reports', 'A member finishes with a worker_done envelope that states how each claim was verified. A malformed report is rejected.'],
+      ['Finish before starting', 'The lead drives each member to a merge before it launches another ticket, so half-done work does not pile up.'],
+      ['Questions go somewhere real', 'Releases, spending, product calls: they become owner questions with options, in an Inbox on desktop and phone.'],
+      ['The Panel shows the truth', 'One card per member with ticket, branch, PR, CI and state, plus your open PRs, the To Do and team metrics.'],
+      ['Recovery is built in', '`game resume-members` after a restart, `game adopt` and `game drop` for strays, `game lead --fresh` for a long conversation.']
+    ],
+    needsTitle: 'Who needs you, at a glance',
+    needsBody: 'The band above the lead’s prompt shows every teammate and flags the one waiting on you. Its question lands in the Inbox with the options the lead offered; your answer goes back to the lead.',
+    views: 'Pick how it looks, and what it costs your machine: Off, Flat, Zen, 2D classic or 2D hd. Scenes are themeable.',
+    credit: 'The idea of running a Claude Code team as a game came from Jucer Orozco.',
+    more: 'Orca Game reference'
+  },
+  es: {
+    eyebrow: 'El orquestador · Orca Game',
+    title: 'Un líder que maneja tu board. Miembros que lo entregan.',
+    lede: 'Orca Game convierte una sesión de Claude Code en el líder de un equipo. No escribe el código: lanza un miembro por ticket, cada uno en su propio worktree y rama, espera sus reportes, responde sus preguntas y solo te pregunta a ti lo que solo tú puedes decidir.',
+    flow: [
+      ['To Do', 'Tickets de Plane, Jira, Linear, GitHub o GitLab, en el orden del board.'],
+      ['Ola', '`orca game wave` llena cada espacio libre, un miembro por ticket.'],
+      ['Miembros', 'Cada uno trabaja en su worktree y su rama, en cualquier host emparejado.'],
+      ['Verificado', 'Reportes tipados; el CI en verde y el estado de revisión salen del tracker y del CI, no del agente.'],
+      ['Merge', 'Cada PR fusionado suma XP; el worktree y la rama fusionados se limpian.']
+    ],
+    xpTitle: 'XP solo por señales verificadas',
+    xpNote: 'Un miembro no gana nada por decir que terminó. Los pesos los cambias tú en orca.yaml.',
+    xp: [
+      ['Un miembro toma un ticket', 10],
+      ['El CI de su PR pasa a verde', 20],
+      ['El ticket pasa a revisión', 50],
+      ['El ticket llega a Done', 70],
+      ['El PR se fusiona', 100],
+      ['El PR fusionado queda perfecto', 100]
+    ],
+    rules: [
+      ['Tus reglas, no solo las nuestras', 'Primero van las reglas de Orca; tu proyecto suma las suyas en orca.yaml: TDD estricto, conventional commits, merge solo por la cola.'],
+      ['Reportes tipados', 'Un miembro termina con un sobre worker_done que dice cómo se verificó cada afirmación. Un reporte mal formado se rechaza.'],
+      ['Termina antes de empezar', 'El líder lleva cada miembro hasta el merge antes de lanzar otro ticket, así el trabajo a medias no se acumula.'],
+      ['Las preguntas llegan a un lugar real', 'Releases, gastos, decisiones de producto: se vuelven preguntas para ti con opciones, en un Inbox en escritorio y teléfono.'],
+      ['El Panel muestra la verdad', 'Una tarjeta por miembro con ticket, rama, PR, CI y estado, más tus PR abiertos, el To Do y las métricas del equipo.'],
+      ['La recuperación viene incluida', '`game resume-members` tras un reinicio, `game adopt` y `game drop` para agentes sueltos, `game lead --fresh` para una conversación larga.']
+    ],
+    needsTitle: 'Quién te necesita, de un vistazo',
+    needsBody: 'La banda sobre el prompt del líder muestra a cada compañero y marca al que te espera. Su pregunta llega al Inbox con las opciones que ofreció el líder; tu respuesta vuelve al líder.',
+    views: 'Elige cómo se ve y cuánto le cuesta a tu máquina: Off, Flat, Zen, 2D classic o 2D hd. Las escenas se pueden personalizar.',
+    credit: 'La idea de llevar un equipo de Claude Code como un juego vino de Jucer Orozco.',
+    more: 'Referencia de Orca Game'
+  }
+}[lang]
+
+const code = (text: string) =>
+  text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section" id="orchestrator" aria-labelledby="orchestrator-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="orchestrator-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+
+    <div class="split">
+      <div>
+        <ol class="flow">
+          {
+            copy.flow.map(([title, text], index) => (
+              <li>
+                <b>
+                  {index + 1}. {title}
+                </b>{' '}
+                <span set:html={code(text)} />
+              </li>
+            ))
+          }
+        </ol>
+        <h3 class="h3">{copy.xpTitle}</h3>
+        <table class="xp">
+          <tbody>
+            {
+              copy.xp.map(([label, points]) => (
+                <tr>
+                  <td>{label}</td>
+                  <td class="pts">+{points} XP</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+        <p class="muted note">{copy.xpNote}</p>
+      </div>
+      <Recording lang={lang} file="lead-wave.gif" />
+    </div>
+
+    <div class="split flip">
+      <ul class="dash">
+        {
+          copy.rules.map(([title, text]) => (
+            <li>
+              <b>{title}.</b> <span set:html={code(text)} />
+            </li>
+          ))
+        }
+      </ul>
+      <Recording lang={lang} file="panel-metrics.gif" />
+    </div>
+
+    <h3 class="h3">{copy.needsTitle}</h3>
+    <div class="split">
+      <p class="lede">{copy.needsBody}</p>
+      <Recording lang={lang} file="owner-inbox.gif" />
+    </div>
+
+    <p class="lede">{copy.views}</p>
+    <p class="muted note">{copy.credit}</p>
+    <ul class="links">
+      <li><a href={docsHref(lang, 'orchestrator/orca-game')}>{copy.more}</a></li>
+    </ul>
+  </div>
+</section>
+
+<style>
+  .flow {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .flow li + li {
+    margin-top: 10px;
+  }
+  .flow b {
+    color: var(--gold);
+  }
+  .flow span {
+    color: var(--muted);
+  }
+  .h3 {
+    margin: 32px 0 0;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .xp {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .xp td {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .xp .pts {
+    text-align: right;
+    white-space: nowrap;
+    color: var(--gold);
+    font-weight: 700;
+  }
+  .note {
+    margin: 10px 0 0;
+    font-size: 13px;
+  }
+</style>

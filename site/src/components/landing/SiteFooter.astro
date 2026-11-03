@@ -1,0 +1,103 @@
+---
+import { docsHref, homeHref, type Lang, REPO_URL, withBase } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    tagline: 'Run a team of coding agents, each in its own worktree, on every machine you own.',
+    docs: 'Docs',
+    project: 'Project',
+    links: [
+      [docsHref(lang, 'install'), 'Install'],
+      [docsHref(lang, 'orchestrator/orca-game'), 'Orca Game'],
+      [docsHref(lang, 'cli/overview'), 'CLI'],
+      [docsHref(lang, 'extend/plugins'), 'Plugins']
+    ],
+    project_links: [
+      [REPO_URL, 'GitHub'],
+      [`${REPO_URL}/releases`, 'Release notes'],
+      [docsHref(lang, 'telemetry'), 'Privacy']
+    ],
+    legal: 'MIT License · Built on Orca by stablyai · The recordings and the /quest demo use demo projects, not real customers.',
+    lang: 'Español'
+  },
+  es: {
+    tagline: 'Lleva un equipo de agentes de código, cada uno en su worktree, en cada máquina que tengas.',
+    docs: 'Docs',
+    project: 'Proyecto',
+    links: [
+      [docsHref(lang, 'install'), 'Instalación'],
+      [docsHref(lang, 'orchestrator/orca-game'), 'Orca Game'],
+      [docsHref(lang, 'cli/overview'), 'CLI'],
+      [docsHref(lang, 'extend/plugins'), 'Plugins']
+    ],
+    project_links: [
+      [REPO_URL, 'GitHub'],
+      [`${REPO_URL}/releases`, 'Notas de versión'],
+      [docsHref(lang, 'telemetry'), 'Privacidad']
+    ],
+    legal: 'Licencia MIT · Basado en Orca de stablyai · Las grabaciones y la /quest demo usan proyectos de demostración, no clientes reales.',
+    lang: 'English'
+  }
+}[lang]
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="tagline">
+      <a class="brand" href={homeHref(lang)}>
+        <img src={withBase('icon.png')} alt="" width="20" height="20" loading="lazy" />Orca Lab
+      </a>
+      <span class="muted">{copy.tagline}</span>
+    </p>
+    <nav aria-label={copy.docs}>
+      <span class="muted">{copy.docs}:</span>
+      {copy.links.map(([href, label]) => <a href={href}>{label}</a>)}
+    </nav>
+    <nav aria-label={copy.project}>
+      <span class="muted">{copy.project}:</span>
+      {copy.project_links.map(([href, label]) => <a href={href}>{label}</a>)}
+      <a href={homeHref(lang === 'es' ? 'en' : 'es')}>{copy.lang}</a>
+    </nav>
+    <p class="legal muted">{copy.legal}</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    padding: 32px 0 40px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+  p,
+  nav {
+    margin: 0;
+  }
+  .tagline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 2ch;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 2ch;
+    margin-top: 10px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .legal {
+    margin-top: 18px;
+  }
+</style>

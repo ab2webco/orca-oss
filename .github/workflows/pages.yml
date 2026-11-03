@@ -23,6 +23,9 @@ on:
       - "resources/build/icon.png"
       - "src/shared/task-providers.ts"
       - "src/shared/tui-agent-display-names.ts"
+      # The landing's hero and palette come from the game's renderer and scenes.
+      - "resources/claude-plugins/orca-game/hooks/**"
+      - "src/renderer/src/components/settings/orchestrator-game-scene-preview-frame.ts"
       - ".github/workflows/pages.yml"
 
 permissions:

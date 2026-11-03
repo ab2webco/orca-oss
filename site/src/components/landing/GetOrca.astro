@@ -1,0 +1,145 @@
+---
+import {
+  ANDROID_RELEASES_URL,
+  desktopDownloads,
+  docsHref,
+  type Lang,
+  RELEASES_URL
+} from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Get Orca Lab',
+    title: 'Start your first team in five minutes.',
+    lede: 'Install the desktop app, register the orca command, open a repo, and let the lead take the first wave from your To Do.',
+    all: 'All releases',
+    install: 'Install guide',
+    phone: 'Phone',
+    ios: 'iOS · TestFlight',
+    iosNote: 'Builds ship through TestFlight.',
+    android: 'Android · APK',
+    androidNote: 'From the mobile-android releases.',
+    server: 'Headless',
+    serverNote: '`orca serve` on Linux, paired as a host.',
+    serverLink: 'Server guide'
+  },
+  es: {
+    eyebrow: 'Consigue Orca Lab',
+    title: 'Arma tu primer equipo en cinco minutos.',
+    lede: 'Instala la app de escritorio, registra el comando orca, abre un repo y deja que el líder tome la primera ola de tu To Do.',
+    all: 'Todas las releases',
+    install: 'Guía de instalación',
+    phone: 'Teléfono',
+    ios: 'iOS · TestFlight',
+    iosNote: 'Las builds se distribuyen por TestFlight.',
+    android: 'Android · APK',
+    androidNote: 'Desde las releases mobile-android.',
+    server: 'Sin pantalla',
+    serverNote: '`orca serve` en Linux, emparejado como host.',
+    serverLink: 'Guía de servidor'
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+---
+
+<section class="section get" id="get" aria-labelledby="get-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="get-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <table class="downloads box">
+      <tbody>
+        {
+          desktopDownloads.map((d) => (
+            <tr>
+              <th scope="row">{d.os}</th>
+              <td class="muted">{d.detail}</td>
+              <td>
+                <a href={d.href}>{d.file}</a>
+              </td>
+            </tr>
+          ))
+        }
+        <tr>
+          <th scope="row">{copy.phone}</th>
+          <td class="muted">{copy.iosNote}</td>
+          <td>{copy.ios}</td>
+        </tr>
+        <tr>
+          <th scope="row">{copy.phone}</th>
+          <td class="muted">{copy.androidNote}</td>
+          <td>
+            <a href={ANDROID_RELEASES_URL}>{copy.android}</a>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">{copy.server}</th>
+          <td class="muted" set:html={code(copy.serverNote)} />
+          <td>
+            <a href={docsHref(lang, 'remote/headless-linux-server')}>{copy.serverLink}</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <ul class="links">
+      <li><a href={RELEASES_URL}>{copy.all}</a></li>
+      <li><a href={docsHref(lang, 'install')}>{copy.install}</a></li>
+    </ul>
+  </div>
+</section>
+
+<style>
+  .get {
+    padding-bottom: 72px;
+  }
+  .downloads {
+    width: 100%;
+    margin-top: 24px;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .downloads th,
+  .downloads td {
+    padding: 10px 16px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px dashed var(--line);
+  }
+  .downloads tr:last-child > * {
+    border-bottom: 0;
+  }
+  .downloads th {
+    white-space: nowrap;
+  }
+  .downloads a {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 640px) {
+    .downloads,
+    .downloads tbody,
+    .downloads tr,
+    .downloads th,
+    .downloads td {
+      display: block;
+    }
+    .downloads tr {
+      padding: 10px 14px;
+      border-bottom: 1px dashed var(--line);
+    }
+    .downloads tr:last-child {
+      border-bottom: 0;
+    }
+    .downloads th,
+    .downloads td {
+      padding: 0;
+      border: 0;
+    }
+  }
+</style>

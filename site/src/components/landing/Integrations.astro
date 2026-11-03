@@ -1,0 +1,83 @@
+---
+import { docsHref, type Lang, reviewProviders, taskProviders } from '../../data/product'
+import Recording from './Recording.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Integrations',
+    title: 'Your tracker holds the work. Your forge holds the code.',
+    lede: 'The lead turns one into the other. Browse tickets, start a worktree with the ticket’s context, and follow its PR, checks and review status without leaving Orca Lab.',
+    tasks: 'Task providers',
+    tasksNote: 'Browse and start workspaces from tickets. Any of them can feed the lead’s To Do.',
+    review: 'Review providers',
+    reviewNote: 'Pull and merge requests, checks and review status.',
+    cli: 'Agents read and move the same tickets with `orca plane` and `orca linear`.',
+    more: 'Plane and Linear tasks'
+  },
+  es: {
+    eyebrow: 'Integraciones',
+    title: 'Tu tracker guarda el trabajo. Tu forja guarda el código.',
+    lede: 'El líder convierte uno en el otro. Explora tickets, abre un worktree con el contexto del ticket y sigue su PR, sus checks y su revisión sin salir de Orca Lab.',
+    tasks: 'Proveedores de tareas',
+    tasksNote: 'Explora tickets y abre espacios de trabajo desde ellos. Cualquiera puede alimentar el To Do del líder.',
+    review: 'Proveedores de revisión',
+    reviewNote: 'Pull requests y merge requests, checks y estado de revisión.',
+    cli: 'Los agentes leen y mueven los mismos tickets con `orca plane` y `orca linear`.',
+    more: 'Tareas de Plane y Linear'
+  }
+}[lang]
+
+const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+const groups = [
+  { title: copy.tasks, note: copy.tasksNote, items: taskProviders.map((p) => p.label) },
+  { title: copy.review, note: copy.reviewNote, items: reviewProviders }
+]
+---
+
+<section class="section" id="integrations" aria-labelledby="integrations-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="integrations-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <div class="split">
+      <div>
+        {
+          groups.map((group) => (
+            <div class="group">
+              <h3>{group.title}</h3>
+              <p class="muted">{group.note}</p>
+              <p class="names">{group.items.join(' · ')}</p>
+            </div>
+          ))
+        }
+        <p class="muted" set:html={code(copy.cli)} />
+        <ul class="links">
+          <li><a href={docsHref(lang, 'review/linear')}>{copy.more}</a></li>
+        </ul>
+      </div>
+      <Recording lang={lang} file="plane-board.gif" />
+    </div>
+  </div>
+</section>
+
+<style>
+  .group + .group {
+    margin-top: 24px;
+  }
+  h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .group p {
+    margin: 4px 0 0;
+  }
+  .names {
+    font-weight: 700;
+    color: var(--gold);
+  }
+</style>

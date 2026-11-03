@@ -23,6 +23,8 @@ export default defineConfig({
         root: { label: 'English', lang: 'en' },
         es: { label: 'Español', lang: 'es' }
       },
+      // Why a component: the config loads outside the pinned tsconfig, so it must not import TS.
+      components: { Head: './src/components/DocsHead.astro' },
       customCss: ['./src/styles/fonts.css', './src/styles/starlight-theme.css'],
       sidebar: docsSidebar
     })

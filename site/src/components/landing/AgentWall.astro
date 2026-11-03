@@ -1,0 +1,78 @@
+---
+import { agents, docsHref, type Lang } from '../../data/product'
+import Recording from './Recording.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Bring your own agent',
+    title: `${agents.length} coding agents. Your subscriptions. One screen.`,
+    lede: 'Orca Lab launches and tracks the agent CLIs you already pay for. Run Claude Code next to Codex next to Gemini, each in its own worktree, and see at a glance which one needs you.',
+    points: [
+      ['Switch accounts mid-session', 'Several Claude and Codex accounts; switch a running terminal and the conversation resumes.'],
+      ['Usage next to every agent', 'Rate-limit usage and quota resets, per account, before you hit the wall.'],
+      ['Resume any past session', 'Browse earlier agent sessions, local or over SSH, and pick one back up.']
+    ],
+    more: 'Supported agents'
+  },
+  es: {
+    eyebrow: 'Trae tu propio agente',
+    title: `${agents.length} agentes de código. Tus suscripciones. Una pantalla.`,
+    lede: 'Orca Lab lanza y sigue las CLIs de agentes que ya pagas. Corre Claude Code junto a Codex y Gemini, cada uno en su worktree, y ve de un vistazo cuál te necesita.',
+    points: [
+      ['Cambia de cuenta sin cortar la sesión', 'Varias cuentas de Claude y Codex; cambia una terminal en marcha y la conversación continúa.'],
+      ['Uso junto a cada agente', 'Uso de rate limit y reinicios de cuota por cuenta, antes de chocar con el límite.'],
+      ['Retoma cualquier sesión', 'Explora sesiones anteriores de los agentes, locales o por SSH, y continúa una.']
+    ],
+    more: 'Agentes soportados'
+  }
+}[lang]
+---
+
+<section class="section" id="agents" aria-labelledby="agents-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="agents-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <ul class="agents box" aria-label={copy.eyebrow}>
+      {agents.map((name) => <li>{name}</li>)}
+    </ul>
+    <div class="split">
+      <div>
+        <ul class="dash">
+          {
+            copy.points.map(([title, text]) => (
+              <li>
+                <b>{title}.</b> <span>{text}</span>
+              </li>
+            ))
+          }
+        </ul>
+        <ul class="links">
+          <li><a href={docsHref(lang, 'agents/supported')}>{copy.more}</a></li>
+        </ul>
+      </div>
+      <Recording lang={lang} file="claude-accounts-switch.gif" />
+    </div>
+  </div>
+</section>
+
+<style>
+  .agents {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+    gap: 2px 24px;
+    margin: 24px 0 0;
+    padding: 14px 16px;
+    list-style: none;
+    font-size: 14px;
+  }
+  .agents li::before {
+    content: '● ';
+    color: var(--scene-done);
+  }
+</style>

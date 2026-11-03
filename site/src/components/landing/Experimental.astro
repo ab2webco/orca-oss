@@ -1,0 +1,57 @@
+---
+import type { Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+// Settings → Experimental (ExperimentalPane.tsx). Off by default; may change or go away.
+const copy = {
+  en: {
+    eyebrow: 'Experimental',
+    title: 'In the lab',
+    lede: 'Behind a switch in Settings → Experimental. Off by default, and they may change before they graduate.',
+    items: [
+      ['Agent Dashboard', 'A kanban board for monitoring agents across worktrees, in the window or popped out.'],
+      ['Agents View', 'A threaded sidebar feed of agent completions and blocking states.'],
+      ['Chat UI', 'A chat view you can switch to from supported agent terminal panes.'],
+      ['Agent sleep', 'Stops idle background agent terminals and resumes supported sessions when you open them.'],
+      ['Terminal attention', 'Keeps a pane highlighted after a bell or an agent finishing.'],
+      ['Per-workspace environments', 'Repo-owned, on-demand environments with setup controls and run targets.'],
+      ['Pet', 'A small animated companion in the corner. It does nothing useful.']
+    ]
+  },
+  es: {
+    eyebrow: 'Experimental',
+    title: 'En el laboratorio',
+    lede: 'Detrás de un interruptor en Settings → Experimental. Apagadas por defecto, y pueden cambiar antes de graduarse.',
+    items: [
+      ['Agent Dashboard', 'Un tablero kanban para seguir agentes entre worktrees, en la ventana o aparte.'],
+      ['Agents View', 'Un feed en la barra lateral con lo que terminan y lo que bloquea a los agentes.'],
+      ['Chat UI', 'Una vista de chat a la que cambias desde las terminales de agentes soportados.'],
+      ['Agent sleep', 'Detiene terminales de agentes inactivas en segundo plano y retoma las sesiones soportadas al abrirlas.'],
+      ['Terminal attention', 'Mantiene resaltado un panel tras una campana o cuando un agente termina.'],
+      ['Entornos por espacio de trabajo', 'Entornos bajo demanda definidos en el repo, con controles de setup y destinos de ejecución.'],
+      ['Pet', 'Una mascota animada en la esquina. No hace nada útil.']
+    ]
+  }
+}[lang]
+---
+
+<section class="section" id="experimental" aria-labelledby="experimental-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="experimental-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <ul class="dash">
+      {
+        copy.items.map(([title, text]) => (
+          <li>
+            <b>{title}.</b> <span>{text}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

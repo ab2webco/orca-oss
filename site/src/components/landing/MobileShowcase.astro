@@ -1,0 +1,85 @@
+---
+import { ANDROID_RELEASES_URL, docsHref, type Lang } from '../../data/product'
+import Recording from './Recording.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'Mobile · iOS and Android',
+    title: 'Your agents, in your pocket.',
+    lede: 'Pair once with a QR code. The phone then reaches your desktop directly, or through an end-to-end encrypted relay, and a lead’s question finds you wherever you are.',
+    phones: [
+      ['mobile-inbox-ios.gif', 'Owner-question Inbox', 'Answer the lead’s decision with one tap; the answer goes back to the lead.'],
+      ['mobile-team-android.gif', 'Team drawer', 'Open questions, a card per member with ticket, state, PR and CI, merges per day and lead time.'],
+      ['mobile-terminal-ios.gif', 'Live terminals', 'Watch any agent’s terminal stream and type into it.']
+    ],
+    ios: 'iOS via TestFlight',
+    android: 'Android APK',
+    more: 'Mobile guide'
+  },
+  es: {
+    eyebrow: 'Móvil · iOS y Android',
+    title: 'Tus agentes, en tu bolsillo.',
+    lede: 'Empareja una vez con un código QR. Desde ahí el teléfono llega a tu escritorio directo, o por un relay cifrado de extremo a extremo, y la pregunta de un líder te encuentra donde estés.',
+    phones: [
+      ['mobile-inbox-ios.gif', 'Inbox de preguntas', 'Responde la decisión del líder con un toque; la respuesta vuelve al líder.'],
+      ['mobile-team-android.gif', 'Panel del equipo', 'Preguntas abiertas, una tarjeta por miembro con ticket, estado, PR y CI, merges por día y lead time.'],
+      ['mobile-terminal-ios.gif', 'Terminales en vivo', 'Mira la terminal de cualquier agente en tiempo real y escribe en ella.']
+    ],
+    ios: 'iOS por TestFlight',
+    android: 'APK de Android',
+    more: 'Guía de la app móvil'
+  }
+}[lang]
+---
+
+<section class="section" id="mobile" aria-labelledby="mobile-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="mobile-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <ul class="phones">
+      {
+        copy.phones.map(([file, title, text]) => (
+          <li>
+            <h3>{title}</h3>
+            <p class="muted">{text}</p>
+            <Recording lang={lang} file={file as 'mobile-inbox-ios.gif'} isPhone />
+          </li>
+        ))
+      }
+    </ul>
+    <ul class="links">
+      <li><a href={ANDROID_RELEASES_URL}>{copy.android}</a></li>
+      <li><a href={docsHref(lang, 'mobile')}>{copy.more}</a></li>
+    </ul>
+    <p class="muted">{copy.ios}</p>
+  </div>
+</section>
+
+<style>
+  .phones {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px 32px;
+    margin: 32px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 768px) {
+    .phones {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .phones p {
+    margin: 6px 0 14px;
+  }
+</style>

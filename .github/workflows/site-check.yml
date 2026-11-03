@@ -16,6 +16,9 @@ on:
       - "src/shared/task-providers.ts"
       - "src/shared/tui-agent-display-names.ts"
       - "src/renderer/src/components/settings/IntegrationsPane.tsx"
+      # The hero plays /quest demo with the game's renderer, and the palette is read from its scenes.
+      - "resources/claude-plugins/orca-game/hooks/**"
+      - "src/renderer/src/components/settings/orchestrator-game-scene-preview-frame.ts"
       - ".github/workflows/site-check.yml"
 
 permissions:

@@ -1,0 +1,86 @@
+---
+import { docsHref, type Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    eyebrow: 'The orca CLI',
+    title: 'Everything you click, your agents can script.',
+    lede: 'Worktrees, terminals, accounts, tickets, the game, the browser and multi-agent orchestration: task graphs with dependencies, decision gates and blocking questions between agents.',
+    panes: [
+      ['orchestration', ['# a task that waits on another', 'orca orchestration task-create --spec "Move billing to v2" --deps \'["task_api"]\'', '# stop on a decision only a human makes', 'orca orchestration gate-create --task task_billing --question "Drop v1 now?"']],
+      ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "Ship in 2.3?" --option Yes --option Hold', 'orca game metrics']],
+      ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
+    ],
+    more: 'CLI guide'
+  },
+  es: {
+    eyebrow: 'La CLI orca',
+    title: 'Todo lo que tú haces con clics, tus agentes lo pueden scriptear.',
+    lede: 'Worktrees, terminales, cuentas, tickets, el juego, el navegador y la orquestación entre agentes: grafos de tareas con dependencias, puertas de decisión y preguntas bloqueantes entre agentes.',
+    panes: [
+      ['orchestration', ['# una tarea que espera a otra', 'orca orchestration task-create --spec "Mover billing a v2" --deps \'["task_api"]\'', '# detenerse en una decisión que toma una persona', 'orca orchestration gate-create --task task_billing --question "¿Quitar v1 ya?"']],
+      ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "¿Publicar en 2.3?" --option Sí --option Esperar', 'orca game metrics']],
+      ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
+    ],
+    more: 'Guía de la CLI'
+  }
+}[lang]
+
+const escape = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// Why a string: whitespace inside <pre> is the output, so the template's indentation must stay out.
+const terminalOf = (lines: string[]) =>
+  lines
+    .map((line) =>
+      line.startsWith('#')
+        ? `<span class="c">${escape(line)}</span>`
+        : `<span class="p">$ </span>${escape(line)}`
+    )
+    .join('\n')
+---
+
+<section class="section" id="cli" aria-labelledby="cli-title">
+  <div class="wrap">
+    <p class="heading">▾ {copy.eyebrow}</p>
+    <h2 class="h2" id="cli-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <div class="panes">
+      {
+        copy.panes.map(([name, lines]) => (
+          <figure class="box">
+            <figcaption>{name}</figcaption>
+            <pre class="prompt" set:html={terminalOf(lines as string[])} />
+          </figure>
+        ))
+      }
+    </div>
+    <ul class="links">
+      <li><a href={docsHref(lang, 'cli/overview')}>{copy.more}</a></li>
+    </ul>
+  </div>
+</section>
+
+<style>
+  .panes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 28px;
+  }
+  figure {
+    margin: 0;
+    min-width: 0;
+  }
+  figcaption {
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+</style>
