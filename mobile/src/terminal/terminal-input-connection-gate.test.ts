@@ -104,11 +104,9 @@ describe('session route offline-compose wiring', () => {
   })
 
   it('keeps the live/buffered mode toggle reachable offline', () => {
-    const modeToggle = routeSlice(
-      'liveInputEnabled && styles.accessoryKeyActive',
-      'onPress={toggleLiveInput}'
-    )
-    expect(modeToggle).toContain('disabled={!canCompose}')
+    // The bar disables the toggle on !canCompose (TerminalAccessoryBar.test.tsx); the route must pass it.
+    const bar = routeSlice('<TerminalAccessoryBar', 'onAddCustomKey=')
+    expect(bar).toContain('canCompose={canCompose}')
   })
 
   it('tells the live-input commit hook about connection loss so stale mirror state resets', () => {

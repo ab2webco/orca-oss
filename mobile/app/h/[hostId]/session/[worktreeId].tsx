@@ -26,9 +26,7 @@ import {
   AlertTriangle,
   ArrowUp,
   Bot,
-  ChevronDown,
   ChevronLeft,
-  ChevronsRight,
   Copy,
   Folder,
   File,
@@ -37,12 +35,10 @@ import {
   Globe,
   Keyboard as KeyboardIcon,
   MessageSquare,
-  Monitor,
   MoreHorizontal,
   Plus,
   RefreshCw,
   Send,
-  Smartphone,
   SquareTerminal,
   X
 } from 'lucide-react-native'
@@ -115,6 +111,7 @@ import {
   loadTerminalAccessoryLayout
 } from '../../../../src/terminal/terminal-accessory-layout'
 import { createTerminalLiveAccessoryInput } from '../../../../src/terminal/terminal-live-accessory-input'
+import { TerminalAccessoryBar } from '../../../../src/terminal/TerminalAccessoryBar'
 import { sendTerminalLiveAccessoryRawBytes } from '../../../../src/terminal/terminal-live-accessory-raw-send'
 import {
   clearTerminalLiveInputFocusTimer,
@@ -4716,198 +4713,39 @@ export default function SessionScreen() {
                   { paddingBottom: insets.bottom, transform: [{ translateY: -keyboardLift }] }
                 ]}
               >
-                {/* Accessory keys */}
-                <View style={styles.accessoryBar}>
-                  {/* Why: fixed keyboard escape hatch; outside ScrollView + shortcut path so it can't scroll away or be hidden (#5106). */}
-                  {keyboardLift > 0 && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.keyboardDismissKey,
-                        pressed && styles.accessoryKeyPressed
-                      ]}
-                      onPress={dismissSoftwareKeyboard}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel="Dismiss keyboard"
-                      accessibilityHint="Hides the software keyboard and keeps the current terminal session open."
-                    >
-                      <View style={styles.keyboardDismissGlyph}>
-                        <KeyboardIcon size={15} color={colors.textSecondary} strokeWidth={2} />
-                        <ChevronDown
-                          size={10}
-                          color={colors.textSecondary}
-                          strokeWidth={2.5}
-                          style={styles.keyboardDismissChevron}
-                        />
-                      </View>
-                    </Pressable>
-                  )}
-                  {/* Why: default tap handling makes the first accessory-key tap dismiss the keyboard and get swallowed (#5106). */}
-                  <ScrollView
-                    style={styles.accessoryScroll}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.accessoryContent}
-                    keyboardShouldPersistTaps="always"
-                  >
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.accessoryKey,
-                        pressed && styles.accessoryKeyPressed,
-                        !canSend && styles.accessoryKeyDisabled
-                      ]}
-                      disabled={!canSend}
-                      onPress={() => {
-                        if (activeHandle) {
-                          void toggleDisplayMode(activeHandle)
-                        }
-                      }}
-                      accessibilityLabel={
-                        isTerminalPhoneDisplayMode(activeHandle, terminalModes)
-                          ? 'Switch to desktop mode'
-                          : 'Switch to phone mode'
-                      }
-                    >
-                      {isTerminalPhoneDisplayMode(activeHandle, terminalModes) ? (
-                        <Monitor
-                          size={14}
-                          color={canSend ? colors.textSecondary : colors.textMuted}
-                        />
-                      ) : (
-                        <Smartphone
-                          size={14}
-                          color={canSend ? colors.textSecondary : colors.textMuted}
-                        />
-                      )}
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.accessoryKey,
-                        liveInputEnabled && styles.accessoryKeyActive,
-                        pressed && styles.accessoryKeyPressed,
-                        !canCompose && styles.accessoryKeyDisabled
-                      ]}
-                      // Why: offline, live mode is dead but the buffered box still composes — keep the escape hatch tappable (#6713).
-                      disabled={!canCompose}
-                      onPress={toggleLiveInput}
-                      accessibilityLabel={
-                        liveInputEnabled
-                          ? 'Switch to buffered command input'
-                          : 'Switch to live terminal input'
-                      }
-                    >
-                      <ChevronsRight
-                        size={14}
-                        color={
-                          liveInputEnabled
-                            ? colors.bgBase
-                            : canCompose
-                              ? colors.textSecondary
-                              : colors.textMuted
-                        }
-                      />
-                    </Pressable>
-                    {canPaste && (
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.accessoryKey,
-                          pressed && styles.accessoryKeyPressed,
-                          !canSend && styles.accessoryKeyDisabled
-                        ]}
-                        disabled={!canSend}
-                        onPress={() => void handlePaste()}
-                        accessibilityLabel="Paste from clipboard"
-                      >
-                        <Text
-                          style={[
-                            styles.accessoryKeyText,
-                            !canSend && styles.accessoryKeyTextDisabled
-                          ]}
-                        >
-                          Paste
-                        </Text>
-                      </Pressable>
-                    )}
-                    {visibleBuiltInAccessoryKeys.map((key) => (
-                      <Pressable
-                        key={key.id}
-                        style={({ pressed }) => [
-                          styles.accessoryKey,
-                          pressed && styles.accessoryKeyPressed,
-                          !canSend && styles.accessoryKeyDisabled
-                        ]}
-                        disabled={!canSend}
-                        onPressIn={() => {
-                          if (!key.repeatable) {
-                            return
-                          }
-                          const input = createTerminalLiveAccessoryInput(key)
-                          void handleAccessoryKey(input)
-                          startAccessoryRepeat(input)
-                        }}
-                        onPressOut={() => {
-                          if (key.repeatable) {
-                            stopAccessoryRepeat()
-                          }
-                        }}
-                        onPress={() => {
-                          if (key.repeatable) {
-                            return
-                          }
-                          void handleAccessoryKey(createTerminalLiveAccessoryInput(key))
-                        }}
-                        accessibilityLabel={key.accessibilityLabel ?? `Send ${key.label}`}
-                      >
-                        <Text
-                          style={[
-                            styles.accessoryKeyText,
-                            !canSend && styles.accessoryKeyTextDisabled
-                          ]}
-                        >
-                          {key.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    {customKeys.map((key) => (
-                      <Pressable
-                        key={key.id}
-                        style={({ pressed }) => [
-                          styles.accessoryKey,
-                          styles.customAccessoryKey,
-                          pressed && styles.accessoryKeyPressed,
-                          !canSend && styles.accessoryKeyDisabled
-                        ]}
-                        disabled={!canSend}
-                        onPress={() => void handleAccessoryKey({ bytes: key.bytes })}
-                        onLongPress={() => {
-                          triggerMediumImpact()
-                          setDeleteKeyTarget(key)
-                        }}
-                        delayLongPress={400}
-                        accessibilityLabel={`Send ${key.label}`}
-                      >
-                        <Text
-                          style={[
-                            styles.accessoryKeyText,
-                            !canSend && styles.accessoryKeyTextDisabled
-                          ]}
-                        >
-                          {key.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.accessoryKey,
-                        pressed && styles.accessoryKeyPressed
-                      ]}
-                      onPress={() => setShowCustomKeyModal(true)}
-                      accessibilityLabel="Add custom shortcut"
-                    >
-                      <Plus size={14} color={colors.textSecondary} strokeWidth={2.2} />
-                    </Pressable>
-                  </ScrollView>
-                </View>
+                <TerminalAccessoryBar
+                  keyboardVisible={keyboardLift > 0}
+                  phoneDisplayMode={isTerminalPhoneDisplayMode(activeHandle, terminalModes)}
+                  liveInputEnabled={liveInputEnabled}
+                  canSend={canSend}
+                  canCompose={canCompose}
+                  canPaste={canPaste}
+                  builtInKeys={visibleBuiltInAccessoryKeys}
+                  customKeys={customKeys}
+                  onDismissKeyboard={dismissSoftwareKeyboard}
+                  onToggleDisplayMode={() => {
+                    if (activeHandle) {
+                      void toggleDisplayMode(activeHandle)
+                    }
+                  }}
+                  onToggleLiveInput={toggleLiveInput}
+                  onPaste={() => void handlePaste()}
+                  onKeyPress={(key) =>
+                    void handleAccessoryKey(createTerminalLiveAccessoryInput(key))
+                  }
+                  onRepeatStart={(key) => {
+                    const input = createTerminalLiveAccessoryInput(key)
+                    void handleAccessoryKey(input)
+                    startAccessoryRepeat(input)
+                  }}
+                  onRepeatStop={stopAccessoryRepeat}
+                  onCustomKeyPress={(key) => void handleAccessoryKey({ bytes: key.bytes })}
+                  onCustomKeyLongPress={(key) => {
+                    triggerMediumImpact()
+                    setDeleteKeyTarget(key)
+                  }}
+                  onAddCustomKey={() => setShowCustomKeyModal(true)}
+                />
 
                 {/* Input bar */}
                 {liveInputEnabled ? (

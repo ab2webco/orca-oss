@@ -7,6 +7,7 @@ import {
   shouldShowSessionHeaderChecksAction,
   type ActivePanel
 } from './session-panel-host'
+import { getResponsiveLayoutMetrics } from '../layout/responsive-layout-metrics'
 
 const PANELS = ['sourceControl', 'files', 'pr'] as const
 
@@ -75,6 +76,27 @@ describe('canDockSessionPanel', () => {
     expect(canDockSessionPanel({ isWideLayout: false, availableWidth: 900, dockWidth: 340 })).toBe(
       false
     )
+  })
+})
+
+describe('session dock on phones', () => {
+  // Phone portrait/landscape (incl. 320 dp, Pro Max, folded foldable) never dock; tablets do.
+  it.each([
+    [320, 568],
+    [390, 844],
+    [844, 390],
+    [440, 956],
+    [956, 440],
+    [344, 882],
+    [882, 344]
+  ])('keeps the terminal full width at %ix%i', (width, height) => {
+    const { isWideLayout } = getResponsiveLayoutMetrics(width, height)
+    expect(canDockSessionPanel({ isWideLayout, availableWidth: width, dockWidth: 340 })).toBe(false)
+  })
+
+  it('still docks on a landscape iPad', () => {
+    const { isWideLayout } = getResponsiveLayoutMetrics(1180, 820)
+    expect(canDockSessionPanel({ isWideLayout, availableWidth: 1180, dockWidth: 340 })).toBe(true)
   })
 })
 

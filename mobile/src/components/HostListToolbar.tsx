@@ -1,17 +1,9 @@
-import { useRef, useState, type ReactNode } from 'react'
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent
-} from 'react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import type { ReactNode } from 'react'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Text } from '../theme/dynamic-type-text'
 import { Filter, Layers, List, Search, SlidersHorizontal, UserCircle, X } from 'lucide-react-native'
 import { MIN_TOUCH_TARGET, colors, spacing } from '../theme/mobile-theme'
+import { HorizontalOverflowCue, useHorizontalOverflow } from './HorizontalOverflowCue'
 
 export type HostListToolbarProps = {
   activeFilterCount: number
@@ -27,8 +19,6 @@ export type HostListToolbarProps = {
   onToggleSearch: () => void
 }
 
-const OVERFLOW_CUE_WIDTH = 28
-
 export function HostListToolbar({
   activeFilterCount,
   sortLabel,
@@ -42,17 +32,8 @@ export function HostListToolbar({
   onOpenTasks,
   onToggleSearch
 }: HostListToolbarProps) {
-  // Why: scroll metrics live in a ref so scrolling only re-renders when the cue flips.
-  const metrics = useRef({ viewportWidth: 0, contentWidth: 0, scrollX: 0 })
   // Why: at 320 dp the chips no longer fit beside the icons; they scroll instead of truncating.
-  const [showOverflowCue, setShowOverflowCue] = useState(false)
-  const updateMetrics = (next: Partial<typeof metrics.current>): void => {
-    const m = Object.assign(metrics.current, next)
-    const overflowing = m.viewportWidth > 0 && m.scrollX + m.viewportWidth < m.contentWidth - 1
-    if (overflowing !== showOverflowCue) {
-      setShowOverflowCue(overflowing)
-    }
-  }
+  const overflow = useHorizontalOverflow()
   const filterActive = activeFilterCount > 0
   const iconColor = connected ? colors.textSecondary : colors.textMuted
 
@@ -63,14 +44,7 @@ export function HostListToolbar({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}
-          scrollEventThrottle={32}
-          onLayout={(event: LayoutChangeEvent) =>
-            updateMetrics({ viewportWidth: event.nativeEvent.layout.width })
-          }
-          onContentSizeChange={(width: number) => updateMetrics({ contentWidth: width })}
-          onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) =>
-            updateMetrics({ scrollX: event.nativeEvent.contentOffset.x })
-          }
+          {...overflow.scrollProps}
         >
           <ToolbarChip
             accessibilityLabel={filterActive ? `Filter, ${activeFilterCount} active` : 'Filter'}
@@ -95,7 +69,7 @@ export function HostListToolbar({
             text={groupLabel}
           />
         </ScrollView>
-        {showOverflowCue ? <OverflowCue /> : null}
+        {overflow.overflowing ? <HorizontalOverflowCue name="host-list-toolbar" /> : null}
       </View>
 
       <Pressable
@@ -162,22 +136,6 @@ function ToolbarChip({
   )
 }
 
-function OverflowCue() {
-  return (
-    <View testID="host-list-toolbar-overflow-cue" pointerEvents="none" style={styles.overflowCue}>
-      <Svg width={OVERFLOW_CUE_WIDTH} height="100%">
-        <Defs>
-          <LinearGradient id="hostListToolbarFade" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={colors.bgPanel} stopOpacity={0} />
-            <Stop offset="1" stopColor={colors.bgPanel} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#hostListToolbarFade)" />
-      </Svg>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
@@ -224,13 +182,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.textPrimary
-  },
-  overflowCue: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: OVERFLOW_CUE_WIDTH
   },
   iconButton: {
     width: MIN_TOUCH_TARGET,
