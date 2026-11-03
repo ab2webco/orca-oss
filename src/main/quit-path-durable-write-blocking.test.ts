@@ -286,8 +286,10 @@ describe('quit-path durable writes never park the main thread', () => {
 
   it('the quit teardown deadline can now bound a wedged state flush', async () => {
     const dir = makeDir()
-    const store = await createStore(dir)
+    // Why import first: a fresh Store arms its 1 s debounced save in the constructor. Any await
+    // between construction and the hold below lets that write land first on a loaded runner.
     const { settleTeardownWithinDeadline } = await import('./quit-teardown-deadline')
+    const store = await createStore(dir)
     store.updateUI({ sidebarWidth: 999 })
 
     fsCalls.dirPrefix = dir
