@@ -10,7 +10,7 @@ export type RunnerAir = { from: number; rise: number; gravity: number; ms: numbe
 const TIME_SHARE = 0.4
 /** The air jump's push as a share of a ground jump's, and the most it may reach, as peaks. */
 const AIR_RISE = 0.8
-export const RUNNER_CEILING = 1.5
+export const RUNNER_CEILING = 1.25
 /** A press this close to touchdown takes off again on landing instead of spending the air jump. */
 export const JUMP_BUFFER_MS = 120
 

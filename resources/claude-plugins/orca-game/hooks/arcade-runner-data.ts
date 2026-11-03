@@ -30,7 +30,7 @@ export const ARCADE_RUNNER: ArcadeRunner = {
   fps: 12,
   speed: { start: 18, max: 30, rampPerMinute: 6 },
   difficulty: { minGap: 22, maxGap: 48 },
-  jump: { rows: 5, ms: 800 },
+  jump: { rows: 4, ms: 900 },
   obstacles: [
     { from: 'scene', weight: 1 },
     {

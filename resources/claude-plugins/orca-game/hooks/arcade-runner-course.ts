@@ -92,7 +92,7 @@ export const courseGroupOf = (
     // Above where a ground jump's head can reach: only the air jump gets these.
     const middle = x + gap / 2
     for (const dx of [-2, 0, 2]) {
-      coins.push({ x: Math.round(middle + dx), h: peak + HERO_BODY + 2 })
+      coins.push({ x: Math.round(middle + dx), h: peak + HERO_BODY })
     }
   }
   return { obstacles, coins, end: x + gap }

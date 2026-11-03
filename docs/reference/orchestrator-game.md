@@ -1636,7 +1636,7 @@ as `path: message` and exits 1 while any remain.
 
 The mod plays its own copy of the built-in runner
 ([`arcade-runner-data.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-runner-data.ts)); a spec
-holds it equal to the JSON Orca validates. A run is drawn as an hd band of the active scene, 14 rows
+holds it equal to the JSON Orca validates. A run is drawn as an hd band of the active scene, 12 rows
 tall: its sky, clouds, far range, hills and ground behind, the scene's working costume as the hero and
 its own decoration (`plantKind`) as obstacles, cut to at most 4 pixels by 5 columns and outlined like a
 character. The scene's scattered plants and pond are left out of the backdrop, since anything on the
@@ -1647,7 +1647,7 @@ ground line reads as something to jump.
 - The jump stretches with the speed: `jump.ms` is its time in the air at `speed.start`, and a faster
   run stays up for less time but covers more columns, so every obstacle leaves at least 150 ms to time
   the press from the start speed to the max (`tests/arcade-runner-fair.spec.ts` sweeps every press
-  moment). A second press in the air jumps once more, up to half the peak higher; a press in the last
+  moment). A second press in the air jumps once more, up to a quarter of the peak higher; a press in the last
   120 ms before touchdown takes off again on landing instead.
 - Every 20 s is a level: the speed steps up by `rampPerMinute` for that time until `speed.max`, the
   name of the level shows for a moment, the gaps close in and obstacles start coming in pairs and

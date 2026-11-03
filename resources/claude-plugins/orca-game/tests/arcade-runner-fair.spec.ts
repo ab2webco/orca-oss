@@ -8,7 +8,12 @@ import {
   type Runner,
   type RunnerState
 } from '../hooks/arcade-runner'
-import { courseGroupOf, runnerLevelOf, RUNNER_LEVEL_MS } from '../hooks/arcade-runner-course'
+import {
+  courseGroupOf,
+  HERO_BODY,
+  runnerLevelOf,
+  RUNNER_LEVEL_MS
+} from '../hooks/arcade-runner-course'
 import { ARCADE_RUNNER } from '../hooks/arcade-runner-data'
 import { runnerAirtimeOf } from '../hooks/arcade-runner-jump'
 import {
@@ -127,6 +132,8 @@ const playOf = (seed: number, jitterMs: number, playMs: number): RunnerState => 
   return state
 }
 
+const highOf = () => ARCADE_RUNNER.jump.rows * 2 + HERO_BODY
+
 describe('a course', () => {
   const shapes = { shapes: SHAPES, total: RUNNER.totalWeight }
   const groupsAt = (level: number) =>
@@ -157,6 +164,22 @@ describe('a course', () => {
         .flatMap((one) => one.coins)
         .every((coin) => coin.h <= peak + 4)
     ).toBe(true)
-    expect(groupsAt(3).some((one) => one.coins.some((coin) => coin.h > peak + 8))).toBe(true)
+    expect(groupsAt(3).some((one) => one.coins.some((coin) => coin.h >= peak + HERO_BODY))).toBe(
+      true
+    )
+  })
+
+  it('leaves a high coin to the air jump: a ground jump passes under it wherever it lies', () => {
+    const takenWith = (isAirJump: boolean) =>
+      Array.from({ length: 30 }, (_, x) => {
+        const road = { ...roadOf(RUNNER, 0, 0), obstacles: [], coins: [{ x: 12 + x, h: highOf() }] }
+        let state = runnerStepOf(RUNNER, road, 0, true)
+        for (let i = 0; i < 40; i += 1) {
+          state = runnerStepOf(RUNNER, state, 25, isAirJump && i === 14)
+        }
+        return state.combo
+      }).some((combo) => combo > 0)
+    expect(takenWith(false)).toBe(false)
+    expect(takenWith(true)).toBe(true)
   })
 })

@@ -32,8 +32,8 @@ import type { Costume, Look, SceneDefinition } from './scenes/index'
 /** A scene decoration is cut to this so a timed jump clears it at max speed (see HERO_HITBOX). */
 export const ARCADE_SHAPE_MAX_HEIGHT = 4
 export const ARCADE_SHAPE_MAX_COLUMNS = 5
-/** Room under the top line for 3 ground pixels, a 9-pixel hero and an air jump's 15-pixel climb. */
-export const ARCADE_ROWS = 14
+/** Room under the top line for 3 ground pixels, a 9-pixel hero and an air jump's 10-pixel climb. */
+export const ARCADE_ROWS = 12
 const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PLANT_MAX_HEIGHT = 16
 const SHADOW = 0.38
