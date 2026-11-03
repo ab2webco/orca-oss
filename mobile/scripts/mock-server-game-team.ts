@@ -12,6 +12,7 @@ import {
   SHOWCASE_METRICS_MERGED,
   showcaseIncomingQuestion
 } from './mock-server-showcase-scenario'
+import { createShowcaseInboxThreads } from './mock-server-showcase-inbox'
 import { showcaseAnswerChunks } from './mock-server-showcase-terminal'
 import { queueTerminalOutput } from './mock-server-terminal-stream'
 
@@ -182,6 +183,11 @@ export function handleMockGameTeamRequest(
 ): boolean {
   if (request.method === 'game.state') {
     respond(success(request.id, leadState(request.params?.worktreeId)))
+    return true
+  }
+  if (request.method === 'game.inboxThreads') {
+    const empty = { threads: [], waiting: [], answered: [] }
+    respond(success(request.id, isShowcaseScenario ? createShowcaseInboxThreads() : empty))
     return true
   }
   if (request.method === 'game.ownerQuestionsAll') {
