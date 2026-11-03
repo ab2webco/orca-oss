@@ -29,6 +29,52 @@ const question = {
   answer: null
 }
 
+const waiting = {
+  id: 'msg_w',
+  ticket: 'ORCA-3',
+  kind: 'decision_gate' as const,
+  subject: 'Pick the port',
+  body: 'Use 6768 or 6769?',
+  at: '2026-11-02T09:00:00.000Z',
+  answerer: 'lead'
+}
+const answered = {
+  id: 'msg_a',
+  ticket: 'ORCA-1',
+  kind: 'question' as const,
+  question: 'Rebase before review?',
+  answer: 'Yes, rebase first.',
+  askedAt: '2026-11-02T08:00:00.000Z',
+  answeredAt: '2026-11-02T08:05:00.000Z'
+}
+const thread = {
+  ticket: 'ORCA-1',
+  last: '2026-11-02T08:05:00.000Z',
+  waiting: 0,
+  messages: [
+    {
+      id: 'm1',
+      at: '2026-11-02T08:00:00.000Z',
+      from: 'ORCA-1',
+      to: 'lead',
+      kind: 'question',
+      subject: 'Rebase?',
+      body: 'Rebase on main?',
+      failure: null
+    },
+    {
+      id: 'm2',
+      at: '2026-11-02T08:05:00.000Z',
+      from: 'lead',
+      to: 'ORCA-1',
+      kind: 'answer',
+      subject: 'Re: Rebase?',
+      body: 'Yes, rebase first.',
+      failure: null
+    }
+  ]
+}
+
 const member = (paneKey: string, displayName: string, state: string) => ({
   paneKey,
   displayName,
@@ -57,7 +103,10 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
     questions: [question],
     answerWorktreeId: 'repo::/main',
     badge: null,
-    inbox: { kind: 'unavailable' },
+    inbox: {
+      kind: 'ready',
+      threads: { threads: [thread], waiting: [waiting], answered: [answered] }
+    },
     answer: vi.fn(async () => {}),
     ...over
   }
@@ -107,20 +156,51 @@ describe('TeamDrawer', () => {
     return onClose
   }
 
-  it('shows open questions, then members needs-you first, then metrics', () => {
+  it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
     show(teamWith())
+    expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
+    expect(texts()).toContain('For you (1)')
+    expect(texts()).toContain('Merge the chain now?')
+    expect(texts()).not.toContain('Metrics')
+
+    act(() => button('Team').click())
     const shown = texts()
     const at = (text: string) => shown.indexOf(text)
-    expect(at('Needs your answer (1)')).toBeGreaterThanOrEqual(0)
-    expect(at('Merge the chain now?')).toBeGreaterThan(at('Needs your answer (1)'))
+    expect(shown).not.toContain('Merge the chain now?')
     expect(at('ORCA-7')).toBeLessThan(at('ORCA-1'))
     expect(at('Metrics')).toBeGreaterThan(at('ORCA-1'))
     expect(shown).toContain('2.0 h')
   })
 
+  it("lists what waits on the lead, its answers, and each ticket's thread on a tap", () => {
+    show(teamWith())
+    const shown = texts()
+    expect(shown).toContain('Waiting on the lead (1)')
+    expect(shown).toContain('Pick the port')
+    expect(shown).toContain('Decision')
+    expect(shown).toContain('Yes, rebase first.')
+    expect(shown).not.toContain('Rebase on main?')
+
+    act(() => button('Open the ORCA-1 thread, 2 messages').click())
+    expect(texts()).toContain('Rebase on main?')
+    expect(texts()).toContain('ORCA-1 → lead')
+  })
+
+  it('opens on the Team tab when no question waits', () => {
+    show(teamWith({ questions: [] }))
+    expect(button('Team').getAttribute('aria-selected')).toBe('true')
+    expect(texts()).toContain('Members (2)')
+  })
+
+  it('says the host must update when its phone allowlist predates the Inbox', () => {
+    show(teamWith({ questions: [], inbox: { kind: 'unavailable' } }))
+    act(() => button('Inbox').click())
+    expect(texts()).toContain("Update Orca on this computer to read the lead's Inbox here.")
+  })
+
   // Why: at 375 pt the tile wrapped "Merged in 4 d" with the "d" alone on its own line.
   it('keeps the window unit on the line of its number', () => {
-    show(teamWith())
+    show(teamWith({ questions: [] }))
     expect(texts().filter((one) => one.startsWith('Merged in'))).toEqual(['Merged in 1 d'])
   })
 
