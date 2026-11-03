@@ -165,6 +165,7 @@
     "**/dist",
     "**/out",
     "tests/e2e/.cross-version-checkouts",
-    ".claude/helpers"
+    ".claude/helpers",
+    "site/.astro"
   ]
 }

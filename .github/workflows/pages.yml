@@ -13,6 +13,17 @@ on:
       - main
     paths:
       - "site/**"
+      - "docs/user/**"
+      # Why: site/scripts/sync-docs.mjs copies these into the docs and the landing.
+      - "docs/reference/orchestrator-game.md"
+      - "docs/reference/headless-linux-server.md"
+      - "docs/reference/plugin-development.md"
+      - "docs/reference/orca-sonar.md"
+      - "docs/assets/readme/**"
+      - "resources/build/icon.png"
+      - "src/shared/task-providers.ts"
+      - "src/shared/tui-agent-display-names.ts"
+      - ".github/workflows/pages.yml"
 
 permissions:
   contents: read
@@ -24,12 +35,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     if: github.event_name != 'workflow_dispatch' || inputs.deploy_unmerged
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,11 +45,22 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
 
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v5
+      # Installs site/'s own lockfile, runs `pnpm build` (docs sync + astro build) and
+      # uploads site/dist as the Pages artifact.
+      - name: Build site
+        uses: withastro/action@v6
         with:
           path: site
+          node-version: 24
 
+  deploy:
+    needs: build
+    if: github.event_name != 'workflow_dispatch' || inputs.deploy_unmerged
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

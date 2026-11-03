@@ -1,0 +1,8 @@
+/* The app's own typeface (src/renderer/src/assets/fonts), copied by sync-docs. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/orca-oss/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
