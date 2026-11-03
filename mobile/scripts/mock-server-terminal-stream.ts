@@ -144,6 +144,8 @@ export function handleMockTerminalRequest(
         process.env.MOCK_TUI === '1'
           ? '\x1b[?1002h\x1b[?1006h[mock] mouse tracking ON (1002/1006)\r\n'
           : ''
+      // Why before respond: with no RPC delay the gate runs synchronously and would drop the scrollback.
+      perSocket.set(terminal, subscriber)
       respond(
         success(request.id, {
           type: 'scrollback',
@@ -154,7 +156,6 @@ export function handleMockTerminalRequest(
         }),
         isCurrent
       )
-      perSocket.set(terminal, subscriber)
       timeline.subscribers.add(subscriber)
       return true
     }

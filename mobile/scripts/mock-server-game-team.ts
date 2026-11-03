@@ -151,7 +151,12 @@ function answerShowcaseQuestion(id: string, params: Record<string, unknown>): vo
         ? found.options[params.option - 1]
         : String(params.text ?? '')
     if (project.worktreeId === LEAD_WORKTREE_ID && answer) {
-      queueTerminalOutput('term-lead', showcaseAnswerChunks(found.ticket, answer))
+      // Why by ticket: the lead relays the answer to whoever owns it, not a fixed member.
+      const owner = SHOWCASE_MEMBERS.find((one) => one.workItem.identifier === found.ticket)
+      queueTerminalOutput(
+        'term-lead',
+        showcaseAnswerChunks(found.ticket, answer, owner?.displayName ?? null)
+      )
     }
   }
   showcaseProjects = showcaseProjects.map((project) => ({
