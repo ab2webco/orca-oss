@@ -1,9 +1,8 @@
-import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
+import type { ElectronApplication } from '@stablyai/playwright-test'
 
-// Invented demo data for the README GIFs: a "Lumen" app team on example.com, no real people,
+// Invented demo data for the README and site clips: a "Lumen" app team on example.com, no real people,
 // hosts or repositories.
 const GB = 1024 ** 3
-const HOLD_MS = 1_500
 
 type Ci = 'pending' | 'success' | 'failure'
 type MemberState = 'working' | 'waiting' | 'idle' | 'done'
@@ -125,8 +124,14 @@ export async function sizeWindow(
   )
 }
 
-/** Saves one GIF frame after the pane has settled. */
-export async function showcaseFrame(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await page.waitForTimeout(HOLD_MS)
-  await page.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
+/** Writes the next `game state --json` and pushes a fleet change, as Orca does on a launch. */
+export function statePusher(band: {
+  setState: (state: unknown) => Promise<void>
+  pushFleetChange: (version: number) => Promise<void>
+}): (state: unknown) => Promise<void> {
+  let version = 1
+  return async (state) => {
+    await band.setState(state)
+    await band.pushFleetChange(++version)
+  }
 }

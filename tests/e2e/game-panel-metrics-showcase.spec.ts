@@ -3,14 +3,14 @@ import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { claudeVersionOk, startGameBand } from './helpers/orchestrator-game-band'
 import { clickOnceRedrawn, screenText } from './helpers/orchestrator-game-panel-capture'
-import {
-  demoLeadState,
-  demoMember,
-  showcaseFrame,
-  sizeWindow
-} from './helpers/game-showcase-demo-party'
+import { demoLeadState, demoMember, sizeWindow } from './helpers/game-showcase-demo-party'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README metrics GIF: the lead's PRs, merges per day, lead time and accounts.
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site metrics clip: the owner opens the Panel on the lead's PRs, then the
+// Metrics widget with merges per day, lead time and account quota.
 const DAY_MS = 86_400_000
 const merged = [2, 4, 3, 0, 1, 5, 6, 3, 4, 2, 0, 3, 7, 5]
 const today = Date.now()
@@ -74,14 +74,18 @@ const state = demoLeadState(
 
 test("the Panel shows the lead's PRs, merges per day, lead time and accounts", async ({
   electronApp,
-  orcaPage,
-  testRepoPath
+  orcaPage
 }, testInfo) => {
   test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
   test.setTimeout(240_000)
   await waitForSessionReady(orcaPage)
   await sizeWindow(electronApp, 1440, 900)
-  const band = await startGameBand(orcaPage, testRepoPath, { state, theme: 'dark', locale: 'en' })
+  const band = await startGameBand(orcaPage, createShowcaseRepo(), {
+    state,
+    theme: 'dark',
+    locale: 'en',
+    showcase: {}
+  })
   try {
     await expect
       .poll(async () => screenText(orcaPage), {
@@ -89,9 +93,12 @@ test("the Panel shows the lead's PRs, merges per day, lead time and accounts", a
         message: 'the band never drew the seeded party'
       })
       .toContain('Pico')
+    await orcaPage.waitForTimeout(1_000)
+    const clip = await showcaseClip(electronApp, testInfo, 'panel-metrics')
+    await orcaPage.waitForTimeout(1_000)
     await clickOnceRedrawn(orcaPage, 'Panel')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toMatch(/▾ my prs/i)
-    await showcaseFrame(orcaPage, testInfo, '01-my-prs.png')
+    await orcaPage.waitForTimeout(1_500)
 
     await clickOnceRedrawn(orcaPage, 'Widgets')
     await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('○ Metrics')
@@ -100,7 +107,8 @@ test("the Panel shows the lead's PRs, merges per day, lead time and accounts", a
     await expect
       .poll(async () => screenText(orcaPage), { timeout: 20_000 })
       .toContain(`${total} merged · 14 days`)
-    await showcaseFrame(orcaPage, testInfo, '02-metrics.png')
+    await orcaPage.waitForTimeout(3_000)
+    await clip.stop()
   } finally {
     await rm(band.root, { recursive: true, force: true })
   }

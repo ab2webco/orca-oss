@@ -2,10 +2,15 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { expect, test } from './helpers/orca-app'
 import { setTheme } from './helpers/settings-window'
-import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { showcaseFrame, sizeWindow } from './helpers/game-showcase-demo-party'
+import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
+import { sizeWindow } from './helpers/game-showcase-demo-party'
+import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README design-mode GIF: pick an element of the app under work in Orca's
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site design-mode clip: pick an element of the app under work in Orca's
 // browser and leave the agent a note on it. The page is an invented "Lumen" landing page.
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Lumen</title>
 <style>
@@ -36,11 +41,16 @@ test('a reviewer annotates an element of the page for the agent', async ({
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
     response.end(PAGE)
   })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  // Why 5173: a dev server's usual port reads as the app under work; any free port still works.
+  await new Promise<void>((resolve) => {
+    server.once('error', () => server.listen(0, '127.0.0.1', resolve))
+    server.listen(5173, '127.0.0.1', resolve)
+  })
   const { port } = server.address() as AddressInfo
   try {
     await waitForSessionReady(orcaPage)
-    const worktreeId = await waitForActiveWorktree(orcaPage)
+    const worktreeId = await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
+    await ensureTerminalVisible(orcaPage)
     await sizeWindow(electronApp, 1440, 900)
     await setTheme(orcaPage, 'dark')
     await expect(orcaPage.getByText('Workspace board moved to the bottom bar')).toHaveCount(0, {
@@ -52,7 +62,7 @@ test('a reviewer annotates an element of the page for the agent', async ({
         window.__store!.getState().setRightSidebarOpen(false)
         window.__store!.getState().createBrowserTab(wId, url, { title: 'Lumen', activate: true })
       },
-      { wId: worktreeId, url: `http://127.0.0.1:${port}/` }
+      { wId: worktreeId, url: `http://localhost:${port}/` }
     )
     const webview = orcaPage.locator('webview').first()
     await expect(webview).toBeVisible({ timeout: 30_000 })
@@ -83,7 +93,9 @@ test('a reviewer annotates an element of the page for the agent', async ({
       await tour.click()
       await expect(tour).toHaveCount(0)
     }
-    await showcaseFrame(orcaPage, testInfo, '01-page.png')
+    await orcaPage.waitForTimeout(800)
+    const clip = await showcaseClip(electronApp, testInfo, 'design-mode')
+    await orcaPage.waitForTimeout(1_500)
 
     await orcaPage.getByRole('button', { name: 'Annotate page element' }).click()
     // Why the guest's own geometry: the headline's box inside the page, offset by the webview's box.
@@ -103,14 +115,14 @@ test('a reviewer annotates an element of the page for the agent', async ({
     expect(box).not.toBeNull()
     const target = { x: box!.x + rect.x + rect.width / 2, y: box!.y + rect.y + rect.height / 2 }
     await orcaPage.mouse.move(target.x - 40, target.y - 30)
-    await orcaPage.mouse.move(target.x, target.y, { steps: 8 })
-    await showcaseFrame(orcaPage, testInfo, '02-hover.png')
+    await orcaPage.mouse.move(target.x, target.y, { steps: 30 })
+    await orcaPage.waitForTimeout(900)
 
     await orcaPage.mouse.click(target.x, target.y)
     const comment = orcaPage.getByRole('textbox', { name: 'Annotation comment' })
     await expect(comment).toBeVisible({ timeout: 15_000 })
-    await comment.pressSequentially(NOTE, { delay: 10 })
-    await showcaseFrame(orcaPage, testInfo, '03-note.png')
+    await comment.pressSequentially(NOTE, { delay: 45 })
+    await orcaPage.waitForTimeout(800)
 
     // Why the regex: the button's name carries its shortcut hint ("Add ⌘↵" on a Mac).
     await orcaPage.getByRole('button', { name: /^Add\b(?! Project| quick)/ }).click()
@@ -118,7 +130,8 @@ test('a reviewer annotates an element of the page for the agent', async ({
     await expect(
       orcaPage.getByRole('button', { name: 'Annotate page element' }).locator('span')
     ).toHaveText('1')
-    await showcaseFrame(orcaPage, testInfo, '04-added.png')
+    await orcaPage.waitForTimeout(2_500)
+    await clip.stop()
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }

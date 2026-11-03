@@ -3,13 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README plugins GIF. The author and entries are invented
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site plugins clip. The author and entries are invented
 // demo data, seeded through the worker because headless clicks never reach the
 // panel iframe (see plugin-worklog-example.spec.ts).
-const WINDOW_WIDTH = 1280
-const WINDOW_HEIGHT = 800
-const HOLD_MS = 900
+const WINDOW_WIDTH = 1440
+const WINDOW_HEIGHT = 900
+const HOLD_MS = 1_800
 const DEMO_AUTHOR = 'Rowan Vale'
 const DEMO_ENTRIES = [
   'Shipped LUM-12: dark mode toggle',
@@ -23,6 +28,7 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
 }, testInfo) => {
   test.setTimeout(120_000)
   await waitForSessionReady(orcaPage)
+  await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
   await electronApp.evaluate(
     ({ BrowserWindow }, size) => {
       BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
@@ -33,10 +39,8 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
   const pluginRoot = join(tempRoot, 'worklog')
   await cp(join(process.cwd(), 'examples', 'plugins', 'worklog'), pluginRoot, { recursive: true })
 
-  const frame = async (name: string): Promise<void> => {
-    await orcaPage.waitForTimeout(HOLD_MS)
-    await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
-  }
+  // Why: each beat holds long enough to read before the next action.
+  const hold = () => orcaPage.waitForTimeout(HOLD_MS)
 
   try {
     // Pinned before the panel mounts: a theme switch rebuilds its document (ORCA-753).
@@ -61,12 +65,13 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
     await orcaPage.getByRole('tab', { name: /^Installed/ }).click()
     const row = orcaPage.locator(`[data-plugin-key="${pluginKey}"]`)
     await expect(row).toContainText('Needs review')
-    await frame('01-needs-review.png')
+    const clip = await showcaseClip(electronApp, testInfo, 'worklog-plugin')
+    await hold()
 
     await row.getByRole('button', { name: 'Review & enable' }).click()
     const consent = orcaPage.getByRole('dialog', { name: 'Review access and content' })
     await expect(consent).toContainText('0 18 * * 1-5')
-    await frame('02-consent.png')
+    await hold()
 
     await consent.getByRole('button', { name: 'Enable plugin' }).click()
     await expect(consent).toBeHidden()
@@ -97,7 +102,9 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
     for (const text of DEMO_ENTRIES) {
       await expect(panel.locator('#entries')).toContainText(text)
     }
-    await frame('03-panel.png')
+    await hold()
+    await orcaPage.waitForTimeout(1_500)
+    await clip.stop()
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
