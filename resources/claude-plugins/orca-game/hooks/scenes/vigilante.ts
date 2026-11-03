@@ -236,7 +236,7 @@ export const VIGILANTE_SCENE: SceneDefinition = {
         ['T...K.K', 'T...KKK', '.KKKKYK', 'K..K...']
       ],
       happy: ['.T..K.K', 'T...KKK', '.KKKKHK', '.K..K..'],
-      colors: { K: 0x4a4a5a, T: 0x4a4a5a, Y: 0xffd84a, H: 0xc8c8d0 }
+      colors: { K: 0x8a8aa0, T: 0x8a8aa0, Y: 0xffd84a, H: 0x3a3a48 }
     },
     advisor: {
       name: { en: 'Commissioner', es: 'Comisionado' },
