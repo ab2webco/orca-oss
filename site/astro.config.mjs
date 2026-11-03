@@ -1,9 +1,13 @@
 import starlight from '@astrojs/starlight'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'astro/config'
 import { BASE, SITE } from './site.config.mjs'
 import { docsSidebar } from './src/data/docs-sidebar.mjs'
 
 export default defineConfig({
+  // Why: without a pinned tsconfig Vite walks up to the repo root's, whose chain needs
+  // the app's devDependencies; CI installs only site/'s.
+  vite: { tsconfig: fileURLToPath(new URL('./tsconfig.json', import.meta.url)) },
   site: SITE,
   base: BASE,
   integrations: [
