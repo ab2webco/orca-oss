@@ -5,6 +5,7 @@ import type {
   GameOwnerQuestionProject
 } from '../../../src/shared/orchestrator-game-owner-questions'
 import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
+import type { GameInboxThreads } from '../../../src/shared/orchestrator-game-inbox-threads'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
@@ -36,6 +37,12 @@ export type TeamLeadView = { members: TeamMemberRow[]; metrics: TeamMetrics | nu
 
 export type TeamBadge = { tone: 'question' | 'working'; count: number } | null
 
+/** `unavailable`: the host's phone allowlist predates the Inbox tab. */
+export type TeamInbox =
+  | { kind: 'loading' }
+  | { kind: 'unavailable' }
+  | { kind: 'ready'; threads: GameInboxThreads }
+
 export type TeamDrawerData = {
   /** null: this terminal is not a live lead, or the host cannot say. */
   view: TeamLeadView | null
@@ -43,6 +50,7 @@ export type TeamDrawerData = {
   /** The worktree the owner board answers through; null when the host has none for this repo. */
   answerWorktreeId: string | null
   badge: TeamBadge
+  inbox: TeamInbox
   answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
 }
 

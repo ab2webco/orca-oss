@@ -8,9 +8,10 @@ import {
   leadOwnerQuestionsOf,
   teamBadgeOf,
   teamLeadViewOf,
-  type TeamDrawerData
+  type TeamDrawerData,
+  type TeamInbox
 } from './team-drawer-model'
-import { readLeadGameState } from './team-drawer-rpc'
+import { readLeadGameState, readLeadInboxThreads } from './team-drawer-rpc'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -37,6 +38,9 @@ export function useTeamDrawer(args: {
   // Why keyed: another tab may not be the lead; never show the last tab's Team over it.
   const [read, setRead] = useState<{ key: string; state: unknown } | null>(null)
   const rawState = read?.key === terminalKey ? read.state : null
+  const [inboxRead, setInboxRead] = useState<{ key: string; inbox: TeamInbox } | null>(null)
+  const leadInbox: TeamInbox =
+    inboxRead?.key === terminalKey ? inboxRead.inbox : { kind: 'loading' }
   const generationRef = useRef(0)
 
   useEffect(() => {
@@ -49,9 +53,23 @@ export function useTeamDrawer(args: {
         return
       }
       void readLeadGameState(client, { worktreeId, terminalHandle, paneKey })
-        .then((result) => {
+        .then(async (result) => {
+          if (generationRef.current !== generation) {
+            return
+          }
+          const state = result.status === 'ok' ? result.state : null
+          setRead({ key: terminalKey, state })
+          // Why after the state: only a live lead has an Inbox, so other panes cost no read.
+          if (!teamLeadViewOf(state)) {
+            return
+          }
+          const threads = await readLeadInboxThreads(client, { worktreeId, terminalHandle })
           if (generationRef.current === generation) {
-            setRead({ key: terminalKey, state: result.status === 'ok' ? result.state : null })
+            const inbox: TeamInbox =
+              threads.status === 'ok'
+                ? { kind: 'ready', threads: threads.threads }
+                : { kind: 'unavailable' }
+            setInboxRead({ key: terminalKey, inbox })
           }
         })
         // Why keep the last state: a failed read says nothing about the team.
@@ -98,6 +116,7 @@ export function useTeamDrawer(args: {
     questions: view ? own.questions : [],
     answerWorktreeId: own.worktreeId,
     badge: view ? teamBadgeOf(own.questions.length, view.members) : null,
+    inbox: leadInbox,
     answer
   }
 }

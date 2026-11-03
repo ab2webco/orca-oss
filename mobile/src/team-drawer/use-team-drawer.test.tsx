@@ -25,6 +25,15 @@ const question = {
   askedAt: '2026-11-02T10:00:00.000Z',
   answer: null
 }
+const waiting = {
+  id: 'msg_1',
+  ticket: 'ORCA-7',
+  kind: 'question',
+  subject: 'Port',
+  body: 'Which port?',
+  at: '2026-11-02T10:00:00.000Z',
+  answerer: 'lead'
+}
 const leadState = {
   role: 'lead',
   lead: { autostart: false, cap: 4, agent: 'claude' },
@@ -48,6 +57,9 @@ function hostReplying(state: unknown) {
   return vi.fn(async (method: string) => {
     if (method === 'game.state') {
       return ok(state)
+    }
+    if (method === 'game.inboxThreads') {
+      return ok({ threads: [], waiting: [waiting], answered: [] })
     }
     if (method === 'game.ownerQuestionsAll') {
       return ok({
@@ -99,6 +111,21 @@ describe('useTeamDrawer', () => {
     expect(team?.view?.members[0]).toMatchObject({ ticket: 'ORCA-7', needsYou: true })
   })
 
+  it("reads the lead's Inbox threads with its terminal once it is the lead", async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+
+    expect(sendRequest).toHaveBeenCalledWith('game.inboxThreads', {
+      worktreeId: 'repo::/lead',
+      terminalHandle: 'term_1'
+    })
+    expect(team?.inbox).toEqual({
+      kind: 'ready',
+      threads: { threads: [], waiting: [waiting], answered: [] }
+    })
+  })
+
   it('reads nothing for a tab with no pane key, and shows no Team', async () => {
     const sendRequest = hostReplying(leadState)
     const client = { sendRequest } as unknown as RpcClient
@@ -114,6 +141,7 @@ describe('useTeamDrawer', () => {
     await render({ client: client as unknown as RpcClient, terminalHandle: 't', paneKey: 'p' })
     expect(team?.view).toBeNull()
     expect(team?.questions).toEqual([])
+    expect(client.sendRequest).not.toHaveBeenCalledWith('game.inboxThreads', expect.anything())
   })
 
   it('answers once through the board, on the worktree the Inbox answers through', async () => {

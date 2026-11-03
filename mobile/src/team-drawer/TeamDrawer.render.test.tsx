@@ -57,6 +57,7 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
     questions: [question],
     answerWorktreeId: 'repo::/main',
     badge: null,
+    inbox: { kind: 'unavailable' },
     answer: vi.fn(async () => {}),
     ...over
   }
