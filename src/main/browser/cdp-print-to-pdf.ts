@@ -55,7 +55,6 @@ export function buildPrintToPdfOptions(params: Record<string, unknown>): PrintTo
   if ([marginTop, marginBottom, marginLeft, marginRight].some((margin) => margin !== null)) {
     // CDP and Electron printToPDF both use inches; omitted CDP sides default to 1cm.
     options.margins = {
-      marginType: 'custom',
       top: marginTop ?? PDF_DEFAULT_MARGIN_INCHES,
       bottom: marginBottom ?? PDF_DEFAULT_MARGIN_INCHES,
       left: marginLeft ?? PDF_DEFAULT_MARGIN_INCHES,
