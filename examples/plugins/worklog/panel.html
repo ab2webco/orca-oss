@@ -275,7 +275,8 @@
       var RETRY_DELAY_MS = 3500
       var MAX_ATTEMPTS = 4
 
-      var pending = Object.create(null)
+      // A Map, not an object: a requestId like '__proto__' must not reach Object.prototype.
+      var pending = new Map()
       var nextRequestId = 0
       var statusEl = document.getElementById('status')
 
@@ -317,7 +318,7 @@
       function callOnce(action, params) {
         return new Promise(function (resolve) {
           var requestId = 'worklog-' + ++nextRequestId
-          pending[requestId] = resolve
+          pending.set(requestId, resolve)
           // The frame's origin is opaque, so '*' is the only usable target; the
           // host identifies the sending window instead of trusting the origin.
           window.parent.postMessage(
@@ -352,9 +353,9 @@
       window.addEventListener('message', function (event) {
         var data = event.data
         if (!data || data.type !== ACTION_RESULT) return
-        var settle = pending[data.requestId]
+        var settle = pending.get(data.requestId)
         if (!settle) return
-        delete pending[data.requestId]
+        pending.delete(data.requestId)
         settle(data)
       })
 
