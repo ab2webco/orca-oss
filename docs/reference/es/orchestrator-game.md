@@ -1,5 +1,5 @@
 ---
-sourceHash: bbe2905854163a43
+sourceHash: 577632322a5fc81a
 ---
 # El juego orquestador de Agent Teams
 
@@ -1737,7 +1737,7 @@ como `path: message` y sale con 1 mientras quede alguno.
 | `fps`        | Tope de fotogramas, un número entero de 5 a 15                                                   |
 | `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`                  |
 | `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                            |
-| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire de 200 a 2000 ms                         |
+| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms       |
 | `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`            |
 | `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa       |
 
@@ -1757,12 +1757,24 @@ El mod juega su propia copia del runner integrado
 spec la mantiene igual al JSON que valida Orca. Una partida se dibuja como una banda hd de la escena
 activa, de 12 filas de alto: su cielo, nubes, cordillera lejana, colinas y suelo detrás, el vestuario
 working de la escena como héroe y su propia decoración (`plantKind`) como obstáculos, recortados a como
-máximo 4 píxeles por 5 columnas y con contorno como un personaje, para que un salto a tiempo despeje uno
-incluso a `speed.max`. Las plantas dispersas y el estanque de la escena quedan fuera del fondo, ya que
-cualquier cosa sobre la línea del suelo se lee como algo que saltar.
+máximo 4 píxeles por 5 columnas y con contorno como un personaje. Las plantas dispersas y el estanque
+de la escena quedan fuera del fondo, ya que cualquier cosa sobre la línea del suelo se lee como algo que
+saltar.
 
 - Una tecla, `j`: inicia una partida, salta, reanuda una partida en pausa y vuelve a empezar después de
-  un choque. `q` (o Esc) cierra el pane.
+  un choque. `q` (o Esc) cierra el pane. Una pulsación despega en el acto, no en el siguiente fotograma.
+- El salto se ajusta a la velocidad: `jump.ms` es su tiempo en el aire a `speed.start`, y una partida
+  más rápida pasa menos tiempo en el aire pero cubre más columnas, así que cada obstáculo deja al menos
+  150 ms para acertar la pulsación desde la velocidad inicial hasta la máxima
+  (`tests/arcade-runner-fair.spec.ts` recorre cada momento de pulsación). Una segunda pulsación en el
+  aire salta una vez más, hasta un cuarto más alto que el pico; una pulsación en los últimos 120 ms antes
+  de aterrizar despega de nuevo al tocar el suelo.
+- Cada 20 s es un nivel: la velocidad sube `rampPerMinute` durante ese tiempo hasta `speed.max`, el
+  nombre del nivel aparece un momento, los huecos se cierran y los obstáculos empiezan a llegar en
+  parejas y tríos a un rebote de distancia. Hay monedas a lo largo de algunos saltos y, desde el nivel 2,
+  en lo alto de un hueco donde solo llega el salto en el aire; las monedas seguidas forman un combo que
+  vale más cada vez. La línea superior muestra el mejor puntaje de la sesión y el nivel a la izquierda, y
+  el combo y el puntaje a la derecha. Nada se guarda más allá de la sesión.
 - La partida avanza con su propio temporizador a `fps`, nunca por encima de 15, y solo mientras se
   mueve: ninguno antes de la primera pulsación, ninguno una vez que el pane se oculta o pierde el teclado
   (se pausa), ninguno después de un choque.
