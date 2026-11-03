@@ -19,6 +19,7 @@ on:
       - "docs/reference/headless-linux-server.md"
       - "docs/reference/plugin-development.md"
       - "docs/reference/orca-sonar.md"
+      - "docs/reference/es/**"
       - "docs/assets/readme/**"
       - "resources/build/icon.png"
       - "src/shared/task-providers.ts"

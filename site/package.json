@@ -9,11 +9,13 @@
     "preview": "astro preview",
     "test": "pnpm run build && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/*.test.mjs\"",
     "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/*.test.mjs\"",
-    "shots": "node scripts/shots.mjs"
+    "shots": "node scripts/shots.mjs",
+    "translations": "node scripts/translations.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.8",
     "astro": "^7.4.4",
+    "github-slugger": "2.0.0",
     "sharp": "^0.34.5"
   },
   "engines": {
