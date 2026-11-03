@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from command_text import strip_heredocs  # noqa: E402
+from command_text import strip_heredocs, strip_redirections  # noqa: E402
 
 PROTECTED_BRANCH = "main"
 PROJECT_SLUG = "ab2webco/orca-oss"
@@ -318,7 +318,7 @@ def main() -> None:
         sys.exit(0)
 
     try:
-        tokens = shlex.split(command)
+        tokens = shlex.split(strip_redirections(command))
     except ValueError:
         # Why: comillas sin cerrar. No se puede leer el comando, y un comando ilegible
         # que nombra un merge se rechaza en vez de asumirse inocente.

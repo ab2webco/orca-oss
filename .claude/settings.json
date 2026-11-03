@@ -12,6 +12,12 @@
           },
           {
             "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start-lead-recovery.sh",
+            "timeout": 180,
+            "statusMessage": "Reanudando members y revisando pendientes del lead..."
+          },
+          {
+            "type": "command",
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/coordinator-sweep.sh --once",
             "timeout": 90,
             "statusMessage": "Barriendo PRs y worktrees..."
