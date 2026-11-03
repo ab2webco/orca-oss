@@ -52,7 +52,9 @@ function AnsweredCard({ item, now }: { item: GameAnsweredItem; now: number }) {
       <Text style={styles.answer} numberOfLines={6}>
         {item.overriddenBy?.text ?? item.answer}
       </Text>
-      {item.overriddenBy ? <Text style={rowStyles.age}>You replaced the lead's answer</Text> : null}
+      {item.overriddenBy ? (
+        <Text style={rowStyles.age}>You replaced the lead&apos;s answer</Text>
+      ) : null}
     </View>
   )
 }
@@ -99,11 +101,11 @@ export function TeamInboxTab({ team, now, onOpenLink }: Props) {
         )}
       </Section>
       {inbox.kind === 'loading' ? (
-        <Text style={styles.empty}>Reading the lead's Inbox…</Text>
+        <Text style={styles.empty}>Reading the lead&apos;s Inbox…</Text>
       ) : null}
       {inbox.kind === 'unavailable' ? (
         <Text style={styles.empty}>
-          Update Orca on this computer to read the lead's Inbox here.
+          Update Orca on this computer to read the lead&apos;s Inbox here.
         </Text>
       ) : null}
       {inbox.kind === 'ready' ? (
