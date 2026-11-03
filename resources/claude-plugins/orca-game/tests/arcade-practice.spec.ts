@@ -24,6 +24,10 @@ describe('the arcade practice entry', () => {
       }
       expect(arcadeCaptionOf('running', 12)).toBeUndefined()
       expect(arcadeCaptionOf('over', 12)).toContain('12')
+      expect(arcadeCaptionOf('over', 40, 40)).toContain('40')
+      expect(arcadeCaptionOf('over', 40, 40)).not.toBe(arcadeCaptionOf('over', 40, 90))
+      // Why 35: the band is 35 cells wide on a 320 px phone.
+      expect(arcadeCaptionOf('over', 1234, 1234)!.length).toBeLessThanOrEqual(35)
     }
   })
 })

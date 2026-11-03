@@ -55,6 +55,8 @@ type Arcade = {
 
 // Why module memory and not $.state or $.store: a practice run ends with its pane and leaves nothing.
 let arcade: Arcade | undefined
+// Why apart from `arcade`: the best score outlives a closed pane until Claude Code restarts.
+let best = 0
 
 const cellsNow = ({ scene, runner, view }: Arcade): string =>
   cellsOf(
@@ -65,9 +67,10 @@ const cellsNow = ({ scene, runner, view }: Arcade): string =>
       columns: view.columns,
       rows: ARCADE_ROWS,
       tick: view.tick,
+      best,
       caption:
         view.offer === undefined
-          ? arcadeCaptionOf(view.screen, view.state.score)
+          ? arcadeCaptionOf(view.screen, view.state.score, best)
           : arcadeWords().unlocked
     })
   )
@@ -137,7 +140,9 @@ export async function openArcade($: EngineInterface, isOffer = false): Promise<v
       return pane !== undefined && pane.isShown && pane.isFocused
     },
     isHeld,
-    draw: (state, screen) => {
+    best,
+    draw: (state, screen, record) => {
+      best = record
       view.state = state
       view.screen = screen
       view.tick += 1

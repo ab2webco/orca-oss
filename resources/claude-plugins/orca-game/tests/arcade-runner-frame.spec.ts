@@ -85,7 +85,10 @@ describe('a runner frame', () => {
   it('lifts the hero off the ground while it jumps', () => {
     const start = runnerStartOf(runnerOf(ARCADE_RUNNER, []), 1)
     const ground = gridFor(undefined, start)
-    const air = gridFor(undefined, { ...start, jumpMs: ARCADE_RUNNER.jump.ms / 2 })
+    const air = gridFor(undefined, {
+      ...start,
+      air: { ms: 100, from: 0, lift: 0.04, gravity: 0, jumps: 1 }
+    })
     const lastRow = (grid: number[][]) => grid.slice(-85 * 3, -85 * 3 + 14).map((c) => c.join())
     expect(lastRow(air)).not.toEqual(lastRow(ground))
   })
@@ -106,5 +109,33 @@ describe('a runner frame', () => {
     const text = glyphs(grid)
     expect(glyphs(grid.slice(0, 85))).toContain('1234')
     expect(text).toContain('Paused')
+  })
+
+  it('shows the best score at the top left and the combo by the score', () => {
+    const scene = sceneOf('quest')
+    const runner = runnerOf(ARCADE_RUNNER, arcadeShapesOf(ARCADE_RUNNER, scene.looks.working))
+    const state = { ...runnerStartOf(runner, 1), score: 77, combo: 3 }
+    const top = (best?: number) =>
+      glyphs(
+        arcadeGridOf({ scene, runner, state, columns: 35, rows: ROWS, tick: 0, best }).slice(0, 35)
+      )
+    expect(top(500)).toMatch(/500.*x3 77$/)
+    expect(top()).not.toContain('500')
+  })
+
+  it('draws a star where one floats and keeps a double-jumping hero inside the band', () => {
+    const start = runnerStartOf(runnerOf(ARCADE_RUNNER, []), 1)
+    const clear = gridFor(undefined, start)
+    const starred = gridFor(undefined, { ...start, stars: [{ x: 30, h: 15 }] })
+    const changed = clear.flatMap((cell, i) => (cell.join() === starred[i]!.join() ? [] : [i % 85]))
+    expect(changed.length).toBeGreaterThan(0)
+    expect(changed.every((x) => x >= 27 && x <= 33)).toBe(true)
+    const high = gridFor(undefined, {
+      ...start,
+      air: { ms: 0, from: 40, lift: 0, gravity: 0, jumps: 2 }
+    })
+    expect(high).toHaveLength(85 * ROWS)
+    const sky = (grid: number[][]) => grid.slice(85, 85 * 3).map((cell) => cell.join())
+    expect(sky(high)).not.toEqual(sky(clear))
   })
 })

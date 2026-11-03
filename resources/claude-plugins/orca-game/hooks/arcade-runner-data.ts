@@ -19,7 +19,7 @@ export type ArcadeRunner = {
   speed: { start: number; max: number; rampPerMinute: number }
   /** Columns of ground between two obstacles. */
   difficulty: { minGap: number; maxGap: number }
-  /** Peak height in band rows (two pixels each) and time in the air. */
+  /** Peak height in band rows (two pixels each), and time in the air at least: a slower run stays up longer so its widest obstacle still clears. */
   jump: { rows: number; ms: number }
   obstacles: readonly ArcadeObstacle[]
 }
@@ -28,7 +28,7 @@ export const ARCADE_RUNNER: ArcadeRunner = {
   engine: 'runner',
   name: { en: 'Endless run', es: 'Carrera sin fin' },
   fps: 12,
-  speed: { start: 12, max: 28, rampPerMinute: 6 },
+  speed: { start: 16, max: 30, rampPerMinute: 5 },
   difficulty: { minGap: 22, maxGap: 48 },
   jump: { rows: 4, ms: 650 },
   obstacles: [

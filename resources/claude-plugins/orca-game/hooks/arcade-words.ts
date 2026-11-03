@@ -18,7 +18,10 @@ export type ArcadeWords = {
   offerReach: string
   play: string
   pass: string
-  over: (score: number) => string
+  /** `isBest`: the run just set the best score. */
+  over: (score: number, isBest: boolean) => string
+  /** Over the sky's top left while a best score stands. */
+  best: string
 }
 
 const EN: ArcadeWords = {
@@ -38,7 +41,8 @@ const EN: ArcadeWords = {
   offerReach: 'ctrl+x tab, then j',
   play: 'play',
   pass: 'pass',
-  over: (score) => `Game over · ${score} · j to run again`
+  over: (score, isBest) => `${isBest ? 'New best' : 'Game over'} · ${score} · j to run again`,
+  best: 'best'
 }
 
 const ES: ArcadeWords = {
@@ -58,7 +62,8 @@ const ES: ArcadeWords = {
   offerReach: 'ctrl+x tab y luego j',
   play: 'jugar',
   pass: 'pasar',
-  over: (score) => `Fin · ${score} · j para otra`
+  over: (score, isBest) => `${isBest ? '¡Récord!' : 'Fin'} · ${score} · j para otra`,
+  best: 'récord'
 }
 
 const WORDS: Readonly<Record<GameLocale, ArcadeWords>> = { en: EN, es: ES }

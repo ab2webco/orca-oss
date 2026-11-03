@@ -22,6 +22,7 @@ import { glyphCell, mix, UPPER_HALF } from './pixel-canvas'
 import { hdFrameOf } from './scene-hd-land'
 import { hdPlantShapePixel, PLANT_EVERY } from './scene-hd-props'
 import { hdSkyPixel } from './scene-hd-sky'
+import { arcadeWords } from './arcade-words'
 import { rasterGlyphsOf } from './game-strings'
 import type { Costume, Look, SceneDefinition } from './scenes/index'
 
@@ -37,6 +38,7 @@ export const ARCADE_ROWS = 12
 const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PLANT_MAX_HEIGHT = 16
 const SHADOW = 0.38
+const STAR = frameSpriteOf(['.Y.', 'YWY', '.Y.'], { Y: 0xf5c542, W: 0xfff6d0 })
 
 export type ArcadeShape = RunnerShape & {
   /** The colour `h` pixels above the ground in the shape's `column`, unlit. */
@@ -139,6 +141,8 @@ export type ArcadeFrameInput = {
   light?: Daylight
   /** A line over the sky (paused, game over), centred. */
   caption?: string
+  /** The best score so far, shown top left once there is one. */
+  best?: number
 }
 
 const textInto = (grid: number[][], columns: number, row: number, left: number, text: string) => {
@@ -167,14 +171,19 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
   })
   const { ground, pixels } = frame
   const land = hdLandBakeOf(frame)
-  const lift = Math.round(runnerHeightOf(runner, state))
+  const standing = costumeSpriteOf(input.costume ?? scene.costumes.working, 0, false)
+  // Why capped: a double jump may peak past the band's top, and the hero stays whole on screen.
+  const lift = Math.min(
+    Math.round(runnerHeightOf(runner, state)),
+    ground - standing.rows.length + 1
+  )
   const legs = lift > 0 || state.isOver ? 0 : Math.floor(state.distance / 2)
-  const sprite = costumeSpriteOf(input.costume ?? scene.costumes.working, legs, false)
-  const top = ground - sprite.rows.length + 1 - lift
+  const hero = costumeSpriteOf(input.costume ?? scene.costumes.working, legs, false)
+  const top = ground - hero.rows.length + 1 - lift
   const figureLight = look.isNight ? NOON : { ...frame.light, night: frame.light.night * 0.5 }
   // Front to back: the hero, then each obstacle, its outline's bottom on the ground like the hero's.
   const placed: { sprite: HdSprite; left: number; top: number }[] = [
-    { sprite, left: HERO_LEFT, top },
+    { sprite: hero, left: HERO_LEFT, top },
     ...state.obstacles.flatMap((one) => {
       const shape = runner.shapes[one.shape]
       return shape === undefined
@@ -186,7 +195,13 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
               top: ground - shape.sprite.rows.length + 1
             }
           ]
-    })
+    }),
+    // Why minus two: the star's middle pixel sits one in from its art and one in from the outline.
+    ...state.stars.map((one) => ({
+      sprite: STAR,
+      left: Math.round(one.x - state.distance) - 2,
+      top: ground - one.h - 2
+    }))
   ]
   const backdropAt = (x: number, y: number): number => {
     if (y < ground) {
@@ -195,7 +210,7 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
     if (y > ground) {
       return hdBakedGroundOf(land, frame, x, y)
     }
-    const isUnder = lift === 0 && x > HERO_LEFT && x < HERO_LEFT + sprite.width - 1
+    const isUnder = lift === 0 && x > HERO_LEFT && x < HERO_LEFT + hero.width - 1
     return mix(hdFloorPixel(frame, land, x), 0x000000, isUnder ? SHADOW : 0)
   }
   const at = (x: number, y: number): number => {
@@ -222,8 +237,11 @@ export const arcadeGridOf = (input: ArcadeFrameInput): number[][] => {
       grid.push([UPPER_HALF, at(x, row * 2), at(x, Math.min(pixels - 1, row * 2 + 1))])
     }
   }
-  const score = String(state.score)
+  const score = state.combo >= 2 ? `x${state.combo} ${state.score}` : String(state.score)
   textInto(grid, columns, 0, columns - score.length - 1, score)
+  if (input.best !== undefined && input.best > 0) {
+    textInto(grid, columns, 0, 1, `${arcadeWords().best} ${input.best}`)
+  }
   if (input.caption !== undefined) {
     textInto(grid, columns, 1, Math.floor((columns - input.caption.length) / 2), input.caption)
   }

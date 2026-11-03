@@ -1,5 +1,20 @@
 import type { ArcadeRunner } from './arcade-runner-data'
-import { hash } from './pixel-canvas'
+import { courseOf, type RunnerCourse } from './arcade-runner-course'
+import {
+  airHeightOf,
+  airStepOf,
+  BUFFER_MS,
+  HERO_HEIGHT,
+  HERO_HITBOX,
+  HERO_REACH,
+  jumpSpanOf,
+  takeOffOf,
+  type RunnerAir
+} from './arcade-runner-hero'
+
+export { HERO_HEIGHT, HERO_HITBOX, HERO_LEFT } from './arcade-runner-hero'
+export type { RunnerAir } from './arcade-runner-hero'
+export type { RunnerObstacle, RunnerStar } from './arcade-runner-course'
 
 // The runner's rules, apart from its drawing: time-based, seeded, and the same on every surface.
 
@@ -12,33 +27,28 @@ export type Runner<S extends RunnerShape = RunnerShape> = {
   totalWeight: number
 }
 
-/** `x` is the world column of the obstacle's left edge; the screen shows `distance` onwards. */
-export type RunnerObstacle = { x: number; shape: number }
-
-export type RunnerState = {
+export type RunnerState = RunnerCourse & {
   seed: number
   ms: number
   distance: number
   speed: number
-  /** Time since take-off; undefined on the ground. */
-  jumpMs: number | undefined
-  obstacles: readonly RunnerObstacle[]
-  /** World column the next obstacle spawns at, and how many have spawned. */
-  nextAt: number
-  spawned: number
+  /** The jump in progress; undefined on the ground. */
+  air: RunnerAir | undefined
+  /** Time since a press that found both jumps spent: it takes off on landing within BUFFER_MS. */
+  queuedMs: number | undefined
+  /** Stars picked up in a row, and the points they brought. */
+  combo: number
+  bonus: number
   score: number
   isOver: boolean
 }
 
-/** Screen columns the hero's feet hit with: the middle legs of its outlined costume. */
-export const HERO_LEFT = 2
-// Why narrower than the legs: at max speed a 4-px obstacle then leaves about ±85 ms to time a jump.
-export const HERO_HITBOX = { left: HERO_LEFT + 4, width: 3 }
-// Why: the widest band (160 columns at 1440 px) never shows an obstacle pop in.
-const HORIZON = 200
+export const STAR_POINTS = 5
 const FIRST_GAP = 40
 // Why: a frame that comes seconds late (a stalled host) must not jump the hero past an obstacle.
 const MAX_STEP_MS = 100
+// Why: hits and pickups are checked this often, so a frame rate never lets the hero clip through.
+const SUB_STEP_MS = 10
 const POINTS_PER_COLUMN = 0.1
 
 export const runnerOf = <S extends RunnerShape>(
@@ -50,58 +60,41 @@ export const runnerOf = <S extends RunnerShape>(
   totalWeight: shapes.reduce((sum, one) => sum + one.weight, 0)
 })
 
-const shapeWidthOf = (runner: Runner, shape: number): number =>
-  runner.shapes[shape]?.heights.length ?? 0
-
-const pickShapeOf = (runner: Runner, seed: number, n: number): number => {
-  let left = (hash(seed, n * 2 + 1) / 0x100000000) * runner.totalWeight
-  for (let i = 0; i < runner.shapes.length; i += 1) {
-    left -= runner.shapes[i]?.weight ?? 0
-    if (left < 0) {
-      return i
-    }
-  }
-  return runner.shapes.length - 1
-}
-
-const spawnedOf = (runner: Runner, state: RunnerState): RunnerState => {
-  const { minGap, maxGap } = runner.game.difficulty
-  const obstacles = state.obstacles.filter(
-    (one) => one.x + shapeWidthOf(runner, one.shape) > state.distance
-  )
-  let { nextAt, spawned } = state
-  while (nextAt < state.distance + HORIZON && runner.shapes.length > 0) {
-    const shape = pickShapeOf(runner, state.seed, spawned)
-    obstacles.push({ x: nextAt, shape })
-    nextAt +=
-      shapeWidthOf(runner, shape) + minGap + (hash(state.seed, spawned * 2) % (maxGap - minGap + 1))
-    spawned += 1
-  }
-  return { ...state, obstacles, nextAt, spawned }
-}
+const withCourse = (runner: Runner, state: RunnerState): RunnerState => ({
+  ...state,
+  ...courseOf(runner, state)
+})
 
 export const runnerStartOf = (runner: Runner, seed: number): RunnerState =>
-  spawnedOf(runner, {
+  withCourse(runner, {
     seed,
     ms: 0,
     distance: 0,
     speed: runner.game.speed.start,
-    jumpMs: undefined,
+    air: undefined,
+    queuedMs: undefined,
     obstacles: [],
+    stars: [],
     nextAt: FIRST_GAP,
     spawned: 0,
+    burst: 0,
+    combo: 0,
+    bonus: 0,
     score: 0,
     isOver: false
   })
 
-/** The hero's feet above the ground, in pixels: a parabola that peaks at `jump.rows` band rows. */
-export const runnerHeightOf = (runner: Runner, state: RunnerState): number => {
-  if (state.jumpMs === undefined) {
-    return 0
-  }
-  const t = state.jumpMs / runner.game.jump.ms
-  return t >= 1 ? 0 : runner.game.jump.rows * 2 * 4 * t * (1 - t)
-}
+/** The hero's feet above the ground, in pixels. */
+export const runnerHeightOf = (_runner: Runner, state: RunnerState): number =>
+  state.air === undefined ? 0 : airHeightOf(state.air)
+
+const takeOff = (runner: Runner, state: RunnerState): RunnerAir | undefined =>
+  takeOffOf(
+    runner.game,
+    jumpSpanOf(runner.game, runner.shapes, state.speed),
+    state.speed,
+    state.air
+  )
 
 const isHitOf = (runner: Runner, state: RunnerState): boolean => {
   const feet = runnerHeightOf(runner, state)
@@ -115,6 +108,60 @@ const isHitOf = (runner: Runner, state: RunnerState): boolean => {
   })
 }
 
+/** Stars the hero touches add to the combo; one that slips past behind it ends the combo. */
+const pickedOf = (runner: Runner, state: RunnerState): RunnerState => {
+  const feet = runnerHeightOf(runner, state)
+  const left = state.distance + HERO_REACH.left
+  let { combo, bonus } = state
+  const stars = state.stars.filter((one) => {
+    const above = one.h - feet
+    if (
+      one.x + 1 > left &&
+      one.x < left + HERO_REACH.width &&
+      above >= -1 &&
+      above <= HERO_HEIGHT
+    ) {
+      combo += 1
+      bonus += STAR_POINTS * combo
+      return false
+    }
+    if (one.x + 1 <= left) {
+      combo = 0
+      return false
+    }
+    return true
+  })
+  return stars.length === state.stars.length ? state : { ...state, stars, combo, bonus }
+}
+
+const movedOf = (runner: Runner, state: RunnerState, dt: number): RunnerState => {
+  const { start, max, rampPerMinute } = runner.game.speed
+  const ms = state.ms + dt
+  const speed = Math.min(max, start + (rampPerMinute * ms) / 60_000)
+  const distance = state.distance + (speed * dt) / 1000
+  const queued = state.queuedMs === undefined ? undefined : state.queuedMs + dt
+  const queuedMs = queued !== undefined && queued <= BUFFER_MS ? queued : undefined
+  let air = state.air === undefined ? undefined : airStepOf(state.air, dt)
+  let next: RunnerState = { ...state, ms, speed, distance, air, queuedMs }
+  if (state.air !== undefined && air === undefined && queuedMs !== undefined) {
+    air = takeOff(runner, next)
+    next = { ...next, air, queuedMs: undefined }
+  }
+  const picked = pickedOf(runner, withCourse(runner, next))
+  const scored = {
+    ...picked,
+    score: Math.floor(distance * POINTS_PER_COLUMN) + picked.bonus
+  }
+  return isHitOf(runner, scored) ? { ...scored, isOver: true } : scored
+}
+
+/** A press: a jump from the ground, the double jump, or a jump held for the landing. */
+const pressedOf = (runner: Runner, state: RunnerState): RunnerState => {
+  const air = takeOff(runner, state)
+  return air === undefined ? { ...state, queuedMs: 0 } : { ...state, air, queuedMs: undefined }
+}
+
+/** `isJump`: the key came just before this step, so the hero is in the air all of it. */
 export const runnerStepOf = (
   runner: Runner,
   state: RunnerState,
@@ -124,16 +171,12 @@ export const runnerStepOf = (
   if (state.isOver) {
     return state
   }
-  const dt = Math.min(MAX_STEP_MS, dtMs)
-  const { start, max, rampPerMinute } = runner.game.speed
-  const ms = state.ms + dt
-  const speed = Math.min(max, start + (rampPerMinute * ms) / 60_000)
-  const distance = state.distance + (speed * dt) / 1000
-  const aired = state.jumpMs === undefined ? undefined : state.jumpMs + dt
-  const landed = aired === undefined || aired >= runner.game.jump.ms ? undefined : aired
-  // Why dt: the key came before this step, so the hero has been in the air all of it.
-  const jumpMs = isJump && state.jumpMs === undefined ? dt : landed
-  const moved = spawnedOf(runner, { ...state, ms, speed, distance, jumpMs })
-  const scored = { ...moved, score: Math.floor(distance * POINTS_PER_COLUMN) }
-  return isHitOf(runner, scored) ? { ...scored, isOver: true } : scored
+  let at = isJump ? pressedOf(runner, state) : state
+  let left = Math.max(0, Math.min(MAX_STEP_MS, dtMs))
+  do {
+    const dt = Math.min(SUB_STEP_MS, left)
+    at = movedOf(runner, at, dt)
+    left -= dt
+  } while (left > 0 && !at.isOver)
+  return at
 }

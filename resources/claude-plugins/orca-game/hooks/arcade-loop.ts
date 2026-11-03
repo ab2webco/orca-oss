@@ -17,7 +17,11 @@ export type ArcadeScreen = 'ready' | 'running' | 'paused' | 'held' | 'over'
 export const ARCADE_HOLD_POLL_MS = 1000
 
 /** The line over the sky on each screen but a run in play: what the one key does now. */
-export const arcadeCaptionOf = (screen: ArcadeScreen, score: number): string | undefined => {
+export const arcadeCaptionOf = (
+  screen: ArcadeScreen,
+  score: number,
+  best = 0
+): string | undefined => {
   const words = arcadeWords()
   switch (screen) {
     case 'ready':
@@ -27,7 +31,7 @@ export const arcadeCaptionOf = (screen: ArcadeScreen, score: number): string | u
     case 'held':
       return words.held
     case 'over':
-      return words.over(score)
+      return words.over(score, best > 0 && score >= best)
     case 'running':
       return undefined
   }
@@ -47,7 +51,9 @@ export const arcadeLoopOf = (args: {
   isActive: () => Promise<boolean>
   /** Whether an agent waits on the user: the run freezes and goes on by itself once answered. */
   isHeld: () => boolean
-  draw: (state: RunnerState, screen: ArcadeScreen) => void
+  /** The best score before this loop, kept by its caller across loops. */
+  best?: number
+  draw: (state: RunnerState, screen: ArcadeScreen, best: number) => void
 }): ArcadeLoop => {
   const { runner, clock } = args
   // Why clamp here too: a game file read past its validator must still not outrun a terminal Raster.
@@ -57,10 +63,13 @@ export const arcadeLoopOf = (args: {
   let timer: { cancel: () => void } | undefined
   let watch: { cancel: () => void } | undefined
   let last: number | undefined
-  let isJump = false
+  let best = args.best ?? 0
+  // Why times and not a flag: the jump starts when the key came, and two keys are a double jump.
+  let presses: Promise<number>[] = []
   let isTicking = false
 
   const halt = () => {
+    presses = []
     timer?.cancel()
     timer = undefined
     watch?.cancel()
@@ -78,13 +87,12 @@ export const arcadeLoopOf = (args: {
     try {
       if (!(await args.isActive())) {
         halt()
-        args.draw(state, 'paused')
+        args.draw(state, 'paused', best)
         return
       }
       if (args.isHeld()) {
         halt()
-        isJump = false
-        args.draw(state, 'held')
+        args.draw(state, 'held', best)
         watch = clock.every(ARCADE_HOLD_POLL_MS, () => {
           if (!args.isHeld()) {
             watch?.cancel()
@@ -94,26 +102,37 @@ export const arcadeLoopOf = (args: {
         })
         return
       }
+      const pending = presses
+      presses = []
+      const times = await Promise.all(pending)
       const now = await clock.now()
-      state = runnerStepOf(runner, state, last === undefined ? periodMs : now - last, isJump)
+      let from = last ?? now - periodMs
+      let isPressed = false
+      for (const time of times) {
+        const to = Math.min(now, Math.max(from, time))
+        state = runnerStepOf(runner, state, to - from, isPressed)
+        from = to
+        isPressed = true
+      }
+      state = runnerStepOf(runner, state, now - from, isPressed)
       last = now
-      isJump = false
       if (state.isOver) {
         halt()
+        best = Math.max(best, state.score)
       }
-      args.draw(state, state.isOver ? 'over' : 'running')
+      args.draw(state, state.isOver ? 'over' : 'running', best)
     } finally {
       isTicking = false
     }
   }
-  args.draw(state, 'ready')
+  args.draw(state, 'ready', best)
   return {
     press: () => {
       if (watch !== undefined) {
         return
       }
       if (timer !== undefined) {
-        isJump = true
+        presses.push(clock.now())
         return
       }
       if (state.isOver) {
