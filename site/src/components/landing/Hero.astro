@@ -13,7 +13,7 @@ const copy = {
     title: 'Run a team of coding agents from your To Do.',
     lede: 'Orca Lab is a desktop IDE where a lead agent takes your tickets, launches one member per ticket in its own worktree, on any machine you own, and asks you only what only you can decide. Free and open source, MIT.',
     download: 'Download',
-    docs: 'Read the docs',
+    start: 'Get started',
     source: 'Source on GitHub',
     platforms: 'macOS · Windows · Linux · iOS · Android'
   },
@@ -21,7 +21,7 @@ const copy = {
     title: 'Lleva un equipo de agentes de código desde tu To Do.',
     lede: 'Orca Lab es un IDE de escritorio donde un agente líder toma tus tickets, lanza un miembro por ticket en su propio worktree, en cualquier máquina que tengas, y solo te pregunta lo que solo tú puedes decidir. Libre y de código abierto, MIT.',
     download: 'Descargar',
-    docs: 'Leer la documentación',
+    start: 'Primeros pasos',
     source: 'Código en GitHub',
     platforms: 'macOS · Windows · Linux · iOS · Android'
   }
@@ -37,7 +37,7 @@ const copy = {
     <p class="lede">{copy.lede}</p>
     <ul class="links">
       <li><a href="#get">{copy.download}</a></li>
-      <li><a href={docsHref(lang, '')}>{copy.docs}</a></li>
+      <li><a href={docsHref(lang, 'get-started')}>{copy.start}</a></li>
       <li><a href={REPO_URL}>{copy.source}</a></li>
     </ul>
     <p class="platforms muted">{copy.platforms}</p>

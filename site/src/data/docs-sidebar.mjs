@@ -3,7 +3,11 @@ const group = (label, es, items) => ({ label, translations: { es }, items })
 const page = (slug) => ({ slug })
 
 export const docsSidebar = [
-  group('Start here', 'Empieza aquí', [page('docs'), page('docs/install')]),
+  group('Start here', 'Empieza aquí', [
+    page('docs/get-started'),
+    page('docs'),
+    page('docs/install')
+  ]),
   group('Workspaces', 'Espacios de trabajo', [
     page('docs/model/worktrees'),
     page('docs/model/quick-open'),

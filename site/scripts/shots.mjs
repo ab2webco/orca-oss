@@ -16,7 +16,14 @@ const { chromium } = require('@playwright/test')
 
 const WIDTHS = [1440, 768, 390, 320]
 const THEMES = ['dark', 'light']
-const DOCS = ['install', 'orchestrator/orca-game', 'cli/overview', 'extend/plugins', 'ssh']
+const DOCS = [
+  'get-started',
+  'install',
+  'orchestrator/orca-game',
+  'cli/overview',
+  'extend/plugins',
+  'ssh'
+]
 const PAGES = [
   { name: 'landing', path: '/' },
   { name: 'landing-es', path: '/es/' },
