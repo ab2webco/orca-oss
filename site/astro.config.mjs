@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'astro/config'
 import { BASE, SITE } from './site.config.mjs'
 import { docsSidebar } from './src/data/docs-sidebar.mjs'
-import { starlightPaletteCss } from './src/data/scene-palette.ts'
 
 export default defineConfig({
   // Why: without a pinned tsconfig Vite walks up to the repo root's, whose chain needs
@@ -24,7 +23,8 @@ export default defineConfig({
         root: { label: 'English', lang: 'en' },
         es: { label: 'Español', lang: 'es' }
       },
-      head: [{ tag: 'style', content: starlightPaletteCss }],
+      // Why a component: the config loads outside the pinned tsconfig, so it must not import TS.
+      components: { Head: './src/components/DocsHead.astro' },
       customCss: ['./src/styles/fonts.css', './src/styles/starlight-theme.css'],
       sidebar: docsSidebar
     })

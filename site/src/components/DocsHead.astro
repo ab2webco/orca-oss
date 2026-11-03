@@ -1,0 +1,7 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro'
+import { starlightPaletteCss } from '../data/scene-palette'
+---
+
+<Default><slot /></Default>
+<style set:html={starlightPaletteCss}></style>
