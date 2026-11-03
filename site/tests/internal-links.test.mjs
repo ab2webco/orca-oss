@@ -60,4 +60,37 @@ describe('internal links in the built site', () => {
     }
     assert.deepEqual(broken, [])
   })
+
+  // A translated heading changes its id, so a link that kept the English anchor lands on top.
+  it('every #anchor names an id on the page it points to', () => {
+    const ids = new Map()
+    const idsOf = (file) => {
+      if (!ids.has(file)) {
+        const html = readFileSync(file, 'utf8')
+        ids.set(file, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1])))
+      }
+      return ids.get(file)
+    }
+    const broken = []
+    for (const file of pages) {
+      const from = pageUrl(file)
+      for (const match of readFileSync(file, 'utf8').matchAll(/\shref="([^"]*#[^"]+)"/g)) {
+        const raw = match[1].replace(/&amp;/g, '&')
+        if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(raw)) {
+          continue
+        }
+        const url = new URL(raw, `https://site.invalid${from}`)
+        const anchor = decodeURIComponent(url.hash.slice(1))
+        const target = path.join(
+          DIST_DIR,
+          decodeURIComponent(url.pathname.slice(BASE.length + 1)),
+          url.pathname.endsWith('/') ? 'index.html' : ''
+        )
+        if (anchor !== '_top' && existsSync(target) && !idsOf(target).has(anchor)) {
+          broken.push(`${from} → ${raw}`)
+        }
+      }
+    }
+    assert.deepEqual(broken, [])
+  })
 })

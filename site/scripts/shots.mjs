@@ -16,11 +16,16 @@ const { chromium } = require('@playwright/test')
 
 const WIDTHS = [1440, 768, 390, 320]
 const THEMES = ['dark', 'light']
+const DOCS = ['install', 'orchestrator/orca-game', 'cli/overview', 'extend/plugins', 'ssh']
 const PAGES = [
   { name: 'landing', path: '/' },
-  { name: 'docs', path: '/docs/install/' }
+  { name: 'landing-es', path: '/es/' },
+  ...DOCS.flatMap((doc) => [
+    { name: `docs-${doc.replace(/\//g, '-')}`, path: `/docs/${doc}/` },
+    { name: `docs-es-${doc.replace(/\//g, '-')}`, path: `/es/docs/${doc}/` }
+  ])
 ]
-const EXTRA = [{ name: 'landing-es', path: '/es/', width: 1440, theme: 'dark' }]
+const EXTRA = [{ name: '404', path: '/404.html', width: 1440, theme: 'dark' }]
 const TYPES = {
   '.html': 'text/html',
   '.css': 'text/css',
