@@ -9,6 +9,13 @@ export type ParsedDaemonPid = {
   spawnerExecPath: string | null
 }
 
+// Why: Number('') is 0, so a record truncated by a power loss parsed as pid 0 — an "owner" no
+// cleanup would remove, failing every later daemon's exclusive publish (ORCA-990). kill(0) also
+// targets our own process group, so no non-positive pid may name a daemon.
+function isDaemonPid(pid: unknown): pid is number {
+  return typeof pid === 'number' && Number.isSafeInteger(pid) && pid > 0
+}
+
 export function parseDaemonPidFile(contents: string): ParsedDaemonPid | null {
   const trimmed = contents.trim()
   try {
@@ -22,7 +29,7 @@ export function parseDaemonPidFile(contents: string): ParsedDaemonPid | null {
       bootId?: unknown
       spawnerExecPath?: unknown
     }
-    if (typeof parsed.pid === 'number' && Number.isFinite(parsed.pid)) {
+    if (isDaemonPid(parsed.pid)) {
       return {
         pid: parsed.pid,
         startedAtMs:
@@ -42,7 +49,7 @@ export function parseDaemonPidFile(contents: string): ParsedDaemonPid | null {
   }
 
   const pid = Number(trimmed)
-  return Number.isFinite(pid)
+  return isDaemonPid(pid)
     ? {
         pid,
         startedAtMs: null,

@@ -118,6 +118,34 @@ describe('daemon endpoint ownership publication', () => {
     await expect(connectsTo(socketPath)).resolves.toBe(false)
   })
 
+  it('logs why durable ownership failed, since the dying daemon has no stderr', async () => {
+    const pidPath = join(dir, 'daemon.pid')
+    // ORCA-990: a power loss truncated the record; the exclusive publish then hits EEXIST.
+    writeFileSync(pidPath, '')
+    const log = { log: vi.fn(), close: vi.fn() }
+    server = new DaemonServer({
+      socketPath,
+      tokenPath,
+      pidPath,
+      launchNonce: 'truncated-record',
+      log,
+      publishEndpointOwnership: () =>
+        publishDaemonPidFile(pidPath, {
+          pid: process.pid,
+          startedAtMs: 1_000,
+          launchNonce: 'truncated-record'
+        }),
+      spawnSubprocess: () => createMockSubprocess()
+    })
+
+    await expect(server.start()).rejects.toMatchObject({ code: 'EEXIST' })
+
+    expect(log.log).toHaveBeenCalledWith(
+      'endpoint-ownership-publish-failed',
+      expect.objectContaining({ stage: 'pid-record', code: 'EEXIST' })
+    )
+  })
+
   it('rolls back exact PID ownership when token publication fails', async () => {
     const pidPath = join(dir, 'daemon.pid')
     const launchNonce = 'failed-launch'
