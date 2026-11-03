@@ -128,6 +128,9 @@ docs/**
 !docs/reference/worktree-scan-fingerprint.md
 !docs/reference/orca-sonar.md
 !docs/reference/worktree-test-resources.md
+# Translations of the reference docs the site publishes (site/scripts/docs-translations.mjs).
+!docs/reference/es/
+!docs/reference/es/**
 
 # Stably CLI (only docs/ are tracked)
 .stably/*
