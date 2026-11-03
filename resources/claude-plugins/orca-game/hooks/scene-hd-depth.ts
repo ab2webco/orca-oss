@@ -230,7 +230,7 @@ export const hdMarkPixelOf = (
   switch (glyph) {
     case 'L':
       return accent(
-        lit(isCrystal ? mix(look.plant, look.snow, 0.45) : mix(look.snow, 0xffffff, 0.2))
+        lit(isCrystal ? mix(look.plant, look.snow, 0.45) : mix(look.sun, 0xffffff, 0.7))
       )
     case '#':
       return layer(isCrystal ? look.plant : mix(look.far, look.snow, 0.3))

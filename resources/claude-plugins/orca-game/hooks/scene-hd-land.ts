@@ -245,9 +245,10 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
     look.scenery !== undefined &&
     look.scenery !== 'peaks'
   ) {
-    const rim = mix(snow, keyLightOf(frame), 0.5)
+    // Why the key light, not the look's snow: a dusk palette's snow is as dim as its rock.
+    const rim = keyLightOf(frame)
     // Why the range's flat colour: its grain under a rim breaks the edge into specks.
-    return accent(mix(litOf(frame, look.far), rim, isLitSide ? 0.55 : 0.3))
+    return accent(mix(litOf(frame, look.far), litOf(frame, rim), isLitSide ? 0.6 : 0.4))
   }
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
@@ -261,8 +262,8 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
       const floor = Math.floor(y / 3)
       const isWindow =
         mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 3) !== 2 && floor * 3 >= top + 2
-      const isLit = isWindow && (hash(fx, floor) + Math.floor(tick / WINDOW_TICKS)) % 10 === 0
-      return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
+      const isLit = isWindow && (hash(fx, floor) + Math.floor(tick / WINDOW_TICKS)) % 4 === 0
+      return isLit ? accent(litOf(frame, mix(WARM_WINDOW, snow, 0.35))) : layer(base)
     }
     case 'crystals':
       // Why a rim deeper than the slope, on spires only: a thinner one, or one the hills cut, leaves specks.
@@ -313,7 +314,7 @@ export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undef
   const facing =
     look.scenery === 'skyline' ? 0.5 : facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
   if (y - top < 1) {
-    return drawn(mix(flat, look.scenery === 'skyline' ? look.snow : keyLightOf(frame), 0.3))
+    return drawn(mix(flat, keyLightOf(frame), 0.4))
   }
   const shade = (color: number): number => mix(color, 0x000000, (y - top) * MID_SHADE)
   const hill = shade(litByFacing(backdropMaterialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
