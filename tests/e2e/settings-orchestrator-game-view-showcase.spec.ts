@@ -1,17 +1,23 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README game-view GIF: each frame is a state the
-// Settings page must render for the chosen default view.
-const WINDOW_WIDTH = 1280
-const WINDOW_HEIGHT = 800
-const HOLD_MS = 900
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site game-view clip: each beat is a state the Settings page must render for
+// the chosen default view.
+const WINDOW_WIDTH = 1440
+const WINDOW_HEIGHT = 900
+const HOLD_MS = 1_600
 
 test('the default view picker lists the views and the preview follows the pick', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
   await electronApp.evaluate(
     ({ BrowserWindow }, size) => {
       BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
@@ -27,32 +33,33 @@ test('the default view picker lists the views and the preview follows the pick',
   const quest = orcaPage.getByRole('img', { name: 'Preview of Quest (built-in)' })
   await expect(quest).toBeVisible({ timeout: 15_000 })
 
-  const frame = async (name: string): Promise<void> => {
-    await orcaPage.waitForTimeout(HOLD_MS)
-    await orcaPage.screenshot({ path: testInfo.outputPath(name) })
-  }
+  const hold = () => orcaPage.waitForTimeout(HOLD_MS)
 
   const defaultView = orcaPage.getByRole('combobox', { name: 'Default view' }).first()
   await defaultView.evaluate((element) => element.scrollIntoView({ block: 'center' }))
-  await frame('01-default.png')
+  await orcaPage.waitForTimeout(800)
+  const clip = await showcaseClip(electronApp, testInfo, 'game-view-switcher')
+  await hold()
 
   await defaultView.click()
   await expect(orcaPage.getByRole('option', { name: 'Flat · light' })).toBeVisible()
   await expect(orcaPage.getByRole('option', { name: 'Off · light' })).toBeVisible()
-  await frame('02-views.png')
+  await hold()
 
   await orcaPage.getByRole('option', { name: 'Flat · light' }).click()
   await expect(quest).toBeHidden()
-  await frame('03-flat.png')
+  await hold()
 
   await defaultView.click()
   await orcaPage.getByRole('option', { name: 'Off · light' }).click()
   await expect(
     orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')
   ).toBeVisible()
-  await frame('04-off.png')
+  await hold()
 
   await defaultView.click()
   await orcaPage.getByRole('option', { name: 'Zen · medium' }).click()
   await expect(quest).toBeVisible()
+  await hold()
+  await clip.stop()
 })

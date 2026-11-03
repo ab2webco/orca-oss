@@ -9,6 +9,8 @@ screenshots — rather than a bespoke launcher. Do not use computer-use for Orca
 The procedure, including how to seed a provider-backed screen and why a screenshot of a screen
 that does not scroll proves nothing, is in
 [`docs/reference/rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md).
+The README GIFs and site clips are recorded by the `*-showcase` specs; how, and what to check
+before one ships, is in [`docs/reference/showcase-media.md`](./docs/reference/showcase-media.md).
 
 # Plugins
 

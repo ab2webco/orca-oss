@@ -123,7 +123,14 @@ export type GameBand = {
 export async function startGameBand(
   page: Page,
   testRepoPath: string,
-  options: { state: unknown; theme: 'dark' | 'light'; locale: 'en' | 'es'; scene?: string }
+  options: {
+    state: unknown
+    theme: 'dark' | 'light'
+    locale: 'en' | 'es'
+    scene?: string
+    /** For recorded clips: `~/lumen-app` instead of a temp path, no auto-mode notice, and this API. */
+    showcase?: { apiUrl?: string }
+  }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
   const projectDir = join(root, 'lumen-app')
@@ -143,10 +150,19 @@ export async function startGameBand(
       // Why: a click on a chip can read as a selection, which would write the real clipboard.
       copyOnSelect: false,
       numStartups: 5,
+      // Why: with a mode configured and a reachable API, Claude offers auto mode before the band.
+      ...(options.showcase ? { hasSeenAutoDefaultNudge: true } : {}),
       customApiKeyResponses: { approved: [DEMO_KEY.slice(-20)], rejected: [] },
       projects: { [projectDir]: trusted, [projectDir.replace(/^\/private/, '')]: trusted }
     })
   )
+  if (options.showcase) {
+    // Why: an unset mode applies the gated auto default and draws its one-time notice.
+    await writeFile(
+      join(configDir, 'settings.json'),
+      JSON.stringify({ permissions: { defaultMode: 'default' } })
+    )
+  }
   await writeFile(stateFile, JSON.stringify(options.state))
   await writeFile(readsFile, '')
   await writeFile(pushFile, '')
@@ -181,7 +197,9 @@ export async function startGameBand(
     CLAUDE_CONFIG_DIR: configDir,
     ANTHROPIC_API_KEY: DEMO_KEY,
     // Nothing listens there: no request leaves the machine, and no 401 banner is drawn.
-    ANTHROPIC_BASE_URL: 'http://127.0.0.1:9',
+    ANTHROPIC_BASE_URL: options.showcase?.apiUrl ?? 'http://127.0.0.1:9',
+    // Why: Claude prints its cwd from HOME, so the demo folder reads ~/lumen-app.
+    ...(options.showcase ? { HOME: root } : {}),
     DISABLE_AUTOUPDATER: '1',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     CLAUDE_CODE_NO_FLICKER: '1',

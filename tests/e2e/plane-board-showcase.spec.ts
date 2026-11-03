@@ -9,13 +9,18 @@ import type {
 } from '../../src/shared/plane-types'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README Plane GIF. Workspace, project, people and work
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site Plane clip. Workspace, project, people and work
 // items are invented demo data, served by replacing the Plane IPC handlers.
 // Wide enough, with the sidebar closed, for all four columns at once.
 const WINDOW_WIDTH = 1440
-const WINDOW_HEIGHT = 860
-const HOLD_MS = 900
+const WINDOW_HEIGHT = 900
+const HOLD_MS = 2_000
 
 const WORKSPACE = {
   id: 'demo-ws',
@@ -85,6 +90,7 @@ test('shows a Plane project as a board with its states as columns', async ({
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
   await waitForActiveWorktree(orcaPage)
   await electronApp.evaluate(
     ({ BrowserWindow, ipcMain }, { size, fixture }) => {
@@ -134,15 +140,16 @@ test('shows a Plane project as a board with its states as columns', async ({
     timeout: 20_000
   })
 
-  const frame = async (name: string): Promise<void> => {
-    await orcaPage.waitForTimeout(HOLD_MS)
-    await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
-  }
-  await frame('01-board.png')
+  // Why: each beat holds long enough to read before the next action.
+  const hold = () => orcaPage.waitForTimeout(HOLD_MS)
+  const clip = await showcaseClip(electronApp, testInfo, 'plane-board')
+  await hold()
 
   await orcaPage.getByLabel('List', { exact: true }).click()
   for (const workItem of ITEMS) {
     await expect(orcaPage.getByText(workItem.title)).toBeVisible()
   }
-  await frame('02-list.png')
+  await hold()
+  await orcaPage.waitForTimeout(1_500)
+  await clip.stop()
 })

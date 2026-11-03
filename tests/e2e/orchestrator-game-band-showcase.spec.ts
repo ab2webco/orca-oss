@@ -3,12 +3,17 @@ import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { getTerminalContent } from './helpers/terminal'
 import { claudeVersionOk, clickTerminalText, startGameBand } from './helpers/orchestrator-game-band'
+import { statePusher } from './helpers/game-showcase-demo-party'
+import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { createShowcaseRepo } from './helpers/showcase-repo'
 
-// Source frames for the README game GIF. Lead, members, tickets and PRs are invented
+test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
+
+// The README and site game clip. Lead, members, tickets and PRs are invented
 // demo data; see the helper for what the band needs to draw.
 const WINDOW_WIDTH = 1440
 const WINDOW_HEIGHT = 900
-const HOLD_MS = 1_500
+const HOLD_MS = 1_800
 
 const member = (
   name: string,
@@ -93,8 +98,7 @@ const gameState = (step: 1 | 2) => ({
 
 test('the game band and Panel draw a lead with three members', async ({
   electronApp,
-  orcaPage,
-  testRepoPath
+  orcaPage
 }, testInfo) => {
   test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
   test.setTimeout(180_000)
@@ -106,11 +110,13 @@ test('the game band and Panel draw a lead with three members', async ({
     { width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
   )
 
-  const band = await startGameBand(orcaPage, testRepoPath, {
+  const band = await startGameBand(orcaPage, createShowcaseRepo(), {
     state: gameState(1),
     theme: 'dark',
-    locale: 'en'
+    locale: 'en',
+    showcase: {}
   })
+  const push = statePusher(band)
   try {
     await expect
       .poll(async () => getTerminalContent(orcaPage, 20_000), {
@@ -118,28 +124,28 @@ test('the game band and Panel draw a lead with three members', async ({
         message: 'the band never drew the seeded party'
       })
       .toContain('Panel')
-    const frame = async (name: string): Promise<void> => {
-      await orcaPage.waitForTimeout(HOLD_MS)
-      await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
-    }
+    const hold = () => orcaPage.waitForTimeout(HOLD_MS)
     await expect
       .poll(async () => getTerminalContent(orcaPage, 20_000), { timeout: 30_000 })
       .toContain('Wren')
-    await frame('01-band.png')
+    await orcaPage.waitForTimeout(800)
+    const clip = await showcaseClip(electronApp, testInfo, 'game-band-panel')
+    await hold()
 
     await clickTerminalText(orcaPage, 'Panel')
     await expect
       .poll(async () => getTerminalContent(orcaPage, 20_000), { timeout: 20_000 })
       .toContain('LUM-14')
-    await frame('02-panel.png')
+    await hold()
 
     // CI goes green on LUM-12 and LUM-15 merges: the next read awards the XP.
-    await band.setState(gameState(2))
-    await clickTerminalText(orcaPage, 'Refresh')
+    await push(gameState(2))
     await expect
       .poll(async () => getTerminalContent(orcaPage, 20_000), { timeout: 20_000 })
       .toContain('merged')
-    await frame('03-xp.png')
+    await hold()
+    await orcaPage.waitForTimeout(1_500)
+    await clip.stop()
   } finally {
     await rm(band.root, { recursive: true, force: true })
   }

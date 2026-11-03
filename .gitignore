@@ -103,6 +103,7 @@ docs/**
 !docs/reference/
 !docs/reference/agent-verification-traps.md
 !docs/reference/rendered-ui-checks.md
+!docs/reference/showcase-media.md
 !docs/reference/ci-failure-classification.md
 !docs/reference/ci-merge-queue.md
 !docs/reference/claude-account-auth-verdicts.md

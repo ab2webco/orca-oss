@@ -22,7 +22,7 @@
 <h3 align="center"><a href="https://github.com/ab2webco/orca-oss/releases/latest"><ins>Download Orca Lab</ins></a></h3>
 
 <p align="center">
-  <img src="docs/assets/readme/multi-host-fleet.gif" alt="The lead's Panel: members on this machine and on two paired hosts, each host with its running/cap, cores, free memory and load; a remote member's CI turns green and another remote PR merges, paying XP and a level-up" width="960" />
+  <img src="docs/assets/readme/multi-host-fleet.gif" alt="The lead's Panel across this machine and two paired hosts: a new member lands on linux-box with its running/cap, cores, free memory and load; a remote member moves from reading to running commands, its CI turns green, and another remote PR merges, paying XP" width="960" />
 </p>
 
 <p align="center">
@@ -69,7 +69,7 @@ Plane holds the work, GitHub holds the code, and the lead turns one into the oth
 The agent grid puts every live agent of every project on one screen, grouped by what it needs from you: **Needs You**, **Working**, **Done** and **Idle**. Each cell is the agent's own terminal.
 
 <p align="center">
-  <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four agents grouped as Needs You, Working and Done, filtered by bucket" width="960" />
+  <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four live Claude Code sessions in lumen-app stream their answers, grouped as Needs You, Working and Done, then filtered by bucket" width="960" />
 </p>
 
 - **One worktree per agent.** Every task gets its own git worktree, so agents never edit the same checkout; folders work as workspaces too. [Worktrees →](docs/user/model/worktrees.md)
@@ -184,19 +184,19 @@ The idea of running a Claude Code team as a game came from [Jucer Orozco](https:
 A wave fills the free slots from the To Do, one member per ticket; green CI and a merge pay XP:
 
 <p align="center">
-  <img src="docs/assets/readme/lead-wave.gif" alt="The lead's Panel with a To Do of 4; after a wave LUM-14 and LUM-15 are launched as members (+10 XP each) and the To Do drops to 2; then LUM-12's CI turns green and its PR merges, paying XP and a level-up" width="960" />
+  <img src="docs/assets/readme/lead-wave.gif" alt="The owner presses Wave in the band; the lead streams which tickets it launches, LUM-14 and LUM-15 join the Panel as members and start working, the To Do drops to 2, then LUM-12's CI turns green and its PR merges, paying XP and a level-up" width="960" />
 </p>
 
 A question only you can answer lands in Orca's Inbox, and your answer goes back to the lead:
 
 <p align="center">
-  <img src="docs/assets/readme/owner-inbox.gif" alt="Orca Lab desktop: the Inbox entry shows 2; the Inbox lists the lead's two questions with option buttons; one is answered with Ship in 2.3 and the count drops to 1" width="960" />
+  <img src="docs/assets/readme/owner-inbox.gif" alt="Orca Lab desktop: the owner asks the live lead to check before the offline cache ships; the lead's two questions reach the Inbox, one is answered with Ship in 2.3, and the lead picks the answer up from its mail" width="960" />
 </p>
 
 The Panel also keeps your open PRs and the team's numbers:
 
 <p align="center">
-  <img src="docs/assets/readme/panel-metrics.gif" alt="The lead's Panel: My PRs with CI green, CI running and changes requested; then the Metrics widget with merges per day over 14 days, median lead time and each Claude account's session and weekly use" width="960" />
+  <img src="docs/assets/readme/panel-metrics.gif" alt="The owner opens the lead's Panel on My PRs with CI green, CI running and changes requested, then the Metrics widget with merges per day over 14 days, median lead time and each Claude account's session and weekly use" width="960" />
 </p>
 
 Settings → Agents picks how it looks, and what it costs your machine: **Off**, **Flat** (plain text), **Zen**, **2D classic** or **2D hd**. Scenes are themeable. [Orca Game reference →](docs/reference/orchestrator-game.md)
