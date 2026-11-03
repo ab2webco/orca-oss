@@ -33,7 +33,7 @@ vi.mock('./ssh-config-parser', async () =>
 function knownHosts(contents: string): void {
   loadHostKeyTrustSourcesMock.mockResolvedValue({
     knownHosts: parseKnownHosts(contents),
-    knownHostsUnreadable: false,
+    trustSourceUnreadable: false,
     orcaStore: []
   })
 }
@@ -57,6 +57,20 @@ describe('SshConnection host key verification', () => {
     expect(spawnSystemSshMock).not.toHaveBeenCalled()
     expect(rememberHostKeyMock).not.toHaveBeenCalled()
     expect(connectAttempts).toBe(1)
+  })
+
+  it('refuses the host before any handshake when the trust sources cannot be loaded', async () => {
+    loadHostKeyTrustSourcesMock.mockRejectedValue(new Error('userData path unavailable'))
+    const callbacks = createCallbacks({
+      onCredentialRequest: vi.fn(async () => 'secret')
+    })
+    const conn = new SshConnection(createTarget(), callbacks)
+
+    await expect(conn.connect()).rejects.toThrow(/Host key verification failed for example\.com/)
+
+    expect(callbacks.onCredentialRequest).not.toHaveBeenCalled()
+    expect(spawnSystemSshMock).not.toHaveBeenCalled()
+    expect(connectAttempts).toBe(0)
   })
 
   it('accepts and remembers a first-contact host key', async () => {

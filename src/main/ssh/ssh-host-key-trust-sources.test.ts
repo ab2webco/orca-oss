@@ -31,9 +31,16 @@ describe('host key trust sources', () => {
 
     const sources = await loadHostKeyTrustSources([a, join(dir, 'missing'), a])
     expect(sources.knownHosts).toHaveLength(1)
-    expect(sources.knownHostsUnreadable).toBe(false)
+    expect(sources.trustSourceUnreadable).toBe(false)
 
-    expect((await loadHostKeyTrustSources([a, unreadable])).knownHostsUnreadable).toBe(true)
+    expect((await loadHostKeyTrustSources([a, unreadable])).trustSourceUnreadable).toBe(true)
+  })
+
+  it('flags an Orca store that exists but cannot be read, since it may hold a pinned key', async () => {
+    await mkdir(join(userData.path, 'ssh', 'known_hosts'), { recursive: true })
+
+    const sources = await loadHostKeyTrustSources([join(dir, 'missing')])
+    expect(sources.trustSourceUnreadable).toBe(true)
   })
 
   it('records accepted keys in its own store and reads them back', async () => {

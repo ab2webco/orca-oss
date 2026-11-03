@@ -22,14 +22,19 @@ type HostKeyDecisionInput = {
   strictHostKeyChecking: string
   /** On-demand VMs present a new key every launch; recording them only breeds false alarms. */
   ephemeral: boolean
-  /** An existing but unreadable known_hosts may hide a mismatch, so nothing is recorded from it. */
-  knownHostsUnreadable: boolean
+  /** An existing but unreadable known_hosts or Orca store may hide a mismatch. */
+  trustSourceUnreadable: boolean
   displayHost: string
   port: number
 }
 
 const STRICT_VALUES = new Set(['true', 'yes', 'always'])
 const LAX_VALUES = new Set(['false', 'no', 'off'])
+
+/** StrictHostKeyChecking=no: ssh connects even to an unchecked key, so Orca may too. */
+export function isHostKeyCheckingOff(strictHostKeyChecking: string): boolean {
+  return LAX_VALUES.has(strictHostKeyChecking.toLowerCase())
+}
 
 /** Typed so the connect path can stop before any credential is offered to the refused host. */
 export class HostKeyVerificationError extends Error {
@@ -95,8 +100,19 @@ export function decideHostKey(input: HostKeyDecisionInput): HostKeyDecision {
   if (STRICT_VALUES.has(strict)) {
     return reject(input, outcome, 'The host is not in known_hosts and StrictHostKeyChecking is on.')
   }
-  if (input.ephemeral || input.knownHostsUnreadable || LAX_VALUES.has(strict)) {
+  if (input.ephemeral || isHostKeyCheckingOff(strict)) {
     return { action: 'accept', outcome }
+  }
+  if (input.trustSourceUnreadable) {
+    return reject(input, outcome, 'A known_hosts file could not be read, so the key is unchecked.')
+  }
+  // ssh would prompt here and Orca has no prompt yet; a CA-managed host never needs a pinned plain key.
+  if (outcome === 'ca-only' && strict === 'ask') {
+    return reject(
+      input,
+      outcome,
+      'Only a @cert-authority line names this host, and it sent a plain key.'
+    )
   }
   // accept-new semantics: first contact is recorded in Orca's own store, never in known_hosts.
   return { action: 'accept-and-remember', outcome }

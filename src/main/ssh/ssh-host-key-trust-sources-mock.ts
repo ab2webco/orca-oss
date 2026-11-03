@@ -6,7 +6,7 @@ type TrustSourcesModule = typeof trustSources
 
 const emptyTrustSources = (): HostKeyTrustSources => ({
   knownHosts: [],
-  knownHostsUnreadable: false,
+  trustSourceUnreadable: false,
   orcaStore: []
 })
 

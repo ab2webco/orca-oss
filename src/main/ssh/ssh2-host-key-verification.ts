@@ -6,6 +6,7 @@ import { loadHostKeyTrustSources, rememberHostKey } from './ssh-host-key-trust-s
 import {
   createHostKeyVerifier,
   HostKeyVerificationError,
+  isHostKeyCheckingOff,
   orderServerHostKeyAlgorithms
 } from './ssh-host-key-verifier'
 
@@ -49,20 +50,31 @@ export async function installSsh2HostKeyVerification(
   const host = resolved?.hostKeyAlias ?? config.host ?? ''
   const isHostKeyAlias = Boolean(resolved?.hostKeyAlias)
   const port = config.port ?? 22
-  const sources = await withTimeout(
-    loadHostKeyTrustSources(resolved?.knownHostsFiles ?? []),
+  const strictHostKeyChecking = resolved?.strictHostKeyChecking ?? 'ask'
+  const ephemeral = options.target.owner?.type === 'on-demand-runtime'
+  const loaded = await withTimeout(
+    loadHostKeyTrustSources(resolved?.knownHostsFiles ?? []).catch((err) => {
+      console.warn('[ssh] failed to load host key trust sources:', err)
+      return null
+    }),
     TRUST_SOURCE_READ_TIMEOUT_MS,
-    // A silent read withholds evidence: connect like ssh would, but record nothing.
-    { knownHosts: [], knownHostsUnreadable: true, orcaStore: [] }
+    null
   )
+  if (!loaded && !ephemeral && !isHostKeyCheckingOff(strictHostKeyChecking)) {
+    throw new HostKeyVerificationError(
+      `Host key verification failed for ${host}. Its known_hosts files could not be read.`,
+      'unknown'
+    )
+  }
+  const sources = loaded ?? { knownHosts: [], trustSourceUnreadable: true, orcaStore: [] }
   const verdict: Ssh2HostKeyVerdict = { rejection: null }
   config.hostVerifier = createHostKeyVerifier({
     host,
     port,
     isHostKeyAlias,
-    strictHostKeyChecking: resolved?.strictHostKeyChecking ?? 'ask',
-    ephemeral: options.target.owner?.type === 'on-demand-runtime',
-    knownHostsUnreadable: sources.knownHostsUnreadable,
+    strictHostKeyChecking,
+    ephemeral,
+    trustSourceUnreadable: sources.trustSourceUnreadable,
     knownHosts: sources.knownHosts,
     orcaStore: sources.orcaStore,
     rememberHostKey: (record) => {

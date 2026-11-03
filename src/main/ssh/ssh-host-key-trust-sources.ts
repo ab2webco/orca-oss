@@ -7,8 +7,8 @@ import { parseKnownHosts, type KnownHostsEntry } from './ssh-known-hosts'
 
 export type HostKeyTrustSources = {
   knownHosts: KnownHostsEntry[]
-  /** An existing file we could not read may hide a mismatch, so first contact is not recorded. */
-  knownHostsUnreadable: boolean
+  /** An existing file we could not read may hide a mismatch, so first contact is refused. */
+  trustSourceUnreadable: boolean
   orcaStore: KnownHostsEntry[]
 }
 
@@ -51,8 +51,7 @@ export async function loadHostKeyTrustSources(
   ])
   return {
     knownHosts: known.flatMap((file) => file.entries),
-    knownHostsUnreadable: known.some((file) => file.unreadable),
-    // An unreadable store only loses Orca-recorded trust; known_hosts still applies.
+    trustSourceUnreadable: store.unreadable || known.some((file) => file.unreadable),
     orcaStore: store.entries
   }
 }

@@ -23,7 +23,7 @@ function decide(overrides: Partial<Parameters<typeof decideHostKey>[0]> = {}) {
     storeOutcome: 'unknown',
     strictHostKeyChecking: 'ask',
     ephemeral: false,
-    knownHostsUnreadable: false,
+    trustSourceUnreadable: false,
     displayHost: 'host.example',
     port: 22,
     ...overrides
@@ -67,7 +67,28 @@ describe('decideHostKey', () => {
     expect(decide({ strictHostKeyChecking: 'true' }).action).toBe('reject')
     expect(decide({ strictHostKeyChecking: 'false' }).action).toBe('accept')
     expect(decide({ ephemeral: true }).action).toBe('accept')
-    expect(decide({ knownHostsUnreadable: true }).action).toBe('accept')
+  })
+
+  it('refuses first contact when a trust source could not be read, unless checking is off', () => {
+    const refused = decide({ trustSourceUnreadable: true })
+    expect(refused.action).toBe('reject')
+    expect(refused.reason?.toLowerCase()).not.toContain('authentication failed')
+    expect(decide({ trustSourceUnreadable: true, strictHostKeyChecking: 'false' }).action).toBe(
+      'accept'
+    )
+    expect(decide({ trustSourceUnreadable: true, knownHostsOutcome: 'match' }).action).toBe(
+      'accept'
+    )
+  })
+
+  it('refuses a host only a @cert-authority line names when StrictHostKeyChecking is ask', () => {
+    expect(decide({ knownHostsOutcome: 'ca-only' }).action).toBe('reject')
+    expect(
+      decide({ knownHostsOutcome: 'ca-only', strictHostKeyChecking: 'accept-new' }).action
+    ).toBe('accept-and-remember')
+    expect(decide({ knownHostsOutcome: 'ca-only', strictHostKeyChecking: 'false' }).action).toBe(
+      'accept'
+    )
   })
 })
 
@@ -78,7 +99,7 @@ describe('createHostKeyVerifier', () => {
       port: 22,
       strictHostKeyChecking: 'ask',
       ephemeral: false,
-      knownHostsUnreadable: false,
+      trustSourceUnreadable: false,
       knownHosts: [],
       orcaStore: [],
       rememberHostKey: vi.fn(),
