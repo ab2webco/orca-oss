@@ -76,12 +76,17 @@ export function showcaseTerminalScript(handle: string): TerminalScript {
 }
 
 /** The lines the lead's terminal prints when the owner answers from the phone. */
-export function showcaseAnswerChunks(ticket: string | null, answer: string): string[] {
+export function showcaseAnswerChunks(
+  ticket: string | null,
+  answer: string,
+  memberName: string | null
+): string[] {
   const about = ticket ? ` ${ticket}` : ''
+  const to = memberName ?? 'the team'
   return [
     `\n${YELLOW}◆ Owner answered${about}:${RESET} ${BOLD}${answer}${RESET}\n`,
-    say(`Relaying "${answer}" to Iris.`),
-    tool('Send', `Iris · ${ticket ?? 'team'}`),
+    say(`Relaying "${answer}" to ${to}.`),
+    tool('Send', `${to} · ${ticket ?? 'team'}`),
     `\n${MAGENTA}>${RESET} `
   ]
 }
