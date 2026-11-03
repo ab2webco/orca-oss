@@ -9,11 +9,11 @@ import type { Look, Scenery } from './scenes/scene-definition'
 // hd's depth, from a look's own colours: a hazy range behind the far scenery, one landmark per
 // scenery standing on the far range, and detail along the hills. Every shape is two pixels thick.
 
-/** The distant range scrolls at a twelfth of the ground's pace, half the far range's. */
-export const hdBackShiftOf = (scroll: number): number => Math.floor(scroll / 12)
+/** The distant range scrolls at a sixteenth of the ground's pace, a quarter of the far range's. */
+export const hdBackShiftOf = (scroll: number): number => Math.floor(scroll / 16)
 
 // Why most of the way to the sky: aerial haze is what reads as distance at this size.
-const HAZE = 0.55
+const HAZE = 0.45
 
 /** How tall the distant range stands over the ground at world column `x`. */
 export const hdBackHeightOf = (look: Look, pixels: number, x: number): number => {
@@ -22,7 +22,7 @@ export const hdBackHeightOf = (look: Look, pixels: number, x: number): number =>
       const i = Math.floor(x / 53)
       let best = 0
       for (let k = i - 1; k <= i + 1; k += 1) {
-        const peak = pixels * (0.7 + (hash(k, 41) % 12) / 100)
+        const peak = pixels * (0.78 + (hash(k, 41) % 12) / 100)
         best = Math.max(best, peak - Math.abs(x - (k * 53 + (hash(k, 43) % 20))) * 0.55)
       }
       return best
@@ -30,19 +30,27 @@ export const hdBackHeightOf = (look: Look, pixels: number, x: number): number =>
     case 'skyline': {
       const block = Math.floor(x / 9)
       const isGap = mod(x, 9) >= 5 + (hash(block, 47) % 3)
-      return isGap ? pixels * 0.3 : pixels * (0.48 + (hash(block, 53) % 26) / 100)
+      return isGap ? pixels * 0.4 : pixels * (0.6 + (hash(block, 53) % 24) / 100)
     }
     case 'crystals': {
       const i = Math.floor(x / 31)
       let best = 0
       for (let k = i - 1; k <= i + 1; k += 1) {
-        const spire = pixels * (0.62 + (hash(k, 59) % 16) / 100)
+        const spire = pixels * (0.72 + (hash(k, 59) % 16) / 100)
         best = Math.max(best, spire - Math.abs(x - (k * 31 + (hash(k, 61) % 9))) * 1.3)
       }
       return best
     }
-    case 'meadow':
-      return pixels * (0.38 + 0.05 * Math.sin(x * 0.045) + 0.03 * Math.sin(x * 0.13 + 2))
+    // Why mountains behind a meadow: rolling hills in front of rolling hills read as one band.
+    case 'meadow': {
+      const i = Math.floor(x / 41)
+      let best = 0
+      for (let k = i - 1; k <= i + 1; k += 1) {
+        const peak = pixels * (0.62 + (hash(k, 101) % 14) / 100)
+        best = Math.max(best, peak - Math.abs(x - (k * 41 + (hash(k, 103) % 16))) * 0.45)
+      }
+      return best
+    }
   }
 }
 
@@ -61,7 +69,7 @@ export const hdBackPixel = (frame: HdFrame, x: number, y: number): number | unde
   return mix(tone, skyRowOf(frame, y), HAZE)
 }
 
-// One landmark per scenery on the far range: `#` its wall, `L` the face that catches the light,
+// One landmark per scenery, standing on the hills: `#` its wall, `L` the face that catches the light,
 // `w` a window lit after dusk, `d` a doorway, `b` a beacon or glint that blinks, `o` a hub.
 // A two-frame landmark turns every MARK_TICKS.
 const MARKS: Readonly<Record<Scenery, readonly (readonly string[])[]>> = {
@@ -155,7 +163,8 @@ const MARKS: Readonly<Record<Scenery, readonly (readonly string[])[]>> = {
   ]
 }
 
-const MARK_EVERY = 160
+const MARK_EVERY = 96
+const MARK_LOWEST = 0.2
 export const MARK_TICKS = 10
 
 /** Which frame of its landmark a scenery shows at `tick`; one frame, or none, never turns. */
@@ -163,7 +172,7 @@ export const hdMarkPhaseOf = (look: Look, tick: number): number =>
   (MARKS[look.scenery ?? 'peaks'].length > 1 ? Math.floor(tick / MARK_TICKS) : 0) % 2
 
 /**
- * The landmark's glyph at far column `fx`, `y`, standing on the range where `heightAt` says;
+ * The landmark's glyph at hill column `fx`, `y`, standing on the hills where `heightAt` says;
  * undefined off the landmark or in its transparent cells.
  */
 export const hdMarkGlyphOf = (
@@ -188,7 +197,8 @@ export const hdMarkGlyphOf = (
   for (let at = left; at < left + width; at += 1) {
     base = Math.min(base, heightAt(at))
   }
-  const top = Math.round(ground - base) - rows.length + 1
+  // Why a floor on its top: a tall landmark on a short band sinks into the hills, not into the sky's top rows.
+  const top = Math.max(Math.round(ground - base) - rows.length + 1, Math.ceil(ground * MARK_LOWEST))
   const row = rows[Math.min(rows.length - 1, y - top)]
   const glyph = y < top ? undefined : row?.[dx]
   return glyph === undefined || glyph === '.' ? undefined : glyph
@@ -197,7 +207,7 @@ export const hdMarkGlyphOf = (
 export const WARM_WINDOW = 0xffd27a
 const BEACON = 0xff4a4a
 
-/** The landmark at far column `fx`, `y`, lit like the range it stands on; undefined off it. */
+/** The landmark at hill column `fx`, `y`, lit like the hills it stands on; undefined off it. */
 export const hdMarkPixelOf = (
   frame: HdFrame,
   fx: number,
@@ -212,17 +222,18 @@ export const hdMarkPixelOf = (
   const lit = (color: number): number =>
     landInLight(color, frame.light, frame.dayLift, look.isNight)
   const layer = (color: number): number =>
-    apartFromSky(pushedBackOf(lit(color), frame.light), frame.far, y)
-  const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
-  // Why a pale face on a dark wall: the landmark reads by its own form, not against the rock behind.
+    apartFromSky(pushedBackOf(lit(color), frame.light), frame.mid, y)
+  const accent = (color: number): number => accentApartFromSky(color, frame.mid, y)
+  // Why a bright face over a mid wall: the landmark reads by its own form, against the dark hills.
   const opening = mix(look.far, 0x000000, 0.62)
+  const isCrystal = look.scenery === 'crystals'
   switch (glyph) {
     case 'L':
-      return layer(
-        look.scenery === 'crystals'
-          ? mix(look.plant, look.snow, 0.3)
-          : mix(look.far, look.snow, 0.55)
+      return accent(
+        lit(isCrystal ? mix(look.plant, look.snow, 0.45) : mix(look.snow, 0xffffff, 0.2))
       )
+    case '#':
+      return layer(isCrystal ? look.plant : mix(look.far, look.snow, 0.3))
     case 'w':
       return frame.light.night > 0.5 ? accent(WARM_WINDOW) : layer(opening)
     case 'd':
@@ -231,7 +242,7 @@ export const hdMarkPixelOf = (
     case 'b':
       return accent(look.scenery === 'skyline' ? BEACON : lit(look.snow))
     default:
-      return layer(mix(look.far, 0x000000, 0.4))
+      return layer(opening)
   }
 }
 

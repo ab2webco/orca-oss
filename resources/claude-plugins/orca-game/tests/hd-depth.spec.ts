@@ -3,13 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { NOON } from '../hooks/hd-daylight'
 import { lightnessOf } from '../hooks/hd-lightness'
 import { hdBackPixel, MARK_TICKS } from '../hooks/scene-hd-depth'
-import {
-  hdFarMarkPixel,
-  hdFarPixel,
-  hdFrameOf,
-  hdMidPixel,
-  hdSkyBaseOf
-} from '../hooks/scene-hd-land'
+import { hdFarPixel, hdMarkPixel, hdFrameOf, hdMidPixel, hdSkyBaseOf } from '../hooks/scene-hd-land'
 import { SCENES } from '../hooks/scenes/index'
 import type { Look } from '../hooks/scenes/scene-definition'
 
@@ -33,8 +27,11 @@ describe('hd depth on every built-in look', () => {
       for (let x = 0; x < WIDTH; x += 1) {
         for (let y = 0; y < frame.ground; y += 1) {
           const back = hdBackPixel(frame, x, y)
-          const far = hdFarPixel(frame, x, y + 1)
-          if (back === undefined || hdFarPixel(frame, x, y) !== undefined || far === undefined) {
+          // Why under its ridge: the range's lit edge is meant to stand out from the haze.
+          const far = hdFarPixel(frame, x, y + 3)
+          const isEdge =
+            hdFarPixel(frame, x, y) === undefined && hdFarPixel(frame, x, y + 1) !== undefined
+          if (back === undefined || !isEdge || far === undefined) {
             continue
           }
           behind += 1
@@ -47,16 +44,20 @@ describe('hd depth on every built-in look', () => {
     }
   })
 
-  it('puts a landmark on the far range in every band width', () => {
+  // Why under the top third: the thought clouds take those rows, and hid the landmark there.
+  it('stands a landmark on the hills, mostly under the clouds’ rows, in every band width', () => {
     for (const { label, look } of LOOKS) {
       const frame = frameAt(look)
       let shown = 0
+      let low = 0
       for (let x = 0; x < WIDTH; x += 1) {
         for (let y = 0; y < frame.ground; y += 1) {
-          shown += hdFarMarkPixel(frame, x, y) === undefined ? 0 : 1
+          const isMark = hdMarkPixel(frame, x, y) !== undefined
+          shown += isMark ? 1 : 0
+          low += isMark && y >= frame.pixels / 3 ? 1 : 0
         }
       }
-      expect([label, shown > 30]).toEqual([label, true])
+      expect([label, shown > 30, low / shown > 0.5]).toEqual([label, true, true])
     }
   })
 
@@ -65,7 +66,7 @@ describe('hd depth on every built-in look', () => {
       const [a, b] = [frameAt(look, 0), frameAt(look, MARK_TICKS)]
       for (let x = 0; x < WIDTH; x += 1) {
         for (let y = 0; y < a.ground; y += 1) {
-          if (hdFarMarkPixel(a, x, y) !== hdFarMarkPixel(b, x, y)) {
+          if (hdMarkPixel(a, x, y) !== hdMarkPixel(b, x, y)) {
             return true
           }
         }
