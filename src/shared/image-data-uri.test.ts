@@ -70,4 +70,15 @@ describe('validateRasterImageDataUri', () => {
     )
     expect(validateRasterImageDataUri('data:image/png,not-base64')).toBeNull()
   })
+
+  it('keeps multi-parameter headers and rejects a long parameter run in linear time', () => {
+    const multi = `data:image/png;charset=x;base64,${pngBase64()}`
+    expect(validateRasterImageDataUri(multi)).toBe(`data:image/png;base64,${pngBase64()}`)
+    // Why: the old `(?:;[^,]*)*` took ~2-5 s on 28 `;` and doubled per extra one.
+    const startedAt = performance.now()
+    expect(validateRasterImageDataUri(`data:image/png${';'.repeat(30)}x`)).toBe(
+      `data:image/png${';'.repeat(30)}x`
+    )
+    expect(performance.now() - startedAt).toBeLessThan(1000)
+  })
 })

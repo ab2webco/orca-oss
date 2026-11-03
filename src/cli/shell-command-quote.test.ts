@@ -17,4 +17,9 @@ describe('quoteCliCommandArgument', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     expect(quoteCliCommandArgument('Text Editor')).toBe('"Text Editor"')
   })
+
+  it('keeps a trailing backslash from closing the Windows quote early', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    expect(quoteCliCommandArgument('C:\\my dir\\')).toBe('"C:\\my dir\\\\"')
+  })
 })

@@ -18,7 +18,8 @@ const TIME_ONLY_RE = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i
 // Why: newer Codex CLIs print 24-hour reset times ("10:21 on 28 Jul") with no am/pm.
 const TIME_24H_RE = /\b(\d{1,2}):(\d{2})\b/
 const DAY_MONTH_RE = new RegExp(`\\b(?:on\\s+)?(\\d{1,2})\\s+(${MONTH_PATTERN})\\b`, 'i')
-const RELATIVE_RESET_RE = /^(?:\s*\d+\s*(?:d(?:ays?)?|h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?)\s*)+$/i
+// Why: one `\s*` per gap; a leading and trailing `\s*` in the group backtrack exponentially.
+const RELATIVE_RESET_RE = /^\s*(?:\d+\s*(?:d(?:ays?)?|h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?)\s*)+$/i
 const RELATIVE_RESET_TOKEN_RE = /(\d+)\s*(d(?:ays?)?|h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?)/gi
 const IANA_TIME_ZONE_RE = /\(([^()]*)\)?\s*$/
 
