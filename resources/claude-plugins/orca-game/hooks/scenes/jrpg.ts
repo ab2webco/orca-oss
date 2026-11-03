@@ -21,7 +21,7 @@ const CHARACTERS = [
   member('Sora', 0xf6dcc4, 0x7fe0ff, 'halo', 0xfff3a0),
   member('Thane', 0x9a6440, 0x8a8a8a, 'horns', 0xb89a70),
   member('Mira', 0xf0c8a0, 0xf878c8, 'bow', 0xffffff),
-  member('Elara', 0xd8a878, 0xf4f0d0, 'crown', 0xffd84a),
+  member('Elara', 0xd8a878, 0xf4f0d0, 'halo', 0xc8e8ff),
   member('Bryn', 0xb07850, 0xe07a2a, 'cape', 0x3a6ad0),
   member('Corin', 0x7a4a2a, 0x4a8a3a, 'antenna', 0x9ae07a),
   member('Faye', 0xfadcc0, 0x9a6ad0, 'feather', 0x4fc3f7),

@@ -9,6 +9,7 @@ import { SCENES, sceneOf, type SceneDefinition, type ScenePhase } from '../hooks
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { castOf } from '../hooks/scenes/cast-shape'
 import { REFEREE } from '../hooks/advisor-art'
+import { LEAD_GOLD } from '../hooks/hd-party'
 import { ADVISOR_GESTURES } from '../hooks/scenes/scene-definition'
 import { ORCHESTRATOR_GAME_BUILT_IN_SCENES } from '../../../../src/shared/orchestrator-game-config'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
@@ -236,6 +237,15 @@ describe('built-in casts', () => {
       )
       expect(names.every((name) => name.length > 0)).toBe(true)
       expect(castOf(JSON.parse(JSON.stringify(one.cast)))).toEqual(one.cast)
+    }
+  })
+
+  it('crown only the lead: no roster character wears a crown or the lead’s gold', () => {
+    for (const one of Object.values(SCENES)) {
+      for (const character of one.characters ?? []) {
+        expect([one.id, character.variant?.accessory]).not.toEqual([one.id, 'crown'])
+        expect([one.id, character.variant?.accessoryColor]).not.toEqual([one.id, LEAD_GOLD])
+      }
     }
   })
 

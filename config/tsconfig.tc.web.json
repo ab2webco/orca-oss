@@ -31,6 +31,7 @@
     "../resources/claude-plugins/orca-game/hooks/hd-words.ts",
     "../resources/claude-plugins/orca-game/hooks/party-sprites.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd.ts",
+    "../resources/claude-plugins/orca-game/hooks/scene-hd-depth.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-land.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-props.ts",
     "../resources/claude-plugins/orca-game/hooks/scene-hd-sky.ts",

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { daylightAt } from '../hooks/hd-daylight'
 import { lightnessOf } from '../hooks/hd-lightness'
-import { hdFarPixel, hdFrameOf, hdGroundPixel } from '../hooks/scene-hd-land'
+import { hdFarMarkPixel, hdFarPixel, hdFrameOf, hdGroundPixel } from '../hooks/scene-hd-land'
 import { SCENES, type ScenePhase } from '../hooks/scenes/index'
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { ORCHESTRATOR_GAME_SCENE_TEMPLATE } from '../../../../src/shared/orchestrator-game-scene-authoring'
@@ -91,7 +91,9 @@ describe('hd land materials on every built-in scene', () => {
       const right = frame.farTops[x + 2] ?? 0
       const y = Math.ceil(frame.ground - (frame.farTops[x + 1] ?? 0)) + 1
       const color = hdFarPixel(frame, x, y)
-      if (color === undefined || Math.abs(left - right) < 1) {
+      // Why: the landmark is a building, not a flank.
+      const isMark = [x, x + 1, x + 2].some((at) => hdFarMarkPixel(frame, at, y) !== undefined)
+      if (color === undefined || isMark || Math.abs(left - right) < 1) {
         continue
       }
       ;(Math.sign(frame.sunX - x) * (left - right) > 0 ? toward : away).push(lightnessOf(color))

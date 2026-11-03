@@ -271,8 +271,8 @@
         "colors": {
           "O": "#f0a0c0"
         },
-        "accessory": "crown",
-        "accessoryColor": "#ffd84a"
+        "accessory": "bow",
+        "accessoryColor": "#f5f0ff"
       }
     },
     {
@@ -341,7 +341,7 @@
           "O": "#f4f4f0"
         },
         "accessory": "halo",
-        "accessoryColor": "#ffd84a"
+        "accessoryColor": "#fff3a0"
       }
     }
   ],

@@ -14,13 +14,13 @@ const knight = (
 const CHARACTERS = [
   knight({ en: 'Merlin', es: 'Merlín' }, 0x6f8fe0, 'halo', 0xfff3a0),
   knight({ en: 'Lancelot', es: 'Lanzarote' }, 0xc8ccd4, 'feather', 0x4fc3f7),
-  knight({ en: 'Guinevere', es: 'Ginebra' }, 0xf0a0c0, 'crown', 0xffd84a),
+  knight({ en: 'Guinevere', es: 'Ginebra' }, 0xf0a0c0, 'bow', 0xf5f0ff),
   knight({ en: 'Gawain', es: 'Galván' }, 0x7ccf6a, 'horns', 0xe8e0c8),
   knight('Morgana', 0x9a6ad0, 'horns', 0xd0a0f0),
   knight('Percival', 0xe8c860, 'cape', 0xe05060),
   knight({ en: 'Tristan', es: 'Tristán' }, 0x4fb8b0, 'cape', 0x5f9ae8),
   knight({ en: 'Isolde', es: 'Isolda' }, 0xf2d0a0, 'bow', 0xe0405a),
-  knight('Galahad', 0xf4f4f0, 'halo', 0xffd84a),
+  knight('Galahad', 0xf4f4f0, 'halo', 0xfff3a0),
   knight('Bedivere', 0xb07a50, 'feather', 0xd83a2e),
   knight('Elaine', 0xe07070, 'bow', 0x5fb8ff)
 ]

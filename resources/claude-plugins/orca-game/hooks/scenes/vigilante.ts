@@ -28,7 +28,7 @@ const CHARACTERS = [
   hero('Nova', 0xfadcc0, 0x2a4a9a, 'antenna', 0xfff06a),
   hero('Shade', 0x8a5a38, 0x2a3a2a, 'cape', 0x5fa07a),
   hero('Ember', 0xf0c8a0, 0xb03a1a, 'horns', 0xff7a2a),
-  hero('Falcon', 0xb57a50, 0x5a4a2a, 'crown', 0xd8b040),
+  hero('Falcon', 0xb57a50, 0x5a4a2a, 'feather', 0xd8b040),
   hero('Cipher', 0xa87048, 0x2a6a5a, 'antenna', 0x5fe0a0)
 ]
 

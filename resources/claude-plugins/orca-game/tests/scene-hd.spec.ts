@@ -15,6 +15,7 @@ import {
   hdSkyBaseOf,
   hdSkyPixel
 } from '../hooks/scene-hd-land'
+import { hdBackPixel } from '../hooks/scene-hd-depth'
 import { skyRowOf } from '../hooks/scene-hd-sky'
 import { SCENES, sceneOf } from '../hooks/scenes/index'
 import { digest } from './grid-digest'
@@ -154,7 +155,10 @@ describe('hd layers', () => {
     const kept: boolean[] = []
     for (const x of [0, 1, columns - 2, columns - 1]) {
       for (let y = 0; y < lit.ground; y += 1) {
-        if (hdFarPixel(lit, x, y) === undefined && hdMidPixel(lit, x, y) === undefined) {
+        const isLand = [hdFarPixel, hdMidPixel, hdBackPixel].some(
+          (layer) => layer(lit, x, y) !== undefined
+        )
+        if (!isLand) {
           kept.push(pixelOf(grid, columns, x, y) === hdSkyPixel(lit, x, y))
         }
       }

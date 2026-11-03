@@ -14,7 +14,7 @@ const CHARACTERS = [
   shiny('Mochi', 0xf8b8d0, 'bow', 0xe0405a),
   shiny('Bramble', 0x7a5a3a, 'horns', 0xe8e0c8),
   shiny('Sprout', 0x9ae07a, 'antenna', 0x5fbf6a),
-  shiny('Pebble', 0xa0a0a8, 'crown', 0xffd84a),
+  shiny('Pebble', 0xa0a0a8, 'bow', 0xffd0e0),
   shiny('Fern', 0x3f9f5a, 'feather', 0x2f8a3a),
   shiny('Clover', 0x6ad08a, 'halo', 0xfff3a0),
   shiny('Thistle', 0xa06ad0, 'horns', 0xb07ae0),
