@@ -26,10 +26,9 @@ export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = 
  *  Keep in sync with src/main/update-feed-target.ts (shared/ cannot import main/).
  *  Upstream isolates each dev channel in its own repo so their tags never evict
  *  stable/RC entries from the 10-entry atom feed. That split buys the fork
- *  nothing: hourly-mac-build.yml, daily-mac-build.yml and adhoc-mac-build.yml are
- *  all gated `github.repository == 'stablyai/orca'`, so none runs here and no
- *  ab2webco hourly/daily/adhoc repo exists. Every channel therefore resolves to
- *  this repo and simply lists no dev builds. If the fork ever ungates one of
+ *  nothing: it has no hourly, daily or adhoc build workflow and no ab2webco
+ *  hourly/daily/adhoc repo exists. Every channel therefore resolves to
+ *  this repo and simply lists no dev builds. If the fork ever adds one of
  *  those workflows, give that channel its own repo again rather than letting its
  *  tags evict this feed's stable/RC entries. */
 export const HOURLY_RELEASE_REPO = 'ab2webco/orca-oss'

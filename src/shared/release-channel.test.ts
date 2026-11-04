@@ -34,9 +34,8 @@ describe('release channel', () => {
 
   // Why upstream splits each dev channel into its own repo: the releases atom feed
   // exposes only 10 entries, so 24 hourly tags a day would evict every stable/RC
-  // entry. The fork publishes no dev channel — hourly-mac-build.yml,
-  // daily-mac-build.yml and adhoc-mac-build.yml are all gated on
-  // `github.repository == 'stablyai/orca'` — so the split buys it nothing, and
+  // entry. The fork has no hourly, daily or adhoc build workflow, so the split
+  // buys it nothing, and
   // pointing any of them at upstream's repo would let the dev build picker pin the
   // updater at upstream assets and install an upstream build over a lab one. The
   // fork's remaining guarantee is the prerelease downgrade, pinned in

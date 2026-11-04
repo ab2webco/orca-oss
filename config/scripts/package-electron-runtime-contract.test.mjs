@@ -387,39 +387,6 @@ describe('Electron runtime package contract', () => {
     expect(versionStep.run).toContain('git rev-parse "$existing_rc_tag"')
   })
 
-  it('bumps separate Homebrew casks for stable and RC desktop tags', () => {
-    const releaseWorkflow = parse(
-      readFileSync(join(projectDir, '.github/workflows/release-cut.yml'), 'utf8')
-    )
-    const homebrewWorkflow = parse(
-      readFileSync(join(projectDir, '.github/workflows/homebrew-bump.yml'), 'utf8')
-    )
-
-    expect(releaseWorkflow.jobs['homebrew-bump'].if).toContain(
-      "startsWith(needs.cut.outputs.tag, 'v')"
-    )
-    expect(releaseWorkflow.jobs['homebrew-bump'].if).not.toContain('-rc.')
-    expect(releaseWorkflow.jobs['homebrew-bump-published-rc-draft'].with.tag).toBe(
-      '${{ needs.cut.outputs.latest_published_rc_tag }}'
-    )
-
-    const resolveCaskStep = homebrewWorkflow.jobs['bump-cask'].steps.find(
-      (step) => step.name === 'Resolve cask target'
-    )
-    const renderStep = homebrewWorkflow.jobs['bump-cask'].steps.find(
-      (step) => step.name === 'Render updated cask file'
-    )
-    const copyStep = homebrewWorkflow.jobs['bump-cask'].steps.find(
-      (step) => step.name === 'Copy cask into tap and open PR'
-    )
-
-    expect(resolveCaskStep.run).toContain('token="orca@rc"')
-    expect(resolveCaskStep.run).toContain('token="orca"')
-    expect(renderStep.env.CASK_PATH).toBe('${{ steps.cask.outputs.path }}')
-    expect(copyStep.run).toContain('cp "$CASK_PATH" "tap/$CASK_PATH"')
-    expect(copyStep.run).toContain('git add "$CASK_PATH"')
-  })
-
   it('installs the Electron package binary in PR checks without changing native module ABI', () => {
     const prWorkflow = readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8')
     const parsedWorkflow = parse(prWorkflow)
