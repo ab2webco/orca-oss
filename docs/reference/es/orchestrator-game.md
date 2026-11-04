@@ -1,5 +1,5 @@
 ---
-sourceHash: 789bc90bd37cbc37
+sourceHash: a2ffb9f743483a69
 ---
 # El juego orquestador de Agent Teams
 
@@ -715,6 +715,15 @@ matches …` (ORCA-866).
   ([`orchestrator-game-history-store.ts`](../../../src/main/runtime/orchestrator-game-history-store.ts)).
   Se escriben mediante `game.historyRecord` y se leen mediante `game.history`, dos métodos RPC que un
   host más antiguo que esto no tiene; `game history` dice entonces que actualices Orca.
+- `orca game adopt-history --from-repo-id <id>` — los datos del juego se guardan bajo el id del repo,
+  y un repo quitado y agregado de nuevo recibe otro, así que su historial, eventos, personajes,
+  lecciones y STOP quedan bajo el id viejo mientras el juego lee un proyecto vacío (ORCA-1011). Esto
+  los integra en el proyecto actual: registros y eventos fusionados por fecha, personajes y conteos de
+  lecciones sumados, un STOP que sigue puesto. Los archivos viejos se renombran
+  `<name>.adopted-<time>` junto a cada store, nunca se borran, así que una segunda corrida no encuentra
+  nada. Rechaza un id de repo que Orca todavía tiene, y solo corre cuando ningún lead ni miembro de
+  ninguno de los dos ids está vivo, desde una terminal de Orca en el proyecto, en el host del lead. Los
+  miembros guardados, la conversación del lead y los drops no se traen: nombran worktrees del id viejo.
 - `orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>]` — los números de entrega
   del proyecto, calculados del lado del cliente a partir de los almacenes completos `game.events` y
   `game.history` (sin RPC nuevo, así que también responde un host más antiguo): tickets hechos (un
