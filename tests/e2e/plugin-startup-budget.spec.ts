@@ -93,9 +93,14 @@ async function launchSample(
   testInfo: TestInfo
 ): Promise<StartupSample> {
   let output = ''
+  let closeStartedAt: number | null = null
   const launched = await session.launch({
     onStderr: (chunk) => {
-      output += chunk
+      // Why: harness arrival offsets show where a slow close spends time outside the main-process quit milestones.
+      output +=
+        closeStartedAt === null || !chunk.includes('[shutdown]')
+          ? chunk
+          : `[e2e] stderr-arrived-after-close-ms=${Date.now() - closeStartedAt}\n${chunk}`
     }
   })
   try {
@@ -113,17 +118,23 @@ async function launchSample(
         duration: expect.any(Number),
         count: expectedPlugins
       })
-    await testInfo.attach(`plugin-startup-${expectedPlugins}-${Date.now()}.log`, {
-      body: Buffer.from(output),
-      contentType: 'text/plain'
-    })
     return {
       readyToShowMs: parseMetric(output, 'ready-to-show', 't')!,
       pluginDurationMs: parseMetric(output, 'plugin-system-initialized', 'durationMs')!,
       installedPlugins: parseMetric(output, 'plugin-system-initialized', 'installedPlugins')!
     }
   } finally {
-    await session.close(launched.app)
+    // Why attach after close: the `[shutdown]` lines name the teardown member a stalled quit waits on (ORCA-992).
+    const startedAt = Date.now()
+    closeStartedAt = startedAt
+    try {
+      await session.close(launched.app)
+    } finally {
+      await testInfo.attach(`plugin-startup-${expectedPlugins}-${startedAt}.log`, {
+        body: Buffer.from(`${output}[e2e] close-duration-ms=${Date.now() - startedAt}\n`),
+        contentType: 'text/plain'
+      })
+    }
   }
 }
 

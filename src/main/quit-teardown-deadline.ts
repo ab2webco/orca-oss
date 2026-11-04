@@ -12,16 +12,34 @@ export type NamedQuitTeardown = {
   promise: Promise<unknown>
 }
 
+export type QuitTeardownObserver = {
+  memberSettled?: (name: string, elapsedMs: number, outcome: 'fulfilled' | 'rejected') => void
+  /** Fires once at `pendingReportMs` if any member is still unsettled. */
+  stillPending?: (pendingNames: string[], elapsedMs: number) => void
+  pendingReportMs?: number
+}
+
 export async function settleTeardownWithinDeadline(
   teardowns: readonly NamedQuitTeardown[],
-  deadlineMs: number = WILL_QUIT_TEARDOWN_DEADLINE_MS
+  deadlineMs: number = WILL_QUIT_TEARDOWN_DEADLINE_MS,
+  observer: QuitTeardownObserver = {}
 ): Promise<string[]> {
+  const startedAt = performance.now()
+  const elapsed = (): number => Math.round(performance.now() - startedAt)
   const pendingNames = new Set(teardowns.map(({ name }) => name))
   const settled = Promise.allSettled(
     teardowns.map(({ name, promise }) =>
-      promise.finally(() => {
-        pendingNames.delete(name)
-      })
+      promise.then(
+        () => {
+          pendingNames.delete(name)
+          observer.memberSettled?.(name, elapsed(), 'fulfilled')
+        },
+        (error: unknown) => {
+          pendingNames.delete(name)
+          observer.memberSettled?.(name, elapsed(), 'rejected')
+          throw error
+        }
+      )
     )
   ).then(() => 'settled' as const)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -29,7 +47,18 @@ export async function settleTeardownWithinDeadline(
     timer = setTimeout(() => resolve('deadline'), deadlineMs)
     timer.unref?.()
   })
+  let pendingTimer: ReturnType<typeof setTimeout> | undefined
+  if (observer.stillPending && observer.pendingReportMs !== undefined) {
+    const report = observer.stillPending
+    pendingTimer = setTimeout(() => {
+      if (pendingNames.size > 0) {
+        report([...pendingNames], elapsed())
+      }
+    }, observer.pendingReportMs)
+    pendingTimer.unref?.()
+  }
   const outcome = await Promise.race([settled, deadline])
   clearTimeout(timer)
+  clearTimeout(pendingTimer)
   return outcome === 'deadline' ? [...pendingNames] : []
 }
