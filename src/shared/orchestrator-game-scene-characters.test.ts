@@ -79,7 +79,7 @@ describe('scene roster characters', () => {
       'roster.4.variant.accessoryColor: needs an accessory',
       'roster.5: set a variant or costumes, not both',
       'roster.6.costumes.pr.rows.0: must be ten printable ASCII glyphs',
-      'roster.6.costumes.pr.rows: Too small: expected array to have >=6 items',
+      'roster.6.costumes.pr.rows: Too small: expected array to have exactly 6 items',
       'roster.6.costumes.pr.colors: glyph "x" has no color',
       ...['docs', 'build', 'verify', 'pr', 'handoff'].map(
         (phase) => `roster.7.costumes.${phase}: Invalid input: expected object, received undefined`
