@@ -1,5 +1,6 @@
 import type {
   AdvisorGesture,
+  CastFrame,
   CharacterAccessory,
   LocalizedName,
   PlantKind,
@@ -67,6 +68,29 @@ export const ADVISOR_GESTURES = Object.keys(ADVISOR_GESTURE_SET) as readonly Adv
 export const CAST_MAX_ROWS = 7
 export const CAST_MAX_WIDTH = 10
 export const CAST_MAX_FRAMES = 4
+
+/** An advisor's body for every gesture from four poses: hand up to stop, arm out to the prop, cheering, thinking. */
+export const advisorGestures = (poses: {
+  stopped: CastFrame
+  reach: CastFrame
+  cheer: CastFrame
+  think: CastFrame
+}): Readonly<Record<AdvisorGesture, CastFrame>> => {
+  const { stopped, reach, cheer, think } = poses
+  return {
+    stopped,
+    lowered: reach,
+    raised: reach,
+    unsure: reach,
+    escalated: reach,
+    ciFailed: reach,
+    approved: cheer,
+    ciPassed: cheer,
+    advised: cheer,
+    consulting: think,
+    ciRunning: think
+  }
+}
 
 /** A roster character in the phase costumes, under its own palette and accessory. */
 export const sceneCharacter = (

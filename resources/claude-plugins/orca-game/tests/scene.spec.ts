@@ -13,6 +13,7 @@ import {
   snoreOf
 } from '../hooks/scene'
 import { digest, glyphs } from './grid-digest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 
 const QUEST = sceneOf('quest')
 
@@ -66,7 +67,7 @@ describe('scene registry', () => {
     }
     expect(localizedNameOf(QUEST.cards.working.name, 'es')).toBe('Escudero')
     expect(localizedNameOf(QUEST.teller.name, 'es')).toBe('Narrador')
-    expect(localizedNameOf(QUEST.cards.handoff.name, 'en')).toBe('King')
+    expect(localizedNameOf(QUEST.cards.handoff.name, 'en')).toBe('Champion')
   })
 
   it('every costume fits the scene rows and names a color for each glyph', () => {
@@ -113,7 +114,9 @@ describe('scene', () => {
   })
 
   it('draws the same frame as the original quest art at a fixed tick', () => {
-    expect(digest(sceneGridOf(QUEST, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe('f3652aeb')
+    expect(digest(sceneGridOf(PLAIN_QUEST, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe(
+      'f3652aeb'
+    )
   })
 
   it('a finished character sits still with a snore instead of walking', () => {

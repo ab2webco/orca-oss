@@ -13,7 +13,8 @@ import type {
   Look,
   SceneCast,
   SceneCharacter,
-  SceneDefinition
+  SceneDefinition,
+  SceneTheme
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import { joinPath } from '../../lib/path'
 import { translate } from '@/i18n/i18n'
@@ -51,6 +52,10 @@ const lookText = (look: Look): Record<string, unknown> => ({
   plant: hex(look.plant),
   cloud: hex(look.cloud)
 })
+
+// Why: a theme look sets only the colors it varies.
+const themeLookText = (look: SceneTheme['look']): Record<string, string> =>
+  Object.fromEntries(Object.entries(look).map(([key, color]) => [key, hex(color as number)]))
 
 const colorsText = (colors: Readonly<Record<string, number>>): Record<string, string> =>
   Object.fromEntries(Object.entries(colors).map(([glyph, color]) => [glyph, hex(color)]))
@@ -115,7 +120,10 @@ export function sceneFileTextOf(scene: SceneDefinition): string {
         }
       : {}),
     ...(scene.cast ? { cast: castText(scene.cast) } : {}),
-    ...(scene.roster ? { roster: rosterText(scene) } : {})
+    ...(scene.roster ? { roster: rosterText(scene) } : {}),
+    ...(scene.themes
+      ? { themes: scene.themes.map((theme) => ({ ...theme, look: themeLookText(theme.look) })) }
+      : {})
   }
   return `${JSON.stringify(file, null, 2)}\n`
 }

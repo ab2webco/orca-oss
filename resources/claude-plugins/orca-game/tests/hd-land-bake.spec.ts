@@ -5,6 +5,7 @@ import { hdBakedGroundOf, hdBakedLandOf, hdLandBakeOf } from '../hooks/hd-land-b
 import * as material from '../hooks/hd-material'
 import { hdSceneGridOf } from '../hooks/scene-hd'
 import { hdFarPixel, hdFrameOf, hdGroundPixel, hdMidPixel } from '../hooks/scene-hd-land'
+import { hdBackPixel } from '../hooks/scene-hd-depth'
 import { SCENES } from '../hooks/scenes/index'
 
 vi.mock('../hooks/hd-material', async (original) => {
@@ -61,7 +62,9 @@ describe('baked hd land', () => {
                         frame.dayLift,
                         look.isNight
                       )
-                    : (hdMidPixel(frame, x, y) ?? hdFarPixel(frame, x, y))
+                    : (hdMidPixel(frame, x, y) ??
+                      hdFarPixel(frame, x, y) ??
+                      hdBackPixel(frame, x, y))
                 const got =
                   y >= frame.ground
                     ? hdBakedGroundOf(bake, frame, x, y)

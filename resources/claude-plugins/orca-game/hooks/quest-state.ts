@@ -3,6 +3,7 @@ import { advisorSpriteOf } from './advisor-art'
 import { advisorPoseAt, isAdvisorActingAt } from './advisor-state'
 import { demoFrameOf, type DemoFrame } from './demo'
 import { DEFAULT_GAME_CONFIG, effectiveConfigOf, isAbsorbingConfig } from './game-config'
+import { localizedNameOf } from './game-strings'
 import { dayOf, daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
 import { crownedLeadOf, type HdMember, type March } from './hd-party'
@@ -105,7 +106,12 @@ export const currentScene = (): SceneDefinition =>
     quest.clockMs === 0 ? undefined : dayOf(quest.clockMs, gameConfig().timezone)
   )
 
-export const demoNow = (): DemoFrame => demoFrameOf(quest.demoStep)
+// Why past the first: the roster's first name is the hero's, who wears the phase costume.
+export const demoNow = (): DemoFrame =>
+  demoFrameOf(
+    quest.demoStep,
+    (currentScene().roster ?? []).slice(1).map((name) => localizedNameOf(name))
+  )
 
 export const shownPhase = (): FlowPhase | undefined =>
   quest.isDemo ? demoNow().phase : (quest.phase ?? quest.fleetPhase)

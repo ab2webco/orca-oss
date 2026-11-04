@@ -3,27 +3,36 @@ import {
   accentApartFromSky,
   apartFromSky,
   layerContrastOf,
+  rimApartFromSky,
   type LayerContrast
 } from './hd-layer-contrast'
 import { lightnessOf, luminanceOf, luminanceOfLightness, withLuminance } from './hd-lightness'
 import { backdropMaterialPixel, facingOf, litByFacing, toneRampOf } from './hd-material'
 import { GROUND_FLOOR, pushedBackOf } from './hd-readability'
 import { hash, mix, mod } from './pixel-canvas'
+import { hdHillDetailOf, hdMarkPixelOf, WARM_WINDOW } from './scene-hd-depth'
+import { hdGroundDetailOf } from './hd-ground-detail'
+import { hdFarHeightOf, hdMidTopOf } from './hd-land-heights'
 import { hdSkyOf, skyRowOf, type HdSky } from './scene-hd-sky'
 import type { Look } from './scenes/index'
 
 export { hdPlantPixel, hdPondPixel } from './scene-hd-props'
 export { hdSkyBaseOf, hdSkyPixel } from './scene-hd-sky'
 
-// hd's land, back to front: far scenery fogged toward the sky, a mid layer of hills, near props, the ground.
+// hd's land, back to front: a hazy distant range, far scenery with its landmark, hills, near props, the ground.
 // Far and mid come out lit for the hour and kept legible against the sky; props and ground are lit by the caller.
 
 const GROUND_ROWS = 3
 const MAX_KEPT = 4
 const WINDOW_TICKS = 40
 const GLINT_TICKS = 8
+// Lightness a rolling range's rim keeps off the sky behind it.
+const RIM_GAP = 16
 // The backdrop skips the material's deepest step: shade, the colour and a highlight are enough.
 const BACKDROP_STEP = 1
+// The hills' own colour leans to the near tone and darkens with each row down.
+const MID_TONE = 0.2
+const MID_SHADE = 0.045
 
 export type HdFrame = HdSky & {
   scroll: number
@@ -37,43 +46,11 @@ export type HdFrame = HdSky & {
   floor: number
 }
 
-const farHeight = (look: Look, pixels: number, x: number): number => {
-  switch (look.scenery ?? 'peaks') {
-    case 'peaks': {
-      const i = Math.floor(x / 26)
-      let best = 0
-      for (let k = i - 1; k <= i + 1; k += 1) {
-        const peak = pixels * (0.38 + (hash(k, 5) % 20) / 100)
-        best = Math.max(best, peak - Math.abs(x - (k * 26 + (hash(k, 3) % 12))) * 0.75)
-      }
-      return best
-    }
-    case 'skyline':
-      return mod(x, 7) === 6
-        ? pixels * 0.12
-        : pixels * (0.22 + (hash(Math.floor(x / 7), 13) % 30) / 100)
-    case 'crystals': {
-      const i = Math.floor(x / 13)
-      let best = 0
-      for (let k = i - 1; k <= i + 1; k += 1) {
-        const spire = pixels * (0.3 + (hash(k, 19) % 25) / 100)
-        best = Math.max(best, spire - Math.abs(x - (k * 13 + (hash(k, 17) % 6))) * 2.2)
-      }
-      return best
-    }
-    case 'meadow':
-      return pixels * (0.2 + 0.08 * Math.sin(x * 0.07 + 1) + 0.04 * Math.sin(x * 0.19))
-  }
-}
+/** How far the far range and the hills have scrolled: a quarter and a half of the ground's pace. */
+export const hdFarShiftOf = (scroll: number): number => Math.floor(scroll / 4)
+export const hdMidShiftOf = (scroll: number): number => Math.floor(scroll / 2)
 
-const midTopOf = (ground: number, pixels: number, mx: number): number =>
-  ground - pixels * (0.13 + 0.05 * Math.sin(mx * 0.11 + 2) + 0.03 * Math.sin(mx * 0.29))
-
-/** How far the far range and the hills have scrolled: a sixth and a third of the ground's pace. */
-export const hdFarShiftOf = (scroll: number): number => Math.floor(scroll / 6)
-export const hdMidShiftOf = (scroll: number): number => Math.floor(scroll / 3)
-
-/** What of the far range moves with the tick: a city's lit windows, a crystal range's glints. */
+/** What of the far range moves with the tick: lit windows and glints. */
 export const hdFarPhaseOf = (look: Look, tick: number): number =>
   look.scenery === 'skyline'
     ? Math.floor(tick / WINDOW_TICKS)
@@ -98,11 +75,11 @@ const silhouettesOf = (sky: HdSky, scroll: number) => {
   const far = new Float64Array(sky.width + 3)
   const mid = new Float64Array(sky.width + 2)
   for (let x = -1; x <= sky.width + 1; x += 1) {
-    far[x + 1] = farHeight(sky.look, sky.pixels, x + farShift)
+    far[x + 1] = hdFarHeightOf(sky.look, sky.pixels, x + farShift)
   }
   // Why one past the edge: the last column's facing reads its right neighbour.
   for (let x = 0; x <= sky.width; x += 1) {
-    mid[x] = midTopOf(sky.ground, sky.pixels, x + midShift)
+    mid[x] = hdMidTopOf(sky.look, sky.ground, sky.pixels, x + midShift)
   }
   if (own.size >= MAX_KEPT) {
     own.clear()
@@ -133,14 +110,14 @@ const hillsRangeOf = (args: {
   y: number
 }): { lo: number; hi: number } => {
   const { look, mid, pixels, y } = args
-  const flat = mix(look.near, look.far, 0.35)
+  const flat = mix(look.near, look.far, MID_TONE)
   const key = mix(look.sun, 0xffffff, 0.4)
   let lo = 100
   let hi = 0
   for (const tone of toneRampOf(flat).slice(BACKDROP_STEP)) {
     for (const facing of [0, 1]) {
-      for (const depth of [0, pixels * 0.21]) {
-        const shade = (color: number): number => mix(color, 0x000000, depth * 0.03)
+      for (const depth of [0, pixels * 0.29]) {
+        const shade = (color: number): number => mix(color, 0x000000, depth * MID_SHADE)
         const hill = shade(litByFacing(tone, facing, key))
         const drawn = apartFromSky(
           pushedBackOf(args.lit(awayFromSky(hill, shade(flat), mid)), args.light),
@@ -190,7 +167,7 @@ const contrastsOf = (sky: HdSky): Contrasts => {
   const middle = skyRowOf(sky, Math.floor(ground * 0.6))
   const mid = layerContrastOf(
     rows,
-    lit(mix(look.near, look.far, 0.35)),
+    lit(mix(look.near, look.far, MID_TONE)),
     Math.floor(ground - pixels * 0.21)
   )
   const made = {
@@ -232,7 +209,16 @@ const litOf = (frame: HdFrame, color: number): number =>
   landInLight(color, frame.light, frame.dayLift, frame.look.isNight)
 
 const farHeightAt = (frame: HdFrame, x: number): number =>
-  frame.farTops[x + 1] ?? farHeight(frame.look, frame.pixels, x + hdFarShiftOf(frame.scroll))
+  frame.farTops[x + 1] ?? hdFarHeightOf(frame.look, frame.pixels, x + hdFarShiftOf(frame.scroll))
+
+/** The landmark standing on the hills at (x, y), lit like them; undefined off it. */
+export const hdMarkPixel = (frame: HdFrame, x: number, y: number): number | undefined =>
+  hdMarkPixelOf(
+    frame,
+    x + hdMidShiftOf(frame.scroll),
+    y,
+    (at) => frame.ground - hdMidTopOf(frame.look, frame.ground, frame.pixels, at)
+  )
 
 export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
   const { look, ground, tick, pixels } = frame
@@ -254,19 +240,38 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
     apartFromSky(pushedBackOf(color, frame.light), frame.far, y)
   const accent = (color: number): number => accentApartFromSky(color, frame.far, y)
   const isLitSide = facing > 0.5
+  // Why a lit ridge on every range: its edge, not its fill, is what tells it from the haze behind.
+  const isRidge = y - top < 2 && !(look.scenery === 'skyline' && mod(fx, 7) === 6)
+  if (
+    isRidge &&
+    look.scenery !== 'crystals' &&
+    look.scenery !== undefined &&
+    look.scenery !== 'peaks'
+  ) {
+    // Why the key light, not the look's snow: a dusk palette's snow is as dim as its rock.
+    // Why brighter and stronger in the country: rolling hills have no snow cap, and a sunset rim
+    // as light as the sky behind it vanishes.
+    const isMeadow = look.scenery === 'meadow'
+    const rim = isMeadow ? mix(look.sun, 0xffffff, 0.7) : keyLightOf(frame)
+    // Why the range's flat colour: its grain under a rim breaks the edge into specks.
+    const reach = (isLitSide ? 0.6 : 0.4) + (isMeadow ? 0.25 : 0)
+    const lit = mix(litOf(frame, look.far), litOf(frame, rim), reach)
+    return isMeadow ? rimApartFromSky(lit, frame.far, y, RIM_GAP) : accent(lit)
+  }
   switch (look.scenery ?? 'peaks') {
     case 'peaks':
-      if (y - top < 1.6 && height > pixels * 0.45) {
-        return accent(litOf(frame, look.snow))
+      // Why every peak capped two deep: a thinner cap on a slope breaks into single pixels.
+      if (isRidge) {
+        return accent(isLitSide ? snow : mix(snow, litOf(frame, look.far), 0.3))
       }
       return layer(base)
     case 'skyline': {
       // Why two pixels tall: a one-pixel window reads as a speck, not a lit room.
       const floor = Math.floor(y / 3)
       const isWindow =
-        mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 3) !== 2 && floor * 3 > top + 1
-      const isLit = isWindow && (hash(fx, floor) + Math.floor(tick / WINDOW_TICKS)) % 10 === 0
-      return isLit ? accent(mix(snow, base, 0.15)) : layer(base)
+        mod(fx, 7) !== 6 && mod(fx, 2) === 1 && mod(y, 3) !== 2 && floor * 3 >= top + 2
+      const isLit = isWindow && (hash(fx, floor) + Math.floor(tick / WINDOW_TICKS)) % 4 === 0
+      return isLit ? accent(litOf(frame, mix(WARM_WINDOW, snow, 0.35))) : layer(base)
     }
     case 'crystals':
       // Why a rim deeper than the slope, on spires only: a thinner one, or one the hills cut, leaves specks.
@@ -281,19 +286,47 @@ export const hdFarPixel = (frame: HdFrame, x: number, y: number): number | undef
 }
 
 export const hdMidPixel = (frame: HdFrame, x: number, y: number): number | undefined => {
+  const { look } = frame
   const mx = x + hdMidShiftOf(frame.scroll)
-  const top = frame.midTops[x] ?? midTopOf(frame.ground, frame.pixels, mx)
+  const mark = hdMarkPixel(frame, x, y)
+  if (mark !== undefined) {
+    return mark
+  }
+  const top = frame.midTops[x] ?? hdMidTopOf(look, frame.ground, frame.pixels, mx)
+  const flat = mix(look.near, look.far, MID_TONE)
+  const drawn = (color: number): number =>
+    apartFromSky(pushedBackOf(litOf(frame, color), frame.light), frame.mid, y)
   if (y < top) {
-    return undefined
+    const detail = hdHillDetailOf(look, mx, Math.ceil(top) - 1 - y)
+    if (detail === undefined) {
+      return undefined
+    }
+    const tone = detail === 'leaf' ? mix(flat, look.plant, 0.45) : mix(flat, look.snow, 0.4)
+    return drawn(mix(tone, 0x000000, detail === 'leaf' ? 0.2 : 0))
+  }
+  // Why both rows inside the roof: a one-pixel window reads as a speck, not a lit room.
+  const sill = y - mod(y, 4)
+  const isRoofWindow =
+    look.scenery === 'skyline' &&
+    frame.light.night > 0.5 &&
+    sill - top > 1 &&
+    sill + 1 < frame.ground &&
+    mod(mx, 6) % 3 === 1 &&
+    mod(y, 4) < 2 &&
+    hash(mx, Math.floor(y / 4)) % 3 === 0
+  if (isRoofWindow) {
+    return accentApartFromSky(WARM_WINDOW, frame.mid, y)
   }
   const heightAt = (at: number): number =>
-    frame.ground - (frame.midTops[at] ?? midTopOf(frame.ground, frame.pixels, at + mx - x))
-  const facing = facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
-  const flat = mix(frame.look.near, frame.look.far, 0.35)
-  const shade = (color: number): number => mix(color, 0x000000, (y - top) * 0.03)
+    frame.ground - (frame.midTops[at] ?? hdMidTopOf(look, frame.ground, frame.pixels, at + mx - x))
+  const facing =
+    look.scenery === 'skyline' ? 0.5 : facingOf(heightAt(x - 1), heightAt(x + 1), x, frame.sunX)
+  if (y - top < 1) {
+    return drawn(mix(flat, keyLightOf(frame), 0.4))
+  }
+  const shade = (color: number): number => mix(color, 0x000000, (y - top) * MID_SHADE)
   const hill = shade(litByFacing(backdropMaterialPixel(flat, mx, y, 23), facing, keyLightOf(frame)))
-  const lit = litOf(frame, awayFromSky(hill, shade(flat), frame.mid))
-  return apartFromSky(pushedBackOf(lit, frame.light), frame.mid, y)
+  return drawn(awayFromSky(hill, shade(flat), frame.mid))
 }
 
 export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
@@ -301,5 +334,5 @@ export const hdGroundPixel = (frame: HdFrame, x: number, y: number): number => {
   const gx = x + frame.scroll
   // Why half the material: under the floor, the soil only needs grain, not specks.
   const soil = mix(backdropMaterialPixel(look.ground, gx, y, 61), look.ground, 0.5)
-  return mix(soil, 0x000000, (y - ground) * 0.08)
+  return mix(hdGroundDetailOf(look, gx, y - ground, soil) ?? soil, 0x000000, (y - ground) * 0.08)
 }

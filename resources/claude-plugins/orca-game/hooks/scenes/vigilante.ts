@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const EYES = 0x1a1a1a
 const WHITE = 0xf4f4f4
@@ -20,15 +20,15 @@ const hero = (
 
 const CHARACTERS = [
   hero('Raven', 0xf6d5b8, 0x2a2a3a, 'feather', 0x8a8ab0),
-  hero('Lynx', 0xc68e5e, 0x8a6a2a, 'horns', 0xc8a050),
+  hero('Lynx', 0xc68e5e, 0x8a6a2a, 'horns', 0xc8b8a0),
   hero('Vesper', 0x9a6440, 0x6a2a6a, 'bow', 0xd83a8a),
   hero('Specter', 0xe8e8f0, 0x4a5a6a, 'halo', 0xc8f0ff),
   hero('Onyx', 0x6b4428, 0x1a1a1a, 'cape', 0x9a9aaa),
   hero('Talon', 0xd8a070, 0x7a3a1a, 'feather', 0xc04a2a),
-  hero('Nova', 0xfadcc0, 0x2a4a9a, 'antenna', 0xfff06a),
+  hero('Nova', 0xfadcc0, 0x2a4a9a, 'antenna', 0x9ae0ff),
   hero('Shade', 0x8a5a38, 0x2a3a2a, 'cape', 0x5fa07a),
   hero('Ember', 0xf0c8a0, 0xb03a1a, 'horns', 0xff7a2a),
-  hero('Falcon', 0xb57a50, 0x5a4a2a, 'crown', 0xd8b040),
+  hero('Falcon', 0xb57a50, 0x5a4a2a, 'feather', 0x9a6a40),
   hero('Cipher', 0xa87048, 0x2a6a5a, 'antenna', 0x5fe0a0)
 ]
 
@@ -61,8 +61,8 @@ export const VIGILANTE_SCENE: SceneDefinition = {
       snow: 0xe8b04a,
       near: 0x16131f,
       ground: 0x0f0d16,
-      plant: 0x3a3048,
-      plantKind: 'antenna',
+      plant: 0x2a3a30,
+      plantKind: 'tree',
       cloud: 0x3a3352,
       scenery: 'skyline'
     },
@@ -119,7 +119,7 @@ export const VIGILANTE_SCENE: SceneDefinition = {
       near: 0x1c2030,
       ground: 0x14161f,
       plant: 0x3a4058,
-      plantKind: 'antenna',
+      plantKind: 'none',
       cloud: 0xd8a080,
       scenery: 'skyline'
     }
@@ -203,26 +203,47 @@ export const VIGILANTE_SCENE: SceneDefinition = {
     colors: { R: 0x8a2a3a, M: 0x1a1a1a, W: WHITE, S: HERO_SKIN, P: 0x2a2a2a }
   },
   finale: { en: '◆ CASE CLOSED', es: '◆ CASO CERRADO' },
+  hud: {
+    skyTop: 0x05070f,
+    skyBottom: 0x1a1d2e,
+    frame: 0x8a93a8,
+    text: 0xe6e8ee,
+    dim: 0x5d6475,
+    star: 0xf5f3c8
+  },
+  themes: [
+    {
+      name: { en: 'Neon', es: 'Neón' },
+      weight: 0.3,
+      look: { skyBottom: 0x8a2a8a, sun: 0xff5ad0, far: 0x3a1a5a, cloud: 0x6a2a7a }
+    },
+    {
+      name: { en: 'Fog', es: 'Niebla' },
+      weight: 0.4,
+      look: { skyBottom: 0x8a94a8, far: 0x5a6478, near: 0x4a5060, cloud: 0xb0b8c8 }
+    }
+  ],
   // Jev's advisor: the commissioner, grey mustache and trench coat, by the signal.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: ['Nightjar', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // An alley cat that follows the hero across the rooftops.
+    pet: {
+      name: { en: 'Alley Cat', es: 'Gato callejero' },
+      frames: [
+        ['T...K.K', 'T...KKK', '.KKKKYK', '.K..K..'],
+        ['T...K.K', 'T...KKK', '.KKKKYK', 'K..K...']
+      ],
+      happy: ['.T..K.K', 'T...KKK', '.KKKKHK', '.K..K..'],
+      colors: { K: 0x8a8aa0, T: 0x8a8aa0, Y: 0xffd84a, H: 0x3a3a48 }
+    },
     advisor: {
       name: { en: 'Commissioner', es: 'Comisionado' },
       frames: [
         ['..HHHH..', '.HSSSSH.', '.SGSGS..', '..MMMS..', '.CCWWCC.', 'SCCRWCCS', '.CC..CC.']
       ],
-      gestures: {
-        escalated: [
-          '..HHHH..',
-          '.HSSSSH.',
-          '.SGSGS..',
-          '..MMMS..',
-          'SCCWWCC.',
-          '.CCRWCCS',
-          '.CC..CC.'
-        ],
+      gestures: advisorGestures({
         stopped: [
           '..HHHH..',
           '.HSSSSH.',
@@ -231,8 +252,11 @@ export const VIGILANTE_SCENE: SceneDefinition = {
           'CCCWWCC.',
           '.CCRWCCS',
           '.CC..CC.'
-        ]
-      },
+        ],
+        reach: ['..HHHH..', '.HSSSSH.', '.SGSGS..', '..MMMS..', 'SCCWWCC.', '.CCRWCCS', '.CC..CC.'],
+        cheer: ['..HHHH.S', '.HSSSSHC', '.SGSGS.C', '..MMMSC.', '.CCWWCC.', 'SCCRWCC.', '.CC..CC.'],
+        think: ['..HHHH..', '.HSSSSH.', '.SGSGS..', '.SMMMS..', '.CCWWCC.', '.CCRWCCS', '.CC..CC.']
+      }),
       colors: {
         H: 0xc9ccd4,
         S: HERO_SKIN,

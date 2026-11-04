@@ -229,7 +229,7 @@ const projectOf = (step: Step): GameProjectWork => ({
   }
 })
 
-const stateOf = (step: Step): GameState => ({
+const stateOf = (step: Step, names: readonly string[]): GameState => ({
   config: {},
   warnings: [],
   extensions: { scenes: [] },
@@ -245,9 +245,9 @@ const stateOf = (step: Step): GameState => ({
       toolName: null,
       isLeader: true
     },
-    ...step.seats.map(([name, state, tool]) => ({
+    ...step.seats.map(([name, state, tool], i) => ({
       paneKey: `demo-${name}`,
-      displayName: name,
+      displayName: names[i] ?? name,
       ...(DEMO_SEAT_AGENTS[name] ?? { agentType: 'claude' }),
       state,
       toolName: tool,
@@ -275,7 +275,8 @@ const stateOf = (step: Step): GameState => ({
   actions: DEMO_ACTIONS
 })
 
-export const demoFrameOf = (step: number): DemoFrame => {
+/** The scripted frame at `step`; `names`, a scene's roster, names the seats so each wears its look. */
+export const demoFrameOf = (step: number, names: readonly string[] = []): DemoFrame => {
   const at = ((step % SCRIPT.length) + SCRIPT.length) % SCRIPT.length
   const frame = SCRIPT[at] ?? SCRIPT[0]
   const before = SCRIPT[(at + SCRIPT.length - 1) % SCRIPT.length] ?? frame
@@ -283,7 +284,7 @@ export const demoFrameOf = (step: number): DemoFrame => {
     throw new Error('the demo script is empty')
   }
   return {
-    state: stateOf(frame),
+    state: stateOf(frame, names),
     xp: frame.xp,
     phase: frame.phase,
     action: frame.action,

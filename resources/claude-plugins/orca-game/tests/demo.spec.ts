@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEMO_FRAMES, demoFrameOf } from '../hooks/demo'
+import { characterCostumeOf } from '../hooks/character-look'
+import { localizedNameOf } from '../hooks/game-strings'
 import { ACTIONS } from '../hooks/quest-policy'
+import { SCENES } from '../hooks/scenes/index'
+
+const QUEST = SCENES.quest!
 
 describe('demo', () => {
   it('cycles every reaction and action, with one level-up and fake data only', () => {
@@ -54,5 +59,22 @@ describe('demo', () => {
       expect(todo?.groups?.review).toBeGreaterThan(0)
       expect(todo?.total).toBeGreaterThanOrEqual(todo?.items.length ?? Infinity)
     }
+  })
+
+  it('names its seats after the scene’s roster, past the hero, so each wears its own look', () => {
+    const roster = (SCENES.quest?.roster ?? []).slice(1).map((name) => localizedNameOf(name, 'en'))
+    for (let step = 0; step < DEMO_FRAMES; step += 1) {
+      const members = demoFrameOf(step, roster).state.agents.filter((one) => !one.isLeader)
+      expect(members.map((one) => one.displayName)).toEqual(roster.slice(0, members.length))
+      expect(
+        members.map((one) => characterCostumeOf(QUEST, one.displayName, 'build'))
+      ).not.toContainEqual(QUEST.costumes.build)
+    }
+    expect(demoFrameOf(0).state.agents.map((one) => one.displayName)).toEqual([
+      'lead',
+      'builder',
+      'tester',
+      'scribe'
+    ])
   })
 })

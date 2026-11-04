@@ -756,7 +756,7 @@ matches …` (ORCA-866).
 - `orca game adopt <name|ticket> [--force]` — makes an agent `game fleet` lists as found (an agent
   of this project's repo no lead lists, ORCA-943), on this machine or on a paired host, a member. It
   runs a new task on the agent's own terminal with `worker-start --worktree id:<wt> --terminal
-  <handle>`, plus `--on <host>` for a paired host, so lead mail reaches the agent and its status,
+<handle>`, plus `--on <host>` for a paired host, so lead mail reaches the agent and its status,
   questions and worker_done reach the current lead. That path is one every paired host already
   serves, so there is no wire change. Adoption is refused while the agent is mid-turn, so the attach
   brief never lands in a running turn (pass `--force` to adopt anyway). It is also refused when the
@@ -1232,7 +1232,7 @@ six phases (working · docs · build · verify · PR · handoff) and signs your 
 
 | Id          | Scene        | World                                        | Party by phase, then teller                                                         | On red CI          | Merge finale    |
 | ----------- | ------------ | -------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------ | --------------- |
-| `quest`     | Quest        | Mountains and hills, sun or night sky        | Squire · Sage · Blacksmith · Knight · Herald · King; Storyteller                    | the member flashes | —               |
+| `quest`     | Quest        | Mountains and hills, sun or night sky        | Squire · Sage · Blacksmith · Knight · Herald · Champion; Storyteller                | the member flashes | —               |
 | `vigilante` | Night Watch  | Night skyline, rooftops, a signal in the sky | Night Watch · Detective · Gadgeteer · Mentor · Rooftop Run · Commissioner; Narrator | a masked rogue     | `◆ CASE CLOSED` |
 | `jrpg`      | Crystal Saga | Crystal spires under day, dusk, storm, night | Mercenary · Mage · Thief · Healer · Lancer · Hero; Chronicler                       | a rival swordsman  | `★ VICTORY ★`   |
 | `tamer`     | Beast Tamer  | Flower meadows                               | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | a wild glitch bug  | `◓ CAUGHT!`     |

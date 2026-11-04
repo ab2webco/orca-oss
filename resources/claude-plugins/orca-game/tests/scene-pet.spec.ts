@@ -6,6 +6,7 @@ import { UPPER_HALF } from '../hooks/pixel-canvas'
 import { restColumnOf, SCENE_ROWS, sceneGridOf, walkColumn } from '../hooks/scene'
 import { PET_TRAIL_TICKS, petColumnOf } from '../hooks/scene-cast'
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 import type { SceneDefinition, ScenePet } from '../hooks/scenes/index'
 
 afterEach(() => setGameLocale('en'))
@@ -79,8 +80,8 @@ describe('the scene pet', () => {
   })
 
   it('leaves a scene without a pet exactly as it was drawn before', () => {
-    const plain = sceneGridOf(QUEST_SCENE, 'build', COLUMNS, 7, 'Editing quest.tsx', 0)
-    const empty = { ...QUEST_SCENE, cast: {} }
+    const plain = sceneGridOf(PLAIN_QUEST, 'build', COLUMNS, 7, 'Editing quest.tsx', 0)
+    const empty = { ...PLAIN_QUEST, cast: {} }
     expect(sceneGridOf(empty, 'build', COLUMNS, 7, 'Editing quest.tsx', 0)).toEqual(plain)
   })
 
@@ -107,7 +108,7 @@ describe('the scene pet', () => {
   })
 
   it('without a pet, Pet still hearts the hero as before', () => {
-    const petted = sceneGridOf(QUEST_SCENE, undefined, COLUMNS, 60, '', 0, { kind: 'pet', age: 1 })
+    const petted = sceneGridOf(PLAIN_QUEST, undefined, COLUMNS, 60, '', 0, { kind: 'pet', age: 1 })
     const walk = walkColumn(COLUMNS, 60)
     expect(heartsAt(petted).every((x) => x >= walk && x < walk + 10)).toBe(true)
   })
@@ -118,10 +119,10 @@ describe('the Pet button', () => {
     menuChipsOf(scene).find((chip) => chip.key === 'band-pet')?.labels[0]
 
   it('names the scene pet, and is plain Pet without one', () => {
-    expect(petLabel(QUEST_SCENE)).toBe('♥ Pet')
+    expect(petLabel(PLAIN_QUEST)).toBe('♥ Pet')
     expect(petLabel(WITH_PET)).toBe('♥ Pet Wolf')
     setGameLocale('es')
-    expect(petLabel(QUEST_SCENE)).toBe('♥ Mimar')
+    expect(petLabel(PLAIN_QUEST)).toBe('♥ Mimar')
     expect(petLabel(WITH_PET)).toBe('♥ Mimar a Lobo')
   })
 

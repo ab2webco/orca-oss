@@ -7,6 +7,7 @@ import { advisorStageOf, type AdvisorPose } from '../hooks/scene-cast'
 import { castOf } from '../hooks/scenes/cast-shape'
 import { ADVISOR_GESTURES } from '../hooks/scenes/scene-definition'
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 import type { SceneAdvisor, SceneDefinition } from '../hooks/scenes/index'
 import { digest } from './grid-digest'
 
@@ -97,7 +98,7 @@ describe('the advisor in the scene', () => {
         undefined
       )
     ).toEqual(plain)
-    expect(digest(sceneGridOf(QUEST_SCENE, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe(
+    expect(digest(sceneGridOf(PLAIN_QUEST, 'build', 60, 7, 'Editing quest.tsx', 0))).toBe(
       'f3652aeb'
     )
     expect(advisorStageOf(COLUMNS, undefined)).toBe(COLUMNS)

@@ -48,8 +48,12 @@ describe('sceneFileTextOf', () => {
       expect(text).toMatch(/"skyTop": "#[0-9a-f]{6}"/)
       expect(text).not.toMatch(/"id":/)
       // Why: a copied scene keeps its cast, as hand-editable as the rest.
-      expect(text).toMatch(/"cast": \{\n {4}"advisor": \{/)
+      expect(text).toMatch(/"cast": \{\n {4}"pet": \{/)
+      expect(text).toMatch(/\n {4}"advisor": \{/)
       expect(text).not.toMatch(/"[!-~]": \d+/)
+      // Why: themes wear the same hand-editable colors as the looks they vary.
+      expect(text).toMatch(/"themes": \[/)
+      expect(text).not.toMatch(/"(?:skyTop|skyBottom|sun|far|snow|near|ground|plant|cloud)": \d/)
       expect(text.endsWith('}\n')).toBe(true)
     }
   )

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { PLAIN_QUEST } from './plain-quest-scene'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 import {
   byScenePhase,
@@ -113,8 +114,8 @@ describe('sceneDefinitionOf', () => {
       isSignal: true
     })
     expect(scene).toEqual(orca.ok ? orca.definition : undefined)
-    const plain = sceneDefinitionOf(quest, 'quest')
-    expect(plain && ('foe' in plain || 'finale' in plain || 'scenery' in plain.looks.pr)).toBe(
+    const plain = sceneDefinitionOf(roundTrip(PLAIN_QUEST), 'quest')
+    expect(plain && ('foe' in plain || 'finale' in plain || 'scenery' in plain.looks.build)).toBe(
       false
     )
   })

@@ -1,4 +1,4 @@
-import { sceneCharacter, type SceneDefinition } from './scene-definition'
+import { advisorGestures, sceneCharacter, type SceneDefinition } from './scene-definition'
 
 const CLAUDE = 0xd77757
 const EYES = 0x1a1a1a
@@ -14,18 +14,18 @@ const knight = (
 const CHARACTERS = [
   knight({ en: 'Merlin', es: 'Merlín' }, 0x6f8fe0, 'halo', 0xfff3a0),
   knight({ en: 'Lancelot', es: 'Lanzarote' }, 0xc8ccd4, 'feather', 0x4fc3f7),
-  knight({ en: 'Guinevere', es: 'Ginebra' }, 0xf0a0c0, 'crown', 0xffd84a),
+  knight({ en: 'Guinevere', es: 'Ginebra' }, 0xf0a0c0, 'bow', 0xf5f0ff),
   knight({ en: 'Gawain', es: 'Galván' }, 0x7ccf6a, 'horns', 0xe8e0c8),
   knight('Morgana', 0x9a6ad0, 'horns', 0xd0a0f0),
   knight('Percival', 0xe8c860, 'cape', 0xe05060),
   knight({ en: 'Tristan', es: 'Tristán' }, 0x4fb8b0, 'cape', 0x5f9ae8),
   knight({ en: 'Isolde', es: 'Isolda' }, 0xf2d0a0, 'bow', 0xe0405a),
-  knight('Galahad', 0xf4f4f0, 'halo', 0xffd84a),
+  knight('Galahad', 0xf4f4f0, 'halo', 0xfff3a0),
   knight('Bedivere', 0xb07a50, 'feather', 0xd83a2e),
   knight('Elaine', 0xe07070, 'bow', 0x5fb8ff)
 ]
 
-// Squire, Sage, Blacksmith, Knight, Herald and King walking a parallax landscape.
+// Squire, Sage, Blacksmith, Knight, Herald and Champion walking a parallax landscape.
 export const QUEST_SCENE: SceneDefinition = {
   id: 'quest',
   looks: {
@@ -40,7 +40,8 @@ export const QUEST_SCENE: SceneDefinition = {
       ground: 0x6b4f35,
       plant: 0x2f6b3a,
       plantKind: 'tree',
-      cloud: 0xf4f7fb
+      cloud: 0xf4f7fb,
+      scenery: 'meadow'
     },
     docs: {
       skyTop: 0x2b3a67,
@@ -51,9 +52,10 @@ export const QUEST_SCENE: SceneDefinition = {
       snow: 0xe9dcf2,
       near: 0x3f5f4a,
       ground: 0x4a3a2c,
-      plant: 0x2c4a36,
-      plantKind: 'tree',
-      cloud: 0xf7c9b0
+      plant: 0x8a6ad0,
+      plantKind: 'crystal',
+      cloud: 0xf7c9b0,
+      scenery: 'crystals'
     },
     build: {
       skyTop: 0x3b8fd6,
@@ -92,7 +94,8 @@ export const QUEST_SCENE: SceneDefinition = {
       ground: 0x2a1c26,
       plant: 0x1c1420,
       plantKind: 'tree',
-      cloud: 0xff9f86
+      cloud: 0xff9f86,
+      scenery: 'meadow'
     },
     handoff: {
       skyTop: 0x0b1030,
@@ -134,10 +137,11 @@ export const QUEST_SCENE: SceneDefinition = {
       legs: ['.O.O.O.O..', 'O.O.O.O.O.'],
       colors: { ...SKIN, F: 0xffffff, C: 0x2e7d4f, G: 0xd4a017, P: 0xf1e2b8 }
     },
+    // A laurel, not a crown: the crown is the lead's alone.
     handoff: {
-      rows: ['.Y.Y.Y.Y..', '.YYYYYYY..', '.YJYYYJY..', '.OEOOOEO..', 'RNNNNNNNR.', '.RRRRRRR..'],
+      rows: ['..........', '.LYYYYYL..', 'LYYYYYYYL.', '.OEOOOEO..', 'RNNMNNNNR.', '.RRRRRRR..'],
       legs: ['.O.O.O.O..', 'O.O.O.O.O.'],
-      colors: { ...SKIN, Y: 0xf5c518, J: 0xd8283a, R: 0xa3202a, N: 0xf4f1ea }
+      colors: { ...SKIN, L: 0x5fae4a, Y: 0x7a4a2a, M: 0xc8d4e8, R: 0xa3202a, N: 0xf4f1ea }
     }
   },
   cards: {
@@ -167,9 +171,9 @@ export const QUEST_SCENE: SceneDefinition = {
       color: '#3fae6f'
     },
     handoff: {
-      icon: '♛',
-      name: { en: 'King', es: 'Rey' },
-      color: '#e0b020'
+      icon: '❦',
+      name: { en: 'Champion', es: 'Campeón' },
+      color: '#6fbf5a'
     }
   },
   teller: {
@@ -178,18 +182,47 @@ export const QUEST_SCENE: SceneDefinition = {
     color: '#8f9bb3'
   },
   band: { gold: '#c9a24a', ink: '#1a1f33', panel: '#2b3150', parchment: '#f1e2b8' },
+  // A red dragon breathing fire at a teammate whose CI is red.
+  foe: {
+    rows: ['.H.....H..', '.RRRRRRR..', 'RRYRRRYRR.', '.RRRRRRRWF', 'RRBBBBBRR.', '.RBBBBBR..'],
+    legs: ['.R.R.R.R..', 'R.R.R.R.R.'],
+    colors: { H: 0xe8e0c8, R: 0xb0302a, Y: 0xffd84a, W: 0xffffff, F: 0xffa030, B: 0xe8a060 }
+  },
+  finale: { en: '◆ QUEST COMPLETE', es: '◆ MISIÓN CUMPLIDA' },
+  themes: [
+    {
+      name: { en: 'Autumn', es: 'Otoño' },
+      weight: 0.4,
+      look: { near: 0xb8742f, plant: 0xc0602a, ground: 0x7a4a2a, cloud: 0xf8e0c0 }
+    },
+    {
+      name: { en: 'Frost', es: 'Escarcha' },
+      weight: 0.35,
+      look: { skyBottom: 0xdfeefa, snow: 0xffffff, near: 0x9ab8c8, plant: 0x4a7a8a }
+    }
+  ],
   // Jev's advisor: a wizard whose staff glows while it waits.
   // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
   roster: [{ en: 'Arthur', es: 'Arturo' }, ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {
+    // The squire's hound, trotting behind the hero.
+    pet: {
+      name: { en: 'Hound', es: 'Sabueso' },
+      frames: [
+        ['.....BB', 'T...BEB', '.BBBBBN', '.B..B..'],
+        ['.....BB', 'T...BEB', '.BBBBBN', 'B..B...']
+      ],
+      happy: ['T....BB', '.T..BEB', '.BBBBBN', '.B..BR.'],
+      colors: { B: 0xb07a40, T: 0xb07a40, E: EYES, N: EYES, R: 0xff6a8a }
+    },
     advisor: {
       name: { en: 'Wizard', es: 'Mago' },
       frames: [
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
         ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.G', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT']
       ],
-      gestures: {
+      gestures: advisorGestures({
         stopped: [
           '...PP...',
           '..PPYP..',
@@ -198,8 +231,11 @@ export const QUEST_SCENE: SceneDefinition = {
           'WWWWWRRT',
           '.RWWRRRT',
           '.RRRRRRT'
-        ]
-      },
+        ],
+        reach: ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', 'SWWWWRRT', '.RWWRRRT', '.RRRRRRT'],
+        cheer: ['...PP..G', '..PPYP.T', '.PPPPPPT', '..SESSST', '.WWWWRRT', '.RWWRRRT', '.RRRRRRT'],
+        think: ['...PP...', '..PPYP..', '.PPPPPP.', '..SESS.T', '.WSWWRRT', '.RWWRRRT', '.RRRRRRT']
+      }),
       colors: {
         P: 0x3e2a78,
         Y: 0xffd84a,

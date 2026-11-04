@@ -70,10 +70,11 @@ describe('hd land materials on every built-in scene', () => {
   })
 
   it('lights the far flank that faces the sun brighter than the one turned away', () => {
-    const look = SCENES.quest?.looks.working
-    if (look === undefined) {
+    const working = SCENES.quest?.looks.working
+    if (working === undefined) {
       throw new Error('quest scene missing')
     }
+    const look = { ...working, scenery: 'peaks' as const }
     // Why right of the sun: there the lit flank rises to the right, which a fixed light gets wrong.
     const frame = hdFrameOf({
       look,
@@ -88,7 +89,8 @@ describe('hd land materials on every built-in scene', () => {
     for (let x = Math.ceil(frame.sunX) + 2; x < WIDTH - 1; x += 1) {
       const left = frame.farTops[x] ?? 0
       const right = frame.farTops[x + 2] ?? 0
-      const y = Math.ceil(frame.ground - (frame.farTops[x + 1] ?? 0)) + 1
+      // Why two under the top: the snow cap takes the first two rows.
+      const y = Math.ceil(frame.ground - (frame.farTops[x + 1] ?? 0)) + 2
       const color = hdFarPixel(frame, x, y)
       if (color === undefined || Math.abs(left - right) < 1) {
         continue

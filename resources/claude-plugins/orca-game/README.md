@@ -151,8 +151,8 @@ A session's own tool calls set its phase: an edit under `docs/` or to a Markdown
 **Sage**, any other edit the **Blacksmith**, tests and linters the **Knight**, `git push`,
 `gh pr create` or `glab mr create` the **Herald**, and a merge (`gh pr merge`, `glab mr merge`) or a
 tracker status change (`orca plane status set`, `orca linear status set`, a tracker MCP update) the
-**King**. Teammates get theirs from their current tool, then from the worktree (an open review is
-the Herald, a merged one or a work item in review or done is the King).
+**Champion**. Teammates get theirs from their current tool, then from the worktree (an open review is
+the Herald, a merged one or a work item in review or done is the Champion).
 
 XP is earned only for a change seen between two polls of the same worktree, so a restart never
 re-awards: review merged 100, CI turning green 20, work item to review 50, to done 70. A lead

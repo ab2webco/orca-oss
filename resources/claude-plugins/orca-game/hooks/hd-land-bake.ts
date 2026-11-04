@@ -9,10 +9,11 @@ import {
   hdMidShiftOf,
   type HdFrame
 } from './scene-hd-land'
+import { hdBackPixel, hdBackShiftOf, hdMarkPhaseOf } from './scene-hd-depth'
 import type { Look } from './scenes/index'
 
 // hd's land baked per world column: a scroll step computes only the columns it brings in, a frame
-// at rest none. Kept while the look, size, hour and sun hold; the far range's own tick re-bakes it.
+// at rest none. Kept while the look, size, hour and sun hold; the far range's and the landmark's own ticks re-bake them.
 
 const EMPTY = -1
 const MAX_KEPT = 4
@@ -20,7 +21,14 @@ const MAX_KEPT = 4
 /** One layer's columns, by world column modulo the width; a tag says which column a slot holds. */
 type Layer = { tags: Float64Array; colors: Int32Array; rows: number; top: number }
 
-export type HdLandBake = { far: Layer; mid: Layer; ground: Layer; farPhase: number }
+export type HdLandBake = {
+  back: Layer
+  far: Layer
+  mid: Layer
+  ground: Layer
+  farPhase: number
+  midPhase: number
+}
 
 const layerOf = (width: number, rows: number, top: number): Layer => ({
   tags: new Float64Array(width).fill(Number.NaN),
@@ -37,11 +45,16 @@ export const hdLandBakeOf = (frame: HdFrame): HdLandBake => {
   const own = bakes.get(look) ?? new Map<string, HdLandBake>()
   bakes.set(look, own)
   const phase = hdFarPhaseOf(look, frame.tick)
+  const midPhase = hdMarkPhaseOf(look, frame.tick)
   const kept = own.get(key)
   if (kept !== undefined) {
     if (kept.farPhase !== phase) {
       kept.far.tags.fill(Number.NaN)
       kept.farPhase = phase
+    }
+    if (kept.midPhase !== midPhase) {
+      kept.mid.tags.fill(Number.NaN)
+      kept.midPhase = midPhase
     }
     return kept
   }
@@ -49,10 +62,12 @@ export const hdLandBakeOf = (frame: HdFrame): HdLandBake => {
     own.clear()
   }
   const made = {
+    back: layerOf(width, ground, 0),
     far: layerOf(width, ground, 0),
     mid: layerOf(width, ground, 0),
     ground: layerOf(width, pixels - ground, ground),
-    farPhase: phase
+    farPhase: phase,
+    midPhase
   }
   own.set(key, made)
   return made
@@ -81,7 +96,7 @@ const bakedOf = (
   return color === EMPTY ? undefined : color
 }
 
-/** The hills over the far range at (x, y) above the ground, or undefined where the sky shows. */
+/** The hills over the far range over the distant one at (x, y), or undefined where the sky shows. */
 export const hdBakedLandOf = (
   bake: HdLandBake,
   frame: HdFrame,
@@ -91,7 +106,8 @@ export const hdBakedLandOf = (
   const side = Math.sign(frame.sunX - x)
   return (
     bakedOf(bake.mid, x + hdMidShiftOf(frame.scroll), side, frame, x, y, hdMidPixel) ??
-    bakedOf(bake.far, x + hdFarShiftOf(frame.scroll), side, frame, x, y, hdFarPixel)
+    bakedOf(bake.far, x + hdFarShiftOf(frame.scroll), side, frame, x, y, hdFarPixel) ??
+    bakedOf(bake.back, x + hdBackShiftOf(frame.scroll), 0, frame, x, y, hdBackPixel)
   )
 }
 
