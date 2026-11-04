@@ -28,6 +28,10 @@ overrides:
   js-yaml@^4: 4.3.2
   # GHSA-2v37-7h3g-55p8
   nanoid@^3: 3.3.18
+  # GHSA-c8x8-7fp4-3x9w: paste XSS; ships in the renderer via @tiptap/pm
+  prosemirror-view@^1: 1.42.8
+  # prosemirror-view 1.42.8 needs ^1.25.12; one copy keeps Node/Schema instanceof checks working
+  prosemirror-model@^1: 1.25.12
   # GHSA-jqcg-44mw-7w3h (critical)
   proxy-addr@^2: 2.0.8
   # GHSA-7w5x-hrqm-74c2
