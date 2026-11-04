@@ -10,6 +10,8 @@ const BURST = 200
 // Why a constant: a render that invalidates or writes state once per draw adds BURST, never a few.
 const FEEDBACK_MAX = 4
 const COLUMNS = [40, 61, 80, 120, 160] as const
+// Why: a BURST takes 3.7-4.5 s on the Windows runner, against the kit's 5 s default.
+const BURST_TIMEOUT_MS = 30_000
 
 type Target = { component: string; requestId?: string }
 type Role = 'lead' | 'member'
@@ -164,30 +166,34 @@ describe('render loops', () => {
   for (const role of ['lead', 'member'] as const) {
     for (const target of targetsOf()) {
       const name = target.requestId ?? target.component
-      test(`${role}: ${BURST} updates to ${name} draw at most once each and feed no redraw`, async ($, on) => {
-        const counts: Counts = { renders: 0, feedback: 0 }
-        const clock = await start($, on, role, counts)
-        const ui = await $.ui.mount({
-          plugin: 'orca-game',
-          surface: 'terminal',
-          viewport: { columns: 170, rows: 40, isFullscreen: true },
-          ...target,
-          props: propsOf(target.component, 0)
-        } as never)
-        await clock.settle()
-        const before = { ...counts }
-        for (let i = 1; i <= BURST; i += 1) {
-          await ui.redraw(propsOf(target.component, i) as never)
+      test(
+        `${role}: ${BURST} updates to ${name} draw at most once each and feed no redraw`,
+        { timeoutMs: BURST_TIMEOUT_MS },
+        async ($, on) => {
+          const counts: Counts = { renders: 0, feedback: 0 }
+          const clock = await start($, on, role, counts)
+          const ui = await $.ui.mount({
+            plugin: 'orca-game',
+            surface: 'terminal',
+            viewport: { columns: 170, rows: 40, isFullscreen: true },
+            ...target,
+            props: propsOf(target.component, 0)
+          } as never)
+          await clock.settle()
+          const before = { ...counts }
+          for (let i = 1; i <= BURST; i += 1) {
+            await ui.redraw(propsOf(target.component, i) as never)
+          }
+          await clock.settle()
+          // Why the drawer: a render that throws falls back to the next hook's tree.
+          expect(((await ui.drawn()) as { part?: { plugin?: string } }).part?.plugin).toBe(
+            'orca-game'
+          )
+          expect(counts.renders - before.renders).toBeLessThanOrEqual(BURST)
+          expect(counts.feedback - before.feedback).toBeLessThanOrEqual(FEEDBACK_MAX)
+          await ui.unmount()
         }
-        await clock.settle()
-        // Why the drawer: a render that throws falls back to the next hook's tree.
-        expect(((await ui.drawn()) as { part?: { plugin?: string } }).part?.plugin).toBe(
-          'orca-game'
-        )
-        expect(counts.renders - before.renders).toBeLessThanOrEqual(BURST)
-        expect(counts.feedback - before.feedback).toBeLessThanOrEqual(FEEDBACK_MAX)
-        await ui.unmount()
-      })
+      )
     }
   }
 })
