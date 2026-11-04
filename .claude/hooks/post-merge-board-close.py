@@ -19,6 +19,7 @@ import sys
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from command_text import strip_heredocs  # noqa: E402
+from orca_cli import resolve_orca_cli
 
 PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 TICKET = re.compile(r"ORCA-(\d+)", re.IGNORECASE)
@@ -56,12 +57,15 @@ def merged_ticket(pr: str) -> str | None:
 
 
 def close(ticket: str, pr: str) -> bool:
+    cli = resolve_orca_cli()
+    if cli is None:
+        return False
     run(
-        ["orca", "plane", "comment", "add", "--id", ticket, "--project", PROJECT_ID,
+        [cli, "plane", "comment", "add", "--id", ticket, "--project", PROJECT_ID,
          "--body", f"Entregado en #{pr}, mergeado."]
     )
     return run(
-        ["orca", "plane", "status", "set", "--id", ticket, "--project", PROJECT_ID,
+        [cli, "plane", "status", "set", "--id", ticket, "--project", PROJECT_ID,
          "--to", "Done"]
     ) is not None
 

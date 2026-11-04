@@ -22,7 +22,11 @@ function run(command, { state = 'MERGED', title = 'fix: algo (ORCA-99)', statusO
   )
   const stdout = execFileSync('python3', [HOOK], {
     input: JSON.stringify({ tool_input: { command } }),
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      ORCA_CLI_COMMAND: path.join(bin, 'orca')
+    },
     encoding: 'utf8'
   })
   const calls = fs.existsSync(path.join(bin, 'calls'))

@@ -33,7 +33,7 @@ function run(script) {
   }
   const result = spawnSync(python, [hook], {
     encoding: 'utf8',
-    env: { PATH: bin }
+    env: { PATH: bin, ...(script === null ? {} : { ORCA_CLI_COMMAND: join(bin, 'orca') }) }
   })
   return {
     status: result.status,

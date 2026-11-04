@@ -27,6 +27,7 @@ function sessionStart({ role, gameRole } = {}) {
   // Why: this suite itself runs inside Orca member terminals, which export both.
   delete env.ORCA_GAME_ROLE
   delete env.ORCA_GAME_CLI
+  env.ORCA_CLI_COMMAND = join(bin, 'orca')
   if (role) {
     env.ORCA_GAME_ROLE = role
   }

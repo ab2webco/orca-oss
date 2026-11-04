@@ -3,6 +3,8 @@
 # worktrees left behind. --once emits SessionStart JSON; no flag loops for the Monitor.
 # Silence would be indistinguishable from a dead monitor, so it always prints a line.
 set -uo pipefail
+# shellcheck source=orca-cli.sh
+source "$(dirname "${BASH_SOURCE[0]}")/orca-cli.sh"
 
 REPO="${ORCA_SWEEP_REPO:-ab2webco/orca-oss}"
 ROOT="${ORCA_SWEEP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
