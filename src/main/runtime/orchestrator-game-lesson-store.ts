@@ -10,6 +10,7 @@ import {
   type GameLesson,
   type GameLessonSignal
 } from '../../shared/orchestrator-game-lessons'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** A project as the lessons know it: the host's key, and the name and folder Engram files it under. */
 export type GameLessonProject = { key: string; name: string; directory: string | null }
@@ -39,7 +40,10 @@ export class GameLessonStore {
   // Why per project: two records to one file must not read the same old list and drop one.
   private readonly queues = new Map<string, Promise<unknown>>()
 
-  constructor(private readonly dirOf: () => string) {}
+  constructor(
+    private readonly dirOf: () => string,
+    private readonly names?: GameStoreNaming
+  ) {}
 
   async list(projectKey: string): Promise<GameLesson[]> {
     return (await this.read(projectKey)).lessons
@@ -126,7 +130,10 @@ export class GameLessonStore {
   }
 
   private nameOf(projectKey: string): string {
-    return createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    return (
+      this.names?.nameIn(this.dirOf(), '.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    )
   }
 
   private fileOf(projectKey: string): string {

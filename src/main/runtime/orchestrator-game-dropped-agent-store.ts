@@ -10,6 +10,7 @@ import {
   type GameDropTarget,
   type GameDroppedAgent
 } from '../../shared/orchestrator-game-dropped-agents'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** The agents each project's lead dropped from its fleet, one file per project (ORCA-943). */
 export class GameDroppedAgentStore {
@@ -18,7 +19,8 @@ export class GameDroppedAgentStore {
 
   constructor(
     private readonly dirOf: () => string,
-    private readonly now: () => string = () => new Date().toISOString()
+    private readonly now: () => string = () => new Date().toISOString(),
+    private readonly names?: GameStoreNaming
   ) {}
 
   async read(projectKey: string): Promise<GameDroppedAgent[]> {
@@ -65,7 +67,9 @@ export class GameDroppedAgentStore {
   }
 
   private fileOf(projectKey: string): string {
-    const name = createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    const name =
+      this.names?.nameIn(this.dirOf(), '.dropped.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
     return join(this.dirOf(), `${name}.dropped.json`)
   }
 }

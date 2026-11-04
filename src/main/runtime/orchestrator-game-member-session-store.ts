@@ -10,6 +10,7 @@ import {
   type GameMemberSessionPatch,
   type GameMemberSessionsRead
 } from '../../shared/orchestrator-game-member-sessions'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Each project's live members, one file per project, so a lead can resume them after a restart. */
 export class GameMemberSessionStore {
@@ -18,7 +19,8 @@ export class GameMemberSessionStore {
 
   constructor(
     private readonly dirOf: () => string,
-    private readonly now: () => string = () => new Date().toISOString()
+    private readonly now: () => string = () => new Date().toISOString(),
+    private readonly names?: GameStoreNaming
   ) {}
 
   async read(projectKey: string): Promise<GameMemberSessionsRead> {
@@ -110,7 +112,9 @@ export class GameMemberSessionStore {
   }
 
   private fileOf(projectKey: string): string {
-    const name = createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    const name =
+      this.names?.nameIn(this.dirOf(), '.members.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
     return join(this.dirOf(), `${name}.members.json`)
   }
 }

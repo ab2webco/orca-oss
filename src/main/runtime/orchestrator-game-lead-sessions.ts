@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { recognizeAgentProcess } from '../../shared/agent-process-recognition'
 import { isShellProcess } from '../../shared/shell-process-detection'
 import type { GameLeadSession } from './orchestrator-game-leads'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 const sessionOf = (value: unknown): GameLeadSession | null => {
   if (typeof value !== 'object' || value === null) {
@@ -111,7 +112,10 @@ export const resumeExitErrorOf = (args: {
 
 /** Each project's last lead conversation, one file per project, so it survives a restart of Orca. */
 export class GameLeadSessions {
-  constructor(private readonly dirOf: () => string) {}
+  constructor(
+    private readonly dirOf: () => string,
+    private readonly names?: GameStoreNaming
+  ) {}
 
   /** Null for a missing or damaged record: the caller then starts a new lead. */
   async read(projectKey: string): Promise<GameLeadSession | null> {
@@ -136,7 +140,9 @@ export class GameLeadSessions {
   }
 
   private fileOf(projectKey: string): string {
-    const name = createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    const name =
+      this.names?.nameIn(this.dirOf(), '.lead.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
     return join(this.dirOf(), `${name}.lead.json`)
   }
 }

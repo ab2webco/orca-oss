@@ -782,7 +782,7 @@ import {
   type ClaudePaneLiveSession
 } from '../claude/claude-pane-live-session'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
-import { GameHistoryStore } from './orchestrator-game-history-store'
+import { GAME_HISTORY_MIGRATIONS, GameHistoryStore } from './orchestrator-game-history-store'
 import {
   GameLessonStore,
   GameLessons,
@@ -838,6 +838,7 @@ import {
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
+import { GameStoreNames } from './orchestrator-game-store-names'
 import { adoptGameProjectHistory } from './orchestrator-game-history-adoption'
 import type { GameHistoryAdoption } from '../../shared/orchestrator-game-log-adoption'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
@@ -3854,14 +3855,23 @@ export class OrcaRuntimeService {
   private readonly gameDelivery = new GameReadCache<GameDelivery>(
     () => GAME_DELIVERY_REFRESH_MS * gameGitHubPollStretch()
   )
-  private readonly gameHistory = new GameHistoryStore(() =>
-    join(app.getPath('userData'), 'orchestrator-game-history')
+  // Why by place: a removed and re-added repo gets a new id but keeps its game data (ORCA-1011).
+  private readonly gameStoreNames = new GameStoreNames((repoId) => {
+    const repo = this.store?.getRepo(repoId)
+    return repo ? { connectionId: repo.connectionId ?? null, path: repo.path } : null
+  })
+  private readonly gameHistory = new GameHistoryStore(
+    () => join(app.getPath('userData'), 'orchestrator-game-history'),
+    GAME_HISTORY_MIGRATIONS,
+    this.gameStoreNames
   )
-  private readonly gameLessonStore = new GameLessonStore(() =>
-    join(app.getPath('userData'), 'orchestrator-game-lessons')
+  private readonly gameLessonStore = new GameLessonStore(
+    () => join(app.getPath('userData'), 'orchestrator-game-lessons'),
+    this.gameStoreNames
   )
-  private readonly gameStops = new GameStopSwitch(() =>
-    join(app.getPath('userData'), 'orchestrator-game-stop')
+  private readonly gameStops = new GameStopSwitch(
+    () => join(app.getPath('userData'), 'orchestrator-game-stop'),
+    this.gameStoreNames
   )
   // Why Engram as a mirror: lessons must survive without it, and reads merge what either holds.
   private readonly gameLessons = new GameLessons({
@@ -3869,11 +3879,15 @@ export class OrcaRuntimeService {
     // Why not under E2E: a spec must never write the developer's own Engram.
     mirror: process.env.ORCA_E2E_USER_DATA_DIR ? null : new EngramLessonMirror(engramRequestOf())
   })
-  private readonly gameMemberSessions = new GameMemberSessionStore(() =>
-    join(app.getPath('userData'), 'orchestrator-game-members')
+  private readonly gameMemberSessions = new GameMemberSessionStore(
+    () => join(app.getPath('userData'), 'orchestrator-game-members'),
+    undefined,
+    this.gameStoreNames
   )
-  private readonly gameDroppedAgents = new GameDroppedAgentStore(() =>
-    join(app.getPath('userData'), 'orchestrator-game-dropped')
+  private readonly gameDroppedAgents = new GameDroppedAgentStore(
+    () => join(app.getPath('userData'), 'orchestrator-game-dropped'),
+    undefined,
+    this.gameStoreNames
   )
   private readonly gameHostCapacity = new GameHostCapacityReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
@@ -3952,7 +3966,10 @@ export class OrcaRuntimeService {
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
     isLive: (handle) => this.isGameLeadTerminalLive(handle),
-    sessions: new GameLeadSessions(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
+    sessions: new GameLeadSessions(
+      () => join(app.getPath('userData'), 'orchestrator-game-leads'),
+      this.gameStoreNames
+    ),
     sessionOf: async (handle) => {
       const pane = await this.snapshotClaudeTerminalSwitchTarget({
         kind: 'handle',

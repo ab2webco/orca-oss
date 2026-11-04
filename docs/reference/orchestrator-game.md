@@ -689,9 +689,16 @@ matches …` (ORCA-866).
   ([`orchestrator-game-history-store.ts`](../../src/main/runtime/orchestrator-game-history-store.ts)).
   They are written through `game.historyRecord` and read through `game.history`, two RPC methods a
   host older than this does not have; `game history` then says to update Orca.
-- `orca game adopt-history --from-repo-id <id>` — game data is filed under the repo's id, and a repo
-  removed and added again gets a new one, so its history, events, characters, lessons and STOP stay
-  under the old id while the game reads an empty project (ORCA-1011). This folds them into the
+- Each project's game files (history, lessons, saved members, drops, lead conversation, STOP) are
+  named by the repo's SSH connection and path, not its repo id, so a repo removed and added again at
+  the same path keeps them; two clones at different paths stay apart
+  ([`orchestrator-game-store-names.ts`](../../src/main/runtime/orchestrator-game-store-names.ts)).
+  The project key the runtime passes around stays `repo:<id>`, so nothing a paired host reads
+  changes. A file still named by the repo id is copied to the new name on first read and left in
+  place for an older build.
+- `orca game adopt-history --from-repo-id <id>` — before those names, a repo removed and added again
+  got a new id, so its history, events, characters, lessons and STOP stayed under the old id while
+  the game read an empty project (ORCA-1011); a repo moved to another path still does. This folds them into the
   current project: records and events merged by time, characters and lesson counts added, a STOP
   kept set. The old files are renamed `<name>.adopted-<time>` beside each store, never deleted, so a
   second run finds nothing. It refuses a repo id Orca still has, and runs only when no lead or member
