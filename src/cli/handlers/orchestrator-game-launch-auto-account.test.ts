@@ -283,6 +283,27 @@ describe('orca game launch with accounts: auto', () => {
     expect(starts()).toEqual([])
   })
 
+  // Why: unknown quota is unverified, not free; the old pick launched on the first unread account (ORCA-1028).
+  it('refuses rather than launch on an account still unread after the refresh', async () => {
+    const { client, calls, starts } = fakeClient(
+      stateWith(),
+      snapshotWith({ ana: limits(100, 40), cy: null })
+    )
+
+    await expect(launch(client)).rejects.toThrow(
+      /cy@example\.com has no usage reading.*unverified.*--account/
+    )
+    expect(calls.filter(([method]) => method === 'accounts.list')).toHaveLength(1)
+    expect(starts()).toEqual([])
+  })
+
+  it('counts 81% of the 7d window as near, not free (ORCA-1028)', async () => {
+    const { client, starts } = fakeClient(stateWith(), snapshotWith({ ana: limits(5, 81) }))
+
+    await expect(launch(client)).rejects.toThrow(/at or near its limit.*75%\+ of its 7d window/)
+    expect(starts()).toEqual([])
+  })
+
   it('launches an agent with no managed accounts on its own login', async () => {
     const { client, calls, starts } = fakeClient(stateWith(), snapshotWith({ ana: limits(1, 1) }))
 

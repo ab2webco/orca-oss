@@ -32,7 +32,19 @@ const ACCOUNTS = {
     activeAccountId: 'acct_ana'
   },
   codex: { accounts: [{ id: 'acct_bo', email: 'bo@example.com' }], activeAccountId: null },
-  rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
+  // Why a reading: auto refuses an account with none (ORCA-1028).
+  rateLimits: {
+    claude: {
+      status: 'ok',
+      session: { usedPercent: 10, resetsAt: null },
+      weekly: { usedPercent: 20, resetsAt: null },
+      updatedAt: 0,
+      error: null
+    },
+    codex: null,
+    inactiveClaudeAccounts: [],
+    inactiveCodexAccounts: []
+  }
 }
 
 function fakeClient(
@@ -130,7 +142,7 @@ describe('orca game launch behind a running setup', () => {
     )
     expect(formatGameLaunch(launched)).toBe(
       'CIN-12 (Arthur): queued #2 · claude · ana@example.com, waiting on Ford · CIN-9; it starts by itself\n' +
-        'ana@example.com: no reading yet, the first Claude account (5h —, 7d —)'
+        'ana@example.com: the freest usable Claude account (5h 10%, 7d 20%)'
     )
   })
 

@@ -95,3 +95,39 @@ export function gameAccountUsagesOf(args: {
       }
     })
 }
+
+/** Another host's 5h and 7d reading of an account, matched by provider and email (ORCA-1028). */
+export type GameAccountReading = {
+  provider: GameAccountProvider
+  email: string
+  session: GameQuotaWindow | null
+  weekly: GameQuotaWindow | null
+}
+
+/** This host's readings of one provider's accounts, for a paired host whose cache is empty. */
+export function gameAccountReadingsOf(
+  entries: readonly AccountListEntry[],
+  provider: GameAccountProvider
+): GameAccountReading[] {
+  return gameAccountUsagesOf({ entries, provider, agents: [] })
+    .filter((usage) => usage.session !== null || usage.weekly !== null)
+    .map(({ email, session, weekly }) => ({ provider, email, session, weekly }))
+}
+
+// Why only gaps: quota belongs to the account, not the host, so another host's reading is valid, but this host's own is fresher.
+export function withSharedGameReadings(
+  usages: readonly GameAccountUsage[],
+  readings: readonly GameAccountReading[] | undefined
+): GameAccountUsage[] {
+  return usages.map((usage) => {
+    if (usage.session !== null || usage.weekly !== null) {
+      return usage
+    }
+    const shared = readings?.find(
+      (reading) =>
+        reading.provider === usage.provider &&
+        reading.email.toLowerCase() === usage.email.toLowerCase()
+    )
+    return shared ? { ...usage, session: shared.session, weekly: shared.weekly } : usage
+  })
+}

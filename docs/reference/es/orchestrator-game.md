@@ -990,13 +990,20 @@ gestionada de su agente con más cuota libre
 
 - El uso de una cuenta es su ventana viva más ajustada, 5h o 7d; una ventana pasada su hora de
   reinicio cuenta como vacía.
-- Al 90 % o más de cualquiera de las ventanas está **near** y se salta, igual que al 100 %
-  (**limited**): el turno de un miembro puede quemar varios puntos de una ventana de 5h, así que un
-  lanzamiento por encima del 90 % se detendría a mitad del ticket.
+- Al 90 % o más de la ventana de 5h, o al 75 % o más de la de 7d, está **near** y se salta, igual
+  que al 100 % (**limited**): el turno de un miembro puede quemar varios puntos de una ventana de 5h,
+  y un miembro largo puede quemar 10 puntos o más de la de 7d, cuyo límite bloquea la cuenta durante
+  días (ORCA-1028).
 - Las cuentas a 5 puntos o menos entre sí empatan; el empate lo gana la que tiene menos miembros de
   este líder (incluidos los que el mismo `game wave` acaba de lanzar).
-- Una cuenta sin lectura de uso es **unknown** y queda detrás de todas las libres conocidas; cuando
-  una es desconocida, Orca refresca el uso una vez (acotado a 20 s) antes de elegir.
+- Una cuenta sin lectura de uso es **unknown**, que significa no verificada, no libre: `auto` nunca
+  lanza en ella (ORCA-1028). Cuando una es desconocida, Orca refresca el uso una vez (acotado a 20 s)
+  antes de elegir; si entonces ninguna cuenta está libre y alguna sigue desconocida, el lanzamiento
+  se rechaza nombrándolas, y `--account <email>` lanza en una de todos modos.
+- En un host emparejado, `auto` completa una cuenta sin lectura en ese host con la lectura que el
+  home tiene del mismo email, porque la cuota es de la cuenta, no del host; la lectura propia del host
+  manda. Solo cruzan el email y las ventanas de 5h y 7d, y solo hacia un host que anuncia
+  `orchestration.federation-member-account-readings.v1`.
 - Solo se eligen cuentas de este host, no endpoints personalizados (cambian el modelo), cuyo inicio
   de sesión no falló. Un agente sin cuentas gestionadas lanza con su propio login.
 - Una cuenta con alguno de sus miembros detenido por un límite (ver abajo) está **limited** hasta que

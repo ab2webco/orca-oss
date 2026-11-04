@@ -124,7 +124,11 @@ export function formatGameAccounts(report: GameAccountsReport, now = Date.now())
             ? `limited, member stopped on a limit, back ${gameResetInText(msOf(row.usableAt), now)}`
             : row.standing,
         row.members.join(', ') || '-',
-        row.autoPick ? '' : 'not picked by auto'
+        !row.autoPick
+          ? 'not picked by auto'
+          : row.standing === 'unknown'
+            ? 'not picked by auto until read'
+            : ''
       ])
       const waiting = allLimited
         ? [

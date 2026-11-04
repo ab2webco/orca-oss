@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   GAME_ACCOUNT_NEAR_LIMIT_PERCENT,
+  GAME_ACCOUNT_WEEKLY_NEAR_LIMIT_PERCENT,
   gameAccountStandingOf,
   gameResetInText,
   pickGameMemberAccount,
@@ -53,6 +54,19 @@ describe('gameAccountStandingOf', () => {
     })
   })
 
+  it('is near at 75% of the 7d window, so 81% weekly with days left is not free (ORCA-1028)', () => {
+    expect(gameAccountStandingOf(usage('a', 10, 81), NOW)).toEqual({
+      standing: 'near',
+      usedPercent: 81,
+      resetsAt: NOW + 48 * HOUR
+    })
+    expect(
+      gameAccountStandingOf(usage('a', 10, GAME_ACCOUNT_WEEKLY_NEAR_LIMIT_PERCENT - 1), NOW)
+    ).toEqual({ standing: 'free', usedPercent: 74, resetsAt: null })
+    // Why: the 5h window keeps its own 90% line; 81% there is still free.
+    expect(gameAccountStandingOf(usage('a', 81, 10), NOW).standing).toBe('free')
+  })
+
   it('is unknown with no usage reading', () => {
     expect(gameAccountStandingOf(usage('a', null, null), NOW)).toEqual({
       standing: 'unknown',
@@ -90,7 +104,6 @@ describe('pickGameMemberAccount', () => {
       [usage('a', 60, 30), usage('b', 10, 20), usage('c', 5, 70)],
       NOW
     )
-    expect(pick).toEqual(expect.objectContaining({ kind: 'account', standing: 'free' }))
     expect(pick.kind === 'account' && pick.account.email).toBe('b')
   })
 
@@ -102,23 +115,38 @@ describe('pickGameMemberAccount', () => {
     expect(pick.kind === 'account' && pick.account.email).toBe('b')
   })
 
-  it('skips accounts at or near their limit, and ranks unknown ones after the known-free', () => {
+  it('skips accounts at or near their limit, and picks a known-free one over an unknown one', () => {
     const pick = pickGameMemberAccount(
       [
         usage('limited', 100, 10),
         usage('near', 92, 10),
         usage('dark', null, null),
-        usage('free', 70, 80)
+        usage('free', 70, 60)
       ],
       NOW
     )
     expect(pick.kind === 'account' && pick.account.email).toBe('free')
-    const onlyUnknown = pickGameMemberAccount(
+  })
+
+  it('never launches on an account with no reading: unknown is unverified, not free (ORCA-1028)', () => {
+    const pick = pickGameMemberAccount(
       [usage('limited', 100, 10), usage('dark', null, null, ['CIN-1']), usage('dim', null, null)],
       NOW
     )
-    expect(onlyUnknown).toEqual(expect.objectContaining({ kind: 'account', standing: 'unknown' }))
-    expect(onlyUnknown.kind === 'account' && onlyUnknown.account.email).toBe('dim')
+    expect(pick.kind).toBe('unverified')
+    expect(pick.kind === 'unverified' && pick.accounts.map((one) => one.email)).toEqual([
+      'dim',
+      'dark'
+    ])
+  })
+
+  it('neither picks 81% weekly as free nor falls through to an unread account (ORCA-1028)', () => {
+    const pick = pickGameMemberAccount([usage('busy', 5, 81), usage('dark', null, null)], NOW)
+    expect(pick.kind === 'unverified' && pick.accounts.map((one) => one.email)).toEqual(['dark'])
+    expect(pickGameMemberAccount([usage('busy', 5, 81)], NOW)).toEqual({
+      kind: 'limited',
+      resetsAt: NOW + 48 * HOUR
+    })
   })
 
   it('waits for the earliest account to come back when every one is limited or near', () => {

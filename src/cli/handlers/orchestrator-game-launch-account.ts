@@ -10,9 +10,11 @@ import {
 } from '../../shared/orchestrator-game-account-usage'
 import { allowedAccountsText, type GameLaunchChoice } from './orchestrator-game-launch-options'
 import {
-  GAME_ACCOUNT_NEAR_LIMIT_PERCENT,
+  GAME_ACCOUNT_NEAR_LIMIT_TEXT,
   gameAccountStandingOf,
   gameResetInText,
+  gameUnverifiedPickText,
+  hasNoGameUsageReading,
   pickGameMemberAccount,
   type GameAccountUsage
 } from '../../shared/orchestrator-game-account-pick'
@@ -178,9 +180,9 @@ const windowText = (label: string, window: GameAccountUsage['session']): string 
 const percentOf = (usage: GameAccountUsage): string =>
   `${windowText('5h', usage.session)}, ${windowText('7d', usage.weekly)}`
 
-/** The launch line: the account picked, and each one passed over as limited or near. */
+/** The launch line: the account picked, and each one passed over as limited, near or unread. */
 function pickWhy(
-  pick: { account: GameAccountUsage; standing: 'free' | 'unknown' },
+  pick: { account: GameAccountUsage },
   usages: readonly GameAccountUsage[],
   allowed: readonly string[] | undefined,
   now: number
@@ -188,17 +190,18 @@ function pickWhy(
   const label = GAME_ACCOUNT_PROVIDER_LABELS[pick.account.provider]
   const skipped = usages.flatMap((usage) => {
     const { standing } = gameAccountStandingOf(usage, now)
-    if (usage === pick.account || (standing !== 'limited' && standing !== 'near')) {
+    if (usage === pick.account || standing === 'free') {
       return []
     }
     const cause = usage.stopped
       ? `${usage.members.join(', ') || 'a member'} stopped on a limit`
-      : percentOf(usage)
+      : standing === 'unknown'
+        ? 'no usage reading'
+        : percentOf(usage)
     return [`${usage.email} (${standing}: ${cause})`]
   })
-  const which = pick.standing === 'free' ? 'the freest usable' : 'no reading yet, the first'
   return [
-    `${pick.account.email}: ${which} ${label} account${allowed ? ' the project allows' : ''} (${percentOf(pick.account)})`,
+    `${pick.account.email}: the freest usable ${label} account${allowed ? ' the project allows' : ''} (${percentOf(pick.account)})`,
     ...(skipped.length > 0 ? [`skipped ${skipped.join(', ')}`] : [])
   ].join('; ')
 }
@@ -222,7 +225,7 @@ async function autoAccount(
   let snapshot = await readAccounts(client)
   let usages = usagesOf(snapshot)
   // Why one refresh: Orca reads an inactive account's usage lazily, so a cold cache would make it look unknown.
-  if (usages.some((usage) => usage.session === null && usage.weekly === null)) {
+  if (usages.some(hasNoGameUsageReading)) {
     const refreshed = await client
       .call<RuntimeAccountsSnapshot>(
         'accounts.list',
@@ -246,10 +249,21 @@ async function autoAccount(
       ? NO_ACCOUNT
       : globalLoginChoice(snapshot, provider, context.globalLoginHolder)
   }
+  if (pick.kind === 'unverified') {
+    throw new RuntimeClientError(
+      GAME_ACCOUNTS_UNUSABLE,
+      gameUnverifiedPickText(
+        provider,
+        pick,
+        'here',
+        'Read them with `orca game accounts --refresh`'
+      )
+    )
+  }
   if (pick.kind === 'limited') {
     throw new RuntimeClientError(
       GAME_ACCOUNTS_LIMITED,
-      `Every ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_PERCENT}%+ of its 5h or 7d window); the first is usable again ${gameResetInText(pick.resetsAt, now)}${pick.resetsAt === null ? '' : ` (${new Date(pick.resetsAt).toISOString()})`}. Wait for it, or name one with --account <email|id>. See \`orca game accounts\`.`
+      `Every ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_TEXT}); the first is usable again ${gameResetInText(pick.resetsAt, now)}${pick.resetsAt === null ? '' : ` (${new Date(pick.resetsAt).toISOString()})`}. Wait for it, or name one with --account <email|id>. See \`orca game accounts\`.`
     )
   }
   return {
