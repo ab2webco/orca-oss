@@ -133,6 +133,7 @@ import { liveRunCoordinatorHandle } from './orchestration-run-coordinator-handle
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
+import { escalateAgentExit } from './orchestration/agent-exit-escalation'
 import {
   DispatchActivityMonitor,
   type DispatchActivityObservation
@@ -11284,6 +11285,7 @@ export class OrcaRuntimeService {
         this.recordTerminalSideEffectFact(ptyId, { kind: 'bell' })
         return
       case 'command-finished':
+        this.escalateAgentExitInLiveShell(ptyId, fact.exitCode)
         this.retirePtyAgentLaunchAuthority(ptyId, 'agent-exited')
         this.recordTerminalSideEffectFact(ptyId, {
           kind: 'command-finished',
@@ -11630,6 +11632,7 @@ export class OrcaRuntimeService {
           this.confirmPtyAgentExit(ptyId)
         },
         onCommandFinished: (exitCode: number | null) => {
+          this.escalateAgentExitInLiveShell(ptyId, exitCode)
           this.retirePtyAgentLaunchAuthority(ptyId, 'agent-exited')
           this.recordTerminalSideEffectFact(ptyId, { kind: 'command-finished', exitCode })
         },
@@ -17107,44 +17110,35 @@ export class OrcaRuntimeService {
 
   // Why: Section 7.2 — the runtime detects agent exit directly and updates
   // dispatch contexts immediately, rather than waiting for the coordinator's
-  // next poll cycle. This catches agent crashes and unexpected exits within
-  // milliseconds. The task is set back to 'pending' so it can be re-dispatched.
-  private failActiveDispatchOnExit(leaf: RuntimeLeafRecord, exitCode: number): void {
+  // next poll cycle. The task is set back to 'pending' so it can be re-dispatched.
+  private failActiveDispatchOnExit(leaf: RuntimeLeafRecord, exitCode: number | null): void {
     if (!this._orchestrationDb) {
       return
     }
-
     const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
     if (!handle) {
       return
     }
+    escalateAgentExit(this._orchestrationDb, (to, type) => this.notifyMessageArrived(to, type), {
+      handle,
+      exitCode,
+      sessionId: this.getExactWorkerProviderSessionIdentity(handle, 0)?.providerSession.id ?? null
+    })
+  }
 
-    const dispatch = this._orchestrationDb.getActiveDispatchForTerminal(handle)
-    if (!dispatch) {
+  // Why (ORCA-989): a member's agent runs inside a shell, so its crash ends no pty and must be caught here.
+  private escalateAgentExitInLiveShell(ptyId: string, exitCode: number | null): void {
+    const pty = this.ptysById.get(ptyId)
+    const hadAgent =
+      !!pty &&
+      (pty.launchToken !== null ||
+        pty.lastAgentStatus !== null ||
+        this.restoredOrchestrationAuthorityByPtyId.has(ptyId))
+    if (!hadAgent) {
       return
     }
-
-    const errorContext = `Agent exited with code ${exitCode}`
-    this._orchestrationDb.failDispatch(dispatch.id, errorContext)
-
-    // Why: create an escalation message so the coordinator is notified about
-    // the unexpected exit on its next check cycle, even if the circuit breaker
-    // hasn't tripped yet.
-    const run = this._orchestrationDb.getActiveCoordinatorRun()
-    if (run) {
-      this._orchestrationDb.insertMessage({
-        runId: dispatch.run_id,
-        from: handle,
-        to: run.coordinator_handle,
-        subject: `Agent exited unexpectedly (code ${exitCode})`,
-        type: 'escalation',
-        priority: 'high',
-        payload: JSON.stringify({
-          taskId: dispatch.task_id,
-          exitCode,
-          handle
-        })
-      })
+    for (const leaf of this.getLeavesForPty(ptyId)) {
+      this.failActiveDispatchOnExit(leaf, exitCode)
     }
   }
 
@@ -19385,6 +19379,7 @@ export class OrcaRuntimeService {
         }
         return
       }
+      this.escalateAgentExitInLiveShell(ptyId, null)
       this.recordTerminalSideEffectFact(ptyId, { kind: 'agent-exited' })
     })
   }
