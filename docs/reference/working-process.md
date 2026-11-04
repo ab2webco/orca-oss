@@ -49,7 +49,7 @@ porqué de cada guarda: todas nacieron de una falla real, no de una buena intenc
 | `board-state-guard.py`           | Rechaza `gh pr create` si el ticket del PR no está en `In Progress`, y al mergear nombra el movimiento a `Done` que falta                                                                                                                                                                                                           | El board se quedó atrás mientras se trabajaba: PRs abiertos y mergeados con su ticket en `Backlog`, seis tickets creados que nadie movió, y uno cerrado por un merge que siguió abierto. Nada de eso se ve desde la terminal, así que recordarlo no alcanzó — `orca plane` no falla cuando el estado está mal, simplemente no se llama |
 | `test-result-guard.py`           | Lee el resumen de vitest y bloquea si hay rojos, ignorando el exit code                                                                                                                                                                                                                                                             | **Medido**: `npm test` salió con exit code 0 reportando `Tests 6 failed \| 40082 passed`. Un gate que mire `$?` deja pasar un build roto                                                                                                                                                                                               |
 | `pre-release-upstream-check.sh`  | Chequea upstream antes de despachar una release                                                                                                                                                                                                                                                                                     | El checklist de release exige mergear `origin/main` primero y se salteaba                                                                                                                                                                                                                                                              |
-| `merged-worktree-close-hook.mjs` | Al abrir sesión y tras cualquier `gh pr merge` cierra worktree y ramas de PRs mergeados; antes de un comando cuyo texto parece un release (ver [Release: desktop y mobile](#release-desktop-y-mobile)) lo rechaza si queda una worktree mergeada abierta o si no pudo verificarlo                                                   | El 2026-10-04 había 4 worktrees fuera de `main` y una (#432, ORCA-554) seguía abierta aunque se mergeó antes de `lab.91.rc`. Nada del harness borraba worktrees ni ramas, y el repo tiene `delete_branch_on_merge` en `false`                                                                                                          |
+| `merged-worktree-close-hook.mjs` | Al abrir sesión y tras un `gh pr merge` en posición de comando cierra worktree y ramas de PRs mergeados; antes de un comando cuyo texto parece un release (ver [Release: desktop y mobile](#release-desktop-y-mobile)) sólo lee, y lo rechaza si queda una worktree mergeada que no se cerraría o si no pudo verificarlo            | El 2026-10-04 había 4 worktrees fuera de `main` y una (#432, ORCA-554) seguía abierta aunque se mergeó antes de `lab.91.rc`. Nada del harness borraba worktrees ni ramas, y el repo tiene `delete_branch_on_merge` en `false`                                                                                                          |
 
 ### Por qué el guard del board rechaza cuando no puede leer el board
 
@@ -140,11 +140,15 @@ Esas quedan abiertas y bloquean la release hasta que alguien decida. Además:
 - Una worktree listada cuyo directorio ya no existe se salta con
   `skipped <rama>: directory missing; run git worktree prune` y no bloquea la release (Git < 2.31
   no marca esas entradas como `prunable`).
-- Tras un comando cuyo texto contiene `pr … merge` (también con `-R o/r` en medio o partido con
-  `\` al final de línea) se toma el primer argumento posicional de cada `gh pr merge` (número, URL del PR o rama) y sólo se
-  cierra si el PR ya figura `MERGED`: un `--auto` que sólo encola el merge no cierra nada. Si no se
-  puede leer ningún selector (por ejemplo, el merge va dentro de un heredoc), se revisan todas las
-  worktrees, y sólo se cierran las que tienen su PR mergeado.
+- Tras un merge sólo actúa un `gh pr merge` en posición de comando (también con `-R o/r` en medio
+  o partido con `\` al final de línea), nunca el texto que lo nombra: un `grep`, un string entre
+  comillas, un comentario o el cuerpo de un heredoc no cierran nada, ni tampoco un heredoc que
+  alimenta a `bash`. Cerrar quita los archivos ignorados, así que aquí, al revés que en el gate, un
+  falso negativo es el lado seguro: lo que queda abierto lo recoge el lead al abrir sesión
+  (ORCA-1017). Se toma el primer argumento posicional de cada `gh pr merge` (número, URL del PR o
+  rama) y sólo se cierra si el PR ya figura `MERGED`: un `--auto` que sólo encola el merge no cierra
+  nada. Sin selector no se cierra ninguna worktree y el hook lo dice. En una sesión de member
+  (`ORCA_GAME_ROLE=member`) este paso no corre.
 
 Para cerrar a mano (nunca cierra la worktree desde la que lo ejecutas):
 
@@ -157,10 +161,12 @@ Las worktrees aparecen anidadas dentro de la raíz del repo por el ajuste global
 
 ## Release: desktop y mobile
 
-El gate de `merged-worktree-close-hook.mjs` aplica a las tres releases: si queda una worktree
-mergeada abierta (sucia, con commits posteriores al merge, con una terminal activa, sin poder leer
-las terminales de Orca, o que no se pudo quitar), la release se rechaza. El gate falla cerrado: la
-rechaza también, diciendo qué no pudo verificar y por qué, cuando
+El gate de `merged-worktree-close-hook.mjs` aplica a las tres releases y sólo lee: corre el cierre
+con `--dry-run`, porque se dispara por texto y no debe quitar nada (ORCA-1017). Si queda una
+worktree mergeada abierta que no se cerraría sola (sucia, con commits posteriores al merge, con una
+terminal activa o sin poder leer las terminales de Orca), la release se rechaza; una limpia no
+guarda nada sin integrar, así que pasa y se nombra como `would close <rama>`. El gate falla cerrado:
+la rechaza también, diciendo qué no pudo verificar y por qué, cuando
 
 - no puede leer los PRs de una rama (`gh` falla o tarda más de 20 s, devuelve algo ilegible, o el
   remoto no es una URL de GitHub): `unverified <rama>: could not read its PRs (<motivo>)`;
@@ -191,7 +197,7 @@ antes las líneas partidas con `\` al final, como hace el shell. Corre el gate s
 
 Para cualquier otro comando sale en unos milisegundos, sin llamar a `git` ni a `gh`. Los falsos
 positivos son esperados: `grep "workflow run" docs` también corre el gate, que lo deja pasar si no
-queda ninguna worktree mergeada abierta y lo rechaza si queda alguna. Por eso el rechazo dice
+queda ninguna worktree mergeada que bloquee y lo rechaza si queda alguna. Por eso el rechazo dice
 "Comando bloqueado: parece un release…" y no da por hecho que lo sea; en ese caso cierra o resuelve
 las worktrees que nombra, o reescribe el comando.
 
