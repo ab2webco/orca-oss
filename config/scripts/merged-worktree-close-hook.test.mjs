@@ -3,7 +3,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -15,13 +14,16 @@ import { afterAll, describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const hookScript = join(projectDir, '.claude/hooks/merged-worktree-close-hook.mjs')
-const settingsPath = join(projectDir, '.claude/settings.json')
-const hookCommand = 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/merged-worktree-close-hook.mjs"'
 const tempDirs = []
 
 afterAll(() => {
   for (const dir of tempDirs) {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    rmSync(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200
+    })
   }
 })
 
@@ -67,6 +69,10 @@ function writeJson(dir, value) {
   return file
 }
 
+function bashEvent(event, cwd, command) {
+  return { hook_event_name: event, cwd, tool_input: { command } }
+}
+
 /** `prs` null leaves the PR lookup to the real remote; `extraEnv` adds hook environment. */
 function runHook(root, payload, prs, { extraEnv = {}, script = hookScript } = {}) {
   const env = { ...process.env, ...extraEnv }
@@ -89,7 +95,10 @@ function runHook(root, payload, prs, { extraEnv = {}, script = hookScript } = {}
     encoding: 'utf8',
     env
   })
-  return { ...result, json: result.stdout.trim() ? JSON.parse(result.stdout) : null }
+  return {
+    ...result,
+    json: result.stdout.trim() ? JSON.parse(result.stdout) : null
+  }
 }
 
 describe('release gate trigger', () => {
@@ -100,7 +109,10 @@ describe('release gate trigger', () => {
       const made = makeRepo()
       const feature = made.addFeature('fix/a')
       writeFileSync(join(feature.path, 'draft.txt'), 'unsaved')
-      shared = { ...made, prs: { 'fix/a': [{ number: 12, headRefOid: feature.head }] } }
+      shared = {
+        ...made,
+        prs: { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
+      }
     }
     return shared
   }
@@ -152,15 +164,7 @@ describe('release gate trigger', () => {
   it('lets a false positive run when no merged worktree is open', () => {
     const { root, repo } = makeRepo()
 
-    const result = runHook(
-      root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'grep "workflow run" docs' }
-      },
-      {}
-    )
+    const result = runHook(root, bashEvent('PreToolUse', repo, 'grep "workflow run" docs'), {})
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.hookSpecificOutput?.permissionDecision).toBeUndefined()
@@ -175,11 +179,7 @@ describe('merged-worktree-close hook', () => {
 
     const result = runHook(
       root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'gh workflow run "Lab Release" --ref main' }
-      },
+      bashEvent('PreToolUse', repo, 'gh workflow run "Lab Release" --ref main'),
       { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
     )
 
@@ -197,40 +197,33 @@ describe('merged-worktree-close hook', () => {
     expect(existsSync(join(feature.path, 'draft.txt'))).toBe(true)
   })
 
-  it('closes a clean merged worktree before a release and lets it run', () => {
+  // Why: the gate triggers on raw text, so closing here let a grep delete worktrees (ORCA-1017).
+  it.each([
+    'git push origin mobile-ios-v1.2.3',
+    'grep -rn "workflow run" docs',
+    "cat > notes.md <<'EOF'\ngh workflow run 'Lab Release'\nEOF"
+  ])('never closes a clean merged worktree under the gate: %j', (command) => {
     const { root, repo, origin, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
 
-    const result = runHook(
-      root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'git push origin mobile-ios-v1.2.3' }
-      },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
-    )
+    const result = runHook(root, bashEvent('PreToolUse', repo, command), {
+      'fix/a': [{ number: 12, headRefOid: feature.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.hookSpecificOutput?.permissionDecision).toBeUndefined()
-    expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${feature.path}`)
-    expect(existsSync(feature.path)).toBe(false)
-    expect(git(origin, 'branch', '--list', 'fix/a')).toBe('')
+    expect(result.json?.systemMessage).toContain(`would close fix/a (#12) ${feature.path}`)
+    expect(existsSync(feature.path)).toBe(true)
+    expect(git(origin, 'branch', '--list', 'fix/a')).toContain('fix/a')
   })
 
   it('does nothing for a command that is not a release', () => {
     const { root, repo, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
 
-    const result = runHook(
-      root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'git push origin fix/a' }
-      },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
-    )
+    const result = runHook(root, bashEvent('PreToolUse', repo, 'git push origin fix/a'), {
+      'fix/a': [{ number: 12, headRefOid: feature.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toBe('')
@@ -242,18 +235,10 @@ describe('merged-worktree-close hook', () => {
     const merged = addFeature('fix/a')
     const other = addFeature('fix/b')
 
-    const result = runHook(
-      root,
-      {
-        hook_event_name: 'PostToolUse',
-        cwd: repo,
-        tool_input: { command: 'gh pr merge 12 --squash' }
-      },
-      {
-        'fix/a': [{ number: 12, headRefOid: merged.head }],
-        'fix/b': [{ number: 13, headRefOid: other.head }]
-      }
-    )
+    const result = runHook(root, bashEvent('PostToolUse', repo, 'gh pr merge 12 --squash'), {
+      'fix/a': [{ number: 12, headRefOid: merged.head }],
+      'fix/b': [{ number: 13, headRefOid: other.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${merged.path}`)
@@ -266,14 +251,10 @@ describe('merged-worktree-close hook', () => {
     const merged = addFeature('fix/a')
     const other = addFeature('fix/b')
 
-    const result = runHook(
-      root,
-      { hook_event_name: 'PostToolUse', cwd: repo, tool_input: { command: 'gh pr \\\n merge 12' } },
-      {
-        'fix/a': [{ number: 12, headRefOid: merged.head }],
-        'fix/b': [{ number: 13, headRefOid: other.head }]
-      }
-    )
+    const result = runHook(root, bashEvent('PostToolUse', repo, 'gh pr \\\n merge 12'), {
+      'fix/a': [{ number: 12, headRefOid: merged.head }],
+      'fix/b': [{ number: 13, headRefOid: other.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${merged.path}`)
@@ -281,27 +262,64 @@ describe('merged-worktree-close hook', () => {
     expect(existsSync(other.path)).toBe(true)
   })
 
-  it('after a merge it cannot parse closes every merged worktree', () => {
+  // Why these: each one sat on a line where the raw-text trigger saw the merge words (ORCA-1017).
+  it.each([
+    ['a heredoc body', "cat > notes.md <<'EOF'\ngh pr merge 12\nEOF"],
+    ['a heredoc piped to a shell', "bash <<'EOF'\ngh pr merge 12\nEOF"],
+    ['a heredoc with a hyphenated tag', "cat <<'END-NOTE' > notes.md\ngh pr merge 12\nEND-NOTE"],
+    ['a double-quoted string', 'echo "gh pr merge 12"'],
+    ['a single-quoted string', "echo 'a; gh pr merge 12'"],
+    ['a grep', 'grep -rn "gh pr merge" .claude docs'],
+    ['a ticket body', 'orca-ide plane create --title x --body "after gh pr merge 12 close it"'],
+    ['a PR body', 'gh pr create --title x --body "land with gh pr merge 12"'],
+    ['a comment', 'ls # then; gh pr merge 12']
+  ])('touches no worktree after the merge words in %s', (_, command) => {
+    const { root, repo, origin, addFeature } = makeRepo()
+    const a = addFeature('fix/a')
+    const b = addFeature('fix/b')
+
+    const result = runHook(root, bashEvent('PostToolUse', repo, command), {
+      'fix/a': [{ number: 12, headRefOid: a.head }],
+      'fix/b': [{ number: 13, headRefOid: b.head }]
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toBe('')
+    expect(existsSync(a.path)).toBe(true)
+    expect(existsSync(b.path)).toBe(true)
+    expect(git(origin, 'branch', '--list', 'fix/*')).toContain('fix/b')
+  })
+
+  it('after a merge with no PR selector closes nothing and says so', () => {
     const { root, repo, addFeature } = makeRepo()
     const a = addFeature('fix/a')
     const b = addFeature('fix/b')
 
+    const result = runHook(root, bashEvent('PostToolUse', repo, 'gh pr merge --squash'), {
+      'fix/a': [{ number: 12, headRefOid: a.head }],
+      'fix/b': [{ number: 13, headRefOid: b.head }]
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.json?.systemMessage).toContain('sin selector')
+    expect(existsSync(a.path)).toBe(true)
+    expect(existsSync(b.path)).toBe(true)
+  })
+
+  it('after a real merge in a member session closes nothing', () => {
+    const { root, repo, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+
     const result = runHook(
       root,
-      {
-        hook_event_name: 'PostToolUse',
-        cwd: repo,
-        tool_input: { command: "bash <<'EOF'\ngh pr merge 12\nEOF" }
-      },
-      {
-        'fix/a': [{ number: 12, headRefOid: a.head }],
-        'fix/b': [{ number: 13, headRefOid: b.head }]
-      }
+      bashEvent('PostToolUse', repo, 'gh pr merge 12'),
+      { 'fix/a': [{ number: 12, headRefOid: feature.head }] },
+      { extraEnv: { ORCA_GAME_ROLE: 'member' } }
     )
 
     expect(result.status, result.stderr).toBe(0)
-    expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${a.path}`)
-    expect(result.json?.systemMessage).toContain(`closed fix/b (#13) ${b.path}`)
+    expect(result.stdout).toBe('')
+    expect(existsSync(feature.path)).toBe(true)
   })
 
   it('stops closing once the merge event has used its time budget', () => {
@@ -310,11 +328,7 @@ describe('merged-worktree-close hook', () => {
 
     const result = runHook(
       root,
-      {
-        hook_event_name: 'PostToolUse',
-        cwd: repo,
-        tool_input: { command: "bash <<'EOF'\ngh pr merge 12\nEOF" }
-      },
+      bashEvent('PostToolUse', repo, 'gh pr merge 12'),
       { 'fix/a': [{ number: 12, headRefOid: feature.head }] },
       { extraEnv: { ORCA_WORKTREE_CLOSE_EVENT_BUDGET_MS: '1' } }
     )
@@ -327,11 +341,9 @@ describe('merged-worktree-close hook', () => {
     const { root, repo, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
 
-    const result = runHook(
-      root,
-      { hook_event_name: 'PostToolUse', cwd: repo, tool_input: { command: 'gh pr merge 99' } },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
-    )
+    const result = runHook(root, bashEvent('PostToolUse', repo, 'gh pr merge 99'), {
+      'fix/a': [{ number: 12, headRefOid: feature.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toBe('')
@@ -394,11 +406,9 @@ describe('merged-worktree-close hook', () => {
     const { root, repo, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
 
-    const result = runHook(
-      root,
-      { hook_event_name: 'PostToolUse', cwd: repo, tool_input: { command } },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
-    )
+    const result = runHook(root, bashEvent('PostToolUse', repo, command), {
+      'fix/a': [{ number: 12, headRefOid: feature.head }]
+    })
 
     expect(result.status, result.stderr).toBe(0)
     expect(result.json?.systemMessage).toContain(`closed fix/a (#12) ${feature.path}`)
@@ -444,7 +454,11 @@ describe('merged-worktree-close hook', () => {
     const { root, repo, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
     const terminals = writeJson(root, [
-      { worktreePath: feature.path, liveness: 'running', lastOutputAt: Date.now() }
+      {
+        worktreePath: feature.path,
+        liveness: 'running',
+        lastOutputAt: Date.now()
+      }
     ])
 
     const result = runHook(
@@ -460,43 +474,13 @@ describe('merged-worktree-close hook', () => {
     expect(existsSync(feature.path)).toBe(true)
   })
 
-  it('denies a release naming a locked merged worktree it could not remove', () => {
-    const { root, repo, addFeature } = makeRepo()
-    const feature = addFeature('fix/a')
-    git(repo, 'worktree', 'lock', '--reason', 'in use', feature.path)
-
-    const result = runHook(
-      root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'gh workflow run "Lab Release"' }
-      },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
-    )
-
-    const output = result.json?.hookSpecificOutput
-    expect(output?.permissionDecision).toBe('deny')
-    expect(output?.permissionDecisionReason).toContain('Comando bloqueado')
-    expect(output?.permissionDecisionReason).toContain(
-      `- fix/a (#12): no se pudo quitar (${feature.path}): `
-    )
-    expect(output?.permissionDecisionReason).toContain('locked')
-    expect(output?.permissionDecisionReason).not.toContain('kept fix/a')
-    expect(existsSync(feature.path)).toBe(true)
-  })
-
   it('denies a release when it cannot read the PRs of a worktree branch, saying why', () => {
     const { root, repo, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
 
     const result = runHook(
       root,
-      {
-        hook_event_name: 'PreToolUse',
-        cwd: repo,
-        tool_input: { command: 'gh workflow run "Lab Release"' }
-      },
+      bashEvent('PreToolUse', repo, 'gh workflow run "Lab Release"'),
       null
     )
 
@@ -653,42 +637,11 @@ describe('merged-worktree-close hook', () => {
   })
 
   it('exits 0 silently on input that is not JSON', () => {
-    const result = spawnSync('node', [hookScript], { input: 'not json', encoding: 'utf8' })
+    const result = spawnSync('node', [hookScript], {
+      input: 'not json',
+      encoding: 'utf8'
+    })
     expect(result.status).toBe(0)
     expect(result.stdout).toBe('')
-  })
-})
-
-describe('merged-worktree-close hook wiring', () => {
-  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
-  const entries = (event) =>
-    (settings.hooks?.[event] ?? []).flatMap((group) =>
-      (group.hooks ?? []).map((hook) => ({ ...hook, matcher: group.matcher }))
-    )
-  const wired = (event) => entries(event).filter((hook) => hook.command === hookCommand)
-
-  it('runs at session start after the coordinator sweep', () => {
-    const all = entries('SessionStart')
-    const sweep = all.findIndex((hook) => hook.command.includes('coordinator-sweep.sh'))
-    const closer = all.findIndex((hook) => hook.command === hookCommand)
-    expect(sweep).toBeGreaterThanOrEqual(0)
-    expect(closer).toBeGreaterThan(sweep)
-    expect(all[closer]).toMatchObject({
-      timeout: 90,
-      statusMessage: 'Cerrando worktrees de PRs mergeados...'
-    })
-  })
-
-  // Why no `if`: a prefix filter misses `env X=1 gh ...`, `command gh ...` and `git -C <dir> push`.
-  it('sees every Bash command after it runs, to catch merges', () => {
-    const hooks = wired('PostToolUse')
-    expect(hooks).toEqual([expect.objectContaining({ matcher: 'Bash', timeout: 90 })])
-    expect(hooks[0].if).toBeUndefined()
-  })
-
-  it('sees every Bash command before it runs, to gate releases', () => {
-    const hooks = wired('PreToolUse')
-    expect(hooks).toEqual([expect.objectContaining({ matcher: 'Bash', timeout: 90 })])
-    expect(hooks[0].if).toBeUndefined()
   })
 })

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   closerArgv,
@@ -8,6 +10,9 @@ import {
   isMergeTrigger,
   mergedPrSelectors
 } from '../../.claude/hooks/merged-worktree-close-hook.mjs'
+
+const settingsPath = join(resolve(import.meta.dirname, '../..'), '.claude/settings.json')
+const hookCommand = 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/merged-worktree-close-hook.mjs"'
 
 describe('mergedPrSelectors', () => {
   it.each([
@@ -34,7 +39,16 @@ describe('mergedPrSelectors', () => {
     ['gh pr \\\n merge 12', ['12']],
     ['gh pr -R o/r merge 12', ['12']],
     ['gh pr --repo=o/r merge --squash 9', ['9']],
-    ['gh pr view 12', []]
+    ['gh pr view 12', []],
+    // Why: Git Bash on Windows may spell the program out.
+    ['gh.exe pr merge 7', ['7']],
+    ["cat <<'END-NOTE' > notes.md\ngh pr merge 12\nEND-NOTE", []],
+    ['cat <<\\EOF > notes.md\ngh pr merge 12\nEOF', []],
+    // Why: bash reads an unterminated heredoc to the end of the script.
+    ['cat <<EOF\ngh pr merge 12\n', []],
+    ['ls # then; gh pr merge 12', []],
+    ['# gh pr merge 12\ngh pr merge 5', ['5']],
+    ['echo a#b; gh pr merge 5', ['5']]
   ])('%j -> %j', (command, expected) => {
     expect(mergedPrSelectors(command)).toEqual(expected)
   })
@@ -99,15 +113,28 @@ describe('isGateTrigger', () => {
 describe('isMergeTrigger', () => {
   it.each([
     'gh pr merge 12',
+    'gh pr merge --squash',
     'gh pr \\\n merge 12',
-    'GH PR  MERGE 1',
-    "bash <<'EOF'\ngh pr merge 1\nEOF",
-    'gh pr -R o/r merge 12'
+    'gh pr -R o/r merge 12',
+    'git fetch && gh pr merge 12',
+    'bash -c "gh pr merge 12"',
+    'timeout 30 gh pr merge 12'
   ])('runs the closer after %j', (command) => {
     expect(isMergeTrigger(command)).toBe(true)
   })
 
-  it.each(['gh pr view 12', 'git merge main', 'gh pr list'])('ignores %j', (command) => {
+  it.each([
+    'gh pr view 12',
+    'git merge main',
+    'gh pr list',
+    'GH PR  MERGE 1',
+    'echo gh pr merge 12',
+    'echo "gh pr merge 12"',
+    "grep 'gh pr merge' docs/reference/working-process.md",
+    "bash <<'EOF'\ngh pr merge 1\nEOF",
+    'gh pr comment 12 --body "gh pr merge 12"',
+    'ls # gh pr merge 12'
+  ])('ignores %j', (command) => {
     expect(isMergeTrigger(command)).toBe(false)
   })
 })
@@ -171,12 +198,12 @@ describe('eventDeadline', () => {
 })
 
 describe('denyReason', () => {
-  it('lists a worktree whose removal error spans several lines', () => {
+  it('lists a worktree whose Orca terminal error spans several lines', () => {
     const reason = denyReason([
-      'kept fix/a (#12): worktree removal failed (/wt/fix-a): fatal: cannot remove\nuse -f -f'
+      'kept fix/a (#12): could not read Orca terminals (timeout\nretry) /wt/fix-a'
     ])
     expect(reason).toMatch(/^Comando bloqueado: parece un release y hay worktrees/)
-    expect(reason).toContain('- fix/a (#12): no se pudo quitar (/wt/fix-a): fatal: cannot remove')
+    expect(reason).toContain('- fix/a (#12): no se pudieron leer las terminales de Orca (timeout')
     expect(reason).not.toContain('kept fix/a')
   })
 
@@ -191,5 +218,39 @@ describe('denyReason', () => {
     expect(reason).toContain('- fix/b: no se pudieron leer sus PRs (gh: HTTP 502)')
     expect(reason).toContain('- /x no es un repositorio git')
     expect(reason).not.toContain('unverified')
+  })
+})
+
+describe('merged-worktree-close hook wiring', () => {
+  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
+  const entries = (event) =>
+    (settings.hooks?.[event] ?? []).flatMap((group) =>
+      (group.hooks ?? []).map((hook) => ({ ...hook, matcher: group.matcher }))
+    )
+  const wired = (event) => entries(event).filter((hook) => hook.command === hookCommand)
+
+  it('runs at session start after the coordinator sweep', () => {
+    const all = entries('SessionStart')
+    const sweep = all.findIndex((hook) => hook.command.includes('coordinator-sweep.sh'))
+    const closer = all.findIndex((hook) => hook.command === hookCommand)
+    expect(sweep).toBeGreaterThanOrEqual(0)
+    expect(closer).toBeGreaterThan(sweep)
+    expect(all[closer]).toMatchObject({
+      timeout: 90,
+      statusMessage: 'Cerrando worktrees de PRs mergeados...'
+    })
+  })
+
+  // Why no `if`: a prefix filter misses `env X=1 gh ...`, `command gh ...` and `git -C <dir> push`.
+  it('sees every Bash command after it runs, to catch merges', () => {
+    const hooks = wired('PostToolUse')
+    expect(hooks).toEqual([expect.objectContaining({ matcher: 'Bash', timeout: 90 })])
+    expect(hooks[0].if).toBeUndefined()
+  })
+
+  it('sees every Bash command before it runs, to gate releases', () => {
+    const hooks = wired('PreToolUse')
+    expect(hooks).toEqual([expect.objectContaining({ matcher: 'Bash', timeout: 90 })])
+    expect(hooks[0].if).toBeUndefined()
   })
 })

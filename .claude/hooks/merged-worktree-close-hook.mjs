@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Runs the merged-worktree closer from the harness: at session start, after `gh pr merge`,
-// and as a gate before a release. Never fails the tool: every error exits 0 silently.
+// Runs the merged-worktree closer from the harness: at session start, after a parsed `gh pr merge`,
+// and read-only as a gate before a release. Never fails the tool: every error exits 0 silently.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -11,7 +11,8 @@ import {
   isMainModule
 } from '../../config/scripts/merged-worktree-close.mjs'
 
-// Why raw text: the gate must not depend on parsing shell correctly; a false positive only runs it.
+// Why raw text: the gate must not depend on parsing shell correctly; it only reads, so a false
+// positive can deny but never close a worktree (ORCA-1017).
 // Words may be split by flags (`gh workflow -R o/r run`), but not across another command.
 const GATE_TRIGGERS = [
   /\bworkflow\b[^\n;|&]*\brun\b/i,
@@ -22,7 +23,6 @@ const GATE_TRIGGERS = [
 ]
 const PUSH = /\bpush\b/i
 const PUSHES_TAGS = /--tags\b|--follow-tags\b|--mirror\b|refs\/tags|refs\/\*|'\*'|"\*"|\s\*(\s|$)/i
-const MERGE_TRIGGER = /\bpr\b[^\n;|&]*\bmerge\b/i
 // `gh pr merge` flags that consume the next word, so it is not the PR selector.
 const MERGE_VALUE_FLAGS = new Set([
   '-R',
@@ -75,9 +75,13 @@ const RUN_TIMEOUT_MS = 20_000
 // Why 65 s for the whole merge event: a closer run can still spend 20 s on its deadline-exempt
 // `git worktree list`, and both must fit under the hooks' 90 s timeout.
 const POST_MERGE_BUDGET_MS = 65_000
+const NO_SELECTOR_NOTE =
+  'Merge sin selector de PR: no cierro worktrees. El barrido del lead al abrir sesión las recoge.'
 
 // Why: a heredoc body is data, not the command (command_text.py, ORCA-362); the rest of the opener line stays.
-const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?^\s*\2\s*$/gm
+// Why `(?![\s\S])`: bash reads an unterminated heredoc to the end of the script.
+const HEREDOC =
+  /<<-?\s*\\?(['"]?)([A-Za-z_][^\s'"<>;&|()]*)\1([^\n]*)\n[\s\S]*?(?:^\s*\2\s*$|(?![\s\S]))/gm
 
 /** The simple commands of a shell line as word lists, quotes removed; only unquoted ; & | ( ) and newlines split. */
 export function simpleCommands(command) {
@@ -116,6 +120,11 @@ export function simpleCommands(command) {
       i++
     } else if (ch === '\\' && i + 1 < text.length) {
       word = (word ?? '') + text[++i]
+    } else if (ch === '#' && word === null) {
+      // Why: a comment is text; only `#` at the start of a word opens one.
+      while (i + 1 < text.length && text[i + 1] !== '\n') {
+        i++
+      }
     } else if (';&|()\n'.includes(ch)) {
       endCommand()
     } else if (/\s/.test(ch)) {
@@ -160,7 +169,7 @@ function skipFlags(words, from, valueFlags) {
 }
 
 function isProgram(word, name) {
-  return word !== undefined && (word === name || basename(word) === name)
+  return word !== undefined && basename(word).replace(/\.exe$/i, '') === name
 }
 
 /** The words from the program on: drops `X=1` assignments, `env`/`command` prefixes and wrappers like `timeout 30`. */
@@ -221,14 +230,17 @@ function firstPositional(words, from, valueFlags) {
   return null
 }
 
+/** The `gh pr merge` commands of a shell line, in command position only. */
+function mergeCommands(command) {
+  return simpleCommands(command).filter(
+    (w) => isProgram(w[0], 'gh') && w[1] === 'pr' && mergeWordIndex(w) !== -1
+  )
+}
+
 /** PR selectors (number, URL or branch) that `gh pr merge` merges in command position. */
 export function mergedPrSelectors(command) {
-  return simpleCommands(command)
-    .filter((w) => isProgram(w[0], 'gh') && w[1] === 'pr')
-    .map((w) => {
-      const at = mergeWordIndex(w)
-      return at === -1 ? null : firstPositional(w, at + 1, MERGE_VALUE_FLAGS)
-    })
+  return mergeCommands(command)
+    .map((w) => firstPositional(w, mergeWordIndex(w) + 1, MERGE_VALUE_FLAGS))
     .filter(Boolean)
 }
 
@@ -250,8 +262,9 @@ export function isGateTrigger(command) {
   )
 }
 
+/** Why parsed, unlike the gate: this path removes worktrees, so text that names a merge must not run it. */
 export function isMergeTrigger(command) {
-  return MERGE_TRIGGER.test(joinContinuations(command))
+  return mergeCommands(command).length > 0
 }
 
 // Why: the shell drops a backslash-newline before anything else, so `gh workflow \<newline> run` still runs.
@@ -380,7 +393,7 @@ function mergedBranch(cwd, selector, deadline) {
   }
 }
 
-// Why the s flag: a removal error from git can span several lines.
+// Why the s flag: an error from Orca can span several lines.
 const KEPT = /^kept (.+?) \(#(\d+)\): (.+)$/s
 const UNVERIFIED = /^unverified(?: (.+?))?: (.*)$/s
 const KEPT_REASONS = [
@@ -400,8 +413,7 @@ const KEPT_REASONS = [
   [
     /^could not read Orca terminals \((.*)\) (.+)$/s,
     (m) => `no se pudieron leer las terminales de Orca (${m[1]}) (${m[2]})`
-  ],
-  [/^worktree removal failed \((.+?)\): (.*)$/s, (m) => `no se pudo quitar (${m[1]}): ${m[2]}`]
+  ]
 ]
 const PR_READ_FAILED = /^could not read its PRs \((.*)\)$/s
 const UNVERIFIED_REASONS = [
@@ -482,9 +494,10 @@ function handle(payload) {
   const event = payload.hook_event_name
   const cwd = resolve(payload.cwd || process.cwd())
   const command = payload.tool_input?.command ?? ''
+  // Why: closing worktrees is the lead's; each member start listed every worktree's PRs (ORCA-877).
+  const isMember = process.env.ORCA_GAME_ROLE === 'member'
   if (event === 'SessionStart') {
-    // Why: closing worktrees is the lead's; each member start listed every worktree's PRs (ORCA-877).
-    if (process.env.ORCA_GAME_ROLE === 'member') {
+    if (isMember) {
       return null
     }
     const { lines } = runCloser(cwd, [])
@@ -498,7 +511,7 @@ function handle(payload) {
       : null
   }
   if (event === 'PostToolUse') {
-    return isMergeTrigger(command) ? afterMerge(cwd, command) : null
+    return !isMember && isMergeTrigger(command) ? afterMerge(cwd, command) : null
   }
   if (event !== 'PreToolUse' || !isGateTrigger(command)) {
     return null
@@ -508,7 +521,7 @@ function handle(payload) {
   const target = gateTargetDir(command, cwd) ?? (projectDir ? resolve(projectDir) : cwd)
   let gate
   try {
-    gate = runCloser(target, ['--gate'], { sessionCwd: cwd })
+    gate = runCloser(target, ['--gate', '--dry-run'], { sessionCwd: cwd })
   } catch (error) {
     // Why: the gate fails closed; an error here must not let the command through.
     return deny(
@@ -521,16 +534,16 @@ function handle(payload) {
   return gate.lines.length ? { systemMessage: gate.lines.join('\n') } : null
 }
 
-/** Closes what the merge shipped; with no PR selector it can parse, every merged worktree. */
+/** Closes what the merge shipped; with no PR selector it names nothing, so it closes nothing. */
 function afterMerge(cwd, command) {
   // Why the env override: lets a test prove every closer run shares this one budget.
   const budget = Number(process.env.ORCA_WORKTREE_CLOSE_EVENT_BUDGET_MS) || POST_MERGE_BUDGET_MS
   const deadline = eventDeadline(budget)
   const selectors = mergedPrSelectors(command)
-  const lines = []
   if (selectors.length === 0) {
-    lines.push(...runCloser(cwd, [], { deadline }).lines)
+    return { systemMessage: NO_SELECTOR_NOTE }
   }
+  const lines = []
   for (const selector of selectors) {
     const branch = deadline.remainingMs() > 0 ? mergedBranch(cwd, selector, deadline) : null
     if (branch && deadline.remainingMs() > 0) {
