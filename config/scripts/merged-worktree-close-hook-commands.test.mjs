@@ -241,6 +241,24 @@ describe('merged-worktree-close hook wiring', () => {
     })
   })
 
+  // Why: the sweep takes up to 79 s and a matcher-less hook also runs on compact and clear (ORCA-1021).
+  it.each([
+    // Why resume: Orca reopens a lead with `claude --resume`, and the lead decided it gets the sweep.
+    ['coordinator-sweep.sh', 'startup|resume'],
+    ['merged-worktree-close-hook.mjs', 'startup']
+  ])('runs %s on %s, never on a compaction', (script, matcher) => {
+    const hooks = entries('SessionStart').filter((hook) => hook.command.includes(script))
+    expect(hooks).toEqual([expect.objectContaining({ matcher })])
+  })
+
+  // Why resume: Orca reopens a lead with `claude --resume`, and that is the restart ORCA-987 fixed.
+  it('resumes members when a lead starts or is reopened, not on a compaction', () => {
+    const hooks = entries('SessionStart').filter((hook) =>
+      hook.command.includes('session-start-lead-recovery.sh')
+    )
+    expect(hooks).toEqual([expect.objectContaining({ matcher: 'startup|resume' })])
+  })
+
   // Why no `if`: a prefix filter misses `env X=1 gh ...`, `command gh ...` and `git -C <dir> push`.
   it('sees every Bash command after it runs, to catch merges', () => {
     const hooks = wired('PostToolUse')

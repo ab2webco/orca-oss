@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import {
   closeMergedWorktrees,
   githubSlug,
@@ -75,6 +75,7 @@ const RUN_TIMEOUT_MS = 20_000
 // Why 65 s for the whole merge event: a closer run can still spend 20 s on its deadline-exempt
 // `git worktree list`, and both must fit under the hooks' 90 s timeout.
 const POST_MERGE_BUDGET_MS = 65_000
+const LEAD_CHECK_TIMEOUT_MS = 10_000
 const NO_SELECTOR_NOTE =
   'Merge sin selector de PR: no cierro worktrees. El barrido del lead al abrir sesión las recoge.'
 
@@ -490,14 +491,26 @@ function deny(reason) {
   }
 }
 
+/** Closing worktrees is the lead's; a check that cannot answer closes nothing (ORCA-877, ORCA-1021). */
+function isLeadSession(cwd) {
+  try {
+    execFileSync('bash', [join(import.meta.dirname, 'lead-session.sh')], {
+      cwd,
+      stdio: 'ignore',
+      timeout: LEAD_CHECK_TIMEOUT_MS
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function handle(payload) {
   const event = payload.hook_event_name
   const cwd = resolve(payload.cwd || process.cwd())
   const command = payload.tool_input?.command ?? ''
-  // Why: closing worktrees is the lead's; each member start listed every worktree's PRs (ORCA-877).
-  const isMember = process.env.ORCA_GAME_ROLE === 'member'
   if (event === 'SessionStart') {
-    if (isMember) {
+    if (!isLeadSession(cwd)) {
       return null
     }
     const { lines } = runCloser(cwd, [])
@@ -511,7 +524,7 @@ function handle(payload) {
       : null
   }
   if (event === 'PostToolUse') {
-    return !isMember && isMergeTrigger(command) ? afterMerge(cwd, command) : null
+    return isMergeTrigger(command) && isLeadSession(cwd) ? afterMerge(cwd, command) : null
   }
   if (event !== 'PreToolUse' || !isGateTrigger(command)) {
     return null

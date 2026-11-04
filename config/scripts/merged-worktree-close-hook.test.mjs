@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -73,9 +74,17 @@ function bashEvent(event, cwd, command) {
   return { hook_event_name: event, cwd, tool_input: { command } }
 }
 
+/** An Orca CLI that answers lead: without one the session owns no coordination. */
+function leadCli(root) {
+  const cli = join(root, 'orca-lead-stub')
+  writeFileSync(cli, `#!/bin/sh\necho '{"result":{"role":"lead"}}'\n`)
+  chmodSync(cli, 0o755)
+  return cli
+}
+
 /** `prs` null leaves the PR lookup to the real remote; `extraEnv` adds hook environment. */
 function runHook(root, payload, prs, { extraEnv = {}, script = hookScript } = {}) {
-  const env = { ...process.env, ...extraEnv }
+  const env = { ...process.env, ORCA_GAME_CLI: leadCli(root), ...extraEnv }
   if (prs) {
     env.ORCA_WORKTREE_CLOSE_PRS_FILE = writeJson(root, prs)
   }
@@ -350,26 +359,38 @@ describe('merged-worktree-close hook', () => {
     expect(existsSync(feature.path)).toBe(true)
   })
 
-  it('keeps the merged worktree the session runs inside', () => {
+  it('after a real merge in a linked worktree session closes nothing', () => {
     const { root, addFeature } = makeRepo()
     const feature = addFeature('fix/a')
     const sessionDir = join(feature.path, 'src')
     mkdirSync(sessionDir)
 
+    const result = runHook(root, bashEvent('PostToolUse', sessionDir, 'gh pr merge 12'), {
+      'fix/a': [{ number: 12, headRefOid: feature.head }]
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toBe('')
+    expect(existsSync(feature.path)).toBe(true)
+  })
+
+  // Why: only a lead owns coordination, and a plain session used to run every step of it (ORCA-1021).
+  it.each([
+    ['session start', { hook_event_name: 'SessionStart' }],
+    ['a real merge', { hook_event_name: 'PostToolUse', tool_input: { command: 'gh pr merge 12' } }]
+  ])('leaves a plain session alone after %s', (_, event) => {
+    const { root, repo, addFeature } = makeRepo()
+    const feature = addFeature('fix/a')
+
     const result = runHook(
       root,
-      {
-        hook_event_name: 'PostToolUse',
-        cwd: sessionDir,
-        tool_input: { command: 'gh pr merge 12' }
-      },
-      { 'fix/a': [{ number: 12, headRefOid: feature.head }] }
+      { ...event, cwd: repo },
+      { 'fix/a': [{ number: 12, headRefOid: feature.head }] },
+      { extraEnv: { ORCA_GAME_CLI: '' } }
     )
 
     expect(result.status, result.stderr).toBe(0)
-    expect(result.json?.systemMessage).toContain(
-      `kept fix/a (#12): this session runs inside it ${feature.path}`
-    )
+    expect(result.stdout).toBe('')
     expect(existsSync(feature.path)).toBe(true)
   })
 
