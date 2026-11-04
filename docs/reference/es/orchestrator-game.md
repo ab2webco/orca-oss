@@ -1,5 +1,5 @@
 ---
-sourceHash: 96cce75123659a8d
+sourceHash: bbe64fe0844852ad
 ---
 
 # El juego orquestador de Agent Teams
@@ -721,10 +721,18 @@ matches …` (ORCA-866).
   ([`orchestrator-game-history-store.ts`](../../../src/main/runtime/orchestrator-game-history-store.ts)).
   Se escriben mediante `game.historyRecord` y se leen mediante `game.history`, dos métodos RPC que un
   host más antiguo que esto no tiene; `game history` dice entonces que actualices Orca.
-- `orca game adopt-history --from-repo-id <id>` — los datos del juego se guardan bajo el id del repo,
-  y un repo quitado y agregado de nuevo recibe otro, así que su historial, eventos, personajes,
-  lecciones y STOP quedan bajo el id viejo mientras el juego lee un proyecto vacío (ORCA-1011). Esto
-  los integra en el proyecto actual: registros y eventos fusionados por fecha, personajes y conteos de
+- Los archivos del juego de cada proyecto (historial, lecciones, miembros guardados, drops,
+  conversación del lead, STOP) se nombran por la conexión SSH y la ruta del repo, no por su id, así
+  que un repo quitado y agregado de nuevo en la misma ruta los conserva; dos clones en rutas distintas
+  quedan separados
+  ([`orchestrator-game-store-names.ts`](../../../src/main/runtime/orchestrator-game-store-names.ts)).
+  La clave de proyecto que el runtime pasa sigue siendo `repo:<id>`, así que nada de lo que lee un
+  host emparejado cambia. Un archivo todavía nombrado por el id del repo se copia al nombre nuevo en
+  la primera lectura y se deja en su lugar para un build anterior.
+- `orca game adopt-history --from-repo-id <id>` — antes de esos nombres, un repo quitado y agregado de
+  nuevo recibía otro id, así que su historial, eventos, personajes, lecciones y STOP quedaban bajo el
+  id viejo mientras el juego leía un proyecto vacío (ORCA-1011); un repo movido a otra ruta todavía
+  pasa por eso. Esto los integra en el proyecto actual: registros y eventos fusionados por fecha, personajes y conteos de
   lecciones sumados, un STOP que sigue puesto. Los archivos viejos se renombran
   `<name>.adopted-<time>` junto a cada store, nunca se borran, así que una segunda corrida no encuentra
   nada. Rechaza un id de repo que Orca todavía tiene, y solo corre cuando ningún lead ni miembro de
