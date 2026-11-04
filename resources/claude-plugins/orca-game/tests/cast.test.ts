@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the scene's pet, and Jev's advisor acting out its decisions.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Plugin, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

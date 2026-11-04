@@ -2,7 +2,8 @@
 // pane that asks for the keyboard so its j and n never reach the prompt, counts down, and leaves
 // nothing once passed or expired; an agent waiting on the user holds the countdown and the run, and
 // keeps the prompt its keyboard, until it is answered.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

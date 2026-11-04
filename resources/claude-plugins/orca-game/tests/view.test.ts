@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: /orca-game:view lists the views and switches this pane, this project or every project.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

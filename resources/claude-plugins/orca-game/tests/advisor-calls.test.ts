@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: Claude's own advisor calls, as the session appends their rows.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Plugin, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

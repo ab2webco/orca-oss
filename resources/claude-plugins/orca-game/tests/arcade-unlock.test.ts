@@ -1,6 +1,7 @@
 // Runs under `claude plugin test`: a member's perfect merge, seen by its lead between two polls of
 // `game state`, offers one arcade run; never twice for the same merge, never from a member's pane.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

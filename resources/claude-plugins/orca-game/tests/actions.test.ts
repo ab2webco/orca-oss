@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the Panel's project actions and "work on" a To Do ticket.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

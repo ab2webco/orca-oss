@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the band draws the configured scene in its theme of the day.
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect } from 'claude-code/testing'
+import { test } from './test-budget'
 
 import { currentScene, quest } from '../hooks/quest-state'
 import { setContributedScenes, type SceneDefinition } from '../hooks/scenes/index'

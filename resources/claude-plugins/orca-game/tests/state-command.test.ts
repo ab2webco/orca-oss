@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: /orca-game:state, answered by the mod from a fresh `orca game state`.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

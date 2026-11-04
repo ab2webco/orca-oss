@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the game publishes whether it draws other plugins' lines, live.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

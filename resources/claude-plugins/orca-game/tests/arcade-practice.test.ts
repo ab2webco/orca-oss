@@ -1,6 +1,7 @@
 // Runs under `claude plugin test`: /orca-game:demo arcade opens a practice run that costs nothing
 // until played, pauses off focus, writes no XP or points, and leaves nothing once closed.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
