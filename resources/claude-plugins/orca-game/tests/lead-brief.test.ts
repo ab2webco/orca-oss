@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: what a lead reads after its conversation is resumed or compacted.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the Panel's hero and the band's HUD hero wear the crown on a lead's pane only.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
@@ -119,7 +120,7 @@ const FLEET = { id: PANE_ID, title: 'Fleet', isFocused: true, isPlaced: true }
 const PANEL_HUD_KEY = 'pane-hud'
 
 const hudGoldOf = async (
-  ui: Awaited<ReturnType<typeof panel>>,
+  ui: Awaited<ReturnType<typeof panel | typeof band>>,
   key: string
 ): Promise<boolean | undefined> => {
   const raster = await ui.find({ type: 'Raster', key })

@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the band fits the pane at every width it is drawn at.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

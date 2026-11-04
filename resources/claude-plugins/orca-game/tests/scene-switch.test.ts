@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: a project scene switched in Settings reaches an open band, spinner and Panel on the next poll.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

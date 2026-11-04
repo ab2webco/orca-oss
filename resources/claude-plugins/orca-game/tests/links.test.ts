@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: game links in the band and the fleet pane.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

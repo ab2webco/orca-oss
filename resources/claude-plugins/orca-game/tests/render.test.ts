@@ -1,6 +1,7 @@
 // Runs under `claude plugin test`: the render a session draws, from the env, Orca's live config and /quest,
 // and what the hd scene learns from the clock and each refresh.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

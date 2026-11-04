@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the lead's own band rests only once no member works and it is idle.
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect } from 'claude-code/testing'
+import { test } from './test-budget'
 
 import type { GameAgent, GameState } from '../types'
 import { syncHdTeam } from '../hooks/hd-team'

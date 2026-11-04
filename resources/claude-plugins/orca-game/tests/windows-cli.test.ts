@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the mod on Windows, where Orca can hand it a batch-file CLI.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

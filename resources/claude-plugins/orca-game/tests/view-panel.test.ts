@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the Panel's view selector, and the same view in the Panel, /orca-game:view and Orca's config.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`, against the engine itself; the *.spec.ts files are vitest's.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { On } from 'claude-code'
 
 import { QUEST_SCENE } from '../hooks/scenes/quest'

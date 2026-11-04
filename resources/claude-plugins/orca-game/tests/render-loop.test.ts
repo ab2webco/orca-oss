@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: no render of the mod feeds its own redraw (ORCA-989).
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

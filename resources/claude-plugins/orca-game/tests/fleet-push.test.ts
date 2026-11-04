@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the band follows a fleet change Orca pushes, and ages a fleet a failed read kept.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: flat draws the game as text, with no Raster and no frame work.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

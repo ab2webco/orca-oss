@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: a member pane tells Orca what its Jev has it on, for the lead's Panel.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine, Plugin } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

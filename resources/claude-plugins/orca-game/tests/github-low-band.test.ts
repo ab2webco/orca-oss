@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: the lead's band warns while the account's GitHub budget is low.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 

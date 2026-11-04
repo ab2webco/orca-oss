@@ -1,5 +1,6 @@
 // Runs under `claude plugin test`: a member's pane draws its own compact band, not the lead's.
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
