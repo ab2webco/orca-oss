@@ -145,23 +145,28 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'member'],
     summary: 'What one member is doing now and what it did since its launch, in one bounded read',
-    usage: 'orca game member <ticket|terminal-handle> [--json]',
+    usage: 'orca game member <ticket|terminal-handle|character> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'member'],
     positionalArgs: ['member'],
     notes: [
       'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes; text left in a Claude input box is marked unsent (typed or a Claude suggestion) and given as unsentInput.',
       'Since launch: every dispatch of its task, the last 10 messages between it and the lead (questions, answers, worker_done), its last 10 commits since the base, PR, CI and ticket status.',
       'A part Orca cannot read is listed under notes; the rest still prints. Read-only.',
+      'A character name reads that character: its member now, if one runs, and the account, host, tickets, PRs and outcomes kept for it. A character with no member running prints only what was kept.',
       'A member already freed is in `orca game history`.'
     ],
-    examples: ['orca game member CIN-12', 'orca game member CIN-12 --json']
+    examples: [
+      'orca game member CIN-12',
+      'orca game member CIN-12 --json',
+      'orca game member Merlin'
+    ]
   },
   {
     path: ['game', 'history'],
     summary:
-      "The project's members already freed: ticket, outcome, PR, agent, account and last report",
-    usage: 'orca game history [--ticket <id>] [--since <date>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'since'],
+      "The project's members already freed: ticket, outcome, PR, character, agent, account, host and last report",
+    usage: 'orca game history [--ticket <id>] [--character <name>] [--since <date>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'character', 'since'],
     notes: [
       '`game sweep --close` and `game stop` write one record per member before freeing it; outcomes: merged, qa, stopped, failed, limited.',
       'Kept per project on the Orca host that runs the lead (also for SSH and folder projects), the last 200 records; newest first.',
@@ -170,6 +175,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'orca game history',
       'orca game history --ticket CIN-12 --json',
+      'orca game history --character Merlin',
       'orca game history --since 2026-10-15'
     ]
   },

@@ -42,7 +42,10 @@ describe('one member, one figure', () => {
   })
 
   it('keeps a language variant of a plain name on one figure', () => {
-    const scene: SceneDefinition = { ...BARE, roster: [{ en: 'Ada', es: 'Adela' }, 'Bo'] }
+    const scene: SceneDefinition = {
+      ...BARE,
+      roster: [{ en: 'Ada', es: 'Adela' }, 'Bo']
+    }
     expect(figureOf(scene, 'Adela · ORCA-1', 'docs')).toBe(figureOf(scene, 'Ada · ORCA-1', 'pr'))
   })
 
@@ -78,7 +81,17 @@ describe('one member, one figure', () => {
       )
     expect(classic('build', 'Ada · ORCA-1')).not.toBe(classic('build'))
     const hd = (hero?: string) =>
-      JSON.stringify(hdSceneGridOf({ scene: PLAIN, columns: 80, rows: 9, tick: 0, hero }))
+      JSON.stringify(
+        hdSceneGridOf({
+          scene: PLAIN,
+          columns: 80,
+          rows: 9,
+          tick: 0,
+          caption: '',
+          since: 0,
+          hero
+        })
+      )
     expect(hd('Ada · ORCA-1')).not.toBe(hd())
     const hud = (phase: ScenePhase) =>
       JSON.stringify(hudGridOf(PLAIN, [], 60, 0, { hero: `Ada · ORCA-1 ${phase}` }))
@@ -117,13 +130,16 @@ describe('the name a member goes by', () => {
   })
 
   it('names the lead by its title on its card, as its hero does', () => {
-    const labelled = state({ agents: [lead], lead: { label: 'Skipper' } as GameState['lead'] })
+    const labelled = state({
+      agents: [lead],
+      lead: { label: 'Skipper' } as GameState['lead']
+    })
     expect(memberOf(lead, labelled, false).name).toBe('Skipper')
   })
 
   it('makes a member pane its hero by the worktree name, and a lead by its title', () => {
     expect(heroNameOf(true, 'Ada · ORCA-1034', 'Skipper')).toBe('Ada · ORCA-1034')
     expect(heroNameOf(false, 'Ada · ORCA-1034', 'Skipper')).toBe('Skipper')
-    expect(heroNameOf(true, 'orca-1034', undefined)).toBeUndefined()
+    expect(heroNameOf(true, 'scratch', undefined)).toBeUndefined()
   })
 })

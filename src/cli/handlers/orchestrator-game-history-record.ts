@@ -109,7 +109,9 @@ export async function recordFreedMember(args: {
     endedAt: new Date().toISOString(),
     outcome: gameHistoryOutcomeOf(member, args.freedBy, dispatch?.workerState),
     pr: member.review ? `#${member.review.number} ${member.review.state}` : null,
-    lastReport
+    lastReport,
+    ...(character === null ? {} : { character }),
+    ...(member.remote ? { host: member.remote.host } : {})
   }
   try {
     await client.call('game.historyRecord', {

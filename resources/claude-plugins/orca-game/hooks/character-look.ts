@@ -12,7 +12,13 @@ import type {
 
 // A member is one figure in every phase: its own costumes, or one body under its variant or a derived one.
 
-type Head = { up: number; top: number; from: number; to: number; centre: number }
+type Head = {
+  up: number
+  top: number
+  from: number
+  to: number
+  centre: number
+}
 type Cell = readonly [x: number, y: number]
 
 // Why only empty cells around the head: no costume's art is covered, so any accessory fits any scene.
@@ -87,7 +93,13 @@ const headOf = (rows: readonly string[]): Head | undefined => {
   }
   const from = row.search(/[^.]/)
   const to = row.search(/[^.]\.*$/)
-  return { up: Math.max(0, top - 1), top, from, to, centre: Math.round((from + to) / 2) }
+  return {
+    up: Math.max(0, top - 1),
+    top,
+    from,
+    to,
+    centre: Math.round((from + to) / 2)
+  }
 }
 
 const withAccessory = (
@@ -148,7 +160,7 @@ const looks = new WeakMap<SceneDefinition, Map<string, Costume>>()
 const lookOf = (scene: SceneDefinition, memberName: string): Costume => {
   const character = characterOf(scene, memberName)
   // Why the character's name: `Merlin 2` and `Merlín` wear Merlin's figure, not one of their own.
-  const key = character === undefined ? lookKeyOf(memberName) : keysOf(character.name)[0] ?? ''
+  const key = character === undefined ? lookKeyOf(memberName) : (keysOf(character.name)[0] ?? '')
   const made = looks.get(scene) ?? new Map<string, Costume>()
   looks.set(scene, made)
   const kept = made.get(key)
@@ -184,7 +196,10 @@ const mostDrawnColorOf = (costume: Costume): number | undefined => {
 }
 
 /** The color that tells a character apart where no sprite is drawn. */
-export const characterColorOf = (scene: SceneDefinition, memberName: string): number | undefined => {
+export const characterColorOf = (
+  scene: SceneDefinition,
+  memberName: string
+): number | undefined => {
   const variant = characterOf(scene, memberName)?.variant
   if (variant === undefined) {
     return mostDrawnColorOf(characterCostumeOf(scene, memberName, 'working'))

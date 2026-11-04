@@ -73,7 +73,13 @@ const hudSky = (hud: HudPalette, x: number, y: number, tick: number): number => 
   return isStar ? hud.star : mix(hud.skyTop, hud.skyBottom, y / (HUD_PIXELS - 1))
 }
 
-type Sprite = { phase: ScenePhase; state: MemberState; mood?: Mood; at: number; name?: string }
+type Sprite = {
+  phase: ScenePhase
+  state: MemberState
+  mood?: Mood
+  at: number
+  name?: string
+}
 
 const spriteTopOf = (sprite: Sprite, tick: number): number =>
   2 -
@@ -156,12 +162,21 @@ export const hudGridOf = (
   const shown = members.slice(0, Math.max(0, Math.floor((columns - PARTY_AT - 1) / SLOT)))
   const heroState = heroStateOf(members, extras)
   const heroAt = heroState === 'idle' ? 2 : 2 + (Math.floor(tick / 8) % 2)
-  const hero: Sprite = { phase: 'working', state: heroState, at: heroAt, name: extras.hero }
+  const hero: Sprite = {
+    phase: 'working',
+    state: heroState,
+    at: heroAt,
+    name: extras.hero
+  }
   const hud = scene.hud ?? QUEST_HUD
   const placed =
     extras.lead === undefined
       ? undefined
-      : crownAtOf(characterCostumeOf(scene, extras.hero, 'working').rows, heroAt, spriteTopOf(hero, tick))
+      : crownAtOf(
+          characterCostumeOf(scene, extras.hero, 'working').rows,
+          heroAt,
+          spriteTopOf(hero, tick)
+        )
   // Why the clamp: row 0 is the frame, so a crown over a costume's top row sits on the head instead.
   const crown = placed === undefined ? undefined : { ...placed, top: Math.max(1, placed.top) }
   const pixel = (x: number, y: number): number => {

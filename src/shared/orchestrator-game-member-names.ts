@@ -147,7 +147,10 @@ type RosterSource = {
   config: { scene?: string }
   lead?: Pick<OrchestratorGameLead, 'memberNames'>
   extensions?: {
-    scenes: readonly { id: string; definition: { roster?: readonly GameMemberName[] } }[]
+    scenes: readonly {
+      id: string
+      definition: { roster?: readonly GameMemberName[] }
+    }[]
   }
 }
 
@@ -173,18 +176,25 @@ const numbered = (variant: string, n: number): string =>
   `${variant.slice(0, GAME_MEMBER_NAME_MAX - String(n).length - 1).trimEnd()} ${n}`
 
 /**
- * The first roster name no live member holds, in `locale` when the roster has it. Once all are
- * taken, a numbered one (`Arthur 2`); null only without a roster.
+ * The first roster name no live member holds, in `locale` when the roster has it. `elsewhere` holds a
+ * name only while another is free. Once all are taken, a numbered one (`Arthur 2`); null only
+ * without a roster.
  */
 export function nextMemberName(
   roster: readonly GameMemberName[],
   inUse: readonly string[],
-  locale: string
+  locale: string,
+  elsewhere: readonly string[] = []
 ): string | null {
   const taken = new Set(inUse.map((one) => one.toLowerCase()))
   const isFree = (variants: readonly string[]): boolean =>
     variants.every((variant) => !taken.has(variant.toLowerCase()))
-  const free = roster.find((name) => isFree(variantsOf(name)))
+  const held = new Set(elsewhere.map((one) => one.toLowerCase()))
+  const free =
+    roster.find(
+      (name) =>
+        isFree(variantsOf(name)) && !variantsOf(name).some((one) => held.has(one.toLowerCase()))
+    ) ?? roster.find((name) => isFree(variantsOf(name)))
   if (free !== undefined) {
     return shownIn(free, locale)
   }

@@ -72,6 +72,20 @@ describe('orca game history', () => {
     expect(JSON.parse(output.join('')).result.records).toEqual([RECORD])
   })
 
+  it('filters by character itself, so an older host that drops the flag cannot list everyone', async () => {
+    const records = [
+      { ...RECORD, character: 'Ada', host: 'imac' },
+      { ...RECORD, ticket: 'CIN-8' }
+    ]
+    const client = {
+      call: async () => ({ ok: true, result: { records } })
+    } as unknown as RuntimeClient
+    await run(client, [['character', 'ada']], false)
+    const text = output.join('\n')
+    expect(text).toContain('CIN-9 qa #41 merged · Ada · codex · bo@example.com · on imac')
+    expect(text).not.toContain('CIN-8')
+  })
+
   it('refuses a since it cannot read', async () => {
     const { client, calls } = fakeClient()
     await expect(run(client, [['since', 'yesterday-ish']])).rejects.toThrow(/--since/)

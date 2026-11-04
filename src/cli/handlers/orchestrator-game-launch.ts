@@ -34,6 +34,7 @@ import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
+import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 import {
   postGameEvents,
   readCallerGameState,
@@ -44,7 +45,7 @@ import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { memberDisplayNameOf, memberNameOf } from '../../shared/orchestrator-game-member-names'
-import { memberNameFor } from './orchestrator-game-member-name-reserve'
+import { memberNameFor, releaseMemberName } from './orchestrator-game-member-name-reserve'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
@@ -92,8 +93,11 @@ function requireLaunchPreferences(capabilities: readonly string[]): void {
   }
 }
 
-/** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
-export async function launchGameMember(args: {
+type GameRemoteWhere = GameRemotePlacement & { worktree: string }
+
+type GameMemberWhere = Awaited<ReturnType<typeof memberWorktreeParamsOf>> | GameRemoteWhere
+
+type GameLaunchArgs = {
   client: Client
   state: OrchestratorGameState
   ticket: string
@@ -112,16 +116,42 @@ export async function launchGameMember(args: {
   onGlobalLogin?: readonly string[]
   /** A paired host instead of this Orca; named from the same roster as a local member. */
   remote?: GameRemotePlacement | null
-}): Promise<GameLaunchResult> {
+}
+
+/** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
+export async function launchGameMember(args: GameLaunchArgs): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
-  const lead = state.lead ?? DEFAULT_GAME_LEAD
-  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
   const where = args.remote
     ? { ...args.remote, worktree: 'new-top-level' }
     : await memberWorktreeParamsOf({ client, state, ticket, repo })
-  const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
   const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
+  const start = { asked: false }
+  try {
+    const launched = await startGameMember(args, where, name, start)
+    if (launched.state === 'failed') {
+      await releaseMemberName(client, ticket)
+    }
+    return launched
+  } catch (error) {
+    // Why not any error: a start the host may have run keeps its name until the hold runs out.
+    if (!start.asked || isLaunchRefusal(error)) {
+      await releaseMemberName(client, ticket)
+    }
+    throw error
+  }
+}
+
+async function startGameMember(
+  args: GameLaunchArgs,
+  where: GameMemberWhere,
+  name: string | null,
+  start: { asked: boolean }
+): Promise<GameLaunchResult> {
+  const { client, state, ticket, repo } = args
+  const lead = state.lead ?? DEFAULT_GAME_LEAD
+  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
+  const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
   const title = memberDisplayNameOf(
     name,
     item ? `${item.id} ${item.title}` : ticket,
@@ -208,6 +238,7 @@ export async function launchGameMember(args: {
     ...setupAdmissionOf(capabilities),
     game: true
   }
+  start.asked = true
   const worker = await callWithLaunchRetry((requestId) =>
     client.call<WorkerStartResult>(
       'orchestration.workerStart',
@@ -227,7 +258,10 @@ export async function launchGameMember(args: {
     ...(name === null ? {} : { name }),
     agent: choice.agent,
     ...(memberAccount.account
-      ? { account: memberAccount.account.email, accountId: memberAccount.account.id }
+      ? {
+          account: memberAccount.account.email,
+          accountId: memberAccount.account.id
+        }
       : {}),
     ...(memberAccount.globalLogin ? { globalLogin: true as const } : {}),
     ...(memberAccount.why ? { accountWhy: memberAccount.why } : {}),

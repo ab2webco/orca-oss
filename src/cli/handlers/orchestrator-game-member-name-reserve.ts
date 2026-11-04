@@ -31,3 +31,10 @@ export async function memberNameFor(
     ? reserved.name
     : nextMemberName(roster, taken, locale)
 }
+
+/** Frees a failed launch's name; an older Orca has no such call, and its hold runs out by itself. */
+export async function releaseMemberName(client: Client, ticket: string): Promise<void> {
+  await client
+    .call('game.memberNameRelease', { ...gameBoardCaller(), ticket })
+    .catch(() => undefined)
+}

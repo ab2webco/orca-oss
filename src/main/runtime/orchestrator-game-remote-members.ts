@@ -181,8 +181,9 @@ export function listEarlierLeadRemoteMemberSources(
 }
 
 /**
- * Task titles of every Run's remote members still holding their host's resources, for the name
- * pool. Not scoped to a project: the home Run DB does not record one, and a skipped name costs nothing.
+ * Task titles of every Run's remote members still holding their host's resources, failed ones aside,
+ * for the name pool. Not scoped to a project (the home Run DB does not record one), so these give way
+ * before a launch takes a numbered name.
  */
 export function liveRemoteMemberTitlesOf(db: OrchestrationDb): string[] {
   const rows = sqliteOf(db)
@@ -190,7 +191,7 @@ export function liveRemoteMemberTitlesOf(db: OrchestrationDb): string[] {
       `SELECT t.task_title AS taskTitle
          ${SOURCE_JOINS}
         WHERE ${NOT_RELEASED}
-          AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
+          AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned', 'failed')
           AND t.task_title IS NOT NULL
         ORDER BY d.created_at, d.rowid`
     )
