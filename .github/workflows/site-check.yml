@@ -1,0 +1,50 @@
+name: Site check
+
+# Builds site/ and runs its tests on PRs: the landing must name every agent and
+# provider the app ships, and every internal link must resolve under the Pages base.
+on:
+  pull_request:
+    paths:
+      - "site/**"
+      - "docs/user/**"
+      - "docs/reference/orchestrator-game.md"
+      - "docs/reference/headless-linux-server.md"
+      - "docs/reference/plugin-development.md"
+      - "docs/reference/orca-sonar.md"
+      - "docs/reference/es/**"
+      - "docs/assets/readme/**"
+      - "resources/build/icon.png"
+      - "src/shared/task-providers.ts"
+      - "src/shared/tui-agent-display-names.ts"
+      - "src/renderer/src/components/settings/IntegrationsPane.tsx"
+      # The hero plays /quest demo with the game's renderer, and the palette is read from its scenes.
+      - "resources/claude-plugins/orca-game/hooks/**"
+      - "src/renderer/src/components/settings/orchestrator-game-scene-preview-frame.ts"
+      - ".github/workflows/site-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: site/package.json
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
