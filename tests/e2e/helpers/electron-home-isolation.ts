@@ -1,6 +1,7 @@
 import { mkdirSync, realpathSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type { ElectronApplication } from '@stablyai/playwright-test'
 
 const RESTRICTED_ENV_KEYS = new Set([
   'HOME',
@@ -93,6 +94,19 @@ export function createElectronHomeIsolation({
       ORCA_E2E_HOME_DIR: isolatedHome
     }
   }
+}
+
+// Why: this is the first evaluate into main, and it lands in main's synchronous
+// startup. A sync result becomes a settled promise V8 15.0's inspector holds
+// weakly, so a GC before main yields answers `Promise was collected` (ORCA-1031).
+// Stay pending until main yields: the reaction jobs then run with nothing between.
+export function readElectronResolvedHome(
+  app: Pick<ElectronApplication, 'evaluate'>
+): Promise<string> {
+  return app.evaluate(
+    ({ app: electronApp }) =>
+      new Promise<string>((resolve) => setImmediate(() => resolve(electronApp.getPath('home'))))
+  )
 }
 
 export function assertElectronResolvedIsolatedHome(

@@ -29,7 +29,8 @@ import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import {
   assertElectronResolvedIsolatedHome,
-  createElectronHomeIsolation
+  createElectronHomeIsolation,
+  readElectronResolvedHome
 } from './electron-home-isolation'
 import { createSeededTestRepo, isValidGitRepo } from './seeded-test-repo'
 import {
@@ -248,7 +249,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     })
     forwardElectronProcessLogs(app, testInfo)
     try {
-      const resolvedHome = await app.evaluate(({ app }) => app.getPath('home'))
+      const resolvedHome = await readElectronResolvedHome(app)
       assertElectronResolvedIsolatedHome(resolvedHome, homeIsolation)
     } catch (error) {
       await closeElectronAppForE2E(app)
