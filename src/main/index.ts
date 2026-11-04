@@ -347,6 +347,10 @@ import { AGENT_AWAKE_STATUS_STALE_AFTER_MS, AgentAwakeService } from './agent-aw
 import { normalizeComputerAwakeMode } from '../shared/computer-awake-mode'
 import { registerSystemResumeBroadcast } from './system-resume-broadcast'
 import { settleTeardownWithinDeadline } from './quit-teardown-deadline'
+import {
+  createQuitTeardownDiagnosticsObserver,
+  logQuitMilestone
+} from './quit-teardown-diagnostics'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { beginSshShutdown } from './ipc/ssh'
 import { PluginService } from './plugins/plugin-service'
@@ -3577,8 +3581,10 @@ void app.whenReady().then(async () => {
 
 // Why: app.exit() skips Electron quit events, so keep its log child from surviving forced exits.
 process.once('exit', stopTccPromptNotice)
+process.once('exit', (code) => logQuitMilestone('process-exit', { code }))
 
 app.on('before-quit', () => {
+  logQuitMilestone('before-quit')
   if (isQuittingForUpdate()) {
     recordUpdaterLifecycle('before_quit_allowed', undefined, {
       message: 'before-quit allowed for update install'
@@ -3612,6 +3618,7 @@ app.on('will-quit', (e) => {
   if (!quitTeardownStartGate.tryStart(e)) {
     return
   }
+  logQuitMilestone('will-quit-teardown-started')
   unsubscribeSystemResumeBroadcast?.()
   unsubscribeSystemResumeBroadcast = null
   // Why: renderer guards can still cancel before this committed phase; `log stream` must survive those vetoes.
@@ -3694,30 +3701,38 @@ app.on('will-quit', (e) => {
   // Why stats/state join here: their writes are durable but not worth hanging the app for.
   // Losing at most the last debounce interval beats a quit that never completes, and the
   // temp+rename swap means a write cut short by the deadline leaves the old file intact.
-  settleTeardownWithinDeadline([
-    { name: 'daemon', promise: daemonTeardown },
-    { name: 'runtime-rpc', promise: rpcStopAndClear },
-    { name: 'watchers', promise: watcherShutdown },
-    { name: 'emulator', promise: emulatorShutdown },
-    { name: 'ssh', promise: sshShutdown },
-    { name: 'plugin-hosts', promise: pluginHostShutdown },
-    { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },
-    { name: 'usage-cache', promise: usageCacheFlush },
-    { name: 'stats', promise: statsFlush },
-    { name: 'state', promise: storeFlush }
-  ])
+  settleTeardownWithinDeadline(
+    [
+      { name: 'daemon', promise: daemonTeardown },
+      { name: 'runtime-rpc', promise: rpcStopAndClear },
+      { name: 'watchers', promise: watcherShutdown },
+      { name: 'emulator', promise: emulatorShutdown },
+      { name: 'ssh', promise: sshShutdown },
+      { name: 'plugin-hosts', promise: pluginHostShutdown },
+      { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },
+      { name: 'usage-cache', promise: usageCacheFlush },
+      { name: 'stats', promise: statsFlush },
+      { name: 'state', promise: storeFlush }
+    ],
+    undefined,
+    createQuitTeardownDiagnosticsObserver()
+  )
     .then((pendingTeardowns) => {
+      logQuitMilestone('teardown-barrier-settled', { pendingTeardowns })
       if (pendingTeardowns.length > 0) {
         console.warn('[shutdown] Quit teardown deadline reached', { pendingTeardowns })
       }
     })
     .then(() => shutdownTelemetry())
+    .then(() => logQuitMilestone('telemetry-shutdown-settled'))
     .then(() => shutdownObservability())
+    .then(() => logQuitMilestone('observability-shutdown-settled'))
     .catch(() => {
       /* swallow — telemetry must never prevent app.quit() */
     })
     .then(() => {
       daemonDisconnectDone = true
+      logQuitMilestone('app-quit-called')
       app.quit()
     })
 })
