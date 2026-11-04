@@ -6,9 +6,10 @@ se trabaja de memoria y el board queda describiendo un estado que ya no existe.
 """
 
 import json
-import shutil
 import subprocess
 import sys
+
+from orca_cli import resolve_orca_cli
 
 ORCA_PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 # Sólo lo que está en vuelo o en cola; el backlog completo es ruido al arrancar.
@@ -52,11 +53,12 @@ def unread(reason: str) -> None:
 
 
 def read_items() -> list:
-    if shutil.which("orca") is None:
-        unread("no hay CLI de Orca en el PATH")
+    cli = resolve_orca_cli()
+    if cli is None:
+        unread("no hay CLI de Orca que sea seguro ejecutar")
     # Why sin --filter ni --limit: el filtro por defecto da los abiertos, y --limit corta antes
     # de separar estados. `everything` además suma todo lo cerrado a la respuesta (ORCA-919).
-    command = ["orca", "plane", "list", "--project", ORCA_PROJECT_ID, "--json"]
+    command = [cli, "plane", "list", "--project", ORCA_PROJECT_ID, "--json"]
     try:
         done = subprocess.run(command, capture_output=True, text=True, timeout=45)
     except (OSError, subprocess.SubprocessError) as error:

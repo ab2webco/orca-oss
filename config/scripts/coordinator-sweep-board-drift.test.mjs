@@ -37,7 +37,11 @@ function sweepLine(planeStdout) {
   const result = spawnSync('bash', [sweepScript, '--tick'], {
     encoding: 'utf8',
     cwd: projectDir,
-    env: { ...process.env, PATH: `${stubBin}:${process.env.PATH}` }
+    env: {
+      ...process.env,
+      PATH: `${stubBin}:${process.env.PATH}`,
+      ORCA_CLI_COMMAND: join(stubBin, 'orca')
+    }
   })
   // Why `--tick`: bare invocation is the Monitor's endless loop and never returns.
   const line = (result.stdout || '').split('\n').find((l) => l.startsWith('SWEEP'))

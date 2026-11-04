@@ -13,6 +13,8 @@
 #                            fingerprint (default: HEAD sha + a hash of the working diff)
 #   ORCA_WATCHDOG_ASK        message sent to a stalled worktree's terminal (default: none)
 set -uo pipefail
+# shellcheck source=orca-cli.sh
+source "$(dirname "${BASH_SOURCE[0]}")/orca-cli.sh"
 
 ROOT="${ORCA_WATCHDOG_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 INTERVAL="${ORCA_WATCHDOG_INTERVAL:-1800}"

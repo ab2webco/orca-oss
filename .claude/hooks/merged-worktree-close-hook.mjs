@@ -337,8 +337,25 @@ export function closerArgv(args, sessionCwd, env, deadline = null) {
   ]
 }
 
+/**
+ * Pins the shared resolver's answer: inside an Orca terminal the closer would otherwise run bare `orca`.
+ * Why a path that does not exist when it finds none: the closer then cannot read the terminals, so it keeps every worktree.
+ */
+function pinOrcaCli() {
+  if (process.env.ORCA_CLI_COMMAND || !process.env.ORCA_TERMINAL_HANDLE) {
+    return
+  }
+  try {
+    const resolver = join(import.meta.dirname, 'orca_cli.py')
+    process.env.ORCA_CLI_COMMAND = exec('python3', [resolver], undefined, RUN_TIMEOUT_MS)
+  } catch {
+    process.env.ORCA_CLI_COMMAND = join(import.meta.dirname, 'no-orca-cli-resolved')
+  }
+}
+
 /** `sessionCwd` is never closed: the session lives there even when the closer runs elsewhere. */
 function runCloser(cwd, args, { sessionCwd = cwd, deadline = null } = {}) {
+  pinOrcaCli()
   const lines = []
   const code = closeMergedWorktrees({
     cwd,

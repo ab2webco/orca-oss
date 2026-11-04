@@ -73,7 +73,12 @@ function sweepLine({ root, bin }) {
   const result = spawnSync('bash', [sweepScript, '--tick'], {
     encoding: 'utf8',
     cwd: projectDir,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ORCA_SWEEP_ROOT: root }
+    env: {
+      ...process.env,
+      ORCA_CLI_COMMAND: join(bin, 'orca'),
+      PATH: `${bin}:${process.env.PATH}`,
+      ORCA_SWEEP_ROOT: root
+    }
   })
   const line = (result.stdout || '').split('\n').find((l) => l.startsWith('SWEEP'))
   expect(line, result.stderr).toBeTruthy()

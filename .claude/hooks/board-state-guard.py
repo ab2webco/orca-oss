@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from command_text import strip_heredocs  # noqa: E402
+from orca_cli import resolve_orca_cli
 
 PROJECT_ID = "e665c0d5-22e7-495e-9ecf-3effee3ae370"
 TICKET_RE = re.compile(r"ORCA-(\d+)", re.IGNORECASE)
@@ -93,9 +94,10 @@ def ticket_from(command: str, cwd: str | None) -> str | None:
 
 
 def board_state(ticket: str, cwd: str | None) -> str | None:
-    code, out = run(
-        ["orca", "plane", "issue", "--id", ticket, "--project", PROJECT_ID, "--json"], cwd
-    )
+    cli = resolve_orca_cli()
+    if cli is None:
+        return None
+    code, out = run([cli, "plane", "issue", "--id", ticket, "--project", PROJECT_ID, "--json"], cwd)
     if code != 0 or not out:
         return None
     try:

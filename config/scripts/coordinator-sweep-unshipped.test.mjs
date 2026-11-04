@@ -60,7 +60,11 @@ esac
   const result = spawnSync('bash', [sweepScript, '--tick'], {
     encoding: 'utf8',
     cwd: projectDir,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      ORCA_CLI_COMMAND: join(bin, 'orca')
+    }
   })
   const line = (result.stdout || '').split('\n').find((l) => l.startsWith('SWEEP'))
   expect(line, result.stderr).toBeTruthy()

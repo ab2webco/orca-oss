@@ -63,7 +63,11 @@ function runHook({ command, cwd, state = 'In Progress', prTitle = null }) {
   const result = spawnSync('python3', [hookScript], {
     input: JSON.stringify({ tool_input: { command }, cwd }),
     encoding: 'utf8',
-    env: { ...process.env, PATH: `${stubBin}:${process.env.PATH}` }
+    env: {
+      ...process.env,
+      PATH: `${stubBin}:${process.env.PATH}`,
+      ORCA_CLI_COMMAND: join(stubBin, 'orca')
+    }
   })
   expect(result.status, result.stderr).toBe(0)
   return JSON.parse(result.stdout || '{}')
