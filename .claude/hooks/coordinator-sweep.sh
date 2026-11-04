@@ -96,7 +96,7 @@ sweep_line() {
 
 if [ "${1:-}" = "--once" ]; then
   # Why: coordination is the lead's; a sweep per member start multiplied its GitHub calls (ORCA-877).
-  [ "${ORCA_GAME_ROLE:-}" = "member" ] && exit 0
+  bash "$(dirname "${BASH_SOURCE[0]}")/lead-session.sh" >/dev/null || exit 0
   jq -n --arg line "$(sweep_line)" '{
     hookSpecificOutput: {
       hookEventName: "SessionStart",
