@@ -6,6 +6,8 @@ packages: []
 
 # Keep every override here: a pnpm.overrides block in package.json replaces this one whole.
 overrides:
+  # One katex for every consumer: main.css imports the root's katex.min.css, and 0.18 prefixed its classes (ORCA-994).
+  katex: $katex
   # GHSA-cg2g-xh64-v4q7 (critical), GHSA-mrv2-3pqr-j5jr; matches the app's dompurify after #888.
   monaco-editor>dompurify: 3.4.17
   # GHSA-22jm-h49p-29qw, GHSA-46jr-4wx8-v453, GHSA-6qxp-vccf-f47h, GHSA-f897-62hf-6gxq
@@ -40,3 +42,8 @@ overrides:
   undici@^6: 6.29.1
   # GHSA-xjj6-f33q-929c, GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3, GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26
   undici@^7: 7.30.1
+
+peerDependencyRules:
+  allowedVersions:
+    # 3.22.5 declares ^0.16.4 but only calls katex.render, which 0.18 kept; 3.32 declares ^0.18.0.
+    '@tiptap/extension-mathematics>katex': '0.18'

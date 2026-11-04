@@ -227,7 +227,7 @@
     "html-to-image": "^1.11.13",
     "husky": "^9.1.7",
     "i18next-cli": "1.65.0",
-    "katex": "^0.16.45",
+    "katex": "0.18.10",
     "lint-staged": "^16.4.0",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.577.0",
