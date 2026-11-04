@@ -24,6 +24,10 @@ jobs:
   static_analysis:
     name: static analysis
     runs-on: ubuntu-latest
+    # Why pull-requests: the merge-queue run reads the live PR title and body.
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout
@@ -64,6 +68,14 @@ jobs:
       # AI-credited commits already in main do not make it red forever (ORCA-529).
       - name: Reject AI attribution in commit messages
         run: pnpm run check:ai-attribution -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+
+      # Why here too and not only in pr-text.yml: `verify` is the required check, so this makes the
+      # rule required today. In the merge queue it reads the live PR, so an edit made after the
+      # last push is judged before the squash copies the text into main (ORCA-1032).
+      - name: Reject AI attribution in the PR title and body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm run check:pr-text-attribution
 
       - name: Enforce changed-code quality
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"

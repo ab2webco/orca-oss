@@ -15,8 +15,9 @@
 //     matches because this history holds `Neil Parker <nwparker@anthropic.com>` (a person at
 //     Anthropic), `LauraGPT`, `Devin345458` and `federico-ntb@notchatbot.com` — all humans that
 //     a vendor-domain or substring rule would have failed.
-//   - A tool signature line ("🤖 Generated with [Claude Code](…)") is a finding: it is credit in
-//     prose rather than in a trailer.
+//   - A tool signature line ("🤖 Generated with [Claude Code](…)", "Written with Claude Code
+//     (Opus 5.5)"), an "AI Disclosure" label and a line that only names a model are findings: they
+//     are credit in prose rather than in a trailer. The PR title and body gate reuses these rules.
 //   - `Claude-Session: <url>` is NOT a finding. It is the session provenance link this repo
 //     requires; it records where the change was produced, it does not credit an author.
 import { execFileSync } from 'node:child_process'
@@ -26,7 +27,7 @@ import process from 'node:process'
 // absorbs the model/version, so `Claude Dupont` (a person) does not match while `Claude Opus 5`
 // does.
 const ASSISTANT =
-  '(?:claude|codex|chatgpt|copilot|cursor|devin|gemini|jules|amp|aider|windsurf|cline|goose|junie|antigravity|grok|opencode|tabnine|openai|anthropic)'
+  '(?:claude|codex|chatgpt|gpt|copilot|cursor|devin|gemini|jules|amp|aider|windsurf|cline|goose|junie|antigravity|grok|opencode|tabnine|openai|anthropic)'
 
 // What may follow an assistant name and still be the same identity: a model, a version, a link,
 // punctuation. Anything else — an ordinary surname, a sentence — means this is not a tool.
@@ -35,10 +36,22 @@ const TAIL =
 
 const ASSISTANT_NAME = new RegExp(`^${ASSISTANT}\\b${TAIL}$`, 'i')
 
-// Only whole-line credit, so prose about an assistant ("the title Claude generated is truncated")
-// is not a finding.
+// Credit that opens the line, after an optional label ("AI Disclosure: Written with Claude Code
+// (Opus 5.5)", ORCA-1032), so prose about an assistant ("the title Claude generated is
+// truncated") is not a finding.
 const TOOL_SIGNATURE = new RegExp(
-  `^[\\s>*_🤖-]*(?:generated|written|created|made|authored)\\s+(?:with|by)\\s+\\[?${ASSISTANT}\\b${TAIL}$`,
+  `^[\\s>*_#🤖-]*(?:[\\p{L} ]{1,30}:\\s*)?(?:generated|written|created|made|authored|drafted|produced|assisted)\\s+(?:with|by|using|in)\\s+(?:the\\s+help\\s+of\\s+|help\\s+from\\s+)?\\[?${ASSISTANT}\\b`,
+  'iu'
+)
+
+// The upstream PR template's disclosure section is credit by another name; this fork leaves it out.
+const DISCLOSURE_LABEL = /^[\s>*_#-]*AI[\s-]*Disclosure\b\s*(?::|$)/i
+
+// A line that is nothing but a model identity ("Claude Opus 5.5", "- Sonnet 5"). Model names in
+// prose stay legal: this product ships model pickers.
+const MODEL_FAMILY = '(?:sonnet|opus|haiku|fable)'
+const MODEL_LINE = new RegExp(
+  `^[\\s>*_🤖-]*(?:${ASSISTANT}\\b${TAIL}\\b${MODEL_FAMILY}\\b${TAIL}|${MODEL_FAMILY}\\s+\\d${TAIL}|gpt-\\d${TAIL})$`,
   'iu'
 )
 
@@ -83,7 +96,11 @@ export function findAiAttribution(message) {
       ? machineAuthorReason(trailer[2])
       : TOOL_SIGNATURE.test(line)
         ? 'the line credits an AI tool for the change'
-        : null
+        : DISCLOSURE_LABEL.test(line)
+          ? 'an AI Disclosure section is credit; leave it out'
+          : MODEL_LINE.test(line)
+            ? 'the line names the AI model that wrote the change'
+            : null
     if (reason !== null) {
       findings.push({ lineNumber: index + 1, line: line.trim(), reason })
     }
