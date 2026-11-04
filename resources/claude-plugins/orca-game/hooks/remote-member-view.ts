@@ -72,9 +72,8 @@ export function remoteRecoveryOf(
 ): RemoteRecovery | null {
   const remote = agent.remote
   const text = REMOTE_TEXT[gameLocale()]
-  // Why the space: NAMED_TICKET wants a title after the ticket, and a launched name may have none.
   const ticket =
-    agent.workItem?.identifier ?? NAMED_TICKET.exec(`${agent.displayName} `)?.[2] ?? null
+    agent.workItem?.identifier ?? NAMED_TICKET.exec(agent.displayName)?.[2] ?? null
   if (remote?.asleep) {
     return { action: 'resume', label: text.resume, ticket }
   }

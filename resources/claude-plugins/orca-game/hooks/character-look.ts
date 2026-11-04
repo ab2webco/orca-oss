@@ -1,3 +1,4 @@
+import { bodyOf, derivedVariantOf, lookKeyOf } from './character-derived-look'
 import type { LocalizedName } from './game-strings'
 import { shortMemberNameOf } from './member-character'
 import type {
@@ -9,7 +10,7 @@ import type {
   ScenePhase
 } from './scenes/index'
 
-// A member is drawn as its roster character: its own costumes, or the phase costume under its variant.
+// A member is one figure in every phase: its own costumes, or one body under its variant or a derived one.
 
 type Head = { up: number; top: number; from: number; to: number; centre: number }
 type Cell = readonly [x: number, y: number]
@@ -71,6 +72,9 @@ const ACCESSORY_ART: Readonly<
 }
 
 export const ACCESSORIES = Object.keys(ACCESSORY_ART) as readonly CharacterAccessory[]
+
+// Why no crown: the crown marks the lead, so a derived look must never wear one.
+const PLAIN_ACCESSORIES = ACCESSORIES.filter((one) => one !== 'crown')
 
 // Why not `#` or `:`: hd reads those as outline and backed gap.
 const SPARE_GLYPHS = '&$%*+=?~^@'
@@ -139,27 +143,35 @@ export const characterOf = (
 }
 
 // Why cached: hd caches a sprite per costume object, so a look must be the same object every tick.
-const looks = new WeakMap<SceneCharacter, Map<Costume, Costume>>()
+const looks = new WeakMap<SceneDefinition, Map<string, Costume>>()
 
-/** What `memberName` wears in `phase`: its character's look, else the scene's phase costume. */
+const lookOf = (scene: SceneDefinition, memberName: string): Costume => {
+  const character = characterOf(scene, memberName)
+  // Why the character's name: `Merlin 2` and `Merlín` wear Merlin's figure, not one of their own.
+  const key = character === undefined ? lookKeyOf(memberName) : keysOf(character.name)[0] ?? ''
+  const made = looks.get(scene) ?? new Map<string, Costume>()
+  looks.set(scene, made)
+  const kept = made.get(key)
+  if (kept !== undefined) {
+    return kept
+  }
+  const authored = character?.variant
+  const variant = authored ?? derivedVariantOf(scene, key, PLAIN_ACCESSORIES)
+  const look = variantCostumeOf(bodyOf(scene, key, authored), variant)
+  made.set(key, look)
+  return look
+}
+
+/** What `memberName` wears in `phase`: the same figure in all of them; nameless, the phase costume. */
 export const characterCostumeOf = (
   scene: SceneDefinition,
   memberName: string | undefined,
   phase: ScenePhase
 ): Costume => {
-  const base = scene.costumes[phase]
-  const character = characterOf(scene, memberName)
-  if (character?.costumes !== undefined) {
-    return character.costumes[phase]
+  if (memberName === undefined) {
+    return scene.costumes[phase]
   }
-  if (character?.variant === undefined) {
-    return base
-  }
-  const made = looks.get(character) ?? new Map<Costume, Costume>()
-  looks.set(character, made)
-  const look = made.get(base) ?? variantCostumeOf(base, character.variant)
-  made.set(base, look)
-  return look
+  return characterOf(scene, memberName)?.costumes?.[phase] ?? lookOf(scene, memberName)
 }
 
 const mostDrawnColorOf = (costume: Costume): number | undefined => {
@@ -171,16 +183,11 @@ const mostDrawnColorOf = (costume: Costume): number | undefined => {
   return costume.colors[glyph]
 }
 
-/** The color that tells a character apart where no sprite is drawn; none for a plain-name member. */
-export const characterColorOf = (
-  scene: SceneDefinition,
-  memberName: string
-): number | undefined => {
-  const character = characterOf(scene, memberName)
-  const variant = character?.variant
+/** The color that tells a character apart where no sprite is drawn. */
+export const characterColorOf = (scene: SceneDefinition, memberName: string): number | undefined => {
+  const variant = characterOf(scene, memberName)?.variant
   if (variant === undefined) {
-    const working = character?.costumes?.working
-    return working === undefined ? undefined : mostDrawnColorOf(working)
+    return mostDrawnColorOf(characterCostumeOf(scene, memberName, 'working'))
   }
   const accessory = variant.accessory === undefined ? undefined : ACCESSORY_ART[variant.accessory]
   return Object.values(variant.colors ?? {})[0] ?? variant.accessoryColor ?? accessory?.color

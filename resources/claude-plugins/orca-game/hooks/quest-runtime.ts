@@ -21,6 +21,7 @@ export {
   isClawdReacting,
   isSceneShown,
   quest,
+  shownHero,
   shownLead,
   shownPhase,
   type Animated,
@@ -212,6 +213,7 @@ export function resetQuest(): void {
     leavers: [],
     marches: new Map(),
     lead: undefined,
+    hero: undefined,
     leadState: undefined,
     event: undefined
   })

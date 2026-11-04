@@ -13,6 +13,7 @@ import {
   reactionAt,
   shownAction,
   shownCaption,
+  shownHero,
   shownLead,
   shownPhase,
   shownResting,
@@ -63,6 +64,7 @@ export const stageCellsOf = (stage: Stage): string => {
         leavers: quest.isDemo ? [] : quest.leavers,
         marches: quest.isDemo ? new Map() : quest.marches,
         lead: shownLead(),
+        hero: shownHero(),
         event: teamEventAt(quest.tick)
       })
     )
@@ -77,7 +79,8 @@ export const stageCellsOf = (stage: Stage): string => {
     reactionAt(quest.tick),
     shownResting(),
     shownAction(),
-    advisorShownAt(quest.tick)
+    advisorShownAt(quest.tick),
+    shownHero()
   ).cells
 }
 
@@ -97,6 +100,7 @@ export const petScene = (key: string, columns: number): Animated => ({
       reactionAt(at),
       shownResting(),
       shownAction(),
-      advisorShownAt(at)
+      advisorShownAt(at),
+      shownHero()
     ).cells
 })

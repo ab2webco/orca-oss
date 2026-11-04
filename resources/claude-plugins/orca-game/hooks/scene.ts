@@ -1,4 +1,5 @@
 import { actionPixel } from './action-props'
+import { characterCostumeOf } from './character-look'
 import { gameStrings, localizedNameOf } from './game-strings'
 import { cellsOf, glyphCell, hash, mix, mod, UPPER_HALF } from './pixel-canvas'
 import type { Action, FlowPhase } from './quest-policy'
@@ -159,7 +160,8 @@ export const sceneGridOf = (
   reaction?: Reaction,
   isResting = false,
   action?: Action,
-  advisor?: AdvisorPose
+  advisor?: AdvisorPose,
+  hero?: string
 ): number[][] => {
   const reacting = isReacting(reaction)
   const resting = isResting && !reacting
@@ -168,7 +170,7 @@ export const sceneGridOf = (
   // A scene with a pet hearts the pet; without one, its hero is Clawd and gets petted.
   const isPetted = reacting && reaction.kind === 'pet' && pet !== undefined
   const look = scene.looks[phase ?? 'working']
-  const costume = scene.costumes[phase ?? 'working']
+  const costume = characterCostumeOf(scene, hero, phase ?? 'working')
   const grid: number[][] = []
   // Why a stage: Jev's advisor keeps the right edge, so the hero and its pet walk short of it.
   const stage = advisorStageOf(columns, advisor)

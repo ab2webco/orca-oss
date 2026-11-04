@@ -61,7 +61,11 @@ const scene = sceneOf('quest')
 const WIDTHS = [40, 60, 130] as const
 
 const linesOf = (agents: GameAgent[], columns: number, maxMembers = 6): FlatLine[] =>
-  flatMemberLinesOf({ state: state(agents), scene, columns, maxMembers })
+  flatMemberLinesOf({ state: state(agents), scene, columns, maxMembers }).map((line) => ({
+    ...line,
+    // Why: every member now carries a swatch; character-look.spec pins it.
+    parts: line.parts.filter((part) => part.key !== 'look')
+  }))
 
 const expectFits = (lines: readonly FlatLine[], columns: number) => {
   for (const line of lines) {
