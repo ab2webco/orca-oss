@@ -156,6 +156,43 @@ export function foldFreedMember(
   return { ...stored, [character.key]: next }
 }
 
+/**
+ * Another store's characters added to these: a character only one side has is kept as it was, and
+ * one both have is summed unless a task of the other is already applied here (adopted before).
+ */
+export function mergeGameCharacters(
+  stored: Record<string, unknown>,
+  adopted: Record<string, unknown>
+): Record<string, unknown> {
+  const merged = { ...adopted, ...stored }
+  for (const key of Object.keys(adopted)) {
+    const mine = parseCharacter(stored[key])
+    const theirs = parseCharacter(adopted[key])
+    if (!mine || !theirs || theirs.applied.some((task) => mine.applied.includes(task))) {
+      continue
+    }
+    const sum = (field: 'tickets' | 'prsOpened' | 'prsMerged' | 'workedMs' | 'xp'): number =>
+      mine[field] + theirs[field]
+    merged[key] = {
+      ...mine,
+      tickets: sum('tickets'),
+      prsOpened: sum('prsOpened'),
+      prsMerged: sum('prsMerged'),
+      outcomes: Object.fromEntries(
+        GAME_HISTORY_OUTCOMES.map((one) => [one, mine.outcomes[one] + theirs.outcomes[one]])
+      ),
+      workedMs: sum('workedMs'),
+      xp: sum('xp'),
+      lastAt: mine.lastAt > theirs.lastAt ? mine.lastAt : theirs.lastAt,
+      recent: [...theirs.recent, ...mine.recent]
+        .toSorted((a, b) => a.endedAt.localeCompare(b.endedAt))
+        .slice(-GAME_CHARACTER_RECENT_MAX),
+      applied: [...theirs.applied, ...mine.applied].slice(-APPLIED_MAX)
+    }
+  }
+  return merged
+}
+
 // Why not `no-project`: unrelated folders share that key, so their characters would merge.
 /** Which character a freed member's record counts for; null when none should. */
 export function freedCharacterOf(args: {

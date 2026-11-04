@@ -50,6 +50,13 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-adopt.js')).ORCHESTRATOR_GAME_ADOPT_HANDLERS
   },
   {
+    name: 'orchestrator-game-adopt-history',
+    keys: ['game adopt-history'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-adopt-history.js'))
+        .ORCHESTRATOR_GAME_ADOPT_HISTORY_HANDLERS
+  },
+  {
     name: 'orchestrator-game-drop',
     keys: ['game drop'],
     load: async () =>

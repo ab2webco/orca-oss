@@ -68,6 +68,22 @@ export class GameStopSwitch {
     })
   }
 
+  /** Carries another key's STOP to this key, that file then set aside; null when it has none. */
+  async adopt(fromKey: string, toKey: string): Promise<GameStop | null> {
+    const stop = await this.read(fromKey)
+    if (!stop) {
+      return null
+    }
+    // Why: STOP fails closed, so one that cannot be read must stay where the person can see it.
+    if (stop.unreadable || !stop.since) {
+      throw new Error(`The STOP under ${fromKey} cannot be read; it was left as it is.`)
+    }
+    await this.set(toKey, { since: stop.since, by: stop.by ?? 'lead' })
+    const file = this.fileOf(fromKey)
+    await rename(file, file.replace(/\.stop\.json$/, `.adopted-${Date.now()}.stop-was.json`))
+    return stop
+  }
+
   private queued<T>(projectKey: string, work: () => Promise<T>): Promise<T> {
     const next = (this.queues.get(projectKey) ?? Promise.resolve())
       .catch(() => undefined)

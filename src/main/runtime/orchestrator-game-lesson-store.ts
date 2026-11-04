@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { durableWriteTempPath, writeFileDurable } from '../durable-file-write'
 import {
@@ -71,6 +71,29 @@ export class GameLessonStore {
       })
     this.queues.set(projectKey, next)
     return next
+  }
+
+  /** Another key's lessons merged into this key's, that file then set aside; null when it has none. */
+  async adopt(fromKey: string, toKey: string): Promise<number | null> {
+    const from = this.fileOf(fromKey)
+    if (
+      !(await stat(from).then(
+        () => true,
+        () => false
+      ))
+    ) {
+      return null
+    }
+    const source = await this.read(fromKey)
+    if (source.isDamaged) {
+      throw new Error(`The lessons under ${fromKey} cannot be read; they were left as they are.`)
+    }
+    // Why one at a time through record(): it keeps the queue, the fingerprint merge and the bound.
+    for (const lesson of source.lessons) {
+      await this.record(toKey, lesson)
+    }
+    await rename(from, join(this.dirOf(), `${this.nameOf(fromKey)}.adopted-${fileStamp()}.json`))
+    return source.lessons.length
   }
 
   private async read(projectKey: string): Promise<Loaded> {

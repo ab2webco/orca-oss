@@ -256,6 +256,15 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       })
   }),
   defineMethod({
+    name: 'game.adoptHistory',
+    params: z.object({
+      worktreeId: z.string().optional(),
+      terminalHandle: z.string().optional(),
+      fromRepoId: z.string().min(1).max(200)
+    }),
+    handler: async (params, { runtime }) => runtime.adoptGameHistory(params)
+  }),
+  defineMethod({
     name: 'game.state',
     params: GameStateParams,
     handler: async (params, { runtime }) => {
