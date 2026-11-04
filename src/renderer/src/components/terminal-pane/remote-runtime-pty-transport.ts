@@ -589,6 +589,7 @@ export function createRemoteRuntimePtyTransport(
     }
     const worktree = toRuntimeWorktreeSelector(worktreeId)
     let activated: RuntimeMobileSessionTabsResult | null = null
+    let activationMissedSurface = false
     try {
       // Why: this runs when the pane itself is opened/attached — the user's wake gesture. Its retries
       // continue that gesture, so they must not downgrade to the intent the host refuses for a slept pane.
@@ -599,6 +600,7 @@ export function createRemoteRuntimePtyTransport(
       }
       // Why: a relaunched host answers for a tab it has not rehydrated yet, so no single activation
       // failure is absence proof — the bounded inventory wait below decides (ORCA-342).
+      activationMissedSurface = true
     }
     const immediate = activated ? findReadyHostSessionHandle(activated, hostTabId) : null
     if (immediate) {
@@ -627,6 +629,24 @@ export function createRemoteRuntimePtyTransport(
       const handle = findReadyHostSessionHandle(listed, hostTabId)
       if (handle) {
         return handle
+      }
+      if (activationMissedSurface && hasHostSessionTerminalSurface(listed, hostTabId)) {
+        // Why: the missed activation ran before the host republished this surface, and only activation
+        // mints a pending surface's PTY — polling alone leaves the pane recovering all window (ORCA-946).
+        activationMissedSurface = false
+        try {
+          const reactivated = await activateHostSessionSurface(hostTabId, worktree, 'user')
+          const reactivatedHandle = findReadyHostSessionHandle(reactivated, hostTabId)
+          if (reactivatedHandle) {
+            return reactivatedHandle
+          }
+        } catch (error) {
+          if (!isMissingHostSessionSurfaceError(error)) {
+            throw error
+          }
+          activationMissedSurface = true
+        }
+        continue
       }
       if (!hasHostSessionTerminalSurface(listed, hostTabId)) {
         if (
