@@ -77,6 +77,7 @@ import {
 import type { TerminalSnapshotUnavailableReason } from '../../../../shared/terminal-snapshot-unavailability'
 import type { RemoteTerminalSourceRangeReplacementReservation } from '../../remote-terminal-source-range-consumer'
 import { withTerminalCloseAttribution } from '../terminal-close-attribution'
+import { remoteMemberTerminalError } from '../remote-member-terminal'
 
 const REQUESTED_SNAPSHOT_BYTE_BUDGET = 2 * 1024 * 1024
 const TERMINAL_OUTPUT_FLUSH_MS = 5
@@ -1327,6 +1328,10 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
       }
       // Why: a stale handle must fail with terminal_handle_stale, not evaluate driver/lock state against the wrong PTY (#7718).
       const leaf = runtime.resolveLiveLeafForHandle(params.terminal)
+      const remoteMember = leaf ? null : remoteMemberTerminalError(runtime, params.terminal)
+      if (remoteMember) {
+        throw remoteMember
+      }
       const driver = leaf?.ptyId ? runtime.getDriver(leaf.ptyId) : null
       if (
         params.inputKind === 'query-reply' &&
