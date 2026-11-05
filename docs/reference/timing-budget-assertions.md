@@ -9,7 +9,7 @@ The short version: **the number on the left is not the product's latency. It is 
 latency plus the cost and the scheduling of whatever the test is doing to observe it.** Poll round
 trips, timer callbacks, event-loop turns and poller ticks are all inside it.
 
-## The three measured cases
+## The measured cases
 
 ### 1. A ceiling that sat inside the instrument's dead zone
 
@@ -73,6 +73,24 @@ the awaited condition arrives, so the counter is a proxy for elapsed wall time w
 The same file's watch budget went red the night before for a different worker: **5124 ms against
 a 5-second fs-watch budget**, under full-suite load. Same shape, different unit.
 
+### 4. A grid that comes from the environment, not the instrument
+
+`tests/e2e/artificial-opencode-hidden-pressure-scenario.ts:218`: `worstLatencyMs < 3000`,
+observed **3065** (ORCA-1058). The poll is 5 ms and the observer's cost is a few ms, so this is
+not case 1. The values still cluster: across 7 queue runs the worst key landed only near 15, 1030,
+2050 or 3065 ms. That was at most once per window, at a random key, and the second-worst key was
+always small.
+
+A trace (Electron `contentTracing`) found the grid. In ORCA_E2E_HEADLESS the window is never
+shown. viz keeps ticking every 16.7 ms, but the renderer's compositor gets a BeginFrame only every
+~1016 ms. Its main thread then waits that long in `BeginMainFrame::commit` → `WaitForCommitCompletion`,
+and a key that lands in that wait reads a whole second late (ORCA-760).
+
+A/B, same probe: never shown, 3 of 25 windows stalled; shown, 0 of 25. The fix maps the window
+for that spec (`ORCA_E2E_SHOW_INACTIVE=1`: shown inactive, not focusable, ignoring the mouse). The
+ceiling did not change. **A cluster that the instrument's own step cannot explain is a step
+somewhere else in the system — trace the measured path before you call it contention.**
+
 ## Two subclasses, and you must tell them apart first
 
 |  | Quantized | Contended |
@@ -84,8 +102,8 @@ a 5-second fs-watch budget**, under full-suite load. Same shape, different unit.
 | Fix | Finer resolution; ceiling untouched | Assert on a distribution, or derive the budget from measured CI percentiles |
 
 **The discriminator is cheap: run the case k times and look at whether the values repeat on a few
-points or spread out.** Clustered ⇒ quantized. Spread ⇒ contended. Case 1 is quantized; cases 2
-and 3 are contended.
+points or spread out.** Clustered ⇒ quantized. Spread ⇒ contended. Cases 1 and 4 are quantized;
+cases 2 and 3 are contended.
 
 Getting this backwards is expensive in both directions. Treating a quantized failure as
 contention leads to raising the ceiling, which buys a night and destroys the signal permanently.
