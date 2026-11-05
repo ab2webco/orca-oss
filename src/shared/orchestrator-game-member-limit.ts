@@ -23,6 +23,17 @@ const LOGGED_OUT_TEXT =
 const isLoggedOutTail = (tail: string): boolean =>
   LOGGED_OUT_TEXT.test(tail.split('\n').slice(-LOGGED_OUT_TAIL_LINES).join('\n'))
 
+// Why: a turn that dies on a logout fires no Stop hook, so its row stays working (ORCA-923).
+export const GAME_MEMBER_STALLED_WORKING_MS = 60_000
+
+/** A working member whose hooks went silent long enough that its tail is worth reading. */
+export const isStalledWorking = (state: GameAgent['state'], hookQuietMs: number | null): boolean =>
+  state === 'working' && hookQuietMs !== null && hookQuietMs >= GAME_MEMBER_STALLED_WORKING_MS
+
+/** A logged-out member waits on a person, whatever its stale hook row says. */
+export const gameMemberStateOf = <S extends string>(state: S, limit: GameMemberLimit | null): S =>
+  limit?.loggedOut && state === 'working' ? ('waiting' as S) : state
+
 /** The usage reading Orca holds for one managed account, active or cached. */
 export function accountLimitsOf(
   state: Pick<
@@ -67,14 +78,22 @@ export function gameMemberLimitOf(args: {
   accountLimits: ProviderRateLimits | null
   terminalTail: string | null
   now: number
+  /** Ms since the member's last hook event; null when unknown. */
+  hookQuietMs?: number | null
 }): GameMemberLimit | null {
   const provider = accountProviderOfAgent(args.agentType)
-  // Why not while working: a member still making progress is not stopped, whatever a reading says.
-  if (provider === null || args.state === 'working') {
+  if (provider === null) {
     return null
   }
   // Why first: a logged-out account has no usable reading, and only a person can log it back in.
-  if (args.terminalTail !== null && isLoggedOutTail(args.terminalTail)) {
+  const loggedOut = args.terminalTail !== null && isLoggedOutTail(args.terminalTail)
+  // Why not while working: a member still making progress is not stopped, whatever a reading says.
+  if (args.state === 'working') {
+    return loggedOut && isStalledWorking(args.state, args.hookQuietMs ?? null)
+      ? { resetsAt: null, loggedOut: true }
+      : null
+  }
+  if (loggedOut) {
     return { resetsAt: null, loggedOut: true }
   }
   const exhausted = args.accountLimits
