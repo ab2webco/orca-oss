@@ -224,7 +224,7 @@ export const VIGILANTE_SCENE: SceneDefinition = {
     }
   ],
   // Jev's advisor: the commissioner, grey mustache and trench coat, by the signal.
-  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  // Orca's built-in roster for the scene; its first name wears a look derived from the name.
   roster: ['Nightjar', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {

@@ -24,6 +24,7 @@ import {
   isClawdReacting,
   isSceneShown,
   petScene,
+  shownHero,
   shownLead,
   ready
 } from './quest-runtime'
@@ -156,6 +157,7 @@ export const registerBand = (on: On): void => {
           level,
           isDemo: v.isDemo,
           lead: shownLead(),
+          hero: shownHero(),
           unseen
         })
     }

@@ -213,7 +213,7 @@ export const TAMER_SCENE: SceneDefinition = {
     }
   ],
   // Jev's advisor: the professor in a lab coat, who knows every creature's level.
-  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  // Orca's built-in roster for the scene; its first name wears a look derived from the name.
   roster: ['Pip', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {

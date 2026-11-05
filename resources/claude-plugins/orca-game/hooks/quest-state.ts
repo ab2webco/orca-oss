@@ -53,6 +53,8 @@ type QuestRuntime = {
   leavers: readonly HdMember[]
   marches: ReadonlyMap<string, March>
   lead: string | undefined
+  /** Whose figure this pane's hero is: the member's own name, or the lead's title. */
+  hero: string | undefined
   /** This pane's own state as the lead; undefined in a member's pane or before the first refresh. */
   leadState: LeadState | undefined
   event: { kind: TeamEvent['kind']; text: string; at: number } | undefined
@@ -88,6 +90,7 @@ export const quest: QuestRuntime = {
   leavers: [],
   marches: new Map<string, March>(),
   lead: undefined,
+  hero: undefined,
   leadState: undefined,
   event: undefined
 }
@@ -132,6 +135,9 @@ export const shownResting = (): boolean => {
 }
 
 export const shownLead = (): string | undefined => crownedLeadOf(quest.lead, quest.isDemo)
+
+/** Who this pane's hero is; the demo walks the phase costumes. */
+export const shownHero = (): string | undefined => (quest.isDemo ? undefined : quest.hero)
 
 export const shownAction = (): Action | undefined =>
   quest.isDemo ? demoNow().action : quest.action

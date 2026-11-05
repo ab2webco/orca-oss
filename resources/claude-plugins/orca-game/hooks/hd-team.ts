@@ -7,6 +7,7 @@ import { leadStateOf } from './lead-state'
 import { isMemberPane } from './member-pane'
 import { marchesOf, MARCH_TICKS, type HdMember } from './hd-party'
 import type { TeamEvent } from './hd-overlay'
+import { heroNameOf } from './member-character'
 import { partyOf } from './party'
 import { quest } from './quest-state'
 
@@ -48,6 +49,7 @@ export function syncHdTeam(state: GameState, hasRewards: boolean): void {
   quest.isHdPartySeen = true
   quest.lead = isLead ? leadTitleOf(state, gameStrings().art.lead) : undefined
   quest.leadState = isLead ? leadStateOf(state) : undefined
+  quest.hero = heroNameOf(isMemberPane(state), state.worktree?.displayName, quest.lead)
 }
 
 /** Plays a team event in the hd scene from this tick. */
