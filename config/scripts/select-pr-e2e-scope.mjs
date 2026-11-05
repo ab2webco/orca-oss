@@ -38,6 +38,8 @@ export const FULL_SUITE_PATHS = [
   // filter skipped the suite that fixture feeds. Code files only, so editing
   // tests/e2e/AGENTS.md still skips.
   /^tests\/e2e\/(?!.*\.spec\.ts$).*\.(ts|tsx|mjs)$/,
+  // The Docker SSH image's Dockerfile and install script, which the code-only rule misses.
+  /^tests\/e2e\/fixtures\/docker-ssh-relay\//,
   /^tests\/playwright\.config\.ts$/,
   // The lane itself, so a change to this gate is proved by running it.
   /^\.github\/workflows\/(pr|e2e)\.yml$/,

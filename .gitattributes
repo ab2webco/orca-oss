@@ -13,3 +13,4 @@
 # Bundled plugin trees are byte-hashed; CRLF checkout would break the pinned hash.
 /resources/plugins/** text eol=lf
 /resources/claude-plugins/**/*.md text eol=lf
+/tests/e2e/fixtures/docker-ssh-relay/install-pinned-packages.sh text eol=lf
