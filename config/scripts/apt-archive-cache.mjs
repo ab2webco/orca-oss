@@ -70,10 +70,31 @@ export const FALLBACK_MIRRORS = [
 // inside one 600 s apt attempt, so waiting on that mirror only burns the shard.
 export const STALL_WINDOW = { ms: 20_000, minBytes: 2 * 1024 * 1024 }
 
+// Why the list: GitHub's runners resolve to apt's mirror method,
+// `mirror+file:/etc/apt/apt-mirrors.txt/pool/...`, which fetch cannot open; its
+// mirrors (Azure first) are tried in apt's order before the fallbacks.
+function resolvedMirrors(uri, pool) {
+  if (!uri.startsWith('mirror+file:')) {
+    return [uri]
+  }
+  const list = uri.slice('mirror+file:'.length, pool)
+  if (!existsSync(list)) {
+    return []
+  }
+  return readFileSync(list, 'utf8')
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/)[0])
+    .filter((mirror) => /^https?:\/\//.test(mirror))
+    .map((mirror) => mirror.replace(/\/+$/, '') + uri.slice(pool))
+}
+
 export function mirrorCandidates(uri, mirrors) {
   const pool = uri.indexOf('/pool/')
-  const alternates = pool === -1 ? [] : mirrors.map((mirror) => mirror + uri.slice(pool))
-  return [...new Set([uri, ...alternates])]
+  if (pool === -1) {
+    return [uri]
+  }
+  const alternates = mirrors.map((mirror) => mirror + uri.slice(pool))
+  return [...new Set([...resolvedMirrors(uri, pool), ...alternates])]
 }
 
 const HASH_ALGORITHMS = { SHA512: 'sha512', SHA256: 'sha256', SHA1: 'sha1', MD5Sum: 'md5' }

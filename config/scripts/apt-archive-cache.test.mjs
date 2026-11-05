@@ -111,6 +111,24 @@ describe('mirrorCandidates', () => {
       'http://archive.ubuntu.com/ubuntu/pool/main/b/build-essential/build-essential_12.10ubuntu1_amd64.deb'
     ])
   })
+
+  // Run 42093213364: every URI on the runner was `mirror+file:/etc/apt/apt-mirrors.txt/...`.
+  it("expands apt's mirror list in order before the fallbacks", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'apt-mirror-list-'))
+    const list = join(dir, 'apt-mirrors.txt')
+    writeFileSync(
+      list,
+      'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\n'
+    )
+    const pool = '/pool/main/z/zsh/zsh_5.9-6ubuntu2_amd64.deb'
+    expect(
+      mirrorCandidates(`mirror+file:${list}${pool}`, ['http://archive.ubuntu.com/ubuntu'])
+    ).toEqual([
+      `http://azure.archive.ubuntu.com/ubuntu${pool}`,
+      `https://archive.ubuntu.com/ubuntu${pool}`,
+      `http://archive.ubuntu.com/ubuntu${pool}`
+    ])
+  })
 })
 
 describe('fetchArchives', () => {
