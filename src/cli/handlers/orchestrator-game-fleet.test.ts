@@ -32,6 +32,7 @@ describe('orca game fleet verbs', () => {
     process.env.ORCA_PANE_KEY = 'tab:lead'
     // Why: an Orca pane exports the host's ORCA_GAME_LOCALE; the names must not follow it.
     delete process.env.ORCA_GAME_LOCALE
+    delete process.env.ORCA_GAME_ROLE
   })
 
   afterEach(() => {

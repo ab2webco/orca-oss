@@ -31988,6 +31988,8 @@ export class OrcaRuntimeService {
     paneKey?: string
     /** The calling member pane's Jev report, kept for its lead's state. */
     advisor?: unknown
+    /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
+    role?: string
   }): Promise<OrchestratorGameState> {
     if (args.paneKey && args.advisor !== undefined) {
       this.gameMemberAdvisors.noteReport(args.paneKey, args.advisor, Date.now())
@@ -32019,9 +32021,11 @@ export class OrcaRuntimeService {
       ? summaries.flatMap((one) => one.agents).find((row) => row.paneKey === args.paneKey)
           ?.parentPaneKey
       : null
-    const hostReadings = callerParentPaneKey
-      ? Promise.resolve(null)
-      : this.gameHostCapacity.read().catch(() => null)
+    const callerRole = args.role === 'member' ? ('member' as const) : undefined
+    const hostReadings =
+      callerParentPaneKey || callerRole
+        ? Promise.resolve(null)
+        : this.gameHostCapacity.read().catch(() => null)
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -32079,6 +32083,7 @@ export class OrcaRuntimeService {
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
       callerParentPaneKey,
+      callerRole,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
       teamHandles: callerHandle ? this.claudeAgentTeams.teamHandlesOf(callerHandle) : null,
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],

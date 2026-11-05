@@ -4,6 +4,7 @@ import type { GameState } from '../types'
 import { leadTitleOf } from './game-lead'
 import { gameStrings } from './game-strings'
 import { leadStateOf } from './lead-state'
+import { isMemberPane } from './member-pane'
 import { marchesOf, MARCH_TICKS, type HdMember } from './hd-party'
 import type { TeamEvent } from './hd-overlay'
 import { partyOf } from './party'
@@ -21,7 +22,10 @@ const memberOf = (one: Required<HdMember>) => ({
 
 /** The party, its marches and the lead's crown from a game state; the first state marches nobody. */
 export function syncHdTeam(state: GameState, hasRewards: boolean): void {
-  const party: HdMember[] = partyOf(state, hasRewards).map(memberOf)
+  // Why: an older host answers a remote member as a lead, with every session it found (ORCA-1044).
+  const isLead = state.role === 'lead' && !isMemberPane(state)
+  const own = isLead ? state : { ...state, agents: state.agents.filter((one) => !one.found) }
+  const party: HdMember[] = partyOf(own, hasRewards).map(memberOf)
   const keys = party.map((one) => one.key)
   const before = quest.hdParty
   if (quest.isHdPartySeen) {
@@ -42,8 +46,8 @@ export function syncHdTeam(state: GameState, hasRewards: boolean): void {
   ]
   quest.hdParty = party
   quest.isHdPartySeen = true
-  quest.lead = state.role === 'lead' ? leadTitleOf(state, gameStrings().art.lead) : undefined
-  quest.leadState = state.role === 'lead' ? leadStateOf(state) : undefined
+  quest.lead = isLead ? leadTitleOf(state, gameStrings().art.lead) : undefined
+  quest.leadState = isLead ? leadStateOf(state) : undefined
 }
 
 /** Plays a team event in the hd scene from this tick. */

@@ -14,12 +14,17 @@ export const gameBoardCaller = () => ({
   terminalHandle: process.env.ORCA_TERMINAL_HANDLE
 })
 
+// Why: a remote member's lead is on another host, so that host finds no parent pane for it.
+export const gameCallerRole = (): { role?: 'member' } =>
+  process.env.ORCA_GAME_ROLE?.trim().toLowerCase() === 'member' ? { role: 'member' } : {}
+
 // Why: the game mod runs inside the Agent Teams pane, so the pane's own env names its worktree.
 export const readCallerGameState = (client: Client) =>
   client.call<OrchestratorGameState>('game.state', {
     worktreeId: process.env.ORCA_WORKTREE_ID,
     terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-    paneKey: process.env.ORCA_PANE_KEY
+    paneKey: process.env.ORCA_PANE_KEY,
+    ...gameCallerRole()
   })
 
 export function optionalText(
