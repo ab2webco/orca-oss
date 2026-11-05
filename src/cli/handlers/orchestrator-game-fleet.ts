@@ -28,7 +28,7 @@ import {
   type GameSweepEntry
 } from '../../shared/orchestrator-game-fleet-verbs'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
-import type { RuntimeTerminalSend } from '../../shared/runtime-types'
+import { sendFollowingRemoteMember, sendOnHost } from './remote-member-terminal-send'
 import { observedGameEventsOf } from '../../shared/orchestrator-game-observed-events'
 import { postGameEvents } from './orchestrator-game-board-call'
 import {
@@ -239,14 +239,23 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
         push.members.push({ ...entry, sent: false })
         continue
       }
+      const params = {
+        terminal: handle,
+        text: entry.prompt,
+        enter: true,
+        agentPrompt: true,
+        client: { id: 'orca-cli', type: 'desktop' }
+      }
+      // Why (ORCA-976): a remote member's handle is a pane of its host, never of this home; from a
+      // remote client the home's environment ids are not this CLI's, so the home names the host.
+      const remote = client.isRemote ? undefined : agentOfRow(response.result, entry.row)?.remote
       try {
-        const { result } = await client.call<{ send: RuntimeTerminalSend }>('terminal.send', {
-          terminal: handle,
-          text: entry.prompt,
-          enter: true,
-          agentPrompt: true,
-          client: { id: 'orca-cli', type: 'desktop' }
-        })
+        const { result } = remote
+          ? await sendOnHost(
+              { host: remote.host, environmentId: remote.environmentId ?? remote.host },
+              params
+            )
+          : await sendFollowingRemoteMember(client, params)
         push.members.push({
           ...entry,
           sent: result.send.accepted,

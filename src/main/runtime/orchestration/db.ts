@@ -8026,6 +8026,19 @@ export class OrchestrationDb {
     ).at(-1)
   }
 
+  /** The remote member on this host terminal handle, unreleased first, then newest (ORCA-976). */
+  findFederatedDispatchOnTerminal(terminalHandle: string): FederatedDispatchRow | undefined {
+    return this.db
+      .prepare(
+        `SELECT fd.* FROM federated_dispatches fd
+         LEFT JOIN worker_dispatches wd ON wd.dispatch_id = fd.dispatch_id
+         WHERE fd.remote_terminal_handle = ?
+         ORDER BY COALESCE(wd.stage, '') = 'released', fd.rowid DESC
+         LIMIT 1`
+      )
+      .get(terminalHandle) as FederatedDispatchRow | undefined
+  }
+
   private reopenableFederatedDispatchIds(filter: string, args: string[]): string[] {
     const rows = this.db
       .prepare(

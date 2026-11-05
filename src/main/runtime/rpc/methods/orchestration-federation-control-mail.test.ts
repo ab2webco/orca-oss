@@ -8,6 +8,7 @@ import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { fingerprintAuthenticatedPairingCredential } from '../orchestration-mutation-executor'
 import { ORCHESTRATION_METHODS } from './orchestration'
+import { TERMINAL_METHODS } from './terminal'
 import { SUCCESS_ENVELOPE } from '../../orchestration/worker-done-envelope-fixture'
 
 describe('orchestration federation control mail', () => {
@@ -316,6 +317,105 @@ describe('orchestration federation control mail', () => {
     await expect(statusWaiter).resolves.toMatchObject({
       ok: true,
       result: { count: 0, timedOut: true }
+    })
+  })
+
+  describe("a remote member's terminal handle sent from its home (ORCA-976)", () => {
+    beforeEach(() => {
+      homeDb.updateFederatedDispatchResources({
+        dispatchId,
+        remoteRuntimeEpoch: workerRuntime.getRuntimeId(),
+        worktreeId: 'repo::worker',
+        terminalHandle: 'term_worker'
+      })
+    })
+
+    it('relays mail to the handle through its Dispatch instead of queueing it at home', async () => {
+      vi.spyOn(homeRuntime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {})
+      const sent = await homeDispatcher.dispatch({
+        id: 'send-to-handle',
+        authToken: 'coordinator-token',
+        orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+        orchestrationRequestId: 'send-to-handle-request',
+        method: 'orchestration.send',
+        params: {
+          from: 'term_coord',
+          to: 'term_worker',
+          subject: 'Follow up',
+          body: 'Address the review comment.',
+          type: 'status'
+        }
+      })
+
+      expect(sent).toMatchObject({
+        ok: true,
+        result: { relay: { dispatchId, destination: 'worker', accepted: true } }
+      })
+      expect(homeDb.getUnreadMessages('term_worker')).toHaveLength(0)
+
+      await homeRuntime.syncOrchestrationFederation()
+      await expect(
+        workerDispatcher.dispatch(checkRequest('check-handle-mail'))
+      ).resolves.toMatchObject({
+        ok: true,
+        result: { count: 1, messages: [{ subject: 'Follow up' }] }
+      })
+    })
+
+    it('fails loudly for a host too old to take control mail, never queueing it at home', async () => {
+      const task = homeDb.createTask({ spec: 'Older host member', runId })
+      const old = homeDb.createStartingWorkerDispatch({
+        taskId: task.id,
+        startOptions: {},
+        federation: {
+          environmentId: 'environment_old',
+          environmentName: 'old-host',
+          peerFingerprint: 'old-peer',
+          protocolVersion: 1
+        }
+      })
+      homeDb.markWorkerDispatchReady(old.dispatch.id)
+      homeDb.updateFederatedDispatchResources({
+        dispatchId: old.dispatch.id,
+        remoteRuntimeEpoch: 'old-epoch',
+        worktreeId: 'repo::old',
+        terminalHandle: 'term_old'
+      })
+      const sent = await homeDispatcher.dispatch({
+        id: 'send-to-old-handle',
+        authToken: 'coordinator-token',
+        orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+        orchestrationRequestId: 'send-to-old-handle-request',
+        method: 'orchestration.send',
+        params: { from: 'term_coord', to: 'term_old', subject: 'Too old', type: 'status' }
+      })
+
+      expect(sent).toMatchObject({ ok: false, error: { code: 'capability_unsupported' } })
+      expect(homeDb.getUnreadMessages('term_old')).toHaveLength(0)
+    })
+
+    it('answers terminal.send with the host the handle runs on', async () => {
+      const terminals = new RpcDispatcher({ runtime: homeRuntime, methods: TERMINAL_METHODS })
+      const send = (terminal: string) =>
+        terminals.dispatch({
+          id: `send-${terminal}`,
+          authToken: 'coordinator-token',
+          method: 'terminal.send',
+          params: { terminal, text: 'continue', enter: true }
+        })
+
+      await expect(send('term_worker')).resolves.toMatchObject({
+        ok: false,
+        error: {
+          code: 'terminal_handle_stale',
+          message: expect.stringContaining('--environment worker --terminal term_worker'),
+          data: { host: 'worker', environmentId: 'environment_worker' }
+        }
+      })
+      // Why: any other handle keeps the home's own answer, with no host named.
+      const unknown = (await send('term_nobody')) as { ok: false; error: { data?: unknown } }
+      expect(unknown.ok).toBe(false)
+      expect(unknown.error.data).toBeUndefined()
     })
   })
 

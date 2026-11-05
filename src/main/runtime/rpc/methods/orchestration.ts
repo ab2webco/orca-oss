@@ -599,10 +599,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           ...(lifecycle ? { lifecycle } : {})
         }
       }
+      // Why (ORCA-976): a remote member's handle names no pane here, so plain mail would never be
+      // delivered; its Dispatch relays the message to the member's host instead.
+      const lifecycleMail = params.type === 'worker_done' || params.type === 'heartbeat'
+      const remoteMember =
+        params.to && !lifecycleMail ? db.findFederatedDispatchOnTerminal(params.to) : undefined
+      const recipient = remoteMember ? `dispatch:${remoteMember.dispatch_id}` : params.to
       const routing = resolveMessageRun(runtime, {
         from,
         senderPaneKey,
-        to: params.to,
+        to: recipient,
         runId: params.run,
         payload: params.payload
       })
@@ -615,13 +621,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           'worker_done requires outcome=succeeded|failed for a current Dispatch.'
         )
       }
-      if (params.to?.startsWith('task:')) {
+      if (recipient?.startsWith('task:')) {
         throw new OrchestrationError(
           'invalid_argument',
           'Task recipients are intentionally unsupported; use run:<id> or dispatch:<id>.'
         )
       }
-      let to = params.to
+      let to = recipient
       if (
         routing.run &&
         (!to ||

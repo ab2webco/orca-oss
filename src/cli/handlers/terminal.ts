@@ -7,7 +7,6 @@ import type {
   RuntimeTerminalAgentSessionState,
   RuntimeTerminalRead,
   RuntimeTerminalRename,
-  RuntimeTerminalSend,
   RuntimeTerminalShow,
   RuntimeTerminalSplit,
   RuntimeTerminalWait
@@ -38,6 +37,7 @@ import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import type { TuiAgent } from '../../shared/types'
 import { RuntimeClientError } from '../runtime-client'
 import { resolveAccountSelectorFlags } from '../account-selector'
+import { sendFollowingRemoteMember } from './remote-member-terminal-send'
 import { attachAgentTerminalToTask, resolveTaskAttachRequest } from './agent-terminal-task-attach'
 import { terminalWakeHandler } from './terminal-wake'
 import {
@@ -148,7 +148,7 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     const text = getOptionalStringFlag(flags, 'text')
     const enter = flags.get('enter') === true
     const interrupt = flags.get('interrupt') === true
-    const result = await client.call<{ send: RuntimeTerminalSend }>('terminal.send', {
+    const result = await sendFollowingRemoteMember(client, {
       terminal: await getTerminalHandle(flags, cwd, client),
       text,
       enter,

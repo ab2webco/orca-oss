@@ -102,6 +102,8 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'global_login_taken',
   'relay_quota_exceeded',
   'dispatch_capability_invalid',
+  // Why: from a member's home it names the paired host the handle runs on (ORCA-976).
+  'terminal_handle_stale',
   // Why: a refused remote member's message names its recovery step (ORCA-857).
   'orchestration_sender_unauthenticated',
   'agent_unconfigured',
