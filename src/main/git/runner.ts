@@ -1392,6 +1392,7 @@ export function gitExecFileSync(
     encoding?: BufferEncoding
     stdio?: SpawnOptions['stdio']
     timeout?: number
+    env?: NodeJS.ProcessEnv
   }
 ): string {
   const resolved = resolveCommand('git', args, options.cwd)
@@ -1400,7 +1401,7 @@ export function gitExecFileSync(
     return execFileSync(resolved.binary, resolved.args, {
       cwd: resolved.cwd,
       encoding: options.encoding ?? 'utf-8',
-      env: untranslatedGitOutputEnv(),
+      env: untranslatedGitOutputEnv(options.env),
       stdio: options.stdio ?? ['pipe', 'pipe', 'pipe'],
       timeout: options.timeout ?? GIT_EXEC_SYNC_TIMEOUT_MS
     }) as string

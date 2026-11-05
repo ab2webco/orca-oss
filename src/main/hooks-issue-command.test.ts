@@ -147,7 +147,7 @@ describe('createIssueCommandRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/issue-command-runner.sh'],
-        { cwd: 'C:\\repo-worktree' }
+        expect.objectContaining({ cwd: 'C:\\repo-worktree' })
       )
       expect(writeFileSyncMock).toHaveBeenCalledWith(
         'C:\\repo\\.git\\orca\\issue-command-runner.sh',
@@ -178,7 +178,7 @@ describe('createIssueCommandRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/issue-command-runner.cmd'],
-        { cwd: 'C:\\repo-worktree' }
+        expect.objectContaining({ cwd: 'C:\\repo-worktree' })
       )
       // Why: the runner file is batch (.cmd) while the pane that launches it is still Git Bash.
       expect(result.shell).toEqual({ family: 'posix' })
@@ -203,7 +203,7 @@ describe('createIssueCommandRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/issue-command-runner.cmd'],
-        { cwd: 'C:\\repo-worktree' }
+        expect.objectContaining({ cwd: 'C:\\repo-worktree' })
       )
       expect(result.shell).toEqual({ family: 'cmd' })
     } finally {
