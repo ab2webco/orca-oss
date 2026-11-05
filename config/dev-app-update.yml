@@ -1,4 +1,4 @@
 provider: github
-owner: stablyai
-repo: orca
+owner: ab2webco
+repo: orca-oss
 updaterCacheDirName: orca-updater

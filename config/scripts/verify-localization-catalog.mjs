@@ -521,7 +521,6 @@ export async function main(root = process.cwd(), options = parseArgs(process.arg
   const unshipped = localeFiles.filter((fileName) => !isShippedCatalogFile(fileName))
   if (unshipped.length > 0) {
     console.error(`Orca Lab does not ship ${unshipped.join(', ')}; delete it.`)
-    console.error('Mid-merge, `pnpm run sync:resolve-removed-locales` resolves it as deleted.')
     return 1
   }
 

@@ -1325,7 +1325,7 @@ seis fases (working · docs · build · verify · PR · handoff) y firma tus men
 
 | Id          | Escena       | Mundo                                                     | Grupo por fase, luego narrador                                                      | Con CI en rojo                | Final del merge |
 | ----------- | ------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- | --------------- |
-| `quest`     | Quest        | Montañas y colinas, sol o cielo nocturno                  | Squire · Sage · Blacksmith · Knight · Herald · King; Storyteller                    | el miembro destella           | —               |
+| `quest`     | Quest        | Montañas y colinas, sol o cielo nocturno                  | Squire · Sage · Blacksmith · Knight · Herald · Champion; Storyteller                | el miembro destella           | —               |
 | `vigilante` | Night Watch  | Horizonte nocturno, azoteas, una señal en el cielo        | Night Watch · Detective · Gadgeteer · Mentor · Rooftop Run · Commissioner; Narrator | un bribón enmascarado         | `◆ CASE CLOSED` |
 | `jrpg`      | Crystal Saga | Agujas de cristal bajo el día, el atardecer, tormenta, noche | Mercenary · Mage · Thief · Healer · Lancer · Hero; Chronicler                    | un espadachín rival           | `★ VICTORY ★`   |
 | `tamer`     | Beast Tamer  | Praderas de flores                                        | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | un bicho glitch salvaje       | `◓ CAUGHT!`     |

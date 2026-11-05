@@ -1972,24 +1972,3 @@ jobs:
             [[ "$attempt" -eq 3 ]] || sleep "$((attempt * 5))"
           done
           echo "::warning::Failed to dispatch post-release E2E for $TAG after 3 attempts."
-
-  homebrew-bump-published-rc-draft:
-    needs:
-      - cut
-    # Why: publish-complete-draft-releases can expose a recovered RC without
-    # running the build/publish jobs; still advance the RC cask to that tag.
-    if: ${{ needs.cut.outputs.latest_published_rc_tag != '' }}
-    uses: ./.github/workflows/homebrew-bump.yml
-    with:
-      tag: ${{ needs.cut.outputs.latest_published_rc_tag }}
-    secrets: inherit
-
-  homebrew-bump:
-    needs:
-      - cut
-      - publish-release
-    if: ${{ needs.cut.outputs.tag != '' && startsWith(needs.cut.outputs.tag, 'v') }}
-    uses: ./.github/workflows/homebrew-bump.yml
-    with:
-      tag: ${{ needs.cut.outputs.tag }}
-    secrets: inherit

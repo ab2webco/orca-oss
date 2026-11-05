@@ -1,8 +1,9 @@
-# Upstream PR Adoption
+# Porting an Upstream PR
 
-This lab is a fork of [`stablyai/orca`](https://github.com/stablyai/orca) and adopts
-upstream pull requests continuously. This document is the decision procedure for that:
-open it next to a PR, work top to bottom, and land on one of three outcomes.
+Orca Lab started from [`stablyai/orca`](https://github.com/stablyai/orca) but no longer follows
+it: there is no sync, no schedule and no parity goal. Upstream is only a place to look for features
+and fixes. When we need one of its changes, we pick that PR, review it with this procedure and port
+it ourselves. Open it next to the PR, work top to bottom, and land on one of three outcomes.
 
 Rule of order: **safe > excellent > useful**. When quality or security is in doubt, do
 not adopt. Only an adopted-and-verified PR enters a release.
@@ -188,7 +189,7 @@ change that only holds for one of those is not adoptable as-is.
 
 ## Step 6 — Outcome
 
-Exactly one of three. Record it in the tracking issue for the PR.
+Exactly one of three. Record it in the Plane ticket for the port.
 
 | Outcome               | When                                                                                                                                                                                                        | Action                                                                                                                                                                    |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -202,38 +203,32 @@ to adopt a PR partially (cherry-picking a subset of its files). Ambiguity is not
 resolved by the reviewer running the gates — it is escalated.
 
 **Partial adoption** is a form of _adopt with rework_: take the files that pass, drop
-the rest, and note in the tracking issue exactly what was left behind, so the next
-upstream sync does not silently pull it in.
+the rest, and note in the Plane ticket exactly what was left behind, so a later port of
+the same PR does not take it by accident.
 
-## Step 7 — Adoption procedure
+## Step 7 — Port procedure
 
 ```sh
-git switch -c fabolivark/adopt-<n> main
-git fetch origin pull/<n>/head
+git switch -c fabolivark/orca-<ticket> main
+git fetch https://github.com/stablyai/orca.git pull/<n>/head
 git merge --squash FETCH_HEAD
 ```
 
-Resolve conflicts in favor of the lab's version where the two diverge intentionally.
-Then run Step 3 Q5 in full, plus the Q1 significance check the diff could not answer.
+The squash makes the port one new commit of ours, so none of upstream's history enters `main`.
+Write its message like any other lab commit, with the upstream PR number in the body. Resolve
+conflicts in favor of the lab's version where the two diverge intentionally. Then run Step 3 Q5
+in full, plus the Q1 significance check the diff could not answer.
 
 ### Paths the lab removed
 
 The lab ships English and Spanish only (ORCA-596). Upstream keeps editing the Chinese, Japanese and
 Korean catalogs, the game's `zh`/`ja`/`ko` word lists and their localization scripts and tests, so
-any merge of upstream work (an adoption here, or an upstream sync) stops on modify/delete conflicts
-for them. Resolve those as deleted, then handle the rest by hand:
-
-```sh
-pnpm run sync:resolve-removed-locales
-```
-
-It acts only mid-merge and only on the exact paths in `REMOVED_LOCALE_PATHS`
-(`config/scripts/resolve-removed-locale-paths.mjs`); every other conflict, other fork deletions
-included, stays unmerged. A strings change upstream made in those catalogs is not lost to the lab:
+a port that touches them stops on modify/delete conflicts. Remove those paths again with `git rm`
+and resolve every other conflict by hand. A strings change upstream made in those catalogs is not lost to the lab:
 if it adds English keys, they arrive through `en.json`, and the localization gate asks for their
 Spanish. `pnpm run verify:localization-catalog` fails if a dropped catalog comes back.
-Push to `fabolivark`, integrate into `main` on `ab2webco`, and release only after the
-gates are green on the merged result — not only on the adoption branch.
+Open the PR on `ab2webco/orca-oss` like any other change, and release only after the gates are
+green on the merged result — not only on the port branch.
 
 ## Known limits of this rubric
 

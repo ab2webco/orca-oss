@@ -125,24 +125,18 @@ const RECORD = '\u0001'
 const FIELD = '\u0002'
 
 /**
- * The PR's own commits: reachable from HEAD, not from the merge target, and not from upstream.
- *
- * Both exclusions matter. Without the base, the gate would re-judge all of main and stay red
- * forever over the two commits that already landed. Without upstream, a sync PR would import
- * ~2800 upstream commits — many of them legitimately co-authored by an assistant in a repo that
- * allows it — and turn every sync red. A missing upstream ref is not fatal: `main` is still
- * excluded, which is the case this gate exists for.
+ * The PR's own commits: reachable from HEAD, not from the merge target. Without that exclusion
+ * the gate would re-judge all of main and stay red forever over the two commits that already
+ * landed.
  *
  * @param {string} base
- * @param {string[]} upstreamRefs
  */
-function prCommits(base, upstreamRefs) {
-  const excluded = [base, ...upstreamRefs.filter(resolves)].map((ref) => `^${ref}`)
+function prCommits(base) {
   const output = git([
     'log',
     `--format=${RECORD}%H${FIELD}%h${FIELD}%s${FIELD}%B`,
     'HEAD',
-    ...excluded
+    `^${base}`
   ])
   return output
     .split(RECORD)
@@ -158,10 +152,6 @@ function main() {
   // bare '--' survives on some runners.
   const requested = (process.argv.slice(2).find((argument) => argument !== '--') ?? '').trim()
   const base = requested === '' ? 'origin/main' : requested
-  const upstreamRefs = (process.env.ORCA_AI_ATTRIBUTION_UPSTREAM_REFS ?? 'upstream/main')
-    .split(',')
-    .map((ref) => ref.trim())
-    .filter(Boolean)
 
   // Why skip instead of fail: a checkout without the merge target cannot bound the range, and a
   // gate that fails there teaches people to feed it any ref until it goes quiet.
@@ -170,7 +160,7 @@ function main() {
     return 0
   }
 
-  const commits = prCommits(base, upstreamRefs)
+  const commits = prCommits(base)
   const offenders = commits
     .map((commit) => ({ ...commit, findings: findAiAttribution(commit.message) }))
     .filter((commit) => commit.findings.length > 0)

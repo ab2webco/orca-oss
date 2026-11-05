@@ -39,7 +39,7 @@ const ledgerPath = path.join(fakeCliDir, 'agent.jsonl')
 
 // Why this exact shape: it is `orchestration-legacy-worker-missing-terminal-
 // recovery.spec.ts`'s fake, verbatim, plus only the two additions the 5/8
-// measurement made to it (docs/reference/orca-201-sync7-handoff.md, "a corrected
+// measurement made to it (the ORCA-201 handoff, "a corrected
 // fake that calls setRawMode(true) and answers on \r or \n"): raw mode, so
 // nothing read can be tty echo, and a per-chunk stdin ledger.
 //

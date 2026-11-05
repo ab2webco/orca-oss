@@ -6,13 +6,9 @@ const requestedBase =
   process.argv.slice(2).find((argument) => argument !== '--') ??
   process.env.ORCA_CODE_QUALITY_BASE ??
   'origin/main'
-// Why syncAware — see resolvePullRequestDiffBase.
-const base = resolvePullRequestDiffBase(process.cwd(), requestedBase, undefined, {
-  syncAware: true
-})
+const base = resolvePullRequestDiffBase(process.cwd(), requestedBase)
 // Why here and not in the workflow: a caller that computes the base separately
-// can print one ref while this resolves another, which is how a base fix read
-// as landed for a full sync cycle without ever reaching the tool (ORCA-202).
+// can print one ref while this resolves another (ORCA-202).
 console.log(`React Doctor measures changed lines against ${base}`)
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const result = spawnSync(
