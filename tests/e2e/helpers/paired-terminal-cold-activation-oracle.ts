@@ -213,14 +213,22 @@ export async function runPairedTerminalColdActivationOracle(
       fallbackWorktreeId
     )
     await expect(firstTab).not.toBeVisible()
+    // Why: the 100 ms E2E hot-retain parks the other hidden tab during any longer
+    // absence; wait for it so the return never depends on how fast CI round-trips.
+    await expectStableColdActivationMountState(page, tabIds, {
+      mounted: 1,
+      parked: TARGET_TAB_COUNT - 1
+    })
     await page.evaluate(
       (targetWorktreeId) => window.__store?.getState().setActiveWorktree(targetWorktreeId),
       worktreeId
     )
     await expect(firstTab).toHaveAttribute('data-active', 'true')
+    // Why: the parking toggle cleared the activation restriction, so the tab
+    // parked while away is not previously allowed and stays deferred.
     await expectStableColdActivationMountState(page, tabIds, {
-      mounted: 2,
-      parked: TARGET_TAB_COUNT - 2
+      mounted: 1,
+      parked: TARGET_TAB_COUNT - 1
     })
 
     const secondTab = page.locator(`[data-testid="sortable-tab"][data-tab-id="${tabs[1].tabId}"]`)
@@ -236,11 +244,19 @@ export async function runPairedTerminalColdActivationOracle(
       fallbackWorktreeId
     )
     await expect(secondTab).not.toBeVisible()
+    // Why: the 100 ms E2E hot-retain parks the other hidden tab during any longer
+    // absence; wait for it so the return never depends on how fast CI round-trips.
+    await expectStableColdActivationMountState(page, tabIds, {
+      mounted: 1,
+      parked: TARGET_TAB_COUNT - 1
+    })
     await page.evaluate(
       (targetWorktreeId) => window.__store?.getState().setActiveWorktree(targetWorktreeId),
       worktreeId
     )
     await expect(secondTab).toHaveAttribute('data-active', 'true')
+    // Why: the first tab was revealed under the current activation restriction,
+    // so it remounts; the other hidden tabs stay deferred.
     await expectStableColdActivationMountState(page, tabIds, {
       mounted: 2,
       parked: TARGET_TAB_COUNT - 2
