@@ -838,6 +838,8 @@ import {
   resumedPaneStateOf
 } from './orchestrator-game-lead-sessions'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
+import { adoptGameProjectHistory } from './orchestrator-game-history-adoption'
+import type { GameHistoryAdoption } from '../../shared/orchestrator-game-log-adoption'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { tellGameLead } from './orchestrator-game-lead-note'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
@@ -3854,9 +3856,15 @@ export class OrcaRuntimeService {
   private readonly gameHistory = new GameHistoryStore(() =>
     join(app.getPath('userData'), 'orchestrator-game-history')
   )
+  private readonly gameLessonStore = new GameLessonStore(() =>
+    join(app.getPath('userData'), 'orchestrator-game-lessons')
+  )
+  private readonly gameStops = new GameStopSwitch(() =>
+    join(app.getPath('userData'), 'orchestrator-game-stop')
+  )
   // Why Engram as a mirror: lessons must survive without it, and reads merge what either holds.
   private readonly gameLessons = new GameLessons({
-    store: new GameLessonStore(() => join(app.getPath('userData'), 'orchestrator-game-lessons')),
+    store: this.gameLessonStore,
     // Why not under E2E: a spec must never write the developer's own Engram.
     mirror: process.env.ORCA_E2E_USER_DATA_DIR ? null : new EngramLessonMirror(engramRequestOf())
   })
@@ -3988,7 +3996,7 @@ export class OrcaRuntimeService {
   })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
-    stops: new GameStopSwitch(() => join(app.getPath('userData'), 'orchestrator-game-stop')),
+    stops: this.gameStops,
     projectOf: async (caller) =>
       withProjectLead(
         await this.gameBoardProjectOf(caller),
@@ -31611,6 +31619,40 @@ export class OrcaRuntimeService {
       key,
       name: (repo?.displayName ?? key).trim().toLowerCase(),
       directory: repo?.path ?? null
+    }
+  }
+
+  /** Folds a removed repo id's game history, lessons and STOP into the caller's project (ORCA-1011). */
+  async adoptGameHistory(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    fromRepoId: string
+  }): Promise<GameHistoryAdoption> {
+    const project = await this.gameBoardProjectOf(args)
+    if (project.isMember) {
+      throw new Error("A member cannot adopt its project's history; the lead's host keeps it.")
+    }
+    try {
+      return await adoptGameProjectHistory({
+        fromRepoId: args.fromRepoId,
+        toKey: project.key,
+        repoExists: (repoId) => Boolean(this.store?.getRepo(repoId)),
+        liveLeadOf: (key) => this.gameLeads.liveLeadOf(key),
+        liveMembersOf: async (key) => {
+          const [ps, saved] = await Promise.all([
+            this.getWorktreePs(GAME_MEMBER_NAME_SCAN_LIMIT),
+            this.gameMemberSessions.read(key)
+          ])
+          return liveProjectMemberNamesOf({
+            worktrees: ps.worktrees,
+            inProject: () => false,
+            saved: saved.ok ? saved.members : []
+          })
+        },
+        stores: { history: this.gameHistory, lessons: this.gameLessonStore, stops: this.gameStops }
+      })
+    } finally {
+      this.gameFleetChange.changed()
     }
   }
 

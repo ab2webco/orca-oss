@@ -684,6 +684,14 @@ matches …` (ORCA-866).
   ([`orchestrator-game-history-store.ts`](../../src/main/runtime/orchestrator-game-history-store.ts)).
   They are written through `game.historyRecord` and read through `game.history`, two RPC methods a
   host older than this does not have; `game history` then says to update Orca.
+- `orca game adopt-history --from-repo-id <id>` — game data is filed under the repo's id, and a repo
+  removed and added again gets a new one, so its history, events, characters, lessons and STOP stay
+  under the old id while the game reads an empty project (ORCA-1011). This folds them into the
+  current project: records and events merged by time, characters and lesson counts added, a STOP
+  kept set. The old files are renamed `<name>.adopted-<time>` beside each store, never deleted, so a
+  second run finds nothing. It refuses a repo id Orca still has, and runs only when no lead or member
+  of either id is live, from an Orca terminal in the project on the lead's host. Saved members, the
+  lead conversation and drops are not carried: they name worktrees of the old repo id.
 - `orca game metrics [--since <date>] [--until <date>] [--ticket <id>] [--character <name>]` — the project's delivery
   numbers, computed client-side from the whole `game.events` and `game.history` stores (no new RPC,
   so an older host answers too): tickets done (a `merged` event, or a member freed as `merged` or

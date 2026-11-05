@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readFile, rename } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { durableWriteTempPath, writeFileDurable } from '../durable-file-write'
 import {
@@ -22,6 +22,7 @@ import {
   type GameStoreData,
   type GameStoreMigration
 } from '../../shared/orchestrator-game-store-migration'
+import { mergeAdoptedGameLog } from '../../shared/orchestrator-game-log-adoption'
 
 /** Ordered steps for this store's file; empty while version 1 is the only shape. */
 export const GAME_HISTORY_MIGRATIONS: readonly GameStoreMigration[] = []
@@ -166,6 +167,34 @@ export class GameHistoryStore {
       return next.list ? { ...current, ownerQuestions: next.list } : null
     })
     return result as R
+  }
+
+  /**
+   * Folds another key's file into this key's, then sets that file aside so a second run finds
+   * nothing. Null when that key has no file; throws, touching neither, when it cannot be read.
+   */
+  async adopt(fromKey: string, toKey: string): Promise<{ records: number; events: number } | null> {
+    const from = this.fileOf(fromKey)
+    if (
+      !(await stat(from).then(
+        () => true,
+        () => false
+      ))
+    ) {
+      return null
+    }
+    const { log, before } = await this.read(fromKey)
+    if (before.kind === 'damaged' || before.kind === 'read-only') {
+      throw new Error(`The history under ${fromKey} cannot be read; it was left as it is.`)
+    }
+    if ((await this.read(toKey)).before.kind === 'read-only') {
+      throw new Error(
+        `The history under ${toKey} was written by a newer Orca; nothing was adopted.`
+      )
+    }
+    await this.update(toKey, (current) => ({ ...current, ...mergeAdoptedGameLog(current, log) }))
+    await rename(from, this.besideOf(fromKey, `adopted-${fileStamp()}`))
+    return { records: log.records.length, events: log.events.length }
   }
 
   // Why migrate only in memory here: reads run outside the queue, so only update() may persist.
