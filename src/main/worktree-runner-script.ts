@@ -6,6 +6,7 @@ import { scriptDeclaresPosixShell } from '../shared/setup-script-shebang'
 import { resolveWindowsShellStartupFamily } from '../shared/windows-terminal-shell'
 import { resolveWindowsGitBashShellPath } from './git-bash'
 import { gitExecFileSync } from './git/runner'
+import { withoutRepoLocalGitEnv } from './git/repo-local-git-env'
 import { isWslPath, toWindowsWslPath, toLinuxPath } from './wsl'
 import { getHookRuntimeTarget, getHookWslContext } from './hook-runtime-target'
 import { SETUP_RUNNER_PATH_ENV_KEYS, getSetupRunnerEnvVars } from './setup-hook-env-vars'
@@ -21,6 +22,9 @@ type SetupRunnerShellSettings = Record<string, unknown> | undefined
 function getGitPath(cwd: string, relativePath: string, runtimeTarget?: HookRuntimeTarget): string {
   return gitExecFileSync(['rev-parse', '--git-path', relativePath], {
     cwd,
+    // Why: an inherited GIT_DIR (e.g. Orca started from a git hook) overrides cwd and would
+    // place this worktree's runner in another repo's gitdir (ORCA-978).
+    env: withoutRepoLocalGitEnv(process.env),
     ...(runtimeTarget?.wslDistro ? { wslDistro: runtimeTarget.wslDistro } : {})
   }).trim()
 }

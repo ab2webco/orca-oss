@@ -14,7 +14,8 @@ import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
 import {
   assertElectronResolvedIsolatedHome,
-  createElectronHomeIsolation
+  createElectronHomeIsolation,
+  readElectronResolvedHome
 } from './electron-home-isolation'
 import { forwardElectronProcessLogs } from './orca-app'
 import {
@@ -174,10 +175,7 @@ export async function launchPairedElectronClient(
   })
 
   try {
-    assertElectronResolvedIsolatedHome(
-      await app.evaluate(({ app: electronApp }) => electronApp.getPath('home')),
-      homeIsolation
-    )
+    assertElectronResolvedIsolatedHome(await readElectronResolvedHome(app), homeIsolation)
     forwardElectronProcessLogs(app, testInfo)
     const page = await app.firstWindow({ timeout: 120_000 })
     await page.waitForLoadState('domcontentloaded')

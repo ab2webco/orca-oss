@@ -224,6 +224,81 @@ describe('createRemoteRuntimePtyTransport', () => {
     }
   })
 
+  it('re-activates a mirror the host republishes pending after a missed first activation (ORCA-946)', async () => {
+    vi.useFakeTimers()
+    try {
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const pendingSnapshot = {
+        worktree: 'wt-1',
+        publicationEpoch: 'epoch-after-relaunch',
+        snapshotVersion: 1,
+        activeGroupId: null,
+        activeTabId: 'host-tab-1::pane:1',
+        activeTabType: 'terminal',
+        tabs: [
+          {
+            type: 'terminal',
+            id: 'host-tab-1::pane:1',
+            parentTabId: 'host-tab-1',
+            leafId: 'pane:1',
+            title: 'Terminal',
+            isActive: false,
+            status: 'pending-handle',
+            terminal: null
+          }
+        ]
+      }
+      let activateCalls = 0
+      runtimeCall.mockImplementation(async (args: { method: string }) => {
+        if (args.method === 'session.tabs.activate') {
+          activateCalls += 1
+          if (activateCalls === 1) {
+            // Why: a relaunched host answers before it has rehydrated the tab.
+            return { ok: false, error: { code: 'runtime_error', message: 'tab_not_found' } }
+          }
+          return {
+            ok: true,
+            result: {
+              ...pendingSnapshot,
+              snapshotVersion: 2,
+              tabs: [
+                { ...pendingSnapshot.tabs[0], status: 'ready', terminal: 'terminal-preserved' }
+              ]
+            }
+          }
+        }
+        if (args.method === 'session.tabs.list') {
+          // Why: an inactive-worktree tab stays pending until something activates it.
+          return { ok: true, result: pendingSnapshot }
+        }
+        return { ok: true, result: {} }
+      })
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'web-terminal-host-tab-1',
+        leafId: 'pane:1'
+      })
+
+      const connect = transport.connect({ url: '', callbacks: {} })
+      await vi.advanceTimersByTimeAsync(1_000)
+
+      expect(
+        runtimeCall.mock.calls
+          .map(([args]) => args.method)
+          .filter((method) => method === 'session.tabs.activate' || method === 'session.tabs.list')
+      ).toEqual(['session.tabs.activate', 'session.tabs.list', 'session.tabs.activate'])
+      await expect(connect).resolves.toEqual({
+        id: 'remote:env-1@@terminal-preserved',
+        replay: '',
+        isReattach: true
+      })
+      expect(latestSubscribePayload()).toMatchObject({ terminal: 'terminal-preserved' })
+      transport.destroy?.()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps a mounted HUB mirror alive when the old stream ends before the replacement snapshot', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const handleEvents = await import('../../runtime/web-session-terminal-handle-events')

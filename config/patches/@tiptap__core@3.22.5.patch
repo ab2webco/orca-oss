@@ -1,0 +1,144 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 614d9372c255cc1f28a232216ff3d726779f5885..93fbe87bb214b8379ed84dbaacaa1560f08ab903 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -6167,6 +6167,35 @@ __export(markdown_exports, {
+ });
+ 
+ // src/utilities/markdown/attributeUtils.ts
++// Orca patch (GHSA-j95f-988m-3j2f): scan each [\w-] run once; the old unanchored regex rescanned it per char.
++function matchQuotedAttributePairs(str) {
++  const pairs = [];
++  const runRegex = /[\w-]+/g;
++  const valueRegex = /\s*=\s*(__QUOTED_\d+__)/y;
++  let run = runRegex.exec(str);
++  while (run !== null) {
++    const keyOffset = run[0].search(/[a-zA-Z]/);
++    if (keyOffset >= 0) {
++      valueRegex.lastIndex = runRegex.lastIndex;
++      const value = valueRegex.exec(str);
++      if (value !== null) {
++        pairs.push({ start: run.index + keyOffset, end: valueRegex.lastIndex, key: run[0].slice(keyOffset), quotedRef: value[1] });
++        runRegex.lastIndex = valueRegex.lastIndex;
++      }
++    }
++    run = runRegex.exec(str);
++  }
++  return pairs;
++}
++function removeQuotedAttributePairs(str) {
++  let result = "";
++  let last = 0;
++  matchQuotedAttributePairs(str).forEach(({ start, end }) => {
++    result += str.slice(last, start);
++    last = end;
++  });
++  return result + str.slice(last);
++}
+ function parseAttributes(attrString) {
+   if (!(attrString == null ? void 0 : attrString.trim())) {
+     return {};
+@@ -6186,9 +6215,8 @@ function parseAttributes(attrString) {
+   if (idMatch) {
+     attributes.id = idMatch[1];
+   }
+-  const kvRegex = /([a-zA-Z][\w-]*)\s*=\s*(__QUOTED_\d+__)/g;
+-  const kvMatches = Array.from(tempString.matchAll(kvRegex));
+-  kvMatches.forEach(([, key, quotedRef]) => {
++  const kvMatches = matchQuotedAttributePairs(tempString);
++  kvMatches.forEach(({ key, quotedRef }) => {
+     var _a;
+     const quotedIndex = parseInt(((_a = quotedRef.match(/__QUOTED_(\d+)__/)) == null ? void 0 : _a[1]) || "0", 10);
+     const quotedValue = quotedStrings[quotedIndex];
+@@ -6196,7 +6224,9 @@ function parseAttributes(attrString) {
+       attributes[key] = quotedValue.slice(1, -1);
+     }
+   });
+-  const cleanString = tempString.replace(/(?:^|\s)\.([a-zA-Z][\w-]*)/g, "").replace(/(?:^|\s)#([a-zA-Z][\w-]*)/g, "").replace(/([a-zA-Z][\w-]*)\s*=\s*__QUOTED_\d+__/g, "").trim();
++  const cleanString = removeQuotedAttributePairs(
++    tempString.replace(/(?:^|\s)\.([a-zA-Z][\w-]*)/g, "").replace(/(?:^|\s)#([a-zA-Z][\w-]*)/g, "")
++  ).trim();
+   if (cleanString) {
+     const booleanAttrs = cleanString.split(/\s+/).filter(Boolean);
+     booleanAttrs.forEach((attr) => {
+@@ -6433,7 +6463,7 @@ function parseShortcodeAttributes(attrString) {
+     return {};
+   }
+   const attributes = {};
+-  const regex = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
++  const regex = /(?<!\w)(\w+)=(?:"([^"]*)"|'([^']*)')/g;
+   let match = regex.exec(attrString);
+   while (match !== null) {
+     const [, key, doubleQuoted, singleQuoted] = match;
+diff --git a/dist/index.js b/dist/index.js
+index 3c4d7ec693803be44ffd3dcb6b03fa4166ac9d02..4dd5733ca48a53e39c78930bb50adcbaceff4078 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -6029,6 +6029,35 @@ __export(markdown_exports, {
+ });
+ 
+ // src/utilities/markdown/attributeUtils.ts
++// Orca patch (GHSA-j95f-988m-3j2f): scan each [\w-] run once; the old unanchored regex rescanned it per char.
++function matchQuotedAttributePairs(str) {
++  const pairs = [];
++  const runRegex = /[\w-]+/g;
++  const valueRegex = /\s*=\s*(__QUOTED_\d+__)/y;
++  let run = runRegex.exec(str);
++  while (run !== null) {
++    const keyOffset = run[0].search(/[a-zA-Z]/);
++    if (keyOffset >= 0) {
++      valueRegex.lastIndex = runRegex.lastIndex;
++      const value = valueRegex.exec(str);
++      if (value !== null) {
++        pairs.push({ start: run.index + keyOffset, end: valueRegex.lastIndex, key: run[0].slice(keyOffset), quotedRef: value[1] });
++        runRegex.lastIndex = valueRegex.lastIndex;
++      }
++    }
++    run = runRegex.exec(str);
++  }
++  return pairs;
++}
++function removeQuotedAttributePairs(str) {
++  let result = "";
++  let last = 0;
++  matchQuotedAttributePairs(str).forEach(({ start, end }) => {
++    result += str.slice(last, start);
++    last = end;
++  });
++  return result + str.slice(last);
++}
+ function parseAttributes(attrString) {
+   if (!(attrString == null ? void 0 : attrString.trim())) {
+     return {};
+@@ -6048,9 +6077,8 @@ function parseAttributes(attrString) {
+   if (idMatch) {
+     attributes.id = idMatch[1];
+   }
+-  const kvRegex = /([a-zA-Z][\w-]*)\s*=\s*(__QUOTED_\d+__)/g;
+-  const kvMatches = Array.from(tempString.matchAll(kvRegex));
+-  kvMatches.forEach(([, key, quotedRef]) => {
++  const kvMatches = matchQuotedAttributePairs(tempString);
++  kvMatches.forEach(({ key, quotedRef }) => {
+     var _a;
+     const quotedIndex = parseInt(((_a = quotedRef.match(/__QUOTED_(\d+)__/)) == null ? void 0 : _a[1]) || "0", 10);
+     const quotedValue = quotedStrings[quotedIndex];
+@@ -6058,7 +6086,9 @@ function parseAttributes(attrString) {
+       attributes[key] = quotedValue.slice(1, -1);
+     }
+   });
+-  const cleanString = tempString.replace(/(?:^|\s)\.([a-zA-Z][\w-]*)/g, "").replace(/(?:^|\s)#([a-zA-Z][\w-]*)/g, "").replace(/([a-zA-Z][\w-]*)\s*=\s*__QUOTED_\d+__/g, "").trim();
++  const cleanString = removeQuotedAttributePairs(
++    tempString.replace(/(?:^|\s)\.([a-zA-Z][\w-]*)/g, "").replace(/(?:^|\s)#([a-zA-Z][\w-]*)/g, "")
++  ).trim();
+   if (cleanString) {
+     const booleanAttrs = cleanString.split(/\s+/).filter(Boolean);
+     booleanAttrs.forEach((attr) => {
+@@ -6295,7 +6325,7 @@ function parseShortcodeAttributes(attrString) {
+     return {};
+   }
+   const attributes = {};
+-  const regex = /(\w+)=(?:"([^"]*)"|'([^']*)')/g;
++  const regex = /(?<!\w)(\w+)=(?:"([^"]*)"|'([^']*)')/g;
+   let match = regex.exec(attrString);
+   while (match !== null) {
+     const [, key, doubleQuoted, singleQuoted] = match;

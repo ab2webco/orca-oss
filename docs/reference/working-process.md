@@ -87,7 +87,9 @@ un error no bloqueante: el comando pasa sin revisar. Así estuvieron apagadas
 `board-state-guard`, `main-merge-guard`, `post-merge-board-close` y
 `oversized-pr-review-guard` en esas sesiones, por un `str | None` en una firma (ORCA-884,
 ORCA-803). Las que anotan `X | Y` abren con `from __future__ import annotations`, y el job
-`Claude hooks on Python 3.9` de PR CI corre cada hook y las suites de las guardas sobre 3.9.
+`Claude hooks on Python 3.9` de la merge queue corre sobre 3.9 cada hook registrado en
+`.claude/settings.json`, importa sin ejecutar los demás `.py` de la carpeta, nombra cada archivo que
+falla y corre las suites de las guardas (ORCA-1038).
 
 ### Ciclo de vida del guard de merge
 
