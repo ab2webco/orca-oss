@@ -23,6 +23,7 @@ import {
 } from '../../shared/orchestrator-game-member-agent'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import { claudeLoginEndNoticeOf, failedSignInRefusalOf } from '../../shared/claude-login-end-notice'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -126,7 +127,15 @@ function namedAccount(
       `${email} is not one of the accounts this project allows: ${allowedAccountsText(allowed ?? [])}.`
     )
   }
-  return { pin: pinOf(provider, id), account: { id, email } }
+  const entry = accountListEntriesOf(snapshot).find(
+    (one) => one.provider === provider && one.id === id
+  )
+  const refusal = entry ? failedSignInRefusalOf(entry) : null
+  if (refusal) {
+    throw new RuntimeClientError('invalid_argument', refusal)
+  }
+  const notice = entry ? claudeLoginEndNoticeOf(entry, Date.now()) : null
+  return { pin: pinOf(provider, id), account: { id, email }, ...(notice ? { why: notice } : {}) }
 }
 
 /** The member already on this host's global login for this agent's provider, if any; one at a time. */
@@ -252,10 +261,12 @@ async function autoAccount(
       `Every ${GAME_ACCOUNT_PROVIDER_LABELS[provider]} account is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_PERCENT}%+ of its 5h or 7d window); the first is usable again ${gameResetInText(pick.resetsAt, now)}${pick.resetsAt === null ? '' : ` (${new Date(pick.resetsAt).toISOString()})`}. Wait for it, or name one with --account <email|id>. See \`orca game accounts\`.`
     )
   }
+  const entry = accountListEntriesOf(snapshot).find((one) => one.id === pick.account.id)
+  const notice = entry ? claudeLoginEndNoticeOf(entry, now) : null
   return {
     pin: pinOf(provider, pick.account.id),
     account: pick.account,
-    why: pickWhy(pick, usages, allowed, now)
+    why: [pickWhy(pick, usages, allowed, now), ...(notice ? [notice] : [])].join('\n')
   }
 }
 

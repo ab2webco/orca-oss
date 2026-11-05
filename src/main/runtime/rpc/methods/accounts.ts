@@ -169,7 +169,6 @@ const GetClaudeCustomEndpointConfigParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })
 
-
 // Why: `orca account list` prints only emails and the active ids, so it opts out
 // of the forced all-provider usage refresh below — that lane bypasses the poll
 // throttle and Retry-After gate and costs one serial round-trip per account.
@@ -204,15 +203,20 @@ export const ACCOUNT_METHODS: readonly RpcAnyMethod[] = [
       if (params.refreshUsage) {
         await runtime.refreshAccountsForMobile()
       }
+      await runtime.reportEndedClaudeLogins()
       return runtime.getAccountsSnapshot()
     }
   }),
   defineMethod({
     // Why: accounts.list blocks behind provider usage refreshes; CLI callers
     // need the cached roster + quota without risking a stall on broken auth.
+    // The offline stored-login read is what fails a dead login before a launch picks it.
     name: 'accounts.snapshot',
     params: null,
-    handler: async (_params, { runtime }) => runtime.getAccountsSnapshot()
+    handler: async (_params, { runtime }) => {
+      await runtime.reportEndedClaudeLogins()
+      return runtime.getAccountsSnapshot()
+    }
   }),
   defineMethod({
     name: 'accounts.getPtyOwner',

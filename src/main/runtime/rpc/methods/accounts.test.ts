@@ -206,7 +206,11 @@ describe('account RPC methods', () => {
   // Why alongside the add: the edit lane is the same exemption, so the guard
   // table above must keep leaving all three out.
   it('allows paired-device reads and edits of a custom endpoint', async () => {
-    const config = { label: 'z.ai · GLM', baseUrl: 'https://api.z.ai/api/anthropic', hasToken: true }
+    const config = {
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      hasToken: true
+    }
     const getConfig = vi.fn().mockReturnValue(config)
     const update = vi.fn().mockResolvedValue({ accounts: [] })
     const runtime = {
@@ -237,13 +241,16 @@ describe('account RPC methods', () => {
     ).resolves.toEqual({ accounts: [] })
 
     expect(getConfig).toHaveBeenCalledWith('acct-1')
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acct-1', token: null }))
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'acct-1', token: null })
+    )
   })
 
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {
       refreshAccountsForMobile: vi.fn().mockResolvedValue(undefined),
+      reportEndedClaudeLogins: vi.fn().mockResolvedValue(undefined),
       getAccountsSnapshot: vi.fn(() => snapshot)
     } as unknown as OrcaRuntimeService
     const list = method('accounts.list')
@@ -260,6 +267,7 @@ describe('account RPC methods', () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {
       refreshAccountsForMobile: vi.fn().mockResolvedValue(undefined),
+      reportEndedClaudeLogins: vi.fn().mockResolvedValue(undefined),
       getAccountsSnapshot: vi.fn(() => snapshot)
     } as unknown as OrcaRuntimeService
     const snapshotMethod = method('accounts.snapshot')
@@ -271,10 +279,32 @@ describe('account RPC methods', () => {
     expect(runtime.refreshAccountsForMobile).not.toHaveBeenCalled()
   })
 
+  it('reads stored logins before serving a snapshot, so a launch never picks a login the CLI ended', async () => {
+    const order: string[] = []
+    const runtime = {
+      reportEndedClaudeLogins: vi.fn(async () => {
+        order.push('stored-logins')
+      }),
+      getAccountsSnapshot: vi.fn(() => {
+        order.push('snapshot')
+        return { claude: null, codex: null }
+      })
+    } as unknown as OrcaRuntimeService
+    const snapshotMethod = method('accounts.snapshot')
+    if (isStreamingMethod(snapshotMethod)) {
+      throw new Error('accounts.snapshot must be a request method')
+    }
+
+    await snapshotMethod.handler(undefined, { runtime })
+
+    expect(order).toEqual(['stored-logins', 'snapshot'])
+  })
+
   it('skips the forced provider refresh when the caller opts out', async () => {
     const snapshot = { claude: null, codex: null }
     const runtime = {
       refreshAccountsForMobile: vi.fn().mockResolvedValue(undefined),
+      reportEndedClaudeLogins: vi.fn().mockResolvedValue(undefined),
       getAccountsSnapshot: vi.fn(() => snapshot)
     } as unknown as OrcaRuntimeService
     const list = method('accounts.list')

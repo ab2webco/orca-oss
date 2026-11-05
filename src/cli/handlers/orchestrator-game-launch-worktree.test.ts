@@ -176,7 +176,13 @@ describe('game launch: the ticket keeps its worktree', () => {
             ok: true,
             result: {
               claude: { accounts: [account], activeAccountId: null },
-              codex: { accounts: [], activeAccountId: null }
+              codex: { accounts: [], activeAccountId: null },
+              rateLimits: {
+                claude: null,
+                codex: null,
+                inactiveClaudeAccounts: [],
+                inactiveCodexAccounts: []
+              }
             }
           }
         : call(method, params)) as RuntimeClient['call']

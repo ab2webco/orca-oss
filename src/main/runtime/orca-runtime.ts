@@ -14611,6 +14611,10 @@ export class OrcaRuntimeService {
     return this.accountServices
   }
 
+  async reportEndedClaudeLogins(): Promise<void> {
+    await this.accountServices?.rateLimits.reportEndedClaudeLogins()
+  }
+
   getAccountsSnapshot(): AccountsSnapshot {
     const { claudeAccounts, codexAccounts, rateLimits } = this.requireAccountServices()
     return {
