@@ -127,7 +127,8 @@ export async function resolveHostMemberAccount(args: {
   runtime: Pick<
     OrcaRuntimeService,
     'getAccountsSnapshot' | 'refreshAccountsForMobile' | 'gameAgentsOnAccounts'
-  >
+  > &
+    Partial<Pick<OrcaRuntimeService, 'reportEndedClaudeLogins'>>
   agent: string | undefined
   selector: string
   allowed?: readonly string[]
@@ -139,6 +140,7 @@ export async function resolveHostMemberAccount(args: {
       'An account cannot be set on a reused terminal; its agent already runs on one.'
     )
   }
+  await args.runtime.reportEndedClaudeLogins?.()
   let entries = accountListEntriesOf(args.runtime.getAccountsSnapshot())
   // Why one refresh: Orca reads an inactive account's usage lazily, so a cold cache would look unknown.
   if (args.selector === FEDERATED_AUTO_ACCOUNT && entries.some((entry) => entry.quota === null)) {

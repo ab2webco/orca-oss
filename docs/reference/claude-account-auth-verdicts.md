@@ -28,7 +28,7 @@ fetches rather than from the filesystem.
 
 Verifying costs one provider call per account and refreshes an OAuth token.
 Rotating a token a live CLI owns is itself a way to break the chain, so Orca
-never polls for verdicts. Verification happens at four moments, three of which
+never polls for verdicts. Verification happens at five moments, four of which
 cost nothing extra:
 
 1. **The Settings accounts pane mounts.** It triggers the same per-account usage
@@ -44,8 +44,34 @@ cost nothing extra:
    inactive-account trickle both record a verdict as a side effect, including
    the per-account fetch failure that was previously only logged.
 4. **A live pane observing a provider rejection.** Free — see below.
+5. **An accounts snapshot, before a member launch picks from it.** Offline — see
+   [A Login The CLI Already Ended](#a-login-the-cli-already-ended).
 
 Orca does not verify on a timer, and it does not verify an account on app start.
+
+## A Login The CLI Already Ended
+
+Measured against Claude CLI 2.1.318 (ORCA-1039). The CLI's stored login carries
+a hard end, `claudeAiOauth.refreshTokenExpiresAt`, about 30 days after sign-in,
+and refreshing does not move it. When a refresh is refused — `invalid_grant`, or
+that end — the CLI rewrites its stored credentials with an empty `refreshToken`
+and `accessToken`. Every pane on that config dir then prints `Not logged in`, and
+nothing can renew it: only a new sign-in.
+
+Both facts sit in the stored credentials, so `accounts.snapshot`, `accounts.list`
+and a paired host's member-account pick read them first
+(`claude-stored-login-end.ts`). No provider call, no rotation, at most one read
+per account every 30 s. A login is ended only when every stored copy is: on macOS
+the CLI wipes its config-dir keychain item while re-auth writes Orca's managed
+item, and a launch seeds from whichever still works. A copy that shares the
+wiped copy's `refreshTokenExpiresAt` is an older link of the same dead grant and
+counts as ended too. An ended login records `credential-rejected`, so `auto`, a
+named `--account` (local or remote) and the rows refuse it before a member
+launches. This matters most on a headless host: no renderer watches its panes,
+so the banner rule below never fires there.
+
+The verdict also carries `loginEndsAt`. A launch inside the last 3 days of it says
+so, since the member could stop at `Not logged in` mid-work.
 
 ## When The State Changes Afterwards
 

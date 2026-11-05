@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: centralizes polling, stale-data handling, account-switch fetch semantics, and renderer push coordination in one place */
 import type { BrowserWindow } from 'electron'
+import { reportEndedClaudeLogins } from '../claude-accounts/claude-stored-login-end'
 import type {
   CodexRateLimitResetResult,
   RateLimitState,
@@ -350,6 +351,7 @@ export class RateLimitService {
   private claudeAuthVerdicts = new Map<string, ClaudeAccountAuthVerdict>()
   private claudeAuthChecking = new Set<string>()
   private claudeAuthRejectionRevision = new Map<string, number>()
+  private claudeLoginEndsAt = new Map<string, number>()
   private inactiveCodexFetchInFlight = false
   private lastInactiveClaudeFetchAt = 0
   private inactiveClaudeAccountsGeneration = 0
@@ -534,16 +536,25 @@ export class RateLimitService {
           this.claudeAuthVerdicts.delete(accountId)
         }
       }
+      for (const accountId of Array.from(this.claudeLoginEndsAt.keys())) {
+        if (!known.has(accountId)) {
+          this.claudeLoginEndsAt.delete(accountId)
+        }
+      }
     }
-    for (const accountId of this.claudeAuthChecking) {
+    for (const accountId of [...this.claudeAuthChecking, ...this.claudeLoginEndsAt.keys()]) {
       if (!this.claudeAuthVerdicts.has(accountId)) {
         this.claudeAuthVerdicts.set(accountId, unverifiedClaudeAccountAuthVerdict(accountId))
       }
     }
-    return [...this.claudeAuthVerdicts.values()].map((verdict) => ({
-      ...verdict,
-      checking: this.claudeAuthChecking.has(verdict.accountId)
-    }))
+    return [...this.claudeAuthVerdicts.values()].map((verdict) => {
+      const loginEndsAt = this.claudeLoginEndsAt.get(verdict.accountId)
+      return {
+        ...verdict,
+        checking: this.claudeAuthChecking.has(verdict.accountId),
+        ...(loginEndsAt !== undefined ? { loginEndsAt } : {})
+      }
+    })
   }
 
   private recordClaudeAuthVerdict(
@@ -1090,7 +1101,29 @@ export class RateLimitService {
       (this.claudeAuthRejectionRevision.get(accountId) ?? 0) + 1
     )
     this.claudeAuthVerdicts.delete(accountId)
+    this.claudeLoginEndsAt.delete(accountId)
     this.pushToRenderer()
+  }
+
+  /** Offline, no provider call: fails a login the CLI already wiped or that passed its hard end. */
+  async reportEndedClaudeLogins(): Promise<void> {
+    await reportEndedClaudeLogins({
+      accounts: this.managedClaudeAccountsResolver?.() ?? [],
+      alreadyFailed: (accountId) => this.claudeAuthVerdicts.get(accountId)?.state === 'failed',
+      recordEnded: (accountId) => {
+        this.recordClaudeCredentialRejection(accountId)
+      },
+      recordEndsAt: (accountId, endsAt) => this.recordClaudeLoginEndsAt(accountId, endsAt)
+    })
+  }
+
+  /** The stored login's hard end (`refreshTokenExpiresAt`), read offline; null when no copy says. */
+  recordClaudeLoginEndsAt(accountId: string, endsAt: number | null): void {
+    if (endsAt === null) {
+      this.claudeLoginEndsAt.delete(accountId)
+    } else {
+      this.claudeLoginEndsAt.set(accountId, endsAt)
+    }
   }
 
   evictInactiveClaudeCache(accountId: string): void {

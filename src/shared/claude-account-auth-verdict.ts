@@ -23,6 +23,8 @@ export type ClaudeAccountAuthVerdict = {
   undecided: ClaudeAccountAuthUndecided | null
   undecidedAt: number | null
   checking: boolean
+  /** When the stored login can no longer be renewed (the CLI's `refreshTokenExpiresAt`). */
+  loginEndsAt?: number
 }
 
 export type ClaudeAccountAuthProbe =
