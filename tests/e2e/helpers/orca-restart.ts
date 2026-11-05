@@ -23,6 +23,7 @@ import path from 'node:path'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
+import { launchWithSpawnStderr } from './electron-spawn-stderr-capture'
 import {
   queueRendererRecoveryEvidence,
   readRendererRecoveryEvidence
@@ -41,10 +42,9 @@ type LaunchedOrca = {
 
 type LaunchOptions = {
   /**
-   * Called for each chunk the relaunched main process writes to stderr. The
-   * listener is attached before `firstWindow()` resolves so main-process
-   * startup logs (e.g. the daemon health-check guard) can't be emitted before
-   * the test starts capturing.
+   * Called for each chunk the relaunched main process writes to stderr, from
+   * spawn on, so whenReady startup logs (orchestration startup, the daemon
+   * health-check guard) are never lost to the launch race (ORCA-1066).
    */
   onStderr?: (chunk: string) => void
   /** Merged into this launch only (not baked into the session's shared env). */
@@ -178,20 +178,22 @@ export function createRestartSession(
 
   const launch = async (options?: LaunchOptions): Promise<LaunchedOrca> => {
     runtimeWsPort ??= await reserveRestartRuntimeWsPort()
-    const app = await electron.launch({
-      args: getOrcaElectronLaunchArgs(mainPath, headful),
-      env: {
-        ...homeIsolation.env,
-        ...options?.extraEnv,
-        ORCA_E2E_RUNTIME_WS_PORT: String(runtimeWsPort)
-      }
-    })
-    // Why: attach before firstWindow — the main-process daemon guard and the
-    // plugin-system startup metrics can both emit before the renderer is ready.
-    if (options?.onStderr) {
-      const onStderr = options.onStderr
-      app.process().stderr?.on('data', (chunk: Buffer) => onStderr(chunk.toString()))
-    }
+    const launchElectron = (): Promise<ElectronApplication> =>
+      electron.launch({
+        args: getOrcaElectronLaunchArgs(mainPath, headful),
+        env: {
+          ...homeIsolation.env,
+          ...options?.extraEnv,
+          ORCA_E2E_RUNTIME_WS_PORT: String(runtimeWsPort)
+        }
+      })
+    const app = options?.onStderr
+      ? await launchWithSpawnStderr(
+          launchElectron,
+          (launched) => launched.process(),
+          options.onStderr
+        )
+      : await launchElectron()
     try {
       const resolvedHome = await readElectronResolvedHome(app)
       assertElectronResolvedIsolatedHome(resolvedHome, homeIsolation)
