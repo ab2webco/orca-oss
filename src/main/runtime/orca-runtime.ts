@@ -663,7 +663,8 @@ import {
 import { retireTerminalSurfaceFromPersistence } from './mobile-session-terminal-persistence-retirement'
 import {
   advanceTerminalTopologyRevision,
-  hasHostAuthoritativeTerminalMembership
+  hasHostAuthoritativeTerminalMembership,
+  workspaceSessionListsTerminalSurface
 } from './workspace-session-terminal-membership-authority'
 import { RuntimeEmulatorCommands } from './orca-runtime-emulator'
 import type { EmulatorBridge } from '../emulator/emulator-bridge'
@@ -7892,7 +7893,11 @@ export class OrcaRuntimeService {
     ) {
       return true
     }
-    if (this.mobileSessionSnapshotHasSurface(worktreeId, parentTabId, leafId)) {
+    if (
+      this.mobileSessionSnapshotHasSurface(worktreeId, parentTabId, leafId) ||
+      // Why: a relaunched host holds none of an inactive worktree's PTYs until activation, which needs this surface (ORCA-946).
+      workspaceSessionListsTerminalSurface(session, worktreeId, parentTabId, leafId)
+    ) {
       return true
     }
     if (!candidatePtyId) {

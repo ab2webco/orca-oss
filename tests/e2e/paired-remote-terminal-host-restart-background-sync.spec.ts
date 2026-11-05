@@ -505,6 +505,26 @@ test('foregrounds a preserved daemon PTY after the paired host relaunches', asyn
       .toBe(true)
     await expectTerminalInteractive(client, target, 'x')
     target.handle = await findTerminalHandle(client, worktreeId, target.parentTabId)
+    // Why: a relaunched host must keep every restored tab, not only those whose PTYs were reattached first (ORCA-946).
+    await expect
+      .poll(
+        async () => {
+          const snapshot = await callRuntime<{ tabs: { type: string; parentTabId?: string }[] }>(
+            client!.page,
+            client!.environmentId,
+            'session.tabs.list',
+            { worktree: `id:${worktreeId}` }
+          )
+          const listed = new Set(
+            snapshot.tabs.filter((tab) => tab.type === 'terminal').map((tab) => tab.parentTabId)
+          )
+          return [firstDecoy, parkingDecoy]
+            .filter((terminal) => !listed.has(terminal.parentTabId))
+            .map((terminal) => terminal.parentTabId)
+        },
+        { timeout: 15_000, message: 'Relaunched host dropped restored terminal tabs' }
+      )
+      .toEqual([])
 
     const reconnectControl = await createHostTerminal(client, worktreeId, 'reconnect-control')
     terminals.push(reconnectControl)
