@@ -847,6 +847,7 @@ import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestr
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
 import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
 import { freedCharacterOf } from '../../shared/orchestrator-game-characters'
+import { memberNameOf } from '../../shared/orchestrator-game-member-names'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   GAME_MEMBER_ADVISOR_VERSION,
@@ -31440,18 +31441,29 @@ export class OrcaRuntimeService {
     const live = liveProjectMemberNamesOf({
       worktrees: ps.worktrees,
       inProject: (one) => `repo:${one.repoId}` === project.key,
-      saved: saved.ok ? saved.members : [],
-      remote: this._orchestrationDb ? liveRemoteMemberTitlesOf(this._orchestrationDb) : []
+      saved: saved.ok ? saved.members : []
     })
+    const remote = this._orchestrationDb ? liveRemoteMemberTitlesOf(this._orchestrationDb) : []
     return {
       name: this.gameMemberNames.reserve({
         projectKey: project.key,
         ticket: args.ticket,
         roster: args.roster,
         locale: args.locale,
-        taken: [...live, ...args.taken]
+        taken: [...live, ...args.taken],
+        elsewhere: remote.flatMap((title) => memberNameOf(title) ?? [])
       })
     }
+  }
+
+  async releaseGameMemberName(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+  }): Promise<{ released: true }> {
+    const project = await this.gameBoardProjectOf(args)
+    this.gameMemberNames.release(project.key, args.ticket)
+    return { released: true }
   }
 
   async resumeGameMember(args: {

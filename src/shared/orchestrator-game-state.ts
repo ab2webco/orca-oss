@@ -97,6 +97,8 @@ export type GameRemoteHost = {
   gone?: true
   /** A host restart slept the member's pane; resume wakes it (ORCA-915). Absent from an older host. */
   asleep?: true
+  /** Its start failed and no agent answers for it, so its name is free again (ORCA-1034). */
+  startFailed?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }

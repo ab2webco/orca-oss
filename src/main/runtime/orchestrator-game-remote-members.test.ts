@@ -643,6 +643,20 @@ describe('remote members an earlier lead launched (ORCA-793)', () => {
     ])
   })
 
+  it('gives a failed remote launch back its name (ORCA-1034)', () => {
+    const own = new OrchestrationDb(':memory:')
+    const lead = leads(own).current
+    const failed = startRemote(own, lead, 'Peach · ORCA-1')
+    expect(liveRemoteMemberTitlesOf(own)).toContain('Peach · ORCA-1')
+    sqliteOf(own)
+      .prepare(`UPDATE worker_dispatches SET state = 'failed' WHERE dispatch_id = '${failed}'`)
+      .run()
+    expect(liveRemoteMemberTitlesOf(own)).not.toContain('Peach · ORCA-1')
+    const [source] = listRemoteGameMemberSources(own, lead)
+    expect(source).toMatchObject({ dispatchId: failed, startFailed: true })
+    own.close()
+  })
+
   const earlier: RemoteGameMemberSource = {
     dispatchId: 'ctx_829',
     taskTitle: 'ORCA-829 versionCode check',

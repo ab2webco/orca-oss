@@ -78,8 +78,8 @@ describe('hud', () => {
       party[2]
     ] as const
     expect(digest(hudGridOf(QUEST, acting, 90, 4))).toBe('8560a5ba')
-    expect(digest(hudGridOf(QUEST, acting, 90, 0, { isDemo: true }))).toBe('99a4b275')
-    expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('351cfb7d')
+    expect(digest(hudGridOf(QUEST, acting, 90, 0, { isDemo: true }))).toBe('61644963')
+    expect(digest(hudGridOf(QUEST, party, 90, 4, { level: levelOf(130) }))).toBe('b6834321')
   })
 
   // Why: Orca Lab dropped ja/ko/zh (ORCA-596), so an older Orca's ja launch draws English art.

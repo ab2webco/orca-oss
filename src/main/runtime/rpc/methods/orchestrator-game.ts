@@ -99,6 +99,12 @@ const GameMemberDiscardParams = z.object({
 const rosterName = z.string().min(1).max(64)
 
 // Why loose bounds: a contributed scene's roster is not held to the memberNames limits.
+const GameMemberNameReleaseParams = z.object({
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional(),
+  ticket: TicketParam
+})
+
 const GameMemberNameReserveParams = z.object({
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional(),
@@ -185,6 +191,11 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
     name: 'game.memberNameReserve',
     params: GameMemberNameReserveParams,
     handler: async (params, { runtime }) => runtime.reserveGameMemberName(params)
+  }),
+  defineMethod({
+    name: 'game.memberNameRelease',
+    params: GameMemberNameReleaseParams,
+    handler: async (params, { runtime }) => runtime.releaseGameMemberName(params)
   }),
   defineMethod({
     name: 'game.memberResume',

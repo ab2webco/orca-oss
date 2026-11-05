@@ -25,6 +25,7 @@ export type RemoteGameMemberSource = {
   lastActivityAt: string | null
   createdAt: string
   finished: boolean
+  startFailed?: boolean
   /** The home Run completed the member's task. */
   ticketDone: boolean
   /** Launched by a lead that no longer leads it (ORCA-793). */
@@ -57,6 +58,7 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               COALESCE(d.last_activity_at, d.last_heartbeat_at) AS lastActivityAt,
               d.created_at AS createdAt,
               d.status NOT IN ('pending', 'dispatched') AS finished,
+              COALESCE(w.state, '') = 'failed' AS startFailed,
               COALESCE(t.status, '') = 'completed' AS ticketDone,
               w.start_options AS startOptions`
 
@@ -78,9 +80,10 @@ const EARLIER_LEAD_LIMIT = 20
 
 type SourceRow = Omit<
   RemoteGameMemberSource,
-  'finished' | 'ticketDone' | 'earlierLead' | 'launch'
+  'finished' | 'startFailed' | 'ticketDone' | 'earlierLead' | 'launch'
 > & {
   finished: number
+  startFailed: number
   ticketDone: number
   startOptions: string | null
 }
@@ -93,6 +96,7 @@ const sourceOf = (
   return {
     ...row,
     finished: row.finished === 1,
+    startFailed: row.startFailed === 1,
     ticketDone: row.ticketDone === 1,
     earlierLead,
     launch: chosen ? gameMemberLaunchOf({ ...chosen, source: 'launch' }) : null
@@ -181,8 +185,9 @@ export function listEarlierLeadRemoteMemberSources(
 }
 
 /**
- * Task titles of every Run's remote members still holding their host's resources, for the name
- * pool. Not scoped to a project: the home Run DB does not record one, and a skipped name costs nothing.
+ * Task titles of every Run's remote members still holding their host's resources, failed ones aside,
+ * for the name pool. Not scoped to a project (the home Run DB does not record one), so these give way
+ * before a launch takes a numbered name.
  */
 export function liveRemoteMemberTitlesOf(db: OrchestrationDb): string[] {
   const rows = sqliteOf(db)
@@ -190,7 +195,7 @@ export function liveRemoteMemberTitlesOf(db: OrchestrationDb): string[] {
       `SELECT t.task_title AS taskTitle
          ${SOURCE_JOINS}
         WHERE ${NOT_RELEASED}
-          AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned')
+          AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned', 'failed')
           AND t.task_title IS NOT NULL
         ORDER BY d.created_at, d.rowid`
     )
@@ -284,7 +289,8 @@ export async function remoteGameMembersOf(
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
           ...(gone ? { gone: true as const } : {}),
-          ...(show?.asleep ? { asleep: true as const } : {})
+          ...(show?.asleep ? { asleep: true as const } : {}),
+          ...(source.startFailed && !agent ? { startFailed: true as const } : {})
         },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch
