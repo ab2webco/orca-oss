@@ -42,4 +42,18 @@ describe('e2e workflow apt installs', () => {
     expect(save).toBeGreaterThan(install)
     expect(steps[save].if).toContain("cache-hit != 'true'")
   })
+
+  // Why: a shared prefix let the build job's cache shadow the shards' (ORCA-1059).
+  it('scopes restore-keys to the requested package set and prefetches before apt', () => {
+    const steps = readAction().runs.steps
+    const resolve = steps.find((step) => step.id === 'resolve')
+    const install = steps.find((step) => /Dir::Cache::Archives=/.test(step.run ?? ''))
+
+    expect(resolve.run).toContain('--packages "$PACKAGES"')
+    expect(resolve.run).not.toContain('echo "prefix=')
+    expect(install.run.indexOf('apt-archive-cache.mjs fetch')).toBeGreaterThan(-1)
+    expect(install.run.indexOf('apt-archive-cache.mjs fetch')).toBeLessThan(
+      install.run.indexOf('ci-apt.sh install')
+    )
+  })
 })
