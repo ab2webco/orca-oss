@@ -24,9 +24,8 @@ runs:
         prefix="apt-archives-${RUNNER_OS}-${RUNNER_ARCH}-${ImageOS:-unknown}"
         # shellcheck disable=SC2086
         bash config/scripts/ci-apt.sh install --print-uris -qq -y $PACKAGES > "$RUNNER_TEMP/apt-archives.uris"
-        node config/scripts/apt-archive-cache.mjs key --prefix "$prefix" \
+        node config/scripts/apt-archive-cache.mjs key --prefix "$prefix" --packages "$PACKAGES" \
           --uris "$RUNNER_TEMP/apt-archives.uris" --list "$RUNNER_TEMP/apt-archives.list" >> "$GITHUB_OUTPUT"
-        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
         echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore apt archives
@@ -44,7 +43,8 @@ runs:
         ARCHIVE_DIR: ${{ steps.resolve.outputs.dir }}
       run: |
         set -euo pipefail
-        mkdir -p "$ARCHIVE_DIR/partial"
+        node config/scripts/apt-archive-cache.mjs fetch \
+          --dir "$ARCHIVE_DIR" --uris "$RUNNER_TEMP/apt-archives.uris"
         # shellcheck disable=SC2086
         bash config/scripts/ci-apt.sh install -y \
           -o Dir::Cache::Archives="$ARCHIVE_DIR/" \
