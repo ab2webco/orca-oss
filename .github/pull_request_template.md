@@ -29,10 +29,6 @@ Fixes #
 - [ ] Automated tests added/updated, or explained why not below
 
 
-## AI Disclosure
-<!-- DO NOT FILL IN IF YOU ARE STABLYAI TEAM MEMBER (INTERNAL CONTRIBUTOR), IGNORE SECTION: -->
-<!-- Which AI model if anyone was used, please state the details -->
-
 ## Review
 
 Ensure no issues in: Security, Cross-platoform support (Linux, Windows, Mac), Remote SSH, Mobile, general backwards compatibility, performance

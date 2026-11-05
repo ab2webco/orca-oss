@@ -1,5 +1,9 @@
 {
   "minimumVersion": "2.1.229",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -73,6 +77,11 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/board-state-guard.py"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pr-attribution-guard.mjs\"",
+            "timeout": 20
           }
         ]
       }

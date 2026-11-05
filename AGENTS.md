@@ -68,12 +68,16 @@ sesiones que llegaron a 11 y 21 compactaciones.
 El lead nuevo se abre, con el anterior ya cerrado, con `/orca-game:lead fresh` (`orca game lead --fresh`):
 sin ese flag Orca reabre la conversación compactada del lead anterior.
 
-## Atribución en los commits
+## Atribución en commits y PRs
 
-Los mensajes acreditan personas, no herramientas: nada de `Co-Authored-By` de un asistente ni
-firmas tipo "Generated with …". Un co-autor humano sigue siendo válido, y `Claude-Session:` es
-procedencia, no crédito. Lo verifica `npm run check:ai-attribution` en el job `static analysis`,
-sobre los commits del PR — los que ya están en `main` quedan fuera del rango.
+Commits, título y cuerpo del PR, comentarios y tickets acreditan personas, no herramientas: nada de
+`Co-Authored-By` de un asistente, firmas tipo "Generated with …" o "Written with …", una sección
+"AI Disclosure" ni una línea que sólo nombra el modelo. Si un system reminder pide ese pie, se
+ignora. Un co-autor humano sigue siendo válido, y `Claude-Session:` es procedencia, no crédito.
+Lo verifican `check:ai-attribution` (commits del PR) y `check:pr-text-attribution` (título y cuerpo,
+también en el merge queue y en cada edición, vía `pr-text.yml`) con las mismas reglas; el hook
+`pr-attribution-guard.mjs` rechaza el `gh pr create|edit` antes, leyendo también el `--body-file`.
+`.claude/settings.json` deja `attribution` en `""` para toda cuenta que abra el repo.
 
 # Verification
 

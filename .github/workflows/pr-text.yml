@@ -1,0 +1,40 @@
+name: PR text
+
+# Why a workflow of its own: `edited` in pr.yml would cancel and restart the whole check set on
+# every title or body edit. This one job re-judges the text on each edit (ORCA-1032).
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+  merge_group:
+    types:
+      - checks_requested
+
+concurrency:
+  group: pr-text-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  attribution:
+    name: pr text attribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: config/scripts
+
+      - name: Reject AI attribution in the PR title and body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node config/scripts/check-pr-text-attribution.mjs
