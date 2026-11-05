@@ -117,6 +117,13 @@ describe('PR E2E scope selection', () => {
     expect(selectPrE2eScope(['tests/playwright.config.ts']).mode).toBe('full')
   })
 
+  it('runs the full suite when the Docker SSH image changes', () => {
+    // ORCA-1064: neither file is code, so a fixture-only change built no image before merge.
+    for (const file of ['Dockerfile', 'install-pinned-packages.sh']) {
+      expect(selectPrE2eScope([`tests/e2e/fixtures/docker-ssh-relay/${file}`]).mode).toBe('full')
+    }
+  })
+
   it('widens to the full suite when a spec lands with a runtime change', () => {
     const scope = selectPrE2eScope([
       'src/main/runtime/orchestration/coordinator.ts',
