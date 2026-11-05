@@ -47,7 +47,7 @@ Descarga el AppImage y hazlo ejecutable:
 
 ```bash
 sudo mkdir -p /opt/orca
-sudo curl -L https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage \
+sudo curl -L https://github.com/ab2webco/orca-oss/releases/latest/download/orca-linux.AppImage \
   -o /opt/orca/orca-linux.AppImage
 sudo chmod +x /opt/orca/orca-linux.AppImage
 ```
@@ -398,7 +398,7 @@ fail-fast y de recuperación sigan activos durante toda la operación:
 set -euo pipefail
 
 # Replace this example with the release tag you intend to deploy
-ORCA_VERSION=v1.4.147
+ORCA_VERSION=v1.4.160-lab.115
 
 # Select the release asset on the server where Orca runs
 case "$(uname -m)" in
@@ -465,7 +465,7 @@ recover_failed_upgrade() {
 trap recover_failed_upgrade EXIT
 
 # 1. Stage and verify the new build while the server stays online
-sudo curl -fL --retry 3 "https://github.com/stablyai/orca/releases/download/${ORCA_VERSION}/${ORCA_ASSET}" \
+sudo curl -fL --retry 3 "https://github.com/ab2webco/orca-oss/releases/download/${ORCA_VERSION}/${ORCA_ASSET}" \
   -o /opt/orca/orca-linux.AppImage.new
 sudo chown root:root /opt/orca/orca-linux.AppImage.new
 sudo chmod 755 /opt/orca/orca-linux.AppImage.new
