@@ -91,7 +91,8 @@ describe('runRemoteOrcaCli', () => {
       ),
       resolveLegacyWorkerCandidate: vi.fn(() => undefined),
       getCurrentRunForPane: vi.fn(() => undefined),
-      findActiveRemoteAttachmentForPane: vi.fn(() => undefined)
+      findActiveRemoteAttachmentForPane: vi.fn(() => undefined),
+      findFederatedDispatchOnTerminal: vi.fn(() => undefined)
     }
     const runtime = {
       getRuntimeId: () => 'runtime-test',
