@@ -131,16 +131,6 @@ describe('AI attribution gate wiring', () => {
     expect(gateIndex).toBeGreaterThanOrEqual(0)
     expect(steps[gateIndex].run).toContain('github.event.pull_request.base.sha')
   })
-
-  // Why after the fetch: without refs/remotes/upstream/main the gate cannot exclude upstream's
-  // commits, and a sync PR imports thousands of them.
-  it('runs after upstream history is fetched', () => {
-    const fetchIndex = steps.findIndex(
-      (step) => step.name === 'Fetch upstream history for base resolution'
-    )
-    expect(fetchIndex).toBeGreaterThanOrEqual(0)
-    expect(fetchIndex).toBeLessThan(gateIndex)
-  })
 })
 
 // The range is the other half of the gate: parsing a message right is useless if the gate judges
@@ -154,12 +144,8 @@ describe('the range the gate judges', () => {
   const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
   const commit = (subject, ...body) =>
     git('commit', '--allow-empty', '--no-gpg-sign', '-m', [subject, '', ...body].join('\n'))
-  const run = (base, upstreamRefs = '') => {
-    const result = spawnSync(process.execPath, [script, base], {
-      cwd: repo,
-      encoding: 'utf8',
-      env: { ...process.env, ORCA_AI_ATTRIBUTION_UPSTREAM_REFS: upstreamRefs }
-    })
+  const run = (base) => {
+    const result = spawnSync(process.execPath, [script, base], { cwd: repo, encoding: 'utf8' })
     return { status: result.status, output: `${result.stdout}${result.stderr}` }
   }
 
@@ -169,7 +155,6 @@ describe('the range the gate judges', () => {
     git('config', 'user.name', 'Fabian Altahona')
     git('config', 'user.email', 'scloud@netsat.co')
     commit('chore: first commit')
-    git('branch', 'fake-upstream')
     // The two commits that already landed on main with AI credit (ORCA-529).
     commit('fix: landed before the gate existed', AI_TRAILER)
     git('checkout', '--quiet', '-b', 'feature')
@@ -196,26 +181,6 @@ describe('the range the gate judges', () => {
   it('passes a PR commit co-authored by a person', () => {
     commit('feat: pair work', 'Co-authored-by: Jinwoo-H <jinwoo0825@gmail.com>')
     expect(run('main').status).toBe(0)
-  })
-
-  // A sync PR merges upstream, whose commits credit assistants under rules this fork does not
-  // set. Judging them would make every sync red for work nobody here wrote.
-  it('excludes commits imported from upstream, and would fail without that exclusion', () => {
-    git('checkout', '--quiet', 'fake-upstream')
-    commit('fix: upstream work', AI_TRAILER)
-    git('checkout', '--quiet', 'feature')
-    git(
-      'merge',
-      '--quiet',
-      '--no-ff',
-      '--no-gpg-sign',
-      '-m',
-      'chore(sync): merge upstream',
-      'fake-upstream'
-    )
-
-    expect(run('main', 'fake-upstream').status).toBe(0)
-    expect(run('main', '').status).toBe(1)
   })
 
   it('skips instead of failing when the base is missing from the checkout', () => {

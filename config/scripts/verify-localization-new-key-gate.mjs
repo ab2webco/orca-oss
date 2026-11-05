@@ -151,10 +151,8 @@ export async function main(root = process.cwd(), argv = process.argv.slice(2)) {
   let baseEnKeys = null
   if (base) {
     const mergeBase = runGit(root, ['merge-base', base, 'HEAD']).trim()
-    // A sync merge inherits existing debt from both parents; only keys absent from both are new.
-    const comparisonBase = resolvePullRequestDiffBase(root, mergeBase, undefined, {
-      syncAware: true
-    })
+    // The checkout's first parent can drift from the merge base; only keys absent from both are new.
+    const comparisonBase = resolvePullRequestDiffBase(root, mergeBase)
     const comparisonCatalog = readCatalogKeysAtRef(root, comparisonBase, EN_CATALOG)
     baseEnKeys =
       comparisonBase === mergeBase

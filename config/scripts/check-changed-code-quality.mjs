@@ -80,11 +80,7 @@ function resolveBase(root, requestedBase) {
 export function collectAddedLineRanges(root, requestedBase) {
   const base = resolveBase(root, requestedBase)
   const mergeBase = runGit(root, ['merge-base', base, 'HEAD']).trim()
-  // Why syncAware: on a sync PR the pre-sync tip hides the fork's own lines —
-  // they did not change against it — so this gate saw none of them (ORCA-205).
-  const comparisonBase = resolvePullRequestDiffBase(root, mergeBase, undefined, {
-    syncAware: true
-  })
+  const comparisonBase = resolvePullRequestDiffBase(root, mergeBase)
   const changedFiles = splitNullDelimited(
     runGit(root, ['diff', '--name-only', '-z', '--diff-filter=ACMRTUB', comparisonBase, '--'])
   )

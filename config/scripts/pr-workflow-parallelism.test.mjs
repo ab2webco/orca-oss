@@ -45,14 +45,9 @@ describe('PR workflow parallelism', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' })
   })
 
-  it('shards the general test suite across Node 24 and Node 26', () => {
-    // Why an expression and not a literal list: the fork runs one Node major to halve
-    // CI cost while upstream keeps both — the owner ternary must preserve exactly
-    // that split, or a sync could silently drop a major on either side (ORCA-127).
-    const nodeMatrix = workflow.jobs.test.strategy.matrix.node
-    expect(nodeMatrix).toContain("github.repository_owner == 'stablyai'")
-    expect(nodeMatrix).toContain('fromJSON(\'["24", "26"]\')')
-    expect(nodeMatrix).toContain('fromJSON(\'["24"]\')')
+  it('shards the general test suite on the Node major the product ships on', () => {
+    // Why one major: a second one doubles every PR's CI cost (ORCA-127).
+    expect(workflow.jobs.test.strategy.matrix.node).toEqual(['24'])
     // Why an expression: a push runs 8 shards and the merge queue 16 (ORCA-932); the
     // per-event split is pinned in pr-workflow-merge-queue.test.mjs.
     expect(workflow.jobs.test.strategy.matrix.shard).toContain("github.event_name == 'merge_group'")

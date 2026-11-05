@@ -50,22 +50,8 @@ jobs:
       - name: Enforce type-aware code-quality baseline
         run: pnpm run audit:code-quality:type-aware
 
-      # Why this runs before both changed-line gates: they measure a sync PR
-      # against the upstream tip it merged, and each resolves that ref itself and
-      # prints it. Without upstream's history neither can tell a sync from a
-      # normal PR, so both silently fall back to the checkout's base — a green
-      # lane that never applied the widening. Keep it above them; the ordering is
-      # pinned by config/scripts/pr-workflow-upstream-fetch-order.test.mjs.
-      - name: Fetch upstream history for base resolution
-        continue-on-error: true
-        run: |
-          git remote add upstream https://github.com/stablyai/orca.git 2>/dev/null \
-            || git remote set-url upstream https://github.com/stablyai/orca.git
-          git fetch --filter=blob:none --no-tags upstream main:refs/remotes/upstream/main
-
-      # Why here and not earlier: the gate excludes upstream's commits from the PR range, which
-      # needs the fetch above. Why the base SHA: only this PR's commits are judged, so the two
-      # AI-credited commits already in main do not make it red forever (ORCA-529).
+      # Why the base SHA: only this PR's commits are judged, so the two AI-credited commits
+      # already in main do not make it red forever (ORCA-529).
       - name: Reject AI attribution in commit messages
         run: pnpm run check:ai-attribution -- "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
 
@@ -361,10 +347,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Why the owner ternary: upstream supports both Node majors, but in the fork
-        # the doubled matrix doubles every PR's CI cost while the product ships on
-        # engines.node 24 — node 26 coverage returns with each upstream sync (ORCA-127).
-        node: ${{ github.repository_owner == 'stablyai' && fromJSON('["24", "26"]') || fromJSON('["24"]') }}
+        # Why one major: a second one doubles every PR's CI cost, and the product ships on
+        # engines.node 24 (ORCA-127).
+        node: ['24']
         # Why fewer on a push: a push's 16 shards were most of its ~45 jobs (ORCA-932).
         shard: ${{ github.event_name == 'merge_group' && fromJSON('[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]') || fromJSON('[1, 2, 3, 4, 5, 6, 7, 8]') }}
         shard_total: ${{ github.event_name == 'merge_group' && fromJSON('[16]') || fromJSON('[8]') }}
