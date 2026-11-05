@@ -1,5 +1,5 @@
 ---
-sourceHash: 52080765e02c94fb
+sourceHash: 502715cf1804e4f6
 ---
 # Servidor Linux sin interfaz gráfica
 
