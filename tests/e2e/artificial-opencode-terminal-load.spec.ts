@@ -150,8 +150,6 @@ const MAX_TIMER_DRIFT_MS = 250
 // the real baseline.
 const MAX_TIMER_DRIFT_UNDER_LOAD_MS = 3_500
 const MAX_SCROLL_LATENCY_MS = 150
-// Why: byte-level peaks vary by drain quantum; the coarse guard matches the main-pressure scenario.
-const MAX_RENDERER_SCHEDULER_QUEUED_CHARS = 5 * 1024 * 1024
 
 function readPositiveInt(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -653,7 +651,6 @@ test.describe('Artificial OpenCode terminal load', () => {
       deps: terminalLoadScenarioDeps,
       mainRendererPressureTargetChars: MAIN_RENDERER_PRESSURE_TARGET_CHARS,
       maxMedianKeyLatencyMs: MAX_MEDIAN_KEY_LATENCY_MS,
-      maxRendererSchedulerQueuedChars: MAX_RENDERER_SCHEDULER_QUEUED_CHARS,
       maxRevisitLatencyMs: MAX_REVISIT_LATENCY_UNDER_LOAD_MS,
       // Why: the printf is sampled while background panes are ACK-gate-held, so
       // worst-key and timer drift are environment-dominated here (worst seen ~2s)

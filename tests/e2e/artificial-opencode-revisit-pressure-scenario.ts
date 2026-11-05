@@ -18,6 +18,7 @@ import {
   waitForActiveTerminalManager
 } from './helpers/terminal'
 import { waitForTerminalPtyVisible } from './artificial-opencode-pane-interactions'
+import { expectRendererDeliveryWithinWindow } from './renderer-delivery-window-bound'
 
 type RevisitPressurePane = { paneKey: string; ptyId: string }
 
@@ -88,7 +89,6 @@ export async function runRendererBackpressureRevisitScenario<
   backgroundPaneCount,
   deps,
   maxMedianKeyLatencyMs,
-  maxRendererSchedulerQueuedChars,
   maxRevisitLatencyMs,
   maxTimerDriftMs,
   maxWorstKeyLatencyMs,
@@ -101,7 +101,6 @@ export async function runRendererBackpressureRevisitScenario<
   backgroundPaneCount: number
   deps: RevisitPressureDeps<TMeasurement, TDebug, TScheduler, TMainPressure, TAckGate>
   maxMedianKeyLatencyMs: number
-  maxRendererSchedulerQueuedChars: number
   maxRevisitLatencyMs: number
   maxTimerDriftMs: number
   maxWorstKeyLatencyMs: number
@@ -186,7 +185,6 @@ export async function runRendererBackpressureRevisitScenario<
       ackGate,
       mainRendererPressureTargetChars,
       maxMedianKeyLatencyMs,
-      maxRendererSchedulerQueuedChars,
       maxTimerDriftMs,
       maxWorstKeyLatencyMs,
       measurement,
@@ -218,6 +216,7 @@ export async function runRendererBackpressureRevisitScenario<
     await deps.focusPane(orcaPage, loadPanes[0]?.paneKey ?? revisitPane.paneKey)
     const pressureDrainLatencyMs = await waitForMarkerLatency(orcaPage, pressureDoneMarker, 20_000)
     const finalScheduler = await deps.readTerminalOutputSchedulerDebug(orcaPage)
+    const finalMainPressure = await deps.readMainPtyPressureDebug(orcaPage)
     testInfo.annotations.push({
       type: 'opencode-main-pressure-worktree-revisit-drain',
       description: `panes=${panes.length + 1} drain=${pressureDrainLatencyMs.toFixed(
@@ -227,9 +226,7 @@ export async function runRendererBackpressureRevisitScenario<
       }`
     })
     expect(finalScheduler?.droppedBacklogCount ?? Number.POSITIVE_INFINITY).toBe(0)
-    expect(finalScheduler?.peakQueuedChars ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-      maxRendererSchedulerQueuedChars
-    )
+    expectRendererDeliveryWithinWindow(finalScheduler, finalMainPressure)
   } finally {
     await deps.releaseTerminalAckGate(orcaPage)
     await sendToTerminal(orcaPage, typingPtyId, '\x03').catch(() => undefined)
@@ -283,7 +280,6 @@ function expectPressureStayedBounded<TMeasurement extends RevisitPressureMeasure
   ackGate,
   mainRendererPressureTargetChars,
   maxMedianKeyLatencyMs,
-  maxRendererSchedulerQueuedChars,
   maxTimerDriftMs,
   maxWorstKeyLatencyMs,
   measurement,
@@ -294,7 +290,6 @@ function expectPressureStayedBounded<TMeasurement extends RevisitPressureMeasure
   ackGate: RevisitPressureAckGate | null
   mainRendererPressureTargetChars: number
   maxMedianKeyLatencyMs: number
-  maxRendererSchedulerQueuedChars: number
   maxTimerDriftMs: number
   maxWorstKeyLatencyMs: number
   measurement: TMeasurement
@@ -309,9 +304,7 @@ function expectPressureStayedBounded<TMeasurement extends RevisitPressureMeasure
   )
   expect(ackGate?.heldAckChars ?? 0).toBeGreaterThan(0)
   expect(scheduler?.droppedBacklogCount ?? Number.POSITIVE_INFINITY).toBe(0)
-  expect(scheduler?.peakQueuedChars ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-    maxRendererSchedulerQueuedChars
-  )
+  expectRendererDeliveryWithinWindow(scheduler, duringPressure)
   expect(measurement.medianLatencyMs).toBeLessThan(maxMedianKeyLatencyMs)
   expect(measurement.worstLatencyMs).toBeLessThan(maxWorstKeyLatencyMs)
   expect(measurement.maxTimerDriftMs).toBeLessThan(maxTimerDriftMs)
