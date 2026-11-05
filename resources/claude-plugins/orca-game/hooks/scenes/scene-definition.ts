@@ -92,7 +92,7 @@ export const advisorGestures = (poses: {
   }
 }
 
-/** A roster character in the phase costumes, under its own palette and accessory. */
+/** A roster character in one phase costume, under its own palette and accessory. */
 export const sceneCharacter = (
   name: LocalizedName,
   colors: Readonly<Record<string, number>>,

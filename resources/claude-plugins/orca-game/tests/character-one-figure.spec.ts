@@ -33,6 +33,15 @@ describe('one member, one figure', () => {
     expect(new Set(NAMES.map((name) => characterColorOf(PLAIN, name))).size).toBeGreaterThan(7)
   })
 
+  it('colors a white-bodied member by what its palette changed, not by its white', () => {
+    const white = { ...BARE.costumes.working, rows: ['WWRR'], colors: { W: 0xfcfcfc, R: 0xd82800 } }
+    const costumes = Object.fromEntries(PHASES.map((phase) => [phase, white]))
+    const scene = { ...BARE, costumes, roster: NAMES } as SceneDefinition
+    const colors = NAMES.map((name) => characterColorOf(scene, name))
+    expect(colors).not.toContain(0xfcfcfc)
+    expect(new Set(colors).size).toBe(8)
+  })
+
   it('gives a scene as a host receives it the same figures as the lead draws', () => {
     const carried = sceneDefinitionOf(JSON.parse(JSON.stringify(PLAIN)), 'file:a.json')
     expect(carried).toBeDefined()

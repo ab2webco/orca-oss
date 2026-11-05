@@ -578,12 +578,14 @@ Each member `game launch`/`game wave` starts is named after the first roster nam
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead
 pane's `ORCA_GAME_LOCALE`. The name goes before the ticket (`Merlin · CIN-12 Cartelera`), so it
 reaches the tab title, `game fleet`, the HUD and the member card. It is freed when the member is
-released, and a member gets its ticket alone once every name is taken or the scene has none
-([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
+released, and a launch that fails gives it back at once: a refused start, a host that reports the
+start failed, or a saved or remote record left `failed` holds no name. A numbered name (`Merlin 2`)
+appears only once the whole roster is busy; a member gets its ticket alone when the scene has no
+names ([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
 The project Settings' **Member names** takes plain names separated by commas. A member on a paired
 host (`game launch --on`) takes its name from the same pool: the lead's Orca picks it and keeps it
-in the home task title, and the names of every unreleased remote member in its Run DB count as held,
-so a local and a remote member never share one.
+in the home task title. The home Run DB records no project, so the names of its unreleased remote
+members hold only while another name is free: they give way before a launch numbers a name.
 
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
@@ -666,16 +668,19 @@ The lead's verbs, run from the lead's terminal
 matches …` (ORCA-866).
 - `orca game push [--dry-run]` — sends `pushPrompt` to idle members; one waiting on a question or
   dialog is reported for the person or the lead, and working ones are left alone.
-- `orca game member <ticket|handle>` — one member in one read, bounded to fit a lead's turn
+- `orca game member <ticket|handle|character>` — one member in one read, bounded to fit a lead's turn
   ([`orchestrator-game-member-report.ts`](../../src/shared/orchestrator-game-member-report.ts)).
   **Now**: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines
   without escape codes. **Since launch**: every dispatch of its task (retries included), the last 10
   messages between it and the lead (questions, answers, `worker_done` bodies, 600 characters each),
   its last 10 commits since the base, PR, CI and ticket status. A part Orca cannot read this time is
   listed under `notes` and the rest still prints. The lead's rules have it read this before telling
-  the person anything about a member.
-- `orca game history [--ticket <id>] [--since <date>]` — the project's members already freed, newest
-  first: ticket, repo, branch, agent, account, launch and end time, outcome (`merged`, `qa`,
+  the person anything about a member. A character name reads that character: its member, if one runs,
+  plus what the project kept for it (account, host, tickets, PRs, outcomes, recent tasks), which
+  survives restarts and a new lead. With no member running it prints only what was kept.
+- `orca game history [--ticket <id>] [--character <name>] [--since <date>]` — the project's members
+  already freed, newest first: ticket, repo, branch, character, agent, account, host, launch and end
+  time, outcome (`merged`, `qa`,
   `stopped`, `failed`, `limited`), PR and last report. `game sweep --close` and `game stop` write a
   member's record before freeing it; if the host cannot take it (an Orca without history), the
   member is freed anyway and the result says `history not recorded: …`. The records live on the Orca
@@ -1560,8 +1565,10 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
 
 ## Characters: a look per roster name
 
-A scene's `roster` entry is a plain name, drawn in the phase costumes, or an object that gives that
-name a look of its own, so members in the same phase are told apart
+A member is one figure: the same sprite on the band, in the Panel and at the finale, in every phase,
+so a phase shows through its label, prop and background instead of a change of costume. A scene's
+`roster` entry is a plain name, whose look is derived from the name, or an object that authors that
+name's look
 ([`orchestrator-game-scene-characters.ts`](../../src/shared/orchestrator-game-scene-characters.ts),
 [`character-look.ts`](../../resources/claude-plugins/orca-game/hooks/character-look.ts)):
 
@@ -1573,18 +1580,25 @@ name a look of its own, so members in the same phase are told apart
 ]
 ```
 
-- **`variant`.** `colors` (glyph → color) is laid over every phase costume's `colors`; a glyph no
-  costume draws is refused. `accessory` is one of `crown`, `halo`, `horns`, `antenna`, `bow`,
+- **A plain name** takes one of the scene's phase costumes as its body, a hue for its main colors and
+  usually an accessory (never the lead's crown), derived from the name and the roster
+  ([`character-derived-look.ts`](../../resources/claude-plugins/orca-game/hooks/character-derived-look.ts)).
+  Nothing is stored, so a scene with a plain roster needs no change and every pane on every host that
+  draws the same scene draws the same figure. A name outside the roster, a numbered one (`Merlin 2`) or
+  a ticket with no name gets a look the same way. Only a pane with no name wears the phase costume.
+- **`variant`.** `colors` (glyph → color) is laid over one body, the first costume from the name's
+  place that draws those glyphs; a glyph no costume draws is refused. `accessory` is one of `crown`, `halo`, `horns`, `antenna`, `bow`,
   `feather`, `cape`, drawn only on empty cells around the head, in `accessoryColor` or its own
   default. A variant needs `colors` or an `accessory`; `accessoryColor` needs an accessory.
-- **`costumes`.** A costume for every phase, validated like the scene's own.
+- **`costumes`.** A costume for every phase, validated like the scene's own. This is the one look
+  that may change by phase, since the author drew the same character in each.
 - **Validation.** An entry with both looks, or any bad look, drops the whole roster with a
   `roster.N…` warning (names included) and the scene still draws; `orca game scene validate`
   lists every issue.
 - **Who is whom.** The mod finds a member's character by the name before the `·` of its display name,
-  in any language, case-insensitively and without a ` 2` suffix. A member with no character, or any
-  member of a scene without characters, draws exactly as before. The band, the Panel tiles and the
-  hd party draw the character; the flat view puts a `■` in its color before the name.
+  in any language, case-insensitively and without a ` 2` suffix. The hero is drawn the same way: a
+  member's pane by the name on its worktree, a lead's by its title. The band, the Panel tiles and the
+  hd party draw the figure; the flat view puts a `■` in its color before the name.
 - **On the wire.** `roster` stays names only, so `game.memberName.reserve` and an older mod see what
   they always did. The looks travel in the definition's optional `characters` field
   (`[{ name, variant?, costumes? }]`), which an older mod ignores. An Orca older than this drops a

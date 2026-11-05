@@ -11,9 +11,11 @@ import {
   startGameBand
 } from './helpers/orchestrator-game-band'
 import { parseOrchestratorGameScene } from '../../src/shared/orchestrator-game-scene'
+import { characterColorOf } from '../../resources/claude-plugins/orca-game/hooks/character-look'
+import { sceneDefinitionOf } from '../../resources/claude-plugins/orca-game/hooks/scenes/scene-shape'
 
-// Four members in one phase drawn by the orca-game mod as four roster characters: one plain name in
-// the phase costume, two variants and one with costumes of its own, on the band and the Panel.
+// Four members drawn by the orca-game mod as four roster characters on the band and the Panel: one
+// plain name, two variants and one with costumes of its own. Each stays one figure in every phase.
 const WIDTHS = [1440, 768, 390, 320]
 const SCENE_ID = 'file:.orca/scenes/characters.json'
 const MERLIN = 0x5f8fd7
@@ -253,7 +255,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
         .toContain('Elaine')
-      // Before: the same names with no looks of their own wear the phase costume alike.
+      // Before: the same names with no authored look wear a derived one, not the authored colors.
       await capture(`before-band-${theme}-1440.png`)
       expect(await charactersPainted(orcaPage)).toEqual([])
       await band.setState(gameState(definition))
@@ -295,6 +297,90 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
+// Why env: a project's real scene may name third-party characters, so it never enters this repo.
+const LIVE_SCENE = process.env.ORCA_E2E_SCENE_FILE
+
+async function oneFigureScene(): Promise<{ definition: Record<string, unknown>; names: string[] }> {
+  if (LIVE_SCENE) {
+    const definition = JSON.parse(await readFile(LIVE_SCENE, 'utf8'))
+    const roster = definition.roster as (string | { en: string })[]
+    const names = roster.map((one) => (typeof one === 'string' ? one : one.en))
+    return { definition, names: names.slice(0, TICKETS.length) }
+  }
+  const { characters: _characters, ...plain } = await sceneDefinition()
+  const names = ['Ada', 'Bo', 'Cy', 'Dee']
+  return { definition: { ...plain, roster: names }, names }
+}
+
+const PHASE_TOOLS = ['Read', 'Edit', 'Bash', 'Write'] as const
+
+/** The roster at work, each in a different phase; `turn` moves everyone one phase on. */
+const inPhases = (definition: unknown, names: string[], turn: number) => {
+  const state = gameState(definition, names)
+  return {
+    ...state,
+    agents: state.agents.map((agent, i) =>
+      agent.isLeader
+        ? agent
+        : { ...agent, toolName: PHASE_TOOLS[(i + turn) % PHASE_TOOLS.length] ?? 'Edit' }
+    )
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`plain roster names stay one figure each as their phases change (${theme})`, async ({
+    electronApp,
+    orcaPage,
+    testRepoPath
+  }, testInfo) => {
+    test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+    test.setTimeout(300_000)
+    await waitForSessionReady(orcaPage)
+    await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
+    const { definition, names } = await oneFigureScene()
+    const scene = sceneDefinitionOf(definition, SCENE_ID)
+    expect(scene, 'the scene did not parse').toBeDefined()
+    const own = Object.fromEntries(names.map((name) => [name, characterColorOf(scene!, name)!]))
+    expect(new Set(Object.values(own)).size).toBe(names.length)
+    const band = await startGameBand(orcaPage, testRepoPath, {
+      state: inPhases(definition, names, 0),
+      theme,
+      locale: 'en',
+      scene: SCENE_ID
+    })
+    const capture: Capture = async (name) => {
+      await orcaPage.waitForTimeout(1_500)
+      await orcaPage.screenshot({ path: testInfo.outputPath(name), animations: 'disabled' })
+    }
+    try {
+      await expect
+        .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'the band never drew' })
+        .toContain(names[3]!)
+      const allPainted = () =>
+        expect
+          .poll(() => charactersPainted(orcaPage, own), { timeout: 20_000 })
+          .toEqual(Object.keys(own))
+      await allPainted()
+      await capture(`one-figure-band-${theme}-phase-1.png`)
+      await band.setState(inPhases(definition, names, 1))
+      await clickTerminalText(orcaPage, 'Refresh')
+      await allPainted()
+      await capture(`one-figure-band-${theme}-phase-2.png`)
+      await clickTerminalText(orcaPage, 'Panel')
+      await expect
+        .poll(() => screenOf(orcaPage), { timeout: 20_000, message: 'the Panel never opened' })
+        .toContain('LUM-16')
+      await allPainted()
+      await capture(`one-figure-panel-${theme}-phase-2.png`)
+      await band.setState(inPhases(definition, names, 2))
+      await allPainted()
+      await capture(`one-figure-panel-${theme}-phase-3.png`)
+    } finally {
+      await rm(band.root, { recursive: true, force: true })
+    }
+  })
+}
+
 for (const { id, plain, colors, widths } of BUILT_INS) {
   for (const theme of ['light', 'dark'] as const) {
     test(`the built-in ${id} draws four of its roster names as four characters (${theme})`, async ({
@@ -307,7 +393,7 @@ for (const { id, plain, colors, widths } of BUILT_INS) {
       await waitForSessionReady(orcaPage)
       await setWindowWidth(electronApp, orcaPage, WIDTHS[0]!)
       const roster = [plain, ...Object.keys(colors)]
-      // Before: names outside the scene's roster all wear the phase costume.
+      // Before: names outside the scene's roster wear derived looks, not these characters' colors.
       const band = await startGameBand(orcaPage, testRepoPath, {
         state: gameState(undefined, ['Rowan', 'Quill', 'Wren', 'Sable'], id),
         theme,

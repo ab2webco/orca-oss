@@ -1,6 +1,7 @@
 ---
-sourceHash: 577632322a5fc81a
+sourceHash: 8a761ec7940a6e2b
 ---
+
 # El juego orquestador de Agent Teams
 
 Los panes de Claude Agent Teams (`orca claude-teams`) cargan un plugin de Claude Code que convierte
@@ -98,11 +99,11 @@ El shell del pane interpreta la línea de lanzamiento, así que `--plugin-dir` s
 ([`orchestrator-game-pane-shell.ts`](../../../src/main/claude/orchestrator-game-pane-shell.ts) elige
 el shell que abrirá el spawn del pty, a partir de los mismos ajustes y del runtime del proyecto):
 
-| Shell del pane                                              | Entrecomillado de la carpeta del plugin                                                                                 |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| PowerShell 5.1 y 7 (el predeterminado)                      | un literal `'…'`, con `'` duplicado                                                                                     |
-| cmd.exe                                                     | `"…"`, saliendo de las comillas en cada `%` como `"^%"`; `& ^ ( ) !` quedan dentro de ellas                             |
-| Git Bash / MSYS                                             | una palabra POSIX `'…'`, conservando las barras invertidas                                                              |
+| Shell del pane                                                    | Entrecomillado de la carpeta del plugin                                                                                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| PowerShell 5.1 y 7 (el predeterminado)                            | un literal `'…'`, con `'` duplicado                                                                                            |
+| cmd.exe                                                           | `"…"`, saliendo de las comillas en cada `%` como `"^%"`; `& ^ ( ) !` quedan dentro de ellas                                    |
+| Git Bash / MSYS                                                   | una palabra POSIX `'…'`, conservando las barras invertidas                                                                     |
 | WSL (`wsl.exe`, un worktree `\\wsl$`, un runtime de proyecto WSL) | sin juego: el Claude de Linux de la distro no puede cargar una ruta de plugin de Windows, y `ORCA_GAME_*` no cruza a la distro |
 
 Un pane de cmd con la expansión retardada activada en el registro seguiría leyendo `!…!` en la ruta;
@@ -598,14 +599,16 @@ Cada miembro que inicia `game launch`/`game wave` recibe el primer nombre del ro
 ningún miembro vivo: `memberNames`, o si no el `roster` de la escena activa (cada escena incluida trae
 uno), en el `ORCA_GAME_LOCALE` del pane del líder. El nombre va antes del ticket
 (`Merlin · CIN-12 Cartelera`), así que llega al título de la pestaña, a `game fleet`, al HUD y a la
-tarjeta del miembro. Se libera cuando el miembro se libera, y un miembro recibe solo su ticket una vez
-que todos los nombres están tomados o la escena no tiene ninguno
+tarjeta del miembro. Se libera cuando el miembro se libera, y un lanzamiento que falla lo devuelve de
+inmediato: un inicio rechazado, un host que informa que el inicio falló, o un registro guardado o remoto
+que quedó en `failed` no retiene ningún nombre. Un nombre numerado (`Merlin 2`) aparece solo cuando todo
+el roster está ocupado; un miembro recibe solo su ticket cuando la escena no tiene nombres
 ([`orchestrator-game-member-names.ts`](../../../src/shared/orchestrator-game-member-names.ts)).
 **Member names**, en los Settings del proyecto, toma nombres simples separados por comas. Un miembro
 en un host emparejado (`game launch --on`) toma su nombre del mismo conjunto: el Orca del líder lo
-elige y lo guarda en el título de la tarea en casa, y los nombres de todos los miembros remotos no
-liberados de su Run DB cuentan como tomados, así que un miembro local y uno remoto nunca comparten
-nombre.
+elige y lo guarda en el título de la tarea en casa. La Run DB de casa no registra el proyecto, así que
+los nombres de sus miembros remotos no liberados solo retienen mientras quede otro nombre libre: ceden
+antes de que un lanzamiento numere un nombre.
 
 Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):
@@ -695,7 +698,7 @@ Los verbos del líder, ejecutados desde la terminal del líder
 matches …` (ORCA-866).
 - `orca game push [--dry-run]` — envía `pushPrompt` a los miembros inactivos; uno que espera una
   pregunta o un diálogo se reporta para la persona o el líder, y los que trabajan se dejan en paz.
-- `orca game member <ticket|handle>` — un miembro en una sola lectura, acotada para caber en un turno
+- `orca game member <ticket|handle|character>` — un miembro en una sola lectura, acotada para caber en un turno
   del líder ([`orchestrator-game-member-report.ts`](../../../src/shared/orchestrator-game-member-report.ts)).
   **Now**: estado, fase, última herramienta, actividad vinculada, un límite de uso y sus últimas 20
   líneas de terminal sin códigos de escape. **Since launch**: cada dispatch de su tarea (reintentos
@@ -703,9 +706,12 @@ matches …` (ORCA-866).
   `worker_done`, 600 caracteres cada uno), sus últimos 10 commits desde la base, PR, CI y estado del
   ticket. Una parte que Orca no puede leer esta vez se lista en `notes` y el resto se imprime igual.
   Las reglas del líder le piden leer esto antes de decirle cualquier cosa a la persona sobre un
-  miembro.
-- `orca game history [--ticket <id>] [--since <date>]` — los miembros del proyecto ya liberados, del
-  más reciente al más antiguo: ticket, repo, rama, agente, cuenta, hora de lanzamiento y de fin,
+  miembro. Un nombre de personaje lee ese personaje: su miembro, si hay uno corriendo, más lo que el
+  proyecto guardó de él (cuenta, host, tickets, PRs, resultados, tareas recientes), que sobrevive a los
+  reinicios y a un líder nuevo. Sin miembro corriendo imprime solo lo guardado.
+- `orca game history [--ticket <id>] [--character <name>] [--since <date>]` — los miembros del proyecto
+  ya liberados, del más reciente al más antiguo: ticket, repo, rama, personaje, agente, cuenta, host, hora
+  de lanzamiento y de fin,
   resultado (`merged`, `qa`, `stopped`, `failed`, `limited`), PR y último reporte.
   `game sweep --close` y `game stop` escriben el registro de un miembro antes de liberarlo; si el host
   no puede recibirlo (un Orca sin historial), el miembro se libera igual y el resultado dice
@@ -796,7 +802,7 @@ matches …` (ORCA-866).
   como encontrado (un agente del repo de este proyecto que ningún líder lista, ORCA-943), en esta
   máquina o en un host emparejado. Ejecuta una tarea nueva en la propia terminal del agente con
   `worker-start --worktree id:<wt> --terminal
-  <handle>`, más `--on <host>` para un host emparejado, así que el correo del líder llega al agente y
+<handle>`, más `--on <host>` para un host emparejado, así que el correo del líder llega al agente y
   su estado, preguntas y worker_done llegan al líder actual. Esa ruta es una que todo host emparejado
   ya sirve, así que no hay cambio en el wire. La adopción se rechaza mientras el agente está a mitad
   de turno, para que el brief de adjunción nunca caiga en un turno en curso (pasa `--force` para
@@ -941,7 +947,7 @@ miembros del líder se guardan mientras corren, así que el equipo retoma donde 
     de los dos minutos siguientes a la primera (el tiempo que tarda la CLI en vincular el nuevo
     dispatch) se rechaza con `already being
 resumed`, así que nunca se reabren dos agentes en un mismo worktree. Cada host de Orca guarda esta
-  reserva en memoria.
+    reserva en memoria.
 - **El brief del líder** (ORCA-746). Cuando se reanuda o se compacta la conversación propia de un
   líder, el mod orca-game le entrega `game fleet` como contexto, miembros en pausa incluidos, para que
   responda a partir del registro del host y no de un resumen; tras una compactación también le indica
@@ -1056,14 +1062,14 @@ Un líder en la rama base no tiene PR ni ticket propios, así que su XP viene de
 refresco compara cada miembro de `game state` que corre en su propio worktree con el refresco
 anterior, emparejados por el id de ese worktree:
 
-| Evento                                                     | Clave de recompensa | XP  |
-| ---------------------------------------------------------- | ------------------- | --- |
-| aparece un miembro (lanzado, o tomó un ticket)             | `member-claimed`    | 10  |
-| el CI de su PR se pone verde                               | `ci-green`          | 20  |
-| su ticket pasa a un grupo de revisión (QA, Review)         | `work-item-review`  | 50  |
-| su ticket pasa a hecho                                     | `work-item-done`    | 70  |
-| su PR tiene merge                                          | `review-merged`     | 100 |
-| su PR con merge pasa a perfecto                            | `perfect-merge`     | 100 |
+| Evento                                             | Clave de recompensa | XP  |
+| -------------------------------------------------- | ------------------- | --- |
+| aparece un miembro (lanzado, o tomó un ticket)     | `member-claimed`    | 10  |
+| el CI de su PR se pone verde                       | `ci-green`          | 20  |
+| su ticket pasa a un grupo de revisión (QA, Review) | `work-item-review`  | 50  |
+| su ticket pasa a hecho                             | `work-item-done`    | 70  |
+| su PR tiene merge                                  | `review-merged`     | 100 |
+| su PR con merge pasa a perfecto                    | `perfect-merge`     | 100 |
 
 La XP es la de por defecto; un proyecto la cambia con `rewardWeights` (más abajo).
 
@@ -1099,14 +1105,14 @@ del hecho, así que un reinicio, un segundo sondeo u otro pane que ve el mismo c
 segunda fila
 ([`rewards.ts`](../../../resources/claude-plugins/orca-game/hooks/rewards.ts)).
 
-| Clave de recompensa | Se gana cuando                                         | Fuente del hecho                                       | Id del hecho                              | Por defecto |
-| ------------------- | ------------------------------------------------------ | ------------------------------------------------------ | ----------------------------------------- | ----------- |
-| `review-merged`     | la revisión del worktree pasa a `merged`               | `review.state` (proveedor de revisión alojado)         | `review-merged:<provider>#<n>@<worktree>` | 100         |
-| `ci-green`          | el CI de la revisión pasa a `success`                  | `review.ci` (checks agregados o pipeline)              | `ci-green:<provider>#<n>@<worktree>`      | 20          |
-| `work-item-review`  | el work item vinculado pasa a un grupo de revisión     | `workItem.statusGroup` (tracker)                       | `work-item-review:<provider>:<id>`        | 50          |
-| `work-item-done`    | el work item vinculado pasa a hecho                    | `workItem.statusGroup` (tracker)                       | `work-item-done:<provider>:<id>`          | 70          |
-| `member-claimed`    | aparece un miembro de un líder en su propio worktree   | `agents` (el id del worktree del miembro)              | `member-claimed:<worktree>`               | 10          |
-| `perfect-merge`     | la revisión con merge pasa a perfecta                  | `review.perfectMerge` (hechos de revisión de GitHub)   | `perfect-merge:<provider>#<n>@<worktree>` | 100         |
+| Clave de recompensa | Se gana cuando                                       | Fuente del hecho                                     | Id del hecho                              | Por defecto |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------- | ----------- |
+| `review-merged`     | la revisión del worktree pasa a `merged`             | `review.state` (proveedor de revisión alojado)       | `review-merged:<provider>#<n>@<worktree>` | 100         |
+| `ci-green`          | el CI de la revisión pasa a `success`                | `review.ci` (checks agregados o pipeline)            | `ci-green:<provider>#<n>@<worktree>`      | 20          |
+| `work-item-review`  | el work item vinculado pasa a un grupo de revisión   | `workItem.statusGroup` (tracker)                     | `work-item-review:<provider>:<id>`        | 50          |
+| `work-item-done`    | el work item vinculado pasa a hecho                  | `workItem.statusGroup` (tracker)                     | `work-item-done:<provider>:<id>`          | 70          |
+| `member-claimed`    | aparece un miembro de un líder en su propio worktree | `agents` (el id del worktree del miembro)            | `member-claimed:<worktree>`               | 10          |
+| `perfect-merge`     | la revisión con merge pasa a perfecta                | `review.perfectMerge` (hechos de revisión de GitHub) | `perfect-merge:<provider>#<n>@<worktree>` | 100         |
 
 `rewardWeights` fija la XP de una recompensa en un número entero de 0 a 1000; `0` apaga esa
 recompensa (sin fila, sin toast) y una recompensa que se omite mantiene su valor por defecto. Un valor
@@ -1318,12 +1324,12 @@ listados para Settings en `ORCHESTRATOR_GAME_BUILT_IN_SCENES`
 ([`orchestrator-game-config.ts`](../../../src/shared/orchestrator-game-config.ts)). Cada uno viste las
 seis fases (working · docs · build · verify · PR · handoff) y firma tus mensajes con un narrador.
 
-| Id          | Escena       | Mundo                                                     | Grupo por fase, luego narrador                                                      | Con CI en rojo                | Final del merge |
-| ----------- | ------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- | --------------- |
-| `quest`     | Quest        | Montañas y colinas, sol o cielo nocturno                  | Squire · Sage · Blacksmith · Knight · Herald · King; Storyteller                    | el miembro destella           | —               |
-| `vigilante` | Night Watch  | Horizonte nocturno, azoteas, una señal en el cielo        | Night Watch · Detective · Gadgeteer · Mentor · Rooftop Run · Commissioner; Narrator | un bribón enmascarado         | `◆ CASE CLOSED` |
-| `jrpg`      | Crystal Saga | Agujas de cristal bajo el día, el atardecer, tormenta, noche | Mercenary · Mage · Thief · Healer · Lancer · Hero; Chronicler                    | un espadachín rival           | `★ VICTORY ★`   |
-| `tamer`     | Beast Tamer  | Praderas de flores                                        | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | un bicho glitch salvaje       | `◓ CAUGHT!`     |
+| Id          | Escena       | Mundo                                                        | Grupo por fase, luego narrador                                                      | Con CI en rojo          | Final del merge |
+| ----------- | ------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------- | --------------- |
+| `quest`     | Quest        | Montañas y colinas, sol o cielo nocturno                     | Squire · Sage · Blacksmith · Knight · Herald · King; Storyteller                    | el miembro destella     | —               |
+| `vigilante` | Night Watch  | Horizonte nocturno, azoteas, una señal en el cielo           | Night Watch · Detective · Gadgeteer · Mentor · Rooftop Run · Commissioner; Narrator | un bribón enmascarado   | `◆ CASE CLOSED` |
+| `jrpg`      | Crystal Saga | Agujas de cristal bajo el día, el atardecer, tormenta, noche | Mercenary · Mage · Thief · Healer · Lancer · Hero; Chronicler                       | un espadachín rival     | `★ VICTORY ★`   |
+| `tamer`     | Beast Tamer  | Praderas de flores                                           | Tamer · Leafling · Emberpup · Voltbit · Aquafin · Starling; Professor               | un bicho glitch salvaje | `◓ CAUGHT!`     |
 
 Quest es el modo quest original de Jucer Orozco; los otros tres son sus juegos de
 koombea/cineco-orchestrator PR #32. Los nombres están traducidos al español; el final es pixel art, en
@@ -1608,20 +1614,20 @@ mismo bloque en el archivo de escena de un proyecto, en la escena de un plugin y
   cortándola; sin Jev, o mientras el HUD está apagado y Jev dibuja su propia banda, el advisor entra para
   la llamada y se va después de su reacción.
 
-| Jev                                                     | Gesto                   | El advisor sostiene                      | Burbuja                        |
-| ------------------------------------------------------- | ----------------------- | ---------------------------------------- | ------------------------------ |
-| subagente `why: lowered`                                | `lowered`               | una flecha hacia abajo                   | su modelo · veredicto de Jev   |
-| subagente `why: raised`                                 | `raised`                | una flecha hacia arriba                  | su modelo · veredicto de Jev   |
-| `chosen`, `same`, `explicit`, `inherited`               | `approved`              | un pulgar arriba y un toque de silbato   | su modelo · veredicto de Jev   |
-| `kept-unsure`, `measuring`                              | `unsure`                | una tarjeta amarilla y una lupa          | su modelo · veredicto de Jev   |
-| un nuevo aviso `block`                                  | `escalated`             | una tarjeta roja y un silbato largo      | el aviso                       |
-| un run de CI `watching`                                 | `ciRunning`             | un cronómetro                            | la línea del run               |
-| un run de CI `success` / `failure`                      | `ciPassed` / `ciFailed` | una bandera verde / roja                 | la línea del run               |
-| cambia el modelo o el esfuerzo de la conversación principal | `approved`          | un pulgar arriba                         | `model·effort`                 |
-| la llamada al advisor de Claude, mientras está abierta  | `consulting`            | una nube de pensamiento llenándose de puntos | `let me think...`          |
-| el resultado de la llamada al advisor                   | `advised`               | una bombilla encendida                   | `here is my advice`            |
-| la compuerta deniega un comando Bash                    | `stopped`               | una señal de stop, empujando             | `jev ·` / `clef ·` comando     |
-| la compuerta permite un comando Bash que juzgó          | `approved`              | un pulgar arriba                         | el comando                     |
+| Jev                                                         | Gesto                   | El advisor sostiene                          | Burbuja                      |
+| ----------------------------------------------------------- | ----------------------- | -------------------------------------------- | ---------------------------- |
+| subagente `why: lowered`                                    | `lowered`               | una flecha hacia abajo                       | su modelo · veredicto de Jev |
+| subagente `why: raised`                                     | `raised`                | una flecha hacia arriba                      | su modelo · veredicto de Jev |
+| `chosen`, `same`, `explicit`, `inherited`                   | `approved`              | un pulgar arriba y un toque de silbato       | su modelo · veredicto de Jev |
+| `kept-unsure`, `measuring`                                  | `unsure`                | una tarjeta amarilla y una lupa              | su modelo · veredicto de Jev |
+| un nuevo aviso `block`                                      | `escalated`             | una tarjeta roja y un silbato largo          | el aviso                     |
+| un run de CI `watching`                                     | `ciRunning`             | un cronómetro                                | la línea del run             |
+| un run de CI `success` / `failure`                          | `ciPassed` / `ciFailed` | una bandera verde / roja                     | la línea del run             |
+| cambia el modelo o el esfuerzo de la conversación principal | `approved`              | un pulgar arriba                             | `model·effort`               |
+| la llamada al advisor de Claude, mientras está abierta      | `consulting`            | una nube de pensamiento llenándose de puntos | `let me think...`            |
+| el resultado de la llamada al advisor                       | `advised`               | una bombilla encendida                       | `here is my advice`          |
+| la compuerta deniega un comando Bash                        | `stopped`               | una señal de stop, empujando                 | `jev ·` / `clef ·` comando   |
+| la compuerta permite un comando Bash que juzgó              | `approved`              | un pulgar arriba                             | el comando                   |
 
 Otros valores de `why` (`kept-pointer`, `teammate`, `no-jev`…) no reproducen nada pero igual llegan al
 Panel. La burbuja conserva solo caracteres de ancho 1, así que una flecha o un texto CJK en las palabras
@@ -1674,8 +1680,10 @@ burbuja es solo el comando.
 
 ## Personajes: un look por nombre del roster
 
-Una entrada del `roster` de una escena es un nombre simple, dibujado con los vestuarios de cada fase, o
-un objeto que le da a ese nombre un look propio, para distinguir a los miembros que están en la misma fase
+Un miembro es una sola figura: el mismo sprite en la banda, en el Panel y en el final, en cada fase, así
+que la fase se ve por su etiqueta, su objeto y el fondo y no por un cambio de vestuario. Una entrada del
+`roster` de una escena es un nombre simple, cuyo look se deriva del nombre, o un objeto que define el look
+de ese nombre
 ([`orchestrator-game-scene-characters.ts`](../../../src/shared/orchestrator-game-scene-characters.ts),
 [`character-look.ts`](../../../resources/claude-plugins/orca-game/hooks/character-look.ts)):
 
@@ -1687,20 +1695,26 @@ un objeto que le da a ese nombre un look propio, para distinguir a los miembros 
 ]
 ```
 
-- **`variant`.** `colors` (glifo → color) se superpone a los `colors` del vestuario de cada fase; un
-  glifo que ningún vestuario dibuja se rechaza. `accessory` es uno de `crown`, `halo`, `horns`,
+- **Un nombre simple** toma uno de los vestuarios de fase de la escena como cuerpo, un tono para sus
+  colores principales y casi siempre un accesorio (nunca la corona del líder), derivados del nombre y del
+  roster ([`character-derived-look.ts`](../../../resources/claude-plugins/orca-game/hooks/character-derived-look.ts)).
+  No se guarda nada, así que una escena con un roster simple no necesita cambios y cada pane en cada host
+  que dibuja la misma escena dibuja la misma figura. Un nombre fuera del roster, uno numerado (`Merlin 2`)
+  o un ticket sin nombre recibe un look igual. Solo un pane sin nombre lleva el vestuario de la fase.
+- **`variant`.** `colors` (glifo → color) se superpone a un solo cuerpo, el primer vestuario desde el lugar
+  del nombre que dibuje esos glifos; un glifo que ningún vestuario dibuja se rechaza. `accessory` es uno de `crown`, `halo`, `horns`,
   `antenna`, `bow`, `feather`, `cape`, dibujado solo en celdas vacías alrededor de la cabeza, en
   `accessoryColor` o en su color predeterminado. Una variante necesita `colors` o un `accessory`;
   `accessoryColor` necesita un accesorio.
-- **`costumes`.** Un vestuario para cada fase, validado como los de la propia escena.
+- **`costumes`.** Un vestuario para cada fase, validado como los de la propia escena. Es el único look
+  que puede cambiar por fase, porque el autor dibujó al mismo personaje en cada una.
 - **Validación.** Una entrada con ambos looks, o cualquier look incorrecto, descarta el roster completo
   con un aviso `roster.N…` (nombres incluidos) y la escena se sigue dibujando; `orca game scene validate`
   lista cada problema.
 - **Quién es quién.** El mod encuentra el personaje de un miembro por el nombre que hay antes del `·` de
-  su nombre visible, en cualquier idioma, sin distinguir mayúsculas y sin un sufijo ` 2`. Un miembro sin
-  personaje, o cualquier miembro de una escena sin personajes, se dibuja exactamente como antes. La banda,
-  las casillas del Panel y el grupo hd dibujan el personaje; la vista plana pone un `■` en su color antes
-  del nombre.
+  su nombre visible, en cualquier idioma, sin distinguir mayúsculas y sin un sufijo ` 2`. El héroe se dibuja
+  igual: el pane de un miembro por el nombre de su worktree, el de un líder por su título. La banda, las
+  casillas del Panel y el grupo hd dibujan la figura; la vista plana pone un `■` en su color antes del nombre.
 - **En el wire.** `roster` sigue siendo solo nombres, así que `game.memberName.reserve` y un mod más
   antiguo ven lo mismo de siempre. Los looks viajan en el campo opcional `characters` de la definición
   (`[{ name, variant?, costumes? }]`), que un mod más antiguo ignora. Un Orca anterior a esto descarta con
@@ -1730,16 +1744,16 @@ del juego, nunca código. El único motor es `runner` (una tecla para saltar), y
 comprueba un archivo con las reglas de `src/shared/orchestrator-game-arcade-file.ts`, lista cada problema
 como `path: message` y sale con 1 mientras quede alguno.
 
-| Clave        | Qué define                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| `engine`     | `runner`                                                                                         |
-| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                        |
-| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                                   |
-| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`                  |
-| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                            |
-| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms       |
-| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`            |
-| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa       |
+| Clave        | Qué define                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| `engine`     | `runner`                                                                                   |
+| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                  |
+| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                             |
+| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`            |
+| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                      |
+| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms |
+| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`      |
+| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa |
 
 - `{ "from": "scene" }` es la decoración del suelo de la escena activa (`plantKind`), así que una escena
   personalizada cambia el estilo del juego sin trabajo extra. Una escena cuyo `plantKind` es `none` no

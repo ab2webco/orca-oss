@@ -200,10 +200,13 @@ export const characterColorOf = (
   scene: SceneDefinition,
   memberName: string
 ): number | undefined => {
-  const variant = characterOf(scene, memberName)?.variant
-  if (variant === undefined) {
-    return mostDrawnColorOf(characterCostumeOf(scene, memberName, 'working'))
+  const character = characterOf(scene, memberName)
+  if (character?.costumes !== undefined) {
+    return mostDrawnColorOf(character.costumes.working)
   }
+  // Why not the most drawn: a body's largest color may be a white the palette leaves alone.
+  const variant =
+    character?.variant ?? derivedVariantOf(scene, lookKeyOf(memberName), PLAIN_ACCESSORIES)
   const accessory = variant.accessory === undefined ? undefined : ACCESSORY_ART[variant.accessory]
   return Object.values(variant.colors ?? {})[0] ?? variant.accessoryColor ?? accessory?.color
 }
