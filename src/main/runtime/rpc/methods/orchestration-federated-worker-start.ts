@@ -12,6 +12,7 @@ import {
 } from './orchestration-worker-launch-preferences'
 import { validateFederatedWorkerStartPlacement } from './orchestration-worker-start-validation'
 import { negotiateFederatedWorkerStart } from './orchestration-federated-worker-capabilities'
+import { homeAccountReadingsOf } from './orchestration-federation-member-account'
 
 export async function startFederatedWorker(args: {
   params: WorkerStartInput
@@ -58,6 +59,9 @@ export async function startFederatedWorker(args: {
   )) as RuntimeStatus
   const negotiation = negotiateFederatedWorkerStart({ status, serverName: server.name, params })
   const { federationProtocolVersion, gameMember, carriesGameScene, memberAccount } = negotiation
+  const accountReadings = negotiation.sharesAccountReadings
+    ? homeAccountReadingsOf(runtime, params.agent)
+    : {}
   // Why never blocking: without the scene the host draws its own, as before.
   const gameScene = carriesGameScene
     ? await runtime.readCallerGameScene(params.from).catch(() => null)
@@ -130,6 +134,7 @@ export async function startFederatedWorker(args: {
         devMode: params.devMode,
         ...gameMember,
         ...memberAccount,
+        ...accountReadings,
         ...(gameScene ? { gameScene } : {})
       },
       (params.timeoutMs ?? 60_000) + 15_000,

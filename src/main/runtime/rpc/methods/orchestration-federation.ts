@@ -19,7 +19,7 @@ import {
   persistFederatedSetupWaitOutcome
 } from './orchestration-federation-setup'
 import { claimFederatedSetupSlot } from './orchestration-federation-setup-admission'
-import { attachAccountOf, accountReceiptOf } from './orchestration-federation-global-login'
+import { attachAccountOfParams, accountReceiptOf } from './orchestration-federation-global-login'
 import { FederationAttachStartParams } from './orchestration-federation-start-schema'
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { holdSlotForSetup } from './orchestration-worker-setup-queue'
@@ -55,16 +55,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
           existingPlacement: 'an exact existing folder workspace'
         })
       }
-      const memberAccount = params.account
-        ? await attachAccountOf({
-            runtime,
-            agent,
-            selector: params.account,
-            allowed: params.allowedAccounts,
-            reusesTerminal: Boolean(params.terminal),
-            dispatchId: params.dispatchId
-          })
-        : null
+      const memberAccount = await attachAccountOfParams({ runtime, agent, params })
       const setupSlot = await claimFederatedSetupSlot({ runtime, params, createsWorktree })
       const gameMember = params.game ? { orchestrationGameMember: true } : {}
 

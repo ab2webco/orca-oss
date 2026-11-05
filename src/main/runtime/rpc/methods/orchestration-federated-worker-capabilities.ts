@@ -10,6 +10,7 @@ import {
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_READINGS_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_PROTOCOL_VERSION,
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
@@ -28,6 +29,8 @@ export type FederatedWorkerNegotiation = {
   carriesGameScene: boolean
   /** The typed selector, sent only to a host that resolves it against its own roster. */
   memberAccount: { account?: string; allowedAccounts?: string[] }
+  /** `auto` on a host that fills its unread accounts from the home's readings (ORCA-1028). */
+  sharesAccountReadings: boolean
   /** The unset policy's `auto` this host cannot honor, so its member keeps the host's global login. */
   keepsHostGlobalLogin: boolean
 }
@@ -127,6 +130,10 @@ export function negotiateFederatedWorkerStart(args: {
       params.remoteAccount && !keepsHostGlobalLogin
         ? { account: params.remoteAccount, ...(allowedAccounts ? { allowedAccounts } : {}) }
         : {},
+    sharesAccountReadings:
+      params.remoteAccount === 'auto' &&
+      !keepsHostGlobalLogin &&
+      capabilities.includes(ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_READINGS_RUNTIME_CAPABILITY),
     keepsHostGlobalLogin
   }
 }

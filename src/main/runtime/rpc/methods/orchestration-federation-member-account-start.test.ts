@@ -411,4 +411,121 @@ describe('remote member accounts across hosts (ORCA-798)', () => {
       })
     })
   })
+
+  // Why: a remote host's cache is often empty for accounts the home reads fine (ORCA-1028).
+  describe('with no usage reading on the host (ORCA-1028)', () => {
+    const READINGS_CAPABILITY = 'orchestration.federation-member-account-readings.v1'
+    const UNREAD = {
+      ...WORKER_ACCOUNTS,
+      rateLimits: {
+        ...WORKER_ACCOUNTS.rateLimits,
+        claude: null,
+        inactiveClaudeAccounts: [
+          {
+            accountId: 'imac-ana',
+            rateLimits: { ...limits(0), status: 'error', session: null, error: 'throttled' }
+          }
+        ]
+      }
+    }
+    const HOME_READS_ANA = {
+      claude: {
+        accounts: [
+          { id: 'home-ana', email: 'ana@koombea.com', authMethod: 'subscription-oauth' },
+          { id: 'home-ops', email: 'OPS@netsat.co', authMethod: 'subscription-oauth' }
+        ],
+        activeAccountId: 'home-ana'
+      },
+      codex: { accounts: [], activeAccountId: null },
+      rateLimits: {
+        claude: limits(12),
+        codex: null,
+        inactiveClaudeAccounts: [{ accountId: 'home-ops', rateLimits: limits(60) }],
+        inactiveCodexAccounts: []
+      }
+    }
+    let refreshes: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue(UNREAD as never)
+      refreshes = vi.spyOn(workerRuntime, 'refreshAccountsForMobile').mockResolvedValue()
+    })
+
+    it('refuses auto instead of launching on an unverified account, after one refresh', async () => {
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'failed', refusal: { code: 'accounts_unusable' } }
+      })
+      expect(JSON.stringify(response)).toContain('unverified')
+      // Why: a failed read caches a quota with no windows, which the old `quota === null` check skipped.
+      expect(refreshes).toHaveBeenCalledTimes(1)
+      expect(workerRuntime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+
+    it("picks from the home's reading of the same email, without a refresh", async () => {
+      vi.spyOn(homeRuntime, 'getAccountsSnapshot').mockReturnValue(HOME_READS_ANA as never)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'ready', account: { provider: 'claude', email: 'ana@koombea.com' } }
+      })
+      expect(attachParams[0]?.accountReadings).toEqual([
+        {
+          provider: 'claude',
+          email: 'ana@koombea.com',
+          session: { usedPercent: 12, resetsAt: NOW + 3_600_000 },
+          weekly: null
+        },
+        {
+          provider: 'claude',
+          email: 'OPS@netsat.co',
+          session: { usedPercent: 60, resetsAt: NOW + 3_600_000 },
+          weekly: null
+        }
+      ])
+      expect(JSON.stringify(attachParams[0])).not.toContain('home-')
+      expect(refreshes).not.toHaveBeenCalled()
+    })
+
+    it("keeps the host's own reading over the home's", async () => {
+      vi.spyOn(homeRuntime, 'getAccountsSnapshot').mockReturnValue({
+        ...HOME_READS_ANA,
+        claude: {
+          accounts: [{ id: 'home-ops', email: 'ops@netsat.co', authMethod: 'subscription-oauth' }],
+          activeAccountId: 'home-ops'
+        }
+      } as never)
+      vi.mocked(workerRuntime.getAccountsSnapshot).mockReturnValue({
+        ...UNREAD,
+        rateLimits: { ...UNREAD.rateLimits, claude: limits(100) }
+      } as never)
+
+      const response = await homeDispatcher.dispatch(
+        claudeStart(createHomeTask().id, { remoteAccount: 'auto' })
+      )
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'failed', refusal: { code: 'accounts_unusable' } }
+      })
+    })
+
+    it('sends no readings to a host that would drop them', async () => {
+      vi.spyOn(homeRuntime, 'getAccountsSnapshot').mockReturnValue(HOME_READS_ANA as never)
+      dropCapabilities(READINGS_CAPABILITY)
+
+      await homeDispatcher.dispatch(claudeStart(createHomeTask().id, { remoteAccount: 'auto' }))
+
+      expect(attachParams[0]).toMatchObject({ account: 'auto' })
+      expect(attachParams[0]).not.toHaveProperty('accountReadings')
+    })
+  })
 })

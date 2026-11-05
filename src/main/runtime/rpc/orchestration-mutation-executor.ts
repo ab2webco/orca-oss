@@ -148,6 +148,8 @@ function replayStableCallerParams(runtime: OrcaRuntimeService, params: unknown):
   }
   const source = params as Record<string, unknown>
   const result = { ...source }
+  // Why: the home's cached usage readings move between retries of the same attach (ORCA-1028).
+  delete result.accountReadings
   for (const property of ['from', 'callerTerminalHandle'] as const) {
     const handle = source[property]
     if (typeof handle !== 'string') {

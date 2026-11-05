@@ -3,11 +3,16 @@ import {
   type AccountListEntry
 } from '../../../../shared/managed-account-list-entries'
 import {
+  gameAccountReadingsOf,
   gameAccountUsagesOf,
-  isAutoPickableAccount
+  isAutoPickableAccount,
+  withSharedGameReadings,
+  type GameAccountReading
 } from '../../../../shared/orchestrator-game-account-usage'
 import {
-  GAME_ACCOUNT_NEAR_LIMIT_PERCENT,
+  GAME_ACCOUNT_NEAR_LIMIT_TEXT,
+  gameUnverifiedPickText,
+  hasNoGameUsageReading,
   pickGameMemberAccount
 } from '../../../../shared/orchestrator-game-account-pick'
 import {
@@ -43,6 +48,8 @@ export function resolveFederatedMemberAccount(args: {
   allowed?: readonly string[]
   /** This host's agents, so `auto` weighs its members and skips an account one stopped on. */
   agents?: Parameters<typeof gameAccountUsagesOf>[0]['agents']
+  /** The home's readings, for accounts this host has none of (ORCA-1028). */
+  readings?: readonly GameAccountReading[]
 }): FederatedMemberAccount {
   const provider = accountProviderOfAgent(args.agent)
   if (provider === null) {
@@ -94,20 +101,35 @@ function autoEntry(
   provider: GameAccountProvider,
   label: string
 ): { id: string; email: string } {
-  const usages = gameAccountUsagesOf({
-    entries: args.entries.filter(isAutoPickableAccount),
-    provider,
-    agents: args.agents ?? [],
-    allowed: args.allowed
-  })
+  const usages = withSharedGameReadings(
+    gameAccountUsagesOf({
+      entries: args.entries.filter(isAutoPickableAccount),
+      provider,
+      agents: args.agents ?? [],
+      allowed: args.allowed
+    }),
+    args.readings
+  )
   const pick = pickGameMemberAccount(usages, args.now)
   if (pick.kind === 'account') {
     return pick.account
   }
+  if (pick.kind === 'unverified') {
+    // Why accounts_unusable: an older home settles only the refusal codes it knows (ORCA-891).
+    throw new OrchestrationError(
+      'accounts_unusable',
+      gameUnverifiedPickText(
+        provider,
+        pick,
+        'on this host',
+        'Sign them in again there or wait for a usage read'
+      )
+    )
+  }
   if (pick.kind === 'limited') {
     throw new OrchestrationError(
       'accounts_limited',
-      `Every ${label} account on this host is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_PERCENT}%+ of its 5h or 7d window)${pick.resetsAt === null ? '' : `; the first is usable again at ${new Date(pick.resetsAt).toISOString()}`}.`,
+      `Every ${label} account on this host is at or near its limit (${GAME_ACCOUNT_NEAR_LIMIT_TEXT})${pick.resetsAt === null ? '' : `; the first is usable again at ${new Date(pick.resetsAt).toISOString()}`}.`,
       { resetsAt: pick.resetsAt }
     )
   }
@@ -117,6 +139,28 @@ function autoEntry(
     'accounts_unusable',
     `No ${label} account${allowed} on this host can take a member (none is there, or each is on WSL, a custom endpoint, or its sign-in failed), and Orca does not fall back to the global login while managed accounts exist or the project lists its own; fix one's sign-in there, or name one \`orca account list\` shows.`
   )
+}
+
+// Why not `quota === null`: a failed read caches a quota with no windows, which picks as unknown too (ORCA-1028).
+function lacksUsageReading(
+  entries: readonly AccountListEntry[],
+  args: {
+    agent: string | undefined
+    allowed?: readonly string[]
+    readings?: readonly GameAccountReading[]
+  }
+): boolean {
+  const provider = accountProviderOfAgent(args.agent)
+  if (provider === null) {
+    return false
+  }
+  const usages = gameAccountUsagesOf({
+    entries: entries.filter(isAutoPickableAccount),
+    provider,
+    agents: [],
+    allowed: args.allowed
+  })
+  return withSharedGameReadings(usages, args.readings).some(hasNoGameUsageReading)
 }
 
 // Why bounded: a usage refresh waits on provider APIs that can stall behind broken auth.
@@ -132,6 +176,7 @@ export async function resolveHostMemberAccount(args: {
   agent: string | undefined
   selector: string
   allowed?: readonly string[]
+  readings?: readonly GameAccountReading[]
   reusesTerminal: boolean
 }): Promise<FederatedMemberAccount> {
   if (args.reusesTerminal) {
@@ -143,7 +188,7 @@ export async function resolveHostMemberAccount(args: {
   await args.runtime.reportEndedClaudeLogins?.()
   let entries = accountListEntriesOf(args.runtime.getAccountsSnapshot())
   // Why one refresh: Orca reads an inactive account's usage lazily, so a cold cache would look unknown.
-  if (args.selector === FEDERATED_AUTO_ACCOUNT && entries.some((entry) => entry.quota === null)) {
+  if (args.selector === FEDERATED_AUTO_ACCOUNT && lacksUsageReading(entries, args)) {
     await Promise.race([
       args.runtime.refreshAccountsForMobile().catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, USAGE_REFRESH_TIMEOUT_MS).unref?.())
@@ -156,9 +201,30 @@ export async function resolveHostMemberAccount(args: {
     selector: args.selector,
     now: Date.now(),
     allowed: args.allowed,
+    readings: args.readings,
     agents:
       args.selector === FEDERATED_AUTO_ACCOUNT
         ? await args.runtime.gameAgentsOnAccounts().catch(() => [])
         : []
   })
+}
+
+/** The home's cached readings a host's `auto` may fill its unread accounts from; never blocks a launch. */
+export function homeAccountReadingsOf(
+  runtime: Pick<OrcaRuntimeService, 'getAccountsSnapshot'>,
+  agent: string | undefined
+): { accountReadings?: GameAccountReading[] } {
+  const provider = accountProviderOfAgent(agent)
+  if (provider === null) {
+    return {}
+  }
+  try {
+    const readings = gameAccountReadingsOf(
+      accountListEntriesOf(runtime.getAccountsSnapshot()),
+      provider
+    )
+    return readings.length > 0 ? { accountReadings: readings } : {}
+  } catch {
+    return {}
+  }
 }

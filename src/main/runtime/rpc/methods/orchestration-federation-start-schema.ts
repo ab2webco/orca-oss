@@ -3,6 +3,17 @@ import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../../../shared/orchestrat
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 import { OptionalWorkerLaunchPreference } from './orchestration-worker-start-schema'
 
+const QuotaWindowParams = z
+  .object({ usedPercent: z.number().finite(), resetsAt: z.number().finite().nullable() })
+  .nullable()
+
+const GameAccountReadingParams = z.object({
+  provider: z.enum(['claude', 'codex']),
+  email: z.string().min(1).max(320),
+  session: QuotaWindowParams,
+  weekly: QuotaWindowParams
+})
+
 export const FederationAttachStartParams = z.object({
   dispatchId: requiredString('Missing Dispatch ID'),
   taskId: requiredString('Missing Task ID'),
@@ -35,7 +46,9 @@ export const FederationAttachStartParams = z.object({
   // Why optional: the home sends it only to a host advertising the member-account capability.
   account: z.string().min(1).max(320).optional(),
   // Why optional: sent with `auto` only to a host advertising the member-account-allowed capability.
-  allowedAccounts: z.array(z.string().min(1).max(320)).min(1).max(100).optional()
+  allowedAccounts: z.array(z.string().min(1).max(320)).min(1).max(100).optional(),
+  // Why optional: sent with `auto` only to a host advertising the member-account-readings capability.
+  accountReadings: z.array(GameAccountReadingParams).max(100).optional()
 })
 
 export type FederationAttachStartInput = z.infer<typeof FederationAttachStartParams>

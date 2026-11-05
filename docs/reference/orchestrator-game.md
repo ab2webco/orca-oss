@@ -930,12 +930,19 @@ of its agent with the most free quota
 ([`orchestrator-game-account-pick.ts`](../../src/shared/orchestrator-game-account-pick.ts)):
 
 - An account's use is its tightest live window, 5h or 7d; a window past its reset counts as empty.
-- At 90% or more of either window it is **near** and skipped, as at 100% (**limited**): a member's
-  turn can burn several points of a 5h window, so a launch past 90% would stop mid-ticket.
+- At 90% or more of the 5h window, or 75% or more of the 7d window, it is **near** and skipped, as
+  at 100% (**limited**): a member's turn can burn several points of a 5h window, and one long member
+  can burn 10 or more points of the 7d window, whose limit locks the account for days (ORCA-1028).
 - Accounts within 5 points of each other tie; the tie goes to the one with fewer of this lead's
   members (including the ones the same `game wave` just launched).
-- An account with no usage reading is **unknown** and ranks after every known-free one; when one is
-  unknown, Orca refreshes usage once (bounded to 20 s) before picking.
+- An account with no usage reading is **unknown**, which is unverified, not free: `auto` never
+  launches on it (ORCA-1028). When one is unknown, Orca refreshes usage once (bounded to 20 s)
+  before picking; when no account then reads free and some are still unknown, the launch is refused
+  by name, and `--account <email>` launches on one anyway.
+- On a paired host, `auto` fills an account the host has no reading of with the home's reading of
+  the same email, since quota belongs to the account, not the host; the host's own reading wins.
+  Only the email and the 5h and 7d windows cross, and only to a host that advertises
+  `orchestration.federation-member-account-readings.v1`.
 - Only accounts on this host, not custom endpoints (they change the model), whose sign-in did not
   fail are picked. An agent without managed accounts launches on its own login.
 - An account one of whose members stopped on a limit (see below) is **limited** until that limit

@@ -56,7 +56,6 @@ describe('orca game launch', () => {
       'worktree.list',
       'game.memberNameReserve',
       'accounts.snapshot',
-      'accounts.list',
       'terminal.show',
       'status.get',
       'orchestration.runCurrent',
@@ -67,12 +66,12 @@ describe('orca game launch', () => {
       'game.memberRecord',
       'game.eventPost'
     ])
-    expect(calls[9]?.[1]).toEqual({
+    expect(calls[8]?.[1]).toEqual({
       spec: withGameMemberCiNote('Implement CIN-12: Cartelera page'),
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
-    expect(calls[11]?.[1]).toEqual(
+    expect(calls[10]?.[1]).toEqual(
       expect.objectContaining({
         task: 'task_1',
         worktree: 'new-child',

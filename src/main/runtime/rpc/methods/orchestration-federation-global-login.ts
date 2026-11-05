@@ -1,6 +1,7 @@
 import type { GameAccountProvider } from '../../../../shared/orchestrator-game-member-agent'
 import { GAME_ACCOUNT_PROVIDER_LABELS } from '../../../../shared/orchestrator-game-member-agent'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { FederationAttachStartInput } from './orchestration-federation-start-schema'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import {
   resolveHostMemberAccount,
@@ -53,6 +54,30 @@ export async function attachAccountOf(
     await claimFederatedGlobalLogin({ ...args, provider: resolved.globalLogin })
   }
   return resolved
+}
+
+/** The member account of an attach, from the home's typed selector; null when it sent none. */
+export async function attachAccountOfParams(args: {
+  runtime: Parameters<typeof attachAccountOf>[0]['runtime']
+  agent: string | undefined
+  params: Pick<
+    FederationAttachStartInput,
+    'account' | 'allowedAccounts' | 'accountReadings' | 'terminal' | 'dispatchId'
+  >
+}): Promise<FederatedMemberAccount | null> {
+  const { params } = args
+  if (!params.account) {
+    return null
+  }
+  return await attachAccountOf({
+    runtime: args.runtime,
+    agent: args.agent,
+    selector: params.account,
+    allowed: params.allowedAccounts,
+    readings: params.accountReadings,
+    reusesTerminal: Boolean(params.terminal),
+    dispatchId: params.dispatchId
+  })
 }
 
 /** What the attach receipt tells the home: the account's email, or that it took the global login. */

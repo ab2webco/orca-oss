@@ -11,7 +11,7 @@ import { defineMethod, type RpcRequest } from './core'
 import { RpcDispatcher } from './dispatcher'
 import { ORCHESTRATION_METHODS } from './methods/orchestration'
 
-const Params = z.object({ subject: z.string() })
+const Params = z.object({ subject: z.string(), accountReadings: z.array(z.unknown()).optional() })
 
 function request(params: {
   rpcId: string
@@ -90,6 +90,24 @@ describe('durable orchestration mutation ledger', () => {
     )
 
     expect(mismatch).toMatchObject({ ok: false, error: { code: 'request_mismatch' } })
+    db.close()
+  })
+
+  // Why: a home's retried attach carries its usage readings as they are then, not as first sent (ORCA-1028).
+  it('replays a retry whose only change is the account readings', async () => {
+    const { db, dispatcher, effect } = createHarness()
+    const withReadings = (rpcId: string, usedPercent: number): RpcRequest => {
+      const base = request({ rpcId, mutationId: 'mutation_1', subject: 'hello' })
+      return {
+        ...base,
+        params: { subject: 'hello', accountReadings: [{ email: 'a@x.co', usedPercent }] }
+      }
+    }
+    await dispatcher.dispatch(withReadings('rpc_1', 10))
+    const retry = await dispatcher.dispatch(withReadings('rpc_2', 30))
+
+    expect(retry).toMatchObject({ ok: true, result: { mutation: { replayed: true } } })
+    expect(effect).toHaveBeenCalledTimes(1)
     db.close()
   })
 

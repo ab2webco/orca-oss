@@ -14,9 +14,21 @@ const stateWith = (lead: Record<string, unknown>) => ({
 })
 
 const ACCOUNTS = {
-  claude: { accounts: [{ id: 'acct_ana', email: 'ana@example.com' }], activeAccountId: null },
+  claude: { accounts: [{ id: 'acct_ana', email: 'ana@example.com' }], activeAccountId: 'acct_ana' },
   codex: { accounts: [], activeAccountId: null },
-  rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
+  // Why a reading: auto refuses an account with none (ORCA-1028).
+  rateLimits: {
+    claude: {
+      status: 'ok',
+      session: { usedPercent: 10, resetsAt: null },
+      weekly: { usedPercent: 20, resetsAt: null },
+      updatedAt: 0,
+      error: null
+    },
+    codex: null,
+    inactiveClaudeAccounts: [],
+    inactiveCodexAccounts: []
+  }
 }
 
 function fakeClient(state: unknown, mcp: unknown) {
