@@ -34,7 +34,6 @@ import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
-import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 import {
   postGameEvents,
   readCallerGameState,
@@ -45,7 +44,7 @@ import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { memberDisplayNameOf, memberNameOf } from '../../shared/orchestrator-game-member-names'
-import { memberNameFor, releaseMemberName } from './orchestrator-game-member-name-reserve'
+import { givingNameBackOnFailure, memberNameFor } from './orchestrator-game-member-name-reserve'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
@@ -126,20 +125,9 @@ export async function launchGameMember(args: GameLaunchArgs): Promise<GameLaunch
     : await memberWorktreeParamsOf({ client, state, ticket, repo })
   const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
   const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
-  const start = { asked: false }
-  try {
-    const launched = await startGameMember(args, where, name, start)
-    if (launched.state === 'failed') {
-      await releaseMemberName(client, ticket)
-    }
-    return launched
-  } catch (error) {
-    // Why not any error: a start the host may have run keeps its name until the hold runs out.
-    if (!start.asked || isLaunchRefusal(error)) {
-      await releaseMemberName(client, ticket)
-    }
-    throw error
-  }
+  return givingNameBackOnFailure(client, ticket, (start) =>
+    startGameMember(args, where, name, start)
+  )
 }
 
 async function startGameMember(

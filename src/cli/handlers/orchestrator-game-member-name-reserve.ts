@@ -1,5 +1,6 @@
 import type { CommandHandler } from '../dispatch'
 import { gameBoardCaller } from './orchestrator-game-board-call'
+import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { memberRosterOf, nextMemberName } from '../../shared/orchestrator-game-member-names'
 
@@ -32,9 +33,27 @@ export async function memberNameFor(
     : nextMemberName(roster, taken, locale)
 }
 
-/** Frees a failed launch's name; an older Orca has no such call, and its hold runs out by itself. */
-export async function releaseMemberName(client: Client, ticket: string): Promise<void> {
-  await client
-    .call('game.memberNameRelease', { ...gameBoardCaller(), ticket })
-    .catch(() => undefined)
+/** Runs a launch; one that failed gives its name back now, not when its hold runs out. */
+export async function givingNameBackOnFailure<T extends { state: string }>(
+  client: Client,
+  ticket: string,
+  launch: (start: { asked: boolean }) => Promise<T>
+): Promise<T> {
+  // Why an older Orca is fine: it has no such call, and its hold runs out by itself.
+  const release = () =>
+    client.call('game.memberNameRelease', { ...gameBoardCaller(), ticket }).catch(() => undefined)
+  const start = { asked: false }
+  try {
+    const launched = await launch(start)
+    if (launched.state === 'failed') {
+      await release()
+    }
+    return launched
+  } catch (error) {
+    // Why not any error: a start the host may have run keeps its name until the hold runs out.
+    if (!start.asked || isLaunchRefusal(error)) {
+      await release()
+    }
+    throw error
+  }
 }

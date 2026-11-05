@@ -152,19 +152,14 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'Now: state, phase, last tool, linked activity, a usage limit, and its last 20 terminal lines without escape codes; text left in a Claude input box is marked unsent (typed or a Claude suggestion) and given as unsentInput.',
       'Since launch: every dispatch of its task, the last 10 messages between it and the lead (questions, answers, worker_done), its last 10 commits since the base, PR, CI and ticket status.',
       'A part Orca cannot read is listed under notes; the rest still prints. Read-only.',
-      'A character name reads that character: its member now, if one runs, and the account, host, tickets, PRs and outcomes kept for it. A character with no member running prints only what was kept.',
-      'A member already freed is in `orca game history`.'
+      'A character name reads its member now, if one runs, and the account, host, tickets, PRs and outcomes kept for it; a member already freed is in `orca game history`.'
     ],
-    examples: [
-      'orca game member CIN-12',
-      'orca game member CIN-12 --json',
-      'orca game member Merlin'
-    ]
+    examples: ['orca game member CIN-12', 'orca game member Merlin --json']
   },
   {
     path: ['game', 'history'],
     summary:
-      "The project's members already freed: ticket, outcome, PR, character, agent, account, host and last report",
+      "The project's freed members: ticket, outcome, PR, character, agent, account, host and report",
     usage: 'orca game history [--ticket <id>] [--character <name>] [--since <date>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'character', 'since'],
     notes: [
@@ -175,7 +170,6 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'orca game history',
       'orca game history --ticket CIN-12 --json',
-      'orca game history --character Merlin',
       'orca game history --since 2026-10-15'
     ]
   },
