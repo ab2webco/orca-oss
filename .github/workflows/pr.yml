@@ -471,10 +471,9 @@ jobs:
       - name: Load every hook and run the hook suites on Python 3.9
         run: |
           python3 -c 'import sys; assert sys.version_info[:2] == (3, 9), sys.version'
-          for hook in .claude/hooks/*.py; do
-            python3 "$hook" </dev/null >/dev/null
-          done
+          python3 config/scripts/check-claude-hooks-load.py
           pnpm exec vitest run --config config/vitest.config.ts \
+            config/scripts/check-claude-hooks-load.test.mjs \
             config/scripts/board-state-guard.test.mjs \
             config/scripts/main-merge-guard.test.mjs \
             config/scripts/oversized-pr-review-guard.test.mjs \
