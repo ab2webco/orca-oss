@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { sendToTerminal } from './helpers/terminal'
+import { expectRendererDeliveryWithinWindow } from './renderer-delivery-window-bound'
 import { writePressureOutputScript } from './artificial-opencode-hidden-pressure-script'
 import {
   annotateScrollMeasurement,
@@ -39,9 +40,6 @@ type MainPressureSchedulerSnapshot = {
   droppedBacklogCount: number
 }
 
-// Why: peak queued chars is noisy at the byte level on CI, but a coarse cap
-// still catches renderer queue growth that dropped-backlog/latency checks miss.
-const MAX_RENDERER_SCHEDULER_QUEUED_CHARS = 5 * 1024 * 1024
 const MAIN_RENDERER_PRESSURE_TARGET_CHARS = 2 * 1024 * 1024
 
 type MainPressureDeps<
@@ -278,9 +276,7 @@ function expectMainPressureAndTyping<TMeasurement extends MainPressureMeasuremen
   )
   expect(ackGate?.heldAckChars ?? 0).toBeGreaterThan(0)
   expect(scheduler?.droppedBacklogCount ?? Number.POSITIVE_INFINITY).toBe(0)
-  expect(scheduler?.peakQueuedChars ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-    MAX_RENDERER_SCHEDULER_QUEUED_CHARS
-  )
+  expectRendererDeliveryWithinWindow(scheduler, mainPressure)
   expect(measurement.medianLatencyMs).toBeLessThan(maxMedianKeyLatencyMs)
   expect(measurement.worstLatencyMs).toBeLessThan(maxWorstKeyLatencyMs)
   expect(measurement.maxTimerDriftMs).toBeLessThan(maxTimerDriftMs)
