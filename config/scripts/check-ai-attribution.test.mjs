@@ -183,6 +183,39 @@ describe('the range the gate judges', () => {
     expect(run('main').status).toBe(0)
   })
 
+  // ORCA-1033: no remote's history is exempt any more, so a merged branch cannot carry credit in.
+  it('judges the commits a merged branch brings in', () => {
+    git('checkout', '--quiet', '-b', 'side', 'main')
+    commit('fix: credited on a side branch', AI_TRAILER)
+    git('checkout', '--quiet', 'feature')
+    git('merge', '--quiet', '--no-ff', '--no-gpg-sign', '-m', 'chore: merge side', 'side')
+
+    const { status, output } = run('main')
+    expect(status).toBe(1)
+    expect(output).toContain('credited on a side branch')
+    git('reset', '--quiet', '--hard', 'HEAD~1')
+    git('branch', '--quiet', '-D', 'side')
+  })
+
+  it('passes a merge whose branch carries no credit', () => {
+    git('checkout', '--quiet', '-b', 'clean-side', 'main')
+    commit('fix: clean side work')
+    git('checkout', '--quiet', 'feature')
+    git(
+      'merge',
+      '--quiet',
+      '--no-ff',
+      '--no-gpg-sign',
+      '-m',
+      'chore: merge clean side',
+      'clean-side'
+    )
+
+    expect(run('main').status).toBe(0)
+    git('reset', '--quiet', '--hard', 'HEAD~1')
+    git('branch', '--quiet', '-D', 'clean-side')
+  })
+
   it('skips instead of failing when the base is missing from the checkout', () => {
     const { status, output } = run('origin/nonexistent')
     expect(status).toBe(0)

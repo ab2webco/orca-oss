@@ -21,3 +21,17 @@ src/main/claude-accounts/service.test.ts # claude-account-service-*.test.ts
 src/main/providers/local-pty-shell-ready.test.ts # local-pty-shell-ready-*.test.ts
 src/main/runtime/rpc/methods/orchestration.test.ts # orchestration-*.test.ts
 src/relay/pty-handler.test.ts # pty-handler-*.test.ts
+
+# ORCA-1033: the lab no longer syncs with or publishes to stablyai/orca, so the code these
+# covered was removed with it.
+config/scripts/adhoc-build-version.test.mjs # adhoc-mac-build.yml version, ran only on stablyai/orca
+config/scripts/daily-build-version.test.mjs # daily-mac-build.yml version, ran only on stablyai/orca
+config/scripts/hourly-build-version.test.mjs # hourly-mac-build.yml version, ran only on stablyai/orca
+config/scripts/package-electron-runtime-contract.test.mjs # Homebrew bump into stablyai/homebrew-orca
+config/scripts/upstream-sync-pr-gate.test.mjs # upstream-sync.yml PR gate
+config/scripts/upstream-sync-pr-gate-workflow.test.mjs # upstream-sync.yml PR gate wiring
+config/scripts/resolve-removed-locale-paths.test.mjs # zh/ja/ko conflicts during an upstream merge
+config/scripts/pr-workflow-upstream-fetch-order.test.mjs # pr.yml fetched upstream for sync bases
+config/scripts/resolve-changed-code-base.test.mjs # widened a sync PR's base to the upstream tip
+config/scripts/git-pull-request-diff-base.test.mjs # sync-base resolver hook; first-parent cases kept
+config/scripts/git-pull-request-diff-base.repo.test.mjs # sync widening; first-parent cases kept
