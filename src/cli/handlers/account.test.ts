@@ -1,7 +1,9 @@
 import { EventEmitter } from 'node:events'
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { delimiter } from 'node:path'
+import { existsSync, mkdtempSync, statSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { delimiter, join, sep } from 'node:path'
 import type * as NodeFs from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -88,6 +90,8 @@ describe('account CLI handlers', () => {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!
   const originalElectronRunAsNode = process.env.ELECTRON_RUN_AS_NODE
   const originalPathAlias = process.env.Path
+  const originalUserDataPath = process.env.ORCA_USER_DATA_PATH
+  let userDataPath = ''
   // Why cleared: `account list` now resolves the caller's own pane, so a test run
   // launched from inside an Orca terminal would otherwise inherit a real handle.
   const originalPaneEnv = {
@@ -130,14 +134,22 @@ describe('account CLI handlers', () => {
     )
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     process.env.ELECTRON_RUN_AS_NODE = '1'
+    userDataPath = mkdtempSync(join(tmpdir(), 'orca-account-test-userdata-'))
+    process.env.ORCA_USER_DATA_PATH = userDataPath
     for (const name of Object.keys(originalPaneEnv)) {
       delete process.env[name]
     }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     Object.defineProperty(process, 'platform', originalPlatform)
     logSpy.mockRestore()
+    await rm(userDataPath, { recursive: true, force: true })
+    if (originalUserDataPath === undefined) {
+      delete process.env.ORCA_USER_DATA_PATH
+    } else {
+      process.env.ORCA_USER_DATA_PATH = originalUserDataPath
+    }
     if (originalElectronRunAsNode === undefined) {
       delete process.env.ELECTRON_RUN_AS_NODE
     } else {
@@ -156,6 +168,35 @@ describe('account CLI handlers', () => {
       }
     }
   })
+
+  it.each([
+    ['claude', 'CLAUDE_CONFIG_DIR', 'accounts.addClaudeFromConfigDir', 'configDir'],
+    ['codex', 'CODEX_HOME', 'accounts.addCodexFromHome', 'sourceHome']
+  ])(
+    'stages the %s login in the runtime userData dir, not the CLI /tmp',
+    async (agent, envName, method, param) => {
+      // Why: under systemd PrivateTmp=true the runtime cannot see the SSH session's /tmp.
+      Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+      let mode = 0
+      spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
+        mode = statSync(options.env[envName]).mode & 0o777
+        return successfulChild()
+      })
+
+      await ACCOUNT_HANDLERS['account add'](context(agent))
+
+      const stagingDir = spawnMock.mock.calls[0]?.[2].env[envName] as string
+      expect(stagingDir.startsWith(join(userDataPath, 'account-add') + sep)).toBe(true)
+      expect(callMock).toHaveBeenCalledWith(
+        method,
+        expect.objectContaining({ [param]: stagingDir })
+      )
+      if (originalPlatform.value !== 'win32') {
+        expect(mode).toBe(0o700)
+      }
+      expect(existsSync(stagingDir)).toBe(false)
+    }
+  )
 
   it('uses Codex device auth and keeps JSON stdout clean', async () => {
     await ACCOUNT_HANDLERS['account add'](context('codex', true))

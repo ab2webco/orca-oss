@@ -1,5 +1,5 @@
 ---
-sourceHash: 26d0c07465130872
+sourceHash: 52080765e02c94fb
 ---
 # Servidor Linux sin interfaz gráfica
 
@@ -799,6 +799,15 @@ directorio de configuración desechable; luego entrega el directorio con la sesi
 iniciada al runtime local y lo borra. El runtime ya debe estar corriendo para ese
 usuario (en primer plano o con la unidad de systemd de arriba); de lo contrario, el
 comando falla antes de iniciar el login, así que nunca inicias sesión en vano.
+
+Ese directorio desechable vive dentro del directorio de datos del propio runtime
+(`~/.config/orca-ide/account-add/` en la build empaquetada), no en `/tmp`, y se
+crea con modo `0700`. Una unidad con `PrivateTmp=true` le da al runtime un `/tmp`
+propio, así que un directorio que la sesión SSH creó en `/tmp` no existe para el
+runtime, y las versiones anteriores fallaban después de un inicio de sesión exitoso
+con `No Claude credentials found in /tmp/orca-account-add-claude-…`. Un login
+que se corta por un crash, y no por Ctrl-C, puede dejar un directorio ahí; contiene
+las credenciales de ese login, así que bórralo.
 
 Ninguno de los dos logins necesita un navegador en el servidor. Claude imprime la
 URL de inicio de sesión y espera el código que muestra la página después de que

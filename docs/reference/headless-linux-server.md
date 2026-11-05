@@ -784,6 +784,15 @@ runtime and deletes it. The runtime must already be running for that user
 (foreground or the systemd unit above); the command fails before starting the
 login otherwise, so you never sign in for nothing.
 
+That throwaway directory lives under the runtime's own data directory
+(`~/.config/orca-ide/account-add/` for the packaged build), not under `/tmp`,
+and is created mode `0700`. A unit with `PrivateTmp=true` gives the runtime a
+`/tmp` of its own, so a directory the SSH session made in `/tmp` does not exist
+for the runtime, and older versions failed after a successful sign-in with `No
+Claude credentials found in /tmp/orca-account-add-claude-…`. A login aborted
+by a crash rather than Ctrl-C can leave a directory there; it holds that
+login's credentials, so delete it.
+
 Neither login needs a browser on the server. Claude prints the sign-in URL and
 waits for the code the page shows after you sign in. Verified from a shell
 with neither `DISPLAY` nor `BROWSER` set, this is the whole first screen:
