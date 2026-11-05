@@ -44,9 +44,10 @@ export async function buildOrchestratorGameState(
       : undefined
   }
   const resolved = resolveOrchestratorGameConfig(layers)
+  const isMember = Boolean(input.callerParentPaneKey) || input.callerRole === 'member'
   const integrations = resolveOrchestratorGameIntegrations(layers)
   // Why not for a member: every member pane polls this, and its band takes the ticket from its own name.
-  const tracker = resolved.config.tracker && input.worktree !== null && !input.callerParentPaneKey
+  const tracker = resolved.config.tracker && input.worktree !== null && !isMember
   const readScenes = input.readScenes
   const {
     readStop,
@@ -58,7 +59,7 @@ export async function buildOrchestratorGameState(
   } = input
   const timezone = desktopGameTimezoneOf(resolved.config.timezone)
   const leadOnly = <T>(read: (() => Promise<T>) | undefined): Promise<T | null> =>
-    read && !input.callerParentPaneKey ? settle(read) : Promise.resolve(null)
+    read && !isMember ? settle(read) : Promise.resolve(null)
   const [
     review,
     plane,
@@ -118,7 +119,7 @@ export async function buildOrchestratorGameState(
     'review.number': gameReview ? String(gameReview.number) : undefined
   }
   const projectLinks = projectGameLinksOf(integrations.links, placeholders)
-  const role = input.callerParentPaneKey ? 'member' : 'lead'
+  const role = isMember ? 'member' : 'lead'
   const placed = await gameLeadOverPairedHostsOf(layers, input, role)
   const actions = gameStateActionsOf({
     role,
@@ -151,7 +152,7 @@ export async function buildOrchestratorGameState(
   const agents = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
-    found: input.callerParentPaneKey ? [] : input.found,
+    found: isMember ? [] : input.found,
     leaderPaneKey: input.leaderPaneKey,
     teamHandles: input.teamHandles,
     terminalHandleOf: input.terminalHandleOf,

@@ -14,6 +14,8 @@ describe('orca game state', () => {
     process.env.ORCA_WORKTREE_ID = 'wt1'
     process.env.ORCA_TERMINAL_HANDLE = 'h1'
     process.env.ORCA_PANE_KEY = 'tab:leaf'
+    // Why: the suite may run inside a member pane, which exports it.
+    delete process.env.ORCA_GAME_ROLE
   })
 
   afterEach(() => {
@@ -41,6 +43,28 @@ describe('orca game state', () => {
       ['game.state', { worktreeId: 'wt1', terminalHandle: 'h1', paneKey: 'tab:leaf' }]
     ])
     expect(output.join('')).toContain('"mode": "zen"')
+  })
+
+  it('tells the host the pane was launched as a member, whose lead may be on another host', async () => {
+    const calls: unknown[] = []
+    const client = {
+      call: async (_method: string, params: unknown) => {
+        calls.push(params)
+        return { ok: true, result: { config: { mode: 'on' }, agents: [] } }
+      }
+    } as unknown as RuntimeClient
+    process.env.ORCA_GAME_ROLE = 'member'
+
+    await ORCHESTRATOR_GAME_HANDLERS['game state']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: true
+    })
+
+    expect(calls).toEqual([
+      { worktreeId: 'wt1', terminalHandle: 'h1', paneKey: 'tab:leaf', role: 'member' }
+    ])
   })
 
   it("prints each member's ticket, host, account, branch, PR and CI in the JSON (ORCA-863)", async () => {

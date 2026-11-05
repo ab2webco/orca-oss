@@ -18,7 +18,9 @@ const GameStateParams = z
     terminalHandle: z.string().optional(),
     paneKey: z.string().optional(),
     // Why unknown: a report this host cannot read must cost the member its Jev row, never its state.
-    advisor: z.unknown().optional()
+    advisor: z.unknown().optional(),
+    // Why a string: a role this host does not know must not fail the poll.
+    role: z.string().optional()
   })
   .optional()
 
@@ -261,7 +263,8 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
         worktreeId: params?.worktreeId,
         terminalHandle: params?.terminalHandle,
         paneKey: params?.paneKey,
-        advisor: params?.advisor
+        advisor: params?.advisor,
+        role: params?.role
       })
       const caller = { worktreeId: params?.worktreeId, terminalHandle: params?.terminalHandle }
       // Why first: auto-release drops a merged member's row from this very state.

@@ -1,6 +1,7 @@
 import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
+import { gameCallerRole } from './orchestrator-game-board-call'
 import { DEFAULT_GAME_LEAD, type OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import { gameLeadBriefOf } from '../../shared/orchestrator-game-lead-brief'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
@@ -52,7 +53,8 @@ const projectNameOf = (worktree: OrchestratorGameState['worktree']): string =>
 const callerParams = () => ({
   worktreeId: process.env.ORCA_WORKTREE_ID,
   terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
-  paneKey: process.env.ORCA_PANE_KEY
+  paneKey: process.env.ORCA_PANE_KEY,
+  ...gameCallerRole()
 })
 
 // Why the env: an older CLI ignores a variable it does not know, where an unknown flag could fail the poll.

@@ -78,3 +78,47 @@ describe('buildOrchestratorGameState for a member pane', () => {
     expect(reads).toEqual(['plane', 'linear'])
   })
 })
+
+describe('buildOrchestratorGameState for a member whose lead is on another host', () => {
+  it('answers a launched member as a member, with no lead reads and only itself', async () => {
+    const reads: string[] = []
+    const read =
+      <T>(name: string, value: T) =>
+      async () => {
+        reads.push(name)
+        return value
+      }
+    const self = {
+      state: 'working' as const,
+      agentType: 'claude',
+      displayName: 'Daisy · ORCA-1033',
+      taskTitle: null,
+      toolName: null,
+      paneKey: 'tab:member',
+      parentPaneKey: null
+    }
+    const other = { ...self, paneKey: 'tab:other', displayName: 'Rex · ORCA-1034' }
+    const state = await buildOrchestratorGameState({
+      settings: { orchestratorGame: { tracker: true } } as never,
+      worktree: worktree(),
+      agents: [self],
+      found: [{ row: other, worktree: { id: 'wt2', branch: 'orca-1034', displayName: 'r' } }],
+      leaderPaneKey: 'tab:member',
+      callerParentPaneKey: null,
+      callerRole: 'member',
+      readReview: none,
+      readPlane: read('plane', null),
+      readLinear: read('linear', null),
+      readInboxes: read('inboxes', []),
+      readMerges: read('merges', []),
+      readPairedHosts: async () => {
+        reads.push('paired-hosts')
+        return []
+      }
+    })
+
+    expect(state.role).toBe('member')
+    expect(state.agents.map((one) => one.displayName)).toEqual(['Daisy · ORCA-1033'])
+    expect(reads).toEqual([])
+  })
+})

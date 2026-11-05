@@ -61,6 +61,8 @@ export type OrchestratorGameStateInput = {
   leaderPaneKey: string | null
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
+  /** The pane says it was launched as a member; its lead may be on another host, with no parent here. */
+  callerRole?: 'member'
   /** The handle of the project's live lead when it is not the caller. */
   readLeadElsewhere?: () => Promise<string | null>
   terminalHandleOf?: (paneKey: string) => string | null

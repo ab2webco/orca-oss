@@ -136,6 +136,8 @@ export async function startGameBand(
     pluginDir?: string
     /** More mods loaded beside it. */
     extraPluginDirs?: readonly string[]
+    /** Launch the pane as Orca launches a member, with ORCA_GAME_ROLE=member. */
+    role?: 'member'
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -220,7 +222,8 @@ export async function startGameBand(
     ORCA_GAME_REWARDS: '1',
     ORCA_GAME_RENDER: 'hd',
     ORCA_GAME_TIMEZONE: options.timezone ?? 'UTC',
-    ORCA_GAME_LOCALE: options.locale
+    ORCA_GAME_LOCALE: options.locale,
+    ...(options.role ? { ORCA_GAME_ROLE: options.role } : {})
   }
   const play = join(projectDir, 'play')
   await writeFile(
