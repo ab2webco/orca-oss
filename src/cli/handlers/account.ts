@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import type { CommandHandler, HandlerContext } from '../dispatch'
 import {
@@ -15,6 +14,7 @@ import { RuntimeClientError } from '../runtime-client'
 import { rejectRemoteSelectionFlags } from './account-runtime-scope'
 import { switchClaudeTerminalAccount } from './account-switch'
 import { stripElectronRunAsNode } from '../runtime/launch'
+import { getDefaultUserDataPath } from '../runtime/metadata'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
   readActiveClaudeKeychainCredentialsStrict,
@@ -180,9 +180,17 @@ async function cleanupClaudeLoginArtifacts(
   }
 }
 
+// Why not tmpdir(): the systemd unit's PrivateTmp=true gives the runtime its own
+// /tmp, so it cannot see a dir made there (ORCA-1041). userData is the runtime's.
+function createLoginStagingDir(agent: 'claude' | 'codex'): string {
+  const parent = join(getDefaultUserDataPath(), 'account-add')
+  mkdirSync(parent, { recursive: true, mode: 0o700 })
+  return mkdtempSync(join(parent, `${agent}-`))
+}
+
 /** Logs into a Claude account in a temp config dir, then registers it with the local runtime. */
 async function addClaudeAccount({ client, json }: HandlerContext): Promise<void> {
-  const configDir = mkdtempSync(join(tmpdir(), 'orca-account-add-claude-'))
+  const configDir = createLoginStagingDir('claude')
   const session: InteractiveLoginSession = {
     child: null,
     registering: false,
@@ -227,7 +235,7 @@ async function addClaudeAccount({ client, json }: HandlerContext): Promise<void>
 
 /** Logs into a Codex account in a temp CODEX_HOME, then registers it with the local runtime. */
 async function addCodexAccount({ client, json }: HandlerContext): Promise<void> {
-  const codexHome = mkdtempSync(join(tmpdir(), 'orca-account-add-codex-'))
+  const codexHome = createLoginStagingDir('codex')
   const session: InteractiveLoginSession = {
     child: null,
     registering: false,
