@@ -30,6 +30,7 @@ import {
 import {
   assertElectronResolvedIsolatedHome,
   createElectronHomeIsolation,
+  readElectronResolvedHome,
   type ElectronHomeIsolation
 } from './electron-home-isolation'
 
@@ -192,7 +193,7 @@ export function createRestartSession(
       app.process().stderr?.on('data', (chunk: Buffer) => onStderr(chunk.toString()))
     }
     try {
-      const resolvedHome = await app.evaluate(({ app }) => app.getPath('home'))
+      const resolvedHome = await readElectronResolvedHome(app)
       assertElectronResolvedIsolatedHome(resolvedHome, homeIsolation)
     } catch (error) {
       await closeElectronAppForE2E(app)

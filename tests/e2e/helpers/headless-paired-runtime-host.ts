@@ -8,7 +8,8 @@ import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
 import {
   assertElectronResolvedIsolatedHome,
-  createElectronHomeIsolation
+  createElectronHomeIsolation,
+  readElectronResolvedHome
 } from './electron-home-isolation'
 import type { RuntimeDesktopPairingOffer } from './paired-electron-client'
 
@@ -220,9 +221,9 @@ export async function launchHeadlessPairedRuntimeHost(): Promise<HeadlessPairedR
     })
     const [offer] = await Promise.all([
       readPairingOffer(app),
-      app
-        .evaluate(({ app: electronApp }) => electronApp.getPath('home'))
-        .then((home) => assertElectronResolvedIsolatedHome(home, isolation))
+      readElectronResolvedHome(app).then((home) =>
+        assertElectronResolvedIsolatedHome(home, isolation)
+      )
     ])
     return {
       app,

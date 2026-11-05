@@ -97,6 +97,28 @@ crbug 536271637), which reaches Electron 44 (V8 15.2) and no 43.x release, 43.8.
 `page.evaluate`, whose utility script adds an async step). It asserts the failure below Electron 44
 and the answer from 44 on. Retrying the evaluate repeats a write that already happened.
 
+### The same answer lost in main, at launch (ORCA-1031)
+
+`electronApplication.evaluate: Execution context was destroyed…` at `helpers/orca-app.ts:251` or
+`helpers/paired-electron-client.ts:178`, in specs with nothing in common, was this bug in the **main**
+process. A local loop of 100 launches read the raw frame: `"message":"Promise was collected"`.
+
+The test's 12.8 s is misleading. The trace puts the launch at 0.75 s and the error 23 ms later, with
+the app alive. The rest is the close stall in the fixture's `catch`, and the
+`Network service crashed`, `zygote` and `renderer gone` lines in stderr are that close killing the
+tree, not a cause.
+
+Launch is the exposed moment because the home read is the first evaluate into main, and it lands
+during main's synchronous startup. Only the first evaluate that arrives in a busy stretch is
+dispatched there; later ones wait for main to yield, which also means a test gets one shot per
+launch. `app.getPath('home')` returns a plain value, so V8 wraps it in an already settled promise
+that it holds weakly, and any GC before main yields collects it.
+
+`readElectronResolvedHome` keeps the promise pending until a `setImmediate`, so it settles when main
+has yielded and the reaction jobs run with nothing in between. Use it for any evaluate that can land
+before the window exists. `tests/e2e/electron-launch-home-read-gc.spec.ts` pins both reads against
+the same busy, collecting main. This narrows one window and does not fix V8: only Electron 44 does.
+
 ## Reading the automated evidence (ORCA-280)
 
 The second row above used to require a human to notice `Target crashed` in a job log by hand —
