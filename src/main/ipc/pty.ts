@@ -19,6 +19,13 @@ import type { GlobalSettings, TuiAgent } from '../../shared/types'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import { terminalOutputBacklogCapChars } from '../../shared/terminal-scrollback-policy'
+import {
+  PTY_BATCH_FLUSH_CHUNK_CHARS,
+  PTY_RENDERER_ACTIVE_PTY_IN_FLIGHT_RESERVE_CHARS,
+  PTY_RENDERER_IN_FLIGHT_HIGH_WATER_CHARS,
+  PTY_RENDERER_INTERACTIVE_RESERVE_CHARS,
+  PTY_RENDERER_TOTAL_IN_FLIGHT_HIGH_WATER_CHARS
+} from '../../shared/pty-renderer-delivery-window'
 import type {
   PtyDeliveryWriteOff,
   PtyRendererDeliveryHealthReply,
@@ -2802,19 +2809,13 @@ export function registerPtyHandlers(
   // Why 2ms: pairs with the daemon stream batcher (daemon-stream-data-batcher.ts); keeps flood coalescing at negligible IPC overhead while cutting the pipeline's latency tax.
   const PTY_BATCH_INTERVAL_MS = 2
   const PTY_BATCH_DRAIN_CONTINUE_MS = 1
-  const PTY_BATCH_FLUSH_CHUNK_CHARS = 16 * 1024
   const PTY_BATCH_FLUSH_MAX_WRITES = 2
-  const PTY_RENDERER_IN_FLIGHT_HIGH_WATER_CHARS = 512 * 1024
-  const PTY_RENDERER_TOTAL_IN_FLIGHT_HIGH_WATER_CHARS = 8 * 1024 * 1024
   // Why: cap unbounded pendingData growth when the renderer can't receive (frozen/reloading); beyond it bytes drop and the pane heals from the main buffer snapshot via the droppedOutput sentinel (#7630).
   // Why read settings live: the cap scales with the user's scrollback so power users don't lose lines their scrollback would have retained.
   const pendingDataCapChars = (): number =>
     terminalOutputBacklogCapChars(getSettings?.().terminalScrollbackRows)
   // Why: self-heal bound — if a reloaded page never sends pty:rendererDispatcherReady, force sends on after this window so a lost handshake can't become a permanent hold.
   const PTY_DISPATCHER_READY_WATCHDOG_MS = 10_000
-  const PTY_RENDERER_INTERACTIVE_RESERVE_CHARS = 256 * 1024
-  // Why: reserve a bounded lane so an active pane's keystroke redraw reaches the renderer ahead of hidden bulk output's ACKs.
-  const PTY_RENDERER_ACTIVE_PTY_IN_FLIGHT_RESERVE_CHARS = 512 * 1024
   // Why: request/response hygiene only (never mutates delivery state) — clears the outstanding-probe flag so a later arrival can re-probe, logs once per silent streak.
   const PTY_DELIVERY_RESYNC_TIMEOUT_MS = 5_000
   // Why: a heal write-off destroys delivery accounting; require this much main-side ACK silence (independent of renderer evidence) before declaring the channel dead.
