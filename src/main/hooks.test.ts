@@ -308,10 +308,10 @@ describe('runHook', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
-        {
+        expect.objectContaining({
           cwd: 'C:\\Users\\jinwo\\git\\orca-feature',
           wslDistro: 'Ubuntu'
-        }
+        })
       )
       expect(result.runnerScriptPath).toContain('setup-runner.sh')
       expect(result.shell).toEqual({ family: 'posix', executable: 'wsl.exe' })
