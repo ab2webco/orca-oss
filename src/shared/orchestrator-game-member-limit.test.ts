@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   accountLimitsOf,
   freshestLimitsOf,
-  gameMemberLimitOf
+  GAME_MEMBER_STALLED_WORKING_MS,
+  gameMemberLimitOf,
+  gameMemberStateOf
 } from './orchestrator-game-member-limit'
 import type { ProviderRateLimits } from './rate-limit-types'
 
@@ -115,6 +117,26 @@ describe('gameMemberLimitOf', () => {
         now: NOW
       })
     ).toBeNull()
+  })
+
+  // Why (ORCA-923): a turn that dies on a logout fires no Stop hook, so its row stays working.
+  it('is logged out when a member reads working but its hooks went silent on a /login prompt', () => {
+    const of = (hookQuietMs: number | null, said = 'Not logged in · Please run /login') =>
+      gameMemberLimitOf({
+        state: 'working',
+        agentType: 'claude',
+        accountLimits: limits(20),
+        terminalTail: ['work', said, '> '].join('\n'),
+        now: NOW,
+        hookQuietMs
+      })
+    expect(of(GAME_MEMBER_STALLED_WORKING_MS)).toEqual({ resetsAt: null, loggedOut: true })
+    expect(of(GAME_MEMBER_STALLED_WORKING_MS - 1)).toBeNull()
+    expect(of(null)).toBeNull()
+    expect(of(GAME_MEMBER_STALLED_WORKING_MS, LIMIT_TEXT)).toBeNull()
+    expect(gameMemberStateOf('working', { resetsAt: null, loggedOut: true })).toBe('waiting')
+    expect(gameMemberStateOf('working', null)).toBe('working')
+    expect(gameMemberStateOf('done', { resetsAt: null, loggedOut: true })).toBe('done')
   })
 
   it('never calls a context or token limit a usage limit, nor an agent with no managed accounts', () => {

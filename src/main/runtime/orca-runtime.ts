@@ -858,7 +858,9 @@ import { gameMemberAgentEnvOf } from '../../shared/game-member-agent-env'
 import {
   accountLimitsOf,
   gameMemberLimitOf,
+  gameMemberStateOf,
   freshestLimitsOf,
+  isStalledWorking,
   type GameMemberLimit
 } from '../../shared/orchestrator-game-member-limit'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
@@ -31890,6 +31892,8 @@ export class OrcaRuntimeService {
     }).catch(() => null)
     return {
       ...agent,
+      // Why: an older home reads `waiting` as needs-you, so the fix reaches it with no wire change (ORCA-923).
+      state: gameMemberStateOf(agent.state, limit),
       // Why the email only: an account id means nothing on the home and must not leave this host (ORCA-798).
       ...(account
         ? { account: { provider: account.provider, email: account.email } }
@@ -31917,7 +31921,12 @@ export class OrcaRuntimeService {
   }): Promise<GameMemberLimit | null> {
     const provider = accountProviderOfAgent(member.agentType)
     const services = this.accountServices
-    if (!provider || member.state === 'working') {
+    const hookAt = (this.getAgentStatusSnapshotFn?.() ?? []).find(
+      (entry) => entry.paneKey === member.paneKey
+    )?.receivedAt
+    const hookQuietMs = hookAt === undefined ? null : Date.now() - hookAt
+    // Why: a working member's tail costs a terminal read, so only a stalled one is read.
+    if (!provider || (member.state === 'working' && !isStalledWorking(member.state, hookQuietMs))) {
       return null
     }
     const roster = services
@@ -31947,7 +31956,8 @@ export class OrcaRuntimeService {
       agentType: member.agentType,
       accountLimits,
       terminalTail: read ? read.tail.join('\n') : null,
-      now: Date.now()
+      now: Date.now(),
+      hookQuietMs
     })
   }
 

@@ -979,6 +979,10 @@ is `limit: { resetsAt: null, loggedOut: true }`: phase `needs-you` with
 `log <email> in again (/login in its pane), or game move <ticket>`, the card says
 `logged out · /login in its pane`, and `game accounts` shows its account as logged out, which
 `auto` skips. An older host relays no `loggedOut`, and an older home shows such a member as limited.
+A turn that dies on that prompt fires no Stop hook, so its row stays `working` (ORCA-923). A
+working member whose hooks have been silent for 60 s has its last lines read too, and a `/login`
+prompt there makes it logged out with state `waiting`. The host relays that state on `agent`, which
+an older home already reads as needs-you; an older host still relays `working`.
 
 ### The lead's XP
 

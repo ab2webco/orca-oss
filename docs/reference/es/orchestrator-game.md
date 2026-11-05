@@ -1,5 +1,5 @@
 ---
-sourceHash: 577632322a5fc81a
+sourceHash: c6bfbbe057a283aa
 ---
 # El juego orquestador de Agent Teams
 
@@ -1048,6 +1048,11 @@ coincide con la propia línea de estado del pane. Un miembro detenido cuyas últ
 `logged out · /login in its pane`, y `game accounts` muestra su cuenta como sin sesión, que `auto`
 salta. Un host más antiguo no retransmite `loggedOut`, y una casa más antigua muestra a ese miembro
 como limitado.
+Un turno que muere en ese aviso no dispara el hook Stop, así que su fila se queda en `working`
+(ORCA-923). A un miembro en `working` cuyos hooks llevan 60 s en silencio también se le leen las
+últimas líneas, y un aviso de `/login` ahí lo deja sin sesión con estado `waiting`. El host
+retransmite ese estado en `agent`, que una casa más antigua ya lee como needs-you; un host más
+antiguo sigue retransmitiendo `working`.
 
 ### La XP del líder
 

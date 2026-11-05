@@ -9,7 +9,10 @@ import {
   type GameStatusGroup,
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
-import type { GameMemberLimit } from '../../shared/orchestrator-game-member-limit'
+import {
+  gameMemberStateOf,
+  type GameMemberLimit
+} from '../../shared/orchestrator-game-member-limit'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
@@ -182,6 +185,7 @@ export async function gameFleetOf(args: {
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,
+        state: gameMemberStateOf(agent.state, limit),
         // Why the worktree's name: outside a dispatch a row has no task title to show.
         ...(found ? { displayName: agent.displayName ?? worktree?.displayName ?? null } : {}),
         ...(isMember ? { isMember: true } : {}),
