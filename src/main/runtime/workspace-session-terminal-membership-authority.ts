@@ -173,6 +173,25 @@ export function hasHostAuthoritativeTerminalMembership(
   )
 }
 
+// Why: retirement removes a surface from the host-persisted membership before publishing its absence,
+// so a surface still listed there is restored state, not a stale renderer resurrection.
+export function workspaceSessionListsTerminalSurface(
+  session: WorkspaceSessionState | undefined,
+  worktreeId: string,
+  parentTabId: string,
+  leafId: string
+): boolean {
+  if (!session || session.terminalSurfaceTombstonesByPaneKey?.[`${parentTabId}:${leafId}`]) {
+    return false
+  }
+  if (!(session.tabsByWorktree[worktreeId] ?? []).some((tab) => tab.id === parentTabId)) {
+    return false
+  }
+  const leafIds = new Set<string>()
+  collectLeafIds(session.terminalLayoutsByTabId[parentTabId]?.root ?? null, leafIds)
+  return leafIds.has(leafId)
+}
+
 export function rebaseWorkspaceSessionTerminalMembership(
   incoming: WorkspaceSessionState,
   prior: WorkspaceSessionState | undefined
