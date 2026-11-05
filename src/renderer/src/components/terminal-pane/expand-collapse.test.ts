@@ -78,6 +78,49 @@ describe('createExpandCollapseActions', () => {
     expect(state.pendingPaneSizeRefreshFrameIdsRef.current).toEqual([])
   })
 
+  describe('collapse refresh frame focus', () => {
+    class FakeHTMLElement {
+      readonly isContentEditable = false
+      readonly classList: { contains: (className: string) => boolean }
+      constructor(
+        readonly tagName: string,
+        classNames: string[] = []
+      ) {
+        this.classList = { contains: (className) => classNames.includes(className) }
+      }
+      closest(): Element | null {
+        return null
+      }
+    }
+
+    function runRefreshFrameWithActiveElement(activeElement: FakeHTMLElement): () => void {
+      vi.stubGlobal('HTMLElement', FakeHTMLElement)
+      vi.stubGlobal('document', { activeElement, querySelector: () => null })
+      const callbacks: FrameRequestCallback[] = []
+      vi.stubGlobal(
+        'requestAnimationFrame',
+        vi.fn((next: FrameRequestCallback) => callbacks.push(next))
+      )
+      const terminal = { focus: vi.fn() }
+      const pane = { terminal }
+      const state = createState({
+        managerRef: ref({ getPanes: () => [pane], getActivePane: () => pane } as never)
+      })
+      createExpandCollapseActions(state).refreshPaneSizes(true)
+      callbacks[0]?.(16)
+      return terminal.focus
+    }
+
+    it('does not take focus from the search input opened before the frame ran', () => {
+      expect(runRefreshFrameWithActiveElement(new FakeHTMLElement('INPUT'))).not.toHaveBeenCalled()
+    })
+
+    it('still refocuses the terminal when no editable field owns focus', () => {
+      const helper = new FakeHTMLElement('TEXTAREA', ['xterm-helper-textarea'])
+      expect(runRefreshFrameWithActiveElement(helper)).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('does not retain synchronously completed pane-size refresh frames', () => {
     vi.stubGlobal(
       'requestAnimationFrame',

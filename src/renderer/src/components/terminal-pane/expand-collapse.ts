@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { safeFit } from '@/lib/pane-manager/pane-tree-ops'
+import { focusActivePane } from './pane-helpers'
 
 type ExpandCollapseState = {
   expandedPaneIdRef: React.MutableRefObject<number | null>
@@ -141,8 +142,8 @@ export function createExpandCollapseActions(state: ExpandCollapseState) {
         safeFit(p)
       }
       if (focusActive) {
-        const active = manager.getActivePane() ?? panes[0]
-        active?.terminal.focus()
+        // Why: this frame can land after Cmd+F opened the search input; don't take focus back.
+        focusActivePane(manager)
       }
     })
   }
