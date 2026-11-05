@@ -9,6 +9,8 @@ export type E2EConfig = {
   /** Test-only override (ORCA_E2E_TERMINAL_RETENTION_LIMIT) shrinking the
    *  hidden un-parkable worktree force-park budget. null means production (12). */
   terminalRetentionLimit: number | null
+  /** Test-only (ORCA_E2E_SHOW_INACTIVE): a headless run still maps its window, without focus or clicks. */
+  showInactive: boolean
 }
 
 type E2EConfigInput = {
@@ -17,6 +19,7 @@ type E2EConfigInput = {
   userDataDir?: string | null
   terminalParkingDelayMs?: number | null
   terminalRetentionLimit?: number | null
+  showInactive?: boolean
 }
 
 export function createE2EConfig(input: E2EConfigInput): E2EConfig {
@@ -43,6 +46,7 @@ export function createE2EConfig(input: E2EConfigInput): E2EConfig {
     exposeStore,
     userDataDir,
     terminalParkingDelayMs,
-    terminalRetentionLimit
+    terminalRetentionLimit,
+    showInactive: headless && Boolean(input.showInactive)
   }
 }
