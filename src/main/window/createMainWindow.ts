@@ -374,6 +374,13 @@ export function createMainWindow(
     // Why: in E2E headless mode keep the window hidden (Playwright drives via CDP) so tests don't steal focus.
     const e2eConfig = getMainE2EConfig()
     if (e2eConfig.headless) {
+      // Why: Chromium sends a never-shown window's renderer ~1 BeginFrame per second, so a commit can
+      // block its main thread for whole seconds (ORCA-760). Latency specs opt into a mapped window.
+      if (e2eConfig.showInactive) {
+        mainWindow.setFocusable(false)
+        mainWindow.setIgnoreMouseEvents(true)
+        mainWindow.showInactive()
+      }
       return
     }
     if (savedMaximized) {

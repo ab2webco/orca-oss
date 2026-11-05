@@ -545,6 +545,8 @@ const terminalLoadScenarioDeps = {
 
 test.describe('Artificial OpenCode terminal load', () => {
   test.describe.configure({ mode: 'serial' })
+  // Why: a never-shown window gets ~1 BeginFrame/s, which stalls one key for whole seconds (ORCA-760).
+  test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
   test('measures baseline typing responsiveness with one active terminal', async ({
     orcaPage,
