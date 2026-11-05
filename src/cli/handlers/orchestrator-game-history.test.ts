@@ -37,6 +37,14 @@ const run = (client: RuntimeClient, flags: [string, string][], json = true) =>
     json
   })
 
+const historyClient = (records: unknown[]): RuntimeClient =>
+  ({
+    call: async (method: string) => ({
+      ok: true,
+      result: method === 'game.state' ? { config: { scene: 'quest' }, agents: [] } : { records }
+    })
+  }) as unknown as RuntimeClient
+
 describe('orca game history', () => {
   const saved = { ...process.env }
   let output: string[] = []
@@ -70,6 +78,29 @@ describe('orca game history', () => {
       ]
     ])
     expect(JSON.parse(output.join('')).result.records).toEqual([RECORD])
+  })
+
+  it('filters by character itself, so an older host that drops the flag cannot list everyone', async () => {
+    const records = [
+      { ...RECORD, character: 'Ada', host: 'imac' },
+      { ...RECORD, ticket: 'CIN-8' }
+    ]
+    const client = historyClient(records)
+    await run(client, [['character', 'ada']], false)
+    const text = output.join('\n')
+    expect(text).toContain('CIN-9 qa #41 merged · Ada · codex · bo@example.com · on imac')
+    expect(text).not.toContain('CIN-8')
+  })
+
+  it('reads one character by any of its language variants', async () => {
+    const records = [
+      { ...RECORD, character: 'Arturo' },
+      { ...RECORD, ticket: 'CIN-8', character: 'Merlin' }
+    ]
+    await run(historyClient(records), [['character', 'Arthur']], false)
+    const text = output.join('\n')
+    expect(text).toContain('Arturo')
+    expect(text).not.toContain('CIN-8')
   })
 
   it('refuses a since it cannot read', async () => {

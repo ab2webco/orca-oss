@@ -134,9 +134,10 @@ const run = (client: RuntimeClient, member: string, json = true) =>
     json
   })
 
+const printed = (output: string[]) => JSON.parse(output.join('')).result
+
 describe('orca game member', () => {
   let output: string[] = []
-  const printed = () => JSON.parse(output.join('')).result
 
   beforeEach(() => {
     output = []
@@ -156,7 +157,7 @@ describe('orca game member', () => {
 
       await run(client, selector)
 
-      const report = printed()
+      const report = printed(output)
       expect(report.ticket).toBe('CIN-5')
       expect(report.now).toEqual(
         expect.objectContaining({ phase: 'working', tool: 'Edit', terminal: ['Editing seats.ts'] })
@@ -178,7 +179,7 @@ describe('orca game member', () => {
 
     await run(client, 'CIN-5')
 
-    const report = printed()
+    const report = printed(output)
     expect(report.now.terminal).toEqual([])
     expect(report.notes).toEqual([
       'terminal: terminal.read is down',
@@ -201,6 +202,64 @@ describe('orca game member', () => {
     expect(text).toContain('Editing seats.ts')
     expect(text).toContain('member question: Which API?')
     expect(text).toContain('aaaaaaa feat: seats')
+  })
+})
+
+describe('orca game member by character (ORCA-1034)', () => {
+  let output: string[] = []
+  const KEPT = {
+    key: 'ada',
+    name: 'Ada',
+    tickets: 2,
+    prsOpened: 2,
+    prsMerged: 1,
+    outcomes: { merged: 1, qa: 0, stopped: 1, failed: 0, limited: 0 },
+    workedMs: 1000,
+    xp: 100,
+    lastAt: '2026-10-20T11:30:00.000Z',
+    account: 'a@example.com',
+    host: 'imac',
+    recent: [{ ticket: 'CIN-1', outcome: 'merged', pr: '#41 merged', endedAt: 'then', workedMs: 1 }]
+  }
+  const clientWith = (state: unknown): RuntimeClient =>
+    ({
+      call: async (method: string) => {
+        if (method === 'game.characters') {
+          return { ok: true, result: { characters: [KEPT] } }
+        }
+        return { ok: true, result: method === 'game.state' ? state : {} }
+      }
+    }) as unknown as RuntimeClient
+
+  beforeEach(() => {
+    output = []
+    vi.spyOn(console, 'log').mockImplementation((line: string) => {
+      output.push(line)
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reads a freed character from what the project kept, restart or new lead aside', async () => {
+    await run(clientWith({ ...STATE, agents: [] }), 'ada', false)
+    const text = output.join('\n')
+    expect(text).toContain('Ada · 2 tickets · 1/2 PRs merged · 1 merged, 1 stopped')
+    expect(text).toContain('last a@example.com on imac')
+    expect(text).toContain('CIN-1 merged #41 merged')
+  })
+
+  it('reads a character by any of its language variants', async () => {
+    const roster = { lead: { memberNames: [{ en: 'Ada', es: 'Adela' }] } }
+    await run(clientWith({ ...STATE, ...roster, agents: [] }), 'Adela', false)
+    expect(output.join('\n')).toContain('Ada · 2 tickets')
+  })
+
+  it('finds a live member by its character and joins what was kept', async () => {
+    const live = { ...MEMBER, displayName: 'Ada · CIN-5 Seats' }
+    await run(clientWith({ ...STATE, agents: [live] }), 'Ada')
+    expect(printed(output)).toMatchObject({ ticket: 'CIN-5', character: { name: 'Ada' } })
   })
 })
 

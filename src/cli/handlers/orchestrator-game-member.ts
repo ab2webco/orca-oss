@@ -3,7 +3,14 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { readCallerGameState } from './orchestrator-game-launch'
 import { dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
+import { gameBoardCaller } from './orchestrator-game-board-call'
+import type { GameCharacter } from '../../shared/orchestrator-game-characters'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  characterKeyOf,
+  memberNameOf,
+  memberRosterOf
+} from '../../shared/orchestrator-game-member-names'
 import {
   GAME_MEMBER_TERMINAL_LINES,
   gameMemberReportOf,
@@ -37,21 +44,32 @@ async function part<T>(notes: string[], label: string, read: () => Promise<T>): 
   }
 }
 
-function memberOf(state: OrchestratorGameState, selector: string): GameAgent {
+function memberOf(state: OrchestratorGameState, selector: string): GameAgent | undefined {
   const wanted = selector.trim()
-  const member = state.agents.find(
-    (agent) =>
-      agent.isMember &&
-      !agent.isLeader &&
-      (agent.terminalHandle === wanted || ticketOfMember(agent) === wanted.toUpperCase())
+  const lower = wanted.toLowerCase()
+  const members = state.agents.filter((agent) => agent.isMember && !agent.isLeader)
+  return (
+    members.find(
+      (agent) => agent.terminalHandle === wanted || ticketOfMember(agent) === wanted.toUpperCase()
+    ) ?? members.find((agent) => memberNameOf(agent.displayName)?.toLowerCase() === lower)
   )
-  if (!member) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `No member is ${wanted}; see \`orca game fleet\`, or \`orca game history\` for one already freed.`
+}
+
+// Why never throw: a host without characters still answers for a live member.
+async function characterOf(
+  client: Client,
+  state: OrchestratorGameState,
+  wanted: string
+): Promise<GameCharacter | undefined> {
+  // Why the key: `Arturo` and `Arthur` are one character, and only the key knows it.
+  const key = characterKeyOf(memberRosterOf(state), wanted)
+  const kept = await client
+    .call<{ characters: GameCharacter[] }>('game.characters', gameBoardCaller())
+    .then(
+      (response) => response.result?.characters ?? [],
+      () => []
     )
-  }
-  return member
+  return kept.find((one) => one.key === key || one.name.toLowerCase() === key)
 }
 
 async function inputOf(
@@ -161,6 +179,24 @@ const readInbox = async (client: Client, terminal: string) =>
     })
   ).result.messages
 
+/** What a project kept of one character, restart and lead rotation aside. */
+export function formatGameCharacter(character: GameCharacter): string {
+  const outcomes = Object.entries(character.outcomes)
+    .filter(([, count]) => count > 0)
+    .map(([outcome, count]) => `${count} ${outcome}`)
+    .join(', ')
+  const seat = [character.account, character.host && `on ${character.host}`].filter(Boolean)
+  return [
+    `${character.name} · ${character.tickets} tickets · ${character.prsMerged}/${character.prsOpened} PRs merged · ${outcomes || 'no outcomes'}${seat.length > 0 ? ` · last ${seat.join(' ')}` : ''}`,
+    ...character.recent
+      .toReversed()
+      .map(
+        (one) =>
+          `  ${one.endedAt} ${one.ticket ?? '?'} ${one.outcome}${one.pr ? ` ${one.pr}` : ''}${one.host ? ` on ${one.host}` : ''}`
+      )
+  ].join('\n')
+}
+
 export function formatGameMember(report: GameMemberReport): string {
   const { now, since } = report
   const lines = [
@@ -189,7 +225,30 @@ export const ORCHESTRATOR_GAME_MEMBER_HANDLERS: Record<string, CommandHandler> =
     }
     const response = await readCallerGameState(client)
     const member = memberOf(response.result, raw)
-    const report = gameMemberReportOf(await inputOf(client, response.result, member))
-    printResult({ ...response, result: report }, json, formatGameMember)
+    const character = await characterOf(
+      client,
+      response.result,
+      (member && memberNameOf(member.displayName)) ?? raw
+    )
+    if (!member && !character) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `No member is ${raw.trim()}; see \`orca game fleet\`, or \`orca game history\` for one already freed.`
+      )
+    }
+    const report = member
+      ? gameMemberReportOf(await inputOf(client, response.result, member))
+      : undefined
+    printResult(
+      {
+        ...response,
+        result: { ...report, ...(character ? { character } : {}) }
+      },
+      json,
+      () =>
+        [report && formatGameMember(report), character && formatGameCharacter(character)]
+          .filter(Boolean)
+          .join('\n')
+    )
   }
 }

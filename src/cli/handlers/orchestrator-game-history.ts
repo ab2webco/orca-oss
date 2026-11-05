@@ -1,7 +1,9 @@
 import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
+import { readCallerGameState } from './orchestrator-game-launch'
 import type { GameHistoryRecord } from '../../shared/orchestrator-game-history'
+import { characterKeyOf, memberRosterOf } from '../../shared/orchestrator-game-member-names'
 
 export type GameHistoryResult = { records: GameHistoryRecord[] }
 
@@ -16,7 +18,9 @@ export function formatGameHistory(history: GameHistoryResult): string {
   }
   return history.records
     .map((one) => {
-      const who = [one.agent, one.account].filter(Boolean).join(' · ')
+      const who = [one.character, one.agent, one.account, one.host && `on ${one.host}`]
+        .filter(Boolean)
+        .join(' · ')
       const where = [one.repo, one.branch ? `⎇ ${one.branch}` : null].filter(Boolean).join(' ')
       const head = `${one.endedAt} ${one.ticket ?? '?'} ${one.outcome}${one.pr ? ` ${one.pr}` : ''}${who ? ` · ${who}` : ''}${where ? ` · ${where}` : ''}`
       return one.lastReport ? `${head}\n  ${one.lastReport.replace(/\s+/g, ' ')}` : head
@@ -24,10 +28,22 @@ export function formatGameHistory(history: GameHistoryResult): string {
     .join('\n')
 }
 
+// Why the key: a record keeps the name as shown, so `Arturo` and `Arthur` are one character.
+async function recordsOfCharacter(
+  client: Parameters<CommandHandler>[0]['client'],
+  records: readonly GameHistoryRecord[],
+  character: string
+): Promise<GameHistoryRecord[]> {
+  const roster = memberRosterOf((await readCallerGameState(client)).result)
+  const wanted = characterKeyOf(roster, character)
+  return records.filter((one) => one.character && characterKeyOf(roster, one.character) === wanted)
+}
+
 export const ORCHESTRATOR_GAME_HISTORY_HANDLERS: Record<string, CommandHandler> = {
   'game history': async ({ flags, client, json }) => {
     const ticket = optionalText(flags, 'ticket')?.toUpperCase()
     const since = optionalText(flags, 'since')
+    const character = optionalText(flags, 'character')
     if (since !== undefined && Number.isNaN(Date.parse(since))) {
       throw new RuntimeClientError(
         'invalid_argument',
@@ -41,7 +57,11 @@ export const ORCHESTRATOR_GAME_HISTORY_HANDLERS: Record<string, CommandHandler> 
         ...(ticket ? { ticket } : {}),
         ...(since ? { since } : {})
       })
-      printResult(response, json, formatGameHistory)
+      // Why here: an older host drops a filter it does not know and would list everyone.
+      const records = character
+        ? await recordsOfCharacter(client, response.result.records, character)
+        : response.result.records
+      printResult({ ...response, result: { records } }, json, formatGameHistory)
     } catch (error) {
       if (error instanceof RuntimeClientError && error.code === 'method_not_found') {
         throw new RuntimeClientError(

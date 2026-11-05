@@ -19,6 +19,10 @@ export type GameHistoryRecord = {
   pr: string | null
   /** The body of its last worker_done or escalation to the lead. */
   lastReport: string | null
+  /** The character it went by; absent from an older build's records. */
+  character?: string | null
+  /** The paired host it ran on; absent when it ran on this Orca. */
+  host?: string | null
 }
 
 // Why 200: a few weeks of one project's tickets, small enough to read whole on every call.
@@ -85,7 +89,9 @@ export function parseGameHistoryRecord(raw: unknown): GameHistoryRecord | null {
     account: textOrNull(raw.account),
     launchedAt: textOrNull(raw.launchedAt),
     pr: textOrNull(raw.pr),
-    lastReport: textOrNull(raw.lastReport, REPORT_MAX)
+    lastReport: textOrNull(raw.lastReport, REPORT_MAX),
+    character: textOrNull(raw.character),
+    host: textOrNull(raw.host)
   }
   if (!outcome || Object.values(fields).some((value) => value === undefined)) {
     return null
@@ -100,6 +106,8 @@ export function parseGameHistoryRecord(raw: unknown): GameHistoryRecord | null {
     endedAt: raw.endedAt,
     outcome,
     pr: fields.pr ?? null,
-    lastReport: fields.lastReport ?? null
+    lastReport: fields.lastReport ?? null,
+    ...(fields.character ? { character: fields.character } : {}),
+    ...(fields.host ? { host: fields.host } : {})
   }
 }
