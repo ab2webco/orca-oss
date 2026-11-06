@@ -188,10 +188,14 @@ own sign-in, so a logout on one host is not this chain alias. It is the login's 
 ([Claude Code authentication](https://code.claude.com/docs/en/authentication)).
 `orca account token set --account <email|id>` reads the token from a hidden prompt or stdin, never
 from argv. It stores the token in that account's vault `settings.json` env, mode 600, and the
-account record keeps only `longLivedTokenSetAt`. Every launch on the vault applies that env, so
-local, SSH and paired-host members, and an in-place account switch, run on the token and never
-refresh the account's single-use chain. The vault belongs to its host, so each host needs its own
-token, set from that host. `applyClaudeEnvPatch` strips only a token the caller's environment
+account record keeps only `longLivedTokenSetAt`. Every launch whose `CLAUDE_CONFIG_DIR` is the
+vault applies that env: members, `--claude-account` launches, worktree pins and an in-place account
+switch, on local, SSH and paired hosts. Those launches are expected to authenticate with the token
+and leave the stored login's refresh chain alone. That expectation is not yet observed live. The
+first live launch should confirm it by checking that the vault's stored refresh token is unchanged
+after a session. A pane opened on the global status-bar selection is not covered. It runs on the
+shared runtime credentials Orca materializes, not on the vault, so it still uses the rotating
+login. The vault belongs to its host, so each host needs its own token, set from that host. `applyClaudeEnvPatch` strips only a token the caller's environment
 supplies. The vault's own setting is untouched.
 
 What the token does not change:
