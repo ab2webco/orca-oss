@@ -23,6 +23,23 @@ export function formatGameArcade(action: string | undefined, result: GameArcadeR
   return action === 'keep' ? `Kept for later: ${playsOf(result.arcade)}` : playsOf(result.arcade)
 }
 
+// Why a JSON list too: the mod's offer ids end in a worktree path, which may hold a comma.
+function offersOf(raw: string | undefined): string[] {
+  let listed: unknown[] = (raw ?? '').split(',')
+  if (raw?.startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      listed = Array.isArray(parsed) ? parsed : []
+    } catch {
+      throw new RuntimeClientError('invalid_argument', '--offers is not a valid JSON list.')
+    }
+  }
+  const ids = listed.flatMap((one) =>
+    typeof one === 'string' && one.trim() !== '' ? [one.trim()] : []
+  )
+  return [...new Set(ids)]
+}
+
 export const ORCHESTRATOR_GAME_ARCADE_CREDIT_HANDLERS: Record<string, CommandHandler> = {
   'game arcade': async ({ flags, client, json }) => {
     const action = optionalText(flags, 'action')
@@ -32,9 +49,7 @@ export const ORCHESTRATOR_GAME_ARCADE_CREDIT_HANDLERS: Record<string, CommandHan
         `Unknown action "${action}": play, keep or migrate.`
       )
     }
-    const offers = [
-      ...new Set((optionalText(flags, 'offers') ?? '').split(',').map((one) => one.trim()))
-    ].filter((one) => one !== '')
+    const offers = offersOf(optionalText(flags, 'offers'))
     if (action === 'migrate' && offers.length === 0) {
       throw new RuntimeClientError('invalid_argument', 'migrate needs --offers <id,id,...>.')
     }

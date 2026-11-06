@@ -59,6 +59,16 @@ describe('orca game arcade', () => {
     expect(output.join('\n')).toBe('Paid 2 kept offers: 3 saved arcade plays.')
   })
 
+  // Why: the mod sends a JSON list, since an offer id ends in a worktree path that may hold a comma.
+  it('takes the offers as a JSON list too', async () => {
+    const { client, calls } = fakeClient({ ok: true, paid: 2, arcade: { credits: 2, offer: null } })
+    await run(client, [
+      ['action', 'migrate'],
+      ['offers', '["perfect-merge:github#7@r::/a,b", "r-2", 3]']
+    ])
+    expect(calls[0]?.[1]).toMatchObject({ offers: ['perfect-merge:github#7@r::/a,b', 'r-2'] })
+  })
+
   it('refuses an action it does not know and migrate without offers', async () => {
     const { client } = fakeClient({})
     await expect(run(client, [['action', 'jackpot']])).rejects.toBeInstanceOf(RuntimeClientError)
