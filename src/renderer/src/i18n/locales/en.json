@@ -17090,6 +17090,15 @@
       "teamTitle": "Team",
       "noTeamTitle": "Your work"
     },
+    "arcade": {
+      "label": "Arcade",
+      "offerTitle": "Perfect merge of #{{pr}}",
+      "offerText": "You won a play. It stays saved until you want it.",
+      "play": "Play",
+      "keep": "Keep",
+      "savedOne": "1 saved play",
+      "savedMany": "{{count}} saved plays"
+    },
     "header": {
       "title": "Team",
       "noTeamTitle": "Your work",

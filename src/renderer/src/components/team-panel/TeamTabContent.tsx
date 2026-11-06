@@ -12,6 +12,7 @@ import { teamHostText, teamLiveText, teamModelText, teamStatusTone } from './tea
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
+import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
 
 function coordinatesText(count: number): string {
   return count === 1
@@ -107,12 +108,15 @@ export function TeamTabContent({
   model,
   look,
   selectTab,
-  now
+  now,
+  arcadeActions
 }: {
   model: TeamPanelGameModel
   look: TeamPanelLook
   selectTab: SelectTeamPanelTab
   now: number
+  /** Null when the host cannot spend a play, which hides the arcade with the model's own null. */
+  arcadeActions: TeamArcadeActions | null
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState<string | null>(null)
   const game = look === 'game'
@@ -125,6 +129,9 @@ export function TeamTabContent({
             ? translate('teamPanel.stopped.by', 'Stopped by {{by}}', { by: model.stopped.by })
             : translate('teamPanel.stopped.plain', 'Stopped')}
         </p>
+      ) : null}
+      {game && model.arcade && arcadeActions ? (
+        <TeamArcadeSection arcade={model.arcade} actions={arcadeActions} />
       ) : null}
       <LeadCardRow lead={model.lead} showName={game} memberCount={model.members.length} />
       {model.advisor ? <AdvisorCardRow advisor={model.advisor} /> : null}
