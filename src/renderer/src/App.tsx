@@ -168,6 +168,7 @@ import {
 } from './startup/startup-diagnostics'
 import { reconnectSshTargetForRendererStartup } from './startup/ssh-startup-reconnect'
 import { shouldRenderPetOverlay } from './components/pet/pet-overlay-visibility'
+import { applyStatusColorOverrides } from './lib/status-color-overrides'
 import { applyDocumentTheme } from './lib/document-theme'
 import { getSystemPrefersDark } from './lib/terminal-theme'
 import { publishTerminalViewAttributesAtAppStart } from './components/terminal-pane/terminal-appearance'
@@ -1507,6 +1508,12 @@ function App(): React.JSX.Element {
     }
     void window.api.ui.set({ activeView })
   }, [activeView, persistedUIReady])
+
+  // Why: overrides key on the theme class, so a theme flip needs no re-run.
+  const statusColors = settings?.statusColors
+  useEffect(() => {
+    applyStatusColorOverrides(statusColors)
+  }, [statusColors])
 
   // Apply theme to document
   useEffect(() => {

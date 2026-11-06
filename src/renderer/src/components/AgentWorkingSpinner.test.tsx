@@ -16,9 +16,9 @@ describe('AgentWorkingSpinner', () => {
 
     expect(markup).toContain('agent-working-spinner')
     expect(markup).toContain('data-agent-spinner')
-    expect(markup).toContain('border-yellow-500')
+    expect(markup).toContain('border-status-info')
     expect(markup).toContain('border-t-transparent')
-    expect(markup).toContain('motion-reduce:border-t-yellow-500')
+    expect(markup).toContain('motion-reduce:border-t-status-info')
   })
 
   it('renders when the Web Animations API is unavailable', async () => {
@@ -130,7 +130,7 @@ describe('AgentWorkingSpinner', () => {
 
       expect(el).not.toBeNull()
       expect(getAnimations).not.toHaveBeenCalled()
-      expect(el!.className).toContain('motion-reduce:border-t-yellow-500')
+      expect(el!.className).toContain('motion-reduce:border-t-status-info')
     } finally {
       act(() => root.unmount())
       container.remove()
