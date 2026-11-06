@@ -131,25 +131,30 @@ describe('tellGameLead', () => {
 
   // Why (ORCA-1100): a lead rotated with `game lead --fresh` has no Run until it dispatches, and the
   // adopted host refused the owner's answer, so it waited unheard until the next read retried it.
-  it('reaches a lead that has no Run yet on a host whose legacy mail was adopted', () => {
+  it("opens a Run on the lead's pane when it has none yet, so its watch hands the answer out", () => {
     const db = adoptedDb()
     const notify = vi.fn()
 
     expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
 
     expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
+    const run = db.getCurrentRunForPane(LEAD_PANE)
+    expect(run).toMatchObject({ coordinator_handle: 'term_lead', legacy: 0 })
+    // An unbound `check` refuses any unread mail filed under the legacy Run.
     expect(db.getUnreadMessages('term_lead', [...LEAD_WATCH_TYPES])).toMatchObject([
-      { from_handle: 'owner', type: 'escalation', subject: NOTE.subject }
+      { run_id: run?.id, from_handle: 'owner', type: 'escalation', subject: NOTE.subject }
     ])
-    // The lead's first dispatch binds a Run; its watch must still hand the answer out.
-    const run = db.createRun({
-      objective: 'lead',
-      coordinatorHandle: 'term_lead',
-      coordinatorPaneKey: LEAD_PANE
-    })
-    expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toMatchObject([
-      { from_handle: 'owner', type: 'escalation' }
-    ])
+    expect(leadDelivery(db, run!.id, run!.consumer_generation)?.messages).toHaveLength(1)
+
+    // A second answer reuses that Run.
+    expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
+    expect(db.getUnreadMessages('term_lead').map((one) => one.run_id)).toEqual([run?.id, run?.id])
+  })
+
+  it('still refuses, for a retry, a lead with no Run whose pane Orca cannot tell', () => {
+    const db = adoptedDb()
+
+    expect(tellGameLead(db, vi.fn(), { handle: 'term_lead', paneKey: null }, NOTE)).toBe(false)
   })
 
   it('returns false instead of throwing when the database refuses the write', () => {
