@@ -7,7 +7,13 @@ import { useAppStore } from '@/store'
 import { createLeadPromptSender } from './team-lead-prompt-sender'
 import { useTeamLeadHandle } from './use-team-panel-model'
 
-export type SendToLead = (key: string, prompt: string, label: string) => void
+/** Resolves true once the lead has the turn; `quiet` leaves the success to the caller's own UI. */
+export type SendToLead = (
+  key: string,
+  prompt: string,
+  label: string,
+  options?: { quiet?: boolean }
+) => Promise<boolean>
 
 const press = createLeadPromptSender(Date.now)
 
@@ -20,16 +26,16 @@ export function useTeamLeadPrompt(): SendToLead | null {
       return null
     }
     const target = gameInboxTargetOf(hostId)
-    return (key, prompt, label) => {
-      void press(key, () => sendRuntimeAgentPrompt(target, handle, prompt)).then((outcome) => {
-        if (outcome === 'sent') {
+    return (key, prompt, label, options) =>
+      press(key, () => sendRuntimeAgentPrompt(target, handle, prompt)).then((outcome) => {
+        if (outcome === 'sent' && !options?.quiet) {
           toast.success(
             translate('teamPanel.leadWork.sent', 'Sent to the lead: {{label}}', { label })
           )
         } else if (outcome === 'failed') {
           toast.error(translate('teamPanel.leadWork.failed', 'Could not send {{label}}', { label }))
         }
+        return outcome === 'sent'
       })
-    }
   }, [handle, hostId])
 }

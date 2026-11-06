@@ -71,7 +71,7 @@ export function TeamPanelPrsTab({ value }: TeamPanelTabBodyProps<TeamPrList>): R
           type="button"
           data-team-pr-more=""
           className={MORE_CLASS}
-          onClick={() => send(listAction.id, listAction.prompt, listAction.label)}
+          onClick={() => void send(listAction.id, listAction.prompt, listAction.label)}
         >
           {viewAll}
         </button>

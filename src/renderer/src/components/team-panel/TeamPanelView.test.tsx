@@ -82,7 +82,8 @@ const solo: TeamPanelSoloModel = {
 async function render(
   source: TeamPanelModelSource,
   onOpenSettings = vi.fn(),
-  look: TeamPanelLook = 'plain'
+  look: TeamPanelLook = 'plain',
+  dock?: (model: TeamPanelGameModel) => React.ReactNode
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -91,7 +92,7 @@ async function render(
   await act(async () => {
     root.render(
       <TooltipProvider>
-        <TeamPanelView source={source} look={look} onOpenSettings={onOpenSettings} />
+        <TeamPanelView source={source} look={look} onOpenSettings={onOpenSettings} dock={dock} />
       </TooltipProvider>
     )
   })
@@ -233,6 +234,26 @@ describe('TeamPanelView scene area', () => {
       'game'
     )
     expect(scene(noTeam.container)).toBeNull()
+  })
+})
+
+describe('the action dock', () => {
+  it('sits under the tabs for a team, and is absent while loading or with no team', async () => {
+    const dock = (model: TeamPanelGameModel) => <div data-testid="dock">{model.projectName}</div>
+    const team = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'plain',
+      dock
+    )
+    const shown = team.container.querySelector('[data-testid="dock"]')
+    expect(shown?.textContent).toBe('orca-oss')
+    expect(shown?.previousElementSibling?.querySelector('[role="tablist"]')).not.toBeNull()
+
+    for (const section of [{ kind: 'loading' as const }, { kind: 'ready' as const, value: solo }]) {
+      const other = await render({ section, retry: null }, vi.fn(), 'plain', dock)
+      expect(other.container.querySelector('[data-testid="dock"]')).toBeNull()
+    }
   })
 })
 
