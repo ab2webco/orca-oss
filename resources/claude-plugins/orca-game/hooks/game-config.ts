@@ -181,3 +181,11 @@ export const gameViewArgvOf = (
   const path = cliOf(cli)
   return path === undefined ? undefined : [path, 'game', 'view', view, '--scope', scope, '--json']
 }
+
+export const gameHideTabArgvOf = (
+  cli: string | null | undefined,
+  tab: 'prs'
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined ? undefined : [path, 'game', 'hide-tab', tab, '--json']
+}

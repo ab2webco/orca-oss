@@ -27,7 +27,7 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'orchestrator-game-view',
-    keys: ['game view'],
+    keys: ['game view', 'game hide-tab'],
     load: async () =>
       (await import('./handlers/orchestrator-game-view.js')).ORCHESTRATOR_GAME_VIEW_HANDLERS
   },

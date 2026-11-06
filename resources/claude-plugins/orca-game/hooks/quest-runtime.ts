@@ -206,6 +206,7 @@ export function resetQuest(): void {
     alert: '',
     isDone: false,
     action: undefined,
+    isTabsMigrationAsked: false,
     isDemo: false,
     caption: '',
     hdParty: [],

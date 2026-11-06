@@ -728,6 +728,11 @@ import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
+import type { GamePanelTab } from '../../shared/orchestrator-game-panel'
+import {
+  gamePanelTabHiddenSettingsOf,
+  type OrchestratorGamePanelTabWrite
+} from '../../shared/orchestrator-game-panel-tab-write'
 import {
   orchestratorGameViewSettingsOf,
   type OrchestratorGameViewWrite
@@ -31261,6 +31266,30 @@ export class OrcaRuntimeService {
       scope: args.scope,
       layer: args.scope === 'global' ? 'global' : 'local'
     }
+  }
+
+  /** Hides a panel tab for the caller's repo on this machine, for the mod's layout migration. */
+  async hideOrchestratorGamePanelTab(args: {
+    tab: GamePanelTab
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<OrchestratorGamePanelTabWrite> {
+    if (!this.store?.getSettings || !this.store.updateSettings) {
+      throw new Error('runtime_unavailable')
+    }
+    const { key } = await this.gameHistoryProjectOf(args)
+    if (!key.startsWith('repo:')) {
+      throw new Error('no_game_project')
+    }
+    const updates = gamePanelTabHiddenSettingsOf(
+      this.store.getSettings(),
+      key.slice('repo:'.length),
+      args.tab
+    )
+    if (updates) {
+      this.store.updateSettings(updates, { notifyListeners: true })
+    }
+    return { tab: args.tab, changed: updates !== null }
   }
 
   // Why the lead's repo: history is the project's, kept on this Orca host for local, SSH and folder repos alike.
