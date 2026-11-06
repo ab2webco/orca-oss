@@ -22,6 +22,15 @@ describe('seatPlanOf', () => {
     expect(new Set(plan.seats.map((s) => s.spot.depth)).size).toBe(2)
   })
 
+  it('staggers the front row so no one stands right in front of a back-row seat', () => {
+    const plan = seatPlanOf(Array.from({ length: 8 }, (_, i) => member(`m${i}`)))
+    const back = plan.seats.slice(0, 4).map((s) => s.spot.x)
+    const front = plan.seats.slice(4).map((s) => s.spot.x)
+    for (const x of front) {
+      expect(Math.min(...back.map((b) => Math.abs(b - x)))).toBeGreaterThan(0.05)
+    }
+  })
+
   it('seats members who need the user first, so overflow never hides them', () => {
     const list = Array.from({ length: 9 }, (_, i) => member(`m${i}`))
     list[8] = member('asker', 'needsYou')
