@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Crown } from 'lucide-react'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
 import type { DashboardAgentRow as DashboardAgentRowData } from '@/components/dashboard/useDashboardData'
 import { AgentIcon } from '@/lib/agent-catalog'
@@ -92,6 +92,8 @@ type CompactAgentRowProps = {
   isFocusedPane?: boolean
   hideIdentityIcon?: boolean
   cacheTimerActive?: boolean
+  /** The project's live game lead (`game.leads`), crowned as in the Team panel. */
+  isGameLead?: boolean
 }
 
 export const CompactAgentRow = React.memo(function CompactAgentRow({
@@ -108,7 +110,8 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
   reserveDisclosureGutter = false,
   isFocusedPane = false,
   hideIdentityIcon = false,
-  cacheTimerActive = true
+  cacheTimerActive = true,
+  isGameLead = false
 }: CompactAgentRowProps) {
   const hasChildDisclosure =
     typeof childAgentCount === 'number' &&
@@ -201,6 +204,13 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
           <AgentIcon agent={agentTypeToIconAgent(agent.agentType)} size={13} />
         </span>
       )}
+      {isGameLead ? (
+        <Crown
+          data-game-lead-crown=""
+          className="size-3 shrink-0 text-foreground"
+          aria-label={translate('teamPanel.lead.badge', 'Lead')}
+        />
+      ) : null}
       <span className="min-w-0 flex-1 truncate">
         {/* Why: the selected-row fill is strong enough to wash out the dimmed
             prompt/secondary text, so lift both toward full foreground when focused. */}

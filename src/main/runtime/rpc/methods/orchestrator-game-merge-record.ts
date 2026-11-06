@@ -26,11 +26,13 @@ export async function recordGameMerges(
     if (recorded.has(id)) {
       continue
     }
+    // Why claim before the await: the panel and the mod poll at once, and both would post it.
+    recorded.add(id)
     try {
       await runtime.getGameBoard().postEvent({ ...caller, ...one })
-      recorded.add(id)
     } catch {
       // Why: a board that cannot be written must cost the merge its rewards, never the lead its state.
+      recorded.delete(id)
     }
   }
 }

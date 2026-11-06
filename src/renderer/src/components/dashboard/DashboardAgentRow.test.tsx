@@ -62,6 +62,33 @@ function renderRow(agent: DashboardAgentRowData, label?: string): string {
   )
 }
 
+function renderLeadRow(isGameLead: boolean): string {
+  return renderToStaticMarkup(
+    <TooltipProvider>
+      <DashboardAgentRow
+        agent={makeAgent()}
+        onDismiss={vi.fn()}
+        onActivate={vi.fn()}
+        now={NOW}
+        hideIdentityIcon
+        hideExpand
+        isGameLead={isGameLead}
+      />
+    </TooltipProvider>
+  )
+}
+
+describe('DashboardAgentRow game lead', () => {
+  it("crowns the project's live game lead", () => {
+    expect(renderLeadRow(true)).toContain('data-game-lead-crown')
+    expect(renderLeadRow(true)).toContain('aria-label="Lead"')
+  })
+
+  it('draws no crown on any other agent', () => {
+    expect(renderLeadRow(false)).not.toContain('data-game-lead-crown')
+  })
+})
+
 function renderSendTargetRow(
   props: Pick<
     ComponentProps<typeof DashboardAgentRow>,
