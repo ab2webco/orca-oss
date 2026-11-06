@@ -5,9 +5,10 @@ import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
 import { readJevAdvisor } from './advisor-state'
-import { offerArcadeOnUnlock } from './arcade-unlock'
+import { celebrateArcadeOnUnlock, migrateKeptArcadeOffers } from './arcade-unlock'
 import { cliInvocationOf } from './cli-invocation'
 import {
+  gameArcadeMigrateArgvOf,
   gameFleetArgvOf,
   gameStateArgvOf,
   gameViewArgvOf,
@@ -117,6 +118,20 @@ export async function readGameStateOutput($: EngineInterface): Promise<GameState
     return { kind: 'failed', reason: `exit ${out.exitCode}${line === '' ? '' : `: ${line}`}` }
   }
   return { kind: 'ok', stdout: out.stdout }
+}
+
+async function sendKeptOffers($: EngineInterface, offers: readonly string[]): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, gameArcadeMigrateArgvOf(cli, offers))
+  if (out?.exitCode !== 0) {
+    return false
+  }
+  try {
+    const reply: unknown = JSON.parse(out.stdout)
+    return typeof reply === 'object' && reply !== null && 'ok' in reply && reply.ok === true
+  } catch {
+    return false
+  }
 }
 
 /** What `orca game fleet` prints for this pane's project; undefined when Orca could not answer. */
@@ -264,10 +279,12 @@ export async function refresh($: EngineInterface): Promise<void> {
     await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
-    // Why after questFleet: a teammate waiting on the user must already hold the offer it opens.
     if (config.rewards) {
-      await offerArcadeOnUnlock($, before.state, next).catch(() => undefined)
+      await celebrateArcadeOnUnlock($, before.state, next).catch(() => undefined)
     }
+    await migrateKeptArcadeOffers($, next, (offers) => sendKeptOffers($, offers)).catch(
+      () => undefined
+    )
   }
 }
 
