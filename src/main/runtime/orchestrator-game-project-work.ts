@@ -6,6 +6,7 @@ import type { LinearIssue } from '../../shared/linear/issue-types'
 import type { PlaneWorkItem } from '../../shared/plane-types'
 import { gameCacheTtlMs, type GameCacheTtl } from './orchestrator-game-read-cache'
 import {
+  readGitHubQueue,
   readGitHubReviews,
   readGitLabReviews,
   type GameProjectReviewsPort
@@ -236,7 +237,8 @@ export async function readGameProjectWork(
           host
         }))
   const todo = source ? await settle(() => readTodo(port, source, repo)) : null
-  return { reviews, todo }
+  const queue = repo ? await readGitHubQueue(port) : null
+  return { reviews, todo, ...(queue ? { queue } : {}) }
 }
 
 const CACHE_MAX_ENTRIES = 32

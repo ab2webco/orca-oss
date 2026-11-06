@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameHostCapacity } from './orchestrator-game-host-capacity'
-import type { GameProjectItem, GameProjectList } from './orchestrator-game-project-work'
+import type {
+  GameProjectItem,
+  GameProjectList,
+  GameProjectQueue,
+  GameQueueEntry
+} from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
-import { teamMachinesSectionOf, teamPrSectionOf } from './team-panel-work-tabs'
+import { teamMachinesSectionOf, teamPrSectionOf, teamQueueSectionOf } from './team-panel-work-tabs'
 import type { TeamHost, TeamMemberCard } from './team-panel-model-types'
 
 const GB = 1024 ** 3
@@ -165,6 +170,104 @@ describe('teamPrSectionOf', () => {
     state.panel = { tabs: { prs: false } } as OrchestratorGameState['panel']
 
     expect(teamPrSectionOf({ state, members: [], isFolder: false, texts, now: NOW })).toBeNull()
+  })
+})
+
+describe('teamQueueSectionOf', () => {
+  const entry = (over: Partial<GameQueueEntry> = {}): GameQueueEntry => ({
+    id: '#1',
+    title: 'PR 1',
+    url: 'https://example.test/1',
+    position: 1,
+    state: 'waiting',
+    since: NOW - 60_000,
+    ...over
+  })
+  const section = (queue: GameProjectQueue | undefined, members: TeamMemberCard[] = []) =>
+    teamQueueSectionOf({
+      state: stateOf({ project: { reviews: null, todo: null, ...(queue ? { queue } : {}) } }),
+      members,
+      isFolder: false,
+      texts,
+      now: NOW
+    })
+
+  it('colours each entry by what it is doing', () => {
+    const result = section({
+      provider: 'github',
+      entries: [
+        entry({ id: '#1', state: 'checks' }),
+        entry({ id: '#2', state: 'waiting' }),
+        entry({ id: '#3', state: 'failed' })
+      ]
+    })
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      value: [
+        { label: '#1', state: 'checks', status: 'working' },
+        { label: '#2', state: 'waiting', status: 'idle' },
+        { label: '#3', state: 'failed', status: 'attention' }
+      ]
+    })
+  })
+
+  it('turns a long wait amber, and keeps a failure red', () => {
+    const long = NOW - 2 * 60 * 60_000
+    const result = section({
+      provider: 'github',
+      entries: [
+        entry({ id: '#1', since: long }),
+        entry({ id: '#2', since: long, state: 'failed' }),
+        entry({ id: '#3', since: null })
+      ]
+    })
+
+    expect(result).toMatchObject({
+      value: [{ status: 'risk' }, { status: 'attention' }, { status: 'idle' }]
+    })
+  })
+
+  it('ties an entry to its member by URL', () => {
+    const result = section({ provider: 'github', entries: [entry()] }, [
+      member('https://example.test/1', 'pane-1')
+    ])
+
+    expect(result).toMatchObject({ value: [{ memberKey: 'pane-1' }] })
+  })
+
+  it('reads an empty queue as empty', () => {
+    expect(section({ provider: 'github', entries: [] })).toEqual({ kind: 'ready', value: [] })
+  })
+
+  it('reads no queue as unavailable, never as empty', () => {
+    expect(section(undefined)).toEqual({ kind: 'unavailable' })
+  })
+
+  it('reports a failed read as an error', () => {
+    expect(section({ provider: 'github', entries: null })).toEqual({
+      kind: 'error',
+      message: 'The provider did not answer.'
+    })
+  })
+
+  it('hides the tab in a folder workspace', () => {
+    const result = teamQueueSectionOf({
+      state: stateOf({}),
+      members: [],
+      isFolder: true,
+      texts,
+      now: NOW
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('hides the tab when the project turned it off', () => {
+    const state = stateOf({})
+    state.panel = { tabs: { queue: false } } as OrchestratorGameState['panel']
+
+    expect(teamQueueSectionOf({ state, members: [], isFolder: false, texts, now: NOW })).toBeNull()
   })
 })
 

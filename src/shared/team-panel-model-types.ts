@@ -169,15 +169,18 @@ export type TeamPrList = {
 }
 
 export type TeamQueueEntry = {
-  number: number
+  /** As the provider names it, like #12. */
+  label: string
   title: string
   url: string
   /** 1 is next to merge. */
   position: number
-  state: 'checks' | 'waiting'
+  state: 'checks' | 'waiting' | 'failed'
   status: TeamStatus
   /** When it entered the queue, ms; a long wait turns it amber. */
   since: number | null
+  /** Whole hours waited, only once the wait is long. */
+  longWaitHours: number | null
   memberKey: string | null
 }
 

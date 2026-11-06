@@ -16087,6 +16087,12 @@
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
   "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
   "teamPanel": {
+    "queue": {
+      "checks": "En checks",
+      "waiting": "En cola",
+      "failed": "Falló",
+      "longWait": "Lleva {{hours}} h"
+    },
     "prs": {
       "reason": {
         "checksFailed": "Check falló",
@@ -16167,7 +16173,9 @@
         "title": "Cola",
         "emptyTitle": "La cola está vacía",
         "emptyText": "Aquí verás cada pull request en orden hasta su merge.",
-        "errorTitle": "No se pudo leer la cola"
+        "errorTitle": "No se pudo leer la cola",
+        "unavailableTitle": "No hay cola de merge que mostrar",
+        "unavailableText": "Este proyecto no tiene cola de merge, o su proveedor o host no la publica."
       },
       "machines": {
         "title": "Máquinas",

@@ -7,10 +7,12 @@ import type {
   TeamMachine,
   TeamPanelModel,
   TeamPrList,
-  TeamPrRow
+  TeamPrRow,
+  TeamQueueEntry
 } from '../../../../shared/team-panel-model-types'
 import { TeamPanelMachinesTab } from './team-panel-machines-tab'
 import { TeamPanelPrsTab } from './team-panel-prs-tab'
+import { TeamPanelQueueTab } from './team-panel-queue-tab'
 
 vi.mock('@/i18n/i18n', () => ({
   getIntlLocale: () => 'en-US',
@@ -106,6 +108,48 @@ describe('TeamPanelPrsTab', () => {
     const noUrl = prs(list([row()], { total: 12, listUrl: null }))
 
     expect(noUrl.querySelector('a[data-team-pr-more]')).toBeNull()
+  })
+})
+
+const queueEntry = (over: Partial<TeamQueueEntry> = {}): TeamQueueEntry => ({
+  label: '#915',
+  title: 'Launch E2E',
+  url: 'https://example.test/915',
+  position: 1,
+  state: 'checks',
+  status: 'working',
+  since: null,
+  longWaitHours: null,
+  memberKey: null,
+  ...over
+})
+
+const queue = (value: TeamQueueEntry[]): HTMLElement =>
+  mount(<TeamPanelQueueTab value={value} model={model} selectTab={selectTab} />)
+
+describe('TeamPanelQueueTab', () => {
+  it('draws the position, the label and the title, linked to the PR', () => {
+    const view = queue([queueEntry({ position: 2 })])
+    const link = view.querySelector('a[data-team-queue="#915"]')
+
+    expect(link?.getAttribute('href')).toBe('https://example.test/915')
+    expect(link?.textContent).toContain('2')
+    expect(link?.textContent).toContain('Launch E2E')
+    expect(link?.textContent).toContain('In checks')
+  })
+
+  it.each([
+    ['waiting', 'In queue'],
+    ['failed', 'Failed']
+  ] as const)('names %s', (state, word) => {
+    expect(queue([queueEntry({ state })]).textContent).toContain(word)
+  })
+
+  it('says how long a stuck entry has waited', () => {
+    const view = queue([queueEntry({ state: 'waiting', status: 'risk', longWaitHours: 2 })])
+
+    expect(view.textContent).toContain('For 2 h')
+    expect(view.textContent).not.toContain('In queue')
   })
 })
 
