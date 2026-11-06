@@ -1,13 +1,18 @@
 // Runs under `claude plugin test`: a member's perfect merge, seen by its lead between two polls of
 // `game state`, celebrates once in the scene and opens no pane: the host saves the play for the
-// Team panel (ORCA-1053). Never twice for the same merge, never from a member's pane.
+// Team panel (ORCA-1053). Never twice for the same merge, never from a member's pane. The offers the
+// old countdown kept are sent to the host once, which pays each as a saved play.
 import { describe, expect, mock } from 'claude-code/testing'
 import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { ARCADE_PANE } from '../hooks/arcade-pane'
-import { ARCADE_OFFERS_KEY } from '../hooks/arcade-unlock'
+import {
+  ARCADE_CHEERS_KEY,
+  ARCADE_OFFERS_KEY,
+  ARCADE_OFFERS_MIGRATED_KEY
+} from '../hooks/arcade-unlock'
 import { POLL_EVERY_MS } from '../hooks/fleet-sync'
 
 const review = (perfectMerge?: boolean) => ({
@@ -49,6 +54,9 @@ type World = {
   opened: { id: string; title?: string; focus?: boolean }[]
   store: Map<string, unknown>
   merges?: unknown[]
+  /** Each `orca game arcade` call, and the exit code it answers with. */
+  arcadeRuns: string[][]
+  arcadeExit: number
 }
 
 const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
@@ -60,6 +68,8 @@ const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
     rewards: true,
     opened: [],
     store: new Map(),
+    arcadeRuns: [],
+    arcadeExit: 0,
     ...patch
   }
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
@@ -79,37 +89,52 @@ const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
     return { value: { isPlaced: true } }
   })
   on('ui.panes', () => ({ value: [] }))
-  on('process.run', () => ({
-    value: {
-      exitCode: 0,
-      stdout: JSON.stringify({
-        id: 'x',
-        ok: true,
-        result: {
-          config: { scene: 'vigilante', rewards: world.rewards },
-          sources: {},
-          warnings: [],
-          worktree: { id: 'wt-main', path: '/w', branch: 'main', displayName: 'main' },
-          agents: world.agents,
-          review: null,
-          workItem: null,
-          links: [],
-          role: world.role,
-          ...(world.merges === undefined ? {} : { merges: world.merges })
+  on('process.run', ($s, e) => {
+    if (e.argv[1] === 'game' && e.argv[2] === 'arcade') {
+      world.arcadeRuns.push(e.argv.slice(1))
+      const result = { ok: true, paid: 2, arcade: { credits: 2, offer: null } }
+      return {
+        value: {
+          exitCode: world.arcadeExit,
+          stdout: world.arcadeExit === 0 ? JSON.stringify({ id: 'a', ok: true, result }) : '',
+          stderr: world.arcadeExit === 0 ? '' : 'Unknown command: game arcade',
+          isStdoutTruncated: false,
+          isStderrTruncated: false
         }
-      }),
-      stderr: '',
-      isStdoutTruncated: false,
-      isStderrTruncated: false
+      }
     }
-  }))
+    return {
+      value: {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          id: 'x',
+          ok: true,
+          result: {
+            config: { scene: 'vigilante', rewards: world.rewards },
+            sources: {},
+            warnings: [],
+            worktree: { id: 'wt-main', path: '/w', branch: 'main', displayName: 'main' },
+            agents: world.agents,
+            review: null,
+            workItem: null,
+            links: [],
+            role: world.role,
+            ...(world.merges === undefined ? {} : { merges: world.merges })
+          }
+        }),
+        stderr: '',
+        isStdoutTruncated: false,
+        isStderrTruncated: false
+      }
+    }
+  })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
   return { clock, world }
 }
 
 const panes = (world: World) => world.opened.filter((one) => one.id === ARCADE_PANE)
-const celebrated = (world: World) => world.store.get(ARCADE_OFFERS_KEY) ?? []
+const celebrated = (world: World) => world.store.get(ARCADE_CHEERS_KEY) ?? []
 
 const mergePerfectly = async (world: World, clock: { advance: (ms: number) => Promise<void> }) => {
   world.agents = [member({ review: review(true) })]
@@ -139,7 +164,8 @@ describe("a member's perfect merge", () => {
     const store = new Map<string, unknown>([[ARCADE_OFFERS_KEY, ['perfect-merge:github#41@wt-12']]])
     const { clock, world } = await start($, on, { store })
     await mergePerfectly(world, clock)
-    expect(celebrated(world)).toEqual(['perfect-merge:github#41@wt-12'])
+    expect(celebrated(world)).toEqual([])
+    expect(world.store.get(ARCADE_OFFERS_KEY)).toEqual(['perfect-merge:github#41@wt-12'])
   })
 
   test('never takes the keyboard while a teammate needs the user', async ($, on) => {
@@ -186,6 +212,47 @@ describe("a member's perfect merge", () => {
     world.agents = [member({ review: review(false) })]
     await clock.advance(POLL_EVERY_MS)
     expect(celebrated(world)).toEqual([])
+  })
+})
+
+const KEPT = ['perfect-merge:github#7@wt-3', 'perfect-merge:gitlab#9@wt-4']
+const kept = () => new Map<string, unknown>([[ARCADE_OFFERS_KEY, KEPT]])
+const MIGRATE = ['game', 'arcade', 'migrate', '--offers', JSON.stringify(KEPT), '--json']
+
+describe('the offers the old countdown kept', () => {
+  test('go to the host once from the lead pane, which pays each as a saved play', async ($, on) => {
+    const { clock, world } = await start($, on, { store: kept() })
+    await clock.advance(POLL_EVERY_MS * 3)
+    expect(world.arcadeRuns).toEqual([MIGRATE])
+    expect(world.store.get(ARCADE_OFFERS_MIGRATED_KEY)).toBe(true)
+  })
+
+  test('are never sent again once the host took them', async ($, on) => {
+    const store = kept()
+    store.set(ARCADE_OFFERS_MIGRATED_KEY, true)
+    const { clock, world } = await start($, on, { store })
+    await clock.advance(POLL_EVERY_MS)
+    expect(world.arcadeRuns).toEqual([])
+  })
+
+  // Why: an Orca older than `game arcade` keeps no credits; the offers wait for one that does.
+  test('wait for a later session when Orca is too old to take them', async ($, on) => {
+    const { clock, world } = await start($, on, { store: kept(), arcadeExit: 1 })
+    await clock.advance(POLL_EVERY_MS * 3)
+    expect(world.arcadeRuns).toEqual([MIGRATE])
+    expect(world.store.get(ARCADE_OFFERS_MIGRATED_KEY)).toBeUndefined()
+  })
+
+  test("are not sent from a member's pane", async ($, on) => {
+    const own = await start($, on, { role: 'member', store: kept() })
+    await own.clock.advance(POLL_EVERY_MS)
+    expect(own.world.arcadeRuns).toEqual([])
+  })
+
+  test('are not sent when the terminal kept none', async ($, on) => {
+    const { clock, world } = await start($, on)
+    await clock.advance(POLL_EVERY_MS)
+    expect(world.arcadeRuns).toEqual([])
   })
 })
 

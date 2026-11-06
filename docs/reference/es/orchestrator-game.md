@@ -1860,18 +1860,25 @@ descarta la partida.
 El merge perfecto de un miembro guarda una partida de arcade para el proyecto en el host de Orca
 ([`orchestrator-game-arcade-credits.ts`](../../../src/shared/orchestrator-game-arcade-credits.ts)).
 El store del juego del host suma el crédito en la misma escritura que el evento `merged` que
-registra, así que un merge visto dos veces paga una sola vez, y los merges registrados antes de
-que existiera el registro no pagan nada. Se guardan como máximo 9 partidas. El `game state` del
-líder las trae como `arcade: { credits, offer }`, y `game.arcade` las lee, o con
-`action: play | keep` gasta una o descarta la oferta. Solo el proyecto del líder las lee o las
-gasta. El panel de Equipo juega la partida en una pestaña central.
+registra, así que un merge visto dos veces paga una sola vez. Se guardan como máximo 9 partidas.
+El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.arcade`
+(`orca game arcade`) las lee, o con `action: play | keep` gasta una o descarta la oferta. Solo el
+proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central.
+
+Las ofertas que hizo la antigua cuenta atrás de 15 segundos se pagan una vez cada una. La terminal
+guardó sus ids bajo `arcade-offers` en `$.store` sin anotar cuáles se jugaron, así que cuentan
+todas. El pane del líder las envía una vez con `orca game arcade migrate`, y el host paga cada id
+que no haya visto, hasta el máximo, y los registra todos en el archivo del proyecto, así que una
+segunda migración no paga nada, tampoco después de un reinicio o de adoptar el repo. Solo la
+respuesta del host las marca como enviadas (`arcade-offers-migrated`); un Orca anterior a
+`game arcade` rechaza el comando, y el pane lo intenta de nuevo en una sesión posterior.
 
 La terminal ya no ofrece partidas. Un pane de líder (`role` distinto de `member`, recompensas
 activadas) solo celebra el merge en su escena y dice que la partida quedó guardada en el panel de
 Equipo ([`arcade-unlock.ts`](../../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)).
 La celebración se identifica por el id de la recompensa del merge perfecto y se guarda bajo
-`arcade-offers` en `$.store`, así que un merge visto de nuevo después de una repetición o una
-recarga, o uno que la antigua oferta de 15 segundos ya mostró, nunca se celebra dos veces.
+`arcade-cheers` en `$.store`, así que un merge visto de nuevo después de una repetición o una
+recarga, o uno que la antigua cuenta atrás ya ofreció, nunca se celebra dos veces.
 `/orca-game:demo offer` (o `/quest demo offer`) reproduce la misma celebración y no guarda nada.
 
 ## Otros plugins en un pane del juego
