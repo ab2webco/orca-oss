@@ -63,6 +63,8 @@ import {
   ProjectOrchestratorGameViewRows
 } from './OrchestratorGameViewSetting'
 import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
+import { ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
+import { getRepositoryGameSectionId } from './repository-settings-targets'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -292,10 +294,21 @@ export function ProjectOrchestratorGameSetting({
   }))
 
   return (
-    <SearchableSetting title={title()} description={description} keywords={keywords}>
+    <SearchableSetting
+      id={getRepositoryGameSectionId(repoId)}
+      title={title()}
+      description={description}
+      keywords={keywords}
+    >
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
+        <ProjectGamePanelRows
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
+        />
         <ProjectOrchestratorGameViewRows
           repoId={repoId}
           settings={settings}
