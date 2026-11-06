@@ -3,7 +3,12 @@ import type { RuntimeTerminalSend } from '../../../shared/runtime-types'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { useAppStore } from '../store'
-import { RuntimeRpcCallError, callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
+import {
+  RuntimeRpcCallError,
+  callRuntimeRpc,
+  getActiveRuntimeTarget,
+  type RuntimeClientTarget
+} from './runtime-rpc-client'
 import {
   getRemoteRuntimePtyEnvironmentId,
   getRemoteRuntimeTerminalHandle
@@ -225,4 +230,19 @@ export async function sendRuntimePtyInputVerified(
     }
     throw error
   }
+}
+
+/** Pastes a prompt into an agent's composer and submits it, past the race a raw `text\r` loses. */
+export async function sendRuntimeAgentPrompt(
+  target: RuntimeClientTarget,
+  terminal: string,
+  prompt: string
+): Promise<boolean> {
+  const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
+    target,
+    'terminal.send',
+    { terminal, text: prompt, enter: true, agentPrompt: true, client: DESKTOP_RUNTIME_CLIENT },
+    { timeoutMs: 15_000 }
+  )
+  return result.send.accepted === true
 }

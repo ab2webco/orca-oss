@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Crown } from 'lucide-react'
 import { StatusDot } from '@/components/StatusDot'
+import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import type { TeamPanelLook } from './use-team-panel-look'
 import type {
@@ -109,7 +110,8 @@ export function TeamTabContent({
   look,
   selectTab,
   now,
-  arcadeActions
+  arcadeActions,
+  onOpenTasks
 }: {
   model: TeamPanelGameModel
   look: TeamPanelLook
@@ -117,6 +119,7 @@ export function TeamTabContent({
   now: number
   /** Absent or null when the host cannot spend a play, which hides the arcade like the model's own null. */
   arcadeActions?: TeamArcadeActions | null
+  onOpenTasks: () => void
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState<string | null>(null)
   const game = look === 'game'
@@ -146,6 +149,16 @@ export function TeamTabContent({
               'Launch one from a ticket and it shows here.'
             )}
           </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-team-view-tasks=""
+            className="mt-1.5 self-start text-xs"
+            onClick={onOpenTasks}
+          >
+            {translate('teamPanel.tabs.team.viewTasks', 'View tasks')}
+          </Button>
         </div>
       ) : (
         model.members.map((card) => (

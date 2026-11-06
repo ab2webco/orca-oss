@@ -112,7 +112,8 @@ async function render(
   value: TeamPanelGameModel,
   look: 'game' | 'display' | 'plain' = 'game',
   selectTab = vi.fn(),
-  arcadeActions: TeamArcadeActions | null = null
+  arcadeActions: TeamArcadeActions | null = null,
+  openTasks = vi.fn()
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -126,10 +127,11 @@ async function render(
         selectTab={selectTab}
         now={NOW}
         arcadeActions={arcadeActions}
+        onOpenTasks={openTasks}
       />
     )
   })
-  return { container, selectTab }
+  return { container, selectTab, openTasks }
 }
 
 const leadCard = (container: HTMLElement): HTMLElement =>
@@ -293,6 +295,21 @@ describe('TeamTabContent', () => {
 
     expect(leadCard(container)).not.toBeNull()
     expect(container.textContent).toContain('No agents yet')
+  })
+
+  it("opens Orca's Tasks view from the empty state, as V28 does", async () => {
+    const { container, openTasks } = await render(model({ members: [] }))
+    const button = container.querySelector<HTMLButtonElement>('button[data-team-view-tasks]')
+
+    expect(button?.textContent).toBe('View tasks')
+    act(() => button?.click())
+    expect(openTasks).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers no Tasks button once the lead has members', async () => {
+    const { container } = await render(model())
+
+    expect(container.querySelector('button[data-team-view-tasks]')).toBeNull()
   })
 
   it('shows the project STOP', async () => {

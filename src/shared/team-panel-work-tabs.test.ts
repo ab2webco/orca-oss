@@ -108,6 +108,17 @@ describe('teamPrSectionOf', () => {
     expect(value.rows).toHaveLength(1)
   })
 
+  it('carries the action the project says the list runs', () => {
+    const value = ready(
+      stateOf({
+        project: { reviews: list([pr('#1')], { actionId: 'action-0' }), todo: null },
+        actions: [{ id: 'action-0', label: 'Review', prompt: 'Review my PRs' }]
+      })
+    )
+
+    expect(value.listAction).toEqual({ id: 'action-0', label: 'Review', prompt: 'Review my PRs' })
+  })
+
   it('ties a row to the member working on it by URL', () => {
     const items = [pr('#1'), pr('#2')]
     const { rows } = ready(stateOf({ project: { reviews: list(items), todo: null } }), [

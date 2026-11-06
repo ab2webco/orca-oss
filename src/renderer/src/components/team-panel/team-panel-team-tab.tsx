@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAppStore } from '@/store'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamTabContent } from './TeamTabContent'
@@ -11,6 +12,7 @@ export function TeamPanelTeamTab({
   selectTab
 }: TeamPanelTabBodyProps<TeamPanelGameModel>): React.JSX.Element {
   const look = useTeamPanelLook()
+  const openTaskPage = useAppStore((s) => s.openTaskPage)
   // Why: ages are minute-grained; a 30 s tick keeps them current without per-frame renders.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -25,6 +27,7 @@ export function TeamPanelTeamTab({
       selectTab={selectTab}
       now={now}
       arcadeActions={null}
+      onOpenTasks={() => openTaskPage()}
     />
   )
 }

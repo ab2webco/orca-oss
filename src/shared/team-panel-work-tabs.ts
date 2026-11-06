@@ -2,6 +2,7 @@ import { gameHostMemoryIsLow, type GameHostCapacity } from './orchestrator-game-
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameProjectItem, GameQueueEntry } from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
+import { teamListActionOf } from './team-panel-list-action'
 import type {
   TeamHost,
   TeamMachine,
@@ -96,7 +97,15 @@ export function teamPrSectionOf(args: {
     .map((row, index) => ({ row, index }))
     .sort((a, b) => STATUS_RANK[a.row.status] - STATUS_RANK[b.row.status] || a.index - b.index)
     .map(({ row }) => row)
-  return { kind: 'ready', value: { rows, total: list.total, listUrl: list.url } }
+  return {
+    kind: 'ready',
+    value: {
+      rows,
+      total: list.total,
+      listUrl: list.url,
+      listAction: teamListActionOf(list, state.actions ?? [])
+    }
+  }
 }
 
 function queueEntryOf(

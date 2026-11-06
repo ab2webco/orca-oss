@@ -16087,6 +16087,10 @@
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
   "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
   "teamPanel": {
+    "leadWork": {
+      "sent": "Enviado al líder: {{label}}",
+      "failed": "No se pudo enviar {{label}}"
+    },
     "queue": {
       "checks": "En checks",
       "waiting": "En cola",
@@ -16149,6 +16153,7 @@
         "title": "Equipo",
         "emptyTitle": "Aún no hay agentes",
         "emptyText": "Lanza uno desde un ticket y aparecerá aquí.",
+        "viewTasks": "Ver tareas",
         "errorTitle": "No se pudo leer el equipo"
       },
       "activity": {

@@ -17086,6 +17086,10 @@
     }
   },
   "teamPanel": {
+    "leadWork": {
+      "sent": "Sent to the lead: {{label}}",
+      "failed": "Could not send {{label}}"
+    },
     "queue": {
       "checks": "In checks",
       "waiting": "In queue",
@@ -17148,6 +17152,7 @@
         "title": "Team",
         "emptyTitle": "No agents yet",
         "emptyText": "Launch one from a ticket and it shows here.",
+        "viewTasks": "View tasks",
         "errorTitle": "Could not read the team"
       },
       "activity": {
