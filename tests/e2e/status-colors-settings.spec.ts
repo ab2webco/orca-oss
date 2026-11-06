@@ -6,7 +6,7 @@
  * only a real cascade shows it beating main.css and leaving the other theme alone.
  */
 
-import type { ElectronApplication, Page } from '@stablyai/playwright-test'
+import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 
@@ -53,7 +53,8 @@ async function openAppearance(page: Page): Promise<void> {
 test('a picked status colour repaints its theme only and Reset restores it', async ({
   electronApp,
   orcaPage
-}) => {
+}, testInfo: TestInfo) => {
+  test.setTimeout(process.env.ORCA_E2E_CAPTURE === '1' ? 300_000 : 120_000)
   await waitForSessionReady(orcaPage)
   await setWindowWidth(electronApp, orcaPage, 1440)
   await setTheme(orcaPage, 'dark')
@@ -83,4 +84,44 @@ test('a picked status colour repaints its theme only and Reset restores it', asy
     .click()
   await orcaPage.getByRole('button', { name: 'Reset status colors' }).click()
   await expect.poll(() => statusInfo(orcaPage)).toBe('#4fc3f7')
+
+  if (process.env.ORCA_E2E_CAPTURE !== '1') {
+    return
+  }
+  // Why: a too-close pair in the shot shows the warning copy fits too.
+  await orcaPage.evaluate(async () => {
+    const settings = await window.api.settings.set({
+      statusColors: { dark: { warning: '#ff6a6a' } }
+    })
+    window.__store?.setState({ settings })
+  })
+  await captureEveryScreen(electronApp, orcaPage, testInfo)
 })
+
+async function captureEveryScreen(
+  app: ElectronApplication,
+  page: Page,
+  testInfo: TestInfo
+): Promise<void> {
+  for (const language of ['en', 'es'] as const) {
+    await page.evaluate(async (uiLanguage) => {
+      const settings = await window.api.settings.set({ uiLanguage })
+      window.__store?.setState({ settings })
+    }, language)
+    for (const theme of ['light', 'dark'] as const) {
+      await setTheme(page, theme)
+      for (const width of [1440, 768, 390, 320]) {
+        await setWindowWidth(app, page, width)
+        await openAppearance(page)
+        const first = page.locator('input[type="color"]').first()
+        await expect(first).toBeVisible()
+        await first.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+        // Why: Settings fades in; an early shot reads as washed out.
+        await page.waitForTimeout(600)
+        await page.screenshot({
+          path: testInfo.outputPath(`settings-${language}-${theme}-${width}.png`)
+        })
+      }
+    }
+  }
+}

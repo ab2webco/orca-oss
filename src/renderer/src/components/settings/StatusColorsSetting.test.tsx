@@ -37,7 +37,7 @@ async function render(statusColors: GlobalSettings['statusColors']) {
   await act(async () => {
     root.render(
       <StatusColorsSetting
-        settings={{ statusColors } as GlobalSettings}
+        settings={{ theme: 'dark', statusColors } as GlobalSettings}
         updateSettings={updateSettings}
       />
     )
@@ -79,6 +79,22 @@ describe('StatusColorsSetting', () => {
 
     await act(async () => vi.advanceTimersByTime(300))
     expect(updateSettings).toHaveBeenCalledWith({ statusColors: { dark: { info: '#123456' } } })
+  })
+
+  it('follows the app theme when it changes while Settings is open', async () => {
+    await render(undefined)
+    expect(picker('Working').value).toBe('#4fc3f7')
+
+    await act(async () => {
+      root.render(
+        <StatusColorsSetting
+          settings={{ theme: 'light' } as GlobalSettings}
+          updateSettings={vi.fn()}
+        />
+      )
+    })
+
+    expect(picker('Working').value).toBe('#0369a1')
   })
 
   it('warns when a tone gets too close to another', async () => {

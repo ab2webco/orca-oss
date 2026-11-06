@@ -6,6 +6,7 @@ import { STATUS_TONES, type StatusTone } from '@/components/status-tone'
 import { Button } from '../ui/button'
 import { SettingsSegmentedControl } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
+import { resolveDocumentTheme } from '@/lib/document-theme'
 import {
   STATUS_COLOR_BACKGROUND,
   STATUS_COLOR_DEFAULTS,
@@ -63,12 +64,13 @@ function toneCopy(tone: StatusTone): { name: string; meaning: string } {
   }
 }
 
-function currentTheme(): StatusColorTheme {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-}
-
 export function StatusColorsSetting({ settings, updateSettings }: Props): React.JSX.Element {
-  const [theme, setTheme] = useState<StatusColorTheme>(currentTheme)
+  const appTheme: StatusColorTheme = resolveDocumentTheme(settings.theme) ? 'dark' : 'light'
+  const [theme, setTheme] = useState<StatusColorTheme>(appTheme)
+  // Why: flipping the Theme row above should bring the matching palette into view.
+  useEffect(() => {
+    setTheme(appTheme)
+  }, [appTheme])
   const [draft, setDraft] = useState(settings.statusColors ?? {})
   const persistTimer = useRef<number | null>(null)
 
