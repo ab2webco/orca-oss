@@ -197,6 +197,66 @@ describe('releasing a remote member that took follow-up work in its worktree', (
     })
   })
 
+  // Why: an unproven stop may leave its process running in the terminal and worktree the first dispatch owns.
+  function stopUnproven(dispatchId: string): void {
+    const sqlite = (homeDb as unknown as { db: { prepare: (sql: string) => { run: () => void } } })
+      .db
+    sqlite
+      .prepare(
+        `UPDATE worker_dispatches SET state = 'stop_unknown', stage = 'stop_outcome_unknown'
+         WHERE dispatch_id = '${dispatchId}'`
+      )
+      .run()
+  }
+
+  it.each(['stop_unknown', 'stopping'])(
+    'touches nothing on the host while a follow-up in %s may still run there',
+    async (state) => {
+      const { run, first, followUp } = await memberWithFollowUp()
+      stopUnproven(followUp)
+      if (state === 'stopping') {
+        const sqlite = (
+          homeDb as unknown as { db: { prepare: (sql: string) => { run: () => void } } }
+        ).db
+        sqlite
+          .prepare(
+            `UPDATE worker_dispatches SET state = 'stopping' WHERE dispatch_id = '${followUp}'`
+          )
+          .run()
+      }
+
+      const response = await release(first)
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: { state: 'retained', reason: 'not_settled' }
+      })
+      expect(JSON.stringify(response)).toContain(followUp)
+      expect(remoteMethods).not.toContain('orchestration.federationRelease')
+      expect(workerRuntime.closeTerminal).not.toHaveBeenCalled()
+      expect(workerRuntime.removeManagedWorktree).not.toHaveBeenCalled()
+      expect(listRemoteGameMemberSources(homeDb, run.id)).toHaveLength(2)
+    }
+  )
+
+  it('frees the member once the host shows nothing of a stop_unknown follow-up is left', async () => {
+    const { run, first, followUp } = await memberWithFollowUp()
+    stopUnproven(followUp)
+    vi.mocked(workerRuntime.showTerminal).mockRejectedValue(new Error('terminal_handle_stale'))
+
+    const response = await release(followUp)
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        state: 'released',
+        worktreeDispatches: [{ dispatchId: first, state: 'released' }]
+      }
+    })
+    expect(workerRuntime.removeManagedWorktree).toHaveBeenCalledWith(`id:${WORKTREE}`, false)
+    expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+  })
+
   it('touches nothing on the host while a follow-up in that worktree still runs', async () => {
     const { run, first, followUp } = await memberWithFollowUp()
 

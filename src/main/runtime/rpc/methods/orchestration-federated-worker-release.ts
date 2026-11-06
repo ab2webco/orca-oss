@@ -31,6 +31,7 @@ type FederatedReleaseArgs = {
 }
 
 const LIVE_STATES: readonly string[] = ['starting', 'ready', 'start_unknown']
+const STOP_UNPROVEN_STATES: readonly string[] = ['stopping', 'stop_unknown']
 
 const isReleased = (receipt: WorkerReleaseReceipt): boolean =>
   receipt.state === 'released' || receipt.state === 'already_released'
@@ -45,7 +46,7 @@ export async function releaseFederatedWorker(
   const db = args.runtime.getOrchestrationDb()
   const dispatchId = args.federated.dispatch_id
   const siblings = db.listUnreleasedWorktreeSiblings(dispatchId)
-  const running = siblings.find((sibling) => LIVE_STATES.includes(sibling.state ?? ''))
+  const running = await runningSiblingOf(args, siblings)
   if (running) {
     const base = { dispatchId, processAction: 'none' as const, archive: null }
     if (db.getWorkerDispatch(dispatchId)?.stage === 'released') {
@@ -56,7 +57,7 @@ export async function releaseFederatedWorker(
       ...base,
       state: 'retained',
       reason: 'not_settled',
-      recovery: `Dispatch ${running.dispatchId} still runs in its worktree on ${args.federated.environment_name}; stop or release that one first.`
+      recovery: `Dispatch ${running.dispatchId} may still run in its worktree on ${args.federated.environment_name}; stop it, or close its terminal there, then release again.`
     }
   }
   const own = await releaseOneFederatedWorker(args)
@@ -78,6 +79,35 @@ export async function releaseFederatedWorker(
     }
   }
   return memberReceiptOf(own, others)
+}
+
+/** A sibling that may still run in the shared terminal and worktree: live, or stopped unproven on a host that still holds it. */
+async function runningSiblingOf(
+  args: FederatedReleaseArgs,
+  siblings: { dispatchId: string; state: string | null }[]
+): Promise<{ dispatchId: string } | undefined> {
+  const live = siblings.find((sibling) => LIVE_STATES.includes(sibling.state ?? ''))
+  if (live) {
+    return live
+  }
+  const db = args.runtime.getOrchestrationDb()
+  for (const sibling of siblings) {
+    if (!STOP_UNPROVEN_STATES.includes(sibling.state ?? '')) {
+      continue
+    }
+    const federated = db.getFederatedDispatch(sibling.dispatchId)
+    const gone = federated
+      ? await isFederatedMemberGoneOnHost(
+          args.runtime,
+          resolvePinnedFederatedServer(args.runtime, federated).environmentId,
+          sibling.dispatchId
+        ).catch(() => false)
+      : true
+    if (!gone) {
+      return sibling
+    }
+  }
+  return undefined
 }
 
 /** One receipt for the member: what every dispatch in its worktree closed and removed. */
