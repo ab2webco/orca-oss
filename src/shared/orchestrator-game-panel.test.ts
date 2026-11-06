@@ -8,6 +8,7 @@ import {
 import { parseOrcaYaml } from './orca-yaml'
 import { resolveOrchestratorGamePanel } from './orchestrator-game-panel-layers'
 import {
+  GAME_PANEL_STYLES,
   gamePanelLookOfLegacy,
   parseGamePanel,
   resolveGamePanel,
@@ -15,6 +16,9 @@ import {
 } from './orchestrator-game-panel'
 
 const legacy = DEFAULT_ORCHESTRATOR_GAME_CONFIG
+
+// Why parsed: Soft is no longer in the type, but a settings file or orca.yaml can still say it.
+const savedSoft = JSON.parse('{"style":"soft"}') as Parameters<typeof resolveGamePanel>[0][number]
 
 describe('parseGamePanel', () => {
   it('keeps every valid key', () => {
@@ -50,12 +54,23 @@ describe('parseGamePanel', () => {
     expect(parsed.value).toEqual({ tabs: {} })
     expect(parsed.warnings).toEqual([
       'orchestratorGame.panel.look must be game, display or plain',
-      'orchestratorGame.panel.style must be figures, soft, office or pixel',
+      'orchestratorGame.panel.style must be figures, office or pixel',
       'orchestratorGame.panel.tabs.prs must be true or false',
       'orchestratorGame.panel.tabs.inbox is not a tab that can be hidden',
       'orchestratorGame.panel.advisor must be true or false',
       'orchestratorGame.panel.colour is not a known setting'
     ])
+  })
+
+  it('offers only the styles something draws', () => {
+    expect(GAME_PANEL_STYLES).toEqual(['figures', 'office', 'pixel'])
+  })
+
+  it('reads a saved soft as Pixel, with no warning', () => {
+    expect(parseGamePanel({ style: 'soft' })).toEqual({
+      value: { style: 'pixel' },
+      warnings: []
+    })
   })
 
   it('rejects a panel or tabs value that is not a mapping', () => {
@@ -112,6 +127,10 @@ describe('resolveGamePanel', () => {
     })
   })
 
+  it('draws a saved soft in Pixel, not in the style of the layer below', () => {
+    expect(resolveGamePanel([{ style: 'figures' }, savedSoft], legacy).style).toBe('pixel')
+  })
+
   it('re-checks a hand-edited Settings layer and ignores what is invalid', () => {
     const edited = {
       look: 'zen',
@@ -157,6 +176,13 @@ describe('orchestratorGame.panel in a layer', () => {
       panel: { look: 'game', tabs: { machines: false } }
     })
     expect(parsed.warnings).toEqual(['orchestratorGame.panel.sparkle is not a known setting'])
+  })
+
+  it('reads a soft left in orca.yaml as Pixel, with no warning', () => {
+    const parsed = parseOrchestratorGameLayer({ panel: { style: 'soft' } })
+
+    expect(parsed.layer).toEqual({ panel: { style: 'pixel' } })
+    expect(parsed.warnings).toEqual([])
   })
 
   it("resolves the panel across global, orca.yaml and this machine's layer", () => {

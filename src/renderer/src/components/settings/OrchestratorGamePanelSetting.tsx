@@ -52,7 +52,6 @@ const styleLabels = (): Record<GamePanelStyle, string> => ({
     'auto.components.settings.OrchestratorGamePanelSetting.styleFigures',
     'Figures'
   ),
-  soft: translate('auto.components.settings.OrchestratorGamePanelSetting.styleSoft', 'Soft'),
   office: translate('auto.components.settings.OrchestratorGamePanelSetting.styleOffice', 'Office'),
   pixel: translate('auto.components.settings.OrchestratorGamePanelSetting.stylePixel', 'Pixel')
 })

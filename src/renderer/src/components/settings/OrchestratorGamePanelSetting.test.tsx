@@ -41,7 +41,36 @@ function toggle(container: HTMLElement, label: string): void {
   act(() => target?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 }
 
+const segments = (container: HTMLElement, group: string): string[] =>
+  Array.from(container.querySelectorAll(`[aria-label="${group}"] [role="radio"]`)).map(
+    (entry) => entry.textContent?.trim() ?? ''
+  )
+
+const selected = (container: HTMLElement, group: string): string | null | undefined =>
+  container
+    .querySelector(`[aria-label="${group}"] [role="radio"][aria-checked="true"]`)
+    ?.textContent?.trim()
+
+// Why parsed: Soft is no longer in the type, but a settings file can still say it.
+const savedSoft = JSON.parse('{"panel":{"style":"soft"}}') as OrchestratorGameLayer
+
 describe('GamePanelSetting', () => {
+  it('offers only the scene styles something draws', () => {
+    const view = render(<GamePanelSetting settings={{}} updateSettings={() => {}} />)
+
+    expect(segments(view.container, 'Scene style')).toEqual(['Figures', 'Office', 'Pixel'])
+    view.unmount()
+  })
+
+  it('shows a saved soft as Pixel', () => {
+    const view = render(
+      <GamePanelSetting settings={{ orchestratorGame: savedSoft }} updateSettings={() => {}} />
+    )
+
+    expect(selected(view.container, 'Scene style')).toBe('Pixel')
+    view.unmount()
+  })
+
   it('is the global Panel section the gear targets, with look, style and the three tabs', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
@@ -113,6 +142,29 @@ describe('ProjectGamePanelRows', () => {
       },
       { orchestratorGameProjects: {} }
     ])
+    view.unmount()
+  })
+
+  it('offers only the scene styles something draws, plus Inherit', () => {
+    const view = projectRows({})
+
+    expect(segments(view.container, 'Scene style')).toEqual([
+      'Inherit',
+      'Figures',
+      'Office',
+      'Pixel'
+    ])
+    view.unmount()
+  })
+
+  it("shows a saved soft as this machine's Pixel, over a global Figures", () => {
+    const view = projectRows({
+      orchestratorGame: { panel: { style: 'figures' } },
+      orchestratorGameProjects: { r1: savedSoft }
+    })
+
+    expect(selected(view.container, 'Scene style')).toBe('Pixel')
+    expect(view.container.textContent).toContain('Pixel · this machine')
     view.unmount()
   })
 

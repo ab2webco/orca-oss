@@ -1,5 +1,5 @@
 ---
-sourceHash: 6ec5b62222842d90
+sourceHash: eb87719603cdd5dc
 ---
 
 # El juego orquestador de Agent Teams
@@ -241,7 +241,7 @@ orchestratorGame:
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
-    style: pixel # figures | soft | office | pixel, for the game look
+    style: pixel # figures | office | pixel, for the game look
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
@@ -266,6 +266,7 @@ las demás capas siguen aplicándose.
 `panel` es del panel nativo y se fusiona clave por clave, y `tabs` pestaña por pestaña. Un `look`
 sin fijar sigue a `mode` (`zen` es Display, `flat` es Sobrio, lo demás Juego) y un `style` sin fijar es
 Pixel, así que nadie cambia de apariencia al actualizar ([`orchestrator-game-panel.ts`](../../../src/shared/orchestrator-game-panel.ts)).
+Soft no es un estilo que se pueda elegir, porque nada lo dibuja: un `style: soft` guardado antes se lee como Pixel.
 Se edita en la sección del juego del proyecto y, como valor por defecto para todos los proyectos, en
 Settings, Agents, Panel; el engranaje del panel abre la primera con equipo y la segunda sin él. Un Orca
 anterior a `panel` lo informa como ajuste desconocido y lo ignora.
