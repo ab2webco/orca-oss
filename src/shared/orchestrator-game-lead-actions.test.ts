@@ -30,6 +30,32 @@ describe('gameStateActionsOf', () => {
     })
   })
 
+  it("gives Orca's buttons an icon and applies the project's orcaActions, never dropping stop", () => {
+    const actions = gameStateActionsOf({
+      role: 'lead',
+      lead: DEFAULT_GAME_LEAD,
+      project,
+      orca: {
+        wave: { enabled: false },
+        sweep: { label: 'Close', icon: 'scan', prompt: 'Close only with CI green.' },
+        stop: { enabled: false }
+      }
+    })
+    expect(actions.map((one) => [one.id, one.label, one.command, one.icon])).toEqual([
+      ['lead:status', 'Status', 'status', 'pulse'],
+      ['lead:push', 'Push', 'push', 'play'],
+      ['lead:sweep', 'Close', 'sweep', 'scan'],
+      ['lead:stop', 'Stop', 'stop', 'stop'],
+      ['action-0', 'Test runs', 'test-runs', undefined],
+      // Why: with Orca's wave off, the project's /wave keeps its command.
+      ['action-1', 'Mine', 'wave', undefined]
+    ])
+    expect(actions.find((one) => one.id === 'lead:sweep')).toMatchObject({
+      prompt: 'Close only with CI green.'
+    })
+    expect(GAME_LEAD_ACTIONS.find((one) => one.id === 'lead:wave')?.icon).toBe('launch')
+  })
+
   it('keeps only the project actions for a member or when the project turns them off', () => {
     const member = gameStateActionsOf({ role: 'member', lead: DEFAULT_GAME_LEAD, project })
     const off = gameStateActionsOf({

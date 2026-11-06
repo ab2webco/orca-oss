@@ -127,7 +127,8 @@ export async function buildOrchestratorGameState(
   const actions = gameStateActionsOf({
     role,
     lead: placed.lead,
-    project: gameActionsOf(integrations.actions, placeholders)
+    project: gameActionsOf(integrations.actions, placeholders),
+    orca: integrations.orcaActions
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
   const listActions = gameListActionsOf(actions, {
