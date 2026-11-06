@@ -152,6 +152,11 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
   }
 }))
 
+// Why: the Team tab polls a runtime this render test does not have.
+vi.mock('../team-panel/use-team-panel-model', () => ({
+  useTeamPanelModel: () => ({ section: { kind: 'unavailable' }, retry: null })
+}))
+
 vi.mock('./FileExplorer', () => ({
   default: () => <div data-file-explorer />
 }))
