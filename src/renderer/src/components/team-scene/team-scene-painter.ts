@@ -4,6 +4,11 @@ import type {
   TeamSceneSpot
 } from '../../../../shared/team-scene/team-scene-types'
 
+export type TeamScenePortraitSubject = Pick<
+  TeamSceneActor,
+  'role' | 'key' | 'characterKey' | 'name'
+>
+
 /** One frame in CSS px; the host already scaled the context for the device pixel ratio. */
 export type TeamSceneFrame = {
   width: number
@@ -27,5 +32,7 @@ export type TeamScenePainter = {
   /** Pixel's grid size when its bubbles are the game's thought cloud; glass otherwise. */
   cloudPixel?: number
   paint: (g: CanvasRenderingContext2D, frame: TeamSceneFrame) => void
+  /** A card face `size` CSS px square, drawn as this style draws the same character. */
+  portrait?: (g: CanvasRenderingContext2D, who: TeamScenePortraitSubject, size: number) => void
   dispose: () => void
 }

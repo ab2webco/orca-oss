@@ -14,6 +14,7 @@ import {
   teamTicketBesideName
 } from './team-card-text'
 import { TeamStatusMark } from './TeamStatusMark'
+import { TeamCardFace } from './TeamCardFace'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 
@@ -74,35 +75,49 @@ export function TeamMemberCardRow({
         aria-expanded={expanded}
         onClick={onToggle}
         className={cn(
-          'flex w-full min-w-0 flex-col gap-0.5 px-3 py-2 text-left hover:bg-sidebar-accent',
+          'flex w-full min-w-0 items-start gap-2.5 px-3 py-2 text-left hover:bg-sidebar-accent',
           expanded && 'bg-sidebar-accent'
         )}
       >
-        <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
-          {showName ? <span className="truncate text-[13px] font-medium">{card.name}</span> : null}
-          {ticket ? (
-            <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
-          ) : null}
-          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-            {teamHostText(card.host)}
+        {showName ? (
+          <TeamCardFace
+            who={{
+              role: 'member',
+              key: card.paneKey,
+              characterKey: card.characterKey,
+              name: card.name
+            }}
+          />
+        ) : null}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
+            {showName ? (
+              <span className="truncate text-[13px] font-medium">{card.name}</span>
+            ) : null}
+            {ticket ? (
+              <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
+            ) : null}
+            <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+              {teamHostText(card.host)}
+            </span>
           </span>
-        </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <TeamStatusMark status={card.status} />
-          {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
-          <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
-            {card.needsYou
-              ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
-              : teamLiveText(card.liveAction, card.condition)}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <TeamStatusMark status={card.status} />
+            {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
+            <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
+              {card.needsYou
+                ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
+                : teamLiveText(card.liveAction, card.condition)}
+            </span>
           </span>
+          <MetaLine
+            model={teamModelText(card.model)}
+            parts={[
+              card.flowPhase ? teamPhaseText(card.flowPhase) : null,
+              card.since !== null ? teamAgeText(card.since, now) : null
+            ]}
+          />
         </span>
-        <MetaLine
-          model={teamModelText(card.model)}
-          parts={[
-            card.flowPhase ? teamPhaseText(card.flowPhase) : null,
-            card.since !== null ? teamAgeText(card.since, now) : null
-          ]}
-        />
       </button>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}
       {expanded ? (

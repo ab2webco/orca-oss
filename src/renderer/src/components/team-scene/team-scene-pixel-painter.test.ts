@@ -117,4 +117,24 @@ describe('createPixelPainter', () => {
     expect(calm.calls.map((c) => c.fillStyle)).not.toContain(COLORS.attention)
     expect(asking.calls.map((c) => c.fillStyle)).toContain(COLORS.attention)
   })
+
+  it('draws a card face from the same sprite, crowned for the lead, crisp and centered', () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const face = (who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey' | 'name'>) => {
+      const r = recordingContext()
+      painter.portrait!(r.g, who, 38)
+      expect(r.g.imageSmoothingEnabled).toBe(false)
+      const drawn = r.calls.filter((c) => c.name === 'drawImage')
+      expect(drawn).toHaveLength(1)
+      return drawn[0]!.args as [HTMLCanvasElement, number, number, number, number]
+    }
+    const member = face({ role: 'member', key: 'p1', characterKey: 'merlin', name: 'Merlín' })
+    const again = face({ role: 'member', key: 'p2', characterKey: 'merlin', name: 'Merlín' })
+    const lead = face({ role: 'lead', key: 'lead', characterKey: null, name: 'Alfred' })
+    expect(again[0]).toBe(member[0])
+    expect(lead[0].height).toBeGreaterThan(member[0].height)
+    // Why integer: every sprite pixel must land on whole device pixels.
+    expect(Number.isInteger(member[3] / member[0].width)).toBe(true)
+    expect(member[3]).toBeLessThanOrEqual(38)
+  })
 })

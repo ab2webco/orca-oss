@@ -14,7 +14,11 @@ import {
 import { hdFrameOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd-land'
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
-import type { TeamSceneFrame, TeamScenePainter } from './team-scene-painter'
+import type {
+  TeamSceneFrame,
+  TeamScenePainter,
+  TeamScenePortraitSubject
+} from './team-scene-painter'
 import {
   createSceneEffects,
   drawSceneEmote,
@@ -100,11 +104,13 @@ export function createPixelPainter(args: {
     return made
   }
 
+  const imageOf = (a: TeamScenePortraitSubject, leg: number): HTMLCanvasElement => {
+    const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
+    return spriteFor(costumeSpriteOf(costume, leg, false), a.role === 'lead')
+  }
   const drawActor = (g: CanvasRenderingContext2D, a: TeamSceneActor, columns: number): void => {
     const leg = a.pose === 'walk' ? Math.floor(a.gait / Math.PI) % 2 : 0
-    const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
-    const crowned = a.role === 'lead'
-    const image = spriteFor(costumeSpriteOf(costume, leg, false), crowned)
+    const image = imageOf(a, leg)
     const left = Math.round(a.x * columns - image.width / 2)
     const bottom = feetRow(a.depth) - Math.round(a.jump / PIXEL)
     g.fillStyle = a.emote === 'alert' ? colors.attention : 'rgb(20 20 30 / 0.35)'
@@ -132,6 +138,14 @@ export function createPixelPainter(args: {
     height: HEIGHT,
     cloudPixel: PIXEL,
     headTop: (depth) => (feetRow(depth) - 10) * PIXEL,
+    portrait: (g, who, size) => {
+      const image = imageOf(who, 0)
+      const px = Math.max(1, Math.floor(size / Math.max(image.width, image.height)))
+      const width = image.width * px
+      const height = image.height * px
+      g.imageSmoothingEnabled = false
+      g.drawImage(image, Math.round((size - width) / 2), size - height, width, height)
+    },
     paint: (g, f: TeamSceneFrame) => {
       const columns = Math.ceil(f.width / PIXEL)
       g.imageSmoothingEnabled = false

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orchestrator-game-scene-native'
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
+import { figureSeedOf } from './team-scene-figure-looks'
 import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-painter'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
@@ -260,5 +261,44 @@ describe('createImagePainter', () => {
     painter.dispose()
     painter.paint(g, frame())
     expect(sprites(calls)).toHaveLength(1)
+  })
+})
+
+describe('createImagePainter portrait', () => {
+  it("draws a card face from the character's idle frame, head up, covering the face", () => {
+    const painter = createImagePainter({ art: { style: style(), images: IMAGES }, colors: COLORS })
+    const face = (who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey' | 'name'>) => {
+      const { g, calls } = recordingContext()
+      painter.portrait!(g, who, 38)
+      const [call] = sprites(calls)
+      return call!.args as [
+        TeamSceneArtImage,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number
+      ]
+    }
+    const merlin = face({ role: 'member', key: 'p1', characterKey: 'merlin', name: 'Merlín' })
+    expect(face({ role: 'member', key: 'p2', characterKey: 'merlin', name: 'Merlín' })[0]).toBe(
+      merlin[0]
+    )
+    const sheet = ['m1.png', 'm2.png'][figureSeedOf('merlin') % 2]!
+    expect(merlin[0]).toBe(IMAGES.get(sheet))
+    // The idle row's first frame, cut above the feet so the head fills the face.
+    const [, sx, sy, sw, sh] = merlin
+    expect(sx).toBeGreaterThanOrEqual(0)
+    expect(sx + sw).toBeLessThanOrEqual(128)
+    expect(sy).toBeGreaterThanOrEqual(0)
+    expect(sy + sh).toBeLessThan(122)
+    expect(sw).toBe(sh)
+    expect(merlin[7]).toBeGreaterThanOrEqual(38)
+    expect(face({ role: 'lead', key: 'lead', characterKey: null, name: 'Alfred' })[0]).toBe(
+      IMAGES.get('lead.png')
+    )
   })
 })
