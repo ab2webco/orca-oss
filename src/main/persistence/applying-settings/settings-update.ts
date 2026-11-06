@@ -33,6 +33,7 @@ import {
 } from '../../protected-secret-persistence'
 import { normalizeNotificationSettings } from './onboarding-normalization'
 import { retireLegacyInstructionsForClearedTextActionRecipes } from './source-control-settings'
+import { normalizeStatusColorOverrides } from '../../../shared/status-colors'
 import { sanitizeTaskViewAndFailoverSettingsUpdate } from './task-view-and-failover-settings'
 import {
   buildWorkspaceDirHistoryForUpdate,
@@ -71,6 +72,9 @@ export function updateSettings(
   // Why: the artifact publish capability must be an exact boolean on disk; no truthy value grants it.
   if ('artifactSharingEnabled' in updates) {
     sanitizedUpdates.artifactSharingEnabled = updates.artifactSharingEnabled === true
+  }
+  if ('statusColors' in updates) {
+    sanitizedUpdates.statusColors = normalizeStatusColorOverrides(updates.statusColors)
   }
   if ('disabledTuiAgents' in updates) {
     sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
