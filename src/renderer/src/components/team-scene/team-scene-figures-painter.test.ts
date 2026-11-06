@@ -6,7 +6,7 @@ import { createFiguresPainter } from './team-scene-figures-painter'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext } from './team-scene-recording-context'
 
-const COLORS = { attention: '#ff0001', done: '#00ff02' }
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
 
 const actor = (key: string, extra: Partial<TeamSceneActor> = {}): TeamSceneActor => ({
   key,
