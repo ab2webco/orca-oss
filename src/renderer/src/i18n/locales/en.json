@@ -17039,5 +17039,63 @@
       "title": "Release {{value0}} resume records?",
       "description": "Orca Lab will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected."
     }
+  },
+  "teamPanel": {
+    "activityBar": {
+      "teamTitle": "Team",
+      "noTeamTitle": "Your work"
+    },
+    "header": {
+      "title": "Team",
+      "noTeamTitle": "Your work",
+      "projectSettings": "Project settings",
+      "panelSettings": "Panel settings"
+    },
+    "state": {
+      "loading": "Loading",
+      "unavailableText": "This Orca host does not publish it yet.",
+      "modelErrorTitle": "Could not read the team",
+      "modelUnavailableTitle": "Team data is not available",
+      "retry": "Try again"
+    },
+    "tabs": {
+      "label": "Panel sections",
+      "team": {
+        "title": "Team",
+        "emptyTitle": "No agents yet",
+        "emptyText": "Launch one from a ticket and it shows here.",
+        "errorTitle": "Could not read the team"
+      },
+      "activity": {
+        "title": "Activity",
+        "emptyTitle": "No agents running",
+        "emptyText": "Start an agent in any workspace and it shows here.",
+        "errorTitle": "Could not read your sessions"
+      },
+      "inbox": {
+        "title": "Inbox",
+        "emptyTitle": "Nothing waits for you",
+        "emptyText": "When an agent asks you something, it shows here.",
+        "errorTitle": "Could not read the inbox"
+      },
+      "prs": {
+        "title": "PRs",
+        "emptyTitle": "No open pull requests",
+        "emptyText": "They show here when an agent opens one.",
+        "errorTitle": "Could not read pull requests"
+      },
+      "queue": {
+        "title": "Queue",
+        "emptyTitle": "The queue is empty",
+        "emptyText": "Each pull request shows here in order until it merges.",
+        "errorTitle": "Could not read the queue"
+      },
+      "machines": {
+        "title": "Machines",
+        "emptyTitle": "Only this machine",
+        "emptyText": "Pair another machine to spread agents across hosts.",
+        "errorTitle": "Could not read the machines"
+      }
+    }
   }
 }

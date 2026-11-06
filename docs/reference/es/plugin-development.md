@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a3042336372ea13
+sourceHash: 99f32b80856dffb6
 ---
 # Escribir un plugin de Orca
 
@@ -773,6 +773,10 @@ ni worker ni capability:
 - `id` es kebab-case, único dentro del plugin, y nunca `quest` (la escena integrada). Como máximo 8
   por plugin; cada archivo de 64 KB como máximo, dentro de la carpeta del plugin (sin ruta absoluta, sin `..`, sin
   symlink hacia fuera: la misma contención que cualquier otro archivo declarado).
+- El bloque opcional `native` de una escena nombra archivos de imagen relativos al archivo de la
+  escena. La instalación rechaza un plugin si falta uno, si enlaza fuera del plugin o si supera los
+  2 MB. Una escena sin arte se dibuja en Pixel. El formato está en
+  [`skill-guides/orca-game-scenes.md`](../../../skill-guides/orca-game-scenes.md#native-optional).
 - El juego ve la escena como **`<publisher>.<id>/<scene id>`**, por ejemplo
   `orca-samples.worklog/night-shift`, así que dos plugins, o un plugin y `quest`, nunca chocan.
   Ese es el id que va en `orchestratorGame.scene` en `orca.yaml`, o el que eliges en

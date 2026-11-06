@@ -280,6 +280,7 @@ export async function remoteGameMembersOf(
         agentType: agent?.agentType ?? null,
         state,
         toolName: agent?.toolName ?? null,
+        ...(agent?.toolInput ? { toolInput: agent.toolInput } : {}),
         isLeader: false,
         isMember: true,
         remote: {

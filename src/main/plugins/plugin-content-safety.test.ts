@@ -11,6 +11,7 @@ import {
   validatePluginInstallContent
 } from './plugin-artifact-validation'
 import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../shared/orchestrator-game-scene'
+import { ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES } from '../../shared/orchestrator-game-scene-native'
 import { hashPluginTree } from './plugin-content-hash'
 import { verifyHashAddressedPluginContent } from './plugin-content-integrity'
 import { PluginService } from './plugin-service'
@@ -223,6 +224,81 @@ describe('declared plugin artifacts', () => {
     await expect(validatePluginInstallContent(root, pluginManifest)).resolves.toMatchObject({
       ok: false,
       error: expect.stringContaining('duplicate VM recipe id "cloud"')
+    })
+  })
+})
+
+describe('game scene art', () => {
+  const role = {
+    sheets: ['art/hero.png'],
+    frame: { width: 32, height: 48 },
+    size: 58,
+    animations: { idle: { row: 0, frames: 2 } }
+  }
+  const scene = JSON.stringify({
+    native: { figures: { layers: [{ src: 'art/sky.png' }], roles: { lead: role, member: role } } }
+  })
+  const plugin = manifest({
+    contributes: { gameScenes: [{ id: 'space', path: 'scenes/space.json' }] }
+  })
+
+  async function pluginRoot(text = scene): Promise<string> {
+    const root = await tempRoot()
+    await mkdir(join(root, 'scenes', 'art'), { recursive: true })
+    await writeFile(join(root, 'scenes', 'space.json'), text)
+    return root
+  }
+
+  it('installs a scene whose art sits next to it, resolved from the scene file', async () => {
+    const root = await pluginRoot()
+    await writeFile(join(root, 'scenes', 'art', 'sky.png'), 'png')
+    await writeFile(join(root, 'scenes', 'art', 'hero.png'), 'png')
+
+    await expect(validatePluginInstallContent(root, plugin)).resolves.toEqual({ ok: true })
+  })
+
+  it('refuses a scene whose art is missing and names it', async () => {
+    const root = await pluginRoot()
+    await writeFile(join(root, 'scenes', 'art', 'hero.png'), 'png')
+
+    const result = await validatePluginInstallContent(root, plugin)
+
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.error).toContain('game scene "space" art art/sky.png')
+  })
+
+  it.skipIf(process.platform === 'win32')('refuses art that links out of the plugin', async () => {
+    const root = await pluginRoot()
+    const outside = await tempRoot()
+    await writeFile(join(outside, 'sky.png'), 'png')
+    await symlink(join(outside, 'sky.png'), join(root, 'scenes', 'art', 'sky.png'))
+    await writeFile(join(root, 'scenes', 'art', 'hero.png'), 'png')
+
+    const result = await validatePluginInstallContent(root, plugin)
+
+    expect(!result.ok && result.error).toContain('resolves outside the plugin directory')
+  })
+
+  it('refuses art over the file cap', async () => {
+    const root = await pluginRoot()
+    await writeFile(join(root, 'scenes', 'art', 'sky.png'), 'png')
+    await writeFile(join(root, 'scenes', 'art', 'hero.png'), 'png')
+    await truncate(
+      join(root, 'scenes', 'art', 'sky.png'),
+      ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES + 1
+    )
+
+    const result = await validatePluginInstallContent(root, plugin)
+
+    expect(!result.ok && result.error).toContain('artifact limit')
+  })
+
+  it('leaves a scene with a broken block or none installable, since it draws in Pixel', async () => {
+    await expect(
+      validatePluginInstallContent(await pluginRoot('{"native":{"figures":{}}}'), plugin)
+    ).resolves.toEqual({ ok: true })
+    await expect(validatePluginInstallContent(await pluginRoot('{}'), plugin)).resolves.toEqual({
+      ok: true
     })
   })
 })

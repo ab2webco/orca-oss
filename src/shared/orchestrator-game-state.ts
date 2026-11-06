@@ -19,6 +19,7 @@ import type { GameMetricsSummary } from './orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
+import { gameToolInputOf } from './orchestrator-game-tool-input'
 import type {
   GamePausedMember,
   GameQueuedMember,
@@ -50,6 +51,8 @@ export type GameAgent = {
   agentType: string | null
   state: 'working' | 'waiting' | 'idle' | 'done'
   toolName: string | null
+  /** A one-line preview of the tool's input; absent when none or from an older host. */
+  toolInput?: string
   isLeader: boolean
   /** Optional on the wire: older hosts send none, and a pane with no terminal gets none. */
   terminalHandle?: string
@@ -290,16 +293,19 @@ export function gameAgentOf(
   row: Pick<
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
-  >,
+  > &
+    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>>,
   leaderPaneKey: string | null,
   terminalHandle: string | null = null
 ): GameAgent {
+  const toolInput = gameToolInputOf(row.toolInput)
   return {
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
     state: gameAgentStateOf(row.state),
     toolName: row.toolName,
+    ...(toolInput ? { toolInput } : {}),
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})
   }

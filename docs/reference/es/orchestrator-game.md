@@ -1,5 +1,5 @@
 ---
-sourceHash: bbe64fe0844852ad
+sourceHash: a4195bc9fccf0114
 ---
 
 # El juego orquestador de Agent Teams
@@ -1539,6 +1539,19 @@ orchestratorGame:
   `orca game scene validate` informa un bloque incorrecto como `scene3d.<key>: <message>` y sale con 1,
   pero el juego solo descarta el bloque con un aviso y dibuja la escena en 2D. Una build de Orca o un mod
   anterior al bloque ignora la clave.
+- **Arte nativo.** El objeto opcional `native` es arte en imágenes para los estilos Figuras y Oficina
+  del panel nativo de Equipo, parseado aparte en
+  [`orchestrator-game-scene-native.ts`](../../../src/shared/orchestrator-game-scene-native.ts): por cada
+  estilo, `layers` de imagen y `animations` por rol sobre `sheets` de sprites, con un objeto de estación
+  opcional. Las imágenes viven en la carpeta de la escena, fuera del JSON de 64 KB, con un máximo de 2 MB
+  cada una y de 8 MB y 16 megapíxeles por estilo; las rutas son relativas al archivo de la escena.
+  `orca game scene validate` lee cada archivo e informa los problemas como
+  `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. Una escena sin arte
+  para un estilo se dibuja en Pixel (`orchestratorGameSceneDrawnStyle`), igual que el arte que no carga
+  en esta máquina, como una escena llevada a un miembro remoto. El arte de Quest viene con Orca. El
+  estado del juego lleva el bloque como campo opcional; las imágenes viajan por la lectura de archivos
+  existente, así que no hay RPC nueva. La
+  [guía de escenas](../../../skill-guides/orca-game-scenes.md#native-optional) tiene el formato.
 
 **Settings.** El selector **Scene** del proyecto termina con **Custom file…**, que muestra la ruta
 (escrita, relativa a la raíz del proyecto; una ruta que sale del proyecto se rechaza en línea) y tres
