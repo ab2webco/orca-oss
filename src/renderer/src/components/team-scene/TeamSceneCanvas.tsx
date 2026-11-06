@@ -48,11 +48,13 @@ export function TeamSceneCanvas({ input, painter, label }: Props): React.JSX.Ele
       painter.paint(g, {
         width,
         height,
+        ratio,
         t: world.t,
         dt,
         actors: teamSceneActors(world),
         effects: drainTeamSceneEffects(world),
-        overflow: world.overflow
+        overflow: world.overflow,
+        stations: world.stations
       })
     },
     [painter]

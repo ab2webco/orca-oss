@@ -61,6 +61,12 @@ describe('team scene director', () => {
     )
   })
 
+  it('keeps one station per seat for styles to draw', () => {
+    const world = seated(['a', 'b', 'c'])
+    expect(world.stations).toHaveLength(3)
+    expect(world.stations[0]).toEqual({ x: actor(world, 'a')?.x, depth: actor(world, 'a')?.depth })
+  })
+
   it('acts out each member state at its seat', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(

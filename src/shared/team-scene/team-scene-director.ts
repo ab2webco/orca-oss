@@ -52,6 +52,8 @@ export type TeamSceneWorld = {
   effects: TeamSceneEffect[]
   /** Members beyond the seats, drawn as +N. */
   overflow: number
+  /** Every seat's spot, so a style draws the stations even while their members walk. */
+  stations: TeamSceneSpot[]
 }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -65,7 +67,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     advisorSaid: null,
     advisorRaiseUntil: 0,
     effects: [],
-    overflow: 0
+    overflow: 0,
+    stations: []
   }
 }
 
@@ -170,6 +173,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
     }
   }
   world.overflow = plan.overflow
+  world.stations = plan.seats.map((s) => s.spot)
 }
 
 function arrive(world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): void {
