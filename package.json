@@ -36,6 +36,7 @@
     "check:feature-wall-assets": "node config/scripts/check-feature-wall-assets.mjs",
     "generate:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --write",
     "capture:orca-game-scenes": "node config/scripts/orca-game-scene-captures.mjs",
+    "generate:quest-art": "node config/scripts/orca-game-quest-art.mjs",
     "verify:bundled-skill-guides": "node config/scripts/generate-bundled-skill-guides.mjs --check",
     "generate:panel-font-data-uri": "node config/scripts/generate-panel-font-data-uri.mjs --write",
     "verify:panel-font-data-uri": "node config/scripts/generate-panel-font-data-uri.mjs",
