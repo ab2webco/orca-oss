@@ -19,7 +19,7 @@ export const STATUS_COLOR_DEFAULTS: Record<StatusColorTheme, Record<StatusTone, 
     attention: '#ff6568',
     warning: '#f5b342',
     info: '#4fc3f7',
-    success: '#86efac',
+    success: '#34d399',
     idle: '#a1a1a1'
   }
 }
