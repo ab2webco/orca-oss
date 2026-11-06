@@ -16325,6 +16325,9 @@
           "send": "Send",
           "overridePlaceholder": "Replace the lead's answer",
           "override": "Override"
+        },
+        "GameInboxUndelivered": {
+          "title": "Your answer has not reached the lead yet. Orca keeps retrying and delivers it once a lead is running."
         }
       }
     },

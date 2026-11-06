@@ -108,6 +108,42 @@ const tab = (view: ReturnType<typeof render>, name: RegExp) => {
 }
 
 describe('GameInboxSheet', () => {
+  // Why (ORCA-1100): the Inbox read "answered" while the lead never got the answer.
+  it('shows under For you an answer that has not reached the lead yet', () => {
+    const view = render(
+      <GameInboxSheet
+        open
+        onOpenChange={() => {}}
+        questions={[]}
+        undelivered={[
+          {
+            id: 'oq_9',
+            ticket: 'ORCA-1039',
+            question: 'Does the warning still show?',
+            options: [],
+            context: null,
+            askedAt: AN_HOUR_AGO,
+            answer: { text: 'No', at: AN_HOUR_AGO, undelivered: true }
+          }
+        ]}
+        onAnswer={async () => {}}
+        threads={THREADS}
+        onReply={async () => {}}
+      />
+    )
+
+    const notice = view.getByTestId('game-inbox-undelivered')
+    expect(notice.textContent).toMatch(/not reached the lead yet/)
+    expect(within(notice).getByText('ORCA-1039')).toBeTruthy()
+    expect(within(notice).getByText('Does the warning still show?')).toBeTruthy()
+  })
+
+  it('shows no undelivered notice when every answer reached the lead', () => {
+    const view = renderSheet()
+
+    expect(view.queryByTestId('game-inbox-undelivered')).toBeNull()
+  })
+
   it('counts For you and Waiting on their tabs, and opens on For you', () => {
     const view = renderSheet()
 

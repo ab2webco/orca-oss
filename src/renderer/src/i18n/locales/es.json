@@ -15376,6 +15376,9 @@
           "send": "Enviar",
           "overridePlaceholder": "Reemplaza la respuesta del lead",
           "override": "Corregir"
+        },
+        "GameInboxUndelivered": {
+          "title": "Tu respuesta aún no le llegó al lead. Orca sigue reintentando y la entrega cuando haya un lead en marcha."
         }
       },
       "terminal-pane": {
