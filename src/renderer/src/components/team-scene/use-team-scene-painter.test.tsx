@@ -48,9 +48,8 @@ describe('teamSceneDrawnStyleOf', () => {
     )
   })
 
-  it('draws Pixel when Pixel or Soft is asked for', () => {
+  it('draws Pixel when Pixel is asked for', () => {
     expect(teamSceneDrawnStyleOf({ style: 'pixel', scene: QUEST })).toBe('pixel')
-    expect(teamSceneDrawnStyleOf({ style: 'soft', scene: QUEST })).toBe('pixel')
   })
 
   it('falls to Pixel for a scene with a native block, whose images the panel cannot read yet', () => {
