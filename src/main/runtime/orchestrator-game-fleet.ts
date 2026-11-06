@@ -117,7 +117,7 @@ export async function gameFleetOf(args: {
   accountOf?: GameMemberAccountOf
   globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
-  /** What a member pane's own Jev last reported; read only for members. */
+  /** What a pane's own Jev last reported; read only for the lead and members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** The model and effort Orca dispatched a member on; read only for members. */
   launchOf?: (paneKey: string) => GameMemberLaunch | null
@@ -185,7 +185,8 @@ export async function gameFleetOf(args: {
               })
             )
           : null
-      const advisor = isMember ? (args.advisorOf?.(row.paneKey) ?? null) : null
+      const advisor =
+        isMember || row.paneKey === leaderPaneKey ? (args.advisorOf?.(row.paneKey) ?? null) : null
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,

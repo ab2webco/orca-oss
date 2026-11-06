@@ -32062,7 +32062,7 @@ export class OrcaRuntimeService {
     worktreeId?: string
     terminalHandle?: string
     paneKey?: string
-    /** The calling member pane's Jev report, kept for its lead's state. */
+    /** The calling pane's Jev report, kept for its lead's state. */
     advisor?: unknown
     /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
     role?: string

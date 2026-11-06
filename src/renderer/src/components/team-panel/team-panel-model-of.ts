@@ -2,6 +2,7 @@ import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-own
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
 import type {
+  TeamAdvisorRow,
   TeamInboxCounts,
   TeamPanelGameModel,
   TeamSection
@@ -26,9 +27,25 @@ function inboxOf(
   }
 }
 
+// Why no calls: Jev's decisions live in the lead pane's own state, which never reaches game.state.
+function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
+  const advisor = state.agents.find((one) => one.isLeader)?.advisor
+  if (!advisor) {
+    return null
+  }
+  return {
+    model: advisor.model,
+    effort: advisor.effort,
+    pinned: advisor.pinned,
+    line: advisor.line ?? null,
+    previous: advisor.previous ?? null,
+    calls: []
+  }
+}
+
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (Advisor, XP, arcade, metrics, PRs, queue, machines) stay
+ * Fields game.state does not publish (XP, arcade, metrics, PRs, queue, machines) stay
  * empty rather than guessed: their tickets fill them.
  */
 export function teamPanelModelOf(args: {
@@ -53,7 +70,7 @@ export function teamPanelModelOf(args: {
     repoId: args.repoId,
     projectName: args.projectName,
     lead: cards.lead,
-    advisor: null,
+    advisor: advisorOf(state),
     members: cards.members,
     metrics: { kind: 'unavailable' },
     xp: null,
