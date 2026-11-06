@@ -102,6 +102,10 @@ describe("a remote member's relayed activity and model (ORCA-933)", () => {
   it("reads the tool the pane's hooks say it runs", () => {
     expect(remoteMemberAgentOf([entry({ toolName: 'Bash' })], 'tab:817')?.toolName).toBe('Bash')
     expect(remoteMemberAgentOf([entry()], 'tab:817')).not.toHaveProperty('toolName')
+    expect(
+      remoteMemberAgentOf([entry({ toolInput: 'gh pr checks 912' })], 'tab:817')?.toolInput
+    ).toBe('gh pr checks 912')
+    expect(remoteMemberAgentOf([entry()], 'tab:817')).not.toHaveProperty('toolInput')
   })
 
   it('keeps a relayed tool, Jev report and model with its source, and drops what it cannot read', () => {
@@ -109,6 +113,8 @@ describe("a remote member's relayed activity and model (ORCA-933)", () => {
       parseRemoteMemberAgent({ state: 'working', updatedAt: 5, ...extra })
     expect(relayed({ toolName: 'Bash' })?.toolName).toBe('Bash')
     expect(relayed({ toolName: 7 })).not.toHaveProperty('toolName')
+    expect(relayed({ toolInput: 'vitest run\u001b[0m' })?.toolInput).toBe('vitest run')
+    expect(relayed({ toolInput: 7 })).not.toHaveProperty('toolInput')
     expect(
       relayed({
         advisor: {
