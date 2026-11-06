@@ -1,3 +1,5 @@
+import { rmSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -105,6 +107,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
 }, testInfo) => {
   test.setTimeout(1_200_000)
   const agent = createStdinLoggingAgent()
+  let projectYaml = ''
   try {
     await waitForSessionReady(orcaPage)
     const worktreeId = await waitForActiveWorktree(orcaPage)
@@ -400,7 +403,38 @@ test('the Team panel draws the live scene beside a member opened under its heade
         path: testInfo.outputPath(`team-scene-with-member-header-en-1440-${theme}.png`)
       })
     }
+
+    // A style set only in the project's orca.yaml draws once the panel opens again (ORCA-1050).
+    const repoPath = await orcaPage.evaluate((id) => {
+      const state = window.__store!.getState()
+      const repoId = state.getKnownWorktreeById(id)?.repoId
+      return state.repos.find((repo) => repo.id === repoId)?.path ?? ''
+    }, worktreeId)
+    expect(repoPath, 'the active worktree has a project').not.toBe('')
+    projectYaml = path.join(repoPath, 'orca.yaml')
+    writeFileSync(projectYaml, 'orchestratorGame:\n  panel:\n    style: figures\n')
+    await orcaPage.evaluate(async () => {
+      const state = window.__store!.getState()
+      await state.updateSettings({ orchestratorGame: {}, orchestratorGameProjects: {} })
+      state.setRightSidebarOpen(false)
+    })
+    await expect(panel).toBeHidden()
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
+    await expect(panel.locator('[data-team-scene="figures"] canvas')).toBeVisible({
+      timeout: 30_000
+    })
+    await expect(header).toBeVisible()
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      await scene.screenshot({
+        path: testInfo.outputPath(`team-scene-orca-yaml-figures-en-1440-${theme}.png`)
+      })
+    }
   } finally {
     agent.dispose()
+    // Why: the seeded repo is shared by the worker; this orca.yaml must not reach the next spec.
+    if (projectYaml) {
+      rmSync(projectYaml, { force: true })
+    }
   }
 })

@@ -17,12 +17,17 @@ import { useTeamPanelLook } from './use-team-panel-look'
  * Why only while the Team panel is open: that is when its model is read, so it is never stale.
  */
 export function TeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.Element | null {
+  const panelOpen = useAppStore((s) => s.rightSidebarOpen && s.rightSidebarTab === 'team')
+  // Why gated before any read: every terminal tab mounts this, and a closed panel reads nothing.
+  return panelOpen ? <OpenTeamMemberPaneHeader tabId={tabId} /> : null
+}
+
+function OpenTeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.Element | null {
   // Why: the terminal tab is memoized; without this a language switch waits for the next poll.
   useTranslation()
-  const panelOpen = useAppStore((s) => s.rightSidebarOpen && s.rightSidebarTab === 'team')
   const card = useTeamMemberOfTab(tabId)
   const showName = useTeamPanelLook() === 'game'
-  if (!panelOpen || !card) {
+  if (!card) {
     return null
   }
   const ci = card.pr ? teamCiText(card.pr) : null
