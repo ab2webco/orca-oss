@@ -6,7 +6,6 @@ import { setTheme, THEMES, WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
-import { GAME_LEAD_ACTIONS } from '../../src/shared/orchestrator-game-lead-actions'
 
 const GB = 1024 ** 3
 const HOUR_MS = 3_600_000
@@ -14,7 +13,8 @@ const LANGUAGES = ['en', 'es'] as const
 const TABS = ['team', 'prs', 'queue', 'machines'] as const
 // Why: the full capture matrix outruns the CI test budget; ORCA_CAPTURE_EVIDENCE=1 runs it locally.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
-const CHECK_WIDTHS = CAPTURE_EVIDENCE ? WIDTHS : ([1440, 320] as const)
+// Why 390 on the way: a jump from 1440 straight to 320 can leave the selected tab in view by chance.
+const CHECK_WIDTHS = CAPTURE_EVIDENCE ? WIDTHS : ([1440, 390, 320] as const)
 const CHECK_THEMES = CAPTURE_EVIDENCE ? THEMES : (['dark'] as const)
 
 type Language = (typeof LANGUAGES)[number]
@@ -29,14 +29,18 @@ const COPY = {
     prsEmpty: 'No open pull requests',
     prsError: 'Could not read pull requests',
     queueNone: 'No merge queue to show',
-    sent: 'Sent to the lead: Wave'
+    viewAll: 'View all 12',
+    viewTasks: 'View tasks',
+    sent: 'Sent to the lead: Review'
   },
   es: {
     tabs: { team: 'Equipo', prs: 'PRs', queue: 'Cola', machines: 'Máquinas' },
     prsEmpty: 'No hay pull requests abiertos',
     prsError: 'No se pudieron leer los pull requests',
     queueNone: 'No hay cola de merge que mostrar',
-    sent: 'Enviado al líder: Ola'
+    viewAll: 'Ver los 12',
+    viewTasks: 'Ver tareas',
+    sent: 'Enviado al líder: Review'
   }
 } as const
 
@@ -45,14 +49,6 @@ const pull = (number: number, title: string, over: Record<string, unknown>) => (
   title,
   url: `https://github.com/o/r/pull/${number}`,
   ...over
-})
-
-const ticket = (id: string, title: string, group: string) => ({
-  id,
-  title,
-  url: `https://tracker.test/${id}`,
-  group,
-  prompt: `Work on ${id}: ${title}`
 })
 
 const machine = (cores: number, total: number, free: number, load: number) => ({
@@ -78,6 +74,7 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
           provider: 'github',
           total: 12,
           url: 'https://github.com/o/r/pulls',
+          actionId: 'action-0',
           items: [
             pull(924, 'Keep the reflow column when the panel is resized', { status: 'pending' }),
             pull(917, 'Release notes for the lab channel', { status: 'success' }),
@@ -87,20 +84,6 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
               reviewBlock: 'conflict'
             }),
             pull(899, 'Draft of the arcade credit', { status: 'none', reviewBlock: 'draft' })
-          ]
-        },
-        todo: {
-          provider: 'plane',
-          total: 9,
-          url: 'https://tracker.test/board',
-          groups: { in_progress: 4, review: 1, todo: 4 },
-          items: [
-            ticket('ORCA-31', 'Show the queue position in the band', 'in_progress'),
-            ticket('ORCA-34', 'A very long ticket title to prove the row truncates', 'in_progress'),
-            ticket('ORCA-35', 'Stop the reflow on resize', 'in_progress'),
-            ticket('ORCA-36', 'Hidden by the three a heading draws', 'in_progress'),
-            ticket('ORCA-40', 'Check the merge train', 'review'),
-            ticket('ORCA-52', 'Translate the empty states', 'todo')
           ]
         },
         queue: {
@@ -129,15 +112,20 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
               position: 3,
               state: 'failed',
               since: now - 0.5 * HOUR_MS
-            }
+            },
+            // Why so many: the last row must reach the floating trigger's corner at 900 px tall.
+            ...Array.from({ length: 13 }, (_, index) => ({
+              id: `#${960 + index}`,
+              title: `Queued pull request ${index + 1}`,
+              url: `https://github.com/o/r/pull/${960 + index}`,
+              position: 4 + index,
+              state: 'waiting',
+              since: now - (index + 1) * 0.1 * HOUR_MS
+            }))
           ]
         }
       },
-      actions: [
-        ...GAME_LEAD_ACTIONS,
-        { id: 'action-0', label: 'Deploy', prompt: 'Deploy the preview' },
-        { id: 'action-1', label: 'Page', mcp: { server: 'pager', tool: 'page' } }
-      ],
+      actions: [{ id: 'action-0', label: 'Review', prompt: 'Review my open pull requests' }],
       hostCapacity: [
         { host: 'local', running: 2, cap: 4, ...machine(14, 36, 21.4, 3.2) },
         { host: 'm1', running: 1, cap: 2, ...machine(8, 16, 2.1, 5) },
@@ -238,6 +226,15 @@ async function expectTabInsideStrip(page: Page, name: string): Promise<void> {
     }, `${name} sits inside the tab strip`)
     .toBe(true)
 }
+
+// Why two frames: a check read right after a resize can still see the wider layout.
+const settleLayout = (page: Page): Promise<void> =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  )
 
 async function expectActiveTabInsideStrip(page: Page, label: string): Promise<void> {
   const clipped = await page.getByTestId('team-panel').evaluate((node) => {
@@ -367,11 +364,14 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
           await panel.getByRole('tab', { name: COPY[language].tabs[tab] }).click()
           // Why: the pointer stays on the tab it pressed, and draws another tab's hover once narrow.
           await orcaPage.mouse.move(0, 0)
+          // Why: a focused tab is sometimes kept in view by the browser, which hid a missing reveal.
+          await orcaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
           for (const width of CHECK_WIDTHS) {
             await orcaPage.setViewportSize({ width, height: 900 })
             for (const theme of CHECK_THEMES) {
               await setTheme(orcaPage, theme)
               await scrollTabToEnd(orcaPage)
+              await settleLayout(orcaPage)
               const label = `${name} ${tab} ${width} ${theme} ${language}`
               await expectNoSidewaysScroll(orcaPage, label)
               await expectNoRowUnderTrigger(orcaPage, label)
@@ -413,28 +413,27 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
 
     // A press has to reach the process in the lead pane, not only the terminal's echo.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await panel.getByRole('tab', { name: COPY.es.tabs.prs }).click()
+    const viewAll = panel.getByRole('button', { name: COPY.es.viewAll })
+    await expect(viewAll).toBeVisible({ timeout: 30_000 })
+    await viewAll.click()
+    await expect(orcaPage.getByText(COPY.es.sent).first()).toBeVisible()
+    await expect.poll(() => agent.readStdin()).toContain('Review my open pull requests')
+
+    // V28's only Tasks surface: the Team tab's empty state opens Orca's Tasks view.
+    await setScene(electronApp, all.empty)
+    await rereadPanel(orcaPage)
     await panel.getByRole('tab', { name: COPY.es.tabs.team }).click()
-    const wave = panel.locator('[data-team-action="lead:wave"]')
-    await expect(wave).toBeVisible({ timeout: 30_000 })
-    await expect(panel.locator('[data-team-action="action-1"]')).toHaveCount(0)
     if (CAPTURE_EVIDENCE) {
       await orcaPage.screenshot({
         animations: 'disabled',
-        path: testInfo.outputPath('full-team-window.png')
+        path: testInfo.outputPath('empty-team-window.png')
       })
     }
-
-    await wave.dblclick()
-    await expect(orcaPage.getByText(COPY.es.sent).first()).toBeVisible()
-    await expect.poll(() => agent.readStdin()).toContain('Run a wave now')
-    await panel.locator('[data-team-action="action-0"]').click()
-    await expect.poll(() => agent.readStdin()).toContain('Deploy the preview')
-    expect(agent.readStdin().match(/Run a wave now/g)).toHaveLength(1)
-
-    await panel.getByRole('button', { name: 'Trabajar en ORCA-31' }).click()
+    await panel.getByRole('button', { name: COPY.es.viewTasks }).click()
     await expect
-      .poll(() => agent.readStdin())
-      .toContain('Work on ORCA-31: Show the queue position in the band')
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeView))
+      .toBe('tasks')
   } finally {
     agent.dispose()
   }
