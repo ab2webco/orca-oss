@@ -69,7 +69,10 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
     case 'working':
     case 'starting':
       return 'working'
-    default:
+    case 'waiting':
+    case 'idle':
+    case 'done':
+    case 'queued':
       return isFinished(work) ? 'done' : 'idle'
   }
 }
