@@ -153,7 +153,7 @@ describe('teamCardsOf', () => {
     expect(byKey.f).toMatchObject({ condition: 'loggedOut', status: 'attention' })
   })
 
-  it('turns red for a waiting member, an open question or failed CI, green only once merged', () => {
+  it('turns red for a waiting member or an open question, green only once merged', () => {
     const rows = cardsOf(
       [
         agent({ paneKey: 'wait', state: 'waiting' }),
@@ -168,7 +168,8 @@ describe('teamCardsOf', () => {
     const byKey = Object.fromEntries((rows ?? []).map((one) => [one.paneKey, one]))
     expect(byKey.wait).toMatchObject({ status: 'attention', needsYou: true })
     expect(byKey.ask).toMatchObject({ status: 'attention', needsYou: true })
-    expect(byKey.red).toMatchObject({ status: 'attention', needsYou: false })
+    // Why: V28 keeps a working member blue with failed CI; only its PR chip turns red.
+    expect(byKey.red).toMatchObject({ status: 'working', needsYou: false, pr: { ci: 'failure' } })
     expect(byKey.turn).toMatchObject({ status: 'idle', condition: 'done' })
     expect(byKey.merged).toMatchObject({ status: 'done', flowPhase: 'merge' })
   })

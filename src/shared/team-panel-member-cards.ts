@@ -51,9 +51,10 @@ const conditionOf = (agent: GameAgent): TeamCondition => {
 const isFinished = (work: Work): boolean =>
   work.review?.state === 'merged' || work.workItem?.statusGroup === 'done'
 
-// Why: red is "needs you or failed", amber "at risk", green only "done and verified".
+// Why: red is "needs you or failed", amber "at risk", green only "done and verified". Failed CI
+// stays on the PR chip, as V28 draws it, so a member fixing it still reads as working.
 const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): TeamStatus => {
-  if (needsYou || work.review?.ci === 'failure') {
+  if (needsYou) {
     return 'attention'
   }
   switch (condition) {
