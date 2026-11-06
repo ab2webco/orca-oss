@@ -20,6 +20,10 @@ import {
   orchestratorGameScene3dOf,
   type OrchestratorGameScene3d
 } from './orchestrator-game-scene-3d'
+import {
+  orchestratorGameSceneNativeOf,
+  type OrchestratorGameSceneNative
+} from './orchestrator-game-scene-native'
 
 /** Scenes a plugin contributes to the Agent Teams game: inert JSON the bundled mod draws. */
 
@@ -140,6 +144,8 @@ export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & 
   themes?: OrchestratorGameSceneTheme[]
   /** What the WebGL panel draws; without it the scene is 2D only. */
   scene3d?: OrchestratorGameScene3d
+  /** Image art for the native panel's styles; without it the scene draws in Pixel. */
+  native?: OrchestratorGameSceneNative
 }
 
 type SceneParse =
@@ -209,7 +215,8 @@ export function orchestratorGameSceneIssues(text: string): string[] {
     ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
     ...rosterOf(raw, parsed.success ? parsed.data.costumes : undefined).issues,
     ...themesOf(raw).issues,
-    ...orchestratorGameScene3dOf(raw).issues
+    ...orchestratorGameScene3dOf(raw).issues,
+    ...orchestratorGameSceneNativeOf(raw).issues
   ]
 }
 
@@ -233,6 +240,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   const { roster, characters, issues: rosterIssues } = rosterOf(raw, parsed.data.costumes)
   const { themes, issues: themeIssues } = themesOf(raw)
   const { scene3d, issues: scene3dIssues } = orchestratorGameScene3dOf(raw)
+  const { native, issues: nativeIssues } = orchestratorGameSceneNativeOf(raw)
   return {
     ok: true,
     definition: {
@@ -242,9 +250,10 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
       ...(characters === undefined ? {} : { characters }),
       ...(themes === undefined ? {} : { themes }),
       ...(scene3d === undefined ? {} : { scene3d }),
+      ...(native === undefined ? {} : { native }),
       id
     },
-    warnings: [...issues, ...rosterIssues, ...themeIssues, ...scene3dIssues]
+    warnings: [...issues, ...rosterIssues, ...themeIssues, ...scene3dIssues, ...nativeIssues]
   }
 }
 
