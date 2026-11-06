@@ -17131,7 +17131,8 @@
       "play": "Play",
       "keep": "Keep",
       "savedOne": "1 saved play",
-      "savedMany": "{{count}} saved plays"
+      "savedMany": "{{count}} saved plays",
+      "failed": "Could not reach the host for your saved play"
     },
     "header": {
       "title": "Team",

@@ -49,3 +49,14 @@ export async function playSavedArcadeRun(
   openTab(scope.worktreeId)
   return true
 }
+
+/** Keeps the offered play saved for later; false when there was no offer left to keep. */
+export async function keepArcadeOffer(scope: GameInboxScope): Promise<boolean> {
+  const result = await callRuntimeRpc<{ ok?: unknown }>(
+    scope.target,
+    'game.arcade',
+    { worktreeId: scope.worktreeId, action: 'keep' },
+    { timeoutMs: GAME_ARCADE_RPC_TIMEOUT_MS }
+  )
+  return result.ok === true
+}
