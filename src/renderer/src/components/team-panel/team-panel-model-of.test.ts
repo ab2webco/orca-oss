@@ -109,6 +109,21 @@ describe('teamPanelModelOf', () => {
       metrics: { kind: 'unavailable' }
     })
   })
+
+  it("fills Display's metrics from the host's published metrics", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const metrics = {
+      computedAt: 'x',
+      timezone: 'UTC',
+      mergedPerDay: [{ day: '2026-11-06', merged: 4 }],
+      leadTime: { medianMs: 60_000, measured: 1 }
+    }
+
+    expect(teamPanelModelOf(args({ state: state({ metrics }) }))?.metrics).toMatchObject({
+      kind: 'ready',
+      value: { mergedPerDay: [{ day: '2026-11-06', merged: 4 }], leadTimeMedianMs: 60_000 }
+    })
+  })
   it("fills the Advisor from the lead's own Jev report, words as written", () => {
     teamCardsOf.mockReturnValue(CARDS)
     const model = teamPanelModelOf(
