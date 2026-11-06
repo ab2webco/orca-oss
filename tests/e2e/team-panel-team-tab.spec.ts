@@ -207,6 +207,48 @@ test('the Team tab shows the live lead and its members from the lead game state'
       }
     }
 
+    // Display and Plain come from the real panel look setting: no scene slot, agents by role.
+    const setLook = (look: 'game' | 'display' | 'plain') =>
+      orcaPage.evaluate(async (next) => {
+        const state = window.__store!.getState()
+        const game = state.settings?.orchestratorGame
+        await state.updateSettings({
+          orchestratorGame: { ...game, panel: { ...game?.panel, look: next } }
+        })
+      }, look)
+    const leadCard = panel.locator('[data-team-card="lead"]')
+    await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(1)
+    await expect(leadCard).toContainText('master')
+    for (const look of ['display', 'plain'] as const) {
+      await setLook(look)
+      await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(0)
+      await expect(leadCard).not.toContainText('master')
+      for (const language of ['en', 'es'] as const) {
+        await orcaPage.evaluate(
+          (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+          language
+        )
+        await expect(leadCard).toContainText(COPY[language].lead)
+        for (const width of WIDTHS) {
+          await orcaPage.setViewportSize({ width, height: 900 })
+          for (const theme of ['dark', 'light'] as const) {
+            await setTheme(orcaPage, theme)
+            const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+            expect(
+              overflow,
+              `${look} overflows at ${width}px ${theme} ${language}`
+            ).toBeLessThanOrEqual(0)
+            await orcaPage.screenshot({
+              animations: 'disabled',
+              path: testInfo.outputPath(`team-look-${look}-${language}-${width}-${theme}.png`)
+            })
+          }
+        }
+      }
+    }
+    await setLook('game')
+    await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(1)
+
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
