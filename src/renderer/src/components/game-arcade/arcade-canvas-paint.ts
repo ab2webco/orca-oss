@@ -13,6 +13,16 @@ export type ArcadePaintSize = { width: number; height: number; scale: number }
 
 const HERO = { body: '#2f5fb3', trim: '#f2c94c', cape: '#b3263a', leg: '#28324a', skin: '#f1c6a0' }
 
+/** Why the edge is added: a width off the 4px grid otherwise leaves sky showing on the right. */
+export function ridgeStepsOf(w: number): number[] {
+  const steps: number[] = []
+  for (let x = 0; x < w; x += 4) {
+    steps.push(x)
+  }
+  steps.push(w)
+  return steps
+}
+
 const ridge = (
   g: CanvasRenderingContext2D,
   w: number,
@@ -23,7 +33,7 @@ const ridge = (
 ): void => {
   g.beginPath()
   g.moveTo(0, h)
-  for (let x = 0; x <= w; x += 4) {
+  for (const x of ridgeStepsOf(w)) {
     const wave = Math.sin(x * 0.012 + seed) + 0.5 * Math.sin(x * 0.031 + seed * 2.1)
     g.lineTo(x, base - amp * wave)
   }
