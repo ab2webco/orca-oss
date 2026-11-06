@@ -45,7 +45,7 @@ const HATS: readonly FigureHat[] = ['helm', 'cap', 'band', 'wizard']
 const TOOLS: readonly FigureTool[] = ['sword', 'shield', 'hammer', 'staff']
 
 // FNV-1a: stable across hosts and runs, so a character keeps its look everywhere.
-function hashOf(text: string): number {
+export function figureSeedOf(text: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {
     h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
@@ -63,7 +63,7 @@ export function figureLookOf(
   if (actor.role === 'advisor') {
     return ADVISOR
   }
-  const h = hashOf(actor.characterKey ?? actor.key)
+  const h = figureSeedOf(actor.characterKey ?? actor.key)
   return {
     ...OUTFITS[h % OUTFITS.length]!,
     skin: SKINS[(h >>> 4) % SKINS.length]!,

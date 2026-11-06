@@ -16361,6 +16361,13 @@
           "overridePlaceholder": "Replace the lead's answer",
           "override": "Override"
         }
+      },
+      "team-scene": {
+        "team-scene-copy": {
+          "label": "Live team scene",
+          "leadAsks": "Waiting for you · {{question}}",
+          "leadDone": "Done, nothing pending"
+        }
       }
     },
     "i18n": {

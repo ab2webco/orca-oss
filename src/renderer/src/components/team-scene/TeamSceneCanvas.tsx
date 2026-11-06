@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
 import {
+  advisorLineShown,
   applyTeamSceneInput,
   createTeamSceneWorld,
   drainTeamSceneEffects,
@@ -10,20 +11,31 @@ import {
 } from '../../../../shared/team-scene/team-scene-director'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { teamSceneLabel } from './team-scene-copy'
 import { createTeamSceneFrameLoop } from './team-scene-frame-loop'
+import { TeamSceneBubbles, type TeamSceneSpeech } from './TeamSceneBubbles'
 import type { TeamScenePainter } from './team-scene-painter'
 
 type Props = {
   input: TeamSceneInput
   painter: TeamScenePainter
-  /** Translated by the caller; the canvas is one image to assistive tech. */
-  label: string
+  /** The lead's bubble, from `teamSceneLeadLineOf`; null shows none. */
+  leadLine: string | null
 }
 
-export function TeamSceneCanvas({ input, painter, label }: Props): React.JSX.Element {
+// Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
+const ADVISOR_BUBBLE_MS = 6000
+
+export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
   const reducedMotion = usePrefersReducedMotion()
+  const [speakers, setSpeakers] = useState<{
+    width: number
+    advisor: string | null
+    anchors: Map<string, TeamSceneSpeech['anchor']>
+  }>({ width: 0, advisor: null, anchors: new Map() })
+  const speakersKeyRef = useRef('')
 
   const paint = useCallback(
     (dt: number) => {
@@ -45,14 +57,29 @@ export function TeamSceneCanvas({ input, painter, label }: Props): React.JSX.Ele
         return
       }
       g.setTransform(ratio, 0, 0, ratio, 0, 0)
+      const actors = teamSceneActors(world)
+      const advisor = advisorLineShown(world)
+      const anchors = new Map(
+        actors
+          .filter((a) => a.role !== 'member')
+          .map((a) => [a.key, { x: a.x * width, top: painter.headTop(a.depth, height) }])
+      )
+      // Why keyed: speakers stand still, so the overlay re-renders only when a line or size changes.
+      const key = `${width}|${advisor}|${[...anchors.keys()].join()}`
+      if (key !== speakersKeyRef.current) {
+        speakersKeyRef.current = key
+        setSpeakers({ width, advisor, anchors })
+      }
       painter.paint(g, {
         width,
         height,
+        ratio,
         t: world.t,
         dt,
-        actors: teamSceneActors(world),
+        actors,
         effects: drainTeamSceneEffects(world),
-        overflow: world.overflow
+        overflow: world.overflow,
+        stations: world.stations
       })
     },
     [painter]
@@ -61,10 +88,21 @@ export function TeamSceneCanvas({ input, painter, label }: Props): React.JSX.Ele
   useEffect(() => {
     worldRef.current ??= createTeamSceneWorld()
     applyTeamSceneInput(worldRef.current, input)
-    if (reducedMotion) {
-      settleTeamScene(worldRef.current)
-      paint(0)
+    if (!reducedMotion) {
+      return
     }
+    const world = worldRef.current
+    settleTeamScene(world)
+    paint(0)
+    if (advisorLineShown(world) === null) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      stepTeamScene(world, ADVISOR_BUBBLE_MS / 1000, { width: canvasRef.current?.clientWidth ?? 0 })
+      settleTeamScene(world)
+      paint(0)
+    }, ADVISOR_BUBBLE_MS)
+    return () => window.clearTimeout(timer)
   }, [input, reducedMotion, paint])
 
   useEffect(() => {
@@ -108,13 +146,32 @@ export function TeamSceneCanvas({ input, painter, label }: Props): React.JSX.Ele
     }
   }, [painter])
 
+  const speeches: TeamSceneSpeech[] = []
+  // Why the advisor first: it keeps its spot, and the lead's bubble climbs above it on a clash.
+  const advisorAnchor = speakers.anchors.get('advisor')
+  if (speakers.advisor && advisorAnchor) {
+    speeches.push({ key: 'advisor', text: speakers.advisor, anchor: advisorAnchor, align: 'end' })
+  }
+  const leadAnchor = speakers.anchors.get('lead')
+  if (leadLine && leadAnchor) {
+    speeches.push({ key: 'lead', text: leadLine, anchor: leadAnchor })
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      role="img"
-      aria-label={label}
-      className="block w-full"
-      style={{ height: painter.height }}
-    />
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        role="img"
+        aria-label={teamSceneLabel()}
+        className="block w-full"
+        style={{ height: painter.height }}
+      />
+      <TeamSceneBubbles
+        speeches={speeches}
+        width={speakers.width}
+        height={painter.height}
+        cloudPixel={painter.cloudPixel}
+      />
+    </div>
   )
 }

@@ -15,7 +15,10 @@ export type TeamSceneSeat = { key: string; spot: TeamSceneSpot }
 
 export type TeamSceneSeatPlan = { seats: TeamSceneSeat[]; overflow: number }
 
-const columnX = (column: number): number => FIRST_X + ((LAST_X - FIRST_X) * column) / (ROW_SIZE - 1)
+const SPACING = (LAST_X - FIRST_X) / (ROW_SIZE - 1)
+const columnX = (column: number): number => FIRST_X + SPACING * column
+// Why half a column: a front-row member standing right before a back-row seat hid it.
+const FRONT_SHIFT = SPACING / 2
 
 /** Needs-you first so the +N never hides someone waiting on the user. */
 export function seatPlanOf(members: readonly TeamSceneMemberInput[]): TeamSceneSeatPlan {
@@ -28,7 +31,7 @@ export function seatPlanOf(members: readonly TeamSceneMemberInput[]): TeamSceneS
   const seats = shown.map((m, i) => ({
     key: m.key,
     spot: {
-      x: columnX(i % ROW_SIZE),
+      x: columnX(i % ROW_SIZE) + (twoRows && i >= ROW_SIZE ? FRONT_SHIFT : 0),
       depth: twoRows ? (i < ROW_SIZE ? BACK_ROW : FRONT_ROW) : SINGLE_ROW
     }
   }))

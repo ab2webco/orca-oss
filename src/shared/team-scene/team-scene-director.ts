@@ -15,7 +15,8 @@ import type {
 } from './team-scene-types'
 
 const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
-const ADVISOR_SPOT: TeamSceneSpot = { x: 0.95, depth: 0.15 }
+// Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
+const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
 const ENTRY_X = -0.1
 const EXIT_X = 1.14
@@ -52,6 +53,8 @@ export type TeamSceneWorld = {
   effects: TeamSceneEffect[]
   /** Members beyond the seats, drawn as +N. */
   overflow: number
+  /** Every seat's spot, so a style draws the stations even while their members walk. */
+  stations: TeamSceneSpot[]
 }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -65,7 +68,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     advisorSaid: null,
     advisorRaiseUntil: 0,
     effects: [],
-    overflow: 0
+    overflow: 0,
+    stations: []
   }
 }
 
@@ -170,6 +174,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
     }
   }
   world.overflow = plan.overflow
+  world.stations = plan.seats.map((s) => s.spot)
 }
 
 function arrive(world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): void {
