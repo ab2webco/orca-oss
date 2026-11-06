@@ -11,10 +11,16 @@ let settings: {
   orchestratorGame?: OrchestratorGameLayer
   orchestratorGameProjects?: Record<string, OrchestratorGameLayer>
 } = {}
+let repo: { id: string; kind: string; connectionId: string | null } = {
+  id: 'repo-1',
+  kind: 'git',
+  connectionId: null
+}
 const storeState = (): Record<string, unknown> => ({
   settings,
   activeWorktreeId: 'wt-1',
   activeWorkspaceExecutionHostId: null,
+  repos: [repo],
   getKnownWorktreeById: () => ({ repoId: 'repo-1' })
 })
 vi.mock('@/store', () => ({
@@ -45,6 +51,7 @@ afterEach(async () => {
 })
 beforeEach(() => {
   settings = {}
+  repo = { id: 'repo-1', kind: 'git', connectionId: null }
   checkRuntimeHooks.mockReset()
   yaml(undefined)
   resetTeamPanelProjectLayers()
@@ -104,5 +111,22 @@ describe('useTeamPanelLook', () => {
 
     expect(await looks(3)).toEqual(['display', 'display', 'display'])
     expect(checkRuntimeHooks).toHaveBeenCalledTimes(1)
+  })
+
+  // Why: a folder project has no orca.yaml to read.
+  it('never reads orca.yaml for a folder project', async () => {
+    repo = { id: 'repo-1', kind: 'folder', connectionId: null }
+    settings = { orchestratorGame: { panel: { look: 'plain' } } }
+
+    expect(await looks()).toEqual(['plain'])
+    expect(checkRuntimeHooks).not.toHaveBeenCalled()
+  })
+
+  // Why: the project's orca.yaml lives on the project's host, whichever workspace is active.
+  it("reads a remote project's orca.yaml on its own host", async () => {
+    repo = { id: 'repo-1', kind: 'git', connectionId: 'box' }
+
+    await looks()
+    expect(checkRuntimeHooks.mock.calls.at(-1)?.slice(1)).toEqual(['repo-1', 'ssh:box'])
   })
 })

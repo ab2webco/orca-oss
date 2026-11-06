@@ -2,10 +2,11 @@ import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
 import { checkRuntimeHooks } from '@/runtime/runtime-hooks-client'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
 import type { GamePanelLook } from '../../../../shared/orchestrator-game-panel'
 import { resolveOrchestratorGamePanel } from '../../../../shared/orchestrator-game-panel-layers'
+import { isFolderRepo } from '../../../../shared/repo-kind'
 
 /** ORCA-1071's `orchestratorGame.panel.look`. */
 export type TeamPanelLook = GamePanelLook
@@ -22,12 +23,12 @@ export function resetTeamPanelProjectLayers(): void {
   useProjectLayers.setState({ byScope: {} })
 }
 
-function readProjectLayer(scope: string, repoId: string, hostId: ExecutionHostId | null): void {
+function readProjectLayer(scope: string, repoId: string, hostId: ExecutionHostId): void {
   if (reading.has(scope)) {
     return
   }
   reading.add(scope)
-  void checkRuntimeHooks(useAppStore.getState().settings, repoId, hostId ?? undefined)
+  void checkRuntimeHooks(useAppStore.getState().settings, repoId, hostId)
     .then((result) => result.hooks?.orchestratorGame ?? null)
     // Why null on failure: an unreadable orca.yaml must not hide the global and machine looks.
     .catch(() => null)
@@ -41,14 +42,16 @@ export function useTeamPanelLook(): TeamPanelLook {
   const repoId = useAppStore((s) =>
     s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
   )
-  const hostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
+  const repo = useAppStore((s) => (repoId ? s.repos.find((one) => one.id === repoId) : undefined))
+  // Why the repo's host, not the active workspace's: orca.yaml lives where the project lives.
+  const hostId = repo && !isFolderRepo(repo) ? getRepoExecutionHostId(repo) : null
   const global = useAppStore((s) => s.settings?.orchestratorGame)
   const local = useAppStore((s) =>
     repoId ? s.settings?.orchestratorGameProjects?.[repoId] : undefined
   )
-  const scope = repoId ? `${hostId ?? 'local'}|${repoId}` : null
+  const scope = repoId && hostId ? `${hostId}|${repoId}` : null
   useEffect(() => {
-    if (scope && repoId) {
+    if (scope && repoId && hostId) {
       readProjectLayer(scope, repoId, hostId)
     }
   }, [hostId, repoId, scope])
