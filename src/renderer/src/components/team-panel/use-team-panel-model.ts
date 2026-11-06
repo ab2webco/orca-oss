@@ -86,3 +86,13 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   const source = useTeamPanelModelStore((s) => s.source)
   return scope ? source : NO_WORKSPACE
 }
+
+/**
+ * The last model kind any open panel read, for the activity bar's icon. Never polls: the bar is
+ * always mounted, and game.state reads reviews and metrics on the host.
+ */
+export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
+  return useTeamPanelModelStore((s) =>
+    s.source.section.kind === 'ready' ? s.source.section.value.kind : null
+  )
+}
