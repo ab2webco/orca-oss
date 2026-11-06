@@ -22,6 +22,8 @@ export type TeamSceneFrame = {
 /** A scene style: Figures, Office or Pixel. `dispose` drops its cached backdrops and sprites. */
 export type TeamScenePainter = {
   height: number
+  /** Where a speaker's head tops out, so its bubble sits just above it. */
+  headTop: (depth: number, height: number) => number
   paint: (g: CanvasRenderingContext2D, frame: TeamSceneFrame) => void
   dispose: () => void
 }
