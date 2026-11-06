@@ -19,6 +19,7 @@ import {
   getMenuBarIconEntries,
   getSidebarEntries,
   getStatusBarEntries,
+  getStatusColorEntries,
   getSystemTrayEntries,
   getThemeEntries,
   getTitlebarEntries,
@@ -138,6 +139,7 @@ export function AppearancePane({
   const interfaceSearchEntries = [
     { title: interfaceTitle },
     ...getThemeEntries(),
+    ...getStatusColorEntries(),
     ...getZoomEntries(),
     ...getTypographyEntries(),
     ...(SHOW_UI_LANGUAGE_SETTING ? getLanguageEntries() : []),
