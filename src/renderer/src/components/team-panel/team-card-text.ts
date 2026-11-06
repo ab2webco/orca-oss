@@ -7,7 +7,8 @@ import type {
   TeamLiveAction,
   TeamModel,
   TeamPullRequest,
-  TeamStatus
+  TeamStatus,
+  TeamTicket
 } from '../../../../shared/team-panel-model-types'
 
 const TONE: Record<TeamStatus, StatusTone> = {
@@ -112,4 +113,13 @@ export function teamCiText(pr: TeamPullRequest): string | null {
     case 'none':
       return null
   }
+}
+
+/** The ticket printed beside the name; null when the member is named after it, so it shows once. */
+export function teamTicketBesideName(
+  card: { name: string; ticket: TeamTicket | null },
+  showName: boolean
+): string | null {
+  const identifier = card.ticket?.identifier ?? null
+  return identifier && !(showName && card.name === identifier) ? identifier : null
 }

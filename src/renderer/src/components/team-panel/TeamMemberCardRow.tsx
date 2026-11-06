@@ -10,7 +10,8 @@ import {
   teamLiveText,
   teamModelText,
   teamPhaseText,
-  teamStatusTone
+  teamStatusTone,
+  teamTicketBesideName
 } from './team-card-text'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
@@ -43,8 +44,7 @@ export function TeamMemberCardRow({
   selectTab: SelectTeamPanelTab
   now: number
 }): React.JSX.Element {
-  // Why: a member launched by ticket is named after it, and the card would print it twice.
-  const ticketShown = card.ticket && !(showName && card.name === card.ticket.identifier)
+  const ticket = teamTicketBesideName(card, showName)
   const answer = card.needsYou ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
@@ -65,10 +65,8 @@ export function TeamMemberCardRow({
       >
         <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
           {showName ? <span className="truncate text-[13px] font-medium">{card.name}</span> : null}
-          {ticketShown && card.ticket ? (
-            <code className="font-mono text-[11.5px] text-muted-foreground">
-              {card.ticket.identifier}
-            </code>
+          {ticket ? (
+            <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
           ) : null}
           <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
             {teamHostText(card.host)}

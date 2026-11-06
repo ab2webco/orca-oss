@@ -1,7 +1,13 @@
 import { useAppStore } from '@/store'
 import { StatusDot } from '@/components/StatusDot'
 import { translate } from '@/i18n/i18n'
-import { teamCiText, teamHostText, teamModelText, teamStatusTone } from './team-card-text'
+import {
+  teamCiText,
+  teamHostText,
+  teamModelText,
+  teamStatusTone,
+  teamTicketBesideName
+} from './team-card-text'
 import { useTeamMemberOfTab } from './use-team-panel-model'
 import { useTeamPanelLook } from './use-team-panel-look'
 
@@ -17,6 +23,7 @@ export function TeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.El
     return null
   }
   const ci = card.pr ? teamCiText(card.pr) : null
+  const ticket = teamTicketBesideName(card, showName)
   const model = teamModelText(card.model)
   return (
     <div
@@ -28,9 +35,7 @@ export function TeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.El
         {showName ? (
           <span className="truncate font-medium text-foreground">{card.name}</span>
         ) : null}
-        {card.ticket ? (
-          <code className="font-mono text-[11.5px]">{card.ticket.identifier}</code>
-        ) : null}
+        {ticket ? <code className="font-mono text-[11.5px]">{ticket}</code> : null}
       </span>
       <span className="font-mono text-[11px]">{teamHostText(card.host)}</span>
       {model ? <span className="truncate">{model}</span> : null}

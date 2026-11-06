@@ -77,6 +77,12 @@ describe('TeamMemberPaneHeader', () => {
     expect(markup).not.toContain('Waiting for you')
   })
 
+  it('names a member launched by its ticket once', () => {
+    memberOfTab = member({ name: 'ORCA-1044' })
+
+    expect(render().match(/ORCA-1044/g)).toHaveLength(1)
+  })
+
   it('says when the member waits for the user', () => {
     memberOfTab = member({ needsYou: true })
 
