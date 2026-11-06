@@ -34,7 +34,7 @@ async function paintedColors(page: Page): Promise<number> {
   })
 }
 
-// Why reported: the scene's clock caps each frame's step, so a bubble's fade depends on the frames.
+// Why reported: a slow runner slows the walking, though the advisor's fade keeps real time.
 async function frameRate(page: Page): Promise<string> {
   return page.evaluate(
     () =>
@@ -315,6 +315,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       tool: 'exec_command'
     })
     const advisorCard = panel.locator('[data-team-card="advisor"]')
+    const leadBubble = panel.locator('[data-scene-bubble="lead"]')
     const advisorBubble = panel.locator('[data-scene-bubble="advisor"]')
     const reportJev = (line: string) =>
       client.call('game.state', {
@@ -358,14 +359,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
           boxesClash(shown.advisor, shown.lead),
           `lead and advisor bubbles clash at ${width}px ${style}`
         ).toBe(false)
-        // Why only wide: at 390 and 320 the stage is 219 px and the layout leaves the lead's out.
-        if (width >= 768) {
-          expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
-        }
-        testInfo.annotations.push({
-          type: 'team-scene-advisor',
-          description: `${style} ${width}: lead bubble ${shown.lead ? 'beside the advisor' : 'waits for the advisor'}`
-        })
+        expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${style}`).toBeLessThanOrEqual(0)
         await orcaPage.screenshot({
@@ -378,6 +372,12 @@ test('the Team panel draws the live scene beside a member opened under its heade
         await setTheme(orcaPage, 'light')
         await orcaPage.screenshot({
           path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-light.png`)
+        })
+        // The advisor's bubble fades in 6 real seconds, however slow the frames, and the lead's stays.
+        await expect(advisorBubble).toBeHidden({ timeout: 10_000 })
+        await expect(leadBubble).toBeVisible()
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-faded.png`)
         })
       }
     }
