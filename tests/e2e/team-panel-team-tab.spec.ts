@@ -15,14 +15,18 @@ const COPY = {
     inbox: 'Inbox',
     answer: 'Answer in Inbox',
     lead: 'Lead',
-    waiting: 'Waiting for your answer'
+    waiting: 'Waiting for your answer',
+    open: 'Open terminal',
+    awaited: 'Waiting for you'
   },
   es: {
     team: 'Equipo',
     inbox: 'Bandeja',
     answer: 'Responder en Bandeja',
     lead: 'Líder',
-    waiting: 'Esperando tu respuesta'
+    waiting: 'Esperando tu respuesta',
+    open: 'Abrir terminal',
+    awaited: 'Te espera'
   }
 } as const
 
@@ -208,6 +212,45 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
 
+    // Entering a member opens its own terminal in the center under a native header; Team stays open.
+    await panel.getByRole('tab', { name: COPY.en.team }).click()
+    const asker = cards.filter({ hasText: 'ORCA-14' })
+    await asker.locator('button[aria-expanded]').click()
+    await asker.getByRole('button', { name: COPY.en.open }).click()
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
+      .toBe(members[1].paneKey.split(':')[0])
+    const header = orcaPage.locator('[data-team-member-header]:visible')
+    await expect(header).toHaveCount(1)
+    await expect(header).toContainText('local')
+    expect((await header.innerText()).match(/ORCA-14/g)).toHaveLength(1)
+    await expect(panel).toBeVisible()
+    for (const language of ['en', 'es'] as const) {
+      await orcaPage.evaluate(
+        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+        language
+      )
+      await expect(header).toContainText(COPY[language].awaited)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          const overflow = await header.evaluate((node) => node.scrollWidth - node.clientWidth)
+          expect(
+            overflow,
+            `header overflows at ${width}px ${theme} ${language}`
+          ).toBeLessThanOrEqual(0)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`member-header-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+
+    // The gear leaves the panel for Settings, so it runs last, back in English at full width.
+    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: 'Project settings' }).click()
     const gameSection = orcaPage.locator('[id^="repo-"][id$="-game"]')
     await expect(gameSection).toBeVisible({ timeout: 15_000 })
