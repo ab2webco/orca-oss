@@ -41,3 +41,28 @@ config/scripts/git-pull-request-diff-base.repo.test.mjs # sync widening; first-p
 resources/claude-plugins/orca-game/tests/arcade-offer.test.ts # demo offer pane and countdown
 resources/claude-plugins/orca-game/tests/arcade-offer.spec.ts # countdown timer and offer line
 tests/e2e/orca-game-arcade-offer.spec.ts # offer pane counts down and takes j from the prompt
+
+# ORCA-1055: the orca-game mod no longer draws the band, member band, Panel, arcade pane or
+# scene in the terminal; the native Team panel draws them. Cases that only drew those go with them.
+resources/claude-plugins/orca-game/tests/advisor-calls.test.ts # advisor calls acted out in the scene
+resources/claude-plugins/orca-game/tests/allies.test.ts # other plugins' lines in the band's strip
+resources/claude-plugins/orca-game/tests/arcade-practice.test.ts # the terminal arcade pane
+resources/claude-plugins/orca-game/tests/band-layout.test.ts # band rows fitting each width
+resources/claude-plugins/orca-game/tests/cast.test.ts # scene pet and Jev acting in the scene and Panel
+resources/claude-plugins/orca-game/tests/flat-mode.test.ts # the band's and Panel's text-only toggle
+resources/claude-plugins/orca-game/tests/github-low-band.test.ts # low GitHub budget chip on the band
+resources/claude-plugins/orca-game/tests/lead-crown.test.ts # crown on the band's and Panel's hero
+resources/claude-plugins/orca-game/tests/links.test.ts # band and Panel link chips
+resources/claude-plugins/orca-game/tests/member-band-colors.test.ts # member band colors
+resources/claude-plugins/orca-game/tests/member-band.test.ts # member band rows and menu
+resources/claude-plugins/orca-game/tests/panel-band.test.ts # Panel opened from the band
+resources/claude-plugins/orca-game/tests/scene-switch.test.ts # band, spinner and Panel redrawn on a scene switch
+resources/claude-plugins/orca-game/tests/tap-layout.test.ts # phone-width band buttons
+resources/claude-plugins/orca-game/tests/view-panel.test.ts # the Panel's view picker
+# Kept files that lost their band and Panel cases; their command, action and poll cases stay.
+resources/claude-plugins/orca-game/tests/actions.test.ts # action buttons now covered via slash commands
+resources/claude-plugins/orca-game/tests/engine.test.ts # band, Fleet pane and language drawing
+resources/claude-plugins/orca-game/tests/member-advisor.test.ts # the Panel's member and advisor cards
+resources/claude-plugins/orca-game/tests/panel-layout.test.ts # Panel section drawing; /orca-game:layout stays
+resources/claude-plugins/orca-game/tests/render.test.ts # hd scene over the spinner
+resources/claude-plugins/orca-game/tests/windows-cli.test.ts # opening a band link through a .cmd CLI

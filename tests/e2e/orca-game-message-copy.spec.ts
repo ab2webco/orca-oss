@@ -77,7 +77,11 @@ async function closeSidebars(page: Page): Promise<void> {
   })
 }
 
-const screenOf = async (page: Page): Promise<string> => (await screenRows(page)).join('\n')
+// Why: newer Claude Code builds mark a reply with ⏺ where older ones drew ●.
+const rowsOf = async (page: Page): Promise<string[]> =>
+  (await screenRows(page)).map((row) => row.replace(/^⏺ /, '● '))
+
+const screenOf = async (page: Page): Promise<string> => (await rowsOf(page)).join('\n')
 
 /** The words of the message that starts with `● first`, joined across its wrapped rows. */
 function messageWordsOf(rows: string[], first: string): string {
@@ -105,7 +109,7 @@ async function waitForWholeReplies(page: Page, words: Words): Promise<void> {
   await expect
     .poll(
       async () => {
-        const rows = await screenRows(page)
+        const rows = await rowsOf(page)
         const now = rows.join('\n')
         const isSteady = now === before
         before = now
@@ -134,66 +138,28 @@ async function ask(page: Page, prompt: string, isDone: (screen: string) => boole
     .toBe(true)
 }
 
-type Cells = { left: number; top: number; width: number; height: number; cols: number }
-
-async function cellsOf(page: Page): Promise<Cells> {
-  const cells = await page.evaluate(() => {
-    for (const manager of window.__paneManagers?.values() ?? []) {
-      const pane = manager.getActivePane?.()
-      const screen = pane?.container.querySelector<HTMLElement>('.xterm-screen')
-      if (!pane || !screen) {
-        continue
-      }
-      const rect = screen.getBoundingClientRect()
-      const { cols, rows } = pane.terminal
-      return {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width / cols,
-        height: rect.height / rows,
-        cols
-      }
-    }
-    return null
-  })
-  expect(cells, 'no active terminal').not.toBeNull()
-  return cells!
-}
-
 /**
- * Drags across visible rows `from` to `to` with Shift held, as a person selects past Claude Code's
- * mouse mode, and reads what Orca's copy takes: the terminal's selection.
+ * Selects visible rows `from` to `to` whole and reads what Orca's copy takes: the terminal's
+ * selection. Why not a Shift drag: Claude Code 2.1.319 leaves xterm no selection from one.
  */
 async function copyRows(page: Page, from: number, to: number): Promise<string> {
-  const cells = await cellsOf(page)
-  const y = (row: number) => cells.top + (row + 0.5) * cells.height
-  // Why up to three drags: a drag can end with no selection; an empty copy is never the answer here.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    // Why the wait: two drags close together read as a double click, which selects a word.
-    await page.waitForTimeout(800)
-    await page.keyboard.down('Shift')
-    await page.mouse.move(cells.left + 1, y(from))
-    await page.mouse.down()
-    await page.mouse.move(cells.left + cells.cols * cells.width - 1, y(to), { steps: 8 })
-    await page.mouse.up()
-    await page.keyboard.up('Shift')
-    const copied = await page.evaluate(() => {
+  return page.evaluate(
+    ([first, last]) => {
       for (const manager of window.__paneManagers?.values() ?? []) {
         const terminal = manager.getActivePane?.()?.terminal
         if (!terminal) {
           continue
         }
+        const top = terminal.buffer.active.viewportY
+        terminal.selectLines(top + first, top + last)
         const selection = terminal.getSelection()
         terminal.clearSelection()
         return selection
       }
       return ''
-    })
-    if (copied !== '') {
-      return copied
-    }
-  }
-  return ''
+    },
+    [from, to] as const
+  )
 }
 
 /** Copies from the row starting with `first` to the row holding `last`, as the screen is now. */
@@ -204,7 +170,7 @@ async function copyBetween(page: Page, first: string, last: string): Promise<str
     .poll(
       async () => {
         const before = rows.join('\n')
-        rows = await screenRows(page)
+        rows = await rowsOf(page)
         return rows.join('\n') === before
       },
       { timeout: 20_000, intervals: [500] }
@@ -245,6 +211,8 @@ for (const one of CASES) {
       theme: one.theme,
       locale: one.locale,
       showcase: { apiUrl: api.url },
+      // Why: ORCA_E2E_ORCA_GAME_DIR runs another build of the mod, as a before for the same checks.
+      pluginDir: process.env.ORCA_E2E_ORCA_GAME_DIR || undefined,
       ...(one.role === 'member' ? { role: 'member' as const } : {})
     })
     const shoot = async (name: string) =>
@@ -272,7 +240,7 @@ for (const one of CASES) {
       await expect.poll(() => screenOf(orcaPage), { timeout: 20_000 }).toContain(question)
 
       const headingText = `${one.name} · ${words.asks}`
-      const rows = await screenRows(orcaPage)
+      const rows = await rowsOf(orcaPage)
       expect(rows, 'the question heading is not at column 0').toContainEqual(
         expect.stringMatching(new RegExp(`^${headingText}`))
       )

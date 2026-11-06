@@ -62,23 +62,6 @@ const start = async ($: Engine, on: On, cli: string, runs: Run[]) => {
   await clock.settle()
 }
 
-const pane = ($: Engine) =>
-  $.ui.mount({
-    plugin: 'orca-game',
-    surface: 'terminal',
-    component: 'Pane',
-    requestId: 'orca-game-fleet',
-    viewport: { columns: 124, rows: 60, isFullscreen: true },
-    props: {
-      title: 'Fleet',
-      isFocused: true,
-      bodyColumns: 120,
-      placement: 'dock',
-      scroll: { offset: 0, bodyRows: 50 },
-      view: {}
-    }
-  })
-
 describe('the Orca CLI on Windows', () => {
   test('a .cmd CLI polls game state through cmd.exe with its line in the env', async ($, on) => {
     const runs: Run[] = []
@@ -87,20 +70,6 @@ describe('the Orca CLI on Windows', () => {
       argv: CMD_RUN,
       env: { ORCA_GAME_CLI_LINE: '"C:\\Users\\Zoë (dev)\\orca-dev.cmd" "game" "state" "--json"' }
     })
-  })
-
-  test('openLinks: system asks the .cmd CLI to open the link, the URL kept whole', async ($, on) => {
-    const runs: Run[] = []
-    await start($, on, 'C:\\Orca\\orca.cmd', runs)
-    const ui = await pane($)
-    await ui.press({ key: 'open-ci' })
-    expect(runs.at(-1)).toEqual({
-      argv: CMD_RUN,
-      env: {
-        ORCA_GAME_CLI_LINE: `"C:\\Orca\\orca.cmd" "game" "open-link" "--url" "${CHECKS}" "--json"`
-      }
-    })
-    await ui.unmount()
   })
 
   test('an .exe CLI runs by its argv in the native spelling', async ($, on) => {
