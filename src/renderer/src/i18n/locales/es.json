@@ -16104,6 +16104,60 @@
         "emptyText": "Empareja otra máquina para repartir agentes entre hosts.",
         "errorTitle": "No se pudieron leer las máquinas"
       }
+    },
+    "condition": {
+      "working": "Trabajando",
+      "waiting": "Esperándote",
+      "idle": "En reposo",
+      "done": "Terminado",
+      "starting": "Arrancando",
+      "queued": "En cola",
+      "paused": "En pausa",
+      "asleep": "Dormido",
+      "limited": "Límite de uso alcanzado",
+      "loggedOut": "Sesión cerrada en la cuenta",
+      "unreachable": "Host sin conexión",
+      "gone": "Sesión cerrada",
+      "startFailed": "No pudo arrancar"
+    },
+    "phase": {
+      "plan": "Planeando",
+      "docs": "Documentando",
+      "code": "Programando",
+      "tests": "Probando",
+      "pr": "En PR",
+      "merge": "En merge"
+    },
+    "host": {
+      "local": "local"
+    },
+    "card": {
+      "merged": "Mergeado",
+      "ciFailed": "CI fallando",
+      "ciRunning": "CI en curso",
+      "ciPassed": "CI en verde",
+      "answerInInbox": "Responder en Bandeja",
+      "waitingForAnswer": "Esperando tu respuesta"
+    },
+    "lead": {
+      "badge": "Líder",
+      "coordinatesOne": "Coordina 1 agente",
+      "coordinatesMany": "Coordina {{count}} agentes"
+    },
+    "advisor": {
+      "label": "Advisor",
+      "source": "Jev"
+    },
+    "xp": {
+      "level": "Nv {{level}}",
+      "progress": "{{into}}/{{need}} XP"
+    },
+    "stopped": {
+      "by": "Detenido por {{by}}",
+      "plain": "Detenido"
+    },
+    "scene": {
+      "placeholder": "Aquí aparece la escena en vivo"
     }
   }
 }
