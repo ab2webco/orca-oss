@@ -1,7 +1,12 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
 import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
 
-export type TeamSceneSpeech = { key: string; text: string; anchor: { x: number; top: number } }
+export type TeamSceneSpeech = {
+  key: string
+  text: string
+  anchor: { x: number; top: number }
+  align?: 'center' | 'end'
+}
 
 type Props = { speeches: TeamSceneSpeech[]; width: number; height: number }
 
@@ -20,6 +25,7 @@ export function TeamSceneBubbles({ speeches, width, height }: Props): React.JSX.
       return {
         key: s.key,
         anchor: s.anchor,
+        align: s.align,
         width: el?.offsetWidth ?? 0,
         height: el?.offsetHeight ?? 0
       }

@@ -148,13 +148,14 @@ export function TeamSceneCanvas({ input, painter, label, leadLine }: Props): Rea
   }, [painter])
 
   const speeches: TeamSceneSpeech[] = []
+  // Why the advisor first: it keeps its spot, and the lead's bubble climbs above it on a clash.
+  const advisorAnchor = speakers.anchors.get('advisor')
+  if (speakers.advisor && advisorAnchor) {
+    speeches.push({ key: 'advisor', text: speakers.advisor, anchor: advisorAnchor, align: 'end' })
+  }
   const leadAnchor = speakers.anchors.get('lead')
   if (leadLine && leadAnchor) {
     speeches.push({ key: 'lead', text: leadLine, anchor: leadAnchor })
-  }
-  const advisorAnchor = speakers.anchors.get('advisor')
-  if (speakers.advisor && advisorAnchor) {
-    speeches.push({ key: 'advisor', text: speakers.advisor, anchor: advisorAnchor })
   }
 
   return (
