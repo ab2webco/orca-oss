@@ -20,6 +20,7 @@ function soloInputsOf(s: AppState): SoloInputs {
     hostedReviewCache: s.hostedReviewCache,
     workspacePortScan: s.workspacePortScan,
     claudeAccountRoster: s.claudeAccountRoster,
+    folderWorkspaces: s.folderWorkspaces,
     runtimeEnvironments: s.runtimeEnvironments,
     sshTargetLabels: s.sshTargetLabels,
     sshConnectionStates: s.sshConnectionStates,

@@ -76,6 +76,11 @@ export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondi
   }
 }
 
+/** GitLab numbers a merge request !12; every other provider says #12. */
+export function teamPrNumberText(pr: Pick<TeamPullRequest, 'provider' | 'number'>): string {
+  return pr.provider === 'gitlab' ? `!${pr.number}` : `#${pr.number}`
+}
+
 export function teamPhaseText(phase: TeamFlowPhase): string {
   switch (phase) {
     case 'plan':

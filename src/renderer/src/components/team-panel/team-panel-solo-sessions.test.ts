@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
-import type { Repo, Worktree } from '../../../../shared/types'
+import type { FolderWorkspace, Repo, Worktree } from '../../../../shared/types'
+import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import { teamSoloSessionsOf, type TeamSoloSessionsState } from './team-panel-solo-sessions'
 import { teamPanelSoloModelFrom } from './use-team-panel-solo-model'
 
@@ -51,6 +52,7 @@ function state(overrides: Partial<TeamSoloSessionsState>): TeamSoloSessionsState
     hostedReviewCache: {},
     workspacePortScan: null,
     claudeAccountRoster: { accounts: [], activeAccountId: null },
+    folderWorkspaces: [],
     runtimeEnvironments: [],
     sshTargetLabels: new Map(),
     sshConnectionStates: new Map(),
@@ -189,6 +191,91 @@ describe('teamSoloSessionsOf hosts and accounts', () => {
     mocks.webClient = true
     const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))
     expect(session?.account).toBeNull()
+  })
+})
+
+describe('teamSoloSessionsOf workspace kinds', () => {
+  const folder = {
+    id: 'folder-1',
+    projectGroupId: 'group-1',
+    name: 'notes',
+    folderPath: '/tmp/notes',
+    linkedTask: null,
+    comment: 'Review the copy',
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 1,
+    lastActivityAt: 1,
+    createdAt: 1,
+    updatedAt: 1
+  } as FolderWorkspace
+
+  it('keeps a folder workspace session, which worktreesByRepo never holds', () => {
+    const key = folderWorkspaceKey(folder.id)
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({ worktreeId: key })
+        },
+        folderWorkspaces: [folder],
+        ...claudeRoster
+      })
+    )
+    expect(session).toMatchObject({
+      worktreeName: 'notes',
+      worktreeId: key,
+      repoName: '',
+      host: { kind: 'local' },
+      pr: null,
+      account: null,
+      note: 'Review the copy'
+    })
+  })
+
+  it('names a folder on an SSH target by that target', () => {
+    const key = folderWorkspaceKey(folder.id)
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({ worktreeId: key })
+        },
+        folderWorkspaces: [{ ...folder, connectionId: 'target-1' }],
+        sshTargetLabels: new Map([['target-1', 'build server']])
+      })
+    )
+    expect(session?.host).toMatchObject({ kind: 'remote', name: 'build server' })
+  })
+
+  it('reads a GitLab issue and a Jira issue as the ticket, not only GitHub', () => {
+    const live = { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) }
+    const gitlab = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        worktreesByRepo: { 'repo-1': [worktree({ linkedGitLabIssue: 42 })] }
+      })
+    )
+    expect(gitlab[0]?.ticket?.identifier).toBe('#42')
+    const jira = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        worktreesByRepo: {
+          'repo-1': [
+            worktree({
+              linkedWorkItem: {
+                provider: 'jira',
+                type: 'issue',
+                number: 1145,
+                jiraIdentifier: 'CIN-1145',
+                title: 'Validate the booking form',
+                url: 'https://j/CIN-1145'
+              }
+            } as Partial<Worktree>)
+          ]
+        }
+      })
+    )
+    expect(jira[0]?.ticket).toMatchObject({ identifier: 'CIN-1145', url: 'https://j/CIN-1145' })
   })
 })
 

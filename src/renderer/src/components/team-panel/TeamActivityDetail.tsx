@@ -9,6 +9,7 @@ import {
   teamHostText,
   teamLiveText,
   teamModelText,
+  teamPrNumberText,
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
@@ -81,8 +82,9 @@ export function TeamActivityDetail({
     row.liveAction && row.liveAction.kind !== 'question'
       ? teamLiveText(row.liveAction, row.condition)
       : null
-  const ci = row.pr ? teamCiText(row.pr) : null
-  const pr = row.pr ? `#${row.pr.number}${ci ? ` · ${ci}` : ''}` : null
+  const pr = row.pr
+    ? [teamPrNumberText(row.pr), teamCiText(row.pr)].filter(Boolean).join(' · ')
+    : null
   return (
     <section data-team-activity="selected" data-pane-key={row.paneKey} className="px-3 pb-3 pt-2.5">
       <div className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">

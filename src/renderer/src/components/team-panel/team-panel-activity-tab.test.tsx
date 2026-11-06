@@ -178,6 +178,22 @@ describe('TeamPanelActivityTab', () => {
     expect(meta?.className).not.toContain('truncate')
   })
 
+  it('labels a GitLab merge request as GitLab does', async () => {
+    const pr = {
+      provider: 'gitlab',
+      number: 12,
+      title: 'Fix',
+      url: 'https://gitlab.example/mr/12',
+      state: 'open',
+      ci: 'none',
+      verdict: null,
+      perfectMerge: null
+    } as const
+    const host = await render(model([row({ pr })], null))
+    expect(host.textContent).toContain('!12')
+    expect(host.textContent).not.toContain('#12')
+  })
+
   it('names the tool a waiting session is stopped on', async () => {
     const host = await render(
       model(

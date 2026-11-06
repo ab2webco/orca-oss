@@ -6,8 +6,10 @@ import { getWslDistroFromPath } from '@/lib/local-preflight-context'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filter'
 import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
+import { getWorktreeCardJiraIssueDisplay } from '../sidebar/worktree-card-jira-issue-display'
 import { buildWorktreeClaudeAccountChipModel } from '../sidebar/worktree-claude-account-chip-model'
 import { getPromptCacheCountdownForPane } from '../sidebar/prompt-cache-timer-selection'
+import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo, Worktree } from '../../../../shared/types'
@@ -31,6 +33,7 @@ export type TeamSoloSessionsState = Pick<
   | 'hostedReviewCache'
   | 'workspacePortScan'
   | 'claudeAccountRoster'
+  | 'folderWorkspaces'
   | 'runtimeEnvironments'
   | 'sshTargetLabels'
   | 'sshConnectionStates'
@@ -84,9 +87,14 @@ function ticketOf(worktree: Worktree): TeamTicket | null {
       statusGroup: null
     }
   }
-  return worktree.linkedIssue
+  const jira = getWorktreeCardJiraIssueDisplay(worktree)
+  if (jira) {
+    return { identifier: jira.identifier, title: jira.title, url: jira.url, statusGroup: null }
+  }
+  const issue = worktree.linkedIssue ?? worktree.linkedGitLabIssue
+  return issue
     ? {
-        identifier: `#${worktree.linkedIssue}`,
+        identifier: `#${issue}`,
         title: null,
         url: null,
         statusGroup: null
@@ -177,6 +185,11 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
     for (const worktree of list) {
       worktrees.set(worktree.id, worktree)
     }
+  }
+  // Why: folder workspaces are absent from worktreesByRepo, and their agents still count.
+  for (const folder of state.folderWorkspaces) {
+    const worktree = folderWorkspaceToWorktree(folder)
+    worktrees.set(worktree.id, worktree)
   }
   const ports = getWorkspacePortsByWorktreeId(state.workspacePortScan?.result)
   const cacheOn = state.settings?.promptCacheTimerEnabled ?? false
