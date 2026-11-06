@@ -62,7 +62,9 @@ beforeEach(() => {
   )
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(360)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    setTransform() {}
+    setTransform() {},
+    clearRect() {},
+    fillRect() {}
   } as unknown as CanvasRenderingContext2D)
   host = document.createElement('div')
   document.body.append(host)
@@ -135,6 +137,29 @@ describe('TeamSceneCanvas', () => {
     )
     act(() => {})
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Reviewing #923')
+  })
+
+  it("draws Pixel's thought cloud instead of the glass bubble", () => {
+    reduced = true
+    // happy-dom has no layout; a measured bubble is what lets the layout place it.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30)
+    const cloudy = { ...painter().value, cloudPixel: 3 }
+    render(
+      <TeamSceneCanvas input={input(['a'])} painter={cloudy} label="scene" leadLine="Merge?" />
+    )
+    const bubble = host.querySelector('[data-scene-bubble="lead"]')!
+    expect(bubble.querySelector('canvas')).not.toBeNull()
+    expect(bubble.className).toContain('font-mono')
+    render(
+      <TeamSceneCanvas
+        input={input(['a'])}
+        painter={painter().value}
+        label="scene"
+        leadLine="Merge?"
+      />
+    )
+    expect(host.querySelector('[data-scene-bubble="lead"] canvas')).toBeNull()
   })
 
   it('fades the advisor line after six seconds even without frames', () => {

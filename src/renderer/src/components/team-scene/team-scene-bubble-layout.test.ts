@@ -94,4 +94,42 @@ describe('layoutTeamSceneBubbles', () => {
     )
     expect(boxes.map((b) => b.key)).toEqual(['first'])
   })
+
+  it('sets bubbles side by side when there is no room to stack them, as Pixel needs', () => {
+    const boxes = layoutTeamSceneBubbles(
+      [
+        { key: 'advisor', anchor: { x: 287, top: 84 }, width: 160, height: 50, align: 'end' },
+        { key: 'lead', anchor: { x: 326, top: 84 }, width: 150, height: 50 }
+      ],
+      { width: 388, height: 126 },
+      { beside: true }
+    )
+    expect(boxes.map((b) => b.key)).toEqual(['advisor', 'lead'])
+    const [advisor, lead] = boxes
+    expect(overlaps(advisor!, lead!)).toBe(false)
+    for (const box of boxes) {
+      expect(box.tailX).toBeGreaterThanOrEqual(10)
+      expect(box.tailX).toBeLessThanOrEqual(box.width - 10)
+      expect(box.left + box.width).toBeLessThanOrEqual(388)
+    }
+  })
+
+  it('narrows two clouds to share a 320 px row instead of dropping one', () => {
+    const boxes = layoutTeamSceneBubbles(
+      [
+        { key: 'advisor', anchor: { x: 235, top: 84 }, width: 170, height: 41, align: 'end' },
+        { key: 'lead', anchor: { x: 267, top: 84 }, width: 170, height: 41 }
+      ],
+      { width: 318, height: 126 },
+      { beside: true }
+    )
+    expect(boxes).toHaveLength(2)
+    const [advisor, lead] = boxes
+    expect(overlaps(advisor!, lead!)).toBe(false)
+    expect(advisor!.left).toBeGreaterThanOrEqual(6)
+    expect(lead!.left + lead!.width).toBeLessThanOrEqual(312)
+    // A narrowed cloud wraps one more line, and it still clears its speaker's head.
+    expect(lead!.height).toBeGreaterThan(41)
+    expect(lead!.top + lead!.height).toBeLessThanOrEqual(84)
+  })
 })

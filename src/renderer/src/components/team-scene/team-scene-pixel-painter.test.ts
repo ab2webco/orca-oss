@@ -91,6 +91,12 @@ describe('createPixelPainter', () => {
     expect(offscreen.at(-1)!.calls.filter((c) => c.name === 'fillRect').length).toBeGreaterThan(20)
   })
 
+  it("asks for the game's thought cloud, not the glass bubble", () => {
+    expect(createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS }).cloudPixel).toBe(
+      3
+    )
+  })
+
   it('steps between the two leg frames while walking', () => {
     const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
     const spriteAt = (gait: number) => {

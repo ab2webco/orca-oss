@@ -24,6 +24,8 @@ export type TeamScenePainter = {
   height: number
   /** Where a speaker's head tops out, so its bubble sits just above it. */
   headTop: (depth: number, height: number) => number
+  /** Pixel's grid size when its bubbles are the game's thought cloud; glass otherwise. */
+  cloudPixel?: number
   paint: (g: CanvasRenderingContext2D, frame: TeamSceneFrame) => void
   dispose: () => void
 }
