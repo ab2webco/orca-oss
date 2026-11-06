@@ -89,6 +89,25 @@ describe('the native art block', () => {
     expect(issues.some((one) => one.startsWith('native.office.roles.member:'))).toBe(true)
   })
 
+  it('keeps a walk stride and refuses a broken one', () => {
+    const walking = (stride: unknown) => ({
+      figures: {
+        ...native().figures,
+        roles: {
+          ...native().figures.roles,
+          lead: {
+            ...role(),
+            animations: { idle: { row: 0, frames: 1 }, walk: { row: 1, frames: 4, stride } }
+          }
+        }
+      }
+    })
+    const kept = orchestratorGameSceneNativeOf({ native: walking(35) })
+    expect(kept.native?.figures?.roles.lead.animations.walk?.stride).toBe(35)
+    const { issues } = orchestratorGameSceneNativeOf({ native: walking(0) })
+    expect(issues[0]).toMatch(/^native\.figures\.roles\.lead\.animations\.walk\.stride:/)
+  })
+
   it.each([
     ['/etc/sky.png', 'must be relative to the scene file, not absolute'],
     ['C:\\art\\sky.png', 'must be relative to the scene file, not absolute'],
@@ -330,6 +349,12 @@ describe('the style a scene draws in', () => {
         scene: definition(native()),
         artFailed: true
       })
+    ).toBe('pixel')
+  })
+
+  it('falls to Pixel when the art bundled for Quest failed', () => {
+    expect(
+      orchestratorGameSceneDrawnStyle({ style: 'figures', sceneId: 'quest', artFailed: true })
     ).toBe('pixel')
   })
 

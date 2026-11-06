@@ -24,7 +24,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -38,7 +38,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,
@@ -81,7 +82,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -95,7 +96,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,
@@ -129,7 +131,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -143,7 +145,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,
@@ -189,7 +192,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -203,7 +206,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,
@@ -246,7 +250,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -260,7 +264,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,
@@ -294,7 +299,7 @@
             "x": 64,
             "y": 122
           },
-          "size": 72,
+          "size": 60,
           "animations": {
             "idle": {
               "row": 0,
@@ -308,7 +313,8 @@
             },
             "walk": {
               "row": 2,
-              "frames": 8
+              "frames": 8,
+              "stride": 35
             },
             "raise": {
               "row": 3,

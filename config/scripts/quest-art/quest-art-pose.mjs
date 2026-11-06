@@ -7,6 +7,9 @@ export const SHIN = 6.2
 const STEP_LIFT = 2.8
 const TAU = 2 * Math.PI
 
+/** Figure units the ground moves in one walk cycle: each foot's stance is half of it. */
+export const WALK_CYCLE_UNITS = 4 * FOOT_REACH
+
 /** Sheet rows: the seven actions the engine acts out. `fps` is absent where the engine steps it. */
 export const QUEST_ACTIONS = {
   idle: { row: 0, frames: 4, fps: 4 },

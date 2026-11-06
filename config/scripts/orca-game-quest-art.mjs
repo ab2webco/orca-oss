@@ -18,7 +18,7 @@ const out = resolve(argOf('--out') ?? join(root, 'src/renderer/src/assets/quest-
 const previewDir = argOf('--preview')
 
 const ENTRY = `
-import { QUEST_ACTIONS } from './quest-art-pose.mjs'
+import { QUEST_ACTIONS, WALK_CYCLE_UNITS } from './quest-art-pose.mjs'
 import { FIGURES_CAST, OFFICE_CAST } from './quest-art-cast.mjs'
 import { drawCharacter } from './quest-art-rig.mjs'
 import * as stage from './quest-art-stage.mjs'
@@ -61,7 +61,10 @@ const casts = { figures: FIGURES_CAST, office: OFFICE_CAST }
 const looksOf = (cast) => ({ lead: cast.lead, advisor: cast.advisor,
   ...Object.fromEntries(cast.members.map((look, at) => ['member-' + (at + 1), look])) })
 window.questArt = {
-  actions: QUEST_ACTIONS,
+  actions: {
+    ...QUEST_ACTIONS,
+    walk: { ...QUEST_ACTIONS.walk, stride: Math.round(WALK_CYCLE_UNITS * FRAME.scale) }
+  },
   frame: FRAME,
   names: (style) => Object.keys(looksOf(casts[style])),
   sheet: (style, name) => {
@@ -95,8 +98,8 @@ window.questArt = {
 `
 
 const SHEET_FRAME = { width: 128, height: 128 }
-// Why 72: a figure fills about 100 of the frame's 128 rows, so it stands 56 CSS px, as Figures does.
-const SIZE = 72
+// Why 60: a figure fills about 100 of the frame's 128 rows, so it stands 47 CSS px at the front.
+const SIZE = 60
 // Where the generator plants every frame's feet.
 const FEET = { x: 64, y: 122 }
 
