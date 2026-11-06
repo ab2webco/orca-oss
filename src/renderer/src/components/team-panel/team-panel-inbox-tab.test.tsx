@@ -147,7 +147,7 @@ describe('Inbox tab', () => {
 
     pick(view, /Waiting/)
     expect(view.getByText('Rebase #917 now or wait for #913?')).toBeTruthy()
-    expect(view.getByPlaceholderText('Answer instead of the lead')).toBeTruthy()
+    expect(view.getByPlaceholderText('Your answer')).toBeTruthy()
 
     pick(view, /Threads/)
     expect(view.getByTestId('game-inbox-thread-ORCA-1039')).toBeTruthy()

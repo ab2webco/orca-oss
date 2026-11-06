@@ -8,6 +8,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { expectPlaceholdersFit } from './helpers/placeholder-fit'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -126,6 +127,7 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
             if (scroller) {
               const wide = await scroller.evaluate((node) => node.scrollWidth - node.clientWidth)
               expect(wide, `${name} list is cut at ${width}px ${theme} ${language}`).toBe(0)
+              await expectPlaceholdersFit(scroller, `in ${name} at ${width}px ${theme} ${language}`)
               // A wrapped sub-tab bar must push the list down, not draw over it.
               const overlap = await scroller.evaluate((node) => {
                 // Why the tabs, not the list: a fixed-height list keeps its box while tabs spill out.
@@ -259,6 +261,8 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
         await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toBeVisible()
       } else {
         await expect(inbox.getByText('Use 8080')).toBeVisible()
+        // Opened so the override box is measured too.
+        await inbox.getByRole('button', { name: 'Override' }).click()
       }
       await capture(name, inbox)
     }

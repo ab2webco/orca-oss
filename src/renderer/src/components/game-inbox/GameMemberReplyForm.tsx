@@ -77,10 +77,13 @@ export function GameMemberReplyForm({
 export function GameMemberOverride({
   id,
   ticket,
+  placeholder,
   onReply
 }: {
   id: string
   ticket: string
+  /** A narrow panel passes a shorter one so it is not cut mid-word. */
+  placeholder?: string
   onReply: (text: string) => Promise<void>
 }): React.JSX.Element {
   const [open, setOpen] = React.useState(false)
@@ -88,10 +91,13 @@ export function GameMemberOverride({
     <GameMemberReplyForm
       id={id}
       ticket={ticket}
-      placeholder={translate(
-        'auto.components.game-inbox.GameMemberReplyForm.overridePlaceholder',
-        "Replace the lead's answer"
-      )}
+      placeholder={
+        placeholder ??
+        translate(
+          'auto.components.game-inbox.GameMemberReplyForm.overridePlaceholder',
+          "Replace the lead's answer"
+        )
+      }
       onReply={onReply}
     />
   ) : (

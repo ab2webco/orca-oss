@@ -65,6 +65,8 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
     ['threads', translate('teamPanel.inbox.threads', 'Threads'), threads.threads.length],
     ['answered', translate('teamPanel.inbox.answered', 'Answered'), threads.answered.length]
   ]
+  // Why short: the panel can be about 200 px wide, where the Sheet's longer placeholders were cut.
+  const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
   if (subTabs.every(([, , count]) => count === 0) && !props.projectUnread) {
@@ -121,6 +123,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
               <GameOwnerQuestionCard
                 key={question.id}
                 question={question}
+                placeholder={yourAnswer}
                 onAnswer={(answer) => props.onAnswer(question.id, answer)}
               />
             ))}
@@ -133,6 +136,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
               <GameOwnerQuestionCard
                 key={question.id}
                 question={question}
+                placeholder={yourAnswer}
                 onAnswer={(answer) => group.onAnswer(question.id, answer)}
               />
             ))}
@@ -151,10 +155,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             <GameMemberReplyForm
               id={item.id}
               ticket={item.ticket}
-              placeholder={translate(
-                'auto.components.game-inbox.GameInboxSheet.answerInstead',
-                'Answer instead of the lead'
-              )}
+              placeholder={yourAnswer}
               onReply={reply(item)}
             />
           )}
@@ -167,7 +168,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         <GameInboxAnsweredList
           items={threads.answered}
           renderActions={(item) => (
-            <GameMemberOverride id={item.id} ticket={item.ticket} onReply={reply(item)} />
+            <GameMemberOverride
+              id={item.id}
+              ticket={item.ticket}
+              placeholder={yourAnswer}
+              onReply={reply(item)}
+            />
           )}
         />
       </TabsContent>

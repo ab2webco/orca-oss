@@ -16218,7 +16218,8 @@
       "answered": "Respondidas",
       "thisProject": "este proyecto",
       "projectUnread": "No se pudieron leer las preguntas de este proyecto.",
-      "forYouEmpty": "No hay preguntas esperando tu respuesta."
+      "forYouEmpty": "No hay preguntas esperando tu respuesta.",
+      "yourAnswer": "Tu respuesta"
     }
   }
 }

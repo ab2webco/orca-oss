@@ -17217,7 +17217,8 @@
       "answered": "Answered",
       "thisProject": "this project",
       "projectUnread": "Could not read this project's questions.",
-      "forYouEmpty": "No questions are waiting for you."
+      "forYouEmpty": "No questions are waiting for you.",
+      "yourAnswer": "Your answer"
     }
   }
 }
