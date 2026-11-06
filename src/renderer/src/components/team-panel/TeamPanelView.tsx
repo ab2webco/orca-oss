@@ -15,6 +15,8 @@ import {
 } from './team-panel-section-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
+import { TeamPanelScene } from '../team-scene/TeamPanelScene'
+import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
 export type TeamPanelSettingsTarget = Pick<SettingsNavigationTarget, 'pane' | 'repoId'>
 
@@ -128,18 +130,6 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
   )
 }
 
-// Why: holds the scene's place until ORCA-1051 draws it; never a stand-in figure.
-function TeamPanelScenePlaceholder(): React.JSX.Element {
-  return (
-    <div
-      data-team-scene-placeholder=""
-      className="flex h-28 shrink-0 items-center justify-center border-b border-border bg-muted/40 text-xs text-muted-foreground"
-    >
-      {translate('teamPanel.scene.placeholder', 'The live scene appears here')}
-    </div>
-  )
-}
-
 export function TeamPanelView({
   source,
   look,
@@ -150,10 +140,13 @@ export function TeamPanelView({
   onOpenSettings: (target: TeamPanelSettingsTarget) => void
 }): React.JSX.Element {
   const { section, retry } = source
+  const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
-      {model?.kind === 'team' && look === 'game' ? <TeamPanelScenePlaceholder /> : null}
+      {model?.kind === 'team' && look === 'game' ? (
+        <TeamPanelScene model={model} style={sceneStyle} />
+      ) : null}
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
       {section.kind === 'ready' ? (
         <TeamPanelTabs model={section.value} />

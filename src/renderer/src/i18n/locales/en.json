@@ -17154,9 +17154,6 @@
     "stopped": {
       "by": "Stopped by {{by}}",
       "plain": "Stopped"
-    },
-    "scene": {
-      "placeholder": "The live scene appears here"
     }
   }
 }

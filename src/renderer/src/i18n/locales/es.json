@@ -16155,9 +16155,6 @@
     "stopped": {
       "by": "Detenido por {{by}}",
       "plain": "Detenido"
-    },
-    "scene": {
-      "placeholder": "Aquí aparece la escena en vivo"
     }
   }
 }
