@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, posix, relative, resolve, sep } from 'node:path'
 import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
 import {
   isPluginCommandAutomation,
@@ -10,6 +10,11 @@ import { isPluginPanelIconPath } from '../../shared/plugins/plugin-manifest-fiel
 import { PLUGIN_PANEL_ICON_SVG_MAX_BYTES } from '../../shared/plugins/plugin-panel-icon-svg'
 import { parsePluginVmRecipeArtifact } from '../../shared/plugins/plugin-vm-recipe-artifact'
 import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../shared/orchestrator-game-scene'
+import {
+  ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES,
+  orchestratorGameSceneArtFiles,
+  orchestratorGameSceneNativeOf
+} from '../../shared/orchestrator-game-scene-native'
 
 export type PluginArtifactValidationResult = { ok: true } | { ok: false; error: string }
 
@@ -227,11 +232,58 @@ export async function validateDeclaredPluginArtifacts(
   return { ok: true }
 }
 
-/** Parses declared VM recipe artifacts at the immutable install boundary. */
+function nativeOfSceneText(text: string): ReturnType<typeof orchestratorGameSceneNativeOf> {
+  try {
+    return orchestratorGameSceneNativeOf(JSON.parse(text))
+  } catch {
+    return { issues: [] }
+  }
+}
+
+// Why only a block that parses: a broken one costs the art at draw time, and the scene is Pixel.
+async function validateGameSceneArt(
+  rootDir: string,
+  manifest: PluginManifest
+): Promise<PluginArtifactValidationResult> {
+  for (const scene of manifest.contributes.gameScenes) {
+    const text = await readContainedPluginArtifactText(
+      rootDir,
+      scene.path,
+      ORCHESTRATOR_GAME_SCENE_MAX_BYTES
+    )
+    const { native } = nativeOfSceneText(text)
+    for (const src of native ? orchestratorGameSceneArtFiles(native) : []) {
+      try {
+        await resolveContainedPluginArtifact(
+          rootDir,
+          posix.join(posix.dirname(scene.path), src),
+          ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES
+        )
+      } catch (error) {
+        return {
+          ok: false,
+          error: `game scene "${scene.id}" art ${src}: ${error instanceof Error ? error.message : String(error)}`
+        }
+      }
+    }
+  }
+  return { ok: true }
+}
+
+/** Parses declared VM recipe artifacts and checks game scene art at the immutable install boundary. */
 export async function validatePluginInstallContent(
   rootDir: string,
   manifest: PluginManifest
 ): Promise<PluginArtifactValidationResult> {
+  const art = await validateGameSceneArt(rootDir, manifest).catch(
+    (error: unknown): PluginArtifactValidationResult => ({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    })
+  )
+  if (!art.ok) {
+    return art
+  }
   const vmRecipeIds = new Set<string>()
   for (const contribution of manifest.contributes.vmRecipes) {
     try {
