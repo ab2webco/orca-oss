@@ -64,4 +64,14 @@ describe('CompactAgentRow live line', () => {
     expect(render(row, true)).toContain('Opus 5.5')
     expect(render(row, true)).not.toContain('claude-opus-5-5')
   })
+
+  it('adds the effort to the model, as Card display names it', () => {
+    expect(render(agent({ toolName: 'Edit', effort: 'high' }), true)).toContain('Opus 5.5 · high')
+  })
+
+  it('names the tool a blocked agent waits on, in the attention tone, when it asked nothing', () => {
+    const markup = render(agent({ state: 'blocked', toolName: 'Bash', toolInput: 'rm -rf dist' }))
+    expect(markup).toContain('class="text-status-attention">Bash · rm -rf dist')
+    expect(markup).not.toContain('Fix the tooltip')
+  })
 })

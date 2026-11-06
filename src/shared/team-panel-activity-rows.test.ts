@@ -98,6 +98,21 @@ describe('teamSoloModelOf', () => {
     })
   })
 
+  it('names the tool a blocked agent waits on when it asked no question', () => {
+    const [row] = rowsOf([
+      session({ entry: entry({ state: 'blocked', toolName: 'Bash', toolInput: 'rm -rf dist' }) })
+    ])
+    expect(row).toMatchObject({
+      condition: 'waiting',
+      liveAction: { kind: 'tool', tool: 'Bash', detail: 'rm -rf dist' }
+    })
+  })
+
+  it('carries the effort the session runs at beside its model', () => {
+    const [row] = rowsOf([session({ entry: entry({ model: 'claude-opus-5-5', effort: 'high' }) })])
+    expect(row?.model).toEqual({ label: 'Opus 5.5', effort: 'high', source: 'session' })
+  })
+
   it('keeps the last message of a finished turn and greys an interrupted one', () => {
     const [done, stopped] = rowsOf([
       session({

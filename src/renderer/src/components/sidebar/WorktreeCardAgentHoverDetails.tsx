@@ -7,7 +7,8 @@ import { isWebClientLocation } from '@/lib/web-client-location'
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
 import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filter'
 import type { Repo, Worktree } from '../../../../shared/types'
-import { teamModelLabelOf } from '../../../../shared/team-panel-activity-rows'
+import { teamModelText } from '@/components/team-panel/team-card-text'
+import { teamSessionModelOf } from '../../../../shared/team-panel-activity-rows'
 import CacheTimer, { usePromptCacheCountdownStartedAt } from './CacheTimer'
 import {
   WorktreeCardDetailSection,
@@ -27,7 +28,7 @@ export function WorktreeCardAgentHoverDetails({
   const models = useAppStore(
     useShallow((s) => {
       const labels = selectLiveAgentStatusEntriesForWorktree(s, worktree.id).map((entry) =>
-        teamModelLabelOf(entry.model?.trim())
+        teamModelText(teamSessionModelOf(entry))
       )
       return [...new Set(labels.filter((label): label is string => Boolean(label)))]
     })

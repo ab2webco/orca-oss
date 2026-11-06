@@ -11,10 +11,10 @@ import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
-import { teamLiveText } from '@/components/team-panel/team-card-text'
+import { teamLiveText, teamModelText } from '@/components/team-panel/team-card-text'
 import {
   teamLiveActionOfEntry,
-  teamModelLabelOf
+  teamSessionModelOf
 } from '../../../../shared/team-panel-activity-rows'
 
 function formatShortTimeAgo(ts: number, now: number): string {
@@ -137,14 +137,16 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
         ? null
         : teamLiveActionOfEntry(agent.entry)
       : null
-  const asksUser = liveAction?.kind === 'question'
+  const asksUser =
+    liveAction !== null &&
+    (liveAction.kind === 'question' || agent.state === 'blocked' || agent.state === 'waiting')
   const primary = liveAction
     ? teamLiveText(liveAction, 'working')
     : (label ?? getCompactAgentPrimary(agent))
   const isLineageChild = agent.lineage?.depth === 1
   const rawSecondary = liveAction ? '' : getCompactAgentSecondary(agent)
   const secondary = rawSecondary === primary ? '' : rawSecondary
-  const model = showModel ? (teamModelLabelOf(agent.entry.model?.trim()) ?? '') : ''
+  const model = showModel ? (teamModelText(teamSessionModelOf(agent.entry)) ?? '') : ''
   const shortTime = getCompactAgentTime(agent, now)
   const cacheTimer = usePromptCacheCountdownForPane(agent.paneKey, cacheTimerActive)
 

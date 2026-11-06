@@ -64,7 +64,8 @@ const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLi
       options: ask.options.map((one) => one.label)
     }
   }
-  return condition === 'working' && entry.toolName
+  // Why waiting too: a permission prompt asks nothing parseable; its tool is what it waits on.
+  return (condition === 'working' || condition === 'waiting') && entry.toolName
     ? { kind: 'tool', tool: entry.toolName, detail: entry.toolInput || null }
     : null
 }
@@ -74,17 +75,18 @@ export function teamLiveActionOfEntry(entry: AgentStatusEntry): TeamLiveAction |
   return liveActionOf(entry, conditionOf(entry))
 }
 
-// Why: reuses the launch labeller so a raw `claude-opus-5-5` reads `Opus 5.5`.
-export const teamModelLabelOf = (model: string | null | undefined): string | null =>
-  gameMemberLaunchOf({ model: model ?? null, effort: null })?.model ?? null
-
-const modelOf = (entry: AgentStatusEntry, advisor: TeamAdvisorRow | null): TeamModel | null => {
-  if (advisor?.model) {
-    return { label: advisor.model, effort: advisor.effort, source: 'advisor' }
-  }
-  const label = teamModelLabelOf(entry.model)
-  return label ? { label, effort: null, source: 'session' } : null
+/** The session's own model and effort; a raw `claude-opus-5-5` reads `Opus 5.5`. */
+export function teamSessionModelOf(
+  entry: Pick<AgentStatusEntry, 'model' | 'effort'>
+): TeamModel | null {
+  const label = gameMemberLaunchOf({ model: entry.model ?? null, effort: null })?.model
+  return label ? { label, effort: entry.effort || null, source: 'session' } : null
 }
+
+const modelOf = (entry: AgentStatusEntry, advisor: TeamAdvisorRow | null): TeamModel | null =>
+  advisor?.model
+    ? { label: advisor.model, effort: advisor.effort, source: 'advisor' }
+    : teamSessionModelOf(entry)
 
 function activityRowOf(session: TeamSoloSession): TeamActivityRow {
   const { entry } = session
