@@ -256,7 +256,9 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
         'true'
       )
       if (key === 'waiting') {
-        await expect(inbox.getByText('Rebase #917 now or wait for #913?')).toBeVisible()
+        await expect(inbox.getByText(/Rebase #917 now or wait for #913\?/)).toBeVisible()
+        // Opened so the reply box behind Answer is measured too.
+        await inbox.getByRole('button', { name: 'Answer' }).click()
       } else if (key === 'threads') {
         await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toBeVisible()
       } else {
@@ -284,7 +286,7 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     await expect(inboxTab).not.toContainText('1', { timeout: 5_000 })
     await inbox.getByRole('tab', { name: /Answered/ }).click()
     await expect(inbox.getByText('You answered: Merge now')).toBeVisible({ timeout: 60_000 })
-    await expect(inbox.getByText('The lead answered')).toBeVisible()
+    await expect(inbox.getByText('The lead answered: Use 8080')).toBeVisible()
     await capture('answered-yours', inbox)
   } finally {
     agent.dispose()

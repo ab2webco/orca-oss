@@ -16347,7 +16347,8 @@
           "failed": "The answer was not sent.",
           "yourAnswer": "Your answer",
           "placeholder": "Answer in your own words",
-          "send": "Send"
+          "send": "Send",
+          "needsYou": "Needs you"
         },
         "SidebarGameInboxEntry": {
           "inbox": "Inbox",
@@ -16377,7 +16378,9 @@
           "failed": "Failed",
           "back": "All threads",
           "empty": "No member has talked with the lead yet.",
-          "waiting": "{{count}} waiting"
+          "waiting": "{{count}} waiting",
+          "messageOne": "1 message",
+          "messageMany": "{{count}} messages"
         },
         "GameMemberReplyForm": {
           "failed": "The reply was not sent.",
@@ -17263,7 +17266,11 @@
       "openTerminal": "Open terminal",
       "youAnswered": "You answered",
       "youAnsweredText": "You answered: {{text}}",
-      "leadAnswered": "The lead answered"
+      "leadAnswered": "The lead answered",
+      "waitingEmpty": "No member is waiting for an answer.",
+      "answeredEmpty": "Nothing answered yet.",
+      "leadAnsweredText": "The lead answered: {{text}}",
+      "answer": "Answer"
     },
     "age": {
       "now": "now",
