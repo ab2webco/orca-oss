@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { sceneDefinitionOf } from '../hooks/scenes/scene-shape'
 import { QUEST_SCENE } from '../hooks/scenes/quest'
+import { sceneGridOf } from '../hooks/scene'
 import { PLAIN_QUEST } from './plain-quest-scene'
 import { parseOrchestratorGameScene } from '../../../../src/shared/orchestrator-game-scene'
 import {
@@ -25,6 +26,29 @@ const withCostume = (patch: Record<string, unknown>) => ({
 })
 
 describe('sceneDefinitionOf', () => {
+  // Why: every scene must still draw in Pixel; the mod and an older Orca never read this block.
+  it('draws a scene with a native art block exactly as it draws one without', () => {
+    const role = {
+      sheets: ['a.png'],
+      frame: { width: 8, height: 8 },
+      size: 58,
+      animations: { idle: { row: 0, frames: 1 } }
+    }
+    const native = {
+      figures: { layers: [{ src: 'art/sky.png' }], roles: { lead: role, member: role } }
+    }
+    const plain = parseOrchestratorGameScene(JSON.stringify(sceneFile()), 'acme.space/orbit')
+    const withArt = parseOrchestratorGameScene(
+      JSON.stringify(sceneFile({ native })),
+      'acme.space/orbit'
+    )
+    expect(withArt.ok && withArt.definition.native?.figures).toBeDefined()
+    const scene = sceneDefinitionOf(withArt.ok ? withArt.definition : null, 'acme.space/orbit')
+    const without = sceneDefinitionOf(plain.ok ? plain.definition : null, 'acme.space/orbit')
+    expect(scene).toBeDefined()
+    expect(sceneGridOf(scene!, 'build', 80, 41)).toEqual(sceneGridOf(without!, 'build', 80, 41))
+  })
+
   it('accepts the built-in quest as Orca would serialize it, under the id it is given', () => {
     const scene = sceneDefinitionOf(quest, 'acme.space/orbit')
     expect(scene?.id).toBe('acme.space/orbit')
