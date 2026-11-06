@@ -221,8 +221,8 @@ function MachinesPage({ page }: { page: PageOf<'machines'> }) {
   return (
     <div className="grid grid-cols-[54px_minmax(0,1fr)_minmax(0,1fr)_46px] items-center gap-x-2.5 gap-y-[7px] @max-[260px]:gap-x-1.5">
       <span />
-      <DisplayLabel>CPU</DisplayLabel>
-      <DisplayLabel>RAM</DisplayLabel>
+      <DisplayLabel>{translate('teamPanel.display.cpu', 'CPU')}</DisplayLabel>
+      <DisplayLabel>{translate('teamPanel.display.ram', 'RAM')}</DisplayLabel>
       <DisplayLabel>{translate('teamPanel.display.agents', 'Agents')}</DisplayLabel>
       {page.rows.map((row) => (
         <div key={row.key} className="contents">

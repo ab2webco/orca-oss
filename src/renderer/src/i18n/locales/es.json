@@ -16294,6 +16294,8 @@
       "days14": "14 días",
       "noCiHistory": "Orca aún no guarda historial de CI",
       "agents": "Agentes",
+      "cpu": "CPU",
+      "ram": "RAM",
       "offline": "Sin conexión",
       "noMachines": "Este host no publica máquinas",
       "costToday": "Costo hoy",

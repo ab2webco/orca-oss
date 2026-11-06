@@ -68,8 +68,9 @@ export function SegmentNumber({
       {prefix && value !== null ? (
         <em className="mr-0.5 text-sm not-italic text-muted-foreground">{prefix}</em>
       ) : null}
-      {[...text].map((char, index) => (
-        <Digit key={index} char={char} />
+      {/* Why keyed by place value: ones stay ones when the number gains a digit. */}
+      {[...text].map((char, index, all) => (
+        <Digit key={`place-${all.length - 1 - index}`} char={char} />
       ))}
       {unit && value !== null ? (
         <em className="ml-0.5 text-sm not-italic text-muted-foreground">{unit}</em>
