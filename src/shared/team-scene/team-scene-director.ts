@@ -15,7 +15,8 @@ import type {
 } from './team-scene-types'
 
 const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
-const ADVISOR_SPOT: TeamSceneSpot = { x: 0.95, depth: 0.15 }
+// Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
+const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
 const ENTRY_X = -0.1
 const EXIT_X = 1.14
