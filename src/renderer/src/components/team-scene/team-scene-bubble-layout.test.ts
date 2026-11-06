@@ -70,29 +70,35 @@ describe('layoutTeamSceneBubbles', () => {
   })
 
   it("fits the lead's and advisor's bubbles on every style's real stage, down to the 219 px panel", () => {
+    // Why every pairing: the advisor's line is often long and the lead's a short tool name.
+    const sizes = (heights: number[]) =>
+      [60, 120, 170].flatMap((width) => heights.map((height) => ({ width, height })))
     for (const stage of STAGES) {
       for (const width of STAGE_WIDTHS) {
-        for (const textWidth of [60, 120, 170]) {
-          for (const height of stage.heights) {
+        for (const advisorSize of sizes(stage.heights)) {
+          for (const leadSize of sizes(stage.heights)) {
             const at = (key: 'lead' | 'advisor') => ({
               x: SPEAKERS[key].x * width,
               top: stage.painter.headTop(SPEAKERS[key].depth, stage.painter.height)
             })
             const anchors = { advisor: at('advisor'), lead: at('lead') }
+            const asked = { advisor: advisorSize, lead: leadSize }
             const boxes = layoutTeamSceneBubbles(
               [
-                { key: 'advisor', anchor: anchors.advisor, width: textWidth, height, align: 'end' },
-                { key: 'lead', anchor: anchors.lead, width: textWidth, height }
+                { key: 'advisor', anchor: anchors.advisor, ...advisorSize, align: 'end' },
+                { key: 'lead', anchor: anchors.lead, ...leadSize }
               ],
               { width, height: stage.painter.height },
               { beside: stage.beside }
             )
-            const where = `${stage.style} ${width} px, ${textWidth}x${height}`
+            const where = `${stage.style} ${width} px, advisor ${advisorSize.width}x${advisorSize.height}, lead ${leadSize.width}x${leadSize.height}`
             expect(boxes.map((box) => box.key).sort(), where).toEqual(['advisor', 'lead'])
             expect(overlaps(boxes[0]!, boxes[1]!), where).toBe(false)
             for (const box of boxes) {
-              const anchor = anchors[box.key as 'lead' | 'advisor']
+              const key = box.key as 'lead' | 'advisor'
+              const anchor = anchors[key]
               const tailX = box.left + box.tailX
+              expect(box.width, where).toBeLessThanOrEqual(asked[key].width)
               expect(box.left, where).toBeGreaterThanOrEqual(0)
               expect(box.left + box.width, where).toBeLessThanOrEqual(width)
               expect(box.top, where).toBeGreaterThanOrEqual(0)
