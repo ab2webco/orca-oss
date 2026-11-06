@@ -55,6 +55,11 @@ export function teamActionHint(action: TeamAction): string {
         return translate('teamPanel.actions.why.push', '{{count}} stopped', { count })
       case 'sweep':
         return translate('teamPanel.actions.why.sweep', '{{count}} finished to close', { count })
+      // Why no count line: status, stop and project actions never carry one.
+      case 'status':
+      case 'stop':
+      case null:
+        break
     }
   }
   return action.send ?? ''
