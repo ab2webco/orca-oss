@@ -16398,10 +16398,12 @@
         "ArcadeTab": {
           "title": "Arcade",
           "canvasLabel": "Arcade game",
-          "score": "{{score}} pts",
+          "score_one": "{{count}} pt",
+          "score_other": "{{count}} pts",
           "hint": "Space or tap to jump",
           "held": "Paused · someone needs you",
-          "over": "Game over · {{score}} pts",
+          "over_one": "Game over · {{count}} pt",
+          "over_other": "Game over · {{count}} pts",
           "overHint": "Space or tap to go back to Claude"
         }
       }
