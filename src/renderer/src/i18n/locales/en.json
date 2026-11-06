@@ -17261,6 +17261,32 @@
       "youAnswered": "You answered",
       "youAnsweredText": "You answered: {{text}}",
       "leadAnswered": "The lead answered"
+    },
+    "actions": {
+      "label": "Actions",
+      "wave": "Wave",
+      "status": "Status",
+      "push": "Push",
+      "sweep": "Sweep",
+      "stop": "Stop",
+      "stopAll": "Stop every member",
+      "stopConfirm": "Stop all {{count}} members? They stay stopped until you push them.",
+      "cancel": "Cancel",
+      "seeReply": "See reply",
+      "done": "Done.",
+      "off": {
+        "stopped": "A STOP is on",
+        "nothingToDo": "Nothing to do",
+        "nobodyStopped": "Nobody stopped",
+        "nothingToClose": "Nothing to close",
+        "alreadyStopped": "Already stopped",
+        "noNativePath": "Runs from the terminal"
+      },
+      "why": {
+        "wave": "{{count}} to do, slots free",
+        "push": "{{count}} stopped",
+        "sweep": "{{count}} finished to close"
+      }
     }
   }
 }

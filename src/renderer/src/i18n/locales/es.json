@@ -16262,6 +16262,32 @@
       "youAnswered": "Respondiste",
       "youAnsweredText": "Respondiste: {{text}}",
       "leadAnswered": "Respondió el lead"
+    },
+    "actions": {
+      "label": "Acciones",
+      "wave": "Ola",
+      "status": "Estado",
+      "push": "Reactivar",
+      "sweep": "Barrer",
+      "stop": "Detener",
+      "stopAll": "Detener a todos",
+      "stopConfirm": "¿Detener a los {{count}} miembros? Siguen parados hasta que los reactives.",
+      "cancel": "Cancelar",
+      "seeReply": "Ver respuesta",
+      "done": "Listo.",
+      "off": {
+        "stopped": "Hay un STOP activo",
+        "nothingToDo": "Nada por hacer",
+        "nobodyStopped": "Nadie detenido",
+        "nothingToClose": "Nada por cerrar",
+        "alreadyStopped": "Ya detenidos",
+        "noNativePath": "Se corre desde la terminal"
+      },
+      "why": {
+        "wave": "{{count}} por hacer, hay cupos",
+        "push": "{{count}} detenidos",
+        "sweep": "{{count}} terminados por cerrar"
+      }
     }
   }
 }
