@@ -67,6 +67,16 @@ describe('teamPanelModelOf', () => {
     })
   })
 
+  it("carries the lead's actions for the dock, empty from a host that sends none", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const actions = [{ id: 'lead:status', label: 'Status', command: 'status', prompt: 'How?' }]
+
+    expect(teamPanelModelOf(args({ state: state({ actions }) }))?.actions).toMatchObject([
+      { id: 'lead:status', orca: 'status', icon: 'pulse', send: 'How?' }
+    ])
+    expect(teamPanelModelOf(args())?.actions).toEqual([])
+  })
+
   it('is null when the state has no lead', () => {
     teamCardsOf.mockReturnValue(null)
 
