@@ -17,5 +17,14 @@ export function TeamPanelTeamTab({
     const timer = window.setInterval(() => setNow(Date.now()), AGE_TICK_MS)
     return () => window.clearInterval(timer)
   }, [])
-  return <TeamTabContent model={value} look={look} selectTab={selectTab} now={now} />
+  // Why null: the host's play and keep reach this tab with the credit wiring (ORCA-1053 P4b).
+  return (
+    <TeamTabContent
+      model={value}
+      look={look}
+      selectTab={selectTab}
+      now={now}
+      arcadeActions={null}
+    />
+  )
 }

@@ -8,6 +8,7 @@ import type {
   TeamMemberCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
+import type { TeamArcadeActions } from './TeamArcadeSection'
 import { TeamTabContent } from './TeamTabContent'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -110,14 +111,23 @@ function model(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameModel 
 async function render(
   value: TeamPanelGameModel,
   look: 'game' | 'display' | 'plain' = 'game',
-  selectTab = vi.fn()
+  selectTab = vi.fn(),
+  arcadeActions: TeamArcadeActions | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   roots.push(root)
   await act(async () => {
-    root.render(<TeamTabContent model={value} look={look} selectTab={selectTab} now={NOW} />)
+    root.render(
+      <TeamTabContent
+        model={value}
+        look={look}
+        selectTab={selectTab}
+        now={NOW}
+        arcadeActions={arcadeActions}
+      />
+    )
   })
   return { container, selectTab }
 }
@@ -289,5 +299,38 @@ describe('TeamTabContent', () => {
     const { container } = await render(model({ stopped: { since: null, by: 'owner' } }))
 
     expect(container.textContent).toContain('Stopped')
+  })
+
+  describe('arcade', () => {
+    const on = (): TeamArcadeActions => ({
+      play: vi.fn(async () => {}),
+      keep: vi.fn(async () => {})
+    })
+    const saved = { credits: 2, offerPr: 923 }
+    const section = (container: HTMLElement): Element | null =>
+      container.querySelector('[data-arcade-offer], [data-arcade-credits]')
+
+    it('offers the saved play above the lead in the Game look', async () => {
+      const { container } = await render(model({ arcade: saved }), 'game', vi.fn(), on())
+      const offer = section(container)!
+
+      expect(offer).not.toBeNull()
+      expect(
+        offer.compareDocumentPosition(leadCard(container)) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    })
+
+    it.each(['display', 'plain'] as const)('hides the arcade in the %s look', async (look) => {
+      const { container } = await render(model({ arcade: saved }), look, vi.fn(), on())
+      expect(section(container)).toBeNull()
+    })
+
+    it('hides the arcade when it is off or the host cannot spend a play', async () => {
+      const off = await render(model({ arcade: null }), 'game', vi.fn(), on())
+      expect(section(off.container)).toBeNull()
+
+      const noHost = await render(model({ arcade: saved }), 'game', vi.fn(), null)
+      expect(section(noHost.container)).toBeNull()
+    })
   })
 })

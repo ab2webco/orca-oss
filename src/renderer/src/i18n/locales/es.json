@@ -16091,6 +16091,15 @@
       "teamTitle": "Equipo",
       "noTeamTitle": "Tu trabajo"
     },
+    "arcade": {
+      "label": "Arcade",
+      "offerTitle": "Merge perfecto de #{{pr}}",
+      "offerText": "Ganaste una partida. Queda guardada hasta que quieras jugarla.",
+      "play": "Jugar",
+      "keep": "Guardar",
+      "savedOne": "1 partida guardada",
+      "savedMany": "{{count}} partidas guardadas"
+    },
     "header": {
       "title": "Equipo",
       "noTeamTitle": "Tu trabajo",
