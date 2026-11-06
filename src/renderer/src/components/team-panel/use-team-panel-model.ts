@@ -2,7 +2,12 @@ import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
 import { gameInboxTargetOf } from '@/components/game-inbox/game-owner-questions-client'
-import type { TeamPanelModel, TeamSection } from '../../../../shared/team-panel-model-types'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import type {
+  TeamMemberCard,
+  TeamPanelModel,
+  TeamSection
+} from '../../../../shared/team-panel-model-types'
 import {
   findTeamLeadCaller,
   readTeamLeadState,
@@ -95,4 +100,20 @@ export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
   return useTeamPanelModelStore((s) =>
     s.source.section.kind === 'ready' ? s.source.section.value.kind : null
   )
+}
+
+/** The member whose pane is in this terminal tab, from the last model the panel read; never polls. */
+export function useTeamMemberOfTab(tabId: string): TeamMemberCard | null {
+  return useTeamPanelModelStore((s) => {
+    const section = s.source.section
+    if (section.kind !== 'ready' || section.value.kind !== 'team') {
+      return null
+    }
+    // Why local only: a paired host's pane key names a tab on that host, not in this window.
+    return (
+      section.value.members.find(
+        (card) => card.host.kind === 'local' && parsePaneKey(card.paneKey)?.tabId === tabId
+      ) ?? null
+    )
+  })
 }

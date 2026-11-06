@@ -6,6 +6,7 @@ import type {
   TeamHost,
   TeamLiveAction,
   TeamModel,
+  TeamPullRequest,
   TeamStatus
 } from '../../../../shared/team-panel-model-types'
 
@@ -93,4 +94,22 @@ export function teamModelText(model: TeamModel | null): string | null {
 
 export function teamHostText(host: TeamHost): string {
   return host.kind === 'local' ? translate('teamPanel.host.local', 'local') : host.name
+}
+
+/** The PR chip's second half; null when there is nothing to say about its checks. */
+export function teamCiText(pr: TeamPullRequest): string | null {
+  if (pr.state === 'merged') {
+    return translate('teamPanel.card.merged', 'Merged')
+  }
+  switch (pr.ci) {
+    case 'failure':
+      return translate('teamPanel.card.ciFailed', 'CI failing')
+    case 'pending':
+      return translate('teamPanel.card.ciRunning', 'CI running')
+    case 'success':
+      return translate('teamPanel.card.ciPassed', 'CI green')
+    case 'neutral':
+    case 'none':
+      return null
+  }
 }
