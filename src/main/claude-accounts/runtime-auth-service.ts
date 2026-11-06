@@ -49,6 +49,11 @@ import {
   readManagedClaudeRefreshCredentials
 } from './claude-managed-refresh-chain'
 import { ClaudeRuntimePathResolver } from './runtime-paths'
+import {
+  assertRefreshChainNotHeldByOtherAccount,
+  ClaudeRefreshChainAliasError,
+  organizationIdentifiesOneAccount
+} from './claude-refresh-chain-ownership'
 import { buildInheritedVaultSettings } from './vault-settings-inheritance'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -463,7 +468,7 @@ export class ClaudeRuntimeAuthService {
             )
           ) {
             // Why: switching away while Claude is live must preserve verified token refreshes before replacing shared runtime credentials.
-            await this.writeManagedCredentials(
+            await this.writeManagedCredentialsUnlessAliased(
               previousAccount,
               outgoingReadBackResult.runtimeCredentialsJson
             )
@@ -638,8 +643,14 @@ export class ClaudeRuntimeAuthService {
             )
           ) {
             // Why: this Claude launched under the active managed account, but persistence still needs positive account proof.
-            await this.writeManagedCredentials(activeAccount, readBackResult.runtimeCredentialsJson)
-            credentialsJson = readBackResult.runtimeCredentialsJson
+            if (
+              await this.writeManagedCredentialsUnlessAliased(
+                activeAccount,
+                readBackResult.runtimeCredentialsJson
+              )
+            ) {
+              credentialsJson = readBackResult.runtimeCredentialsJson
+            }
           } else {
             // Why: while Claude runs, an unknown refresh may belong to a live session; rewriting stale managed auth logs it out.
             console.warn(
@@ -1543,7 +1554,21 @@ export class ClaudeRuntimeAuthService {
       match === 'unverifiable' &&
       Boolean(selectedOrganizationUuid) &&
       (identity?.organizationUuid ?? runtimeOauthIdentity.organizationUuid) ===
-        selectedOrganizationUuid
+        selectedOrganizationUuid &&
+      // Why: with two accounts in one organization this blob may be the other's chain (ORCA-1039).
+      organizationIdentifiesOneAccount(
+        account.id,
+        selectedOrganizationUuid as string,
+        this.store.getSettings().claudeManagedAccounts,
+        (other) => this.readStoredOrganizationUuid(other)
+      )
+    )
+  }
+
+  private readStoredOrganizationUuid(account: ClaudeManagedAccount): string | null {
+    return this.normalizeField(
+      account.organizationUuid ??
+        this.readIdentityFromOauthAccount(this.readManagedOauthAccount(account)).organizationUuid
     )
   }
 
@@ -1728,6 +1753,23 @@ export class ClaudeRuntimeAuthService {
     return readClaudeManagedAuthFile(managedAuthPath, '.credentials.json')
   }
 
+  /** False when the blob holds another account's chain; that write is skipped, not fatal. */
+  private async writeManagedCredentialsUnlessAliased(
+    account: ClaudeManagedAccount,
+    credentialsJson: string
+  ): Promise<boolean> {
+    try {
+      await this.writeManagedCredentials(account, credentialsJson)
+      return true
+    } catch (error) {
+      if (!(error instanceof ClaudeRefreshChainAliasError)) {
+        throw error
+      }
+      console.warn('[claude-runtime-auth] Skipped a managed write that would share a refresh chain')
+      return false
+    }
+  }
+
   private async writeManagedCredentials(
     account: ClaudeManagedAccount,
     credentialsJson: string
@@ -1736,6 +1778,12 @@ export class ClaudeRuntimeAuthService {
     if (!managedAuthPath) {
       throw new Error('Managed Claude auth storage is not owned by Orca Lab.')
     }
+    await assertRefreshChainNotHeldByOtherAccount(
+      account.id,
+      credentialsJson,
+      this.store.getSettings().claudeManagedAccounts,
+      (other) => this.readManagedCredentials(other)
+    )
     if (process.platform === 'darwin') {
       await writeManagedClaudeKeychainCredentials(account.id, credentialsJson)
       return
