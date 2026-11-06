@@ -1,5 +1,6 @@
 import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
+import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { GameReviewVerdict, GameStatusGroup } from './orchestrator-game-state'
 
 // Why: one view model for the desktop Team panel and the mobile sheet (ORCA-1048). It holds ids
@@ -210,6 +211,14 @@ export type TeamPanelTabs = {
   machines: TeamSection<TeamMachine[]> | null
 }
 
+/** What the live scene draws, as game.state publishes it (`config.scene`, `extensions.scenes`). */
+export type TeamSceneSource = {
+  /** The project's scene id; null when the host did not say, and Pixel draws Quest. */
+  id: string | null
+  /** Plugin and file scene definitions the host carried; built-ins are resolved by id. */
+  extensions: OrchestratorGameSceneExtension[]
+}
+
 export type TeamPanelGameModel = TeamPanelTabs & {
   kind: 'team'
   repoId: string
@@ -225,6 +234,7 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   arcade: { credits: number; offerPr: number | null } | null
   /** The project's STOP; null when clear. */
   stopped: { since: string | null; by: string | null } | null
+  scene: TeamSceneSource
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */

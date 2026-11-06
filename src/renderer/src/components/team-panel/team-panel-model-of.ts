@@ -59,6 +59,11 @@ export function teamPanelModelOf(args: {
     xp: null,
     arcade: null,
     stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
+    // Why guarded: a paired host on an older build may send neither.
+    scene: {
+      id: typeof state.config?.scene === 'string' ? state.config.scene : null,
+      extensions: state.extensions?.scenes ?? []
+    },
     inbox: inboxOf(state, questions),
     prs: null,
     queue: null,
