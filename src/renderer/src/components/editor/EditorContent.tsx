@@ -29,6 +29,7 @@ import {
 import { getDiffContentSignature } from './diff-content-signature'
 import { translate } from '@/i18n/i18n'
 import { CheckRunDetailsPanel } from './CheckRunDetailsPanel'
+import { GameArcadeEditorTab } from '../game-arcade/GameArcadeEditorTab'
 import { ExternalFileChangeBanner } from './ExternalFileChangeBanner'
 
 const MonacoEditor = lazy(() => import('./MonacoEditor'))
@@ -613,6 +614,10 @@ export function EditorContent({
         {unresolvedEntries.map(renderConflictReviewInlineFile)}
       </div>
     )
+  }
+
+  if (activeFile.mode === 'arcade') {
+    return <GameArcadeEditorTab key={activeFile.arcadeRunId} file={activeFile} />
   }
 
   if (activeFile.mode === 'check-details') {
