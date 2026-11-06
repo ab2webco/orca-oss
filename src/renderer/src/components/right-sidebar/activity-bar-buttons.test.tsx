@@ -72,6 +72,7 @@ describe('TopActivityOverflowMenu', () => {
       )
     })
 
-    expect(container.querySelector(`button .${tone}`)).not.toBeNull()
+    // Why: the shared StatusDot draws it, so a user-picked colour reaches this badge too.
+    expect(container.querySelector(`button [data-status-tone] .${tone}`)).not.toBeNull()
   })
 })

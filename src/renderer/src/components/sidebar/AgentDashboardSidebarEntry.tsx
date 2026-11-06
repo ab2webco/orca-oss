@@ -1,15 +1,17 @@
 import { LayoutDashboard } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
-import { AgentQuestionIcon } from '@/components/AgentQuestionIcon'
+import { StatusDot } from '@/components/StatusDot'
+import type { StatusTone } from '@/components/status-tone'
 import { DASHBOARD_BUCKET_ORDER, type DashboardBucket } from '../../../../shared/dashboard-snapshot'
 import { useAgentBucketCounts } from '@/components/dashboard/useAgentBucketCounts'
 import { translate } from '@/i18n/i18n'
 
-const DASHBOARD_BUCKET_DOT_CLASS: Record<'working' | 'done' | 'idle', string> = {
-  working: 'bg-status-info',
-  done: 'bg-status-success',
-  idle: 'bg-status-idle/50'
+const DASHBOARD_BUCKET_TONE: Record<DashboardBucket, StatusTone> = {
+  attention: 'attention',
+  working: 'info',
+  done: 'success',
+  idle: 'idle'
 }
 
 function dashboardBucketLabel(bucket: DashboardBucket): string {
@@ -46,11 +48,12 @@ function DashboardBucketCounts({
           aria-label={`${dashboardBucketLabel(bucket)}: ${counts[bucket]}`}
           className="inline-flex items-center gap-1 text-[10px] tabular-nums text-worktree-sidebar-foreground/55"
         >
-          {bucket === 'attention' ? (
-            <AgentQuestionIcon className="size-2.5" />
-          ) : (
-            <span className={cn('size-1.5 rounded-full', DASHBOARD_BUCKET_DOT_CLASS[bucket])} />
-          )}
+          <StatusDot
+            tone={DASHBOARD_BUCKET_TONE[bucket]}
+            glyph={bucket === 'attention' ? 'question' : 'dot'}
+            faded={bucket === 'idle'}
+            aria-hidden="true"
+          />
           {counts[bucket]}
         </span>
       ))}

@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
-import { statusToneBgClass } from '@/components/status-tone'
+import { StatusDot } from '@/components/StatusDot'
 import { checkStatusTone } from '@/components/review-status-tone'
 
 export type ActivityBarItem = {
@@ -30,10 +30,6 @@ export type ActivityBarItem = {
   sshOnly?: boolean
   /** Host-owned health indicator; plugin content cannot style this chrome. */
   statusIndicator?: CheckStatus
-}
-
-function statusDotClass(status: CheckStatus): string {
-  return statusToneBgClass(checkStatusTone(status))
 }
 
 function activityItemAriaLabel(item: ActivityBarItem, status?: CheckStatus | null): string {
@@ -83,11 +79,11 @@ export function TopActivityOverflowMenu({
         >
           <MoreHorizontal size={16} />
           {hiddenItemStatus && (
-            <div
-              className={cn(
-                'absolute top-[8px] right-[4px] size-[7px] rounded-full ring-1 ring-sidebar',
-                statusDotClass(hiddenItemStatus)
-              )}
+            <StatusDot
+              tone={checkStatusTone(hiddenItemStatus)}
+              size="badge"
+              className="absolute top-[8px] right-[4px]"
+              aria-hidden="true"
             />
           )}
         </button>
@@ -107,10 +103,7 @@ export function TopActivityOverflowMenu({
               <Icon size={14} />
               <span>{item.title}</span>
               {item.statusIndicator === 'failure' ? (
-                <span
-                  className={cn('ml-auto size-2 rounded-full', statusDotClass('failure'))}
-                  aria-hidden="true"
-                />
+                <StatusDot tone="attention" size="md" className="ml-auto" aria-hidden="true" />
               ) : null}
               {item.shortcut && <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>}
             </DropdownMenuItem>
@@ -155,12 +148,11 @@ export function ActivityBarButton({
           <Icon size={isTop ? 16 : 18} />
 
           {effectiveStatus && effectiveStatus !== 'neutral' && (
-            <div
-              className={cn(
-                'absolute rounded-full size-[7px] ring-1 ring-sidebar',
-                isTop ? 'top-[8px] right-[5px]' : 'top-[7px] right-[7px]',
-                statusDotClass(effectiveStatus)
-              )}
+            <StatusDot
+              tone={checkStatusTone(effectiveStatus)}
+              size="badge"
+              className={cn('absolute', isTop ? 'top-[8px] right-[5px]' : 'top-[7px] right-[7px]')}
+              aria-hidden="true"
             />
           )}
 
