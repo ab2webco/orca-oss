@@ -10,6 +10,7 @@ import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
 const ART_STYLES = ['figures', 'office'] as const
+const ADVISOR_STYLES = ['pixel', ...ART_STYLES] as const
 const ART_STAGE_HEIGHT = 176
 const COPY = {
   en: { label: 'Live team scene', open: 'Open terminal' },
@@ -33,6 +34,57 @@ async function paintedColors(page: Page): Promise<number> {
   })
 }
 
+// Why reported: the scene's clock caps each frame's step, so a bubble's fade depends on the frames.
+async function frameRate(page: Page): Promise<string> {
+  return page.evaluate(
+    () =>
+      new Promise<string>((resolve) => {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const start = performance.now()
+        let frames = 0
+        const tick = (now: number): void => {
+          frames += 1
+          if (now - start < 2000) {
+            requestAnimationFrame(tick)
+          } else {
+            resolve(
+              `${frames / 2} frames/s, reduced motion ${reduced}, ${document.visibilityState}`
+            )
+          }
+        }
+        requestAnimationFrame(tick)
+        setTimeout(() => resolve(`${frames} frames in 5 s, reduced motion ${reduced}`), 5000)
+      })
+  )
+}
+
+type BubbleBox = { left: number; right: number; top: number; bottom: number }
+
+// Why one read: the advisor's bubble fades on a timer, so two separate reads can straddle it.
+async function shownBubbles(
+  page: Page
+): Promise<{ advisor: BubbleBox | null; lead: BubbleBox | null }> {
+  return page.evaluate(() => {
+    const boxOf = (key: string) => {
+      const node = document.querySelector(`[data-scene-bubble="${key}"]`)
+      if (!node || getComputedStyle(node).visibility !== 'visible') {
+        return null
+      }
+      const { left, right, top, bottom } = node.getBoundingClientRect()
+      return { left, right, top, bottom }
+    }
+    return { advisor: boxOf('advisor'), lead: boxOf('lead') }
+  })
+}
+
+const boxesClash = (a: BubbleBox | null, b: BubbleBox | null): boolean =>
+  a !== null &&
+  b !== null &&
+  a.left < b.right &&
+  b.left < a.right &&
+  a.top < b.bottom &&
+  b.top < a.bottom
+
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate(async (next) => {
     const settings = await window.api.settings.set({ theme: next })
@@ -51,7 +103,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(600_000)
+  test.setTimeout(1_200_000)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -250,6 +302,83 @@ test('the Team panel draws the live scene beside a member opened under its heade
             path: testInfo.outputPath(`team-panel-scene-${style}-${width}-${theme}.png`)
           })
         }
+      }
+    }
+
+    // The lead's Jev, on the same game.state call its mod polls with, and a real tool hook for the
+    // lead's bubble. A new line is a new advisor bubble that fades in 6 s and the panel reads state every
+    // 20 s, so each width waits for its own line (ORCA-1052).
+    await emitCodexHookStatus(endpoint, {
+      paneKey: pane.paneKey,
+      worktreeId,
+      state: 'working',
+      tool: 'exec_command'
+    })
+    const advisorCard = panel.locator('[data-team-card="advisor"]')
+    const advisorBubble = panel.locator('[data-scene-bubble="advisor"]')
+    const reportJev = (line: string) =>
+      client.call('game.state', {
+        worktreeId,
+        terminalHandle: lead,
+        paneKey: pane.paneKey,
+        advisor: {
+          version: 1,
+          model: 'Opus 5.5',
+          effort: 'high',
+          line,
+          pinned: { model: false, effort: false }
+        }
+      })
+    testInfo.annotations.push({ type: 'team-scene-frames', description: await frameRate(orcaPage) })
+    let said = 0
+    for (const style of ADVISOR_STYLES) {
+      await orcaPage.evaluate(
+        (next) =>
+          window.__store!.getState().updateSettings({
+            orchestratorGame: { panel: { style: next } }
+          }),
+        style
+      )
+      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+        timeout: 30_000
+      })
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        await setTheme(orcaPage, 'dark')
+        said += 1
+        const line = `Keep this one small, step ${said}`
+        await reportJev(line)
+        await expect(advisorCard).toContainText(line, { timeout: 45_000 })
+        await expect(advisorCard).toContainText('Opus 5.5 · high')
+        await expect(advisorBubble).toHaveText(line)
+        await expect(advisorBubble).toBeVisible()
+        const shown = await shownBubbles(orcaPage)
+        expect(shown.advisor, `advisor bubble hidden at ${width}px ${style}`).not.toBeNull()
+        expect(
+          boxesClash(shown.advisor, shown.lead),
+          `lead and advisor bubbles clash at ${width}px ${style}`
+        ).toBe(false)
+        // Why only wide: at 390 and 320 the stage is 219 px and the layout leaves the lead's out.
+        if (width >= 768) {
+          expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
+        }
+        testInfo.annotations.push({
+          type: 'team-scene-advisor',
+          description: `${style} ${width}: lead bubble ${shown.lead ? 'beside the advisor' : 'waits for the advisor'}`
+        })
+        const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+        expect(overflow, `panel overflows at ${width}px ${style}`).toBeLessThanOrEqual(0)
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-dark.png`)
+        })
+        await scene.screenshot({
+          path: testInfo.outputPath(`team-scene-advisor-${style}-${width}-dark.png`)
+        })
+        // Why no bubble check here: the row is what this capture is for, and the cloud may have faded.
+        await setTheme(orcaPage, 'light')
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-light.png`)
+        })
       }
     }
 

@@ -1,6 +1,8 @@
 /* eslint-disable max-lines */
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
+import { gameArcadeTabIdOf } from '../../components/game-arcade/arcade-tab-id'
+import { arcadeTabTitle } from '../../components/game-arcade/arcade-words'
 import {
   createRecentlyClosedTabPositionIndex,
   getRecentlyClosedTabPosition,
@@ -271,6 +273,8 @@ export type OpenFile = {
   conflict?: OpenConflictMetadata
   skippedConflicts?: CombinedDiffSkippedConflict[]
   conflictReview?: ConflictReviewState
+  /** Renewed by every saved play, so the Arcade tab remounts with a fresh run. */
+  arcadeRunId?: number
   isPreview?: boolean // preview tabs are replaced when another file is single-clicked
   isUntitled?: boolean // true for files created via "New Markdown" that haven't been renamed yet
   // Why: templated New Markdown files have real content at creation, unlike blank placeholders that can be discarded.
@@ -299,7 +303,8 @@ export type OpenFile = {
   readOnly?: boolean
   /** Why: explicit live tail, only meaningful for a read-only local log. */
   liveTail?: boolean
-  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details'
+  /** Why 'arcade': a saved play of the game's runner beside Claude; transient, never persisted. */
+  mode: 'edit' | 'diff' | 'conflict-review' | 'markdown-preview' | 'check-details' | 'arcade'
 }
 
 export type ActivityBarPosition = 'top' | 'side'
@@ -605,6 +610,8 @@ export type EditorSlice = {
     entries: ConflictReviewEntry[],
     source: ConflictReviewState['source']
   ) => void
+  /** Opens or focuses this worktree's Arcade tab; the caller has already spent a credit. */
+  openGameArcadeTab: (worktreeId: string) => void
   openCheckRunDetails: (
     worktreeId: string,
     contextKey: string,
@@ -3839,6 +3846,34 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       }
     })
     void openWorkspaceEditorItem(get(), id, worktreeId, 'Conflict Review', 'conflict-review')
+  },
+
+  openGameArcadeTab: (worktreeId) => {
+    const id = gameArcadeTabIdOf(worktreeId)
+    const label = arcadeTabTitle()
+    const arcadeRunId = Date.now()
+    set((s) => ({
+      openFiles: s.openFiles.some((f) => f.id === id)
+        ? s.openFiles.map((f) => (f.id === id ? { ...f, arcadeRunId } : f))
+        : [
+            ...s.openFiles,
+            {
+              id,
+              filePath: id,
+              relativePath: label,
+              worktreeId,
+              language: 'plaintext',
+              isDirty: false,
+              mode: 'arcade' as const,
+              arcadeRunId
+            }
+          ],
+      activeFileId: id,
+      activeTabType: 'editor',
+      activeFileIdByWorktree: { ...s.activeFileIdByWorktree, [worktreeId]: id },
+      activeTabTypeByWorktree: { ...s.activeTabTypeByWorktree, [worktreeId]: 'editor' }
+    }))
+    void openWorkspaceEditorItem(get(), id, worktreeId, label, 'editor')
   },
 
   // Why: the checks sidebar only fits inline summaries; full logs and annotations belong in the center editor pane.

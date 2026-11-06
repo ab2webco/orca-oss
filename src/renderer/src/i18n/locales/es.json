@@ -15458,9 +15458,11 @@
           "title": "Arcade",
           "canvasLabel": "Partida de arcade",
           "score": "{{score}} pts",
+          "scoreOne": "1 pto",
           "hint": "Espacio o toque para saltar",
           "held": "En pausa · alguien te necesita",
           "over": "Fin de la partida · {{score}} pts",
+          "overOne": "Fin de la partida · 1 pto",
           "overHint": "Espacio o toque para volver a Claude"
         }
       }

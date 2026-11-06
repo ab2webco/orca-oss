@@ -125,6 +125,7 @@ describe("a member pane's Jev report", () => {
         version: 1,
         model: 'Sonnet 5.5',
         effort: '3',
+        line: 'jev',
         pinned: { model: true, effort: false }
       })
     }
@@ -190,6 +191,7 @@ describe("a member pane's Jev report", () => {
         version: 1,
         model: 'Opus 5.5',
         effort: 'high',
+        line: 'jev',
         pinned: { model: false, effort: true }
       })
     })
