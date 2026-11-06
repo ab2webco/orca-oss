@@ -123,15 +123,6 @@ const engine = (on: On, world: World) => {
   }))
 }
 
-type Drawn = { type?: unknown; props?: { text?: unknown }; children?: unknown }
-const isDrawn = (one: unknown): one is Drawn => typeof one === 'object' && one !== null
-const shownOf = (one: unknown): string =>
-  typeof one === 'string'
-    ? one
-    : isDrawn(one) && Array.isArray(one.children)
-      ? one.children.map(shownOf).join('')
-      : ''
-
 const start = async ($: Engine, on: On, world: World) => {
   const clock = mock.clock(on)
   engine(on, world)
@@ -140,23 +131,6 @@ const start = async ($: Engine, on: On, world: World) => {
   return clock
 }
 
-const pane = ($: Engine) =>
-  $.ui.mount({
-    plugin: 'orca-game',
-    surface: 'terminal',
-    component: 'Pane',
-    requestId: 'orca-game-fleet',
-    viewport: { columns: 124, rows: 60, isFullscreen: true },
-    props: {
-      title: 'Fleet',
-      isFocused: true,
-      bodyColumns: 120,
-      placement: 'dock',
-      scroll: { offset: 0, bodyRows: 50 },
-      view: {}
-    }
-  })
-
 const worldOf = (patch: Partial<World> = {}): World => ({
   prompts: [],
   mcp: [],
@@ -164,125 +138,6 @@ const worldOf = (patch: Partial<World> = {}): World => ({
   mcpFails: false,
   registered: [],
   ...patch
-})
-
-describe('project actions in the Panel', () => {
-  test('a Panel without the Actions widget draws no action and keeps no action hotkey', async ($, on) => {
-    const world = worldOf({ isDefaultLayout: true })
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await ui.find({ type: 'Button', key: 'action-action-0' })).toBeUndefined()
-    expect(await ui.find({ type: 'Button', key: 'action-action-1' })).toBeUndefined()
-    const hotkeys = (await ui.findAll({ type: 'Button' })).map(
-      (one) => (one.props as { hotkey?: unknown }).hotkey
-    )
-    expect(hotkeys).not.toContain('e')
-    expect(hotkeys).not.toContain('f')
-    await ui.unmount()
-  })
-
-  test('a prompt action sends its prompt to the lead on e and says so', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await ui.find({ type: 'Button', key: 'action-action-0' })).toMatchObject({
-      props: { hotkey: 'e' }
-    })
-    await ui.press({ key: 'action-action-0' })
-    expect(world.prompts).toEqual(['Open a PR for ORCA-1'])
-    expect(world.toasts).toEqual(['Sent to the lead: Ship it'])
-    await ui.unmount()
-  })
-
-  test('an MCP action shows what it runs, calls it on f and draws its lines', async ($, on) => {
-    const world = worldOf()
-    const clock = await start($, on, world)
-    const ui = await pane($)
-    const button = await ui.find({ type: 'Button', key: 'action-action-1' })
-    expect(button).toMatchObject({ props: { hotkey: 'f' } })
-    expect(shownOf(button)).toContain('Tambora·list_test_runs')
-    await ui.press({ key: 'action-action-1' })
-    await clock.settle()
-    expect(world.mcp).toEqual([
-      { server: 'Tambora', tool: 'list_test_runs', args: { project: 'CIN' } }
-    ])
-    expect(world.prompts).toEqual([])
-    const result = await ui.find({ type: 'Box', key: 'action-result-action-1' })
-    expect(shownOf(result)).toContain('TR-1 passed')
-    expect(shownOf(result)).toContain('TR-2 failed')
-    await ui.unmount()
-  })
-
-  test('a failed MCP call draws its error in red', async ($, on) => {
-    const world = worldOf({ mcpFails: true })
-    const clock = await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'action-action-1' })
-    await clock.settle()
-    const error = await ui.find({ type: 'Text', text: /no access/ })
-    expect(error).toMatchObject({ props: { color: 'red' } })
-    await ui.unmount()
-  })
-})
-
-describe('a button pressed repeatedly', () => {
-  test('sends its prompt once, then again after the cooldown', async ($, on) => {
-    const world = worldOf()
-    const clock = await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'action-action-0' })
-    await ui.press({ key: 'action-action-0' })
-    await ui.press({ key: 'work-ORCA-2' })
-    await ui.press({ key: 'work-ORCA-2' })
-    await clock.settle()
-    expect(world.prompts).toEqual(['Open a PR for ORCA-1', 'Work on ORCA-2: Check'])
-    expect(world.toasts.filter((one) => one === 'Sent to the lead: Ship it')).toHaveLength(2)
-
-    await clock.advance(3001)
-    await ui.press({ key: 'action-action-0' })
-    expect(world.prompts).toEqual([
-      'Open a PR for ORCA-1',
-      'Work on ORCA-2: Check',
-      'Open a PR for ORCA-1'
-    ])
-    await ui.unmount()
-  })
-})
-
-describe('/quest demo', () => {
-  test('shows actions and work buttons that only toast, never sending or calling', async ($, on) => {
-    const world = worldOf()
-    const clock = await start($, on, world)
-    await $.command.run({ command: 'quest', args: 'demo' } as never)
-    const ui = await pane($)
-    await ui.press({ key: 'action-action-0' })
-    await ui.press({ key: 'action-action-1' })
-    await ui.press({ key: 'work-ORCA-4' })
-    await clock.settle()
-    expect(world.prompts).toEqual([])
-    expect(world.mcp).toEqual([])
-    expect(world.toasts).toEqual([
-      'Demo: Open a PR is not run',
-      'Demo: Test runs is not run',
-      'Demo: Work on ORCA-4 is not run'
-    ])
-    expect(await ui.find({ type: 'Text', text: /^QA \/ review 2$/ })).toBeDefined()
-    await ui.unmount()
-  })
-})
-
-describe('the To Do in the Panel', () => {
-  test('heads tickets by status with counts and works on one with ▶', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await ui.find({ type: 'Text', text: /^In progress 1$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^QA \/ review 3$/ })).toBeDefined()
-    await ui.press({ key: 'work-ORCA-2' })
-    expect(world.prompts).toEqual(['Work on ORCA-2: Check'])
-    expect(world.toasts).toEqual(['Sent to the lead: Work on ORCA-2'])
-    await ui.unmount()
-  })
 })
 
 const LEAD_ACTIONS = [
@@ -347,104 +202,35 @@ describe('actions as slash commands', () => {
     ])
     expect(ran.text).toContain('TR-1 passed')
   })
-})
 
-describe("the lead's buttons in the band", () => {
-  const band = ($: Engine) =>
-    $.ui.mount({
-      plugin: 'orca-game',
-      surface: 'terminal',
-      component: 'AbovePrompt',
-      viewport: { columns: 124, rows: 40, isFullscreen: true },
-      props: {
-        hasSurvey: false,
-        isWorking: false,
-        maxRows: 8,
-        bodyColumns: 120,
-        scroll: { offset: 0, bodyRows: 7 },
-        view: {}
-      }
-    })
+  test('a failed MCP action answers with its error', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE, mcpFails: true })
+    const clock = await start($, on, world)
+    const ran = await $.command.run({ command: 'runs', args: '' } as never)
+    await clock.settle()
+    expect(ran.text).toContain('no access')
+  })
 
-  test('draws them in the session language and sends a pressed one to the lead', async ($, on) => {
-    const world = worldOf({ state: LEAD_STATE, env: { ORCA_GAME_LOCALE: 'es' } })
-    await start($, on, world)
-    const ui = await band($)
-    const row = await ui.find({ type: 'Box', key: 'band-actions-band-action-lead:wave' })
-    expect(shownOf(row)).toContain('Ola')
-    expect(shownOf(row)).toContain('Detener')
-    expect(shownOf(row)).toContain('Test runs')
-    await ui.press({ key: 'band-action-lead:wave' })
+  // Why: the buttons moved out of the terminal (ORCA-1055); a retyped command must not queue the turn twice.
+  test('sends a prompt once, then again after the cooldown', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE })
+    const clock = await start($, on, world)
+    await $.command.run({ command: 'wave', args: '' } as never)
+    await $.command.run({ command: 'wave', args: '' } as never)
+    await clock.settle()
     expect(world.prompts).toEqual(['Run a wave now'])
+
+    await clock.advance(3001)
+    await $.command.run({ command: 'wave', args: '' } as never)
+    await clock.settle()
+    expect(world.prompts).toEqual(['Run a wave now', 'Run a wave now'])
+  })
+
+  test('says a lead action in the session language', async ($, on) => {
+    const world = worldOf({ state: LEAD_STATE, env: { ORCA_GAME_LOCALE: 'es' } })
+    const clock = await start($, on, world)
+    await $.command.run({ command: 'wave', args: '' } as never)
+    await clock.settle()
     expect(world.toasts).toContain('Enviado al líder: Ola')
-    await ui.unmount()
-  })
-})
-
-describe('a To Do that runs an action', () => {
-  const TODO_STATE = {
-    ...STATE,
-    project: { ...STATE.project, todo: { ...STATE.project.todo, actionId: 'action-0' } }
-  }
-
-  test('the t link, the Panel heading and the band chip send its prompt instead of opening the list', async ($, on) => {
-    const world = worldOf({ state: TODO_STATE })
-    const clock = await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'open-todo' })
-    await clock.advance(3001)
-    await ui.press({ key: 'project-todo-action' })
-    await ui.unmount()
-    await clock.advance(3001)
-    const strip = await $.ui.mount({
-      plugin: 'orca-game',
-      surface: 'terminal',
-      component: 'AbovePrompt',
-      viewport: { columns: 164, rows: 40, isFullscreen: true },
-      props: {
-        hasSurvey: false,
-        isWorking: false,
-        maxRows: 8,
-        bodyColumns: 160,
-        scroll: { offset: 0, bodyRows: 7 },
-        view: {}
-      }
-    })
-    await strip.press({ key: 'band-todo' })
-    await clock.settle()
-    expect(world.prompts).toEqual([
-      'Open a PR for ORCA-1',
-      'Open a PR for ORCA-1',
-      'Open a PR for ORCA-1'
-    ])
-    await strip.unmount()
-  })
-})
-
-describe('a PR list that runs an action', () => {
-  const PRS_STATE = {
-    ...STATE,
-    project: {
-      ...STATE.project,
-      reviews: {
-        provider: 'github',
-        total: 0,
-        url: 'https://github.com/o/r/pulls',
-        items: [],
-        actionId: 'action-0'
-      }
-    }
-  }
-
-  test('the g link and the Panel heading send its prompt instead of opening the list', async ($, on) => {
-    const world = worldOf({ state: PRS_STATE })
-    const clock = await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'open-reviews' })
-    await clock.advance(3001)
-    await ui.press({ key: 'project-reviews-action' })
-    await clock.settle()
-    expect(world.prompts).toEqual(['Open a PR for ORCA-1', 'Open a PR for ORCA-1'])
-    await ui.unmount()
   })
 })

@@ -1,11 +1,8 @@
-// Runs under `claude plugin test`: the Panel's sections collapse, and the layout comes back from `$.store`.
+// Runs under `claude plugin test`: `/orca-game:layout` stores the sections the native panel carries over.
 import { describe, expect, mock } from 'claude-code/testing'
 import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
-
-import { cellWidthOf } from '../hooks/cell-width'
-import { SCENE_TICK_MS } from '../hooks/scene'
 
 const ORCA_CLI = '/opt/orca/bin/orca'
 const LAYOUT_KEY = 'panel-layout'
@@ -76,21 +73,6 @@ const fleetStore = (fleet: Record<string, unknown>) => ({
   }
 })
 
-// What the host sends the lead: three days of merges, the median lead time and one account.
-const METRICS = {
-  computedAt: '2026-10-30T18:00:00.000Z',
-  timezone: 'America/Bogota',
-  mergedPerDay: [
-    { day: '2026-10-28', merged: 0 },
-    { day: '2026-10-29', merged: 2 },
-    { day: '2026-10-30', merged: 4 }
-  ],
-  leadTime: { medianMs: 26 * 3_600_000, measured: 6 },
-  claudeAccounts: [
-    { email: 'lead@example.com', active: true, sessionPercent: 41, weeklyPercent: 92 }
-  ]
-}
-
 const engine = (on: On, world: World, locale: string, state: unknown) => {
   mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: locale })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
@@ -121,15 +103,6 @@ const engine = (on: On, world: World, locale: string, state: unknown) => {
   }))
 }
 
-type Drawn = { type?: unknown; key?: unknown; children?: unknown }
-const isDrawn = (one: unknown): one is Drawn => typeof one === 'object' && one !== null
-const shownOf = (one: unknown): string => {
-  if (typeof one === 'string') {
-    return one
-  }
-  return isDrawn(one) && Array.isArray(one.children) ? one.children.map(shownOf).join('') : ''
-}
-
 const start = async ($: Engine, on: On, world: World, locale = 'en', state: unknown = STATE) => {
   const clock = mock.clock(on)
   engine(on, world, locale, state)
@@ -137,244 +110,6 @@ const start = async ($: Engine, on: On, world: World, locale = 'en', state: unkn
   await clock.settle()
   return clock
 }
-
-const pane = ($: Engine, columns = 120) =>
-  $.ui.mount({
-    plugin: 'orca-game',
-    surface: 'terminal',
-    component: 'Pane',
-    requestId: 'orca-game-fleet',
-    viewport: { columns: columns + 4, rows: 60, isFullscreen: true },
-    props: {
-      title: 'Fleet',
-      isFocused: true,
-      bodyColumns: columns,
-      placement: 'dock',
-      scroll: { offset: 0, bodyRows: 50 },
-      view: {}
-    }
-  })
-
-type Mounted = Awaited<ReturnType<typeof pane>>
-
-/** How many member-tile frames the Panel sends over 30 animation ticks. */
-const tileBlitsOf = async ($: Engine, on: On, world: World) => {
-  const blits: string[] = []
-  on('ui.blit', ($s, e) => {
-    blits.push(e.key)
-    return { value: {} }
-  })
-  const clock = await start($, on, world)
-  const ui = await pane($)
-  blits.length = 0
-  await clock.advance(SCENE_TICK_MS * 30)
-  await ui.unmount()
-  return blits.filter((key) => key.startsWith('tile-')).length
-}
-
-const headerOf = async (ui: Mounted, section: string) =>
-  shownOf(await ui.find({ type: 'Box', key: `layout-header-${section}` }))
-const cardsOf = async (ui: Mounted) =>
-  (await ui.findAll({ type: 'Box' })).filter((one) => one.key?.startsWith('card-tab-1:'))
-
-describe('panel layout', () => {
-  test('an untouched layout draws Team, leaves To Do off the Panel and stores nothing', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toMatch(/^▾ TEAM  3  ─+$/)
-    expect((await cardsOf(ui)).length).toBe(3)
-    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
-    expect(await ui.find({ type: 'Box', key: 'project-todo' })).toBeUndefined()
-    expect(world.writes).toEqual([])
-    await ui.unmount()
-  })
-
-  test('pressing a section header collapses it to one line and stores it for the project', async ($, on) => {
-    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
-    await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'layout-toggle-todo' })
-    expect(await headerOf(ui, 'todo')).toMatch(/^▸ TO DO  12  ─+$/)
-    expect(shownOf(await ui.find({ type: 'Box', key: 'project-todo' }))).not.toContain('ORCA-1')
-    expect(world.writes).toEqual([
-      [LAYOUT_KEY, fleetStore({ collapsed: ['todo'], shown: ['team', 'reviews', 'todo'] })]
-    ])
-    await ui.press({ key: 'layout-toggle-team' })
-    expect(await headerOf(ui, 'team')).toMatch(/^▸ TEAM  3  ─+$/)
-    expect(await cardsOf(ui)).toEqual([])
-    await ui.press({ key: 'layout-toggle-todo' })
-    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
-    await ui.unmount()
-  })
-
-  test('a stored layout comes back: collapsed, catalog and moved sections', async ($, on) => {
-    const world = worldOf(
-      fleetStore({ order: ['todo', 'team'], collapsed: ['team'], shown: ['todo', 'team'] })
-    )
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toMatch(/^▸ TEAM  3  ─+$/)
-    expect(await cardsOf(ui)).toEqual([])
-    expect(await ui.find({ type: 'Box', key: 'layout-header-review' })).toBeUndefined()
-    const keys = (await ui.findAll({ type: 'Box' }))
-      .map((one) => one.key)
-      .filter((key) => key === 'layout-header-todo' || key === 'layout-header-team')
-    expect(keys).toEqual(['layout-header-todo', 'layout-header-team'])
-    await ui.unmount()
-  })
-
-  test('on a phone each section toggles from a touch-sized chip', async ($, on) => {
-    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
-    await start($, on, world)
-    const ui = await pane($, 40)
-    // Every heading's rule ends at the pane's edge, so headings line up at any width.
-    for (const section of ['team', 'todo']) {
-      expect(cellWidthOf(await headerOf(ui, section)), section).toBe(40)
-    }
-    const chip = await ui.find({ type: 'Button', key: 'layout-tap-todo' })
-    expect(shownOf(chip)).toContain('▾ To Do')
-    // A tap chip is three rows tall: its label sits between two padding rows.
-    expect(shownOf(chip).split('\n')).toHaveLength(3)
-    await ui.press({ key: 'layout-tap-todo' })
-    expect(await headerOf(ui, 'todo')).toMatch(/^▸ TO DO  12  ─+$/)
-    expect(shownOf(await ui.find({ type: 'Button', key: 'layout-tap-todo' }))).toContain('▸ To Do')
-    await ui.unmount()
-  })
-
-  test('a collapsed review still says CI is failing', async ($, on) => {
-    const world = worldOf(fleetStore({ collapsed: ['review'], shown: ['review'] }))
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await headerOf(ui, 'review')).toBe('▸ REVIEW #42 open · CI failing')
-    await ui.unmount()
-  })
-
-  test('a damaged or newer-build layout draws the default and is never overwritten', async ($, on) => {
-    const newer = { version: 9, projects: { 'repo-1': { fleet: 'future' } } }
-    const world = worldOf(newer)
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await headerOf(ui, 'team')).toMatch(/^▾ TEAM  3  ─+$/)
-    await ui.press({ key: 'layout-toggle-team' })
-    expect(world.writes).toEqual([])
-    expect(world.toasts.at(-1)).toContain('newer')
-    await ui.unmount()
-  })
-
-  test('a closed Team widget animates no member tile', async ($, on) => {
-    expect(await tileBlitsOf($, on, worldOf(fleetStore({ shown: ['reviews'] })))).toBe(0)
-  })
-
-  test('an open Team widget animates its member tiles', async ($, on) => {
-    expect(await tileBlitsOf($, on, worldOf())).toBeGreaterThan(0)
-  })
-
-  test('a version 1 layout keeps every section it drew and stores nothing until changed', async ($, on) => {
-    const world = worldOf({
-      version: 1,
-      projects: { 'repo-1': { fleet: { order: DEFAULT_ORDER, collapsed: [], hidden: ['review'] } } }
-    })
-    await start($, on, world)
-    const ui = await pane($)
-    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
-    expect(await ui.find({ type: 'Box', key: 'layout-header-review' })).toBeUndefined()
-    expect(world.writes).toEqual([])
-    await ui.unmount()
-  })
-
-  test('a widget added from the Panel menu shows at once and is still there after a reopen', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'widgets' })
-    await ui.press({ key: 'catalog-todo' })
-    expect(await headerOf(ui, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
-    expect(fleetIn(world)).toEqual({
-      order: DEFAULT_ORDER,
-      collapsed: [],
-      shown: ['team', 'reviews', 'todo']
-    })
-    await ui.press({ key: 'widgets' })
-    await ui.unmount()
-    const reopened = await pane($)
-    expect(await headerOf(reopened, 'todo')).toMatch(/^▾ TO DO  12  ─+$/)
-    await reopened.unmount()
-  })
-
-  test('the catalog removes a shown widget and moves one up or down', async ($, on) => {
-    const world = worldOf(fleetStore({ shown: ['team', 'reviews', 'todo'] }))
-    await start($, on, world)
-    const ui = await pane($)
-    await ui.press({ key: 'widgets' })
-    await ui.press({ key: 'catalog-down-team' })
-    await ui.press({ key: 'catalog-todo' })
-    expect(fleetIn(world)).toEqual({
-      order: ['review', 'team', 'reviews', 'todo', 'actions', 'metrics'],
-      collapsed: [],
-      shown: ['team', 'reviews']
-    })
-    expect(await ui.find({ type: 'Box', key: 'layout-header-todo' })).toBeUndefined()
-    await ui.press({ key: 'widgets' })
-    await ui.unmount()
-  })
-
-  test('the Metrics widget draws the merges per day, the lead time and each account', async ($, on) => {
-    const world = worldOf(fleetStore({ shown: ['metrics'] }))
-    await start($, on, world, 'en', { ...STATE, metrics: METRICS })
-    const ui = await pane($)
-    expect(await headerOf(ui, 'metrics')).toMatch(/^▾ METRICS ─+$/)
-    const rows = shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))
-    for (const title of ['Merged per day', 'Lead time', 'Accounts']) {
-      expect(rows).toContain(title)
-    }
-    expect(rows).toContain('6 merged · 3 days')
-    expect(rows).toContain('1d 2h')
-    expect(rows).toContain('6 tickets measured')
-    expect(rows).toContain('● lead@example.com')
-    expect(rows).toContain('92%')
-    await ui.unmount()
-    // On a phone the cards stack, and no account row runs past a card's inner width (40 less border and padding).
-    const phone = await pane($, 40)
-    expect(await phone.find({ type: 'Box', key: 'metrics-top' })).toBeUndefined()
-    const accountRows = (await phone.findAll({ type: 'Box' })).filter((one) =>
-      /^metrics-account-\d/.test(one.key ?? '')
-    )
-    expect(accountRows.length).toBeGreaterThan(0)
-    for (const one of accountRows) {
-      expect(cellWidthOf(shownOf(one)), shownOf(one)).toBeLessThanOrEqual(36)
-    }
-    await phone.unmount()
-    const again = await pane($)
-    await again.press({ key: 'layout-toggle-metrics' })
-    expect(shownOf(await again.find({ type: 'Box', key: 'section-metrics' }))).not.toContain(
-      'merged'
-    )
-    await again.unmount()
-  })
-
-  test("a member's Panel, or an older host's, says where the metrics come from", async ($, on) => {
-    const world = worldOf(fleetStore({ shown: ['metrics'] }))
-    await start($, on, world)
-    const ui = await pane($)
-    expect(shownOf(await ui.find({ type: 'Box', key: 'section-metrics' }))).toContain(
-      "Metrics show in the lead's Panel"
-    )
-    await ui.unmount()
-  })
-
-  test('on a phone the Widgets chip opens a catalog of touch-sized chips', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await pane($, 40)
-    await ui.press({ key: 'widgets' })
-    const chip = await ui.find({ type: 'Button', key: 'catalog-todo' })
-    expect(shownOf(chip)).toContain('○ To Do')
-    expect(shownOf(chip).split('\n')).toHaveLength(3)
-    await ui.press({ key: 'widgets' })
-    await ui.unmount()
-  })
-})
 
 const layout = async ($: Engine, args = '') =>
   (await $.command.run({ command: 'orca-game:layout', args } as never)) as { text: string }
@@ -414,7 +149,7 @@ describe('/orca-game:layout', () => {
     expect(world.writes).toEqual([])
   })
 
-  test('hides, shows and moves a section, and the Panel follows', async ($, on) => {
+  test('hides, shows and moves a section', async ($, on) => {
     const world = worldOf()
     await start($, on, world)
     await layout($, 'hide team')
@@ -424,9 +159,6 @@ describe('/orca-game:layout', () => {
       collapsed: [],
       shown: ['reviews']
     })
-    const ui = await pane($)
-    expect(await ui.find({ type: 'Box', key: 'layout-header-team' })).toBeUndefined()
-    await ui.unmount()
     const shown = await layout($, 'show team')
     expect(shown.text.split('\n')[1]).toBe('1. Team (team): shown')
   })
@@ -476,36 +208,5 @@ describe('/orca-game:layout', () => {
     expect(fleetIn(world)).toMatchObject({ shown: ['reviews', 'todo', 'actions'] })
     await layout($, 'quitar reviews')
     expect(fleetIn(world)).toMatchObject({ shown: ['todo', 'actions'] })
-  })
-})
-
-const band = ($: Engine) =>
-  $.ui.mount({
-    plugin: 'orca-game',
-    surface: 'terminal',
-    component: 'AbovePrompt',
-    viewport: { columns: 124, rows: 40, isFullscreen: true },
-    props: {
-      hasSurvey: false,
-      isWorking: false,
-      maxRows: 8,
-      bodyColumns: 120,
-      scroll: { offset: 0, bodyRows: 7 },
-      view: {}
-    }
-  })
-
-describe('the layout hint', () => {
-  test('opening the Panel says once how to collapse its sections', async ($, on) => {
-    const world = worldOf()
-    await start($, on, world)
-    const ui = await band($)
-    await ui.press({ key: 'band-panel' })
-    await ui.press({ key: 'band-panel' })
-    const hint =
-      'Tip: press ▾ beside a Panel section to collapse it; /orca-game:layout hides, moves or resets them.'
-    expect(world.toasts.filter((one) => one === hint)).toEqual([hint])
-    expect(world.store.has(LAYOUT_KEY)).toBe(false)
-    await ui.unmount()
   })
 })

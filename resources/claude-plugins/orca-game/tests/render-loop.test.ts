@@ -162,11 +162,13 @@ const start = async ($: Engine, on: On, role: Role, counts: Counts) => {
 }
 
 describe('render loops', () => {
-  test('the mod draws at least the band, the spinner and both panes', () => {
+  // Why: the team, its scene and the arcade draw in Orca's Team panel (ORCA-1055).
+  test('the mod draws the line above the prompt and no scene or pane', () => {
     const drawn = targetsOf().map((one) => one.requestId ?? one.component)
-    expect(drawn).toEqual(
-      expect.arrayContaining(['AbovePrompt', 'Spinner', 'orca-game-fleet', 'orca-game-arcade'])
-    )
+    expect(drawn).toContain('AbovePrompt')
+    for (const gone of ['Spinner', 'orca-game-fleet', 'orca-game-arcade']) {
+      expect(drawn).not.toContain(gone)
+    }
   })
 
   for (const role of ['lead', 'member'] as const) {

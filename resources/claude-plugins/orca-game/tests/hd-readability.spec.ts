@@ -148,7 +148,8 @@ describe('hd readability on every scene', () => {
       const inkedInArt = sprite.rows.join('').replace(/[^#:]/g, '').length
       const shownAt = (x: number, y: number) =>
         grid[Math.floor(y / 2) * WIDTH + x]?.[y % 2 === 0 ? 1 : 2]
-      const isSunk = (color: number) => Math.abs(lightnessOf(ink) - lightnessOf(color)) < FIGURE_FLOOR
+      const isSunk = (color: number) =>
+        Math.abs(lightnessOf(ink) - lightnessOf(color)) < FIGURE_FLOOR
       let inked = 0
       let bare = 0
       for (let y = 0; y < frame.ground; y += 1) {
@@ -157,8 +158,14 @@ describe('hd readability on every scene', () => {
             continue
           }
           inked += 1
-          for (const [nx, ny] of [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y]] as const) {
-            const behind = ny < 0 || nx < 0 || nx >= WIDTH ? undefined : hdBackdropPixel(frame, land, nx, ny)
+          for (const [nx, ny] of [
+            [x, y - 1],
+            [x, y + 1],
+            [x - 1, y],
+            [x + 1, y]
+          ] as const) {
+            const behind =
+              ny < 0 || nx < 0 || nx >= WIDTH ? undefined : hdBackdropPixel(frame, land, nx, ny)
             bare += behind !== undefined && shownAt(nx, ny) === behind && isSunk(behind) ? 1 : 0
           }
         }

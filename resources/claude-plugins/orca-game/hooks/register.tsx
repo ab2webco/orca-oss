@@ -1,24 +1,18 @@
 import type { Register } from 'claude-code'
 
 import { registerActionCommands } from './action-commands'
-import { registerArcade } from './arcade-pane'
 import { dropAdvisorCall } from './advisor-state'
 import { actOutGate, registerAdvisor } from './advisor-sync'
-import { clearAllies, registerAllies } from './allies-strip'
-import { registerBand } from './band'
-import { registerFleetPane } from './fleet-pane'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
 import { leadAutostart } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
-import { whileAsking } from './member-band'
-import { askedQuestionOf } from './member-pane'
 import { registerStateCommand } from './state-command'
+import { registerTextLayer } from './text-layer'
 import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
-import { clawdReact } from './quest-runtime'
 import { markLeadStarted, unmarkLeadStarted } from './lead-autostart'
 import { isSubagentTool, isTeammateSpawnOf, leadSubagentDenyOf } from './lead-subagent-guard'
 import { isGameLeadCommand, isLeadStarted, isMadeLeadOutput } from './lead-started'
@@ -28,11 +22,8 @@ import { questLeadActive, questToolCall, questTurnComplete } from './quest-turns
 
 export const register: Register = (on) => {
   registerQuest(on)
-  registerBand(on)
-  registerAllies(on)
+  registerTextLayer(on)
   registerAdvisor(on)
-  registerFleetPane(on)
-  registerArcade(on)
   registerLeadName(on)
   registerLeadBrief(on)
   registerActionCommands(on)
@@ -40,7 +31,6 @@ export const register: Register = (on) => {
   registerLayoutCommand(on)
 
   on('session.start', async ($, e, next) => {
-    await clearAllies($)
     const started = await next(e)
     await questSessionStart($).catch(() => undefined)
     // Why the poll stays: PR and CI changes, paired hosts and an older Orca push nothing.
@@ -82,10 +72,6 @@ export const register: Register = (on) => {
         )
         return answered
       }
-      const question = askedQuestionOf(command)
-      if (question !== undefined) {
-        return await whileAsking($, question, () => next(e))
-      }
     }
     return next(e)
   })
@@ -111,7 +97,6 @@ export const register: Register = (on) => {
   on('prompt.submit', ($, e, next) => {
     if (isHumanOrigin(e.origin.kind)) {
       questLeadActive()
-      clawdReact($, 'hello')
     }
     return next(e)
   })
