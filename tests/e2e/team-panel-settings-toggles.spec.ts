@@ -10,6 +10,7 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 const GB = 1024 ** 3
 // Why: one capture per toggle value and width outruns the CI budget; ORCA_CAPTURE_EVIDENCE=1 runs it.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
+const SETTLE_MS = 3_000
 
 /** What the lead's `game.state` gets on top of the real answer: work on every tab and a Jev row. */
 const OVERLAY = {
@@ -172,17 +173,20 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await expect(panel.getByRole('tab', { name: 'Machines' })).toBeVisible({ timeout: 30_000 })
 
     // Soft, so one run names every setting that changes nothing and still captures each value.
+    // SETTLE_MS: game.state's own panel.tabs hides a tab only on the next 20 s poll; a toggle must show now.
     for (const one of CASES) {
       await setPanel(orcaPage, { look: 'plain', ...one.panel })
       await panel.getByRole('tab', { name: 'Team' }).click()
       for (const name of ['PRs', 'Queue', 'Machines']) {
         await expect
           .soft(panel.getByRole('tab', { name }), `${one.name}: ${name}`)
-          .toHaveCount((one.hidden as readonly string[]).includes(name) ? 0 : 1)
+          .toHaveCount((one.hidden as readonly string[]).includes(name) ? 0 : 1, {
+            timeout: SETTLE_MS
+          })
       }
       await expect
         .soft(panel.locator('[data-team-card="advisor"]'), `${one.name}: advisor`)
-        .toHaveCount(one.advisor ? 1 : 0)
+        .toHaveCount(one.advisor ? 1 : 0, { timeout: SETTLE_MS })
       if (!CAPTURE_EVIDENCE) {
         continue
       }
@@ -201,7 +205,13 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await setPanel(orcaPage, { look: 'plain' })
     await panel.getByRole('tab', { name: 'Queue' }).click()
     await setPanel(orcaPage, { look: 'plain', tabs: { queue: false } })
-    await expect(panel.getByRole('tab', { name: 'Team' })).toHaveAttribute('aria-selected', 'true')
+    await expect(panel.getByRole('tab', { name: 'Team' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+      {
+        timeout: SETTLE_MS
+      }
+    )
   } finally {
     agent.dispose()
   }
