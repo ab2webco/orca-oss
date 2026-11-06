@@ -6,6 +6,7 @@ import {
   openQuestionCountOf,
   useOtherGameInboxGroups
 } from '@/components/game-inbox/use-other-game-inbox-groups'
+import { isFolderRepo } from '../../../../shared/repo-kind'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type {
   TeamMemberCard,
@@ -58,7 +59,10 @@ const poller = createTeamPanelModelPoller(
       }),
     readState: readTeamLeadState,
     readQuestions: readTeamOwnerQuestions,
-    modelOf: teamPanelModelOf,
+    modelOf: (args) => {
+      const repo = useAppStore.getState().repos.find((one) => one.id === args.repoId)
+      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false })
+    },
     publish: (source) => useTeamPanelModelStore.setState({ source })
   },
   TEAM_REFRESH_MS

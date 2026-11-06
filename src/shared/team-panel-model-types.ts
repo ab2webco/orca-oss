@@ -142,13 +142,30 @@ export type TeamInboxCounts = {
 }
 
 export type TeamPrRow = {
+  /** As the provider names it: #12 on GitHub, !12 on GitLab. */
+  label: string
   number: number
   title: string
   url: string
   status: TeamStatus
-  /** Why it is in that status: checks failed, conflict, in review, ready. */
-  reason: 'checksFailed' | 'conflict' | 'inReview' | 'ready' | 'draft' | 'merged' | 'closed'
+  /** Why it is in that status; `checksUnknown` is no CI reading, never a pass. */
+  reason:
+    | 'checksFailed'
+    | 'checksUnknown'
+    | 'conflict'
+    | 'inReview'
+    | 'ready'
+    | 'draft'
+    | 'merged'
+    | 'closed'
   memberKey: string | null
+}
+
+/** `total` counts every open one; the host keeps only the first few rows, `listUrl` opens the rest. */
+export type TeamPrList = {
+  rows: TeamPrRow[]
+  total: number
+  listUrl: string | null
 }
 
 export type TeamQueueEntry = {
@@ -208,7 +225,7 @@ export type TeamTabId = 'team' | 'activity' | 'inbox' | 'prs' | 'queue' | 'machi
 /** A tab that is hidden by a setting, or has no reason to show, is null. */
 export type TeamPanelTabs = {
   inbox: TeamSection<TeamInboxCounts>
-  prs: TeamSection<TeamPrRow[]> | null
+  prs: TeamSection<TeamPrList> | null
   queue: TeamSection<TeamQueueEntry[]> | null
   machines: TeamSection<TeamMachine[]> | null
 }

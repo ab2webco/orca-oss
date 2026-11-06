@@ -40,6 +40,8 @@ export type GameProjectItem = {
   group?: GameStatusGroup
   /** What "work on" sends the lead for this ticket. */
   prompt?: string
+  /** What keeps a PR from merging besides its CI; absent from an older host or when unread. */
+  reviewBlock?: 'draft' | 'conflict'
 }
 
 /** `total` counts every open item; `items` keeps the first few, `url` opens the full list. */

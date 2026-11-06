@@ -9,7 +9,10 @@ vi.mock('../../../../shared/team-panel-member-cards', () => ({
   teamCardsOf: (...args: unknown[]) => teamCardsOf(...args)
 }))
 
-const CARDS = { lead: { paneKey: 'lead' }, members: [{ paneKey: 'm1' }] } as unknown as TeamCards
+const CARDS = {
+  lead: { paneKey: 'lead' },
+  members: [{ paneKey: 'm1', host: { kind: 'local' } }]
+} as unknown as TeamCards
 
 function question(overrides: Partial<GameOwnerQuestion>): GameOwnerQuestion {
   return {
@@ -104,9 +107,7 @@ describe('teamPanelModelOf', () => {
       xp: null,
       arcade: null,
       metrics: { kind: 'unavailable' },
-      prs: null,
-      queue: null,
-      machines: null
+      queue: null
     })
   })
   it("fills the Advisor from the lead's own Jev report, words as written", () => {
@@ -166,6 +167,45 @@ describe('teamPanelModelOf', () => {
       previous: null,
       calls: []
     })
+  })
+
+  it('reads an older host with no project work or hosts as unavailable tabs', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args())).toMatchObject({
+      prs: { kind: 'unavailable' },
+      machines: { kind: 'unavailable' }
+    })
+  })
+
+  it('fills PRs and Machines from the same state', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const reviews = {
+      provider: 'github',
+      total: 1,
+      url: null,
+      items: [{ id: '#7', title: 'Fix', url: 'https://example.test/7', status: 'success' }]
+    }
+    const model = teamPanelModelOf(
+      args({
+        state: state({
+          project: { reviews, todo: null },
+          hostCapacity: [{ host: 'm1', running: 1, status: 'unreachable' }]
+        })
+      })
+    )
+
+    expect(model?.prs).toMatchObject({ kind: 'ready', value: { rows: [{ label: '#7' }] } })
+    expect(model?.machines).toMatchObject({
+      kind: 'ready',
+      value: [{ status: 'attention', running: 1 }]
+    })
+  })
+
+  it('hides PRs in a folder workspace', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args({ isFolder: true }))?.prs).toBeNull()
   })
 
   // Why both: Pixel draws a built-in scene by id, else the plugin or file scene the host carried.

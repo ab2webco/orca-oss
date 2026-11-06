@@ -72,10 +72,11 @@ export function withGameHostCapacity(
 const gbOf = (bytes: number): string =>
   bytes < 10 * GB ? (bytes / GB).toFixed(1) : String(Math.round(bytes / GB))
 
+export const gameHostMemoryIsLow = (one: GameHostMachine): boolean =>
+  one.availableMemory < LOW_MEMORY_BYTES || one.availableMemory < one.totalMemory * 0.1
+
 const flagsOf = (one: GameHostMachine): string[] => [
-  ...(one.availableMemory < LOW_MEMORY_BYTES || one.availableMemory < one.totalMemory * 0.1
-    ? ['low memory']
-    : []),
+  ...(gameHostMemoryIsLow(one) ? ['low memory'] : []),
   ...(one.loadAverage1m !== null && one.loadAverage1m >= one.cpuCoreCount ? ['busy'] : [])
 ]
 
