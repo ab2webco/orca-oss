@@ -17096,6 +17096,59 @@
         "emptyText": "Pair another machine to spread agents across hosts.",
         "errorTitle": "Could not read the machines"
       }
+    },
+    "condition": {
+      "working": "Working",
+      "waiting": "Waiting for you",
+      "idle": "Idle",
+      "done": "Done",
+      "starting": "Starting",
+      "queued": "Queued",
+      "paused": "Paused",
+      "asleep": "Asleep",
+      "limited": "Usage limit reached",
+      "loggedOut": "Logged out",
+      "unreachable": "Host unreachable",
+      "gone": "Session closed",
+      "startFailed": "Failed to start"
+    },
+    "phase": {
+      "plan": "Planning",
+      "docs": "Documenting",
+      "code": "Coding",
+      "tests": "Testing",
+      "pr": "In PR",
+      "merge": "Merging"
+    },
+    "host": {
+      "local": "local"
+    },
+    "card": {
+      "merged": "Merged",
+      "ciFailed": "CI failing",
+      "ciRunning": "CI running",
+      "ciPassed": "CI green",
+      "answerInInbox": "Answer in Inbox"
+    },
+    "lead": {
+      "badge": "Lead",
+      "coordinatesOne": "Coordinates 1 agent",
+      "coordinatesMany": "Coordinates {{count}} agents"
+    },
+    "advisor": {
+      "label": "Advisor",
+      "source": "Jev"
+    },
+    "xp": {
+      "level": "Lv {{level}}",
+      "progress": "{{into}}/{{need}} XP"
+    },
+    "stopped": {
+      "by": "Stopped by {{by}}",
+      "plain": "Stopped"
+    },
+    "scene": {
+      "placeholder": "The live scene appears here"
     }
   }
 }

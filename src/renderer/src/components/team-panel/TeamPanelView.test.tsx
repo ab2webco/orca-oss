@@ -12,6 +12,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { TeamPanelView, teamPanelSettingsTarget } from './TeamPanelView'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import type { TeamPanelLook } from './use-team-panel-look'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -76,7 +77,11 @@ const solo: TeamPanelSoloModel = {
   machines: null
 }
 
-async function render(source: TeamPanelModelSource, onOpenSettings = vi.fn()) {
+async function render(
+  source: TeamPanelModelSource,
+  onOpenSettings = vi.fn(),
+  look: TeamPanelLook = 'plain'
+) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -84,7 +89,7 @@ async function render(source: TeamPanelModelSource, onOpenSettings = vi.fn()) {
   await act(async () => {
     root.render(
       <TooltipProvider>
-        <TeamPanelView source={source} onOpenSettings={onOpenSettings} />
+        <TeamPanelView source={source} look={look} onOpenSettings={onOpenSettings} />
       </TooltipProvider>
     )
   })
@@ -202,6 +207,34 @@ describe('TeamPanelView', () => {
       pane: 'repo',
       repoId: 'repo-1'
     })
+  })
+})
+
+describe('TeamPanelView scene area', () => {
+  const placeholder = (container: HTMLElement): Element | null =>
+    container.querySelector('[data-team-scene-placeholder]')
+
+  it('holds the scene place in the Game look with no figure drawn', async () => {
+    const { container } = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'game'
+    )
+
+    expect(placeholder(container)).not.toBeNull()
+    expect(container.querySelector('canvas, img')).toBeNull()
+  })
+
+  it('draws no scene in the Plain look or without a team', async () => {
+    const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
+    expect(placeholder(plain.container)).toBeNull()
+
+    const noTeam = await render(
+      { section: { kind: 'ready', value: solo }, retry: null },
+      vi.fn(),
+      'game'
+    )
+    expect(placeholder(noTeam.container)).toBeNull()
   })
 })
 
