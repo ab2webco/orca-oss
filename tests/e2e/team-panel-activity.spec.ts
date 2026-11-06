@@ -188,6 +188,17 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
       window.setTimeout(() => callback(performance.now()), 16)
     window.cancelAnimationFrame = (id) => window.clearTimeout(id)
   })
+  // A press on the pane the manager already holds fires no change, so the store must agree first.
+  await expect
+    .poll(() =>
+      orcaPage.evaluate(() => {
+        const state = window.__store!.getState()
+        const tabId = state.activeTabId!
+        const stored = state.terminalLayoutsByTabId[tabId]?.activeLeafId
+        return stored === window.__paneManagers?.get(tabId)?.getActivePane()?.leafId
+      })
+    )
+    .toBe(true)
   await clickWithoutFrameDependency(other, orcaPage)
   await expect(selected).toHaveAttribute('data-pane-key', target!)
   await expect(other).toHaveAttribute('data-pane-key', before!)
