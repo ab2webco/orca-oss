@@ -10,8 +10,20 @@ import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
 const COPY = {
-  en: { team: 'Team', inbox: 'Inbox', answer: 'Answer in Inbox', lead: 'Lead' },
-  es: { team: 'Equipo', inbox: 'Bandeja', answer: 'Responder en Bandeja', lead: 'Líder' }
+  en: {
+    team: 'Team',
+    inbox: 'Inbox',
+    answer: 'Answer in Inbox',
+    lead: 'Lead',
+    waiting: 'Waiting for your answer'
+  },
+  es: {
+    team: 'Equipo',
+    inbox: 'Bandeja',
+    answer: 'Responder en Bandeja',
+    lead: 'Líder',
+    waiting: 'Esperando tu respuesta'
+  }
 } as const
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -168,6 +180,11 @@ test('the Team tab shows the live lead and its members from the lead game state'
         language
       )
       await expect(panel.getByRole('tab', { name: COPY[language].team })).toBeVisible()
+      // The red tone says ORCA-14 needs the user, so its line must say so too, and name it once.
+      const asking = cards.filter({ hasText: 'ORCA-14' })
+      await expect(asking).toContainText(COPY[language].waiting)
+      await expect(asking).not.toContainText(/Working|Trabajando/)
+      expect((await asking.innerText()).match(/ORCA-14/g)).toHaveLength(1)
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
