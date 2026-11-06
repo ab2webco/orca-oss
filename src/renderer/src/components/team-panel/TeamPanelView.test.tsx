@@ -223,6 +223,28 @@ describe('TeamPanelView scene area', () => {
     expect(scene(container)).not.toBeNull()
   })
 
+  it('draws the metrics carousel instead of the scene in the Display look, and only with a team', async () => {
+    const carousel = (container: HTMLElement): Element | null =>
+      container.querySelector('[aria-roledescription="carousel"]')
+    const display = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'display'
+    )
+    expect(carousel(display.container)).not.toBeNull()
+    expect(scene(display.container)).toBeNull()
+
+    const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
+    expect(carousel(plain.container)).toBeNull()
+
+    const noTeam = await render(
+      { section: { kind: 'ready', value: solo }, retry: null },
+      vi.fn(),
+      'display'
+    )
+    expect(carousel(noTeam.container)).toBeNull()
+  })
+
   it('draws no scene in the Plain look or without a team', async () => {
     const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
     expect(scene(plain.container)).toBeNull()
