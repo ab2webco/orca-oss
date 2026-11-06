@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   parseOrchestratorGameArcade,
@@ -38,9 +38,9 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
   const isHeld = useAppStore((s) => isSomeoneWaitingOnUser(s.agentStatusByPaneKey))
   const boxRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const runRef = useRef<ArcadeRun>(arcadeRunOf(GAME, Date.now()))
+  const [firstRun] = useState(() => arcadeRunOf(GAME, Date.now()))
+  const runRef = useRef<ArcadeRun>(firstRun)
   const heldRef = useRef(isHeld)
-  heldRef.current = isHeld
   const paintRef = useRef<{ size: ArcadePaintSize; backdrop: HTMLCanvasElement } | null>(null)
   const frameRef = useRef<number | null>(null)
 
@@ -148,6 +148,7 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
   }, [isActive, startLoop, stopLoop])
 
   useEffect(() => {
+    heldRef.current = isHeld
     if (isActive && runRef.current.screen === 'held' && !isHeld) {
       startLoop()
     }
@@ -157,6 +158,8 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
     <div
       ref={boxRef}
       data-arcade-tab=""
+      role="application"
+      aria-label={arcadeCanvasLabel()}
       tabIndex={-1}
       className="relative h-full w-full bg-background outline-none"
       style={{ touchAction: 'manipulation' }}
@@ -175,12 +178,7 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
         press()
       }}
     >
-      <canvas
-        ref={canvasRef}
-        role="img"
-        aria-label={arcadeCanvasLabel()}
-        className="block h-full w-full"
-      />
+      <canvas ref={canvasRef} aria-hidden="true" className="block h-full w-full" />
     </div>
   )
 }
