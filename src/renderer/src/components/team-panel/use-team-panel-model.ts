@@ -23,6 +23,7 @@ import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-m
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
 import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
+import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -32,7 +33,6 @@ export type TeamPanelModelSource = {
 
 // Why 20 s: the same cadence as the mobile Team drawer, which polls the same game.state cache.
 const TEAM_REFRESH_MS = 20_000
-const NO_WORKSPACE: TeamPanelModelSource = { section: { kind: 'unavailable' }, retry: null }
 
 const useTeamPanelModelStore = create<{ source: TeamPanelModelSource }>(() => ({
   source: { section: { kind: 'loading' }, retry: null }
@@ -86,8 +86,12 @@ const poller = createTeamPanelModelPoller(
 /** Reads the panel again now, after it changed something on the host. */
 export const refreshTeamPanelModel = (): void => poller.refresh()
 
+/** No team means the user's own sessions: no lead, no workspace, or a host with no game. */
+const hasNoTeam = (section: TeamSection<TeamPanelModel>): boolean =>
+  section.kind === 'unavailable' || section.kind === 'error'
+
 /**
- * The Team panel's only data source: the lead's own game.state for the active project.
+ * The lead's own game.state for the active project, else the no-team view from agent status.
  * Why one poller: the activity bar and the panel both call this hook.
  */
 export function useTeamPanelModel(): TeamPanelModelSource {
@@ -135,18 +139,19 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   }, [scope])
   const source = useTeamPanelModelStore((s) => s.source)
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
-  return useMemo(() => {
-    if (!scope) {
-      return NO_WORKSPACE
-    }
-    const { section } = source
+  const noTeam = !scope || hasNoTeam(source.section)
+  const solo = useTeamPanelSoloModel(noTeam)
+  return useMemo<TeamPanelModelSource>(() => {
+    const shown: TeamPanelModelSource =
+      noTeam && solo ? { section: { kind: 'ready', value: solo }, retry: null } : source
+    const { section } = shown
     if (otherOpen === 0 || section.kind !== 'ready') {
-      return source
+      return shown
     }
     const model = section.value
     const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, otherOpen) }
-    return { ...source, section: { kind: 'ready', value } }
-  }, [scope, source, otherOpen])
+    return { ...shown, section: { kind: 'ready', value } }
+  }, [noTeam, solo, source, otherOpen])
 }
 
 /** The lead's pane as the last model read it, for what the panel sends it. */
@@ -164,7 +169,11 @@ export function useTeamLeadHandle(): string | null {
  */
 export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
   return useTeamPanelModelStore((s) =>
-    s.source.section.kind === 'ready' ? s.source.section.value.kind : null
+    s.source.section.kind === 'ready'
+      ? s.source.section.value.kind
+      : hasNoTeam(s.source.section)
+        ? 'solo'
+        : null
   )
 }
 

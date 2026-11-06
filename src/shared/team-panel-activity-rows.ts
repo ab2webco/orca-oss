@@ -58,19 +58,31 @@ const STATUS_OF: Partial<Record<TeamCondition, TeamStatus>> = {
 const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLiveAction | null => {
   const ask = parseAskFromStatus(entry.interactivePrompt, entry.toolName)?.questions[0]
   if (ask) {
-    return { kind: 'question', text: ask.question, options: ask.options.map((one) => one.label) }
+    return {
+      kind: 'question',
+      text: ask.question,
+      options: ask.options.map((one) => one.label)
+    }
   }
   return condition === 'working' && entry.toolName
     ? { kind: 'tool', tool: entry.toolName, detail: entry.toolInput || null }
     : null
 }
 
+/** What the session does now, for any row that shows one line: its question, else its tool. */
+export function teamLiveActionOfEntry(entry: AgentStatusEntry): TeamLiveAction | null {
+  return liveActionOf(entry, conditionOf(entry))
+}
+
+// Why: reuses the launch labeller so a raw `claude-opus-5-5` reads `Opus 5.5`.
+export const teamModelLabelOf = (model: string | null | undefined): string | null =>
+  gameMemberLaunchOf({ model: model ?? null, effort: null })?.model ?? null
+
 const modelOf = (entry: AgentStatusEntry, advisor: TeamAdvisorRow | null): TeamModel | null => {
   if (advisor?.model) {
     return { label: advisor.model, effort: advisor.effort, source: 'advisor' }
   }
-  // Why: reuses the launch labeller so a raw `claude-opus-5-5` reads `Opus 5.5`.
-  const label = gameMemberLaunchOf({ model: entry.model ?? null, effort: null })?.model
+  const label = teamModelLabelOf(entry.model)
   return label ? { label, effort: null, source: 'session' } : null
 }
 

@@ -10,6 +10,7 @@ import {
   WorktreeCardMetaBadges
 } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails, WorktreeCardPortsTrigger } from './WorktreeCardPorts'
+import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function buildWorktreeCardPresentation(card: WorktreeCardController) {
@@ -68,7 +69,8 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     hasExplicitLinkedReview,
     handleUnlinkReview,
     detailsHoverControl,
-    showDeleteQuickAction
+    showDeleteQuickAction,
+    activityViewOpen
   } = card
 
   // Why: pinned trees mix repos, so the repo icon shows regardless of groupBy's hideRepoBadge.
@@ -143,12 +145,18 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     }) ||
       workspacePorts.length > 0 ||
       hasHoverIdentity)
+  const agentAndPortsDetails = (
+    <>
+      <WorktreeCardAgentHoverDetails worktree={worktree} repo={repo} />
+      {hasPorts ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null}
+    </>
+  )
   // Why: the parent row owns metadata hover; don't stack the title's truncation tooltip on the details popover.
   const titleWrapper = newCardStyle
     ? hasHoverDetails
       ? (title: React.ReactElement): React.ReactElement => title
       : undefined
-    : compactCards && (showBranchIdentityHover || hasDetails || hasPorts)
+    : compactCards && !activityViewOpen && (showBranchIdentityHover || hasDetails || hasPorts)
       ? (title: React.ReactElement): React.ReactElement => (
           <WorktreeCardDetailsHover
             issue={metaIssue}
@@ -163,7 +171,7 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
             branchName={showBranchIdentityHover ? branch : undefined}
             workspaceTitle={worktree.displayName}
             identityOrder="branch-first"
-            detailsAfter={hasPorts ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null}
+            detailsAfter={agentAndPortsDetails}
             openDelay={100}
             // Why: compact mode also renders the plug/badge hover root; sharing one open-state made hovering the
             // plug force-open the wider title card and race it closed (#9304), so let this title hover own its state.
@@ -223,8 +231,9 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
         )}
       </div>
     ) : null
+  // Why: the no-team Activity view shows the same facts, so hover cards stay off while it is open.
   const detailsAndPorts =
-    detailsAndPortsContent && !newCardStyle ? (
+    detailsAndPortsContent && !newCardStyle && !activityViewOpen ? (
       <WorktreeCardDetailsHover
         issue={metaIssue}
         linearIssue={metaLinearIssue}
@@ -235,7 +244,7 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
         automationProvenance={metaAutomationProvenance}
         cliProvenance={metaCliProvenance}
         automationHostId={worktree.hostId}
-        detailsAfter={hasPorts ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null}
+        detailsAfter={agentAndPortsDetails}
         hoverControl={detailsHoverControl}
         onEditIssue={affiliateListMode ? undefined : handleEditIssue}
         onEditComment={affiliateListMode ? undefined : handleEditComment}

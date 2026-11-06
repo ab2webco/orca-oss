@@ -11,6 +11,11 @@ import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
+import { teamLiveText } from '@/components/team-panel/team-card-text'
+import {
+  teamLiveActionOfEntry,
+  teamModelLabelOf
+} from '../../../../shared/team-panel-activity-rows'
 
 function formatShortTimeAgo(ts: number, now: number): string {
   const delta = now - ts
@@ -94,6 +99,8 @@ type CompactAgentRowProps = {
   cacheTimerActive?: boolean
   /** The project's live game lead (`game.leads`), crowned as in the Team panel. */
   isGameLead?: boolean
+  /** Card display's Model option; off by default, the hover card holds it. */
+  showModel?: boolean
 }
 
 export const CompactAgentRow = React.memo(function CompactAgentRow({
@@ -111,7 +118,8 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
   isFocusedPane = false,
   hideIdentityIcon = false,
   cacheTimerActive = true,
-  isGameLead = false
+  isGameLead = false,
+  showModel = false
 }: CompactAgentRowProps) {
   const hasChildDisclosure =
     typeof childAgentCount === 'number' &&
@@ -122,11 +130,21 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
   // "?" glyph. Nesting under the parent already conveys identity.
   const hideIcon = hideIdentityIcon || agent.rowSource === 'subagent'
   const dotState = getAgentDotState(agent)
-  const primary = label ?? getCompactAgentPrimary(agent)
+  // Why: the live action or question replaces the prompt; subagent and stale-decayed rows have none.
+  const liveAction =
+    agent.rowSource === 'live' || agent.rowSource === undefined
+      ? agent.state === 'idle' || agent.state === 'done'
+        ? null
+        : teamLiveActionOfEntry(agent.entry)
+      : null
+  const asksUser = liveAction?.kind === 'question'
+  const primary = liveAction
+    ? teamLiveText(liveAction, 'working')
+    : (label ?? getCompactAgentPrimary(agent))
   const isLineageChild = agent.lineage?.depth === 1
-  const rawSecondary = getCompactAgentSecondary(agent)
+  const rawSecondary = liveAction ? '' : getCompactAgentSecondary(agent)
   const secondary = rawSecondary === primary ? '' : rawSecondary
-  const model = agent.entry.model?.trim() ?? ''
+  const model = showModel ? (teamModelLabelOf(agent.entry.model?.trim()) ?? '') : ''
   const shortTime = getCompactAgentTime(agent, now)
   const cacheTimer = usePromptCacheCountdownForPane(agent.paneKey, cacheTimerActive)
 
@@ -214,7 +232,15 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
       <span className="min-w-0 flex-1 truncate">
         {/* Why: the selected-row fill is strong enough to wash out the dimmed
             prompt/secondary text, so lift both toward full foreground when focused. */}
-        <span className={isFocusedPane ? 'text-foreground' : 'text-muted-foreground/90'}>
+        <span
+          className={
+            asksUser
+              ? 'text-status-attention'
+              : isFocusedPane
+                ? 'text-foreground'
+                : 'text-muted-foreground/90'
+          }
+        >
           {primary}
         </span>
         {secondary && (

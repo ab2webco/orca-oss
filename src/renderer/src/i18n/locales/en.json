@@ -4862,7 +4862,9 @@
           "cli": "Orca Lab CLI",
           "planeWorkItems": "Plane work items",
           "planeWorkItem": "Plane work item",
-          "showSection": "Show"
+          "showSection": "Show",
+          "account": "Account",
+          "model": "Model"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -17226,6 +17228,30 @@
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
       "openTerminal": "Open terminal"
+    },
+    "activity": {
+      "prompt": "Asked",
+      "now": "Now",
+      "question": "Question",
+      "last": "Last reply",
+      "model": "Model",
+      "modelPinned": "Model pinned",
+      "change": "Change",
+      "account": "Account",
+      "cache": "Cache",
+      "pr": "PR",
+      "ticket": "Ticket",
+      "ports": "Ports",
+      "notes": "Notes",
+      "subagents": "Subagents",
+      "otherSessions": "Other sessions",
+      "countNeedsYou_one": "{{count}} needs you",
+      "countNeedsYou_other": "{{count}} need you",
+      "countWorking": "{{count}} working",
+      "countDone_one": "{{count}} done",
+      "countDone_other": "{{count}} done",
+      "agent": "Agent",
+      "jev": "Jev"
     },
     "lead": {
       "badge": "Lead",

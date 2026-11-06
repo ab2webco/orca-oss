@@ -4604,7 +4604,9 @@
           "219ebf1961": "Nombre de rama",
           "folderPathIdentity": "Rama / ruta de carpeta",
           "cli": "Orca Lab CLI",
-          "showSection": "Mostrar"
+          "showSection": "Mostrar",
+          "account": "Cuenta",
+          "model": "Modelo"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",
@@ -16227,6 +16229,30 @@
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
       "openTerminal": "Abrir terminal"
+    },
+    "activity": {
+      "prompt": "Pedido",
+      "now": "Ahora",
+      "question": "Pregunta",
+      "last": "Final",
+      "model": "Modelo",
+      "modelPinned": "Modelo fijado",
+      "change": "Cambio",
+      "account": "Cuenta",
+      "cache": "Caché",
+      "pr": "PR",
+      "ticket": "Ticket",
+      "ports": "Puertos",
+      "notes": "Notas",
+      "subagents": "Subagentes",
+      "otherSessions": "Otras sesiones",
+      "countNeedsYou_one": "{{count}} te necesita",
+      "countNeedsYou_other": "{{count}} te necesitan",
+      "countWorking": "{{count}} trabajando",
+      "countDone_one": "{{count}} terminado",
+      "countDone_other": "{{count}} terminados",
+      "agent": "Agente",
+      "jev": "Jev"
     },
     "lead": {
       "badge": "Líder",
