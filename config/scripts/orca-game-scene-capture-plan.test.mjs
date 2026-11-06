@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   arcadeShotsOf,
   captureOptionsOf,
+  nativeSheetsOf,
   rosterShotsOf,
   scenePhasesOf,
   sceneShotsOf
@@ -10,6 +11,38 @@ import {
 const ALL = ['working', 'docs', 'build', 'verify', 'pr', 'handoff']
 
 describe('orca-game scene capture plan', () => {
+  it('sheets each style of a native art block: its stage, then every role, sheet and action', () => {
+    const hero = {
+      sheets: ['art/hero.png', 'art/two.png'],
+      frame: { width: 32, height: 48 },
+      animations: { idle: { row: 0, frames: 2 }, walk: { row: 1, frames: 4 } }
+    }
+    const sheets = nativeSheetsOf({
+      figures: {
+        layers: [{ src: 'art/sky.png' }, { src: 'art/bush.png', front: true }],
+        roles: { lead: { ...hero, sheets: ['art/hero.png'] }, member: hero },
+        props: { station: 'art/anvil.png' }
+      }
+    })
+    expect(sheets).toHaveLength(1)
+    expect(sheets[0].name).toBe('native-figures')
+    expect(sheets[0].layers).toEqual(['art/sky.png', 'art/bush.png'])
+    expect(sheets[0].props).toEqual(['art/anvil.png'])
+    expect(sheets[0].strips.map((one) => `${one.role} ${one.sheet} ${one.action}`)).toEqual([
+      'lead art/hero.png idle',
+      'lead art/hero.png walk',
+      'member art/hero.png idle',
+      'member art/hero.png walk',
+      'member art/two.png idle',
+      'member art/two.png walk'
+    ])
+    expect(sheets[0].strips[1]).toMatchObject({ width: 32, height: 48, row: 1, frames: 4 })
+  })
+
+  it('has no native sheet for a scene with no art', () => {
+    expect(nativeSheetsOf(undefined)).toEqual([])
+  })
+
   it('reads --out, --scene-file and --phases', () => {
     expect(
       captureOptionsOf(['--out', '/tmp/x', '--scene-file', 'a.json', '--phases', 'pr,docs'], '/r')

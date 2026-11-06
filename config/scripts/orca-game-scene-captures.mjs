@@ -5,19 +5,22 @@
 //   [--gesture <advisor gesture>] [--columns <a,b>]
 // A scene file is drawn in every phase and the built-ins in build, unless --phases says otherwise.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
 import {
   arcadeShotsOf,
   captureOptionsOf,
+  nativeSheetsOf,
   rosterShotsOf,
   scenePhasesOf,
   sceneShotsOf
 } from './orca-game-scene-capture-plan.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
+const NATIVE_STAGE_WIDTHS = [320, 390, 768]
+const NATIVE_STAGE_HEIGHT = 176
 const mod = join(root, 'resources/claude-plugins/orca-game/hooks')
 const { out, sceneFile, phases, gesture, columns } = captureOptionsOf(process.argv.slice(2), root)
 
@@ -286,6 +289,46 @@ const main = async () => {
 p{margin:10px 0 4px}img{display:block}</style><div id="s">${panels.join('')}</div>`
     )
     const path = join(out, `sheet-${id}.png`)
+    await page.locator('#s').screenshot({ path })
+    shots.push(path)
+  }
+  // Native art as the files hold it, each stage at the panel's narrow widths; the styles draw it live.
+  const artUrlOf = async (src) => {
+    const mime = extname(src).toLowerCase() === '.webp' ? 'image/webp' : 'image/png'
+    const data = (await readFile(resolve(dirname(sceneFile), src))).toString('base64')
+    return `data:${mime};base64,${data}`
+  }
+  for (const sheet of nativeSheetsOf(custom[0]?.native)) {
+    const layers = await Promise.all(sheet.layers.map(artUrlOf))
+    const props = await Promise.all(sheet.props.map(artUrlOf))
+    const stages = NATIVE_STAGE_WIDTHS.map(
+      (width) =>
+        `<p>stage ${width}</p><div class="stage" style="width:${width}px">${layers
+          .map((url) => `<img src="${url}">`)
+          .join('')}</div>`
+    )
+    const strips = await Promise.all(
+      sheet.strips.map(async ({ role, sheet: file, action, width, height, row, frames }) => {
+        const url = await artUrlOf(file)
+        const cells = Array.from(
+          { length: frames },
+          (_, frame) =>
+            `<i style="width:${width}px;height:${height}px;background:url(${url}) ${-frame * width}px ${-row * height}px"></i>`
+        )
+        return `<p>${role} ${file} ${action}</p><div class="strip">${cells.join('')}</div>`
+      })
+    )
+    await page.setContent(
+      `<!doctype html><style>body{margin:8px;background:#222;color:#ddd;font:13px Menlo,monospace}
+p{margin:10px 0 4px}.stage{position:relative;height:${NATIVE_STAGE_HEIGHT}px;overflow:hidden;background:#000}
+.stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:bottom}
+.strip{display:flex;gap:4px;zoom:2}.strip i{display:block;background-repeat:no-repeat}
+.prop{display:block}</style><div id="s">${stages.join('')}${props
+        .map((url) => `<p>station</p><img class="prop" src="${url}">`)
+        .join('')}${strips.join('')}</div>`
+    )
+    await page.evaluate(() => Promise.all([...document.images].map((one) => one.decode())))
+    const path = join(out, `${sheet.name}.png`)
     await page.locator('#s').screenshot({ path })
     shots.push(path)
   }
