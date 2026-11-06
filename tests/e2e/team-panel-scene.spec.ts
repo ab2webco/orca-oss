@@ -351,12 +351,15 @@ test('the Team panel draws the live scene beside a member opened under its heade
         await orcaPage.screenshot({
           path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-light.png`)
         })
-        // A narrow stage may hold only one bubble: the lead's must come back once the advisor's fades.
-        await expect(advisorBubble).toBeHidden({ timeout: 10_000 })
-        await expect(leadBubble).toBeVisible()
-        await orcaPage.screenshot({
-          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-faded.png`)
-        })
+        // A narrow stage holds one bubble: the lead's must return once the advisor's fades. Why the
+        // long wait: the scene clock caps each frame's step, so a slow runner stretches the 6 s.
+        if (!shown.lead) {
+          await expect(advisorBubble).toBeHidden({ timeout: 60_000 })
+          await expect(leadBubble).toBeVisible()
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-faded.png`)
+          })
+        }
       }
     }
 
