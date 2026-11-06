@@ -7,6 +7,7 @@ import {
   GAME_OWNER_OPTION_TEXT_MAX,
   GAME_OWNER_QUESTION_TEXT_MAX
 } from '../../../../shared/orchestrator-game-owner-questions'
+import { GAME_ARCADE_ACTIONS } from '../../../../shared/orchestrator-game-arcade-credits'
 
 // Why the caller's worktree or terminal: the board belongs to the lead's project, and a member's to its lead's.
 const Caller = {
@@ -44,6 +45,9 @@ const GameFleetDropParams = z.object({
 
 // Why set optional: without it the call only reads, so the mod can poll it like game.state.
 const GameStopSwitchParams = z.object({ ...Caller, set: z.boolean().optional() })
+
+// Why action optional: without it the call only reads, so a client polls it like game.state.
+const GameArcadeParams = z.object({ ...Caller, action: z.enum(GAME_ARCADE_ACTIONS).optional() })
 
 const GameInboxParams = z
   .object({
@@ -115,6 +119,17 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
       const result = await (params.set ? board.setStop(caller) : board.clearStop(caller))
       runtime.noteGameFleetChanged()
       return result
+    }
+  }),
+  defineMethod({
+    name: 'game.arcade',
+    params: GameArcadeParams,
+    handler: async (params, { runtime }) => {
+      const ledger = runtime.getGameArcade()
+      const caller = { worktreeId: params.worktreeId, terminalHandle: params.terminalHandle }
+      return params.action === undefined
+        ? { arcade: await ledger.read(caller) }
+        : ledger.apply(caller, params.action)
     }
   }),
   defineMethod({

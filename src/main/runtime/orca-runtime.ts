@@ -819,6 +819,7 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import {
   gameOwnerQuestionMobileNotification,
   gameOwnerQuestionNotificationId,
@@ -4011,6 +4012,11 @@ export class OrcaRuntimeService {
       const pane = await this.inspectTerminalProcess(handle).catch(() => null)
       return leadPaneStateOf(pane?.foregroundProcess ?? null)
     }
+  })
+  private readonly gameArcade = new GameArcadeLedger({
+    store: this.gameHistory,
+    projectOf: (caller) => this.gameBoardProjectOf(caller),
+    changed: () => this.noteGameFleetChanged()
   })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
@@ -31311,6 +31317,10 @@ export class OrcaRuntimeService {
     return this.gameBoard
   }
 
+  getGameArcade(): GameArcadeLedger {
+    return this.gameArcade
+  }
+
   getGameLeads(): GameLeads {
     return this.gameLeads
   }
@@ -32189,6 +32199,8 @@ export class OrcaRuntimeService {
         ).open,
       readMerges: () =>
         this.gameBoard.merges({ worktreeId, terminalHandle: callerHandle ?? undefined }),
+      readArcade: () =>
+        this.gameArcade.read({ worktreeId, terminalHandle: callerHandle ?? undefined }),
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
           worktreeId,
