@@ -207,6 +207,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
+
+    await panel.getByRole('button', { name: 'Project settings' }).click()
+    const gameSection = orcaPage.locator('[id^="repo-"][id$="-game"]')
+    await expect(gameSection).toBeVisible({ timeout: 15_000 })
+    // Why the top: the section already shows low on the project page without being scrolled to.
+    await expect
+      .poll(async () => (await gameSection.boundingBox())?.y, { timeout: 15_000 })
+      .toBeLessThan(200)
   } finally {
     agent.dispose()
   }
