@@ -47,6 +47,17 @@ async function setWindowWidth(app: ElectronApplication, page: Page, width: numbe
   await expect.poll(async () => page.evaluate(() => window.innerWidth)).toBe(width)
 }
 
+// Why: the app's star and update cards can open over the page's lower right, where the switches are.
+async function dismissAppCards(page: Page): Promise<void> {
+  for (const name of [/^(Later|Más tarde)$/, /^(Dismiss|Descartar)$/]) {
+    for (const one of await page.getByRole('button', { name }).all()) {
+      if (await one.isVisible().catch(() => false)) {
+        await one.click()
+      }
+    }
+  }
+}
+
 test('Settings > Actions edits the project actions and Orca ones, as V30', async ({
   electronApp,
   orcaPage
@@ -78,6 +89,7 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
   await expect(section).toContainText('This project · 2 of 6')
 
   // A template opens the form first in the list; Create saves it on this machine, pinned.
+  await dismissAppCards(orcaPage)
   await section.getByRole('button', { name: 'Deploy', exact: true }).click()
   const form = section.locator('[data-slot="game-action-form"]')
   await expect(form).toContainText('/deploy')
@@ -91,6 +103,7 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
     }
     await setWindowWidth(electronApp, orcaPage, 1440)
   }
+  await dismissAppCards(orcaPage)
   await form.getByRole('button', { name: 'Create action' }).click()
   await expect(rows.nth(0)).toContainText('Deploy')
   await expect(rows.nth(0)).toContainText('This machine')
@@ -114,6 +127,7 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
     ])
 
   // Orca's Wave turns off on this machine; Stop has no switch.
+  await dismissAppCards(orcaPage)
   await section.getByRole('switch', { name: 'Turn on Wave' }).click()
   await expect
     .poll(() =>
