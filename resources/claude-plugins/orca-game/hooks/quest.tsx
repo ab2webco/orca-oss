@@ -7,7 +7,14 @@ import {
   gameCommandOf,
   type GameCommand
 } from './game-commands'
-import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
+import { activityOf, cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
+import {
+  headingNameOf,
+  isQuestionToPerson,
+  messageHeadingOf,
+  toolSummaryOf
+} from './message-heading'
+import { messageHeadingWords } from './message-heading-words'
 import { briefPathOf } from './brief-line'
 import {
   configuredConfig,
@@ -33,12 +40,14 @@ import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
 import { flatPhaseLineOf } from './flat-view'
 import { isMemberBandCollapsed } from './member-pane'
-import { shownCaption } from './quest-state'
+import { shownCaption, shownHero } from './quest-state'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
+// Why a named color: the terminal's own red reads on dark and light themes alike.
+const NEEDS_YOU_COLOR = 'red'
 
 // Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
 const shownSetting = (key: 'mode' | 'render'): string => {
@@ -228,24 +237,35 @@ const registerSpinner = (on: On) => {
   })
 }
 
+// Why zen stays hidden: it is the quiet view; on and flat show each step as one dim line.
+const isToolLineShown = (): boolean => gameConfig().mode !== 'zen'
+
+function toolLine($: EngineInterface, e: RenderInput, text: string) {
+  const { Text } = $.ui.resolve(e)
+  return <Text dimColor>{`▸ ${text}`}</Text>
+}
+
 const registerQuietRows = (on: On) => {
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     await ready($)
-    if (isOff() || e.props.isErrored || e.props.isInterrupted) {
+    const { isErrored, isInterrupted, isExpanded, tool, input } = e.props
+    if (isOff() || isErrored || isInterrupted || isExpanded === true) {
       return next(e)
     }
-    return hidden($, e)
+    return isToolLineShown() ? toolLine($, e, activityOf(tool, input)) : hidden($, e)
   })
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
     await ready($)
-    return isOff() || e.props.isErrored ? next(e) : hidden($, e)
+    return isOff() || e.props.isErrored || e.props.isExpanded === true ? next(e) : hidden($, e)
   })
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     await ready($)
-    if (isOff() || e.props.calls.some((call) => call.isErrored)) {
+    const { calls, isExpanded } = e.props
+    if (isOff() || isExpanded || calls.some((call) => call.isErrored || call.isInterrupted)) {
       return next(e)
     }
-    return hidden($, e)
+    const summary = toolSummaryOf(calls, messageHeadingWords())
+    return isToolLineShown() && summary !== '' ? toolLine($, e, summary) : hidden($, e)
   })
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     await ready($)
@@ -253,6 +273,7 @@ const registerQuietRows = (on: On) => {
   })
 }
 
+// Why no frame or padding: a terminal selection copies every cell of the row, border included.
 const registerCards = (on: On) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     await ready($)
@@ -265,20 +286,25 @@ const registerCards = (on: On) => {
     if (isOff() || key === '') {
       return drawn
     }
-    // A card keeps the phase it was first drawn in, so scrolling back never repaints it.
+    const isQuestion = isQuestionToPerson(e.props.text)
+    if (!e.props.isFirstOfReply && !isQuestion) {
+      return drawn
+    }
+    // A heading keeps the phase it was first drawn in, so scrolling back never repaints it.
     const cardKey = cardKeyOf(e.requestId, e.props.text)
     if (!quest.cardPhases.has(cardKey)) {
       quest.cardPhases.set(cardKey, shownPhase() ?? 'working')
     }
-    const card = currentScene().cards[quest.cardPhases.get(cardKey) ?? 'working']
+    const phase = quest.cardPhases.get(cardKey) ?? 'working'
+    const name = headingNameOf(shownHero(), localizedNameOf(currentScene().cards[phase].name))
+    const heading = messageHeadingOf(name, phase, isQuestion, messageHeadingWords())
     const { Box, Text } = $.ui.resolve(e)
+    // Why a top margin only: an empty row copies as nothing, and it parts the heading from the prompt.
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={card.color} paddingX={1}>
-        {e.props.isFirstOfReply ? (
-          <Text bold color={card.color}>{`${card.icon} ${localizedNameOf(card.name)}`}</Text>
-        ) : (
-          <Box />
-        )}
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color={isQuestion ? NEEDS_YOU_COLOR : undefined}>
+          {heading}
+        </Text>
         {drawn}
       </Box>
     )
@@ -291,23 +317,16 @@ const registerCards = (on: On) => {
     if (!isHumanOrigin(e.props.origin.kind)) {
       return hidden($, e)
     }
-    const teller = currentScene().teller
-    const { Box, Text } = $.ui.resolve(e)
     // Why not when expanded: ctrl+o shows the line Orca typed, as for any compact row.
     const brief = e.props.isExpanded ? null : briefPathOf(e.props.text)
-    if (brief !== null) {
-      return (
-        <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
-          <Text bold color={teller.color}>{`📜 ${gameStrings().text.briefReceived}`}</Text>
-          <Text dimColor>{brief}</Text>
-        </Box>
-      )
+    if (brief === null) {
+      return next(e)
     }
-    const drawn = await next(e)
+    const { Box, Text } = $.ui.resolve(e)
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
-        <Text bold color={teller.color}>{`${teller.icon} ${localizedNameOf(teller.name)}`}</Text>
-        {drawn}
+      <Box flexDirection="column">
+        <Text bold>{`📜 ${gameStrings().text.briefReceived}`}</Text>
+        <Text dimColor>{brief}</Text>
       </Box>
     )
   })

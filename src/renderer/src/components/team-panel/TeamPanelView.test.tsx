@@ -9,7 +9,7 @@ import type {
   TeamPanelSoloModel
 } from '../../../../shared/team-panel-model-types'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { TeamPanelView, teamPanelSettingsTarget } from './TeamPanelView'
+import { TeamPanelView, teamPanelSettingsRepoId } from './TeamPanelView'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
@@ -204,10 +204,7 @@ describe('TeamPanelView', () => {
     const gear = container.querySelector<HTMLButtonElement>('button[aria-label="Project settings"]')
 
     await act(async () => gear?.click())
-    expect(onOpenSettings).toHaveBeenCalledWith({
-      pane: 'repo',
-      repoId: 'repo-1'
-    })
+    expect(onOpenSettings).toHaveBeenCalledWith('repo-1')
   })
 })
 
@@ -238,19 +235,10 @@ describe('TeamPanelView scene area', () => {
   })
 })
 
-describe('teamPanelSettingsTarget', () => {
-  it('opens the project with a team and the global Agents settings without one', () => {
-    expect(teamPanelSettingsTarget(game)).toEqual({
-      pane: 'repo',
-      repoId: 'repo-1'
-    })
-    expect(teamPanelSettingsTarget(solo)).toEqual({
-      pane: 'agents',
-      repoId: null
-    })
-    expect(teamPanelSettingsTarget(null)).toEqual({
-      pane: 'agents',
-      repoId: null
-    })
+describe('teamPanelSettingsRepoId', () => {
+  it('names the project with a team and no project without one', () => {
+    expect(teamPanelSettingsRepoId(game)).toBe('repo-1')
+    expect(teamPanelSettingsRepoId(solo)).toBeNull()
+    expect(teamPanelSettingsRepoId(null)).toBeNull()
   })
 })

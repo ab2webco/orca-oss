@@ -7,6 +7,7 @@ import type { ActivityTerminalPortalTarget } from '../activity/activity-terminal
 import TerminalPane from './TerminalPane'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { shouldDeferParkedPtyExitTabClose } from './terminal-parked-tab-watchers'
+import { TeamMemberPaneHeader } from '../team-panel/TeamMemberPaneHeader'
 
 const HAS_CSS_ANCHOR_POSITIONING =
   typeof CSS !== 'undefined' &&
@@ -265,10 +266,13 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       ref={overlayRef}
       style={style}
       data-terminal-overlay-tab-id={terminalTabId}
+      className="flex-col"
       onPointerDown={focusGroup}
       onFocusCapture={focusGroup}
     >
-      {terminalPane}
+      <TeamMemberPaneHeader tabId={terminalTabId} />
+      {/* Why always wrapped: a wrapper added only with the header would remount the terminal. */}
+      <div className="relative min-h-0 min-w-0 flex-1">{terminalPane}</div>
       {/* The chat/terminal toggle now lives in the pane header's action cluster
           (TerminalPaneHeaderOverlay), beside split/close — not as a separate
           floating overlay. */}

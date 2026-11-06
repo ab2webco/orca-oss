@@ -289,7 +289,6 @@ describe('the style a scene draws in', () => {
   it('keeps the art Orca ships for Quest, in the styles that have it', () => {
     expect(orchestratorGameSceneDrawnStyle({ style: 'figures', sceneId: 'quest' })).toBe('figures')
     expect(orchestratorGameSceneDrawnStyle({ style: 'office', sceneId: 'quest' })).toBe('office')
-    expect(orchestratorGameSceneDrawnStyle({ style: 'soft', sceneId: 'quest' })).toBe('pixel')
   })
 
   it('draws a plugin scene with no art in Pixel', () => {

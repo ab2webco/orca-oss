@@ -15,14 +15,18 @@ const COPY = {
     inbox: 'Inbox',
     answer: 'Answer in Inbox',
     lead: 'Lead',
-    waiting: 'Waiting for your answer'
+    waiting: 'Waiting for your answer',
+    open: 'Open terminal',
+    awaited: 'Waiting for you'
   },
   es: {
     team: 'Equipo',
     inbox: 'Bandeja',
     answer: 'Responder en Bandeja',
     lead: 'Líder',
-    waiting: 'Esperando tu respuesta'
+    waiting: 'Esperando tu respuesta',
+    open: 'Abrir terminal',
+    awaited: 'Te espera'
   }
 } as const
 
@@ -207,6 +211,71 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
+
+    // Entering a member opens its own terminal in the center under a native header; Team stays open.
+    await panel.getByRole('tab', { name: COPY.en.team }).click()
+    const asker = cards.filter({ hasText: 'ORCA-14' })
+    await asker.locator('button[aria-expanded]').click()
+    await asker.getByRole('button', { name: COPY.en.open }).click()
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
+      .toBe(members[1].paneKey.split(':')[0])
+    const askerTab = members[1].paneKey.split(':')[0]
+    // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
+    const header = orcaPage.locator(
+      `[data-terminal-overlay-tab-id="${askerTab}"] [data-team-member-header]`
+    )
+    await expect(header).toBeVisible()
+    await expect(orcaPage.locator('[data-team-member-header]:visible')).toHaveCount(1)
+    await expect(header).toContainText('local')
+    expect((await header.innerText()).match(/ORCA-14/g)).toHaveLength(1)
+    await expect(panel).toBeVisible()
+    for (const language of ['en', 'es'] as const) {
+      await orcaPage.evaluate(
+        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+        language
+      )
+      await expect(header).toContainText(COPY[language].awaited)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          const fit = await header.evaluate((node) => {
+            const slot = node.parentElement!.getBoundingClientRect()
+            return {
+              spill: node.getBoundingClientRect().right - slot.right,
+              slot: Math.round(slot.width),
+              hidden: node.scrollWidth - node.clientWidth
+            }
+          })
+          testInfo.annotations.push({
+            type: 'member-header',
+            description: `${language} ${width} ${theme}: slot ${fit.slot}px, hidden ${fit.hidden}px`
+          })
+          const where = `${width}px ${theme} ${language}`
+          expect(fit.spill, `header spills out of the center at ${where}`).toBeLessThanOrEqual(0)
+          // Why 300: narrower, both sidebars leave the center terminal itself without columns.
+          if (fit.slot >= 300) {
+            expect(fit.hidden, `header cuts its facts at ${where}`).toBeLessThanOrEqual(0)
+          }
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`member-header-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+
+    // The gear leaves the panel for Settings, so it runs last, back in English at full width.
+    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await panel.getByRole('button', { name: 'Project settings' }).click()
+    const gameSection = orcaPage.locator('[id^="repo-"][id$="-game"]')
+    await expect(gameSection).toBeVisible({ timeout: 15_000 })
+    // Why the top: the section already shows low on the project page without being scrolled to.
+    await expect
+      .poll(async () => (await gameSection.boundingBox())?.y, { timeout: 15_000 })
+      .toBeLessThan(200)
   } finally {
     agent.dispose()
   }

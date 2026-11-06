@@ -99,7 +99,12 @@ const propsOf = (component: string, i: number): Record<string, unknown> => {
     case 'AssistantMessage':
       return { text: `Step ${i} done.`, isFirstOfReply: i % 2 === 0 }
     case 'UserMessage':
-      return { text: `Do step ${i}`, origin: { kind: 'composer' }, isExpanded: false }
+      // Why the brief: the mod draws only Orca's brief line; any other prompt is Claude Code's own.
+      return {
+        text: `Read your Orca Lab brief at .orca/briefs/ctx_${i}.md (task t${i}) and follow it.`,
+        origin: { kind: 'composer' },
+        isExpanded: false
+      }
     default:
       throw new Error(`render-loop.test.ts has no props for ${component}: add a case`)
   }

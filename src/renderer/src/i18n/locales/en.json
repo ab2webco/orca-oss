@@ -11552,6 +11552,31 @@
           "view": "Default view",
           "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
           "viewDescription": "How panes draw the game, with what it costs. Each project can change it, and one pane with /orca-game:view."
+        },
+        "OrchestratorGamePanelSetting": {
+          "advisor": "Advisor",
+          "advisorDescription": "Row under the lead. Shows only when the plugin is installed.",
+          "arcade": "Arcade",
+          "arcadeDescription": "A perfect merge saves a game.",
+          "description": "The right sidebar panel for your agents. Each project can change it in its own settings.",
+          "look": "Panel look",
+          "lookDescription": "Same data and actions in all three.",
+          "lookDisplay": "Display",
+          "lookGame": "Game",
+          "lookPlain": "Plain",
+          "machines": "Machines",
+          "machinesDescription": "Tab with the hosts and their memory.",
+          "prs": "PRs",
+          "prsDescription": "Tab with your open PRs.",
+          "queue": "Queue",
+          "queueDescription": "Tab with the merge queue.",
+          "show": "Show {{label}}",
+          "style": "Scene style",
+          "styleDescription": "They all act out the same real state.",
+          "styleFigures": "Figures",
+          "styleOffice": "Office",
+          "stylePixel": "Pixel",
+          "title": "Panel"
         }
       },
       "right": {
@@ -17136,7 +17161,8 @@
       "ciRunning": "CI running",
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
-      "waitingForAnswer": "Waiting for your answer"
+      "waitingForAnswer": "Waiting for your answer",
+      "openTerminal": "Open terminal"
     },
     "lead": {
       "badge": "Lead",
@@ -17154,6 +17180,12 @@
     "stopped": {
       "by": "Stopped by {{by}}",
       "plain": "Stopped"
+    },
+    "open": {
+      "failed": "Could not open {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Waiting for you"
     }
   }
 }
