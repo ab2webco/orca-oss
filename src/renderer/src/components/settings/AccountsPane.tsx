@@ -1029,6 +1029,21 @@ export function AccountsPane({
         (action.startsWith('reauth:') &&
           nextActiveAccountId !== null &&
           action === `reauth:${nextActiveAccountId}`)
+      if (action.startsWith('token:')) {
+        // Why: the CLI reads the vault settings env only at startup.
+        toast.info(
+          translate(
+            'auto.components.settings.AccountsPane.longLivedTokenUpdated',
+            'Long-lived token updated.'
+          ),
+          {
+            description: translate(
+              'auto.components.settings.AccountsPane.longLivedTokenRestart',
+              'Restart live Claude terminals on this account so they use it.'
+            )
+          }
+        )
+      }
       if (shouldPromptRestart) {
         toast.info(
           translate('auto.components.settings.AccountsPane.f921d32606', 'Claude account updated.'),

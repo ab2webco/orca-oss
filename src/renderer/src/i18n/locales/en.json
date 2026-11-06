@@ -5930,7 +5930,9 @@
           "longLivedTokenWslHint": "Long-lived tokens are not supported for WSL accounts yet.",
           "longLivedTokenBadgeHint": "Agents on this account use a long-lived token, not the stored login. Sign-in and quota below describe the stored login.",
           "longLivedTokenBadge": "Token",
-          "longLivedTokenAction": "Token"
+          "longLivedTokenAction": "Token",
+          "longLivedTokenUpdated": "Long-lived token updated.",
+          "longLivedTokenRestart": "Restart live Claude terminals on this account so they use it."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",

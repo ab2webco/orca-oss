@@ -5577,7 +5577,9 @@
           "longLivedTokenWslHint": "Los tokens de larga duración todavía no funcionan con cuentas de WSL.",
           "longLivedTokenBadgeHint": "Los agentes de esta cuenta usan un token de larga duración, no el inicio de sesión guardado. El estado de sesión y la cuota de abajo describen el inicio de sesión guardado.",
           "longLivedTokenBadge": "Token",
-          "longLivedTokenAction": "Token"
+          "longLivedTokenAction": "Token",
+          "longLivedTokenUpdated": "Token de larga duración actualizado.",
+          "longLivedTokenRestart": "Reinicia los terminales de Claude abiertos en esta cuenta para que lo usen."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",

@@ -164,6 +164,11 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
   await screenshotAllWidths(orcaPage, testInfo, 'dialog', dialog)
   await dialog.getByRole('button', { name: 'Save token' }).click()
   await expect(dialog).toBeHidden()
+  // A pane reads the vault env only at startup, so a live one keeps the old login until restarted.
+  await expect(
+    orcaPage.getByText('Restart live Claude terminals on this account so they use it.')
+  ).toBeVisible()
+  await orcaPage.screenshot({ path: testInfo.outputPath('saved-toast-320.png') })
 
   expect(await tokenCalls(electronApp)).toEqual([
     { accountId: 'plain-account', tokenLength: FIXTURE_TOKEN.length }
