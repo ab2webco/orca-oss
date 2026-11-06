@@ -7,7 +7,8 @@ description: >-
   until it is clean, select it with `orchestratorGame.sceneFile` in project Settings
   or orca.yaml, and check it live with `/quest demo`. Use when someone asks for a new
   game scene, theme or skin (e.g. "make a Mario scene"), to change a scene's colors,
-  characters or names, or when a custom scene draws Quest instead of itself.
+  characters or names, to add native image art (Figures, Office) over its Pixel form,
+  or when a custom scene draws Quest instead of itself.
 ---
 
 # Orca Lab game scenes
@@ -79,6 +80,11 @@ Run every step; skipping validation is the usual way scenes ship broken.
 6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed. For a
    private scene (licensed characters, personal jokes) see [Private scenes](#private-scenes).
 
+7. **Optionally add native art.** The JSON above is the Pixel form, and it stays required: it is
+   what every scene falls back to. To also draw in the native panel's Figures or Office styles,
+   add a [`native` block](#native-optional) and its image files, validate again, and look at both
+   forms with the [captures](#looking-at-it-without-a-pane).
+
 `orca game scene list` shows the built-in scene ids and every file in `.orca/scenes/` with
 its status, from any folder of the project.
 
@@ -105,6 +111,10 @@ are the only ways to keep a scene out of the repo:
   and never touches a repo. See `docs/reference/plugin-development.md` (Game scenes) for the manifest.
 
 `orca game scene validate` takes any path, so validate a plugin's scene file the same way.
+
+Native art follows the scene: the images sit in the scene's own folder, so a private scene needs
+its art excluded the same way (add the folder to the exclude file). A checkout or remote host that
+lacks the images draws the scene in Pixel.
 
 ## Characters for an existing scene
 
@@ -149,6 +159,10 @@ pnpm run capture:orca-game-scenes -- --scene-file /abs/path/<name>.json --out /t
   and `sheet-members.png`; `index.txt` lists every file.
 - They are the cells the game hands the terminal, painted in a browser: a terminal's font and
   gamma differ, so confirm in a pane before you report.
+- A file with a [`native` block](#native-optional) also gets `native-<style>.png`, one per style:
+  its stage at 320, 390 and 768 px, the station prop and every animation of every role and sheet
+  as a strip of frames. They show the files as authored, not the panel's live scene. Check that
+  frames line up, that feet sit on the same line, and that the stage holds at 320.
 
 ## Format
 
@@ -167,9 +181,10 @@ Top level, all required unless marked optional:
 | `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
 | `roster`   | Optional. Names a lead's members take, each in a look of its own   |
 | `themes`   | Optional. Palette variants the band shows one a day                |
+| `native`   | Optional. Image art for the native panel's Figures and Office      |
 
 Unknown keys are ignored, so a scene written for a newer Orca still loads on an older one.
-The file must be at most 64 KB.
+The file must be at most 64 KB; `native` art lives in image files next to it, outside that limit.
 
 ### Phases
 
@@ -401,6 +416,74 @@ in order, then the plain looks again. Keep the layer contrast in mind: a `far` c
 is pushed apart from it like any other. An invalid `themes` is left out with a warning and the
 scene still draws in its plain looks.
 
+### `native` (optional)
+
+Image art for the native Team panel. The scene file still holds everything above: `native` adds to
+the Pixel form and never replaces it. Interactions belong to the engine and art to the scene, so
+characters act out the same real state in every scene; a scene only draws them, names the actions
+and swaps the station prop.
+
+```json
+{
+  "figures": {
+    "layers": [{ "src": "art/sky.png" }, { "src": "art/bushes.png", "front": true }],
+    "roles": {
+      "lead": {
+        "sheets": ["art/lead.png"],
+        "frame": { "width": 64, "height": 96 },
+        "size": 58,
+        "animations": {
+          "idle": { "row": 0, "frames": 4, "fps": 6 },
+          "walk": { "row": 1, "frames": 8 },
+          "work": { "row": 2, "frames": 4, "label": { "en": "Forging", "es": "Forjando" } }
+        }
+      },
+      "member": {
+        "sheets": ["art/knight.png", "art/smith.png"],
+        "frame": { "width": 64, "height": 96 },
+        "size": 58,
+        "animations": { "idle": { "row": 0, "frames": 4 } }
+      }
+    },
+    "props": { "station": "art/anvil.png" }
+  }
+}
+```
+
+- **Styles.** The keys are `figures` and `office`, at least one. A style with no block draws the
+  scene in Pixel.
+- **Paths.** `src`, `sheets` and `props.station` are relative to the scene file. `.png` or `.webp`
+  only; no absolute path, no `..`, no link out of the scene's folder.
+- **`layers`.** 1 to 8, back to front. Each covers the stage from its bottom edge, so keep what
+  matters low and centered: the stage is 176 px tall and as wide as the panel, from 320 px up.
+  `front: true` draws over the characters.
+- **`roles`.** `lead` and `member` are required; `advisor` is optional and wears the member art.
+- **`sheets`.** 1 to 16 images with the same layout. Each is one look, and a member keeps the look
+  its persistent character picks, so eight members can differ.
+- **`frame`.** The size of one frame in sheet pixels, up to 512. `size` is the height drawn at the
+  front of the stage, 16 to 160 CSS px. `feet` (`{ "x", "y" }` in frame pixels) says where the feet
+  are; without it they are at the bottom center.
+- **`animations`.** `idle` is required, and any action left out plays it. The others are `work`,
+  `walk`, `raise`, `give`, `wave` and `cheer`, and nothing else: a misspelt one is refused rather
+  than silently standing idle. Frames run left to right from the first column of `row`. `fps` is 1
+  to 30, default 8; `walk` ignores it, since the engine steps it by distance so feet stay planted.
+  `label` (a name, or `{ "en", "es" }`) is what the scene calls that action.
+- **Limits.** Each file at most 2 MB; each style at most 8 MB and 16 megapixels in total, which is
+  what it costs in memory however well the files compress.
+
+`orca game scene validate` reads every file: it reports a missing one, a link out, a file that is
+not an image, an animation that runs past its sheet, and a style over its limits, each as
+`native.<style>…: <message>`, and exits 1. Orca only leaves a broken block out with a warning and
+draws the scene in Pixel. So do an Orca that predates the block and the terminal game, which ignore
+the key.
+
+**Pixel is the floor.** A built-in scene other than Quest, a plugin or private scene with no block,
+a style the block does not cover, and art that does not load on this machine all draw in Pixel,
+with no error. Quest's Figures and Office art ships with Orca.
+
+Never use third-party characters in anything committed or published: see
+[Private scenes](#private-scenes) for art that must stay on your machine.
+
 ## Common problems
 
 | Validate says                                                     | Fix                                                                   |
@@ -417,6 +500,9 @@ scene still draws in its plain looks.
 | `roster.N.variant.colors: glyph "X" is in no costume`             | Recolor only glyphs a `costumes.<phase>.colors` lists                 |
 | `roster.N: set a variant or costumes, not both`                   | Keep one look per entry                                               |
 | `roster.N.variant: must set colors or an accessory`               | Give the variant a palette, an accessory or both                      |
+| `native.<style>…: not found`                                      | Paths are relative to the scene file, not to the project              |
+| `native.<style>.roles…animations.<a>: N frames in row R need…`    | Grow the sheet, or fix `frame`, `row` or `frames`                     |
+| `native.<style>.roles…animations: Unrecognized key`               | Use only `idle work walk raise give wave cheer`                       |
 | `not valid JSON`                                                  | Trailing comma, missing quote or comment: JSON allows none            |
 
 If the game still draws Quest after `validate` passes: check the path in Settings or

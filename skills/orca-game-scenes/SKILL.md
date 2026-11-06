@@ -7,7 +7,8 @@ description: >-
   until it is clean, select it with `orchestratorGame.sceneFile` in project Settings
   or orca.yaml, and check it live with `/quest demo`. Use when someone asks for a new
   game scene, theme or skin (e.g. "make a Mario scene"), to change a scene's colors,
-  characters or names, or when a custom scene draws Quest instead of itself.
+  characters or names, to add native image art (Figures, Office) over its Pixel form,
+  or when a custom scene draws Quest instead of itself.
 ---
 
 # Orca Lab game scenes

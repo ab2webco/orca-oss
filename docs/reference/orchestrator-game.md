@@ -1435,6 +1435,18 @@ orchestratorGame:
   `.glow` (default: the scene's own looks) are optional. `orca game scene validate` reports a bad
   block as `scene3d.<key>: <message>` and exits 1, but the game only drops the block with a warning
   and draws the scene as 2D. An Orca build or mod older than the block ignores the key.
+- **Native art.** The optional `native` object is image art for the native Team panel's Figures
+  and Office styles, parsed apart in
+  [`orchestrator-game-scene-native.ts`](../../src/shared/orchestrator-game-scene-native.ts): for
+  each style, image `layers` and per-role `animations` over sprite `sheets`, with an optional
+  station prop. The images sit in the scene's folder, outside the 64 KB JSON, at most 2 MB each and
+  8 MB and 16 megapixels a style; paths are relative to the scene file. `orca game scene validate`
+  reads every file and reports problems as `native.<style>…: <message>`; the game drops a broken
+  block with a warning. A scene with no art for a style draws in Pixel
+  (`orchestratorGameSceneDrawnStyle`), and so does art that does not load on this machine, such as
+  a scene carried to a remote member. Quest's art ships with Orca. Game state carries the block as
+  an optional field; the images travel through the existing file read, so there is no new RPC. The
+  [scenes guide](../../skill-guides/orca-game-scenes.md#native-optional) has the format.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
 relative to the project root; a path leaving the project is refused inline) and three actions:
