@@ -98,7 +98,7 @@ const styleSchema = z.object({
   props: z.object({ station: artPath.optional() }).optional()
 })
 
-// Why only these keys: Pixel is the game's own art, and Soft has no drawn result yet.
+// Why only these keys: Pixel is the game's own art.
 const nativeSchema = z
   .object({ figures: styleSchema.optional(), office: styleSchema.optional() })
   .refine((native) => native.figures !== undefined || native.office !== undefined, {
@@ -109,7 +109,7 @@ export type OrchestratorGameSceneNative = z.infer<typeof nativeSchema>
 export type OrchestratorGameSceneNativeStyle = z.infer<typeof styleSchema>
 
 /** Mirrors the panel's styles; a scene has art for some of them at most. */
-export type OrchestratorGameSceneStyle = 'figures' | 'soft' | 'office' | 'pixel'
+export type OrchestratorGameSceneStyle = 'figures' | 'office' | 'pixel'
 
 // Why apart, like the roster and themes: a bad block only costs the art; the scene draws in Pixel.
 export function orchestratorGameSceneNativeOf(raw: unknown): {

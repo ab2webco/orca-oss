@@ -11552,6 +11552,31 @@
           "view": "Default view",
           "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
           "viewDescription": "How panes draw the game, with what it costs. Each project can change it, and one pane with /orca-game:view."
+        },
+        "OrchestratorGamePanelSetting": {
+          "advisor": "Advisor",
+          "advisorDescription": "Row under the lead. Shows only when the plugin is installed.",
+          "arcade": "Arcade",
+          "arcadeDescription": "A perfect merge saves a game.",
+          "description": "The right sidebar panel for your agents. Each project can change it in its own settings.",
+          "look": "Panel look",
+          "lookDescription": "Same data and actions in all three.",
+          "lookDisplay": "Display",
+          "lookGame": "Game",
+          "lookPlain": "Plain",
+          "machines": "Machines",
+          "machinesDescription": "Tab with the hosts and their memory.",
+          "prs": "PRs",
+          "prsDescription": "Tab with your open PRs.",
+          "queue": "Queue",
+          "queueDescription": "Tab with the merge queue.",
+          "show": "Show {{label}}",
+          "style": "Scene style",
+          "styleDescription": "They all act out the same real state.",
+          "styleFigures": "Figures",
+          "styleOffice": "Office",
+          "stylePixel": "Pixel",
+          "title": "Panel"
         }
       },
       "right": {
@@ -17103,6 +17128,64 @@
         "emptyText": "Pair another machine to spread agents across hosts.",
         "errorTitle": "Could not read the machines"
       }
+    },
+    "condition": {
+      "working": "Working",
+      "waiting": "Waiting for you",
+      "idle": "Idle",
+      "done": "Done",
+      "starting": "Starting",
+      "queued": "Queued",
+      "paused": "Paused",
+      "asleep": "Asleep",
+      "limited": "Usage limit reached",
+      "loggedOut": "Logged out",
+      "unreachable": "Host unreachable",
+      "gone": "Session closed",
+      "startFailed": "Failed to start"
+    },
+    "phase": {
+      "plan": "Planning",
+      "docs": "Documenting",
+      "code": "Coding",
+      "tests": "Testing",
+      "pr": "In PR",
+      "merge": "Merging"
+    },
+    "host": {
+      "local": "local"
+    },
+    "card": {
+      "merged": "Merged",
+      "ciFailed": "CI failing",
+      "ciRunning": "CI running",
+      "ciPassed": "CI green",
+      "answerInInbox": "Answer in Inbox",
+      "waitingForAnswer": "Waiting for your answer",
+      "openTerminal": "Open terminal"
+    },
+    "lead": {
+      "badge": "Lead",
+      "coordinatesOne": "Coordinates 1 agent",
+      "coordinatesMany": "Coordinates {{count}} agents"
+    },
+    "advisor": {
+      "label": "Advisor",
+      "source": "Jev"
+    },
+    "xp": {
+      "level": "Lv {{level}}",
+      "progress": "{{into}}/{{need}} XP"
+    },
+    "stopped": {
+      "by": "Stopped by {{by}}",
+      "plain": "Stopped"
+    },
+    "open": {
+      "failed": "Could not open {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Waiting for you"
     }
   }
 }

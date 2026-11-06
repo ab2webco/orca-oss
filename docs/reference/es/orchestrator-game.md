@@ -1,11 +1,11 @@
 ---
-sourceHash: 551b6f64ab69bd40
+sourceHash: 02f9d9cd7c5b8336
 ---
 
 # El juego orquestador de Agent Teams
 
 Los panes de Claude Agent Teams (`orca claude-teams`) cargan un plugin de Claude Code que convierte
-la sesión en un pequeño juego: una escena pixel-art en el spinner, tarjetas por cada fase del flujo,
+la sesión en un pequeño juego: una escena pixel-art en el spinner, respuestas encabezadas por su fase,
 un HUD de compañeros sobre el prompt y recompensas cuando se hace merge de las revisiones, el CI se pone
 verde o los tickets avanzan (los del propio líder del proyecto y los de sus miembros). Empezó como el
 modo quest del plugin `o` en koombea/cineco-orchestrator (Jucer Orozco) y vive en
@@ -63,7 +63,7 @@ colores del propio pane: **Collapse** pliega la banda a esa fila y quita la esce
 la sesión, **Text** es el mismo interruptor de texto del líder y **Refresh** vuelve a leer `game state`.
 Mientras el `orca orchestration ask` del miembro espera al líder, una línea muestra la pregunta
 (`? Asked <lead>: …`), que se mantiene al plegar la banda y se borra cuando vuelve la respuesta. Sus
-respuestas usan las mismas tarjetas que las del líder, y la escena se sigue dibujando sobre el
+respuestas usan las mismas filas de encabezado que las del líder, y la escena se sigue dibujando sobre el
 spinner salvo que esté plegada o en modo texto.
 
 Un miembro local dibuja el archivo de escena de su líder cuando su propio worktree no puede leerlo:
@@ -241,7 +241,7 @@ orchestratorGame:
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
-    style: pixel # figures | soft | office | pixel, for the game look
+    style: pixel # figures | office | pixel, for the game look
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
@@ -266,6 +266,7 @@ las demás capas siguen aplicándose.
 `panel` es del panel nativo y se fusiona clave por clave, y `tabs` pestaña por pestaña. Un `look`
 sin fijar sigue a `mode` (`zen` es Display, `flat` es Sobrio, lo demás Juego) y un `style` sin fijar es
 Pixel, así que nadie cambia de apariencia al actualizar ([`orchestrator-game-panel.ts`](../../../src/shared/orchestrator-game-panel.ts)).
+Soft no es un estilo que se pueda elegir, porque nada lo dibuja: un `style: soft` guardado antes se lee como Pixel.
 Se edita en la sección del juego del proyecto y, como valor por defecto para todos los proyectos, en
 Settings, Agents, Panel; el engranaje del panel abre la primera con equipo y la segunda sin él. Un Orca
 anterior a `panel` lo informa como ajuste desconocido y lo ignora.

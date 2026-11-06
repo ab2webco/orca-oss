@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react'
+import { Crown } from 'lucide-react'
+import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { AgentStateDot, agentStateLabel, type AgentDotState } from '@/components/AgentStateDot'
 import { AgentIcon } from '@/lib/agent-catalog'
@@ -79,6 +81,8 @@ type Props = {
   sendTargetStatus?: 'eligible' | 'disabled' | 'sending'
   sendTargetDisabledReason?: string
   onSendTargetClick?: (paneKey: string) => void
+  /** The project's live game lead (`game.leads`), crowned as in the Team panel. */
+  isGameLead?: boolean
 }
 
 const DashboardAgentRow = React.memo(function DashboardAgentRow({
@@ -99,7 +103,8 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
   hideLineageConnectors = false,
   sendTargetStatus,
   sendTargetDisabledReason,
-  onSendTargetClick
+  onSendTargetClick,
+  isGameLead = false
 }: Props) {
   const hasChildDisclosure =
     typeof childAgentCount === 'number' &&
@@ -256,6 +261,13 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
             <AgentIcon agent={agentTypeToIconAgent(agent.agentType)} size={14} />
           </span>
         )}
+        {isGameLead ? (
+          <Crown
+            data-game-lead-crown=""
+            className="size-3 shrink-0 text-foreground"
+            aria-label={translate('teamPanel.lead.badge', 'Lead')}
+          />
+        ) : null}
         {/* Why: interpolate-size:allow-keywords is the only way to animate height to/from auto without measuring in JS; falls back to an instant swap where unsupported. */}
         <span
           className={cn(

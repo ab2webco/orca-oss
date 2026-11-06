@@ -20,6 +20,7 @@ import {
   getClaudeStatusLineTitle
 } from './claude-statusline-items-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { getOrcaGameScenesSkillSearchEntries } from './orca-game-scenes-skill-search'
 import { translate } from '@/i18n/i18n'
 import { searchKeywords, translateSearchKeyword, uniqueKeywords } from './settings-search-keywords'
@@ -152,6 +153,7 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
     ]
   },
   ...getOrcaGameScenesSkillSearchEntries(),
+  ...getGamePanelSearchEntries(),
   ...getAgentCacheTimerSearchEntries()
 ])
 

@@ -67,6 +67,17 @@ describe('team scene director', () => {
     expect(world.stations[0]).toEqual({ x: actor(world, 'a')?.x, depth: actor(world, 'a')?.depth })
   })
 
+  it('keeps every seat clear of the advisor, so a full team never hides it', () => {
+    const world = createTeamSceneWorld()
+    const eight = Array.from({ length: 8 }, (_, i) => member(`m${i}`))
+    applyTeamSceneInput(world, input(eight, 'watching CI'))
+    const advisor = actor(world, 'advisor')!
+    for (const seat of world.stations) {
+      // 0.06 of the width is ~19 px at 320, past half a figure on either side.
+      expect(Math.abs(seat.x - advisor.x)).toBeGreaterThanOrEqual(0.06)
+    }
+  })
+
   it('acts out each member state at its seat', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(

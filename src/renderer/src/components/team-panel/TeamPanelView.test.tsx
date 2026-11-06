@@ -9,9 +9,10 @@ import type {
   TeamPanelSoloModel
 } from '../../../../shared/team-panel-model-types'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { TeamPanelView, teamPanelSettingsTarget } from './TeamPanelView'
+import { TeamPanelView, teamPanelSettingsRepoId } from './TeamPanelView'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import type { TeamPanelLook } from './use-team-panel-look'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -57,6 +58,7 @@ const game: TeamPanelGameModel = {
   xp: null,
   arcade: null,
   stopped: null,
+  scene: { id: null, extensions: [] },
   inbox: {
     kind: 'ready',
     value: { forYou: 2, waiting: 0, threads: 0, answered: 0 }
@@ -76,7 +78,11 @@ const solo: TeamPanelSoloModel = {
   machines: null
 }
 
-async function render(source: TeamPanelModelSource, onOpenSettings = vi.fn()) {
+async function render(
+  source: TeamPanelModelSource,
+  onOpenSettings = vi.fn(),
+  look: TeamPanelLook = 'plain'
+) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -84,7 +90,7 @@ async function render(source: TeamPanelModelSource, onOpenSettings = vi.fn()) {
   await act(async () => {
     root.render(
       <TooltipProvider>
-        <TeamPanelView source={source} onOpenSettings={onOpenSettings} />
+        <TeamPanelView source={source} look={look} onOpenSettings={onOpenSettings} />
       </TooltipProvider>
     )
   })
@@ -198,26 +204,41 @@ describe('TeamPanelView', () => {
     const gear = container.querySelector<HTMLButtonElement>('button[aria-label="Project settings"]')
 
     await act(async () => gear?.click())
-    expect(onOpenSettings).toHaveBeenCalledWith({
-      pane: 'repo',
-      repoId: 'repo-1'
-    })
+    expect(onOpenSettings).toHaveBeenCalledWith('repo-1')
   })
 })
 
-describe('teamPanelSettingsTarget', () => {
-  it('opens the project with a team and the global Agents settings without one', () => {
-    expect(teamPanelSettingsTarget(game)).toEqual({
-      pane: 'repo',
-      repoId: 'repo-1'
-    })
-    expect(teamPanelSettingsTarget(solo)).toEqual({
-      pane: 'agents',
-      repoId: null
-    })
-    expect(teamPanelSettingsTarget(null)).toEqual({
-      pane: 'agents',
-      repoId: null
-    })
+describe('TeamPanelView scene area', () => {
+  const scene = (container: HTMLElement): Element | null =>
+    container.querySelector('[data-team-scene] canvas')
+
+  it('draws the live scene in the Game look', async () => {
+    const { container } = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'game'
+    )
+
+    expect(scene(container)).not.toBeNull()
+  })
+
+  it('draws no scene in the Plain look or without a team', async () => {
+    const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
+    expect(scene(plain.container)).toBeNull()
+
+    const noTeam = await render(
+      { section: { kind: 'ready', value: solo }, retry: null },
+      vi.fn(),
+      'game'
+    )
+    expect(scene(noTeam.container)).toBeNull()
+  })
+})
+
+describe('teamPanelSettingsRepoId', () => {
+  it('names the project with a team and no project without one', () => {
+    expect(teamPanelSettingsRepoId(game)).toBe('repo-1')
+    expect(teamPanelSettingsRepoId(solo)).toBeNull()
+    expect(teamPanelSettingsRepoId(null)).toBeNull()
   })
 })

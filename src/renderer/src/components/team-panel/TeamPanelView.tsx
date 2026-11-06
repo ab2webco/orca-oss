@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import type { SettingsNavigationTarget } from '@/lib/settings-navigation-types'
 import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
@@ -14,14 +13,13 @@ import {
   TeamPanelUnavailableState
 } from './team-panel-section-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import type { TeamPanelLook } from './use-team-panel-look'
+import { TeamPanelScene } from '../team-scene/TeamPanelScene'
+import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
-export type TeamPanelSettingsTarget = Pick<SettingsNavigationTarget, 'pane' | 'repoId'>
-
-/** With a team the gear opens the project; without one, the global Agents settings. */
-export function teamPanelSettingsTarget(model: TeamPanelModel | null): TeamPanelSettingsTarget {
-  return model?.kind === 'team'
-    ? { pane: 'repo', repoId: model.repoId }
-    : { pane: 'agents', repoId: null }
+/** With a team the gear opens the project; without one, the global Panel settings. */
+export function teamPanelSettingsRepoId(model: TeamPanelModel | null): string | null {
+  return model?.kind === 'team' ? model.repoId : null
 }
 
 function TeamPanelHeader({
@@ -29,7 +27,7 @@ function TeamPanelHeader({
   onOpenSettings
 }: {
   model: TeamPanelModel | null
-  onOpenSettings: (target: TeamPanelSettingsTarget) => void
+  onOpenSettings: (repoId: string | null) => void
 }): React.JSX.Element {
   const title =
     model?.kind === 'team'
@@ -51,7 +49,7 @@ function TeamPanelHeader({
             size="icon-xs"
             className="text-muted-foreground"
             aria-label={gearLabel}
-            onClick={() => onOpenSettings(teamPanelSettingsTarget(model))}
+            onClick={() => onOpenSettings(teamPanelSettingsRepoId(model))}
           >
             <Settings2 />
           </Button>
@@ -129,15 +127,21 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
 
 export function TeamPanelView({
   source,
+  look,
   onOpenSettings
 }: {
   source: TeamPanelModelSource
-  onOpenSettings: (target: TeamPanelSettingsTarget) => void
+  look: TeamPanelLook
+  onOpenSettings: (repoId: string | null) => void
 }): React.JSX.Element {
   const { section, retry } = source
+  const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
+      {model?.kind === 'team' && look === 'game' ? (
+        <TeamPanelScene model={model} style={sceneStyle} />
+      ) : null}
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
       {section.kind === 'ready' ? (
         <TeamPanelTabs model={section.value} />

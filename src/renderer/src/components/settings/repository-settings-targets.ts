@@ -18,3 +18,10 @@ export function getRepositorySourceControlAiActionRecipeSectionId(
 ): string {
   return `repo-${repoId}-source-control-ai-${actionId}`
 }
+
+export function getRepositoryGameSectionId(repoId: string): string {
+  return `repo-${repoId}-game`
+}
+
+/** The global Panel section under Agents, which the panel gear opens with no team. */
+export const GAME_PANEL_GLOBAL_SECTION_ID = 'agents-game-panel'
