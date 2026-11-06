@@ -43,6 +43,8 @@ export type TeamSceneBody = TeamSceneMover & {
 
 export type TeamSceneWorld = {
   t: number
+  /** Real seconds the scene has run, for the advisor's bubble; `t` takes each frame's capped step. */
+  clock: number
   last: TeamSceneInput | null
   bodies: Map<string, TeamSceneBody>
   queue: string[]
@@ -60,6 +62,7 @@ export type TeamSceneWorld = {
 export function createTeamSceneWorld(): TeamSceneWorld {
   return {
     t: 0,
+    clock: 0,
     last: null,
     bodies: new Map(),
     queue: [],
@@ -169,7 +172,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
         emote(world, b, 'star', CHEER_SECONDS)
       }
     } else if (event.kind === 'advisorSpoke') {
-      world.advisorSaid = { line: event.line, at: world.t }
+      world.advisorSaid = { line: event.line, at: world.clock }
       world.advisorRaiseUntil = world.t + ADVISOR_RAISE_SECONDS
     }
   }
@@ -226,8 +229,14 @@ function advancePlan(world: TeamSceneWorld, body: TeamSceneBody, width: number):
   }
 }
 
-export function stepTeamScene(world: TeamSceneWorld, dt: number, opts: { width: number }): void {
+export function stepTeamScene(
+  world: TeamSceneWorld,
+  dt: number,
+  /** `elapsed`: the real seconds behind a step capped for motion; it defaults to `dt`. */
+  opts: { width: number; elapsed?: number }
+): void {
   world.t += dt
+  world.clock += opts.elapsed ?? dt
   if (world.t < world.cheerUntil) {
     return
   }
@@ -269,5 +278,5 @@ export function drainTeamSceneEffects(world: TeamSceneWorld): TeamSceneEffect[] 
 
 export function advisorLineShown(world: TeamSceneWorld): string | null {
   const said = world.advisorSaid
-  return said && world.t - said.at < ADVISOR_BUBBLE_SECONDS ? said.line : null
+  return said && world.clock - said.at < ADVISOR_BUBBLE_SECONDS ? said.line : null
 }

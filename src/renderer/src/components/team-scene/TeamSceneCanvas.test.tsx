@@ -147,6 +147,27 @@ describe('TeamSceneCanvas', () => {
     vi.useRealTimers()
   })
 
+  it('fades the advisor line after six real seconds on a runner at 3.5 frames a second', () => {
+    let pending: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => pending.push(cb))
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const p = painter()
+    render(<TeamSceneCanvas input={input([], 'first')} painter={p.value} leadLine={null} />)
+    render(<TeamSceneCanvas input={input([], 'Raised effort')} painter={p.value} leadLine={null} />)
+    let now = 0
+    const runUntil = (ms: number): void => {
+      for (; now <= ms; now += 1000 / 3.5) {
+        const due = pending
+        pending = []
+        act(() => due.forEach((cb) => cb(now)))
+      }
+    }
+    runUntil(5700)
+    expect(host.querySelector('[data-scene-bubble="advisor"]')?.textContent).toBe('Raised effort')
+    runUntil(6300)
+    expect(host.querySelector('[data-scene-bubble="advisor"]')).toBeNull()
+  })
+
   it('releases the canvas, the frame and the painter on close', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(7)
     const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
