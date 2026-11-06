@@ -23,9 +23,12 @@ function errorText(error: unknown): string {
 /** One open question the lead asked the person: its options as buttons, or a typed answer. */
 export function GameOwnerQuestionCard({
   question,
+  placeholder,
   onAnswer
 }: {
   question: GameOwnerQuestion
+  /** A narrow panel passes a shorter one so it is not cut mid-word. */
+  placeholder?: string
   onAnswer: (reply: GameOwnerReply) => Promise<void>
 }): React.JSX.Element {
   const [text, setText] = React.useState('')
@@ -104,10 +107,13 @@ export function GameOwnerQuestionCard({
           id={answerId}
           value={text}
           disabled={sending}
-          placeholder={translate(
-            'auto.components.game-inbox.GameOwnerQuestionCard.placeholder',
-            'Answer in your own words'
-          )}
+          placeholder={
+            placeholder ??
+            translate(
+              'auto.components.game-inbox.GameOwnerQuestionCard.placeholder',
+              'Answer in your own words'
+            )
+          }
           className="h-8 min-w-0 text-sm @xs:flex-1"
           onChange={(event) => setText(event.target.value)}
         />

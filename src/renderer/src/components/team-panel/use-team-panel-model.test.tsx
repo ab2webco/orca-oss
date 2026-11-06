@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamMemberCard, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
+import { useGameInboxAppState } from '@/components/game-inbox/game-inbox-app-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 
 const subscribe = vi.fn(() => () => {})
@@ -22,7 +23,8 @@ vi.mock('@/store', () => ({
         activeWorktreeId: 'wt',
         getKnownWorktreeById: () => ({ repoId: 'repo-1' }),
         repos: [{ id: 'repo-1', displayName: 'orca-oss' }],
-        worktreesByRepo: { 'repo-1': [{ id: 'wt' }] }
+        worktreesByRepo: { 'repo-1': [{ id: 'wt' }] },
+        runtimeEnvironments: []
       }),
     { getState: () => ({}) }
   )
@@ -39,6 +41,9 @@ afterEach(async () => {
     }
   })
   subscribe.mockClear()
+  useGameInboxAppState.setState({ hosts: [] })
+  // Why: the model store is module state; a test's partial model must not reach the next test.
+  publish({ section: { kind: 'loading' }, retry: null })
 })
 
 async function mount(Probe: () => null): Promise<void> {
@@ -100,5 +105,53 @@ describe('useTeamMemberOfTab', () => {
 
     expect(seen.slice(-2)).toEqual(['Knight', null])
     expect(subscribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('Team model Inbox count', () => {
+  // Why: only the Inbox tab has a count, and it must cover every project and host.
+  it('adds other projects open questions to the Inbox For you count', async () => {
+    useGameInboxAppState.setState({
+      hosts: [
+        {
+          environmentId: 'env-imac',
+          status: 'ok',
+          projects: [
+            {
+              repoId: 'repo-web',
+              repoName: 'Ab2Web',
+              worktreeId: 'wt-web',
+              questions: [
+                {
+                  id: 'q-web',
+                  ticket: 'WEB-212',
+                  question: 'Ship the price change today?',
+                  options: [],
+                  context: null,
+                  askedAt: '2026-11-06T10:00:00.000Z',
+                  answer: null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    })
+    let seen: TeamPanelModelSource | null = null
+    await mount(() => {
+      seen = useTeamPanelModel()
+      return null
+    })
+    const model = {
+      kind: 'team',
+      inbox: { kind: 'ready', value: { forYou: 1, waiting: 0, threads: 2, answered: 0 } }
+    } as unknown as TeamPanelGameModel
+    await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
+
+    const section = (seen as TeamPanelModelSource | null)?.section
+    expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
+      kind: 'ready',
+      value: { forYou: 2, waiting: 0, threads: 2, answered: 0 }
+    })
   })
 })

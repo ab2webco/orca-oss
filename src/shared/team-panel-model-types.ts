@@ -137,6 +137,8 @@ export type TeamInboxCounts = {
   waiting: number
   threads: number
   answered: number
+  /** This project's own questions were not read while other projects' show; null message: not published. */
+  projectUnread?: { message: string | null }
 }
 
 export type TeamPrRow = {

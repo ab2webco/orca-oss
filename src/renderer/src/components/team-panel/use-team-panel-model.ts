@@ -2,6 +2,10 @@ import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
 import { gameInboxTargetOf } from '@/components/game-inbox/game-owner-questions-client'
+import {
+  openQuestionCountOf,
+  useOtherGameInboxGroups
+} from '@/components/game-inbox/use-other-game-inbox-groups'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type {
   TeamMemberCard,
@@ -16,6 +20,7 @@ import {
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
+import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -89,7 +94,19 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   )
   useEffect(() => (scope ? poller.subscribe(scope) : undefined), [scope])
   const source = useTeamPanelModelStore((s) => s.source)
-  return scope ? source : NO_WORKSPACE
+  const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
+  return useMemo(() => {
+    if (!scope) {
+      return NO_WORKSPACE
+    }
+    const { section } = source
+    if (otherOpen === 0 || section.kind !== 'ready') {
+      return source
+    }
+    const model = section.value
+    const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, otherOpen) }
+    return { ...source, section: { kind: 'ready', value } }
+  }, [scope, source, otherOpen])
 }
 
 /**
