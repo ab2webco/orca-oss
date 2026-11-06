@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import type { AppState } from '@/store/types'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import { getWorkspacePortsByWorktreeId } from '@/lib/workspace-port-groups'
@@ -145,7 +146,10 @@ function accountOf(
     pinnedAccountId: worktree.claudeAccountId,
     wslDistro: getWslDistroFromPath(worktree.path),
     roster: state.claudeAccountRoster,
-    systemDefaultLabel: ''
+    systemDefaultLabel: translate(
+      'auto.components.sidebar.WorktreeCardClaudeAccountChip.systemDefault',
+      'System default'
+    )
   })
   return chip?.label ? { provider: 'claude', email: chip.label, usedPercent: null } : null
 }

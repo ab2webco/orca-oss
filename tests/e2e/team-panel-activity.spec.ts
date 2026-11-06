@@ -1,5 +1,6 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
+import { clickWithoutFrameDependency } from './helpers/frame-independent-ui'
 import {
   splitActiveTerminalPane,
   waitForActiveTerminalManager,
@@ -28,11 +29,50 @@ async function setLanguage(page: Page, uiLanguage: 'en' | 'es'): Promise<void> {
 }
 
 const COPY = {
-  en: { title: 'Your work', activity: 'Activity', others: 'Other sessions', asked: 'Asked' },
-  es: { title: 'Tu trabajo', activity: 'Actividad', others: 'Otras sesiones', asked: 'Pedido' }
+  en: {
+    title: 'Your work',
+    activity: 'Activity',
+    others: 'Other sessions',
+    prompt: 'Prompt',
+    count: '1 need'
+  },
+  es: {
+    title: 'Tu trabajo',
+    activity: 'Actividad',
+    others: 'Otras sesiones',
+    prompt: 'Pedido',
+    count: '1 te necesita'
+  }
 } as const
 
+const EMPTY = { en: 'No agents running', es: 'No hay agentes en marcha' } as const
+
 const QUESTION = 'Apply the migration now or at release?'
+
+/** Every language, width and theme, after checking the screen means what the name says. */
+async function capture(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  check: (language: 'en' | 'es') => Promise<void>
+): Promise<void> {
+  for (const language of ['en', 'es'] as const) {
+    await setLanguage(page, language)
+    await check(language)
+    for (const width of [1440, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(page, theme)
+        await page.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`team-activity-${name}-${language}-${width}-${theme}.png`)
+        })
+      }
+    }
+  }
+  await setLanguage(page, 'en')
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
 
 async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
   await page.evaluate(
@@ -46,6 +86,7 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
           prompt: 'Check how the merge queue is doing',
           agentType: 'claude',
           model: 'claude-opus-5-5',
+          effort: 'high',
           toolName: 'Bash',
           toolInput: 'gh pr checks 912'
         },
@@ -94,7 +135,6 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await waitForPaneCount(orcaPage, 2)
   const snapshot = await waitForPaneIdentitySnapshot(orcaPage, 2)
   const panes = snapshot.panes.map((pane) => `${snapshot.tabId}:${pane.leafId}`)
-  await seedAgents(orcaPage, [panes[0]!, panes[1]!])
 
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
@@ -106,6 +146,12 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   })
 
   const panel = orcaPage.getByTestId('team-panel')
+  await capture(orcaPage, testInfo, 'empty', async (language) => {
+    await expect(panel.getByRole('heading', { name: COPY[language].title })).toBeVisible()
+    await expect(panel.getByRole('tabpanel')).toContainText(EMPTY[language])
+  })
+
+  await seedAgents(orcaPage, [panes[0]!, panes[1]!])
   const summary = orcaPage.locator('.compact-agent-summary-button[aria-expanded="false"]').first()
   if (await summary.isVisible()) {
     await summary.click()
@@ -116,35 +162,57 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     orcaPage.locator('.compact-agent-row').getByText('Bash · gh pr checks 912')
   ).toBeVisible()
 
-  for (const language of ['en', 'es'] as const) {
-    await setLanguage(orcaPage, language)
+  await capture(orcaPage, testInfo, 'full', async (language) => {
     const copy = COPY[language]
     await expect(panel.getByRole('heading', { name: copy.title })).toBeVisible()
     await expect(panel.getByRole('tab', { name: copy.activity })).toHaveAttribute(
       'aria-selected',
       'true'
     )
-    await expect(panel.locator('[data-team-activity="selected"]')).toContainText(copy.asked)
+    await expect(panel.locator('[data-team-activity="selected"]')).toContainText(copy.prompt)
+    await expect(panel.locator('[data-team-activity-count]')).toContainText(copy.count)
     await expect(panel.getByText(copy.others)).toBeVisible()
     await expect(panel.locator('[data-team-activity="other"]')).toHaveCount(1)
+  })
 
-    for (const width of [1440, 768, 390, 320]) {
-      await orcaPage.setViewportSize({ width, height: 900 })
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`team-activity-${language}-${width}-${theme}.png`)
-        })
-      }
-    }
-  }
-  await setLanguage(orcaPage, 'en')
-  await orcaPage.setViewportSize({ width: 1440, height: 900 })
+  // Pressing the other session focuses its pane, and Activity follows that focus.
+  const selected = panel.locator('[data-team-activity="selected"]')
+  const before = await selected.getAttribute('data-pane-key')
+  const other = panel.locator('[data-team-activity="other"]')
+  const target = await other.getAttribute('data-pane-key')
+  expect(target).not.toBe(before)
+  // Why: activateTabAndFocusPane waits one frame and a never-shown window has none; only that frame
+  // is substituted, so the click, the focus event, the pane and the panel below are all real.
+  await orcaPage.evaluate(() => {
+    window.requestAnimationFrame = (callback) =>
+      window.setTimeout(() => callback(performance.now()), 16)
+    window.cancelAnimationFrame = (id) => window.clearTimeout(id)
+  })
+  await clickWithoutFrameDependency(other, orcaPage)
+  await expect(selected).toHaveAttribute('data-pane-key', target!)
+  await expect(other).toHaveAttribute('data-pane-key', before!)
+  await orcaPage.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('team-activity-after-switch.png')
+  })
 
-  // Why no switch check here: the panel focuses a pane through activateTabAndFocusPane, which waits
-  // one animation frame, and the never-shown E2E window produces frames at ~1 Hz or not at all
-  // (helpers/frame-independent-ui.ts). team-panel-activity-tab.test.tsx covers the press.
+  // The default card has no badge here, so its title is the way to the hover card.
+  const title = orcaPage.locator('[data-worktree-title-inline-rename]').first()
+  const defaultFacts = orcaPage.locator('[data-worktree-agent-hover]')
+  await title.hover()
+  await orcaPage.waitForTimeout(600)
+  await expect(defaultFacts).toHaveCount(0)
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+  await title.hover()
+  await expect(defaultFacts).toBeVisible()
+  await expect(defaultFacts).toContainText('Opus 5.5 · high')
+  await orcaPage.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('team-activity-hover-default-card.png')
+  })
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
 
   // The hover card holds what left the row; it stays off while Activity shows the same facts.
   await orcaPage.evaluate(() =>

@@ -13,7 +13,6 @@ import {
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
-import { MetaLine } from './TeamMemberCardRow'
 import { TeamActivityDetail } from './TeamActivityDetail'
 import { openTeamSession } from './team-panel-open-session'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
@@ -57,13 +56,15 @@ function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): Reac
           {teamActivityLine(row)}
         </span>
       </span>
-      <MetaLine
-        parts={[
+      <span data-team-activity-meta="" className="text-xs text-muted-foreground">
+        {[
           teamModelText(row.model),
           teamSessionStateText(row.condition),
           row.since !== null ? formatUiRelativeTime(row.since - now) : null
-        ]}
-      />
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </span>
     </button>
   )
 }

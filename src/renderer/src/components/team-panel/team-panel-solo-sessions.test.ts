@@ -180,6 +180,11 @@ describe('teamSoloSessionsOf hosts and accounts', () => {
     expect(session?.account?.email).toBe('dev@example.com')
   })
 
+  it('says System default like the hover card when no managed account is active', () => {
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live }))
+    expect(session?.account?.email).toBe('System default')
+  })
+
   it('never names an account on a web client, where the sidebar hides it too', () => {
     mocks.webClient = true
     const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))

@@ -171,6 +171,13 @@ describe('TeamPanelActivityTab', () => {
     expect(host.querySelector('[data-team-activity="other"]')?.textContent).toContain('Needs you')
   })
 
+  it('wraps the facts of another session, so a narrow panel never cuts its age', async () => {
+    const host = await render(model([blocked, row({ paneKey: 'tab-c:leaf-c' })], 'tab-b:leaf-b'))
+    const meta = host.querySelector('[data-team-activity-meta]')
+    expect(meta?.textContent).toContain('Opus 5.5 · Working · ')
+    expect(meta?.className).not.toContain('truncate')
+  })
+
   it('names the tool a waiting session is stopped on', async () => {
     const host = await render(
       model(
