@@ -170,7 +170,7 @@ describe('WorktreeCard linked PR display', () => {
     )
 
     expect(markup).toContain('Active')
-    expect(markup).toContain('bg-emerald-500')
+    expect(markup).toContain('bg-status-idle')
     expect(markup).not.toContain('PR: Open')
     expect(markup).not.toContain('Linked PR #456')
   }, 20_000)
