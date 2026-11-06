@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { StatusDot } from '@/components/StatusDot'
 import { translate } from '@/i18n/i18n'
@@ -16,6 +17,8 @@ import { useTeamPanelLook } from './use-team-panel-look'
  * Why only while the Team panel is open: that is when its model is read, so it is never stale.
  */
 export function TeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.Element | null {
+  // Why: the terminal tab is memoized; without this a language switch waits for the next poll.
+  useTranslation()
   const panelOpen = useAppStore((s) => s.rightSidebarOpen && s.rightSidebarTab === 'team')
   const card = useTeamMemberOfTab(tabId)
   const showName = useTeamPanelLook() === 'game'
