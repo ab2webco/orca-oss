@@ -202,7 +202,7 @@ const EN: GameStrings = {
     perfectMerge: (review) => `${review} perfect merge`,
     memberLaunched: (member) => `${member} launched`,
     questDescription:
-      'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
+      'Quest mode, short for /orca-game:quest: an animated Claude, replies headed by phase, one-line tool steps',
     questModesHelp:
       '/orca-game:mode on|zen|flat|off: off shows everything, on hides tool rows, zen also hides working notes, flat draws the game as text with no scene. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn. /orca-game:view lists every view with its cost and switches this pane, this project or every project.',
     questShown: (mode) => `Quest: ${mode}.`,

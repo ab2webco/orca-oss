@@ -1,7 +1,7 @@
 # Agent Teams orchestrator game
 
 Claude Agent Teams panes (`orca claude-teams`) load a Claude Code plugin that turns the session
-into a small game: a pixel-art scene on the spinner, cards per flow phase, a teammate HUD above
+into a small game: a pixel-art scene on the spinner, replies headed by phase, a teammate HUD above
 the prompt, and rewards when reviews merge, CI turns green or tickets move on (a project lead's
 own and its members'). It started as the quest mode of the
 `o` plugin in koombea/cineco-orchestrator (Jucer Orozco) and lives in
@@ -56,7 +56,7 @@ no Panel, team chips, party HUD or lead buttons, only a menu row on the pane's o
 **Collapse** folds the band to that row and takes the scene off the spinner for the session,
 **Text** is the lead's text toggle, and **Refresh** reads `game state` again. While the member's
 `orca orchestration ask` waits on the lead, a line shows the question (`? Asked <lead>: …`), kept
-when collapsed and cleared when the answer returns. Its replies use the same cards as the lead's,
+when collapsed and cleared when the answer returns. Its replies use the same heading rows as the lead's,
 and the scene still draws above the spinner unless collapsed or in text mode.
 
 A local member draws its lead's scene file when its own worktree cannot read it: `.orca/` is often

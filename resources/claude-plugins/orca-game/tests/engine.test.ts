@@ -434,7 +434,7 @@ describe('language', () => {
       props: { text: 'Listo.', isFirstOfReply: true }
     })
     // The open review puts the fleet in the pr phase, whose character is the Herald.
-    expect(await reply.find({ type: 'Text', text: /^✉ Heraldo$/ })).toBeDefined()
+    expect(await reply.find({ type: 'Text', text: /^Heraldo · abriendo el PR$/ })).toBeDefined()
     await reply.unmount()
   })
 
@@ -455,7 +455,9 @@ describe('language', () => {
       viewport: VIEWPORT,
       props: { text: 'Listo.', isFirstOfReply: true }
     })
-    expect(await reply.find({ type: 'Text', text: /^↗ Carrera en azoteas$/ })).toBeDefined()
+    expect(
+      await reply.find({ type: 'Text', text: /^Carrera en azoteas · abriendo el PR$/ })
+    ).toBeDefined()
     await reply.unmount()
     const spinner = await $.ui.mount({ plugin: 'orca-game', surface: 'terminal', ...SPINNER })
     expect(await spinner.find({ type: 'Raster' })).toBeDefined()

@@ -1,11 +1,11 @@
 ---
-sourceHash: 3e75afd63bf7edfd
+sourceHash: 6ec5b62222842d90
 ---
 
 # El juego orquestador de Agent Teams
 
 Los panes de Claude Agent Teams (`orca claude-teams`) cargan un plugin de Claude Code que convierte
-la sesión en un pequeño juego: una escena pixel-art en el spinner, tarjetas por cada fase del flujo,
+la sesión en un pequeño juego: una escena pixel-art en el spinner, respuestas encabezadas por su fase,
 un HUD de compañeros sobre el prompt y recompensas cuando se hace merge de las revisiones, el CI se pone
 verde o los tickets avanzan (los del propio líder del proyecto y los de sus miembros). Empezó como el
 modo quest del plugin `o` en koombea/cineco-orchestrator (Jucer Orozco) y vive en
@@ -63,7 +63,7 @@ colores del propio pane: **Collapse** pliega la banda a esa fila y quita la esce
 la sesión, **Text** es el mismo interruptor de texto del líder y **Refresh** vuelve a leer `game state`.
 Mientras el `orca orchestration ask` del miembro espera al líder, una línea muestra la pregunta
 (`? Asked <lead>: …`), que se mantiene al plegar la banda y se borra cuando vuelve la respuesta. Sus
-respuestas usan las mismas tarjetas que las del líder, y la escena se sigue dibujando sobre el
+respuestas usan las mismas filas de encabezado que las del líder, y la escena se sigue dibujando sobre el
 spinner salvo que esté plegada o en modo texto.
 
 Un miembro local dibuja el archivo de escena de su líder cuando su propio worktree no puede leerlo:
