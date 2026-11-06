@@ -167,7 +167,12 @@ export function TeamSceneCanvas({ input, painter, label, leadLine }: Props): Rea
         className="block w-full"
         style={{ height: painter.height }}
       />
-      <TeamSceneBubbles speeches={speeches} width={speakers.width} height={painter.height} />
+      <TeamSceneBubbles
+        speeches={speeches}
+        width={speakers.width}
+        height={painter.height}
+        cloudPixel={painter.cloudPixel}
+      />
     </div>
   )
 }

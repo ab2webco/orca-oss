@@ -130,6 +130,7 @@ export function createPixelPainter(args: {
 
   return {
     height: HEIGHT,
+    cloudPixel: PIXEL,
     headTop: (depth) => (feetRow(depth) - 10) * PIXEL,
     paint: (g, f: TeamSceneFrame) => {
       const columns = Math.ceil(f.width / PIXEL)
