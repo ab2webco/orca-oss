@@ -115,8 +115,8 @@ export function TeamTabContent({
   look: TeamPanelLook
   selectTab: SelectTeamPanelTab
   now: number
-  /** Null when the host cannot spend a play, which hides the arcade with the model's own null. */
-  arcadeActions: TeamArcadeActions | null
+  /** Absent or null when the host cannot spend a play, which hides the arcade like the model's own null. */
+  arcadeActions?: TeamArcadeActions | null
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState<string | null>(null)
   const game = look === 'game'
