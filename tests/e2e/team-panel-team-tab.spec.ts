@@ -1,0 +1,196 @@
+import type { Page } from '@stablyai/playwright-test'
+import { test, expect } from './helpers/orca-app'
+import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
+import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
+import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+
+const WIDTHS = [1440, 768, 390, 320]
+const COPY = {
+  en: { team: 'Team', inbox: 'Inbox', answer: 'Answer in Inbox', lead: 'Lead' },
+  es: { team: 'Equipo', inbox: 'Bandeja', answer: 'Responder en Bandeja', lead: 'Líder' }
+} as const
+
+async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+  await page.evaluate(async (next) => {
+    const settings = await window.api.settings.set({ theme: next })
+    window.__store?.setState({ settings })
+  }, theme)
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
+    )
+    .toBe(theme)
+}
+
+// The Team tab draws the lead and members the runtime itself reports; nothing is seeded into the
+// panel (ORCA-1050). A real lead pane, real orchestration members and a real owner question.
+test('the Team tab shows the live lead and its members from the lead game state', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(420_000)
+  const agent = createStdinLoggingAgent()
+  try {
+    await waitForSessionReady(orcaPage)
+    const worktreeId = await waitForActiveWorktree(orcaPage)
+    await ensureTerminalVisible(orcaPage)
+    await waitForActivePanePtyId(orcaPage)
+    const pane = await waitForActivePaneHookDescriptor(orcaPage)
+    const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+    const client = new RuntimeClient(userDataDir, 30_000, null, null)
+    const lead = (
+      await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
+        paneKey: pane.paneKey
+      })
+    ).result.terminal.handle
+    await orcaPage.evaluate(async (command) => {
+      await window.__store?.getState().updateSettings({
+        uiLanguage: 'en',
+        defaultTuiAgent: 'codex',
+        agentCmdOverrides: { codex: command },
+        agentDefaultArgs: { codex: '' }
+      })
+    }, agent.command)
+
+    // Why a foreground process: a lead pane back at its shell is not a live lead.
+    await client.call('terminal.send', {
+      terminal: lead,
+      text: 'node -e "setInterval(() => {}, 1e9)"',
+      enter: true
+    })
+    await expect
+      .poll(async () => {
+        const registered = await client.call<{ registered: boolean }>('game.leadRegister', {
+          terminalHandle: lead,
+          project: 'e2e',
+          label: 'Alfred'
+        })
+        return registered.result.registered
+      })
+      .toBe(true)
+
+    const endpoint = await readHookEndpoint(electronApp)
+    // The lead's agent row is posted the way Orca's hooks do; main attaches its terminal handle.
+    await emitCodexHookStatus(endpoint, {
+      paneKey: pane.paneKey,
+      worktreeId,
+      state: 'working',
+      prompt: 'Lead the team'
+    })
+
+    const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
+      objective: 'Team tab',
+      from: lead
+    })
+    const member = async (ticket: string) => {
+      const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
+        spec: `Work on ${ticket}`,
+        taskTitle: ticket,
+        run: run.result.run.id,
+        callerTerminalHandle: lead
+      })
+      const started = await client.call<{
+        effects: { kind: string; role?: string; id?: string }[]
+      }>('orchestration.workerStart', {
+        task: task.result.task.id,
+        from: lead,
+        worktree: `id:${worktreeId}`,
+        displayName: ticket,
+        agent: 'codex',
+        timeoutMs: 20_000
+      })
+      const handle = started.result.effects.find(
+        (effect) => effect.kind === 'terminal' && effect.role === 'agent'
+      )?.id
+      expect(handle, `workerStart opened no agent terminal for ${ticket}`).toBeTruthy()
+      const listed = await client.call<RuntimeTerminalListResult>('terminal.list')
+      const terminal = listed.result.terminals.find((one) => one.handle === handle)
+      expect(terminal, `the ${ticket} terminal is not listed`).toBeTruthy()
+      return {
+        paneKey: `${terminal!.tabId}:${terminal!.leafId}`,
+        worktreeId: terminal!.worktreeId
+      }
+    }
+    const members = [await member('ORCA-12'), await member('ORCA-14')]
+    const postMemberHooks = async (): Promise<void> => {
+      for (const one of members) {
+        await emitCodexHookStatus(endpoint, { ...one, state: 'working', prompt: 'Work' })
+      }
+    }
+    await client.call('game.ownerAsk', {
+      worktreeId,
+      terminalHandle: lead,
+      ticket: 'ORCA-14',
+      question: 'Merge #14 now?',
+      options: ['Yes', 'No']
+    })
+
+    // The runtime itself must report both members before the panel is judged.
+    await expect
+      .poll(
+        async () => {
+          await postMemberHooks()
+          const state = (
+            await client.call<OrchestratorGameState>('game.state', {
+              worktreeId,
+              terminalHandle: lead,
+              paneKey: pane.paneKey
+            })
+          ).result
+          return state.agents.filter((one) => one.isMember && !one.isLeader).length
+        },
+        { timeout: 90_000, message: 'game.state never listed the two members' }
+      )
+      .toBe(2)
+
+    await orcaPage.evaluate(() => {
+      const state = window.__store!.getState()
+      state.setRightSidebarOpen(true)
+      state.setRightSidebarTab('team')
+    })
+    const panel = orcaPage.getByTestId('team-panel')
+    const cards = panel.locator('[data-team-card="member"]')
+    await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
+      timeout: 90_000
+    })
+    await expect(cards).toHaveCount(2, { timeout: 60_000 })
+    await expect(cards.filter({ hasText: 'ORCA-12' })).toHaveCount(1)
+    await expect(cards.filter({ hasText: 'ORCA-14' })).toHaveCount(1)
+    await expect(panel.getByRole('tab', { name: /Inbox/ })).toContainText('1')
+
+    for (const language of ['en', 'es'] as const) {
+      await orcaPage.evaluate(
+        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+        language
+      )
+      await expect(panel.getByRole('tab', { name: COPY[language].team })).toBeVisible()
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          // A card wider than the panel is cut, and the person cannot read the member's line.
+          const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+          expect(
+            overflow,
+            `panel overflows at ${width}px ${theme} ${language}`
+          ).toBeLessThanOrEqual(0)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`team-tab-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+
+    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await panel.getByRole('button', { name: COPY.en.answer }).first().click()
+    await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
+  } finally {
+    agent.dispose()
+  }
+})
