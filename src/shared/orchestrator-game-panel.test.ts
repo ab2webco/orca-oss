@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   parseOrchestratorGameLayer,
+  resolveOrchestratorGameConfig,
   type OrchestratorGameLayer
 } from './orchestrator-game-config'
+import { parseOrcaYaml } from './orca-yaml'
 import { resolveOrchestratorGamePanel } from './orchestrator-game-panel-layers'
 import {
   gamePanelLookOfLegacy,
@@ -174,5 +176,52 @@ describe('orchestratorGame.panel in a layer', () => {
         project: { mode: 'flat' }
       }).look
     ).toBe('plain')
+  })
+})
+
+describe('orchestratorGame.panel across versions and writers', () => {
+  it('survives the real orca.yaml parser with nested tabs', () => {
+    const parsed = parseOrcaYaml(`orchestratorGame:
+  mode: zen
+  panel:
+    look: plain
+    tabs:
+      queue: false
+    arcade: false
+`)
+
+    expect(parsed?.orchestratorGame).toEqual({
+      mode: 'zen',
+      panel: { look: 'plain', tabs: { queue: false }, arcade: false }
+    })
+    expect(parsed?.orchestratorGameWarnings).toBeUndefined()
+  })
+
+  it('falls back to the legacy view when an older host drops panel from its orca.yaml reply', () => {
+    // An older host's parser warns on `panel` and returns the rest of the layer.
+    const olderHostLayer: OrchestratorGameLayer = { mode: 'flat' }
+
+    expect(
+      resolveOrchestratorGamePanel({
+        global: { panel: { tabs: { queue: false } } },
+        project: olderHostLayer,
+        local: { panel: { style: 'office' } }
+      })
+    ).toEqual({
+      look: 'plain',
+      style: 'office',
+      tabs: { prs: true, queue: false, machines: true },
+      advisor: true,
+      arcade: true
+    })
+  })
+
+  it('leaves the resolved terminal config untouched', () => {
+    const plain = resolveOrchestratorGameConfig({ global: { mode: 'zen', render: 'hd' } })
+    const withPanel = resolveOrchestratorGameConfig({
+      global: { mode: 'zen', render: 'hd', panel: { look: 'game', style: 'office' } }
+    })
+
+    expect(withPanel).toEqual(plain)
   })
 })
