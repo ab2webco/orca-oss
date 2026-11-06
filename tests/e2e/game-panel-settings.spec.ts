@@ -146,3 +146,60 @@ test('panel rows save to their layer and the Advisor row follows the project hos
     animations: 'disabled'
   })
 })
+
+test('a saved soft shows as Pixel in both rows, stays on disk, and is not offered', async ({
+  orcaPage
+}, testInfo: TestInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  const save = (global: string, project: string): Promise<void> =>
+    orcaPage.evaluate(
+      async ([id, globalStyle, projectStyle]) => {
+        const settings = await window.api.settings.set({
+          orchestratorGame: { panel: { style: globalStyle } },
+          orchestratorGameProjects: { [id]: { panel: { style: projectStyle } } }
+        } as Parameters<typeof window.api.settings.set>[0])
+        window.__store?.setState({ settings })
+      },
+      [repoId, global, project]
+    )
+  const styles = (section: string) =>
+    orcaPage.locator(`[id="${section}"] [aria-label="Scene style"] [role="radio"]`)
+  const checked = (section: string) =>
+    orcaPage.locator(
+      `[id="${section}"] [aria-label="Scene style"] [role="radio"][aria-checked="true"]`
+    )
+
+  await save('soft', 'soft')
+  const globalSection = await openTarget(orcaPage, null)
+  await expectSectionInView(orcaPage, globalSection)
+  await expect(styles(globalSection)).toHaveText(['Figures', 'Office', 'Pixel'])
+  await expect(checked(globalSection)).toHaveText('Pixel')
+  await orcaPage.screenshot({
+    path: testInfo.outputPath('saved-soft-global.png'),
+    animations: 'disabled'
+  })
+  await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+
+  // Why over Figures: a dropped soft would show the layer below, and only Pixel proves it resolved.
+  await save('figures', 'soft')
+  const projectSection = await openTarget(orcaPage, repoId)
+  await expectSectionInView(orcaPage, projectSection)
+  await expect(styles(projectSection)).toHaveText(['Inherit', 'Figures', 'Office', 'Pixel'])
+  await expect(checked(projectSection)).toHaveText('Pixel')
+  await expect(orcaPage.locator(`[id="${projectSection}"]`)).toContainText('Pixel · this machine')
+  await checked(projectSection).scrollIntoViewIfNeeded()
+  await orcaPage.screenshot({
+    path: testInfo.outputPath('saved-soft-project.png'),
+    animations: 'disabled'
+  })
+
+  const onDisk = await orcaPage.evaluate(async (id) => {
+    const saved = (await window.api.settings.get()) as {
+      orchestratorGameProjects?: Record<string, { panel?: { style?: string } }>
+    }
+    return saved.orchestratorGameProjects?.[id]?.panel?.style
+  }, repoId)
+  expect(onDisk).toBe('soft')
+})
