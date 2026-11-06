@@ -1,0 +1,341 @@
+{
+  "native": {
+    "figures": {
+      "layers": [
+        {
+          "src": "figures/sky.png"
+        },
+        {
+          "src": "figures/land.png"
+        },
+        {
+          "src": "figures/grass.png",
+          "front": true
+        }
+      ],
+      "roles": {
+        "lead": {
+          "sheets": ["figures/lead.png"],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        },
+        "member": {
+          "sheets": [
+            "figures/member-1.png",
+            "figures/member-2.png",
+            "figures/member-3.png",
+            "figures/member-4.png",
+            "figures/member-5.png",
+            "figures/member-6.png",
+            "figures/member-7.png",
+            "figures/member-8.png"
+          ],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        },
+        "advisor": {
+          "sheets": ["figures/advisor.png"],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        }
+      },
+      "props": {
+        "station": "figures/forge.png"
+      }
+    },
+    "office": {
+      "layers": [
+        {
+          "src": "office/room.png"
+        }
+      ],
+      "roles": {
+        "lead": {
+          "sheets": ["office/lead.png"],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        },
+        "member": {
+          "sheets": [
+            "office/member-1.png",
+            "office/member-2.png",
+            "office/member-3.png",
+            "office/member-4.png",
+            "office/member-5.png",
+            "office/member-6.png",
+            "office/member-7.png",
+            "office/member-8.png"
+          ],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        },
+        "advisor": {
+          "sheets": ["office/advisor.png"],
+          "frame": {
+            "width": 128,
+            "height": 128
+          },
+          "feet": {
+            "x": 64,
+            "y": 122
+          },
+          "size": 72,
+          "animations": {
+            "idle": {
+              "row": 0,
+              "frames": 4,
+              "fps": 4
+            },
+            "work": {
+              "row": 1,
+              "frames": 6,
+              "fps": 8
+            },
+            "walk": {
+              "row": 2,
+              "frames": 8
+            },
+            "raise": {
+              "row": 3,
+              "frames": 4,
+              "fps": 6
+            },
+            "give": {
+              "row": 4,
+              "frames": 4,
+              "fps": 6
+            },
+            "wave": {
+              "row": 5,
+              "frames": 4,
+              "fps": 6
+            },
+            "cheer": {
+              "row": 6,
+              "frames": 6,
+              "fps": 10
+            }
+          }
+        }
+      },
+      "props": {
+        "station": "office/desk.png"
+      }
+    }
+  }
+}
