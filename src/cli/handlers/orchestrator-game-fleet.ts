@@ -175,7 +175,7 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           namesTaken,
           onGlobalLogin
         })
-        if (launched.name) {
+        if (launched.name && launched.state !== 'failed') {
           namesTaken.push(launched.name)
         }
         if (launched.globalLogin) {

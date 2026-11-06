@@ -4,7 +4,8 @@ import {
   freedCharacterOf,
   GAME_CHARACTER_RECENT_MAX,
   gameCharacterLevelOf,
-  listGameCharacters
+  listGameCharacters,
+  type GameCharacter
 } from './orchestrator-game-characters'
 import type { GameHistoryRecord } from './orchestrator-game-history'
 
@@ -144,5 +145,22 @@ describe('freedCharacterOf', () => {
     expect(freedCharacterOf({ projectKey: 'no-project', character: 'Mario' })).toBeNull()
     expect(freedCharacterOf({ projectKey: 'repo:a', character: '  ' })).toBeNull()
     expect(freedCharacterOf({ projectKey: 'repo:a' })).toBeNull()
+  })
+})
+
+describe('a character across hosts and accounts', () => {
+  it('keeps where each task ran and where it last worked, for a store an older build wrote too', () => {
+    const local = foldFreedMember({}, arthur, freed({ account: 'a@example.com' })) ?? {}
+    const remote =
+      foldFreedMember(
+        local,
+        arthur,
+        freed({ ticket: 'CIN-2', launchedAt: '2026-10-21', host: 'imac', account: 'b@example.com' })
+      ) ?? {}
+    const [character] = listGameCharacters(remote)
+    expect(character).toMatchObject({ account: 'b@example.com', host: 'imac', tickets: 2 })
+    expect(character?.recent[1]).toMatchObject({ ticket: 'CIN-2', host: 'imac' })
+    const { account: _account, host: _host, ...older } = character ?? ({} as GameCharacter)
+    expect(listGameCharacters({ arthur: older })[0]?.host).toBeUndefined()
   })
 })

@@ -43,8 +43,14 @@ import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import { memberDisplayNameOf, memberNameOf } from '../../shared/orchestrator-game-member-names'
-import { memberNameFor } from './orchestrator-game-member-name-reserve'
+import { memberDisplayNameOf } from '../../shared/orchestrator-game-member-names'
+import {
+  givingNameBackOnFailure,
+  memberNameFor,
+  namesInUseOf,
+  nameReusedWorktree,
+  type GameLaunchStart
+} from './orchestrator-game-member-name-reserve'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
@@ -92,8 +98,11 @@ function requireLaunchPreferences(capabilities: readonly string[]): void {
   }
 }
 
-/** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
-export async function launchGameMember(args: {
+type GameRemoteWhere = GameRemotePlacement & { worktree: string }
+
+type GameMemberWhere = Awaited<ReturnType<typeof memberWorktreeParamsOf>> | GameRemoteWhere
+
+type GameLaunchArgs = {
   client: Client
   state: OrchestratorGameState
   ticket: string
@@ -112,16 +121,31 @@ export async function launchGameMember(args: {
   onGlobalLogin?: readonly string[]
   /** A paired host instead of this Orca; named from the same roster as a local member. */
   remote?: GameRemotePlacement | null
-}): Promise<GameLaunchResult> {
+}
+
+/** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
+export async function launchGameMember(args: GameLaunchArgs): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
-  const lead = state.lead ?? DEFAULT_GAME_LEAD
-  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
   const where = args.remote
     ? { ...args.remote, worktree: 'new-top-level' }
     : await memberWorktreeParamsOf({ client, state, ticket, repo })
+  const inUse = [...namesInUseOf(state), ...(args.namesTaken ?? [])]
+  const name = await memberNameFor(client, state, ticket, inUse)
+  return givingNameBackOnFailure(client, ticket, (start) =>
+    startGameMember(args, where, name, start)
+  )
+}
+
+async function startGameMember(
+  args: GameLaunchArgs,
+  where: GameMemberWhere,
+  name: string | null,
+  start: GameLaunchStart
+): Promise<GameLaunchResult> {
+  const { client, state, ticket, repo } = args
+  const lead = state.lead ?? DEFAULT_GAME_LEAD
+  const choice = gameLaunchChoiceOf(args.overrides ?? {}, lead, args.remote)
   const item = state.project?.todo?.items.find((one) => one.id.toUpperCase() === ticket)
-  const inUse = state.agents.flatMap((agent) => memberNameOf(agent.displayName) ?? [])
-  const name = await memberNameFor(client, state, ticket, [...inUse, ...(args.namesTaken ?? [])])
   const title = memberDisplayNameOf(
     name,
     item ? `${item.id} ${item.title}` : ticket,
@@ -208,6 +232,7 @@ export async function launchGameMember(args: {
     ...setupAdmissionOf(capabilities),
     game: true
   }
+  start.asked = true
   const worker = await callWithLaunchRetry((requestId) =>
     client.call<WorkerStartResult>(
       'orchestration.workerStart',
@@ -221,6 +246,11 @@ export async function launchGameMember(args: {
     worktreeId: worker.result.effects?.find((one) => one.kind === 'worktree')?.id,
     lastState: worker.result.state
   })
+  // Why: a pane that failed to report ready may still come up under this name.
+  start.hasPane = worker.result.effects?.some((one) => one.kind === 'terminal') === true
+  if (!createsWorktree && worker.result.state !== 'failed') {
+    await nameReusedWorktree(client, where.worktree, title)
+  }
   const { account: hostAccount, globalLogin: hostGlobalLogin, ...started } = worker.result
   const launched: GameLaunchResult = {
     ticket,

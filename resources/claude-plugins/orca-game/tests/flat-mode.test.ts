@@ -150,7 +150,7 @@ describe('flat mode', () => {
       }
       const drawn = await band($, columns)
       const builder = await drawn.find({ type: 'Box', key: 'flat-member-t:builder' })
-      expect(builder?.text, `${columns}`).toMatch(/^• builder {2}ORCA-7/)
+      expect(builder?.text, `${columns}`).toMatch(/^■ • builder {2}ORCA-7/)
       expect(cellWidthOf(builder?.text ?? ''), `${columns}`).toBeLessThanOrEqual(columns)
       expect(await drawn.find({ type: 'Box', key: 'flat-member-t:lead' })).toBeDefined()
       expect(await drawn.find({ type: 'Button', key: 'band-pet' })).toBeUndefined()

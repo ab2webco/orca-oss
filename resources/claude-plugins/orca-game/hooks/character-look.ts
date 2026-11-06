@@ -1,3 +1,4 @@
+import { bodyOf, derivedVariantOf, lookKeyOf } from './character-derived-look'
 import type { LocalizedName } from './game-strings'
 import { shortMemberNameOf } from './member-character'
 import type {
@@ -9,12 +10,12 @@ import type {
   ScenePhase
 } from './scenes/index'
 
-// A member is drawn as its roster character: its own costumes, or the phase costume under its variant.
+// A member is one figure in every phase: its own costumes, or one body under its variant or a derived one.
 
 type Head = { up: number; top: number; from: number; to: number; centre: number }
 type Cell = readonly [x: number, y: number]
 
-// Why only empty cells around the head: no costume's art is covered, so any accessory fits any scene.
+// Why empty cells around the head: no costume's art is covered, so any accessory fits any scene.
 const ACCESSORY_ART: Readonly<
   Record<
     CharacterAccessory,
@@ -72,11 +73,16 @@ const ACCESSORY_ART: Readonly<
 
 export const ACCESSORIES = Object.keys(ACCESSORY_ART) as readonly CharacterAccessory[]
 
+// Why no crown: the crown marks the lead, so a derived look must never wear one.
+const PLAIN_ACCESSORIES = ACCESSORIES.filter((one) => one !== 'crown')
+
 // Why not `#` or `:`: hd reads those as outline and backed gap.
 const SPARE_GLYPHS = '&$%*+=?~^@'
 
+// Why past a single cell: a plume or hat tip fills the top row, leaving an accessory nowhere to sit.
 const headOf = (rows: readonly string[]): Head | undefined => {
-  const top = rows.findIndex((row) => /[^.]/.test(row))
+  const wide = rows.findIndex((row) => row.replaceAll('.', '').length > 1)
+  const top = wide !== -1 ? wide : rows.findIndex((row) => /[^.]/.test(row))
   const row = rows[top]
   if (row === undefined) {
     return undefined
@@ -98,10 +104,12 @@ const withAccessory = (
   }
   const art = ACCESSORY_ART[accessory]
   const rows = costume.rows.map((row) => [...row])
+  // Why: a 6-row costume whose head fills row 0 has no room above it, so it wears the top row itself.
+  const isRoofless = head.up === head.top
   for (const [x, y] of art.cells(head, costume.rows)) {
-    const row = rows[y]
-    if (row?.[x] === '.') {
-      row[x] = glyph
+    const cell = rows[y]?.[x]
+    if (cell === '.' || (isRoofless && y === head.top && cell !== undefined)) {
+      rows[y]![x] = glyph
     }
   }
   return {
@@ -110,6 +118,13 @@ const withAccessory = (
     colors: { ...costume.colors, [glyph]: color ?? art.color }
   }
 }
+
+// Why: an antenna under a plume or a feather at the costume's edge finds no cell, so that body is out.
+const showsAccessory = (costume: Costume, accessory: CharacterVariant['accessory']): boolean =>
+  accessory === undefined || withAccessory(costume, accessory).rows.join() !== costume.rows.join()
+
+const plainVariantOf = (scene: SceneDefinition, key: string): CharacterVariant =>
+  derivedVariantOf(scene, key, PLAIN_ACCESSORIES, showsAccessory)
 
 const variantCostumeOf = (costume: Costume, variant: CharacterVariant): Costume => {
   const colored =
@@ -139,27 +154,36 @@ export const characterOf = (
 }
 
 // Why cached: hd caches a sprite per costume object, so a look must be the same object every tick.
-const looks = new WeakMap<SceneCharacter, Map<Costume, Costume>>()
+const looks = new WeakMap<SceneDefinition, Map<string, Costume>>()
 
-/** What `memberName` wears in `phase`: its character's look, else the scene's phase costume. */
+const lookOf = (scene: SceneDefinition, memberName: string): Costume => {
+  const character = characterOf(scene, memberName)
+  // Why the character's name: `Merlin 2` and `Merlín` wear Merlin's figure, not one of their own.
+  const key = character === undefined ? lookKeyOf(memberName) : (keysOf(character.name)[0] ?? '')
+  const made = looks.get(scene) ?? new Map<string, Costume>()
+  looks.set(scene, made)
+  const kept = made.get(key)
+  if (kept !== undefined) {
+    return kept
+  }
+  const authored = character?.variant
+  const variant = authored ?? plainVariantOf(scene, key)
+  const body = bodyOf(scene, key, authored, (one) => showsAccessory(one, variant.accessory))
+  const look = variantCostumeOf(body, variant)
+  made.set(key, look)
+  return look
+}
+
+/** What `memberName` wears in `phase`: the same figure in all of them; nameless, the phase costume. */
 export const characterCostumeOf = (
   scene: SceneDefinition,
   memberName: string | undefined,
   phase: ScenePhase
 ): Costume => {
-  const base = scene.costumes[phase]
-  const character = characterOf(scene, memberName)
-  if (character?.costumes !== undefined) {
-    return character.costumes[phase]
+  if (memberName === undefined) {
+    return scene.costumes[phase]
   }
-  if (character?.variant === undefined) {
-    return base
-  }
-  const made = looks.get(character) ?? new Map<Costume, Costume>()
-  looks.set(character, made)
-  const look = made.get(base) ?? variantCostumeOf(base, character.variant)
-  made.set(base, look)
-  return look
+  return characterOf(scene, memberName)?.costumes?.[phase] ?? lookOf(scene, memberName)
 }
 
 const mostDrawnColorOf = (costume: Costume): number | undefined => {
@@ -171,17 +195,17 @@ const mostDrawnColorOf = (costume: Costume): number | undefined => {
   return costume.colors[glyph]
 }
 
-/** The color that tells a character apart where no sprite is drawn; none for a plain-name member. */
+/** The color that tells a character apart where no sprite is drawn. */
 export const characterColorOf = (
   scene: SceneDefinition,
   memberName: string
 ): number | undefined => {
   const character = characterOf(scene, memberName)
-  const variant = character?.variant
-  if (variant === undefined) {
-    const working = character?.costumes?.working
-    return working === undefined ? undefined : mostDrawnColorOf(working)
+  if (character?.costumes !== undefined) {
+    return mostDrawnColorOf(character.costumes.working)
   }
+  // Why not the most drawn: a body's largest color may be a white the palette leaves alone.
+  const variant = character?.variant ?? plainVariantOf(scene, lookKeyOf(memberName))
   const accessory = variant.accessory === undefined ? undefined : ACCESSORY_ART[variant.accessory]
   return Object.values(variant.colors ?? {})[0] ?? variant.accessoryColor ?? accessory?.color
 }

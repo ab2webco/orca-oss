@@ -42,15 +42,14 @@ describe('liveProjectMemberNamesOf', () => {
     ])
   })
 
-  it('adds the names of members placed on paired hosts, so a local launch never takes one (ORCA-794)', () => {
-    expect(
-      liveProjectMemberNamesOf({
-        worktrees: [],
-        inProject,
-        saved: [],
-        remote: ['Lancelot · ORCA-5 Away', 'ORCA-6 unnamed']
-      })
-    ).toEqual(['Lancelot'])
+  it('gives a failed launch back its name while its worktree still has agents', () => {
+    const saved = [
+      { name: 'Percival · ORCA-7 Gone', worktreeId: 'wt-1', lastState: 'failed' },
+      { name: 'Elaine · ORCA-8 Busy', worktreeId: 'wt-1', lastState: 'ready' }
+    ]
+    expect(liveProjectMemberNamesOf({ worktrees: WORKTREES, inProject, saved }).slice(3)).toEqual([
+      'Elaine'
+    ])
   })
 })
 
@@ -91,5 +90,25 @@ describe('GameMemberNameReservations', () => {
     expect(reserve(names, 'A-2')).toBe('Merlin')
     now = 11 * 60_000
     expect(reserve(names, 'A-3')).toBe('Arthur')
+  })
+
+  it('frees a failed launch at once, for this ticket only', () => {
+    const names = new GameMemberNameReservations()
+    const args = { projectKey: 'p', roster: ROSTER, locale: 'en', taken: [] }
+    expect(names.reserve({ ...args, ticket: 'ORCA-1' })).toBe('Arthur')
+    expect(names.reserve({ ...args, ticket: 'ORCA-2' })).toBe('Merlin')
+    names.release('p', 'ORCA-1')
+    expect(names.reserve({ ...args, ticket: 'ORCA-3' })).toBe('Arthur')
+  })
+
+  it('lets a name unscoped to the project give way before it numbers one (ORCA-1034)', () => {
+    const names = new GameMemberNameReservations()
+    const args = { projectKey: 'p', roster: ROSTER, locale: 'en', taken: ['Arthur', 'Merlin'] }
+    expect(names.reserve({ ...args, ticket: 'ORCA-1', elsewhere: ['Lancelot'] })).toBe('Lancelot')
+    const other = new GameMemberNameReservations()
+    const free = { ...args, taken: [] }
+    expect(other.reserve({ ...free, ticket: 'ORCA-2', elsewhere: ['Arthur'] })).toBe('Merlin')
+    const full = { ...args, taken: ['Arthur', 'Merlin', 'Lancelot'] }
+    expect(new GameMemberNameReservations().reserve({ ...full, ticket: 'ORCA-3' })).toBe('Arthur 2')
   })
 })

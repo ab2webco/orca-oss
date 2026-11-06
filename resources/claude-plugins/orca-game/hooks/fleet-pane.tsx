@@ -25,7 +25,14 @@ import { gameLinkOf } from './game-link'
 import { gameStrings } from './game-strings'
 import { countsOf, drawnPartyOf, memberOf, needsOf, teamOrderOf } from './party'
 import { animate } from './quest'
-import { currentScene, gameConfig, isSceneShown, ready, shownLead } from './quest-runtime'
+import {
+  currentScene,
+  gameConfig,
+  isSceneShown,
+  ready,
+  shownHero,
+  shownLead
+} from './quest-runtime'
 import { paneLinksOf, type PaneLink } from './pane-links'
 import { projectKeyOf, type PanelSection } from './panel-layout'
 import { hintLayoutOnce, readFleetLayout } from './panel-layout-store'
@@ -174,7 +181,7 @@ export const registerFleetPane = (on: On): void => {
         columns,
         rows: HUD_ROWS,
         draw: (at: number) =>
-          hudCellsOf(scene, party, columns, at, { ...extras, lead: shownLead() })
+          hudCellsOf(scene, party, columns, at, { ...extras, lead: shownLead(), hero: shownHero() })
       },
       ...(isShown('team') && cardLayout.withTile ? members : []).map(({ member }) => ({
         key: `tile-${member.key}`,

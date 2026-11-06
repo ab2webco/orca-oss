@@ -41,32 +41,32 @@ const SCENE: SceneDefinition = {
 const NAMES = ['Arthur · ORCA-1 a', 'Merlin · ORCA-2 b', 'Morgana · ORCA-3 c', 'Elaine · ORCA-4 d']
 
 describe('characterCostumeOf', () => {
-  it('draws a plain-name member, or a scene without characters, in the phase costume as before', () => {
-    expect(characterCostumeOf(SCENE, NAMES[0]!, 'build')).toBe(QUEST_SCENE.costumes.build)
-    expect(characterCostumeOf(PLAIN, NAMES[1]!, 'build')).toBe(QUEST_SCENE.costumes.build)
-    expect(characterCostumeOf(SCENE, 'ORCA-9 no name', 'pr')).toBe(QUEST_SCENE.costumes.pr)
+  it('draws only a pane with no name in the phase costume', () => {
+    expect(characterCostumeOf(SCENE, undefined, 'build')).toBe(QUEST_SCENE.costumes.build)
+    expect(characterCostumeOf(SCENE, NAMES[0]!, 'build')).not.toBe(QUEST_SCENE.costumes.build)
+    expect(characterCostumeOf(PLAIN, NAMES[1]!, 'pr')).not.toBe(QUEST_SCENE.costumes.pr)
+    expect(characterCostumeOf(SCENE, 'ORCA-9 no name', 'pr')).not.toBe(QUEST_SCENE.costumes.pr)
   })
 
-  it('lays a variant palette over every phase costume and adds its accessory on empty cells', () => {
+  it('lays a variant palette and accessory over one body, the same in every phase', () => {
+    const merlin = characterCostumeOf(SCENE, NAMES[1]!, 'working')
+    const body = Object.values(QUEST_SCENE.costumes).find(
+      (one) => one.legs === merlin.legs && one.rows.length === merlin.rows.length
+    )!
+    expect(merlin.colors.O).toBe(0x5f8fd7)
+    body.rows.forEach((row, y) =>
+      [...row].forEach((glyph, x) => {
+        if (glyph !== '.') {
+          expect(merlin.rows[y]?.[x]).toBe(glyph)
+        }
+      })
+    )
+    expect(merlin.rows.join('')).not.toBe(body.rows.join(''))
     for (const phase of ['working', 'docs', 'build', 'verify', 'pr', 'handoff'] as const) {
-      const base = QUEST_SCENE.costumes[phase]
-      const merlin = characterCostumeOf(SCENE, NAMES[1]!, phase)
-      expect(merlin.colors.O).toBe(0x5f8fd7)
-      expect(merlin.legs).toEqual(base.legs)
-      base.rows.forEach((row, y) =>
-        [...row].forEach((glyph, x) => {
-          if (glyph !== '.') {
-            expect(merlin.rows[y]?.[x]).toBe(glyph)
-          }
-        })
-      )
-      expect(merlin.rows.join('')).not.toBe(base.rows.join(''))
+      expect(characterCostumeOf(SCENE, NAMES[1]!, phase)).toBe(merlin)
     }
     const morgana = characterCostumeOf(SCENE, NAMES[2]!, 'working')
-    const added = [...morgana.rows.join('').replaceAll('.', '')].find(
-      (one) => !(one in QUEST_SCENE.costumes.working.colors)
-    )
-    expect(added === undefined ? undefined : morgana.colors[added]).toBe(0x7a2a8a)
+    expect(Object.values(morgana.colors)).toContain(0x7a2a8a)
   })
 
   it('draws a character with costumes of its own in them, and finds it by any language or number', () => {
@@ -145,11 +145,11 @@ const slotsOf = (scene: SceneDefinition): string[] => {
 }
 
 describe('members drawn as their characters', () => {
-  it('draws each member in one phase as its character on the band, a plain name as before', () => {
+  it('draws each member in one phase as its character on the band, a plain name too', () => {
     const drawn = slotsOf(SCENE)
     const plain = slotsOf(PLAIN)
-    expect(drawn[0]).toBe(plain[0])
-    expect(drawn.slice(1).filter((slot, i) => slot === plain[i + 1])).toEqual([])
+    expect(new Set(drawn).size).toBe(NAMES.length)
+    expect(new Set(plain).size).toBe(NAMES.length)
   })
 
   it('draws each Panel tile and hd party member in its own character', () => {
@@ -175,7 +175,7 @@ describe('members drawn as their characters', () => {
     expect(new Set(party.map((one) => JSON.stringify(one.sprite.rows))).size).toBe(4)
   })
 
-  it('marks each character in the flat view with its own color, and a plain name with none', () => {
+  it('marks each character in the flat view with its own color, a plain name too', () => {
     const agent = (displayName: string, paneKey: string): GameAgent => ({
       paneKey,
       displayName,
@@ -198,8 +198,8 @@ describe('members drawn as their characters', () => {
     }
     const lines = flatMemberLinesOf({ state, scene: SCENE, columns: 80, maxMembers: 4 })
     const looks = lines.map((line) => line.parts.find((part) => part.key === 'look')?.color)
-    expect(looks[0]).toBeUndefined()
-    expect(new Set(looks.slice(1)).size).toBe(3)
+    expect(looks).not.toContain(undefined)
+    expect(new Set(looks).size).toBe(4)
     expect(looks[1]).toBe('#5f8fd7')
   })
 })

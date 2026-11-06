@@ -12,6 +12,9 @@ export type GameCharacterTask = {
   endedAt: string
   /** Null when the member's launch time was not known. */
   workedMs: number | null
+  account?: string
+  /** The paired host it ran on; absent on this Orca. */
+  host?: string
 }
 
 /** A game character's saved progress in one project, kept across Orca restarts. */
@@ -27,6 +30,9 @@ export type GameCharacter = {
   workedMs: number
   xp: number
   lastAt: string
+  /** Where it last ran; absent until a build that records them frees it. */
+  account?: string
+  host?: string
   /** Oldest first. */
   recent: GameCharacterTask[]
 }
@@ -54,6 +60,11 @@ const count = (value: unknown): number =>
 
 const textOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
+const seatOf = (raw: Record<string, unknown>): { account?: string; host?: string } => ({
+  ...(typeof raw.account === 'string' && raw.account ? { account: raw.account } : {}),
+  ...(typeof raw.host === 'string' && raw.host ? { host: raw.host } : {})
+})
+
 function parseTask(raw: unknown): GameCharacterTask | null {
   if (!isRecord(raw) || typeof raw.endedAt !== 'string') {
     return null
@@ -67,7 +78,8 @@ function parseTask(raw: unknown): GameCharacterTask | null {
     outcome,
     pr: textOrNull(raw.pr),
     endedAt: raw.endedAt,
-    workedMs: typeof raw.workedMs === 'number' ? count(raw.workedMs) : null
+    workedMs: typeof raw.workedMs === 'number' ? count(raw.workedMs) : null,
+    ...seatOf(raw)
   }
 }
 
@@ -88,6 +100,7 @@ function parseCharacter(raw: unknown): (GameCharacter & { applied: string[] }) |
     workedMs: count(raw.workedMs),
     xp: count(raw.xp),
     lastAt: typeof raw.lastAt === 'string' ? raw.lastAt : '',
+    ...seatOf(raw),
     recent: Array.isArray(raw.recent) ? raw.recent.flatMap((one) => parseTask(one) ?? []) : [],
     applied: Array.isArray(raw.applied)
       ? raw.applied.filter((one): one is string => typeof one === 'string')
@@ -132,12 +145,14 @@ export function foldFreedMember(
     return null
   }
   const workedMs = workedMsOf(record)
+  const seat = seatOf(record)
   const task: GameCharacterTask = {
     ticket: record.ticket,
     outcome: record.outcome,
     pr: record.pr,
     endedAt: record.endedAt,
-    workedMs
+    workedMs,
+    ...seat
   }
   const outcomes = before?.outcomes ?? { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 }
   const next: GameCharacter & { applied: string[] } = {
@@ -150,6 +165,7 @@ export function foldFreedMember(
     workedMs: (before?.workedMs ?? 0) + (workedMs ?? 0),
     xp: (before?.xp ?? 0) + GAME_CHARACTER_XP[record.outcome],
     lastAt: record.endedAt,
+    ...seat,
     recent: [...(before?.recent ?? []), task].slice(-GAME_CHARACTER_RECENT_MAX),
     applied: [...(before?.applied ?? []), taskKey].slice(-APPLIED_MAX)
   }

@@ -217,7 +217,7 @@ export const JRPG_SCENE: SceneDefinition = {
     }
   ],
   // Jev's advisor: a hooded oracle whose orb flickers while it reads the signs.
-  // Orca's built-in roster for the scene; its first name wears the phase costumes as they are.
+  // Orca's built-in roster for the scene; its first name wears a look derived from the name.
   roster: ['Aerin', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
   cast: {

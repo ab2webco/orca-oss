@@ -117,7 +117,8 @@ too, and change only its `roster`: every other key stays as it is.
    figure's main ones (body, clothes, hair); leave the eyes and the darkest color alone, since hd
    inks the outline from it.
 3. Keep the roster's names and their order, then add names in the scene's voice until there are
-   at least 10. The first stays a plain name. Each of the others becomes
+   at least 10. A plain name still gets a look derived from it, so this is optional polish. Each
+   name you want to author becomes
    `{ "name": …, "variant": { "colors": {…}, "accessory": …, "accessoryColor": … } }` with 1 to 3
    of those glyphs in colors of its own. To regenerate, replace the `variant`s and keep the names.
 4. Make each one unmistakable: no two characters share a palette and an accessory, and every
@@ -373,12 +374,14 @@ it until it is released; the ticket stays next to it (`Mario · CIN-12 Cartelera
 name is taken, members are named after their ticket only. A name is 1 to 32 characters, a plain
 string or per-language object, must not look like a ticket id (`K-9`), contain `·`, or repeat.
 
-An entry is a plain name, drawn in the phase costumes, or an object with `name` and one look:
+An entry is a plain name, whose one look Orca derives from the name, or an object with `name` and
+one look of your own. A member wears the same figure in every phase:
 
-- `variant`: the phase costumes with changes, at least one of:
-  - `colors`: glyph → color, laid over every phase's `colors`. Only glyphs some costume draws.
+- `variant`: one phase costume with changes, at least one of:
+  - `colors`: glyph → color, laid over that costume's `colors`. Only glyphs some costume draws.
   - `accessory`: `crown`, `halo`, `horns`, `antenna`, `bow`, `feather` or `cape`, drawn on the
-    empty cells around the head, so it never covers the costume. `accessoryColor` sets its color.
+    empty cells around the head. A head on the costume's top row has no room above it, so there the
+    accessory sits on that row. `accessoryColor` sets its color.
 - `costumes`: a costume of its own for **every** phase, in the shape above.
 
 Set a `variant` or `costumes`, not both. An invalid roster is left out with a warning and the

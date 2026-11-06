@@ -1,7 +1,12 @@
 import type { CommandHandler } from '../dispatch'
 import { gameBoardCaller } from './orchestrator-game-board-call'
+import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
-import { memberRosterOf, nextMemberName } from '../../shared/orchestrator-game-member-names'
+import {
+  memberNameOf,
+  memberRosterOf,
+  nextMemberName
+} from '../../shared/orchestrator-game-member-names'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -30,4 +35,47 @@ export async function memberNameFor(
   return reserved?.name === null || typeof reserved?.name === 'string'
     ? reserved.name
     : nextMemberName(roster, taken, locale)
+}
+
+/** The names this lead's members hold; a remote start that failed has none. */
+export const namesInUseOf = (state: OrchestratorGameState): string[] =>
+  state.agents.flatMap((agent) =>
+    agent.remote?.startFailed ? [] : (memberNameOf(agent.displayName) ?? [])
+  )
+
+// Why: workerStart names only a worktree it creates, and a member's own band reads that name.
+export async function nameReusedWorktree(
+  client: Client,
+  worktree: string,
+  title: string
+): Promise<void> {
+  await client.call('worktree.set', { worktree, displayName: title }).catch(() => undefined)
+}
+
+/** How far a launch got, which decides whether its name can go back. */
+export type GameLaunchStart = { asked: boolean; hasPane?: boolean }
+
+/** Runs a launch; one that failed gives its name back now, not when its hold runs out. */
+export async function givingNameBackOnFailure<T extends { state: string }>(
+  client: Client,
+  ticket: string,
+  launch: (start: GameLaunchStart) => Promise<T>
+): Promise<T> {
+  // Why an older Orca is fine: it has no such call, and its hold runs out by itself.
+  const release = () =>
+    client.call('game.memberNameRelease', { ...gameBoardCaller(), ticket }).catch(() => undefined)
+  const start: GameLaunchStart = { asked: false }
+  try {
+    const launched = await launch(start)
+    if (launched.state === 'failed' && !start.hasPane) {
+      await release()
+    }
+    return launched
+  } catch (error) {
+    // Why not any error: a start the host may have run keeps its name until the hold runs out.
+    if (!start.asked || isLaunchRefusal(error)) {
+      await release()
+    }
+    throw error
+  }
 }

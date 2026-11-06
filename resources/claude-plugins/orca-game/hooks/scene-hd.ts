@@ -1,4 +1,5 @@
 import { actionPixel, PROP_WIDTH } from './action-props'
+import { characterCostumeOf } from './character-look'
 import { hdBandRoomOf, hdRestColumnOf } from './hd-band-room'
 import { hdAdvisorOf, hdAdvisorPropPixel, hdPetOf } from './hd-cast'
 import { landInLight, MIDNIGHT, NOON, type Daylight } from './hd-daylight'
@@ -65,6 +66,8 @@ export type HdSceneInput = {
   marches?: ReadonlyMap<string, March>
   /** The lead's label; the hero wears the crown only when it is set. */
   lead?: string
+  /** Whose figure the hero is; without one it wears the phase costume. */
+  hero?: string
   event?: TeamEvent
 }
 
@@ -114,7 +117,11 @@ export const hdSceneGridOf = (input: HdSceneInput): number[][] => {
   const { ground, pixels } = frame
   const land = hdLandBakeOf(frame)
   const pose = hdHeroPoseOf(tick, resting)
-  const sprite = costumeSpriteOf(scene.costumes[input.phase ?? 'working'], pose.frame, resting)
+  const sprite = costumeSpriteOf(
+    characterCostumeOf(scene, input.hero, input.phase ?? 'working'),
+    pose.frame,
+    resting
+  )
   const petDef = scene.cast?.pet
   const petWidth =
     petDef?.frames[0] === undefined ? 0 : frameSpriteOf(petDef.frames[0], petDef.colors).width

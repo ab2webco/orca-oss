@@ -165,6 +165,18 @@ describe('game launch: the ticket keeps its worktree', () => {
     )
   })
 
+  it('names the worktree it reuses after the new member, as the member band reads it', async () => {
+    const old = worktree('/ws/cin-12', 'fab/cin-12')
+    const { client, calls, start } = fakeClient([MAIN, old])
+
+    await launch(client, 'cin-12')
+
+    expect(calls.find(([method]) => method === 'worktree.set')?.[1]).toEqual({
+      worktree: `id:${old.id}`,
+      displayName: (start() as { displayName: string }).displayName
+    })
+  })
+
   it('relaunches into the idle worktree on a named account', async () => {
     const old = worktree('/ws/cin-12', 'fab/cin-12')
     const { client, calls, start } = fakeClient([MAIN, old])

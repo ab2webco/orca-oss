@@ -1,6 +1,7 @@
 import type { GameAgent, GameState } from '../types'
 import type { HudMember } from './fleet-hud'
 import { linkOfKind } from './fleet-labels'
+import { leadTitleOf } from './game-lead'
 import { gameStrings } from './game-strings'
 import { leadStateOf } from './lead-state'
 import { limitTagOf } from './member-tags'
@@ -62,7 +63,7 @@ const awakeLeadOf = (agent: GameAgent, state: GameState): PartyMember | undefine
   const shared = worktreePhaseOf(state)
   return {
     key: agent.paneKey,
-    name: agent.displayName,
+    name: leadTitleOf(state, gameStrings().art.lead),
     phase: phaseOf(tool, {}) ?? (shared === 'handoff' ? undefined : shared) ?? 'working',
     state: lead === 'waiting' ? 'waiting' : 'working',
     mood: isCiRed(state.review) ? 'hurt' : 'none',

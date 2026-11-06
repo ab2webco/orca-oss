@@ -13,14 +13,13 @@ const HOLD_MS = 10 * 60_000
 
 /**
  * Every name a live member of the project holds, whichever lead launched it: rows in the project's
- * worktrees, members its panes launched in other repos, saved members whose worktree still runs,
- * and members placed on paired hosts (their home task titles).
+ * worktrees, members its panes launched in other repos, and saved members whose worktree still runs.
+ * A failed launch holds none: nothing of it answers to that name.
  */
 export function liveProjectMemberNamesOf(args: {
   worktrees: readonly ScannedWorktree[]
   inProject: (worktree: ScannedWorktree) => boolean
   saved: readonly Pick<GameMemberSession, 'name' | 'worktreeId' | 'lastState'>[]
-  remote?: readonly string[]
 }): string[] {
   const projectPanes = new Set(
     args.worktrees.filter(args.inProject).flatMap((one) => one.agents.map((row) => row.paneKey))
@@ -34,13 +33,15 @@ export function liveProjectMemberNamesOf(args: {
     args.worktrees.filter((one) => one.agents.length > 0).map((one) => one.worktreeId)
   )
   const saved = args.saved.filter(
-    (one) => one.lastState !== 'finished' && one.worktreeId !== null && running.has(one.worktreeId)
+    (one) =>
+      one.lastState !== 'finished' &&
+      one.lastState !== 'failed' &&
+      one.worktreeId !== null &&
+      running.has(one.worktreeId)
   )
-  return [
-    ...rows.map((row) => row.displayName),
-    ...saved.map((one) => one.name),
-    ...(args.remote ?? [])
-  ].flatMap((name) => memberNameOf(name) ?? [])
+  return [...rows.map((row) => row.displayName), ...saved.map((one) => one.name)].flatMap(
+    (name) => memberNameOf(name) ?? []
+  )
 }
 
 /** Names picked for launches whose members do not run yet, held per project so two launches never share one. */
@@ -56,6 +57,8 @@ export class GameMemberNameReservations {
     roster: readonly GameMemberName[]
     locale: string
     taken: readonly string[]
+    /** Names unscoped to this project, which give way before a numbered name does. */
+    elsewhere?: readonly string[]
   }): string | null {
     const now = this.now()
     const held = (this.held.get(args.projectKey) ?? []).filter(
@@ -64,12 +67,24 @@ export class GameMemberNameReservations {
     const name = nextMemberName(
       args.roster,
       [...args.taken, ...held.map((one) => one.name)],
-      args.locale
+      args.locale,
+      args.elsewhere
     )
     this.held.set(
       args.projectKey,
       name === null ? held : [...held, { ticket: args.ticket, name, until: now + HOLD_MS }]
     )
     return name
+  }
+
+  /** Gives a launch's name back the moment it fails, not when its hold runs out. */
+  release(projectKey: string, ticket: string): void {
+    const held = this.held.get(projectKey)
+    if (held !== undefined) {
+      this.held.set(
+        projectKey,
+        held.filter((one) => one.ticket !== ticket)
+      )
+    }
   }
 }
