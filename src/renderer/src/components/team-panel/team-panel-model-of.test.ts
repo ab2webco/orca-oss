@@ -108,4 +108,25 @@ describe('teamPanelModelOf', () => {
       machines: null
     })
   })
+  // Why both: Pixel draws a built-in scene by id, else the plugin or file scene the host carried.
+  it('carries the scene id and the scene definitions the host sends, for the live scene', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const carried = { id: 'acme.space/orbit', pluginId: 'acme.space', definition: {} }
+    const model = teamPanelModelOf(
+      args({
+        state: state({
+          config: { scene: 'acme.space/orbit' },
+          extensions: { scenes: [carried] }
+        } as unknown as Partial<OrchestratorGameState>)
+      })
+    )
+
+    expect(model?.scene).toEqual({ id: 'acme.space/orbit', extensions: [carried] })
+  })
+
+  it('reads an older host that sends no scene extensions as none, and no scene id as unknown', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args())?.scene).toEqual({ id: null, extensions: [] })
+  })
 })
