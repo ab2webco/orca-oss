@@ -17286,6 +17286,16 @@
         "wave": "{{count}} to do, slots free",
         "push": "{{count}} stopped",
         "sweep": "{{count}} finished to close"
+      },
+      "menu": {
+        "label": "All actions",
+        "search": "Search actions",
+        "now": "Now",
+        "project": "This project",
+        "orca": "From Orca",
+        "none": "No action with that name.",
+        "new": "New action",
+        "edit": "Edit"
       }
     }
   }

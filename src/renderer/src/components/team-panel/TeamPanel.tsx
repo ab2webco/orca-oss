@@ -35,7 +35,7 @@ export default function TeamPanel(): React.JSX.Element {
       source={source}
       look={panel.look}
       onOpenSettings={openSettings}
-      dock={(model) => <TeamActionDockConnected model={model} />}
+      dock={(model) => <TeamActionDockConnected model={model} onOpenSettings={openSettings} />}
     />
   )
 }
