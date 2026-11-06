@@ -175,10 +175,10 @@ blob whose refresh chain is another saved account's current chain
 aliases. An alias already on disk still needs one of the two accounts re-authenticated, which the
 Settings notice offers.
 
-A second way needs no Orca write at all. Claude CLI 2.1.319 names its Keychain item from
-`CLAUDE_SECURESTORAGE_CONFIG_DIR` whenever that variable is set, even to an empty string, and then
-ignores `CLAUDE_CONFIG_DIR`. Inherited by every pane, it makes each vault read and rotate one shared
-item. The CLI never sets it; it only forwards it to the teammates and background sessions it starts.
+A second way needs no Orca write at all. Claude CLI 2.1.319 derives both its macOS Keychain item and
+the directory of its plaintext `.credentials.json` from `CLAUDE_SECURESTORAGE_CONFIG_DIR` whenever that
+variable is set, even to an empty string, and then ignores `CLAUDE_CONFIG_DIR`. Inherited by every
+pane, it makes each vault read and rotate one shared login on every platform. The CLI never sets it; it only forwards it to the teammates and background sessions it starts.
 A managed account launch now drops it, along with the ambient auth variables (`environment.ts`), on
 local, daemon and SSH spawns.
 

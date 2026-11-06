@@ -195,7 +195,7 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776, ORCA-792)', () => {
   it('does not hand an inherited Keychain scope to a managed account launch', async () => {
     spawnMock.mockClear()
     const { configDir, worktree } = await memberFixture('trusted')
-    // Why: set even to "", the CLI ignores CLAUDE_CONFIG_DIR when naming its Keychain item.
+    // Why: set even to "", the CLI ignores CLAUDE_CONFIG_DIR when locating its stored login.
     vi.stubEnv('CLAUDE_SECURESTORAGE_CONFIG_DIR', '')
     const prepareClaudeAuth = vi.fn(async () => ({
       configDir,

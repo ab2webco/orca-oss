@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { applyClaudeEnvPatch, CLAUDE_MANAGED_LAUNCH_ENV_TO_DELETE } from './environment'
 
-// Claude CLI 2.1.319 names its Keychain item from CLAUDE_SECURESTORAGE_CONFIG_DIR whenever the
-// variable is set, even to "", ignoring CLAUDE_CONFIG_DIR: every vault would share one item.
+// Claude CLI 2.1.319 derives its Keychain item and credentials file dir from
+// CLAUDE_SECURESTORAGE_CONFIG_DIR whenever it is set, even to "", ignoring CLAUDE_CONFIG_DIR.
 const KEYCHAIN_SCOPE_ENV = 'CLAUDE_SECURESTORAGE_CONFIG_DIR'
 
 describe('applyClaudeEnvPatch', () => {
