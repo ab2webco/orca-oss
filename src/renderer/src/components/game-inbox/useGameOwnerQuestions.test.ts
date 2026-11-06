@@ -45,6 +45,19 @@ afterEach(() => {
 })
 
 describe('useGameOwnerQuestions', () => {
+  // Why: the Inbox tab's Answered lists what you answered, which only an `all` read returns.
+  it('asks for answered questions too when told to', async () => {
+    const answered = { ...question('q-2'), answer: { text: 'Yes', at: '2026-10-29T11:00:00.000Z' } }
+    const { call } = stubRuntime(() => ({ questions: [question('q-1'), answered] }))
+    const { result } = renderHook(() => useGameOwnerQuestions(SCOPE, { all: true }))
+
+    await waitFor(() => expect(result.current.questions).toHaveLength(2))
+    expect(call.mock.calls[0]?.[0]).toMatchObject({
+      method: 'game.ownerQuestions',
+      params: { worktreeId: 'repo::wt', all: true }
+    })
+  })
+
   it('reads nothing without a worktree', () => {
     const { call } = stubRuntime(() => ({ questions: [] }))
     const { result } = renderHook(() => useGameOwnerQuestions(null))

@@ -274,6 +274,16 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
       timeout: 60_000
     })
     await expect(inboxTab).toContainText('1', { timeout: 60_000 })
+
+    // Answering this project's question moves it to Answered, under what you answered.
+    await inbox.getByRole('button', { name: 'Merge now' }).click()
+    await expect(inbox.getByText('Merge #923 now or wait for #915 first?')).toHaveCount(0, {
+      timeout: 60_000
+    })
+    await inbox.getByRole('tab', { name: /Answered/ }).click()
+    await expect(inbox.getByText('You answered: Merge now')).toBeVisible({ timeout: 60_000 })
+    await expect(inbox.getByText('The lead answered')).toBeVisible()
+    await capture('answered-yours', inbox)
   } finally {
     agent.dispose()
     rmSync(otherRepo, { recursive: true, force: true })

@@ -27,6 +27,12 @@ import { useGameInboxThreads } from '@/components/game-inbox/useGameInboxThreads
 import { useOtherGameInboxGroups } from '@/components/game-inbox/use-other-game-inbox-groups'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
+import {
+  openTeamInboxAgent,
+  teamInboxAgentQuestionsOf,
+  type TeamInboxAgentQuestion
+} from './team-panel-inbox-agents'
+import { TeamInboxAgentCard, TeamInboxYouAnsweredList } from './team-panel-inbox-items'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
@@ -51,19 +57,30 @@ export type TeamInboxViewProps = {
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
   onReply: (reply: GameMemberReply) => Promise<void>
+  /** Sessions blocked on a question, read from agent status when there is no team. */
+  agentQuestions: TeamInboxAgentQuestion[]
+  /** This project's questions you already answered, newest first. */
+  answeredQuestions: GameOwnerQuestion[]
+  onOpenAgent: (question: TeamInboxAgentQuestion) => void
 }
 
 /** The full questions live only here: For you across projects and hosts, then the lead's mail. */
 export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
-  const { questions, otherGroups, threads, onReply } = props
+  const { questions, otherGroups, threads, onReply, agentQuestions, answeredQuestions } = props
   const [tab, setTab] = React.useState<InboxSubTab>('for-you')
   const forYou =
-    questions.length + otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
+    agentQuestions.length +
+    questions.length +
+    otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
   const subTabs: [InboxSubTab, string, number][] = [
     ['for-you', translate('teamPanel.inbox.forYou', 'For you'), forYou],
     ['waiting', translate('teamPanel.inbox.waiting', 'Waiting'), threads.waiting.length],
     ['threads', translate('teamPanel.inbox.threads', 'Threads'), threads.threads.length],
-    ['answered', translate('teamPanel.inbox.answered', 'Answered'), threads.answered.length]
+    [
+      'answered',
+      translate('teamPanel.inbox.answered', 'Answered'),
+      threads.answered.length + answeredQuestions.length
+    ]
   ]
   // Why short: the panel can be about 200 px wide, where the Sheet's longer placeholders were cut.
   const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
@@ -113,6 +130,13 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             ) : null}
           </div>
         ) : null}
+        {agentQuestions.map((question) => (
+          <TeamInboxAgentCard
+            key={question.paneKey}
+            question={question}
+            onOpen={props.onOpenAgent}
+          />
+        ))}
         {questions.length > 0 ? (
           <section className="space-y-2" data-team-inbox-project="active">
             <GroupLabel
@@ -164,7 +188,20 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col">
         <GameInboxThreadsView threads={threads.threads} />
       </TabsContent>
-      <TabsContent value="answered" className={LIST}>
+      <TabsContent value="answered" className={`${LIST} space-y-2`}>
+        {answeredQuestions.length > 0 ? (
+          <>
+            <GroupLabel
+              title={translate('teamPanel.inbox.youAnswered', 'You answered')}
+              place={null}
+            />
+            <TeamInboxYouAnsweredList questions={answeredQuestions} />
+            <GroupLabel
+              title={translate('teamPanel.inbox.leadAnswered', 'The lead answered')}
+              place={null}
+            />
+          </>
+        ) : null}
         <GameInboxAnsweredList
           items={threads.answered}
           renderActions={(item) => (
@@ -191,19 +228,31 @@ export function TeamPanelInboxTab({
     () => (worktreeId ? { target: gameInboxTargetOf(hostId), worktreeId } : null),
     [worktreeId, hostId]
   )
-  const { questions, answer } = useGameOwnerQuestions(scope)
+  const projectName = useAppStore((s) => {
+    const repoId = s.activeWorktreeId ? s.getKnownWorktreeById(s.activeWorktreeId)?.repoId : null
+    return s.repos.find((repo) => repo.id === repoId)?.displayName ?? ''
+  })
+  const read = useGameOwnerQuestions(scope, { all: true })
+  const { open, answered } = React.useMemo(() => {
+    const done = read.questions.filter((one) => one.answer)
+    done.sort((a, b) => (b.answer?.at ?? '').localeCompare(a.answer?.at ?? ''))
+    return { open: read.questions.filter((one) => !one.answer), answered: done }
+  }, [read.questions])
   // Why open: the tab follows every message while it is shown, as the Sheet did when open.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
   return (
     <TeamInboxView
-      projectName={model.kind === 'team' ? model.projectName : ''}
+      projectName={model.kind === 'team' ? model.projectName : projectName}
       projectUnread={value.projectUnread ?? null}
-      questions={questions}
-      onAnswer={answer}
+      questions={open}
+      onAnswer={read.answer}
       otherGroups={otherGroups}
       threads={threads}
       onReply={threads.reply}
+      agentQuestions={teamInboxAgentQuestionsOf(model)}
+      answeredQuestions={answered}
+      onOpenAgent={openTeamInboxAgent}
     />
   )
 }
