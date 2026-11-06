@@ -129,6 +129,29 @@ describe('tellGameLead', () => {
     expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toHaveLength(1)
   })
 
+  // Why (ORCA-1100): a lead rotated with `game lead --fresh` has no Run until it dispatches, and the
+  // adopted host refused the owner's answer, so it waited unheard until the next read retried it.
+  it('reaches a lead that has no Run yet on a host whose legacy mail was adopted', () => {
+    const db = adoptedDb()
+    const notify = vi.fn()
+
+    expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
+
+    expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
+    expect(db.getUnreadMessages('term_lead', [...LEAD_WATCH_TYPES])).toMatchObject([
+      { from_handle: 'owner', type: 'escalation', subject: NOTE.subject }
+    ])
+    // The lead's first dispatch binds a Run; its watch must still hand the answer out.
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toMatchObject([
+      { from_handle: 'owner', type: 'escalation' }
+    ])
+  })
+
   it('returns false instead of throwing when the database refuses the write', () => {
     const closed = new OrchestrationDb(':memory:')
     closed.close()

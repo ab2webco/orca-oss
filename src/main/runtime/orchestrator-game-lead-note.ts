@@ -1,4 +1,4 @@
-import type { OrchestrationDb } from './orchestration/db'
+import { LEGACY_RUN_ID, type OrchestrationDb } from './orchestration/db'
 import type { GameBoardLead, GameLeadNote } from './orchestrator-game-board'
 
 /** Mail from the person to the lead's terminal; escalation is a type the lead's watch already passes. */
@@ -21,7 +21,9 @@ export function tellGameLead(
       type: 'escalation',
       priority: 'high',
       payload: JSON.stringify(note.payload),
-      ...(run ? { runId: run.id } : {})
+      // Why (ORCA-1100): a lead rotated with --fresh has no Run until it dispatches; its handle's watch
+      // reads mail by address, so it files under the legacy Run by name, as peer mail does.
+      runId: run?.id ?? LEGACY_RUN_ID
     })
     notify(message.to_handle, message.type)
     return true
