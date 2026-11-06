@@ -98,7 +98,14 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
         'teamPanel.tabs.queue.emptyText',
         'Each pull request shows here in order until it merges.'
       ),
-      errorTitle: translate('teamPanel.tabs.queue.errorTitle', 'Could not read the queue')
+      errorTitle: translate('teamPanel.tabs.queue.errorTitle', 'Could not read the queue'),
+      unavailable: {
+        title: translate('teamPanel.tabs.queue.unavailableTitle', 'No merge queue to show'),
+        text: translate(
+          'teamPanel.tabs.queue.unavailableText',
+          'This project has no merge queue, or its provider or host does not publish one.'
+        )
+      }
     }),
     Body: TeamPanelQueueTab
   }),

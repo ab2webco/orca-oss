@@ -11,6 +11,7 @@ import type {
 import {
   teamMachinesSectionOf,
   teamPrSectionOf,
+  teamQueueSectionOf,
   type TeamPrFailureTexts
 } from '../../../../shared/team-panel-work-tabs'
 
@@ -65,8 +66,8 @@ function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
 
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP, arcade, metrics, queue) stay empty rather than
- * guessed: their tickets fill them.
+ * Fields game.state does not publish (XP, arcade, metrics) stay empty rather than guessed:
+ * their tickets fill them.
  */
 export function teamPanelModelOf(args: {
   repoId: string
@@ -87,6 +88,13 @@ export function teamPanelModelOf(args: {
   if (!cards) {
     return null
   }
+  const work = {
+    state,
+    members: cards.members,
+    isFolder: args.isFolder === true,
+    texts: prFailureTexts(),
+    now: Date.now()
+  }
   return {
     kind: 'team',
     repoId: args.repoId,
@@ -104,14 +112,8 @@ export function teamPanelModelOf(args: {
       extensions: state.extensions?.scenes ?? []
     },
     inbox: inboxOf(state, questions),
-    prs: teamPrSectionOf({
-      state,
-      members: cards.members,
-      isFolder: args.isFolder === true,
-      texts: prFailureTexts(),
-      now: Date.now()
-    }),
-    queue: null,
+    prs: teamPrSectionOf(work),
+    queue: teamQueueSectionOf(work),
     machines: teamMachinesSectionOf({ state, members: cards.members })
   }
 }

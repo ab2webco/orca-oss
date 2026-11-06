@@ -1,6 +1,6 @@
 import { gameHostMemoryIsLow, type GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
-import type { GameProjectItem } from './orchestrator-game-project-work'
+import type { GameProjectItem, GameQueueEntry } from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 import type {
   TeamHost,
@@ -8,6 +8,7 @@ import type {
   TeamMemberCard,
   TeamPrList,
   TeamPrRow,
+  TeamQueueEntry,
   TeamSection,
   TeamStatus
 } from './team-panel-model-types'
@@ -17,6 +18,9 @@ export type TeamPrFailureTexts = {
   providerFailed: string
   githubLimit: (minutes: number) => string
 }
+
+const HOUR_MS = 60 * 60_000
+const LONG_QUEUE_WAIT_MS = HOUR_MS
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
@@ -93,6 +97,55 @@ export function teamPrSectionOf(args: {
     .sort((a, b) => STATUS_RANK[a.row.status] - STATUS_RANK[b.row.status] || a.index - b.index)
     .map(({ row }) => row)
   return { kind: 'ready', value: { rows, total: list.total, listUrl: list.url } }
+}
+
+function queueEntryOf(
+  entry: GameQueueEntry,
+  members: readonly TeamMemberCard[],
+  now: number
+): TeamQueueEntry {
+  const waited = entry.since === null ? 0 : now - entry.since
+  const stuck = entry.state === 'waiting' && waited >= LONG_QUEUE_WAIT_MS
+  return {
+    label: entry.id,
+    title: entry.title,
+    url: entry.url,
+    position: entry.position,
+    state: entry.state,
+    status:
+      entry.state === 'failed'
+        ? 'attention'
+        : entry.state === 'checks'
+          ? 'working'
+          : stuck
+            ? 'risk'
+            : 'idle',
+    since: entry.since,
+    longWaitHours: stuck ? Math.floor(waited / HOUR_MS) : null,
+    memberKey: members.find((one) => one.pr?.url === entry.url)?.paneKey ?? null
+  }
+}
+
+/** Null hides the tab; no queue is unavailable, because an empty one would claim nothing waits. */
+export function teamQueueSectionOf(args: {
+  state: OrchestratorGameState
+  members: readonly TeamMemberCard[]
+  isFolder: boolean
+  texts: TeamPrFailureTexts
+  now: number
+}): TeamSection<TeamQueueEntry[]> | null {
+  const { state, members, now } = args
+  if (args.isFolder || state.panel?.tabs.queue === false) {
+    return null
+  }
+  const queue = state.project?.queue
+  if (!queue) {
+    return { kind: 'unavailable' }
+  }
+  if (!queue.entries) {
+    return { kind: 'error', message: failureOf(state.githubBudget, args.texts, now) }
+  }
+  return { kind: 'ready', value: queue.entries.map((one) => queueEntryOf(one, members, now)) }
 }
 
 function hostOf(one: GameHostCapacity, members: readonly TeamMemberCard[]): TeamHost {

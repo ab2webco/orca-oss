@@ -128,6 +128,15 @@ describe('resolveTeamPanelTabs', () => {
     })
   })
 
+  it('says a project has no queue rather than that the host is old', () => {
+    const queue = resolveTeamPanelTabs(gameModel({ queue: { kind: 'unavailable' } })).find(
+      (tab) => tab.id === 'queue'
+    )
+
+    expect(queue?.view.kind).toBe('unavailable')
+    expect(queue?.copy.unavailable?.title).toBe('No merge queue to show')
+  })
+
   it('draws the empty state for a ready section with nothing in it', () => {
     const model = gameModel({ prs: NO_PRS })
     const prs = resolveTeamPanelTabs(model).find((tab) => tab.id === 'prs')

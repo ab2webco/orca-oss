@@ -908,6 +908,7 @@ import {
   type MainWorkItem,
   type GitHubPRBranchLookupOptions
 } from '../github/client'
+import { getMergeQueueEntries } from '../github/merge-queue'
 import { getPullRequestsMergeable } from '../github/pull-request-mergeable'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
@@ -32556,6 +32557,15 @@ export class OrcaRuntimeService {
           ...this.getLocalGitExecutionOptionArgs(repo)
         )
       },
+      githubMergeQueue: async () => {
+        const repo = await this.resolveRepoSelector(selector)
+        return getMergeQueueEntries(
+          repo.path,
+          repo.connectionId ?? null,
+          ...this.getLocalGitExecutionOptionArgs(repo)
+        )
+      },
+      githubBudgetLow: async () => (await readGameGitHubBudget())?.low === true,
       githubIssues: async () =>
         (await this.listRepoWorkItems(selector, 20, 'assignee:@me is:issue is:open')).items.filter(
           (item) => item.type === 'issue'

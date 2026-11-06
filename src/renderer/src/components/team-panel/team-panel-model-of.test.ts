@@ -106,8 +106,7 @@ describe('teamPanelModelOf', () => {
       advisor: null,
       xp: null,
       arcade: null,
-      metrics: { kind: 'unavailable' },
-      queue: null
+      metrics: { kind: 'unavailable' }
     })
   })
   it("fills the Advisor from the lead's own Jev report, words as written", () => {
@@ -174,6 +173,7 @@ describe('teamPanelModelOf', () => {
 
     expect(teamPanelModelOf(args())).toMatchObject({
       prs: { kind: 'unavailable' },
+      queue: { kind: 'unavailable' },
       machines: { kind: 'unavailable' }
     })
   })

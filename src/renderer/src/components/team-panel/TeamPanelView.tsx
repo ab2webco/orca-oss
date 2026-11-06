@@ -74,7 +74,11 @@ function TeamPanelTabBody({
     case 'loading':
       return <TeamPanelLoadingState rows={4} />
     case 'unavailable':
-      return <TeamPanelUnavailableState title={copy.errorTitle} />
+      return copy.unavailable ? (
+        <TeamPanelMessageState title={copy.unavailable.title} text={copy.unavailable.text} />
+      ) : (
+        <TeamPanelUnavailableState title={copy.errorTitle} />
+      )
     case 'error':
       return <TeamPanelMessageState title={copy.errorTitle} text={view.message} tone="error" />
     case 'empty':

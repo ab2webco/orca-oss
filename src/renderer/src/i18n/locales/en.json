@@ -17086,6 +17086,12 @@
     }
   },
   "teamPanel": {
+    "queue": {
+      "checks": "In checks",
+      "waiting": "In queue",
+      "failed": "Failed",
+      "longWait": "For {{hours}} h"
+    },
     "prs": {
       "reason": {
         "checksFailed": "Check failed",
@@ -17166,7 +17172,9 @@
         "title": "Queue",
         "emptyTitle": "The queue is empty",
         "emptyText": "Each pull request shows here in order until it merges.",
-        "errorTitle": "Could not read the queue"
+        "errorTitle": "Could not read the queue",
+        "unavailableTitle": "No merge queue to show",
+        "unavailableText": "This project has no merge queue, or its provider or host does not publish one."
       },
       "machines": {
         "title": "Machines",

@@ -28,12 +28,94 @@ const port = (overrides: Partial<GameProjectWorkPort>): GameProjectWorkPort => (
   githubChecks: unused,
   githubIssues: unused,
   githubMergeable: async () => new Map(),
+  githubMergeQueue: async () => null,
+  githubBudgetLow: async () => false,
   gitlabMergeRequests: async () => null,
   gitlabIssues: unused,
   planeAssigned: unused,
   jiraSearch: unused,
   linearAssigned: unused,
   ...overrides
+})
+
+describe('readGameProjectWork queue', () => {
+  const github: Partial<GameProjectWorkPort> = {
+    githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
+    githubPullRequests: async () => ({ repos: [], items: [] }),
+    githubIssues: async () => []
+  }
+  const queueOf = async (over: Partial<GameProjectWorkPort>) =>
+    (await readGameProjectWork(port(over), { todo: 'off', workItem: null })).queue
+
+  it('carries the entries of a repo with a merge queue', async () => {
+    const entry = {
+      id: '#1',
+      title: 'PR',
+      url: 'u/1',
+      position: 1,
+      state: 'waiting' as const,
+      since: null
+    }
+
+    expect(await queueOf({ ...github, githubMergeQueue: async () => [entry] })).toEqual({
+      provider: 'github',
+      entries: [entry]
+    })
+  })
+
+  it('keeps an empty queue apart from no queue', async () => {
+    expect(await queueOf({ ...github, githubMergeQueue: async () => [] })).toEqual({
+      provider: 'github',
+      entries: []
+    })
+    expect(await queueOf({ ...github, githubMergeQueue: async () => null })).toBeUndefined()
+  })
+
+  it('says the read failed rather than that nothing waits', async () => {
+    expect(await queueOf({ ...github, githubMergeQueue: unused })).toEqual({
+      provider: 'github',
+      entries: null
+    })
+  })
+
+  it('spends nothing while the GitHub budget is low', async () => {
+    let reads = 0
+    const queue = await queueOf({
+      ...github,
+      githubBudgetLow: async () => true,
+      githubMergeQueue: async () => {
+        reads += 1
+        return []
+      }
+    })
+
+    expect(queue).toBeUndefined()
+    expect(reads).toBe(0)
+  })
+
+  it('still reads the queue when the budget itself cannot be read', async () => {
+    const queue = await queueOf({
+      ...github,
+      githubBudgetLow: unused,
+      githubMergeQueue: async () => []
+    })
+
+    expect(queue).toEqual({ provider: 'github', entries: [] })
+  })
+
+  it('never asks GitHub for the queue of a repo without a GitHub remote', async () => {
+    let reads = 0
+    const queue = await queueOf({
+      gitlabIssues: async () => [],
+      githubMergeQueue: async () => {
+        reads += 1
+        return []
+      }
+    })
+
+    expect(queue).toBeUndefined()
+    expect(reads).toBe(0)
+  })
 })
 
 describe('readGameProjectWork review blocks', () => {

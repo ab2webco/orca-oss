@@ -9,7 +9,9 @@ import {
   reviewsListUrlOf,
   reviewToneOf,
   type GameProjectItem,
-  type GameProjectList
+  type GameProjectList,
+  type GameProjectQueue,
+  type GameQueueEntry
 } from '../../shared/orchestrator-game-project-work'
 import {
   readMergeableStates,
@@ -29,6 +31,9 @@ export type GameProjectReviewsPort = {
   }>
   githubChecks: (pr: PullRequest) => Promise<readonly PRCheckDetail[]>
   githubMergeable: GameMergeableRead
+  /** Null when the repo has no merge queue. */
+  githubMergeQueue: () => Promise<GameQueueEntry[] | null>
+  githubBudgetLow: () => Promise<boolean>
   /** Null when the repo is not a GitLab project. */
   gitlabMergeRequests: () => Promise<
     | readonly (Pick<GitLabWorkItem, 'number' | 'title' | 'url' | 'state'> &
@@ -75,6 +80,21 @@ export async function readGitHubReviews(
     reviewsListUrlOf({ provider: 'github', repo, repos: found.repos }),
     prs.length
   )
+}
+
+/** GitHub only: GitLab merge trains are another model, and their tab reads as unavailable. */
+export async function readGitHubQueue(
+  port: GameProjectReviewsPort
+): Promise<GameProjectQueue | null> {
+  if (await port.githubBudgetLow().catch(() => false)) {
+    return null
+  }
+  try {
+    const entries = await port.githubMergeQueue()
+    return entries ? { provider: 'github', entries } : null
+  } catch {
+    return { provider: 'github', entries: null }
+  }
 }
 
 export async function readGitLabReviews(

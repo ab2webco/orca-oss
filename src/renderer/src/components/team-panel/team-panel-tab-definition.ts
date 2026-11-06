@@ -17,6 +17,8 @@ export type TeamPanelTabCopy = {
   emptyTitle: string
   emptyText: string
   errorTitle: string
+  /** When `unavailable` means this project has none, not that the host is too old. */
+  unavailable?: { title: string; text: string }
 }
 
 export type TeamPanelTabView =
