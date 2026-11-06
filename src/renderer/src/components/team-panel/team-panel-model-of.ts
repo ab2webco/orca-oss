@@ -2,6 +2,7 @@ import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
+import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
 import type {
   TeamAdvisorRow,
   TeamInboxCounts,
@@ -66,7 +67,7 @@ function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
 
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP, arcade, metrics) stay empty rather than guessed:
+ * Fields game.state does not publish (XP, arcade) stay empty rather than guessed:
  * their tickets fill them.
  */
 export function teamPanelModelOf(args: {
@@ -102,7 +103,7 @@ export function teamPanelModelOf(args: {
     lead: cards.lead,
     advisor: advisorOf(state),
     members: cards.members,
-    metrics: { kind: 'unavailable' },
+    metrics: teamMetricsOf(state),
     xp: null,
     arcade: null,
     stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
