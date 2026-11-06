@@ -58,7 +58,8 @@ export function TeamMemberCardRow({
   selectTab: SelectTeamPanelTab
   now: number
 }): React.JSX.Element {
-  const asks = card.liveAction?.kind === 'question' || card.needsYou
+  // Why: a member launched by ticket is named after it, and the card would print it twice.
+  const ticketShown = card.ticket && !(showName && card.name === card.ticket.identifier)
   const answer = card.needsYou ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
@@ -78,7 +79,7 @@ export function TeamMemberCardRow({
       >
         <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
           {showName ? <span className="truncate text-[13px] font-medium">{card.name}</span> : null}
-          {card.ticket ? (
+          {ticketShown && card.ticket ? (
             <code className="font-mono text-[11.5px] text-muted-foreground">
               {card.ticket.identifier}
             </code>
@@ -89,8 +90,11 @@ export function TeamMemberCardRow({
         </span>
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <StatusDot tone={teamStatusTone(card.status)} />
-          <span className={cn('truncate', asks && 'text-status-attention')}>
-            {teamLiveText(card.liveAction, card.condition)}
+          {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
+          <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
+            {card.needsYou
+              ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
+              : teamLiveText(card.liveAction, card.condition)}
           </span>
         </span>
         <MetaLine

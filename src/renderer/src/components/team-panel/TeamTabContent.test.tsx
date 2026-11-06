@@ -199,9 +199,39 @@ describe('TeamTabContent', () => {
       (node) => node.textContent === 'Answer in Inbox'
     )
 
-    expect(memberCards(container)[0].textContent).toContain('Merge #923 now?')
     await act(async () => button?.click())
     expect(selectTab).toHaveBeenCalledWith('inbox')
+  })
+
+  // Why: the red tone says the member needs the user; a "Working" label under it contradicts it (V28).
+  it('says a member needing the user waits for an answer, in the tone that shows it', async () => {
+    const { container } = await render(
+      model({ members: [member({ needsYou: true, status: 'attention' })] })
+    )
+    const card = memberCards(container)[0]
+    const line = [...card.querySelectorAll('span')].findLast(
+      (node) => node.textContent === 'Waiting for your answer'
+    )
+
+    expect(line?.className).toContain('text-status-attention')
+    expect(card.textContent).not.toContain('Edit · terminal-role.ts')
+  })
+
+  // Why: a question appears in full only in Inbox (ORCA-1048).
+  it('never prints the question on the card', async () => {
+    const question = { kind: 'question' as const, text: 'Merge #14 now?', options: ['Yes'] }
+    const { container } = await render(
+      model({ members: [member({ needsYou: true, status: 'attention', liveAction: question })] })
+    )
+
+    expect(memberCards(container)[0].textContent).not.toContain('Merge #14 now?')
+    expect(memberCards(container)[0].textContent).toContain('Waiting for your answer')
+  })
+
+  it('shows the ticket once when the member is named after it', async () => {
+    const { container } = await render(model({ members: [member({ name: 'ORCA-1044' })] }), 'game')
+
+    expect(memberCards(container)[0].textContent?.match(/ORCA-1044/g)).toHaveLength(1)
   })
 
   it('expands a member to show its summary, pull request and account', async () => {

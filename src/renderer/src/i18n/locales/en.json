@@ -17128,7 +17128,8 @@
       "ciFailed": "CI failing",
       "ciRunning": "CI running",
       "ciPassed": "CI green",
-      "answerInInbox": "Answer in Inbox"
+      "answerInInbox": "Answer in Inbox",
+      "waitingForAnswer": "Waiting for your answer"
     },
     "lead": {
       "badge": "Lead",
