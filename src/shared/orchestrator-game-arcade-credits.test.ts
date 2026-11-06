@@ -5,6 +5,7 @@ import {
   applyGameArcadeAction,
   earnGameArcadeCredit,
   laterGameArcadeCredits,
+  migrateGameArcadeOffers,
   parseGameArcadeCredits
 } from './orchestrator-game-arcade-credits'
 
@@ -97,5 +98,39 @@ describe('laterGameArcadeCredits', () => {
     }
     expect(laterGameArcadeCredits(current, adopted)).toEqual(adopted)
     expect(laterGameArcadeCredits(adopted, current)).toEqual(adopted)
+  })
+})
+
+describe('migrateGameArcadeOffers', () => {
+  it('pays each offer the terminal kept once and records it', () => {
+    const migrated = migrateGameArcadeOffers(
+      { credits: 1, offer: null },
+      ['r-1'],
+      ['r-1', 'r-2', 'r-3', 'r-3']
+    )
+    expect(migrated).toEqual({
+      next: { credits: 3, offer: null },
+      seen: ['r-1', 'r-2', 'r-3'],
+      paid: 2
+    })
+    expect(migrateGameArcadeOffers(migrated.next, migrated.seen, ['r-2', 'r-3']).paid).toBe(0)
+  })
+
+  it('stops paying at the cap but still records every offer, so none pays later', () => {
+    const offers = Array.from({ length: 12 }, (_, at) => `r-${at}`)
+    const migrated = migrateGameArcadeOffers({ credits: 7, offer: null }, [], offers)
+    expect(migrated.next.credits).toBe(GAME_ARCADE_CREDITS_MAX)
+    expect(migrated.paid).toBe(2)
+    expect(migrated.seen).toEqual(offers)
+  })
+
+  it('ignores what is not an offer id', () => {
+    const migrated = migrateGameArcadeOffers(
+      NO_GAME_ARCADE_CREDITS,
+      [],
+      ['', 'x'.repeat(201), 'r-1']
+    )
+    expect(migrated.seen).toEqual(['r-1'])
+    expect(migrated.paid).toBe(1)
   })
 })

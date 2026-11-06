@@ -25,10 +25,10 @@ import {
 import { mergeAdoptedGameLog } from '../../shared/orchestrator-game-log-adoption'
 import {
   earnGameArcadeCredit,
-  laterGameArcadeCredits,
   parseGameArcadeCredits,
   type GameArcadeCredits
 } from '../../shared/orchestrator-game-arcade-credits'
+import { adoptedArcadeFields, migratedArcadeFields } from './orchestrator-game-history-arcade'
 import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Ordered steps for this store's file; empty while version 1 is the only shape. */
@@ -186,6 +186,20 @@ export class GameHistoryStore {
     return result as R
   }
 
+  /** Pays the terminal's kept offers once; the paid ids ride in the file, so a restart pays none again. */
+  async migrateArcadeOffers(
+    projectKey: string,
+    offers: readonly unknown[]
+  ): Promise<{ paid: number; arcade: GameArcadeCredits }> {
+    let paid = 0
+    const log = await this.update(projectKey, (current) => {
+      const migrated = migratedArcadeFields(current, offers)
+      paid = migrated.paid
+      return migrated.fields && { ...current, ...migrated.fields }
+    })
+    return { paid, arcade: parseGameArcadeCredits(log.arcade) }
+  }
+
   async ownerQuestions(projectKey: string): Promise<unknown[]> {
     return (await this.read(projectKey)).log.ownerQuestions ?? []
   }
@@ -230,10 +244,7 @@ export class GameHistoryStore {
     await this.update(toKey, (current) => ({
       ...current,
       ...mergeAdoptedGameLog(current, log),
-      arcade: laterGameArcadeCredits(
-        parseGameArcadeCredits(current.arcade),
-        parseGameArcadeCredits(log.arcade)
-      )
+      ...adoptedArcadeFields(current, log)
     }))
     await rename(from, this.besideOf(fromKey, `adopted-${fileStamp()}`))
     return { records: log.records.length, events: log.events.length }

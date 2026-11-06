@@ -47,7 +47,17 @@ const GameFleetDropParams = z.object({
 const GameStopSwitchParams = z.object({ ...Caller, set: z.boolean().optional() })
 
 // Why action optional: without it the call only reads, so a client polls it like game.state.
-const GameArcadeParams = z.object({ ...Caller, action: z.enum(GAME_ARCADE_ACTIONS).optional() })
+// Why a separate action: `migrate` carries the terminal's kept offer ids, which play and keep never do.
+const GameArcadeParams = z
+  .object({
+    ...Caller,
+    action: z.enum([...GAME_ARCADE_ACTIONS, 'migrate']).optional(),
+    offers: z.array(z.string().min(1).max(200)).max(200).optional()
+  })
+  .refine((params) => params.action !== 'migrate' || params.offers !== undefined, {
+    message: 'migrate needs the offers to pay',
+    path: ['offers']
+  })
 
 const GameInboxParams = z
   .object({
@@ -127,8 +137,11 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
     handler: async (params, { runtime }) => {
       const ledger = runtime.getGameArcade()
       const caller = { worktreeId: params.worktreeId, terminalHandle: params.terminalHandle }
-      return params.action === undefined
-        ? { arcade: await ledger.read(caller) }
+      if (params.action === undefined) {
+        return { arcade: await ledger.read(caller) }
+      }
+      return params.action === 'migrate'
+        ? ledger.migrate(caller, params.offers ?? [])
         : ledger.apply(caller, params.action)
     }
   }),

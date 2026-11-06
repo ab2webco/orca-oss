@@ -231,6 +231,10 @@ describe('game board RPC: the person answers a member (ORCA-878)', () => {
         apply: async (caller: unknown, action: unknown) => {
           calls.push(['apply', caller, action])
           return { ok: true, arcade: { credits: 0, offer: null } }
+        },
+        migrate: async (caller: unknown, offers: unknown) => {
+          calls.push(['migrate', caller, offers])
+          return { ok: true, paid: 2, arcade: { credits: 2, offer: null } }
         }
       })
     } as unknown as OrcaRuntimeService
@@ -249,10 +253,17 @@ describe('game board RPC: the person answers a member (ORCA-878)', () => {
     await expect(send({ worktreeId: 'wt_1', action: 'jackpot' })).resolves.toMatchObject({
       ok: false
     })
+    await expect(
+      send({ worktreeId: 'wt_1', action: 'migrate', offers: ['r-1', 'r-2'] })
+    ).resolves.toMatchObject({ ok: true, result: { paid: 2, arcade: { credits: 2 } } })
+    await expect(send({ worktreeId: 'wt_1', action: 'migrate' })).resolves.toMatchObject({
+      ok: false
+    })
     const caller = { worktreeId: 'wt_1', terminalHandle: undefined }
     expect(calls).toEqual([
       ['read', caller],
-      ['apply', caller, 'play']
+      ['apply', caller, 'play'],
+      ['migrate', caller, ['r-1', 'r-2']]
     ])
   })
 

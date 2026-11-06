@@ -45,7 +45,7 @@ describe('GameHistoryStore arcade credits', () => {
     expect(await again.arcade('repo-b')).toEqual({ credits: 0, offer: null })
   })
 
-  // Why: those merges were already offered by the terminal's countdown, which cannot tell played from passed.
+  // Why: those merges were offered by the terminal's countdown; they pay once through migrateArcadeOffers.
   it('credits nothing for perfect merges a store held before it kept credits', async () => {
     const { store: first, dir } = store()
     await first.appendEvent('repo-a', merged(4, true))
@@ -90,5 +90,33 @@ describe('GameHistoryStore arcade credits', () => {
 
     await history.adopt('old-key', 'new-key')
     expect((await history.arcade('new-key')).credits).toBe(2)
+  })
+
+  it('pays the offers a terminal kept once, even after a restart', async () => {
+    const { store: first, dir } = store()
+    await first.appendEvent('repo-a', merged(4, true))
+    const [one, two] = await Promise.all([
+      first.migrateArcadeOffers('repo-a', ['r-1', 'r-2']),
+      first.migrateArcadeOffers('repo-a', ['r-2', 'r-3'])
+    ])
+    const again = new GameHistoryStore(() => dir)
+    const three = await again.migrateArcadeOffers('repo-a', ['r-1', 'r-2', 'r-3'])
+
+    expect([one.paid, two.paid, three.paid]).toEqual([2, 1, 0])
+    expect(await again.arcade('repo-a')).toEqual({
+      credits: 4,
+      offer: { provider: 'github', number: 4 }
+    })
+    await again.appendEvent('repo-a', merged(5, true))
+    expect((await again.migrateArcadeOffers('repo-a', ['r-3'])).arcade.credits).toBe(5)
+  })
+
+  it('keeps the migrated offers of an adopted project, so they never pay again', async () => {
+    const { store: history } = store()
+    await history.migrateArcadeOffers('old-key', ['r-1'])
+    await history.migrateArcadeOffers('new-key', ['r-2'])
+
+    await history.adopt('old-key', 'new-key')
+    expect((await history.migrateArcadeOffers('new-key', ['r-1', 'r-2'])).paid).toBe(0)
   })
 })

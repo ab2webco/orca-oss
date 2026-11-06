@@ -10,7 +10,7 @@ import {
 export class GameArcadeLedger {
   constructor(
     private readonly deps: {
-      store: Pick<GameHistoryStore, 'arcade' | 'changeArcade'>
+      store: Pick<GameHistoryStore, 'arcade' | 'changeArcade' | 'migrateArcadeOffers'>
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       /** Lets an open panel refresh instead of polling. */
       changed?: (projectKey: string) => void
@@ -39,5 +39,21 @@ export class GameArcadeLedger {
       this.deps.changed?.(project.key)
     }
     return { ok: outcome.ok, arcade: outcome.next }
+  }
+
+  /** The offers the terminal's old countdown kept, paid once into the lead's project. */
+  async migrate(
+    caller: GameBoardCaller,
+    offers: readonly string[]
+  ): Promise<{ ok: true; paid: number; arcade: GameArcadeCredits }> {
+    const project = await this.deps.projectOf(caller)
+    if (project.isMember) {
+      throw new Error("Only the lead's project takes the terminal's kept offers.")
+    }
+    const outcome = await this.deps.store.migrateArcadeOffers(project.key, offers)
+    if (outcome.paid > 0) {
+      this.deps.changed?.(project.key)
+    }
+    return { ok: true, ...outcome }
   }
 }

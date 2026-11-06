@@ -85,6 +85,38 @@ export function applyGameArcadeAction(
   return { ok: true, next: { credits: current.credits - 1, offer: null } }
 }
 
+// Why bounded: a terminal kept at most 50 offers, and a second migration is refused by the mod's own flag.
+export const GAME_ARCADE_MIGRATED_MAX = 500
+const OFFER_ID_MAX = 200
+
+/** Stored migrated offer ids; anything else in the list is dropped. */
+export const gameArcadeOfferIdsOf = (raw: unknown): string[] =>
+  Array.isArray(raw)
+    ? raw.filter(
+        (one): one is string =>
+          typeof one === 'string' && one.length > 0 && one.length <= OFFER_ID_MAX
+      )
+    : []
+
+/**
+ * The offers the terminal's old 15-second countdown kept, each paid once up to the cap. Every one is
+ * recorded, the ones past the cap too, so a later migration pays none of them.
+ */
+export function migrateGameArcadeOffers(
+  current: GameArcadeCredits,
+  seen: readonly string[],
+  offered: readonly unknown[]
+): { next: GameArcadeCredits; seen: string[]; paid: number } {
+  const known = new Set(seen)
+  const fresh = [...new Set(gameArcadeOfferIdsOf(offered))].filter((one) => !known.has(one))
+  const credits = Math.min(GAME_ARCADE_CREDITS_MAX, current.credits + fresh.length)
+  return {
+    next: { ...current, credits },
+    seen: [...seen, ...fresh].slice(-GAME_ARCADE_MIGRATED_MAX),
+    paid: credits - current.credits
+  }
+}
+
 /** Two projects' ledgers folded into one: the larger, so a repeated adoption adds nothing. */
 export function laterGameArcadeCredits(
   current: GameArcadeCredits,

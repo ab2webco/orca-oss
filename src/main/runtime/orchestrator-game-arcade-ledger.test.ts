@@ -5,6 +5,7 @@ import type { GameArcadeCredits } from '../../shared/orchestrator-game-arcade-cr
 
 function ledgerWith(start: GameArcadeCredits, isMember = false) {
   let saved = start
+  const paidIds = new Set<string>()
   const changed: string[] = []
   const project: GameBoardProject = {
     key: 'repo:r1',
@@ -19,6 +20,14 @@ function ledgerWith(start: GameArcadeCredits, isMember = false) {
         const { next, result } = change(saved)
         saved = next ?? saved
         return result
+      },
+      migrateArcadeOffers: async (_key, offers) => {
+        const fresh = offers.filter(
+          (one): one is string => typeof one === 'string' && !paidIds.has(one)
+        )
+        fresh.forEach((one) => paidIds.add(one))
+        saved = { ...saved, credits: saved.credits + fresh.length }
+        return { paid: fresh.length, arcade: saved }
       }
     },
     projectOf: async () => project,
@@ -60,6 +69,20 @@ describe('GameArcadeLedger', () => {
   it('never lets a member spend its lead credits', async () => {
     await expect(
       ledgerWith(offered, true).ledger.apply({ worktreeId: 'wt' }, 'play')
+    ).rejects.toThrow(/lead/)
+  })
+
+  it("pays the terminal's kept offers into the lead's project and tells listeners only when it paid", async () => {
+    const { ledger, changed } = ledgerWith({ credits: 0, offer: null })
+    await expect(ledger.migrate({ worktreeId: 'wt' }, ['r-1', 'r-2'])).resolves.toEqual({
+      ok: true,
+      paid: 2,
+      arcade: { credits: 2, offer: null }
+    })
+    await expect(ledger.migrate({ worktreeId: 'wt' }, ['r-1'])).resolves.toMatchObject({ paid: 0 })
+    expect(changed).toEqual(['repo:r1'])
+    await expect(
+      ledgerWith(offered, true).ledger.migrate({ worktreeId: 'wt' }, ['r-1'])
     ).rejects.toThrow(/lead/)
   })
 })
