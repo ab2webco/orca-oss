@@ -57,12 +57,13 @@ describe('createFiguresPainter', () => {
     const { g } = recordingContext()
     painter.paint(g, frame())
     painter.paint(g, frame())
-    expect(backdrops).toBe(1)
-    painter.paint(g, frame({ width: 300 }))
+    // The backdrop and the one cloud sprite.
     expect(backdrops).toBe(2)
-    painter.dispose()
     painter.paint(g, frame({ width: 300 }))
     expect(backdrops).toBe(3)
+    painter.dispose()
+    painter.paint(g, frame({ width: 300 }))
+    expect(backdrops).toBe(5)
   })
 
   it('marks a member who needs the user with the attention colour', () => {
