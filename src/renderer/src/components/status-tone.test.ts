@@ -64,6 +64,13 @@ describe('status tone tokens', () => {
     }
   })
 
+  it('uses the approved dark defaults from the panel prototype', () => {
+    expect(resolveHex(DARK, 'status-attention')).toBe('#ff6568')
+    expect(resolveHex(DARK, 'status-warning')).toBe('#f5b342')
+    expect(resolveHex(DARK, 'status-info')).toBe('#4fc3f7')
+    expect(resolveHex(DARK, 'status-success')).toBe('#34d399')
+  })
+
   it('gives light and dark their own warning and info values', () => {
     expect(resolveHex(LIGHT, 'status-warning')).not.toBe(resolveHex(DARK, 'status-warning'))
     expect(resolveHex(LIGHT, 'status-info')).not.toBe(resolveHex(DARK, 'status-info'))

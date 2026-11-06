@@ -321,7 +321,7 @@
   --status-idle: var(--muted-foreground);
   --agent-question: var(--status-attention);
   --agent-question-text: color-mix(in srgb, var(--status-attention) 45%, white);
-  --status-success: #86efac;
+  --status-success: #34d399;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
   --workspace-status-done: #c7a594;
