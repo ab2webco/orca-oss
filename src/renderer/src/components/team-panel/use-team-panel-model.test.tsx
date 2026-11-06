@@ -2,17 +2,19 @@
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TeamMemberCard, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { useGameInboxAppState } from '@/components/game-inbox/game-inbox-app-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 
 const subscribe = vi.fn(() => () => {})
+const refresh = vi.fn()
 let publish: (source: TeamPanelModelSource) => void = () => {}
 vi.mock('./team-panel-model-poll', () => ({
   createTeamPanelModelPoller: (deps: { publish: typeof publish }) => {
     publish = deps.publish
-    return { subscribe }
+    return { subscribe, refresh }
   }
 }))
 vi.mock('@/store', () => ({
@@ -34,6 +36,9 @@ const { useTeamMemberOfTab, useTeamPanelKind, useTeamPanelModel } =
   await import('./use-team-panel-model')
 
 const roots: ReturnType<typeof createRoot>[] = []
+beforeEach(() => {
+  Object.defineProperty(window, 'api', { configurable: true, value: { runtime: {} } })
+})
 afterEach(async () => {
   await act(async () => {
     for (const root of roots.splice(0)) {
@@ -41,9 +46,11 @@ afterEach(async () => {
     }
   })
   subscribe.mockClear()
+  refresh.mockClear()
   useGameInboxAppState.setState({ hosts: [] })
   // Why: the model store is module state; a test's partial model must not reach the next test.
   publish({ section: { kind: 'loading' }, retry: null })
+  Reflect.deleteProperty(window, 'api')
 })
 
 async function mount(Probe: () => null): Promise<void> {
@@ -153,5 +160,34 @@ describe('Team model Inbox count', () => {
       kind: 'ready',
       value: { forYou: 2, waiting: 0, threads: 2, answered: 0 }
     })
+  })
+})
+
+describe('Team model refresh', () => {
+  // Why: an answer changes the Inbox count now; the 20 s poll alone left the badge stale.
+  it('re-reads when an owner question changes on this computer or a paired host', async () => {
+    let pushed: (() => void) | null = null
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        runtime: {
+          onGameOwnerQuestionsChanged: (callback: () => void) => {
+            pushed = callback
+            return () => {
+              pushed = null
+            }
+          }
+        }
+      }
+    })
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    ;(pushed as (() => void) | null)?.()
+    act(() => signalGameOwnerQuestionsChanged())
+
+    expect(refresh).toHaveBeenCalledTimes(2)
   })
 })

@@ -108,4 +108,34 @@ describe('createTeamPanelModelPoller', () => {
 
     expect(vi.mocked(all.modelOf).mock.calls.at(-1)?.[0]).toMatchObject({ repoId: 'repo-2' })
   })
+
+  // Why coalesce: an answer pushes a change signal per host, and each must not stack a game.state read.
+  it('re-reads on demand, folding a burst into one read after the one in flight', async () => {
+    let finish: (state: OrchestratorGameState) => void = () => {}
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+      .mockResolvedValue({ role: 'lead' })
+    const { all } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.refresh()
+    expect(all.readLeads).not.toHaveBeenCalled()
+
+    poller.subscribe(SCOPE)
+    await flush()
+    poller.refresh()
+    await flush()
+    expect(readState).toHaveBeenCalledTimes(2)
+
+    poller.refresh()
+    poller.refresh()
+    await flush()
+    expect(readState).toHaveBeenCalledTimes(2)
+
+    finish({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    await flush()
+    expect(readState).toHaveBeenCalledTimes(3)
+  })
 })

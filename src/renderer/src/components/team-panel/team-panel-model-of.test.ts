@@ -70,6 +70,7 @@ describe('teamPanelModelOf', () => {
     expect(teamPanelModelOf(args())).toBeNull()
   })
 
+  // Why one thread: the lead's own inbox holds what waits on it, not a ticket's thread.
   it('counts the Inbox from the questions and the lead inboxes it was given', () => {
     teamCardsOf.mockReturnValue(CARDS)
     const questions = [
@@ -80,7 +81,7 @@ describe('teamPanelModelOf', () => {
 
     expect(teamPanelModelOf(args({ questions }))?.inbox).toEqual({
       kind: 'ready',
-      value: { forYou: 2, waiting: 2, threads: 2, answered: 1 }
+      value: { forYou: 2, waiting: 2, threads: 1, answered: 1 }
     })
   })
 

@@ -280,6 +280,8 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     await expect(inbox.getByText('Merge #923 now or wait for #915 first?')).toHaveCount(0, {
       timeout: 60_000
     })
+    // Why 5 s: the badge follows the answer's change push, not the 20 s model poll.
+    await expect(inboxTab).not.toContainText('1', { timeout: 5_000 })
     await inbox.getByRole('tab', { name: /Answered/ }).click()
     await expect(inbox.getByText('You answered: Merge now')).toBeVisible({ timeout: 60_000 })
     await expect(inbox.getByText('The lead answered')).toBeVisible()

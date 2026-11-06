@@ -21,7 +21,8 @@ function inboxOf(
     value: {
       forYou: questions.filter((one) => !one.answer).length,
       waiting: inboxes.reduce((sum, one) => sum + one.waiting.length, 0),
-      threads: inboxes.length,
+      // Why not 'lead': that inbox holds what waits on the lead, which Waiting already counts.
+      threads: inboxes.filter((one) => one.key !== 'lead').length,
       answered: questions.filter((one) => one.answer).length
     }
   }
