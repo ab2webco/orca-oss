@@ -169,9 +169,11 @@ With two accounts in one organization, that blob could be the other account's li
 both into the account being switched away from and into the selected account.
 
 An organization match now counts as proof only when no other saved account shares that
-organization. Every managed write (read-back, switch-away, re-authentication, add) also refuses a
-blob whose refresh chain is another saved account's current chain
-(`claude-refresh-chain-ownership.ts`), whatever path produced it. This refusal only prevents new
+organization. The managed writes that take a blob Orca did not mint itself (runtime read-back,
+switch-away, scoped-item adoption, re-authentication, add, and the usage-panel read-back) also refuse
+a blob whose refresh chain is another saved account's current chain
+(`claude-refresh-chain-ownership.ts`). A token refresh Orca performs itself mints a new chain, so it
+needs no check. This refusal only prevents new
 aliases. An alias already on disk still needs one of the two accounts re-authenticated, which the
 Settings notice offers.
 
