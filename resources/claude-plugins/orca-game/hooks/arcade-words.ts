@@ -10,14 +10,8 @@ export type ArcadeWords = {
   ready: string
   paused: string
   held: string
-  offerTitle: string
-  unlocked: string
-  offerLeft: (seconds: number) => string
-  offerHeld: (seconds: number) => string
-  /** How to give the offer the keyboard while the prompt holds it. */
-  offerReach: string
-  play: string
-  pass: string
+  /** The scene's line when a perfect merge saves a play. */
+  saved: string
   over: (score: number) => string
   /** A run that ended above the best before it. */
   best: (score: number) => string
@@ -30,19 +24,13 @@ const EN: ArcadeWords = {
   opened:
     'Arcade: practice run in its own pane. j jumps; it earns no points or XP and closes with q or Esc.',
   offered:
-    'Arcade: a demo offer of a run. j plays, n passes; it closes by itself when the countdown ends and keeps no points.',
+    'Arcade: a demo of a perfect merge. A real one saves a play you start from the Team panel; the demo saves none.',
   title: 'Arcade · practice',
   jump: 'jump',
   ready: 'j to run',
   paused: 'Paused · j to go on',
   held: 'On hold · someone needs you',
-  offerTitle: 'Arcade · unlocked',
-  unlocked: 'Arcade unlocked!',
-  offerLeft: (seconds) => `A run is yours · ${seconds}s to choose`,
-  offerHeld: (seconds) => `On hold · someone needs you · ${seconds}s left`,
-  offerReach: 'ctrl+x tab, then j',
-  play: 'play',
-  pass: 'pass',
+  saved: 'Play saved · start it from the Team panel',
   over: (score) => `Game over · ${score} · j to run again`,
   best: (score) => `New best · ${score} · j to run again`,
   level: (level) => `Level ${level} · faster`,
@@ -53,19 +41,13 @@ const ES: ArcadeWords = {
   opened:
     'Arcade: partida de práctica en su propio panel. j salta; no da puntos ni XP y se cierra con q o Esc.',
   offered:
-    'Arcade: oferta de prueba de una partida. j juega, n pasa; se cierra sola al acabar la cuenta y no guarda puntos.',
+    'Arcade: prueba de un merge perfecto. Uno real guarda una partida que inicias desde el panel de Equipo; la prueba no guarda ninguna.',
   title: 'Arcade · práctica',
   jump: 'saltar',
   ready: 'j para correr',
   paused: 'En pausa · j para seguir',
   held: 'En espera · alguien te necesita',
-  offerTitle: 'Arcade · desbloqueado',
-  unlocked: '¡Arcade desbloqueado!',
-  offerLeft: (seconds) => `Te ganaste una partida · ${seconds}s para elegir`,
-  offerHeld: (seconds) => `En espera · alguien te necesita · quedan ${seconds}s`,
-  offerReach: 'ctrl+x tab y luego j',
-  play: 'jugar',
-  pass: 'pasar',
+  saved: 'Partida guardada · iníciala desde el panel de Equipo',
   over: (score) => `Fin · ${score} · j para otra`,
   best: (score) => `Nuevo récord · ${score} · j para otra`,
   level: (level) => `Nivel ${level} · más rápido`,

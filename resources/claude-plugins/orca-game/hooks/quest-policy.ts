@@ -20,7 +20,7 @@ export type QuestCommand =
   | { demo: true }
   | { arcade: true; isOffer?: true }
 
-/** The demo's arcade words: a practice run, or the offer a verified merge would make. */
+/** The demo's arcade words: a practice run, or the cheer a verified merge's saved play gets. */
 export const arcadeCommandOf = (word: string | undefined): QuestCommand | undefined =>
   word === 'arcade'
     ? { arcade: true }
