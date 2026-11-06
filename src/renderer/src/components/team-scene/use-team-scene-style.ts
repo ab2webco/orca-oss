@@ -1,16 +1,13 @@
 import { useMemo } from 'react'
-import { useAppStore } from '@/store'
 import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import { resolveOrchestratorGamePanel } from '../../../../shared/orchestrator-game-panel-layers'
+import { useTeamPanelSettingLayers } from '../team-panel/team-panel-setting-layers'
 
-/** The scene style after global Settings and this machine's choice for the project. */
+/** The scene style after global Settings, the project's orca.yaml and this machine's choice. */
 export function useTeamSceneStyle(): GamePanelStyle {
-  const repoId = useAppStore((s) =>
-    s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
+  const { global, project, local } = useTeamPanelSettingLayers()
+  return useMemo(
+    () => resolveOrchestratorGamePanel({ global, project, local }).style,
+    [global, local, project]
   )
-  const global = useAppStore((s) => s.settings?.orchestratorGame)
-  const local = useAppStore((s) =>
-    repoId ? s.settings?.orchestratorGameProjects?.[repoId] : undefined
-  )
-  return useMemo(() => resolveOrchestratorGamePanel({ global, local }).style, [global, local])
 }

@@ -32,7 +32,8 @@ vi.mock('@/store', () => ({
 const checkRuntimeHooks = vi.hoisted(() => vi.fn())
 vi.mock('@/runtime/runtime-hooks-client', () => ({ checkRuntimeHooks }))
 
-const { resetTeamPanelProjectLayers, useTeamPanelLook } = await import('./use-team-panel-look')
+const { useTeamPanelLook } = await import('./use-team-panel-look')
+const { resetTeamPanelProjectLayers } = await import('./team-panel-setting-layers')
 
 const yaml = (orchestratorGame: OrchestratorGameLayer | undefined) =>
   checkRuntimeHooks.mockResolvedValue({
@@ -111,6 +112,21 @@ describe('useTeamPanelLook', () => {
 
     expect(await looks(3)).toEqual(['display', 'display', 'display'])
     expect(checkRuntimeHooks).toHaveBeenCalledTimes(1)
+  })
+
+  // Why: like Settings, an orca.yaml edited by hand or unreadable at first shows on the next open.
+  it('reads orca.yaml again when the panel opens after every part closed', async () => {
+    yaml({ panel: { look: 'display' } })
+    expect(await looks(2)).toEqual(['display', 'display'])
+    await act(async () => {
+      for (const root of roots.splice(0)) {
+        root.unmount()
+      }
+    })
+
+    yaml({ panel: { look: 'plain' } })
+    expect(await looks()).toEqual(['plain'])
+    expect(checkRuntimeHooks).toHaveBeenCalledTimes(2)
   })
 
   // Why: a folder project has no orca.yaml to read.
